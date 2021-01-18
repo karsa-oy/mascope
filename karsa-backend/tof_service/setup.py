@@ -27,7 +27,7 @@ setuptools.setup(
         'asyncio',
         #'fsspec',
         'numpy',
-        'python-socketio<5',
+        'python-socketio',
     ],
     entry_points={
         'console_scripts': [

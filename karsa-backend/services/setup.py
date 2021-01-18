@@ -28,7 +28,7 @@ setuptools.setup(
         'dask[array]',
         'environs',
         'numpy',
-        'python-socketio<5',
+        'python-socketio',
         'xarray',
         'zarr',
     ],

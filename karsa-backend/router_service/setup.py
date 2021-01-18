@@ -27,7 +27,7 @@ setuptools.setup(
         'aiohttp_cors',
         'asyncio',
         'environs',
-        'python-socketio<5',
+        'python-socketio',
     ],
     entry_points={
         'console_scripts': [

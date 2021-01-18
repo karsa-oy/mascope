@@ -1,42 +1,26 @@
 ### Description 
-This project consists of two repositories
+This project contains karsa-electron - Karsa desktop client application.
 
-1. Karsa Desktop client application - https://bitbucket.org/kausiala/karsa-electron/src/master/  
-2. Karsa data processors (python code) - https://bitbucket.org/kausiala/karsa2020/src/master/
-
-The project is powered by self-consistent Portable Python 3.8.2 64-bit provided with the Karsa Desktop client.
-
-Directory structure  
-Karsa-Electron (Desktop client)  
-    |---- py_code Directory (karsa2020 repository)
-    |       |---- assets  
-    |       |---- doc  
-    |       |---- html  
-    |       |---- karsaorbi  
-    |       |---- karsatof  
-    |       |---- UIClasses  
-    |  
-    |---- py Directory (Contains portable Python)   
-    |---- Other Karsa Desktop js files  
+Front-end/back-end prototypes can be found here:
+1. Karsa Desktop client application - https://bitbucket.org/kausiala/karsa-electron/
+2. Karsa Router and backend services - https://gitlab.com/karsa_dev/karsa-backend
 
 
 ### Setup Requirements 
-* Node version 12.13.1  
-* yarn (package manager / recommended) or npm   
+* Node version 12.13.1
+* yarn (package manager / recommended) or npm 
 
 ### Project setup
-1) Clone Karsa Desktop repo and cd path-to-project-repo-clone from commandline
-
-2) then call install.bat in command line, this will clone other require repos and install the projects.  
+Call dev_setup.cmd to set up the project from the current repository.
 
 ### Compilation and hot-reloads for development
-1) for Web version (web version will display error, as it's customized for electron)  
+1) for Web version (web version will display error, as it's customized for electron)
 
-yarn serve  
+yarn serve
 
-2) for electron version (use this)  
+2) for electron version (use this)
 
-yarn electron:serve  
+yarn electron:serve
 
 ### Compilation and minify for production
 yarn build
@@ -44,8 +28,11 @@ yarn build
 ### Lints and fixes files
 yarn lint
 
-### Compile for electron at the end 
+### Compile and build distribution package
 yarn electron:build
+
+### Compile, build and publish distribution package (to github.com)
+yarn electron:publish
 
 ### Customize configuration
 See [Configuration Reference](https://cli.vuejs.org/config/).
