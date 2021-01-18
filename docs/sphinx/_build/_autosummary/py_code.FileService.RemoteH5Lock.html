@@ -1,0 +1,269 @@
+
+<!DOCTYPE html>
+
+<html lang="Python, JavaScript">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>py_code.FileService.RemoteH5Lock &#8212; Scenthound 0.1 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="py_code.InstrumentClient" href="py_code.InstrumentClient.html" />
+    <link rel="prev" title="py_code.FileService.FileServiceNamespace" href="py_code.FileService.FileServiceNamespace.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="py-code-fileservice-remoteh5lock">
+<h1>py_code.FileService.RemoteH5Lock<a class="headerlink" href="#py-code-fileservice-remoteh5lock" title="Permalink to this headline">¶</a></h1>
+<dl class="py class">
+<dt id="py_code.FileService.RemoteH5Lock">
+<em class="property">class </em><code class="sig-prename descclassname">py_code.FileService.</code><code class="sig-name descname">RemoteH5Lock</code><span class="sig-paren">(</span><em class="sig-param">filename</em>, <em class="sig-param">sio_client</em>, <em class="sig-param">namespace</em>, <em class="sig-param">lock=&lt;Lock(owner=None)&gt;</em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.FileService.RemoteH5Lock" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Remotely shared Lock object to synchronize file access</p>
+<p>Can be used in place of a <code class="xref py py-class docutils literal notranslate"><span class="pre">multiprocessing.Lock</span></code> object.
+<a class="reference internal" href="py_code.FileService.html#module-py_code.FileService" title="py_code.FileService"><code class="xref py py-mod docutils literal notranslate"><span class="pre">FileService</span></code></a> holds <code class="xref py py-class docutils literal notranslate"><span class="pre">Lock</span></code>
+objects for each file in the current
+<a class="reference internal" href="py_code.karsatof.kdatapool.KDataPool.html#py_code.karsatof.kdatapool.KDataPool" title="py_code.karsatof.kdatapool.KDataPool"><code class="xref py py-class docutils literal notranslate"><span class="pre">KDataPool</span></code></a>. RemoteH5Lock
+objects can be used by other services to request file read/write
+access to files in the pool.</p>
+<dl class="py attribute">
+<dt id="py_code.FileService.RemoteH5Lock.lock">
+<code class="sig-name descname">lock</code><a class="headerlink" href="#py_code.FileService.RemoteH5Lock.lock" title="Permalink to this definition">¶</a></dt>
+<dd><p>Lock instance</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>Lock</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="py_code.FileService.RemoteH5Lock.filename">
+<code class="sig-name descname">filename</code><a class="headerlink" href="#py_code.FileService.RemoteH5Lock.filename" title="Permalink to this definition">¶</a></dt>
+<dd><p>Full file path of the file the lock belongs to</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="py_code.FileService.RemoteH5Lock.sio">
+<code class="sig-name descname">sio</code><a class="headerlink" href="#py_code.FileService.RemoteH5Lock.sio" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="xref py py-class docutils literal notranslate"><span class="pre">socketio.Client</span></code> instance used to sync lock via
+<a class="reference internal" href="py_code.MainService.html#module-py_code.MainService" title="py_code.MainService"><code class="xref py py-mod docutils literal notranslate"><span class="pre">MainService</span></code></a></p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">socketio.Client</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="py_code.FileService.RemoteH5Lock.ns">
+<code class="sig-name descname">ns</code><a class="headerlink" href="#py_code.FileService.RemoteH5Lock.ns" title="Permalink to this definition">¶</a></dt>
+<dd><p>Namespace of the service acquiring the lock</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.FileService.RemoteH5Lock.__init__">
+<code class="sig-name descname">__init__</code><span class="sig-paren">(</span><em class="sig-param">filename</em>, <em class="sig-param">sio_client</em>, <em class="sig-param">namespace</em>, <em class="sig-param">lock=&lt;Lock(owner=None)&gt;</em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.FileService.RemoteH5Lock.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initialize self</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>filename</strong> (<em>str</em>) -- Full file path of the file the lock belongs to</p></li>
+<li><p><strong>sio_client</strong> (<a class="reference internal" href="py_code.DataVizService.XarrayCollector.html#py_code.DataVizService.XarrayCollector" title="py_code.DataVizService.XarrayCollector"><code class="xref py py-class docutils literal notranslate"><span class="pre">XarrayCollector</span></code></a>) -- socket.io Client instance used to sync lock via
+<a class="reference internal" href="py_code.MainService.html#module-py_code.MainService" title="py_code.MainService"><code class="xref py py-mod docutils literal notranslate"><span class="pre">MainService</span></code></a></p></li>
+<li><p><strong>namespace</strong> (<em>str</em>) -- Namespace of the service acquiring the lock</p></li>
+<li><p><strong>lock</strong> (<em>Lock</em><em>, </em><em>optional</em>) -- Lock instance to sync file writing, created if not given</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<p class="rubric">Methods</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.FileService.RemoteH5Lock.__init__" title="py_code.FileService.RemoteH5Lock.__init__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code></a>(filename, sio_client, namespace[, lock])</p></td>
+<td><p>Initialize self</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.FileService.RemoteH5Lock.acquire" title="py_code.FileService.RemoteH5Lock.acquire"><code class="xref py py-obj docutils literal notranslate"><span class="pre">acquire</span></code></a>([timeout])</p></td>
+<td><p>Try to acquire remote lock</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.FileService.RemoteH5Lock.release" title="py_code.FileService.RemoteH5Lock.release"><code class="xref py py-obj docutils literal notranslate"><span class="pre">release</span></code></a>()</p></td>
+<td><p>Release remote lock</p></td>
+</tr>
+</tbody>
+</table>
+<dl class="py method">
+<dt id="py_code.FileService.RemoteH5Lock.acquire">
+<code class="sig-name descname">acquire</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">timeout</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.FileService.RemoteH5Lock.acquire" title="Permalink to this definition">¶</a></dt>
+<dd><p>Try to acquire remote lock</p>
+<p>Emit 'file_write_request' with the set 'filename',
+'timeout' and 'ns' to be forwarded via MainService to
+FileService. FileService will emit response
+'write_lock_acquired' (via MainService) to the set
+namespace.</p>
+<p>To properly handle the response, the emitting Client
+Namespace should implement:</p>
+<blockquote>
+<div><dl>
+<dt>def on_write_lock_acquired(self, data):</dt><dd><p>acquired = data.get('lock_acquired')
+if acquired:</p>
+<blockquote>
+<div><p>remote_lock.lock.release()</p>
+</div></blockquote>
+</dd>
+</dl>
+</div></blockquote>
+<p>Where remote_lock is the instance of this class to  be
+acquired.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>timeout</strong> (<em>int</em><em> or </em><em>None</em>) -- Timeout in seconds</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><strong>acquired</strong> -- Returns True if the lock was acquired</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.FileService.RemoteH5Lock.release">
+<code class="sig-name descname">release</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#py_code.FileService.RemoteH5Lock.release" title="Permalink to this definition">¶</a></dt>
+<dd><p>Release remote lock</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">Scenthound</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="..\..\frontend.html#http://">Front-end</a></li>
+<li class="toctree-l1"><a class="reference external" href="..\..\frontend_deprecated.html#http://">Front-end deprecated</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="py_code.html">py_code</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="py_code.DataVizService.html">py_code.DataVizService</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="py_code.FileService.html">py_code.FileService</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="py_code.FileService.main.html">py_code.FileService.main</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.FileService.FileServiceNamespace.html">py_code.FileService.FileServiceNamespace</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">py_code.FileService.RemoteH5Lock</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.InstrumentClient.html">py_code.InstrumentClient</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.InstrumentService.html">py_code.InstrumentService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.MainService.html">py_code.MainService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.UIClasses.html">py_code.UIClasses</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.UIProperties.html">py_code.UIProperties</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.app.html">py_code.app</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.karsaorbi.html">py_code.karsaorbi</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.karsatof.html">py_code.karsatof</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.kcassettestation.html">py_code.kcassettestation</a></li>
+</ul>
+</li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="py_code.html">py_code</a><ul>
+  <li><a href="py_code.FileService.html">py_code.FileService</a><ul>
+      <li>Previous: <a href="py_code.FileService.FileServiceNamespace.html" title="previous chapter">py_code.FileService.FileServiceNamespace</a></li>
+      <li>Next: <a href="py_code.InstrumentClient.html" title="next chapter">py_code.InstrumentClient</a></li>
+  </ul></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Karsa Ltd..
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.1.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/_autosummary/py_code.FileService.RemoteH5Lock.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

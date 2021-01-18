@@ -1,0 +1,569 @@
+# -*- coding: utf-8 -*-
+"""File Service
+
+This script runs the file service for Karsa Tarkka TOF system.
+
+FileService connects to the :mod:`~py_code.MainService` via socket.io, and handles
+file i/o synchronization. It holds in memory a :class:`~py_code.karsatof.kdatapool.KDataPool`
+instance of the currently selected data path.
+      
+Created on Thu May  7 12:43:13 2020
+"""
+
+import os
+import sys
+import getopt
+import subprocess
+import asyncio
+import socketio
+import xarray
+import zarr
+import numpy as np
+import dask.array as da
+
+from multiprocessing import Lock
+
+from karsatof.kcollector import ExtendableDataArray
+from karsatof.kdatapool import DataPool
+from helpers import BaseClientNamespace
+
+# TODO: Make configuration file for the paths
+data_path = 'Data'
+projects_path = 'Projects'
+datapool = DataPool(data_path, projects_path)
+
+
+class FileServiceNamespace(BaseClientNamespace):
+    """ python-socket.io client namespace for connecting to MainService """
+
+    rooms = [
+        'acquisition_coordinates',
+        'acquired_spectrum',
+        'acquired_tps_data',
+        'acquisition_started',
+        'acquisition_finished',
+        'data_request',
+        'experiment_selected',
+        'experiments',
+        'import_sample_table_datetime_range',
+        'project_selected',
+        'projects',
+        'sample_attributes',
+        'service_state',
+        'tps_data_request',
+        'tps_parameter_info',
+        ]
+
+    service_state = dict(
+        projects = dict(value=datapool.get_projects()),
+    )
+
+    # ========== UI requests ==========
+    async def on_data_request(self, data):
+        
+        print("Data request: %s" %str(data))
+
+        global datapool
+        global signal_cache
+
+        filename = data.get('filename', None)
+        if filename is None:
+            raise ValueError("Received data_request without filename")
+        
+        mz_range = data.get('mz_range', None)
+        t_range = data.get('t_range', None)
+        
+        if filename not in signal_cache.keys():
+            filename_zarr = base_to_zarr_filename(filename, 'signal')
+            signal_array = open_mfzarr(filename_zarr)
+            signal_cache.update({filename: signal_array})
+        else:
+            signal_array = signal_cache.get(filename)
+            if isinstance(signal_array, ExtendableDataArray):
+                signal_array = signal_array.data_array.to_dataset()
+
+        set_figure_ranges = False
+        if mz_range is None:
+            mz0 = float( signal_array.mz[0] )
+            mz1 = float( signal_array.mz[-1] )
+            mz_range = [mz0, mz1]
+            set_figure_ranges = True
+        if t_range is None:
+            t0 = float( signal_array.time[0] )
+            t1 = float( signal_array.time[-1] )
+            t_range = [t0, t1]
+            print("t_range: %s" %str(t_range))
+            
+        signal = signal_array.signal.sel(
+                    mz=slice(mz_range[0], mz_range[1]),
+                    time=slice(t_range[0], t_range[1])
+                    )
+
+        mz = signal.mz.values.astype(np.float32)
+        t = signal.time.values.astype(np.float32)
+
+        cookies = data['cookies']
+        await emit_client_notification(
+                            'data_stream_coordinates',
+                            {'filename': filename,
+                             'mz': mz.tobytes(),
+                             'time': t.tobytes(),
+                             'mz_range': mz_range,
+                             't_range': t_range,
+                             'set_figure_ranges': set_figure_ranges,
+                             'cookies': cookies,
+                             },
+                            no_data_logging=True
+                            )
+        await asyncio.sleep(0)
+        for i, spec_array in enumerate(signal.transpose()):
+            spec = spec_array.values
+            ti = float( spec_array.time )
+            await emit_client_notification('loaded_spectrum',
+                                           {'filename': filename,
+                                            'i': i,
+                                            'spec': spec.tobytes(),
+                                            'mz_range': mz_range,
+                                            't_range': t_range,
+                                            't': ti,
+                                            'cookies': cookies,
+                                            },
+                                           no_data_logging=True
+                                           )
+            await asyncio.sleep(0)
+        await emit_client_notification('data_stream_finished',
+                                       {'filename': filename,
+                                        'mz_range': mz_range,
+                                        't_range': t_range,
+                                        'cookies': cookies,
+                                        },
+                                       no_data_logging=True
+                                       )
+    
+    async def on_experiment_selected(self, data):
+        experiment = data.get('id', '')
+        cookies = data.get('cookies', {})
+        if experiment == '':
+            await self.emit_client_notification(
+                            'samples',
+                            {'rows': [],
+                             'cols': [],
+                             'cookies': cookies
+                             },
+                            no_data_logging=False
+                            )
+            return
+
+        attributes = data.get('attributes')
+        project = attributes.get('project')
+        global datapool
+        if project not in datapool.pool.keys():
+            raise ValueError("Requested project does not exist!")
+
+        project_experiments = datapool.pool.get(project).keys()
+        # If experiment does not exist, create it
+        if experiment not in project_experiments:
+            # Create new experiment directory
+            datapool.new_experiment(project, experiment, attributes)
+            # Update UI
+            project_experiments = datapool.get_experiments(project)
+            await emit_client_notification('experiments',
+                                           dict(value=project_experiments,
+                                                cookies=cookies
+                                                )
+                                           )
+        # Update sample table data
+        await self.emit_client_notification(
+                            'samples',
+                            {**datapool.get_sample_table(project, experiment),
+                             'cookies': cookies
+                             },
+                            no_data_logging=False
+                            )
+
+    async def on_import_sample_table_datetime_range(self, data):
+        global datapool
+        cookies = data.get('cookies', {})
+        # Update sample table data
+        await self.emit_client_notification(
+                            'importable_samples',
+                            {**datapool.get_sample_table(),
+                             'cookies': cookies
+                             },
+                            no_data_logging=False
+                            )
+
+    async def on_project_selected(self, data):
+        global datapool
+        project = data.get('id', '')
+        cookies = data.get('cookies', {})
+        if project == '':
+            await emit_client_notification('experiments', dict(value=[], cookies=cookies))
+            return
+
+        attributes = data.get('attributes')
+        if project not in datapool.pool.keys():
+            print("Starting new project: %s" %project)
+            datapool.new_project(project, attributes)
+            projects = datapool.get_projects()
+            await emit_client_notification('projects', dict(value=projects, cookies=cookies))
+
+        experiments = datapool.get_experiments(project)
+        await emit_client_notification('experiments', dict(value=experiments, cookies=cookies))
+
+    async def on_sample_attributes(self, data):
+        """Write attributes of a sample to disk. Make a symbolic link from
+        the sample directory in 'data_path' to 'project_path'/experiment 
+
+        Parameters
+        ----------
+        data : [type]
+            [description]
+
+        Raises
+        ------
+        ValueError
+            [description]
+        """
+        global data_path
+        global projects_path
+        global datapool
+
+        sample = data.get('id', '')
+        attributes = data.get('attributes')
+        cookies = data.get('cookies', {})
+        if sample == '':
+            raise ValueError("Received write_sample_attributes without 'id'")
+        project = attributes.get('project', '')
+        if project == '':
+            raise ValueError("Received write_sample_attributes without 'project'")
+        experiment = attributes.get('experiment', '')
+        if experiment == '':
+            raise ValueError("Received write_sample_attributes without 'experiment'")
+
+        attributes.update({'id': sample})
+        datapool.new_sample(project, experiment, sample, attributes)
+
+        # Force experiment update to push sample data to UI
+        data.update( {'id': experiment, 'cookies': cookies} )
+        await self.on_experiment_selected(data)
+
+    async def on_tps_data_request(self, data):
+        
+        print("TPS data request: %s" %str(data))
+
+        global tps_cache
+        
+        figure_ranges = data.pop('figure_ranges', {})
+        filename = figure_ranges.get('filename', None)
+        if filename is None:
+            raise ValueError("Received data_request without filename")
+        
+        selected = data.get('tps_parameters_selected', None) 
+        if selected is None:
+            return   
+        parameters = [ val.get('label') for key, val in selected.items() ]   
+
+        if filename not in tps_cache.keys():
+            filename = base_to_zarr_filename(filename, '_tps')
+            sample_array = open_mfzarr(filename)
+            tps_cache.update({filename: sample_array})
+        else:
+            sample_array = tps_cache.get(filename)
+
+        t_range = figure_ranges.get('t_range', None)
+        if t_range is None:
+            t0 = float( sample_array.time[0] )
+            t1 = float( sample_array.time[-1] )
+            t_range = [t0, t1]
+            
+        tps_data = sample_array.data_array.loc[
+                                    parameters,
+                                    t_range[0]:t_range[1],
+                                    ]
+        t = tps_data.time.values.astype(np.float32)
+
+        cookies = data['cookies']
+        await emit_client_notification(
+                            'tps_data_stream_coordinates',
+                            {'filename': filename,
+                             'parameters': parameters,
+                             'time': t.tobytes(),
+                             'set_tps_parameters': False,
+                             'cookies': cookies,
+                             },
+                            no_data_logging=True
+                            )
+        await asyncio.sleep(0)
+        for i, param_array in enumerate(tps_data.transpose()):
+            param_ys = param_array.values
+            ti = float( param_array.time )
+            await emit_client_notification('loaded_tps_data',
+                                           {'filename': filename,
+                                            'i': i,
+                                            'tps_data': param_ys.tobytes(),
+                                            't': ti,
+                                            'cookies': cookies,
+                                            },
+                                           no_data_logging=True
+                                           )
+            await asyncio.sleep(0)
+        await emit_client_notification('tps_data_stream_finished',
+                                       {'filename': filename,
+                                        'cookies': cookies,
+                                       },
+                                       no_data_logging=True
+                                      )
+    
+    # ---------------------------------
+
+    # ========== MS data ==========
+    async def on_acquisition_coordinates(self, data):
+        """Initialize acquisition cache with received coordinates
+
+        Parameters
+        ----------
+        data : dict
+            keys: 'mz' and 'time'
+        """
+
+        global signal_cache
+
+        filename_base = data.get('filename')
+        print("Start acquiring sample: %s" %filename_base)
+        filename = base_to_zarr_filename(filename_base, 'signal')
+        
+        # Check if sample and dataset with given name exists
+        # if os.path.isdir(filename):
+        #     print("Dataset %s exists already" %filename)
+        #     i = 0
+        #     while True:
+        #         new_filename_base = filename_base + '_%s' % i
+        #         filename = base_to_zarr_filename(new_filename_base, 'signal')
+        #         if os.path.isdir(filename):
+        #             i += 1
+        #             continue
+        #         else:
+        #             filename_base = new_filename_base
+        #             break
+        
+        print("Writing signal into: %s" %filename)
+
+        mz = np.frombuffer( data.get('mz'), dtype=np.float32 )
+        signal_array = ExtendableDataArray(path=filename,
+                                           array_module=da
+                                           )
+        signal_array.init_array(dims=('mz', 'time'),
+                                coords=[mz, []],
+                                name='signal'
+                                )
+        signal_cache.update({filename_base: signal_array})
+
+    async def on_acquired_spectrum(self, data):
+        """Receive new spectrum, add to cache
+
+        Parameters
+        ----------
+        data : dict
+            keys: 'filename', 'i', 't' and 'spec'
+        """
+        
+        global signal_cache
+
+        # Get package index
+        i = data.get('i')
+        print(i)
+        filename_base = data.get('filename')
+
+        ti = np.array( [data.get('t')], dtype=np.float32 )
+        spec = np.frombuffer(data.get('spec'), dtype=np.float32)
+        spec = spec.reshape(-1, 1)
+        signal_array = signal_cache.get(filename_base)
+        mz = signal_array.data_array.mz
+        await signal_array.extend_array(spec,
+                                        [mz, ti],
+                                        'time'
+                                        )
+
+    async def on_acquisition_finished(self, data):
+        global signal_cache
+        global tps_cache
+
+        filename_base = data.get('filename')
+        filename = base_to_zarr_filename(filename_base, 'signal')
+        print("Finished acquiring file: %s" %filename)
+
+        signal_array = signal_cache.get(filename_base)
+        await signal_array.flush()
+
+        tps_array = tps_cache.get(filename_base)
+        await tps_array.flush()
+
+    # ------------------------------
+    
+    # ========== TPS data ==========
+    async def on_tps_parameter_info(self, data):
+        
+        global tps_cache
+
+        filename_base = data.get('filename')
+        filename = base_to_zarr_filename(filename_base, 'tps')
+
+        # Check if sample and dataset with given name exists
+        # if os.path.isdir(filename):
+        #     print("Dataset %s exists already" %filename)
+        #     i = 0
+        #     while True:
+        #         new_filename_base = filename_base + '_%s' % i
+        #         filename = base_to_zarr_filename(new_filename_base, 'tps')
+        #         if os.path.isdir(filename):
+        #             i += 1
+        #             continue
+        #         else:
+        #             filename_base = new_filename_base
+        #             break
+
+        print("Writing TPS data into: %s" %filename)
+
+        tps_info = data.get('tps_info')
+        
+        tps_array = ExtendableDataArray(path=filename,
+                                        array_module=da
+                                        )
+        tps_array.init_array(dims=('parameter', 'time'),
+                             coords=[tps_info, []],
+                             name='tps'
+                             )
+        tps_cache.update({filename_base: tps_array})
+
+    async def on_acquired_tps_data(self, data):
+
+        global tps_cache
+        filename_base = data.get('filename')
+        ti = np.array( [data.get('t')], dtype=np.float32 )
+        tps_data = np.frombuffer( data.get('tps_data'), dtype=np.float32)
+        tps_data = tps_data.reshape(-1, 1)
+        tps_array = tps_cache.get(filename_base)
+        tps_info = tps_array.data_array.parameter
+        await tps_array.extend_array(tps_data,
+                                     [tps_info, ti],
+                                     'time'
+                                     )
+    # ------------------------------
+
+# ---------- Utility functions ----------
+def base_to_zarr_filename(base_filename, variable):
+    global data_path
+    filepath = os.path.join(data_path, base_filename)
+    zarr_filename = variable + os.extsep + 'zarr'
+    return os.path.join(filepath, zarr_filename)
+
+def open_mfzarr(path, mode='r', concat_dim='time'):    
+    if not os.path.exists(path):
+        raise ValueError("Zarr file %s does not exist" %path)
+    z = zarr.open(path, mode=mode)
+    groups = [ g[0] for g in z.groups() ]
+    x = xarray.concat([ xarray.open_zarr(path, g) for g in groups ],
+                      concat_dim
+                      )
+    x.attrs = z.attrs.asdict()
+    return x
+    
+def read_zarr_attributes(filepath):
+    if not os.path.exists(filepath):
+        raise ValueError("Zarr file %s does not exist" %filepath)
+    z = zarr.open(filepath, mode='r')
+    attributes = z.attrs.asdict()
+    return attributes
+
+def write_zarr_attributes(filepath, attributes):
+    if not os.path.exists(filepath):
+        raise ValueError("Zarr file %s does not exist" %filepath)
+    z = zarr.open(filepath, mode='a')
+    z.attrs.update(attributes)
+# ---------------------------------------
+
+async def emit_client_notification(name, value, **kwarg):
+    global root_ns
+    await root_ns.emit_client_notification(name, value, **kwarg)
+
+async def init_service(addr):
+    global sio
+    global root_ns
+
+    while True:
+        try:
+            print('Connecting Router...')
+            await sio.connect(addr, namespaces=['/',])
+            break
+        except Exception as e:
+            print("Failed.", e)
+            await sio.sleep(2)
+    root_ns = sio.namespace_handlers['/']
+    
+
+
+async def main():
+    global sio
+    while True:
+        await sio.sleep(1)
+
+
+sio = None
+root_ns = None
+
+acquired_file = None
+acquired_file_lock = Lock()
+acquired_file_lock.acquire()
+
+signal_cache = {}
+tps_cache = {}
+
+
+def parse_cmd_args():
+    """Parse command line arguments
+    Allowed command line arguments
+    ------------------------------
+    --url : string
+        IP address (localhost)
+    --port : int
+        Server port (5010)
+    """
+    url = 'localhost'
+    port = 5010
+    opts, _ = getopt.getopt(
+                    sys.argv[1:],
+                    'o:v',
+                    ['url=', 'port=', ]
+                    )
+    for opt, arg in opts:
+        if opt=='--url':
+            url = arg
+        if opt=='--port':
+            try:
+                port = int(arg)
+            except:
+                print('Invalid command line argument: %s=%s' %(opt, arg))
+    return url, port
+
+
+async def run_service(url, port):
+    addr = f'{url}:{port}'
+    if not addr.startswith('http'):
+        addr = 'http://' + addr
+    await init_service(addr)
+    await main()
+
+
+def run():
+    global sio
+
+    url, port = parse_cmd_args()
+    loop = asyncio.get_event_loop()
+    sio = socketio.AsyncClient()
+    sio.register_namespace(FileServiceNamespace('/'))
+    loop.run_until_complete(run_service(url, port))
+
+
+if __name__=='__main__':
+    run()

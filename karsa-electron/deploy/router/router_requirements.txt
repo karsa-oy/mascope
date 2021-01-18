@@ -1,0 +1,5 @@
+aiohttp==3.7.2
+aiohttp_cors==0.7.0
+asyncio==3.4.3
+environs==7.1.0
+python-socketio==4.6.1

@@ -1,0 +1,188 @@
+
+<!DOCTYPE html>
+
+<html lang="Python, JavaScript">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>py_code.InstrumentClient.KAcquisitionAdapter &#8212; Scenthound 0.1 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="py_code.InstrumentClient.ObjTraversableProxy" href="py_code.InstrumentClient.ObjTraversableProxy.html" />
+    <link rel="prev" title="py_code.InstrumentClient.get_proxy_object" href="py_code.InstrumentClient.get_proxy_object.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="py-code-instrumentclient-kacquisitionadapter">
+<h1>py_code.InstrumentClient.KAcquisitionAdapter<a class="headerlink" href="#py-code-instrumentclient-kacquisitionadapter" title="Permalink to this headline">¶</a></h1>
+<dl class="py class">
+<dt id="py_code.InstrumentClient.KAcquisitionAdapter">
+<em class="property">class </em><code class="sig-prename descclassname">py_code.InstrumentClient.</code><code class="sig-name descname">KAcquisitionAdapter</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">enable_complex</span><span class="o">=</span><span class="default_value">False</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.InstrumentClient.KAcquisitionAdapter" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Adapter to use KAcquisition proxy in place of local KAcquisition instance</p>
+<p>...</p>
+<dl class="py attribute">
+<dt id="py_code.InstrumentClient.KAcquisitionAdapter.kacq_proxy">
+<code class="sig-name descname">kacq_proxy</code><a class="headerlink" href="#py_code.InstrumentClient.KAcquisitionAdapter.kacq_proxy" title="Permalink to this definition">¶</a></dt>
+<dd><p>Pyro4 Proxy object for KAcquisition instance in InstrumentService</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>Proxy</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="py_code.InstrumentClient.KAcquisitionAdapter.kacq_complex_proxy">
+<code class="sig-name descname">kacq_complex_proxy</code><a class="headerlink" href="#py_code.InstrumentClient.KAcquisitionAdapter.kacq_complex_proxy" title="Permalink to this definition">¶</a></dt>
+<dd><p>Traversable Proxy object for KAcquisition instance in
+InstrumentService, allowing to call nested methods</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Using complex proxy objects may open a security
+vulnerability: Dotted name (object traversal)</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="py_code.InstrumentClient.ObjTraversableProxy.html#py_code.InstrumentClient.ObjTraversableProxy" title="py_code.InstrumentClient.ObjTraversableProxy">ObjTraversableProxy</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.InstrumentClient.KAcquisitionAdapter.__init__">
+<code class="sig-name descname">__init__</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">enable_complex</span><span class="o">=</span><span class="default_value">False</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.InstrumentClient.KAcquisitionAdapter.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initialize self.  See help(type(self)) for accurate signature.</p>
+</dd></dl>
+
+<p class="rubric">Methods</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.InstrumentClient.KAcquisitionAdapter.__init__" title="py_code.InstrumentClient.KAcquisitionAdapter.__init__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code></a>([enable_complex])</p></td>
+<td><p>Initialize self.</p></td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">Scenthound</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="..\..\frontend.html#http://">Front-end</a></li>
+<li class="toctree-l1"><a class="reference external" href="..\..\frontend_deprecated.html#http://">Front-end deprecated</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="py_code.html">py_code</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="py_code.DataVizService.html">py_code.DataVizService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.FileService.html">py_code.FileService</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="py_code.InstrumentClient.html">py_code.InstrumentClient</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="py_code.InstrumentClient.get_proxy_object.html">py_code.InstrumentClient.get_proxy_object</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">py_code.InstrumentClient.KAcquisitionAdapter</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.InstrumentClient.ObjTraversableProxy.html">py_code.InstrumentClient.ObjTraversableProxy</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.InstrumentService.html">py_code.InstrumentService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.MainService.html">py_code.MainService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.UIClasses.html">py_code.UIClasses</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.UIProperties.html">py_code.UIProperties</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.app.html">py_code.app</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.karsaorbi.html">py_code.karsaorbi</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.karsatof.html">py_code.karsatof</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.kcassettestation.html">py_code.kcassettestation</a></li>
+</ul>
+</li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="py_code.html">py_code</a><ul>
+  <li><a href="py_code.InstrumentClient.html">py_code.InstrumentClient</a><ul>
+      <li>Previous: <a href="py_code.InstrumentClient.get_proxy_object.html" title="previous chapter">py_code.InstrumentClient.get_proxy_object</a></li>
+      <li>Next: <a href="py_code.InstrumentClient.ObjTraversableProxy.html" title="next chapter">py_code.InstrumentClient.ObjTraversableProxy</a></li>
+  </ul></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Karsa Ltd..
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.1.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/_autosummary/py_code.InstrumentClient.KAcquisitionAdapter.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

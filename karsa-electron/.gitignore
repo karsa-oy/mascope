@@ -1,0 +1,15 @@
+# node module directory
+node_modules
+py
+py_code
+tofwerk
+.env
+requirements.txt
+dist_electron
+dist
+*.lock
+*.log
+.vagrant
+Data/
+Projects/
+cert

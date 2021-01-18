@@ -1,0 +1,421 @@
+
+<!DOCTYPE html>
+
+<html lang="Python, JavaScript">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>py_code.karsatof.kworker.KEncoder &#8212; Scenthound 0.1 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="py_code.karsatof.lib" href="py_code.karsatof.lib.html" />
+    <link rel="prev" title="py_code.karsatof.kworker.init_encoders" href="py_code.karsatof.kworker.init_encoders.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="py-code-karsatof-kworker-kencoder">
+<h1>py_code.karsatof.kworker.KEncoder<a class="headerlink" href="#py-code-karsatof-kworker-kencoder" title="Permalink to this headline">¶</a></h1>
+<dl class="py class">
+<dt id="py_code.karsatof.kworker.KEncoder">
+<em class="property">class </em><code class="sig-prename descclassname">py_code.karsatof.kworker.</code><code class="sig-name descname">KEncoder</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">alpha</span></em>, <em class="sig-param"><span class="n">queue_in</span></em>, <em class="sig-param"><span class="n">queue_out</span></em>, <em class="sig-param"><span class="n">event_active</span></em>, <em class="sig-param"><span class="n">D_shape</span></em>, <em class="sig-param"><span class="n">D_data</span></em>, <em class="sig-param"><span class="n">D_indices</span></em>, <em class="sig-param"><span class="n">D_indptr</span></em>, <em class="sig-param"><span class="n">error_log</span><span class="o">=</span><span class="default_value">False</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kworker.KEncoder" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">multiprocessing.context.Process</span></code></p>
+<p>Process to perform SparseCoding to a segment of mass spectrum</p>
+<dl class="py attribute">
+<dt id="py_code.karsatof.kworker.KEncoder.alpha">
+<code class="sig-name descname">alpha</code><a class="headerlink" href="#py_code.karsatof.kworker.KEncoder.alpha" title="Permalink to this definition">¶</a></dt>
+<dd><p>Regularization parameter for the SparseCoder</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>Value</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="py_code.karsatof.kworker.KEncoder.queue_in">
+<code class="sig-name descname">queue_in</code><a class="headerlink" href="#py_code.karsatof.kworker.KEncoder.queue_in" title="Permalink to this definition">¶</a></dt>
+<dd><p>Queue to read signal from</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>Queue</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="py_code.karsatof.kworker.KEncoder.queue_out">
+<code class="sig-name descname">queue_out</code><a class="headerlink" href="#py_code.karsatof.kworker.KEncoder.queue_out" title="Permalink to this definition">¶</a></dt>
+<dd><p>Queue to put results into</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>Queue</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="py_code.karsatof.kworker.KEncoder.event_active">
+<code class="sig-name descname">event_active</code><a class="headerlink" href="#py_code.karsatof.kworker.KEncoder.event_active" title="Permalink to this definition">¶</a></dt>
+<dd><p>Process active flag</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>Event</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="py_code.karsatof.kworker.KEncoder.D">
+<code class="sig-name descname">D</code><a class="headerlink" href="#py_code.karsatof.kworker.KEncoder.D" title="Permalink to this definition">¶</a></dt>
+<dd><p>SparseCoder dictionary, sparse matrix whose data is stored in
+RawArrays and shared among all KEncoder processes</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>csr</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="py_code.karsatof.kworker.KEncoder.error_log">
+<code class="sig-name descname">error_log</code><a class="headerlink" href="#py_code.karsatof.kworker.KEncoder.error_log" title="Permalink to this definition">¶</a></dt>
+<dd><p>Log errors to txt file</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kworker.KEncoder.__init__">
+<code class="sig-name descname">__init__</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">alpha</span></em>, <em class="sig-param"><span class="n">queue_in</span></em>, <em class="sig-param"><span class="n">queue_out</span></em>, <em class="sig-param"><span class="n">event_active</span></em>, <em class="sig-param"><span class="n">D_shape</span></em>, <em class="sig-param"><span class="n">D_data</span></em>, <em class="sig-param"><span class="n">D_indices</span></em>, <em class="sig-param"><span class="n">D_indptr</span></em>, <em class="sig-param"><span class="n">error_log</span><span class="o">=</span><span class="default_value">False</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kworker.KEncoder.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initialize self</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>alpha</strong> (<em>Value</em>) -- Regularization parameter for the SparseCoder</p></li>
+<li><p><strong>queue_in</strong> (<em>Queue</em>) -- Queue to read signal from</p></li>
+<li><p><strong>queue_out</strong> (<em>Queue</em>) -- Queue to put results into</p></li>
+<li><p><strong>event_active</strong> (<em>Event</em>) -- Process active flag</p></li>
+<li><p><strong>D_shape</strong> (<em>tuple</em>) -- Dictionary shape</p></li>
+<li><p><strong>D_data</strong> (<em>RawArray</em>) -- Dictionary data</p></li>
+<li><p><strong>D_indices</strong> (<em>RawArray</em>) -- Dictionary indices</p></li>
+<li><p><strong>D_indptr</strong> (<em>RawArray</em>) -- Dictionary index pointer</p></li>
+<li><p><strong>error_log</strong> (<em>bool</em><em>, </em><em>optional</em>) -- Log errors to txt file, by default False</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<p class="rubric">Methods</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.karsatof.kworker.KEncoder.__init__" title="py_code.karsatof.kworker.KEncoder.__init__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code></a>(alpha, queue_in, queue_out, ...[, ...])</p></td>
+<td><p>Initialize self</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.karsatof.kworker.KEncoder.close" title="py_code.karsatof.kworker.KEncoder.close"><code class="xref py py-obj docutils literal notranslate"><span class="pre">close</span></code></a>()</p></td>
+<td><p>Close the Process object.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.karsatof.kworker.KEncoder.encode" title="py_code.karsatof.kworker.KEncoder.encode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">encode</span></code></a>(**kwargs)</p></td>
+<td><p>Function that performs SparseCoding for a segment of mass spectrum</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.karsatof.kworker.KEncoder.initialize_logging" title="py_code.karsatof.kworker.KEncoder.initialize_logging"><code class="xref py py-obj docutils literal notranslate"><span class="pre">initialize_logging</span></code></a>()</p></td>
+<td><p>Reroute stderr of the process to file, for debugging</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.karsatof.kworker.KEncoder.is_alive" title="py_code.karsatof.kworker.KEncoder.is_alive"><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_alive</span></code></a>()</p></td>
+<td><p>Return whether process is alive</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.karsatof.kworker.KEncoder.join" title="py_code.karsatof.kworker.KEncoder.join"><code class="xref py py-obj docutils literal notranslate"><span class="pre">join</span></code></a>([timeout])</p></td>
+<td><p>Wait until child process terminates</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.karsatof.kworker.KEncoder.kill" title="py_code.karsatof.kworker.KEncoder.kill"><code class="xref py py-obj docutils literal notranslate"><span class="pre">kill</span></code></a>()</p></td>
+<td><p>Terminate process; sends SIGKILL signal or uses TerminateProcess()</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.karsatof.kworker.KEncoder.run" title="py_code.karsatof.kworker.KEncoder.run"><code class="xref py py-obj docutils literal notranslate"><span class="pre">run</span></code></a>()</p></td>
+<td><p>Main loop</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.karsatof.kworker.KEncoder.start" title="py_code.karsatof.kworker.KEncoder.start"><code class="xref py py-obj docutils literal notranslate"><span class="pre">start</span></code></a>()</p></td>
+<td><p>Start child process</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.karsatof.kworker.KEncoder.terminate" title="py_code.karsatof.kworker.KEncoder.terminate"><code class="xref py py-obj docutils literal notranslate"><span class="pre">terminate</span></code></a>()</p></td>
+<td><p>Terminate process; sends SIGTERM signal or uses TerminateProcess()</p></td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Attributes</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">authkey</span></code></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.karsatof.kworker.KEncoder.daemon" title="py_code.karsatof.kworker.KEncoder.daemon"><code class="xref py py-obj docutils literal notranslate"><span class="pre">daemon</span></code></a></p></td>
+<td><p>Return whether process is a daemon</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.karsatof.kworker.KEncoder.exitcode" title="py_code.karsatof.kworker.KEncoder.exitcode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">exitcode</span></code></a></p></td>
+<td><p>Return exit code of process or <cite>None</cite> if it has yet to stop</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.karsatof.kworker.KEncoder.ident" title="py_code.karsatof.kworker.KEncoder.ident"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ident</span></code></a></p></td>
+<td><p>Return identifier (PID) of process or <cite>None</cite> if it has yet to start</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">name</span></code></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.karsatof.kworker.KEncoder.pid" title="py_code.karsatof.kworker.KEncoder.pid"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pid</span></code></a></p></td>
+<td><p>Return identifier (PID) of process or <cite>None</cite> if it has yet to start</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.karsatof.kworker.KEncoder.sentinel" title="py_code.karsatof.kworker.KEncoder.sentinel"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sentinel</span></code></a></p></td>
+<td><p>Return a file descriptor (Unix) or handle (Windows) suitable for waiting for process termination.</p></td>
+</tr>
+</tbody>
+</table>
+<dl class="py method">
+<dt id="py_code.karsatof.kworker.KEncoder.close">
+<code class="sig-name descname">close</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kworker.KEncoder.close" title="Permalink to this definition">¶</a></dt>
+<dd><p>Close the Process object.</p>
+<p>This method releases resources held by the Process object.  It is
+an error to call this method if the child process is still running.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kworker.KEncoder.daemon">
+<em class="property">property </em><code class="sig-name descname">daemon</code><a class="headerlink" href="#py_code.karsatof.kworker.KEncoder.daemon" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return whether process is a daemon</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kworker.KEncoder.encode">
+<code class="sig-name descname">encode</code><span class="sig-paren">(</span><em class="sig-param"><span class="o">**</span><span class="n">kwargs</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kworker.KEncoder.encode" title="Permalink to this definition">¶</a></dt>
+<dd><p>Function that performs SparseCoding for a segment of mass spectrum</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>s0</strong> (<em>inst</em>) -- First sample number</p></li>
+<li><p><strong>s1</strong> (<em>inst</em>) -- Last sample number</p></li>
+<li><p><strong>spec</strong> (<em>array</em>) -- Signal to encode</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>3-tuple is returned with (i0, i1, code), where 'i0' and 'i1'
+are the rows of the dictionary and 'code' is the processing result.
+If subsampling=1, i0==s0 and i1==s1.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>tuple</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kworker.KEncoder.exitcode">
+<em class="property">property </em><code class="sig-name descname">exitcode</code><a class="headerlink" href="#py_code.karsatof.kworker.KEncoder.exitcode" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return exit code of process or <cite>None</cite> if it has yet to stop</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kworker.KEncoder.ident">
+<em class="property">property </em><code class="sig-name descname">ident</code><a class="headerlink" href="#py_code.karsatof.kworker.KEncoder.ident" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return identifier (PID) of process or <cite>None</cite> if it has yet to start</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kworker.KEncoder.initialize_logging">
+<code class="sig-name descname">initialize_logging</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kworker.KEncoder.initialize_logging" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reroute stderr of the process to file, for debugging</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kworker.KEncoder.is_alive">
+<code class="sig-name descname">is_alive</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kworker.KEncoder.is_alive" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return whether process is alive</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kworker.KEncoder.join">
+<code class="sig-name descname">join</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">timeout</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kworker.KEncoder.join" title="Permalink to this definition">¶</a></dt>
+<dd><p>Wait until child process terminates</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kworker.KEncoder.kill">
+<code class="sig-name descname">kill</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kworker.KEncoder.kill" title="Permalink to this definition">¶</a></dt>
+<dd><p>Terminate process; sends SIGKILL signal or uses TerminateProcess()</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kworker.KEncoder.pid">
+<em class="property">property </em><code class="sig-name descname">pid</code><a class="headerlink" href="#py_code.karsatof.kworker.KEncoder.pid" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return identifier (PID) of process or <cite>None</cite> if it has yet to start</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kworker.KEncoder.run">
+<code class="sig-name descname">run</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kworker.KEncoder.run" title="Permalink to this definition">¶</a></dt>
+<dd><p>Main loop</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kworker.KEncoder.sentinel">
+<em class="property">property </em><code class="sig-name descname">sentinel</code><a class="headerlink" href="#py_code.karsatof.kworker.KEncoder.sentinel" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return a file descriptor (Unix) or handle (Windows) suitable for
+waiting for process termination.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kworker.KEncoder.start">
+<code class="sig-name descname">start</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kworker.KEncoder.start" title="Permalink to this definition">¶</a></dt>
+<dd><p>Start child process</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kworker.KEncoder.terminate">
+<code class="sig-name descname">terminate</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kworker.KEncoder.terminate" title="Permalink to this definition">¶</a></dt>
+<dd><p>Terminate process; sends SIGTERM signal or uses TerminateProcess()</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">Scenthound</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="..\..\frontend.html#http://">Front-end</a></li>
+<li class="toctree-l1"><a class="reference external" href="..\..\frontend_deprecated.html#http://">Front-end deprecated</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="py_code.html">py_code</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="py_code.DataVizService.html">py_code.DataVizService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.FileService.html">py_code.FileService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.InstrumentClient.html">py_code.InstrumentClient</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.InstrumentService.html">py_code.InstrumentService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.MainService.html">py_code.MainService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.UIClasses.html">py_code.UIClasses</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.UIProperties.html">py_code.UIProperties</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.app.html">py_code.app</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.karsaorbi.html">py_code.karsaorbi</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="py_code.karsatof.html">py_code.karsatof</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kchem.html">py_code.karsatof.kchem</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kcode.html">py_code.karsatof.kcode</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kcollector.html">py_code.karsatof.kcollector</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kdatapool.html">py_code.karsatof.kdatapool</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kevent.html">py_code.karsatof.kevent</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kfeeder.html">py_code.karsatof.kfeeder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kgenerator.html">py_code.karsatof.kgenerator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kimage.html">py_code.karsatof.kimage</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kinstrument.html">py_code.karsatof.kinstrument</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kpeak.html">py_code.karsatof.kpeak</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.ksegment.html">py_code.karsatof.ksegment</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.ksignalprocessor.html">py_code.karsatof.ksignalprocessor</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kspectra.html">py_code.karsatof.kspectra</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kutil.html">py_code.karsatof.kutil</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="py_code.karsatof.kworker.html">py_code.karsatof.kworker</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="py_code.karsatof.kworker.init_encoders.html">py_code.karsatof.kworker.init_encoders</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">py_code.karsatof.kworker.KEncoder</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.lib.html">py_code.karsatof.lib</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.kcassettestation.html">py_code.kcassettestation</a></li>
+</ul>
+</li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="py_code.html">py_code</a><ul>
+  <li><a href="py_code.karsatof.html">py_code.karsatof</a><ul>
+  <li><a href="py_code.karsatof.kworker.html">py_code.karsatof.kworker</a><ul>
+      <li>Previous: <a href="py_code.karsatof.kworker.init_encoders.html" title="previous chapter">py_code.karsatof.kworker.init_encoders</a></li>
+      <li>Next: <a href="py_code.karsatof.lib.html" title="next chapter">py_code.karsatof.lib</a></li>
+  </ul></li>
+  </ul></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Karsa Ltd..
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.1.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/_autosummary/py_code.karsatof.kworker.KEncoder.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

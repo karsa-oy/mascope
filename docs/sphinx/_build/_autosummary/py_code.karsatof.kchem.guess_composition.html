@@ -1,0 +1,182 @@
+
+<!DOCTYPE html>
+
+<html lang="Python, JavaScript">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>py_code.karsatof.kchem.guess_composition &#8212; Scenthound 0.1 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="py_code.karsatof.kcode" href="py_code.karsatof.kcode.html" />
+    <link rel="prev" title="py_code.karsatof.kchem.get_exact_mass" href="py_code.karsatof.kchem.get_exact_mass.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="py-code-karsatof-kchem-guess-composition">
+<h1>py_code.karsatof.kchem.guess_composition<a class="headerlink" href="#py-code-karsatof-kchem-guess-composition" title="Permalink to this headline">¶</a></h1>
+<dl class="py function">
+<dt id="py_code.karsatof.kchem.guess_composition">
+<code class="sig-prename descclassname">py_code.karsatof.kchem.</code><code class="sig-name descname">guess_composition</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">target_mz</span></em>, <em class="sig-param"><span class="n">elements</span></em>, <em class="sig-param"><span class="n">num_filter</span></em>, <em class="sig-param"><span class="n">ratio_filter</span></em>, <em class="sig-param"><span class="n">tolerance</span><span class="o">=</span><span class="default_value">1e-05</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kchem.guess_composition" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="simple">
+<dt>Function to guess the elemental composition based on</dt><dd><p>mass and a list of allowed elements and their numbers and ratios</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>target_mz</strong> (<em>double</em>) -- Mass for which to guess the elemental composition</p></li>
+<li><p><strong>elements</strong> (<em>list</em>) -- List of elements allowed in the composition</p></li>
+<li><p><strong>num_filter</strong> (<em>list</em>) -- List of 2-tuples per element, with min and max allowed number</p></li>
+<li><p><strong>ratio_filter</strong> (<em>list</em>) -- List of 4-tuples, with indices of two elements, and
+min and max allowed ratio for those two</p></li>
+<li><p><strong>tolerance</strong> (<em>double</em>) -- Maximum allowed relative m/z error</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p><strong>formulae</strong> (<em>list</em>) -- List of elemental compositions within set mass tolerance</p></li>
+<li><p><strong>TODO</strong> (<em>TO BE REVIEWED</em>)</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">Scenthound</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="..\..\frontend.html#http://">Front-end</a></li>
+<li class="toctree-l1"><a class="reference external" href="..\..\frontend_deprecated.html#http://">Front-end deprecated</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="py_code.html">py_code</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="py_code.DataVizService.html">py_code.DataVizService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.FileService.html">py_code.FileService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.InstrumentClient.html">py_code.InstrumentClient</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.InstrumentService.html">py_code.InstrumentService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.MainService.html">py_code.MainService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.UIClasses.html">py_code.UIClasses</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.UIProperties.html">py_code.UIProperties</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.app.html">py_code.app</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.karsaorbi.html">py_code.karsaorbi</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="py_code.karsatof.html">py_code.karsatof</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="py_code.karsatof.kchem.html">py_code.karsatof.kchem</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="py_code.karsatof.kchem.get_exact_isotope_masses.html">py_code.karsatof.kchem.get_exact_isotope_masses</a></li>
+<li class="toctree-l4"><a class="reference internal" href="py_code.karsatof.kchem.get_exact_mass.html">py_code.karsatof.kchem.get_exact_mass</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">py_code.karsatof.kchem.guess_composition</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kcode.html">py_code.karsatof.kcode</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kcollector.html">py_code.karsatof.kcollector</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kdatapool.html">py_code.karsatof.kdatapool</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kevent.html">py_code.karsatof.kevent</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kfeeder.html">py_code.karsatof.kfeeder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kgenerator.html">py_code.karsatof.kgenerator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kimage.html">py_code.karsatof.kimage</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kinstrument.html">py_code.karsatof.kinstrument</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kpeak.html">py_code.karsatof.kpeak</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.ksegment.html">py_code.karsatof.ksegment</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.ksignalprocessor.html">py_code.karsatof.ksignalprocessor</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kspectra.html">py_code.karsatof.kspectra</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kutil.html">py_code.karsatof.kutil</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kworker.html">py_code.karsatof.kworker</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.lib.html">py_code.karsatof.lib</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.kcassettestation.html">py_code.kcassettestation</a></li>
+</ul>
+</li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="py_code.html">py_code</a><ul>
+  <li><a href="py_code.karsatof.html">py_code.karsatof</a><ul>
+  <li><a href="py_code.karsatof.kchem.html">py_code.karsatof.kchem</a><ul>
+      <li>Previous: <a href="py_code.karsatof.kchem.get_exact_mass.html" title="previous chapter">py_code.karsatof.kchem.get_exact_mass</a></li>
+      <li>Next: <a href="py_code.karsatof.kcode.html" title="next chapter">py_code.karsatof.kcode</a></li>
+  </ul></li>
+  </ul></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Karsa Ltd..
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.1.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/_autosummary/py_code.karsatof.kchem.guess_composition.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,5 @@
+aiohttp
+aiohttp_cors
+asyncio
+environs
+python-socketio<5

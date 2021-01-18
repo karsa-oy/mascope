@@ -1,0 +1,475 @@
+
+<!DOCTYPE html>
+
+<html lang="Python, JavaScript">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>py_code.karsatof.ksignalprocessor.KOnlinePeakId &#8212; Scenthound 0.1 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="py_code.karsatof.ksignalprocessor.KSignalProcessor" href="py_code.karsatof.ksignalprocessor.KSignalProcessor.html" />
+    <link rel="prev" title="py_code.karsatof.ksignalprocessor" href="py_code.karsatof.ksignalprocessor.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="py-code-karsatof-ksignalprocessor-konlinepeakid">
+<h1>py_code.karsatof.ksignalprocessor.KOnlinePeakId<a class="headerlink" href="#py-code-karsatof-ksignalprocessor-konlinepeakid" title="Permalink to this headline">¶</a></h1>
+<dl class="py class">
+<dt id="py_code.karsatof.ksignalprocessor.KOnlinePeakId">
+<em class="property">class </em><code class="sig-prename descclassname">py_code.karsatof.ksignalprocessor.</code><code class="sig-name descname">KOnlinePeakId</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">target_list</span></em>, <em class="sig-param"><span class="n">kgenerator</span></em>, <em class="sig-param"><span class="n">segment_borders</span></em>, <em class="sig-param"><span class="n">queue_in</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.ksignalprocessor.KOnlinePeakId" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">threading.Thread</span></code></p>
+<p>Online peak identifier. Get KEncoder results from queue and process.
+Put results (detected targets) to queue.</p>
+<p>TODO: !!! This implementation needs to be revisited and refactored !!!</p>
+<dl class="py attribute">
+<dt id="py_code.karsatof.ksignalprocessor.KOnlinePeakId.kgen">
+<code class="sig-name descname">kgen</code><a class="headerlink" href="#py_code.karsatof.ksignalprocessor.KOnlinePeakId.kgen" title="Permalink to this definition">¶</a></dt>
+<dd><p>KAcquisition or KStreamer instance, data producer</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="py_code.karsatof.kgenerator.KAcquisition.html#py_code.karsatof.kgenerator.KAcquisition" title="py_code.karsatof.kgenerator.KAcquisition">KAcquisition</a> or <a class="reference internal" href="py_code.karsatof.kgenerator.KStreamer.html#py_code.karsatof.kgenerator.KStreamer" title="py_code.karsatof.kgenerator.KStreamer">KStreamer</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="py_code.karsatof.ksignalprocessor.KOnlinePeakId.target_list">
+<code class="sig-name descname">target_list</code><a class="headerlink" href="#py_code.karsatof.ksignalprocessor.KOnlinePeakId.target_list" title="Permalink to this definition">¶</a></dt>
+<dd><p>List of targets to monitor</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="py_code.karsatof.ksignalprocessor.KOnlinePeakId.queue_in">
+<code class="sig-name descname">queue_in</code><a class="headerlink" href="#py_code.karsatof.ksignalprocessor.KOnlinePeakId.queue_in" title="Permalink to this definition">¶</a></dt>
+<dd><p>Queue to receive processed data from KEncoders</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>Queue</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="py_code.karsatof.ksignalprocessor.KOnlinePeakId.queue_out">
+<code class="sig-name descname">queue_out</code><a class="headerlink" href="#py_code.karsatof.ksignalprocessor.KOnlinePeakId.queue_out" title="Permalink to this definition">¶</a></dt>
+<dd><p>Queue into which put the results (detected targets)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>Queue</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="py_code.karsatof.ksignalprocessor.KOnlinePeakId.seg_seqs">
+<code class="sig-name descname">seg_seqs</code><a class="headerlink" href="#py_code.karsatof.ksignalprocessor.KOnlinePeakId.seg_seqs" title="Permalink to this definition">¶</a></dt>
+<dd><p>List of KSegmentSequences, keeping track of the peak detection</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>list</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="py_code.karsatof.ksignalprocessor.KOnlinePeakId.all_peaks">
+<code class="sig-name descname">all_peaks</code><a class="headerlink" href="#py_code.karsatof.ksignalprocessor.KOnlinePeakId.all_peaks" title="Permalink to this definition">¶</a></dt>
+<dd><p>All detected peaks (ridges of the segment sequences)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.ksignalprocessor.KOnlinePeakId.__init__">
+<code class="sig-name descname">__init__</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">target_list</span></em>, <em class="sig-param"><span class="n">kgenerator</span></em>, <em class="sig-param"><span class="n">segment_borders</span></em>, <em class="sig-param"><span class="n">queue_in</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.ksignalprocessor.KOnlinePeakId.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initialize self</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>target_list</strong> (<em>DataFrame</em>) -- List of targets to monitor</p></li>
+<li><p><strong>kgenerator</strong> (<a class="reference internal" href="py_code.karsatof.kgenerator.KAcquisition.html#py_code.karsatof.kgenerator.KAcquisition" title="py_code.karsatof.kgenerator.KAcquisition"><em>KAcquisition</em></a><em> or </em><a class="reference internal" href="py_code.karsatof.kgenerator.KStreamer.html#py_code.karsatof.kgenerator.KStreamer" title="py_code.karsatof.kgenerator.KStreamer"><em>KStreamer</em></a>) -- KAcquisition or KStreamer instance</p></li>
+<li><p><strong>segment_borders</strong> (<em>list</em>) -- List of 2-tuples, segment borders</p></li>
+<li><p><strong>queue_in</strong> (<em>Queue</em>) -- Queue to receive processed data from KCollector</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<p class="rubric">Methods</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.karsatof.ksignalprocessor.KOnlinePeakId.__init__" title="py_code.karsatof.ksignalprocessor.KOnlinePeakId.__init__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code></a>(target_list, kgenerator, ...)</p></td>
+<td><p>Initialize self</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">getName</span></code>()</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.karsatof.ksignalprocessor.KOnlinePeakId.initialize_target_list" title="py_code.karsatof.ksignalprocessor.KOnlinePeakId.initialize_target_list"><code class="xref py py-obj docutils literal notranslate"><span class="pre">initialize_target_list</span></code></a>(target_list)</p></td>
+<td><p>Prepare target list and target peak list</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.karsatof.ksignalprocessor.KOnlinePeakId.isAlive" title="py_code.karsatof.ksignalprocessor.KOnlinePeakId.isAlive"><code class="xref py py-obj docutils literal notranslate"><span class="pre">isAlive</span></code></a>()</p></td>
+<td><p>Return whether the thread is alive.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">isDaemon</span></code>()</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.karsatof.ksignalprocessor.KOnlinePeakId.is_alive" title="py_code.karsatof.ksignalprocessor.KOnlinePeakId.is_alive"><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_alive</span></code></a>()</p></td>
+<td><p>Return whether the thread is alive.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.karsatof.ksignalprocessor.KOnlinePeakId.join" title="py_code.karsatof.ksignalprocessor.KOnlinePeakId.join"><code class="xref py py-obj docutils literal notranslate"><span class="pre">join</span></code></a>([timeout])</p></td>
+<td><p>Wait until the thread terminates.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.karsatof.ksignalprocessor.KOnlinePeakId.match_ridge_to_target" title="py_code.karsatof.ksignalprocessor.KOnlinePeakId.match_ridge_to_target"><code class="xref py py-obj docutils literal notranslate"><span class="pre">match_ridge_to_target</span></code></a>(peak)</p></td>
+<td><p>Try to find a match for a detected ridge in 'target_peaks'.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.karsatof.ksignalprocessor.KOnlinePeakId.match_target" title="py_code.karsatof.ksignalprocessor.KOnlinePeakId.match_target"><code class="xref py py-obj docutils literal notranslate"><span class="pre">match_target</span></code></a>(target)</p></td>
+<td><p>Compare calculated identification scores to set parameters.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.karsatof.ksignalprocessor.KOnlinePeakId.run" title="py_code.karsatof.ksignalprocessor.KOnlinePeakId.run"><code class="xref py py-obj docutils literal notranslate"><span class="pre">run</span></code></a>()</p></td>
+<td><p>Get KEncoder results from queue, calculate identification score towards a target list and then match against set thresholds.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.karsatof.ksignalprocessor.KOnlinePeakId.score_peaks_to_targets" title="py_code.karsatof.ksignalprocessor.KOnlinePeakId.score_peaks_to_targets"><code class="xref py py-obj docutils literal notranslate"><span class="pre">score_peaks_to_targets</span></code></a>(target_i)</p></td>
+<td><p>For a specified target, see if matching peaks can be found from 'target_peaks' and if so, put the detected target into 'queue_out'.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">setDaemon</span></code>(daemonic)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">setName</span></code>(name)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.karsatof.ksignalprocessor.KOnlinePeakId.start" title="py_code.karsatof.ksignalprocessor.KOnlinePeakId.start"><code class="xref py py-obj docutils literal notranslate"><span class="pre">start</span></code></a>()</p></td>
+<td><p>Start the thread's activity.</p></td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Attributes</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.karsatof.ksignalprocessor.KOnlinePeakId.daemon" title="py_code.karsatof.ksignalprocessor.KOnlinePeakId.daemon"><code class="xref py py-obj docutils literal notranslate"><span class="pre">daemon</span></code></a></p></td>
+<td><p>A boolean value indicating whether this thread is a daemon thread.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.karsatof.ksignalprocessor.KOnlinePeakId.ident" title="py_code.karsatof.ksignalprocessor.KOnlinePeakId.ident"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ident</span></code></a></p></td>
+<td><p>Thread identifier of this thread or None if it has not been started.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.karsatof.ksignalprocessor.KOnlinePeakId.name" title="py_code.karsatof.ksignalprocessor.KOnlinePeakId.name"><code class="xref py py-obj docutils literal notranslate"><span class="pre">name</span></code></a></p></td>
+<td><p>A string used for identification purposes only.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.karsatof.ksignalprocessor.KOnlinePeakId.native_id" title="py_code.karsatof.ksignalprocessor.KOnlinePeakId.native_id"><code class="xref py py-obj docutils literal notranslate"><span class="pre">native_id</span></code></a></p></td>
+<td><p>Native integral thread ID of this thread, or None if it has not been started.</p></td>
+</tr>
+</tbody>
+</table>
+<dl class="py method">
+<dt id="py_code.karsatof.ksignalprocessor.KOnlinePeakId.daemon">
+<em class="property">property </em><code class="sig-name descname">daemon</code><a class="headerlink" href="#py_code.karsatof.ksignalprocessor.KOnlinePeakId.daemon" title="Permalink to this definition">¶</a></dt>
+<dd><p>A boolean value indicating whether this thread is a daemon thread.</p>
+<p>This must be set before start() is called, otherwise RuntimeError is
+raised. Its initial value is inherited from the creating thread; the
+main thread is not a daemon thread and therefore all threads created in
+the main thread default to daemon = False.</p>
+<p>The entire Python program exits when only daemon threads are left.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.ksignalprocessor.KOnlinePeakId.ident">
+<em class="property">property </em><code class="sig-name descname">ident</code><a class="headerlink" href="#py_code.karsatof.ksignalprocessor.KOnlinePeakId.ident" title="Permalink to this definition">¶</a></dt>
+<dd><p>Thread identifier of this thread or None if it has not been started.</p>
+<p>This is a nonzero integer. See the get_ident() function. Thread
+identifiers may be recycled when a thread exits and another thread is
+created. The identifier is available even after the thread has exited.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.ksignalprocessor.KOnlinePeakId.initialize_target_list">
+<code class="sig-name descname">initialize_target_list</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">target_list</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.ksignalprocessor.KOnlinePeakId.initialize_target_list" title="Permalink to this definition">¶</a></dt>
+<dd><p>Prepare target list and target peak list</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>target_list</strong> (<em>DataFrame</em>) -- List of targets to monitor</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Returns the modified 'target_list' and another DataFrame
+'target_peaks' where the peaks relevant to the 'target_list'
+are extracted into.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>tuple</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.ksignalprocessor.KOnlinePeakId.isAlive">
+<code class="sig-name descname">isAlive</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.ksignalprocessor.KOnlinePeakId.isAlive" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return whether the thread is alive.</p>
+<p>This method is deprecated, use is_alive() instead.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.ksignalprocessor.KOnlinePeakId.is_alive">
+<code class="sig-name descname">is_alive</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.ksignalprocessor.KOnlinePeakId.is_alive" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return whether the thread is alive.</p>
+<p>This method returns True just before the run() method starts until just
+after the run() method terminates. The module function enumerate()
+returns a list of all alive threads.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.ksignalprocessor.KOnlinePeakId.join">
+<code class="sig-name descname">join</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">timeout</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.ksignalprocessor.KOnlinePeakId.join" title="Permalink to this definition">¶</a></dt>
+<dd><p>Wait until the thread terminates.</p>
+<p>This blocks the calling thread until the thread whose join() method is
+called terminates -- either normally or through an unhandled exception
+or until the optional timeout occurs.</p>
+<p>When the timeout argument is present and not None, it should be a
+floating point number specifying a timeout for the operation in seconds
+(or fractions thereof). As join() always returns None, you must call
+is_alive() after join() to decide whether a timeout happened -- if the
+thread is still alive, the join() call timed out.</p>
+<p>When the timeout argument is not present or None, the operation will
+block until the thread terminates.</p>
+<p>A thread can be join()ed many times.</p>
+<p>join() raises a RuntimeError if an attempt is made to join the current
+thread as that would cause a deadlock. It is also an error to join() a
+thread before it has been started and attempts to do so raises the same
+exception.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.ksignalprocessor.KOnlinePeakId.match_ridge_to_target">
+<code class="sig-name descname">match_ridge_to_target</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">peak</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.ksignalprocessor.KOnlinePeakId.match_ridge_to_target" title="Permalink to this definition">¶</a></dt>
+<dd><p>Try to find a match for a detected ridge in 'target_peaks'.
+If match is found, try to match 'target_peaks' with a target
+in 'target_list'.</p>
+<p>TODO: !!! There are currently some hard-coded parameters which need
+to be tuned !!!</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>peak</strong> (<em>DataFrame</em>) -- Single row DataFrame with parameters of a peak</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.ksignalprocessor.KOnlinePeakId.match_target">
+<code class="sig-name descname">match_target</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">target</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.ksignalprocessor.KOnlinePeakId.match_target" title="Permalink to this definition">¶</a></dt>
+<dd><p>Compare calculated identification scores to set parameters.</p>
+<p>TODO: !!! There are some hard-coded parameters intended for testing
+purposes only !!!</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>target</strong> (<em>DataFrame</em>) -- Single DataFrame row with target data</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Returns True if match was found, False otherwise.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.ksignalprocessor.KOnlinePeakId.name">
+<em class="property">property </em><code class="sig-name descname">name</code><a class="headerlink" href="#py_code.karsatof.ksignalprocessor.KOnlinePeakId.name" title="Permalink to this definition">¶</a></dt>
+<dd><p>A string used for identification purposes only.</p>
+<p>It has no semantics. Multiple threads may be given the same name. The
+initial name is set by the constructor.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.ksignalprocessor.KOnlinePeakId.native_id">
+<em class="property">property </em><code class="sig-name descname">native_id</code><a class="headerlink" href="#py_code.karsatof.ksignalprocessor.KOnlinePeakId.native_id" title="Permalink to this definition">¶</a></dt>
+<dd><p>Native integral thread ID of this thread, or None if it has not been started.</p>
+<p>This is a non-negative integer. See the get_native_id() function.
+This represents the Thread ID as reported by the kernel.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.ksignalprocessor.KOnlinePeakId.run">
+<code class="sig-name descname">run</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.ksignalprocessor.KOnlinePeakId.run" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get KEncoder results from queue, calculate identification score
+towards a target list and then match against set thresholds. Runs
+until poison pill is received to 'queue_in'.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.ksignalprocessor.KOnlinePeakId.score_peaks_to_targets">
+<code class="sig-name descname">score_peaks_to_targets</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">target_i</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.ksignalprocessor.KOnlinePeakId.score_peaks_to_targets" title="Permalink to this definition">¶</a></dt>
+<dd><p>For a specified target, see if matching peaks can be found
+from 'target_peaks' and if so, put the detected target into
+'queue_out'.</p>
+<p>TODO: Separate this so that here the matching score is calculated
+and actual matching in separate function.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>target_i</strong> (<em>[</em><em>type</em><em>]</em>) -- [description]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.ksignalprocessor.KOnlinePeakId.start">
+<code class="sig-name descname">start</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.ksignalprocessor.KOnlinePeakId.start" title="Permalink to this definition">¶</a></dt>
+<dd><p>Start the thread's activity.</p>
+<p>It must be called at most once per thread object. It arranges for the
+object's run() method to be invoked in a separate thread of control.</p>
+<p>This method will raise a RuntimeError if called more than once on the
+same thread object.</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">Scenthound</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="..\..\frontend.html#http://">Front-end</a></li>
+<li class="toctree-l1"><a class="reference external" href="..\..\frontend_deprecated.html#http://">Front-end deprecated</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="py_code.html">py_code</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="py_code.DataVizService.html">py_code.DataVizService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.FileService.html">py_code.FileService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.InstrumentClient.html">py_code.InstrumentClient</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.InstrumentService.html">py_code.InstrumentService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.MainService.html">py_code.MainService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.UIClasses.html">py_code.UIClasses</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.UIProperties.html">py_code.UIProperties</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.app.html">py_code.app</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.karsaorbi.html">py_code.karsaorbi</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="py_code.karsatof.html">py_code.karsatof</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kchem.html">py_code.karsatof.kchem</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kcode.html">py_code.karsatof.kcode</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kcollector.html">py_code.karsatof.kcollector</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kdatapool.html">py_code.karsatof.kdatapool</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kevent.html">py_code.karsatof.kevent</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kfeeder.html">py_code.karsatof.kfeeder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kgenerator.html">py_code.karsatof.kgenerator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kimage.html">py_code.karsatof.kimage</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kinstrument.html">py_code.karsatof.kinstrument</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kpeak.html">py_code.karsatof.kpeak</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.ksegment.html">py_code.karsatof.ksegment</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="py_code.karsatof.ksignalprocessor.html">py_code.karsatof.ksignalprocessor</a><ul class="current">
+<li class="toctree-l4 current"><a class="current reference internal" href="#">py_code.karsatof.ksignalprocessor.KOnlinePeakId</a></li>
+<li class="toctree-l4"><a class="reference internal" href="py_code.karsatof.ksignalprocessor.KSignalProcessor.html">py_code.karsatof.ksignalprocessor.KSignalProcessor</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kspectra.html">py_code.karsatof.kspectra</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kutil.html">py_code.karsatof.kutil</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kworker.html">py_code.karsatof.kworker</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.lib.html">py_code.karsatof.lib</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.kcassettestation.html">py_code.kcassettestation</a></li>
+</ul>
+</li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="py_code.html">py_code</a><ul>
+  <li><a href="py_code.karsatof.html">py_code.karsatof</a><ul>
+  <li><a href="py_code.karsatof.ksignalprocessor.html">py_code.karsatof.ksignalprocessor</a><ul>
+      <li>Previous: <a href="py_code.karsatof.ksignalprocessor.html" title="previous chapter">py_code.karsatof.ksignalprocessor</a></li>
+      <li>Next: <a href="py_code.karsatof.ksignalprocessor.KSignalProcessor.html" title="next chapter">py_code.karsatof.ksignalprocessor.KSignalProcessor</a></li>
+  </ul></li>
+  </ul></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Karsa Ltd..
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.1.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/_autosummary/py_code.karsatof.ksignalprocessor.KOnlinePeakId.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,1188 @@
+
+<!DOCTYPE html>
+
+<html lang="Python, JavaScript">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>py_code.karsatof.kevent.KEvent &#8212; Scenthound 0.1 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="py_code.karsatof.kfeeder" href="py_code.karsatof.kfeeder.html" />
+    <link rel="prev" title="py_code.karsatof.kevent" href="py_code.karsatof.kevent.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="py-code-karsatof-kevent-kevent">
+<h1>py_code.karsatof.kevent.KEvent<a class="headerlink" href="#py-code-karsatof-kevent-kevent" title="Permalink to this headline">¶</a></h1>
+<dl class="py class">
+<dt id="py_code.karsatof.kevent.KEvent">
+<em class="property">class </em><code class="sig-prename descclassname">py_code.karsatof.kevent.</code><code class="sig-name descname">KEvent</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">filename</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kevent.KEvent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="py_code.karsatof.kspectra.KSpectra.html#py_code.karsatof.kspectra.KSpectra" title="py_code.karsatof.kspectra.KSpectra"><code class="xref py py-class docutils literal notranslate"><span class="pre">py_code.karsatof.kspectra.KSpectra</span></code></a></p>
+<p>Class providing an API to read and visualize
+TOF data</p>
+<p>...</p>
+<dl class="py attribute">
+<dt id="py_code.karsatof.kevent.KEvent.sampleid">
+<code class="sig-name descname">sampleid</code><a class="headerlink" href="#py_code.karsatof.kevent.KEvent.sampleid" title="Permalink to this definition">¶</a></dt>
+<dd><p>User defined Sample ID for the data</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="py_code.karsatof.kevent.KEvent.description">
+<code class="sig-name descname">description</code><a class="headerlink" href="#py_code.karsatof.kevent.KEvent.description" title="Permalink to this definition">¶</a></dt>
+<dd><p>User defined description of the sample</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kevent.KEvent.__init__">
+<code class="sig-name descname">__init__</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">filename</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kevent.KEvent.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initialize self</p>
+<p>Retrieve TwH5Descriptor for the file, load time vectors,
+Sample ID and Sample description when available.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>filename</strong> (<em>TYPE</em>) -- DESCRIPTION.</p>
+</dd>
+<dt class="field-even">Raises</dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>ValueError</strong> -- If the given filename is not valid</p></li>
+<li><p><strong>Exception</strong> -- If retrieving TwH5Descriptor fails</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<p class="rubric">Methods</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.karsatof.kevent.KEvent.R" title="py_code.karsatof.kevent.KEvent.R"><code class="xref py py-obj docutils literal notranslate"><span class="pre">R</span></code></a>(m, r0, r1)</p></td>
+<td><p>Calculate resolution at a m/z with the 2-parameter function</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.karsatof.kevent.KEvent.R_3p" title="py_code.karsatof.kevent.KEvent.R_3p"><code class="xref py py-obj docutils literal notranslate"><span class="pre">R_3p</span></code></a>(m, R0, m0, dm)</p></td>
+<td><p>Calculate resolution at a m/z with the 3-parameter function</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.karsatof.kevent.KEvent.__init__" title="py_code.karsatof.kevent.KEvent.__init__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code></a>(filename)</p></td>
+<td><p>Initialize self</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.karsatof.kevent.KEvent.fit_baseline" title="py_code.karsatof.kevent.KEvent.fit_baseline"><code class="xref py py-obj docutils literal notranslate"><span class="pre">fit_baseline</span></code></a>(spec[, lam, p, niter])</p></td>
+<td><p>Baseline removal from &quot;Asymmetric Least Squares Smoothing&quot; by P.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.karsatof.kevent.KEvent.fit_rfun" title="py_code.karsatof.kevent.KEvent.fit_rfun"><code class="xref py py-obj docutils literal notranslate"><span class="pre">fit_rfun</span></code></a>()</p></td>
+<td><p>Placeholder function for fitting the resolution function parameters.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.karsatof.kevent.KEvent.get_avg_spectra" title="py_code.karsatof.kevent.KEvent.get_avg_spectra"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_avg_spectra</span></code></a>(avg_s[, m0, m1, si0, si1, ...])</p></td>
+<td><p>Get averaged spectra from file</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.karsatof.kevent.KEvent.get_avg_stickspectra" title="py_code.karsatof.kevent.KEvent.get_avg_stickspectra"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_avg_stickspectra</span></code></a>(avg_s[, pi0, pi1, t0, ...])</p></td>
+<td><p>Get averaged UMR spectra from file</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.karsatof.kevent.KEvent.get_avg_tps_data" title="py_code.karsatof.kevent.KEvent.get_avg_tps_data"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_avg_tps_data</span></code></a>(avg_s[, t0, t1, dt])</p></td>
+<td><p>Load averaged TPS parameter data from file</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.karsatof.kevent.KEvent.get_code" title="py_code.karsatof.kevent.KEvent.get_code"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_code</span></code></a>([m0, m1, si0, si1, t0, t1, dt])</p></td>
+<td><p>Get a single code vector from file</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.karsatof.kevent.KEvent.get_codes" title="py_code.karsatof.kevent.KEvent.get_codes"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_codes</span></code></a>([m0, m1, si0, si1, t0, t1, dt])</p></td>
+<td><p>Get code sparse matrix from file</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.karsatof.kevent.KEvent.get_description" title="py_code.karsatof.kevent.KEvent.get_description"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_description</span></code></a>()</p></td>
+<td><p>Read Sample Description from file</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.karsatof.kevent.KEvent.get_heatmap" title="py_code.karsatof.kevent.KEvent.get_heatmap"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_heatmap</span></code></a>([t_range, mz_range, img_width, ...])</p></td>
+<td><p>Get (generate) heatmap image in given m/z and/or time range</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.karsatof.kevent.KEvent.get_peaks" title="py_code.karsatof.kevent.KEvent.get_peaks"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_peaks</span></code></a>()</p></td>
+<td><p>Read peaks from file</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.karsatof.kevent.KEvent.get_ps" title="py_code.karsatof.kevent.KEvent.get_ps"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_ps</span></code></a>(ppos)</p></td>
+<td><p>Get peakshape at particular position in the TOF space</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.karsatof.kevent.KEvent.get_ridge_traces" title="py_code.karsatof.kevent.KEvent.get_ridge_traces"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_ridge_traces</span></code></a>()</p></td>
+<td><p>Generate Plotly traces for ridges</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.karsatof.kevent.KEvent.get_sampleid" title="py_code.karsatof.kevent.KEvent.get_sampleid"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_sampleid</span></code></a>()</p></td>
+<td><p>Read Sample ID from file</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.karsatof.kevent.KEvent.get_spec" title="py_code.karsatof.kevent.KEvent.get_spec"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_spec</span></code></a>([m0, m1, si0, si1, t0, t1, dt])</p></td>
+<td><p>Get a single (averaged) spectrum from file</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.karsatof.kevent.KEvent.get_spec_stack" title="py_code.karsatof.kevent.KEvent.get_spec_stack"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_spec_stack</span></code></a>(avg_s[, t_range, mz_range, ...])</p></td>
+<td><p>Get (generate) spec stack image in given m/z and/or time range</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.karsatof.kevent.KEvent.get_spectra" title="py_code.karsatof.kevent.KEvent.get_spectra"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_spectra</span></code></a>([m0, m1, si0, si1, t0, t1, dt])</p></td>
+<td><p>Get multiple spectra from file</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.karsatof.kevent.KEvent.get_stickspec" title="py_code.karsatof.kevent.KEvent.get_stickspec"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_stickspec</span></code></a>([pi0, pi1, t0, t1, dt])</p></td>
+<td><p>Get a single (averaged) unit mass resolution (UMR) spectrum from file</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.karsatof.kevent.KEvent.get_stickspectra" title="py_code.karsatof.kevent.KEvent.get_stickspectra"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_stickspectra</span></code></a>([pi0, pi1, t0, t1, dt])</p></td>
+<td><p>Get multiple unit mass resolution (UMR) spectra from file</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.karsatof.kevent.KEvent.get_target_list" title="py_code.karsatof.kevent.KEvent.get_target_list"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_target_list</span></code></a>()</p></td>
+<td><p>Read target list DataFrame from file</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.karsatof.kevent.KEvent.get_tps_data" title="py_code.karsatof.kevent.KEvent.get_tps_data"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_tps_data</span></code></a>([t0, t1, dt])</p></td>
+<td><p>Load TPS parameter data from file</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.karsatof.kevent.KEvent.get_tps_traces" title="py_code.karsatof.kevent.KEvent.get_tps_traces"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_tps_traces</span></code></a>([selected_traces])</p></td>
+<td><p>Generate TPS traces for selected parameters</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.karsatof.kevent.KEvent.load_ps" title="py_code.karsatof.kevent.KEvent.load_ps"><code class="xref py py-obj docutils literal notranslate"><span class="pre">load_ps</span></code></a>([ps_file])</p></td>
+<td><p>Load peakshape from a file generated by tofTools</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.karsatof.kevent.KEvent.load_spec" title="py_code.karsatof.kevent.KEvent.load_spec"><code class="xref py py-obj docutils literal notranslate"><span class="pre">load_spec</span></code></a>([ind, si0, si1])</p></td>
+<td><p>Load a single (averaged over a time range) mass spectrum, in signal intensity unit mV/ext.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.karsatof.kevent.KEvent.load_spectra" title="py_code.karsatof.kevent.KEvent.load_spectra"><code class="xref py py-obj docutils literal notranslate"><span class="pre">load_spectra</span></code></a>([ind, si0, si1])</p></td>
+<td><p>Load multiple mass spectra in a specified time range, in signal intensity unit mV/ext.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.karsatof.kevent.KEvent.load_stickspec" title="py_code.karsatof.kevent.KEvent.load_stickspec"><code class="xref py py-obj docutils literal notranslate"><span class="pre">load_stickspec</span></code></a>([ind, pi0, pi1])</p></td>
+<td><p>Load a single (averaged over a time range) unit mass resolution mass spectrum, in signal intensity unit mV/ext.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.karsatof.kevent.KEvent.load_stickspectra" title="py_code.karsatof.kevent.KEvent.load_stickspectra"><code class="xref py py-obj docutils literal notranslate"><span class="pre">load_stickspectra</span></code></a>([ind, pi0, pi1])</p></td>
+<td><p>Load multiple unit mass resolution  mass spectra in a specified time range, in signal intensity unit mV/ext.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.karsatof.kevent.KEvent.load_tps_data" title="py_code.karsatof.kevent.KEvent.load_tps_data"><code class="xref py py-obj docutils literal notranslate"><span class="pre">load_tps_data</span></code></a>([ind, loc])</p></td>
+<td><p>Load TPS parameter data from the file.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.karsatof.kevent.KEvent.mz" title="py_code.karsatof.kevent.KEvent.mz"><code class="xref py py-obj docutils literal notranslate"><span class="pre">mz</span></code></a>([si0, si1])</p></td>
+<td><p>Calculate m/z axis for given range of TOF sample numbers</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.karsatof.kevent.KEvent.mz2sno" title="py_code.karsatof.kevent.KEvent.mz2sno"><code class="xref py py-obj docutils literal notranslate"><span class="pre">mz2sno</span></code></a>(mzs[, roundit])</p></td>
+<td><p>Convert m/z to sample number.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.karsatof.kevent.KEvent.r_at" title="py_code.karsatof.kevent.KEvent.r_at"><code class="xref py py-obj docutils literal notranslate"><span class="pre">r_at</span></code></a>(x[, mode, space])</p></td>
+<td><p>Calculate resolution at given m/z or sample number with the 2-parameter resolution function.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.karsatof.kevent.KEvent.r_at_3p" title="py_code.karsatof.kevent.KEvent.r_at_3p"><code class="xref py py-obj docutils literal notranslate"><span class="pre">r_at_3p</span></code></a>(sno[, mode])</p></td>
+<td><p>Calculate resolution at given sample number with the 3-parameter resolution function.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.karsatof.kevent.KEvent.sno2mz" title="py_code.karsatof.kevent.KEvent.sno2mz"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sno2mz</span></code></a>(snos[, roundit])</p></td>
+<td><p>Convert sample number to m/z.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.karsatof.kevent.KEvent.write_description" title="py_code.karsatof.kevent.KEvent.write_description"><code class="xref py py-obj docutils literal notranslate"><span class="pre">write_description</span></code></a>(description)</p></td>
+<td><p>Write Sample Description to file</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.karsatof.kevent.KEvent.write_peaks" title="py_code.karsatof.kevent.KEvent.write_peaks"><code class="xref py py-obj docutils literal notranslate"><span class="pre">write_peaks</span></code></a>(peaks)</p></td>
+<td><p>Write peaks to file</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.karsatof.kevent.KEvent.write_sampleid" title="py_code.karsatof.kevent.KEvent.write_sampleid"><code class="xref py py-obj docutils literal notranslate"><span class="pre">write_sampleid</span></code></a>(sampleid)</p></td>
+<td><p>Write Sample ID to file</p></td>
+</tr>
+</tbody>
+</table>
+<dl class="py method">
+<dt id="py_code.karsatof.kevent.KEvent.R">
+<code class="sig-name descname">R</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">m</span></em>, <em class="sig-param"><span class="n">r0</span></em>, <em class="sig-param"><span class="n">r1</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kevent.KEvent.R" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculate resolution at a m/z with the 2-parameter function</p>
+<p>The 2-parameter function is the one used by tofTools.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>m</strong> (<em>float</em>) -- m/z for which to calculate the resolution</p></li>
+<li><p><strong>r0</strong> (<em>float</em>) -- 2-parameter resolution function slope parameter</p></li>
+<li><p><strong>r1</strong> (<em>float</em>) -- 2-parameter resolution function offset parameter</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Resolution at said m/z</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kevent.KEvent.R_3p">
+<code class="sig-name descname">R_3p</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">m</span></em>, <em class="sig-param"><span class="n">R0</span></em>, <em class="sig-param"><span class="n">m0</span></em>, <em class="sig-param"><span class="n">dm</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kevent.KEvent.R_3p" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculate resolution at a m/z with the 3-parameter function</p>
+<p>The 3-parameter function is the one suggested in Tofwerk documentation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>m</strong> (<em>float</em>) -- m/z for which to calculate the resolution</p></li>
+<li><p><strong>R0</strong> (<em>float</em>) -- 3-parameter resolution function first parameter</p></li>
+<li><p><strong>m0</strong> (<em>float</em>) -- 3-parameter resolution function second parameter</p></li>
+<li><p><strong>dm</strong> (<em>float</em>) -- 3-parameter resolution function third parameter</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Resolution at said m/z</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kevent.KEvent.fit_baseline">
+<code class="sig-name descname">fit_baseline</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">spec</span></em>, <em class="sig-param"><span class="n">lam</span><span class="o">=</span><span class="default_value">500000.0</span></em>, <em class="sig-param"><span class="n">p</span><span class="o">=</span><span class="default_value">1e-07</span></em>, <em class="sig-param"><span class="n">niter</span><span class="o">=</span><span class="default_value">10</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kevent.KEvent.fit_baseline" title="Permalink to this definition">¶</a></dt>
+<dd><p>Baseline removal from
+&quot;Asymmetric Least Squares Smoothing&quot; by P. Eilers and H. Boelens (2005)</p>
+<p>There are two parameters: p for asymmetry and λ for smoothness.
+Both have to be tuned to the data at hand.
+We found that generally 0.001 ≤ p ≤ 0.1 is a good choice
+(for a signal with positive peaks) and 10^2 ≤ λ ≤ 10^9 ,
+but exceptions may occur. In any case one should vary λ on a grid
+that is approximately linear for log λ</p>
+<p>NOTE: !!! This should be moved to a more appropriate place !!!</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>spec</strong> (<em>array</em>) -- Data vector</p></li>
+<li><p><strong>lam</strong> (<em>float</em><em>, </em><em>optional</em>) -- Smoothness, by default 5e5</p></li>
+<li><p><strong>p</strong> (<em>float</em><em>, </em><em>optional</em>) -- Asymmetry, by default 1e-7</p></li>
+<li><p><strong>niter</strong> (<em>int</em><em>, </em><em>optional</em>) -- Number of iterations, by default 10</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Baseline</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>array</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kevent.KEvent.fit_rfun">
+<code class="sig-name descname">fit_rfun</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kevent.KEvent.fit_rfun" title="Permalink to this definition">¶</a></dt>
+<dd><p>Placeholder function for fitting the resolution function
+parameters.</p>
+<p>TODO: Implement properly</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kevent.KEvent.get_avg_spectra">
+<code class="sig-name descname">get_avg_spectra</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">avg_s</span></em>, <em class="sig-param"><span class="n">m0</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">m1</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">si0</span><span class="o">=</span><span class="default_value">0</span></em>, <em class="sig-param"><span class="n">si1</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">t0</span><span class="o">=</span><span class="default_value">0.0</span></em>, <em class="sig-param"><span class="n">t1</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">dt</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kevent.KEvent.get_avg_spectra" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get averaged spectra from file</p>
+<p>Calculate averaged spectra for a given mass/sample and/or time range
+and averaging window. Use either m0 &amp; m1 or si0 &amp; si1 to specify the
+ranges.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>avg_s</strong> (<em>float</em>) -- Averaging window in seconds</p></li>
+<li><p><strong>m0</strong> (<em>int</em><em>, </em><em>optional</em>) -- Beginning of mass range. The default is None.</p></li>
+<li><p><strong>m1</strong> (<em>int</em><em>, </em><em>optional</em>) -- End of mass range. The default is None.</p></li>
+<li><p><strong>si0</strong> (<em>int</em><em>, </em><em>optional</em>) -- Beginning of sample number range. The default is 0.</p></li>
+<li><p><strong>si1</strong> (<em>int</em><em>, </em><em>optional</em>) -- End of sample number range. The default is None.</p></li>
+<li><p><strong>t0</strong> (<em>float</em><em>, </em><em>optional</em>) -- Start time of the desired time range. The default is 0.</p></li>
+<li><p><strong>t1</strong> (<em>float</em><em>, </em><em>optional</em>) -- End time of the desired range. The default is None.
+If None, end time of the acquisition is used.</p></li>
+<li><p><strong>dt</strong> (<em>float</em><em>, </em><em>optional</em>) -- Length of the desired range. The default is None.
+If not None, 't0' and 'dt' are used to define the range
+instead of 't0' and 't1'.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><strong>avg_spectra</strong> -- Averaged spectra for the requested ranges.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>array</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kevent.KEvent.get_avg_stickspectra">
+<code class="sig-name descname">get_avg_stickspectra</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">avg_s</span></em>, <em class="sig-param"><span class="n">pi0</span><span class="o">=</span><span class="default_value">0</span></em>, <em class="sig-param"><span class="n">pi1</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">t0</span><span class="o">=</span><span class="default_value">0.0</span></em>, <em class="sig-param"><span class="n">t1</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">dt</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kevent.KEvent.get_avg_stickspectra" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get averaged UMR spectra from file</p>
+<p>Calculate averaged UMR spectra for a given mass/sample and/or time range
+and averaging window.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>avg_s</strong> (<em>float</em>) -- Averaging window in seconds</p></li>
+<li><p><strong>pi0</strong> (<em>int</em><em>, </em><em>optional</em>) -- Beginning of UM range (amu). The default is 0.</p></li>
+<li><p><strong>pi1</strong> (<em>int</em><em>, </em><em>optional</em>) -- End of UM range (amu). The default is None.</p></li>
+<li><p><strong>t0</strong> (<em>float</em><em>, </em><em>optional</em>) -- Start time of the desired time range. The default is 0.</p></li>
+<li><p><strong>t1</strong> (<em>float</em><em>, </em><em>optional</em>) -- End time of the desired range. The default is None.
+If None, end time of the acquisition is used.</p></li>
+<li><p><strong>dt</strong> (<em>float</em><em>, </em><em>optional</em>) -- Length of the desired range. The default is None.
+If not None, 't0' and 'dt' are used to define the range
+instead of 't0' and 't1'.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><strong>avg_spectra</strong> -- Averaged spectra for the requested ranges.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>array</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kevent.KEvent.get_avg_tps_data">
+<code class="sig-name descname">get_avg_tps_data</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">avg_s</span></em>, <em class="sig-param"><span class="n">t0</span><span class="o">=</span><span class="default_value">0.0</span></em>, <em class="sig-param"><span class="n">t1</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">dt</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kevent.KEvent.get_avg_tps_data" title="Permalink to this definition">¶</a></dt>
+<dd><p>Load averaged TPS parameter data from file</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>avg_s</strong> (<em>float</em>) -- averaging window in seconds</p></li>
+<li><p><strong>t0</strong> (<em>float</em><em>, </em><em>optional</em>) -- Start time of the desired time range. The default is 0.</p></li>
+<li><p><strong>t1</strong> (<em>float</em><em>, </em><em>optional</em>) -- End time of the desired range. The default is None.
+If None, end time of the acquisition is used.</p></li>
+<li><p><strong>dt</strong> (<em>float</em><em>, </em><em>optional</em>) -- Length of the desired range. The default is None.
+If not None, 't0' and 'dt' are used to define the range
+instead of 't0' and 't1'.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><strong>data, info</strong> -- Returns averaged TPS parameter data and parameter names</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>array</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kevent.KEvent.get_code">
+<code class="sig-name descname">get_code</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">m0</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">m1</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">si0</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">si1</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">t0</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">t1</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">dt</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kevent.KEvent.get_code" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get a single code vector from file</p>
+<p>Get averaged KEncoder result code for a given mass/sample and/or
+time range. Use either m0 &amp; m1 or si0 &amp; si1 to specify the ranges.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>m0</strong> (<em>int</em><em>, </em><em>optional</em>) -- Beginning of mass range. The default is None.</p></li>
+<li><p><strong>m1</strong> (<em>int</em><em>, </em><em>optional</em>) -- End of mass range. The default is None.</p></li>
+<li><p><strong>si0</strong> (<em>int</em><em>, </em><em>optional</em>) -- Beginning of sample number range. The default is None.</p></li>
+<li><p><strong>si1</strong> (<em>int</em><em>, </em><em>optional</em>) -- End of sample number range. The default is None.</p></li>
+<li><p><strong>t0</strong> (<em>float</em><em>, </em><em>optional</em>) -- Start time of the desired time range. The default is None.
+If None, start time of the acquisition is used.</p></li>
+<li><p><strong>t1</strong> (<em>float</em><em>, </em><em>optional</em>) -- End time of the desired range. The default is None.
+If None, end time of the acquisition is used.</p></li>
+<li><p><strong>dt</strong> (<em>float</em><em>, </em><em>optional</em>) -- Length of the desired range. The default is None.
+If not None, 't0' and 'dt' are used to define the range
+instead of 't0' and 't1'.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><strong>code</strong> -- Average code for the requested ranges.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>array</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kevent.KEvent.get_codes">
+<code class="sig-name descname">get_codes</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">m0</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">m1</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">si0</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">si1</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">t0</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">t1</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">dt</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kevent.KEvent.get_codes" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get code sparse matrix from file</p>
+<p>Get KEncoder result codes for a given mass/sample and/or
+time range. Use either m0 &amp; m1 or si0 &amp; si1 to specify the ranges.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>m0</strong> (<em>int</em><em>, </em><em>optional</em>) -- Beginning of mass range. The default is None.</p></li>
+<li><p><strong>m1</strong> (<em>int</em><em>, </em><em>optional</em>) -- End of mass range. The default is None.</p></li>
+<li><p><strong>si0</strong> (<em>int</em><em>, </em><em>optional</em>) -- Beginning of sample number range. The default is None.</p></li>
+<li><p><strong>si1</strong> (<em>int</em><em>, </em><em>optional</em>) -- End of sample number range. The default is None.</p></li>
+<li><p><strong>t0</strong> (<em>float</em><em>, </em><em>optional</em>) -- Start time of the desired time range. The default is None.
+If None, start time of the acquisition is used.</p></li>
+<li><p><strong>t1</strong> (<em>float</em><em>, </em><em>optional</em>) -- End time of the desired range. The default is None.
+If None, end time of the acquisition is used.</p></li>
+<li><p><strong>dt</strong> (<em>float</em><em>, </em><em>optional</em>) -- Length of the desired range. The default is None.
+If not None, 't0' and 'dt' are used to define the range
+instead of 't0' and 't1'.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><strong>codes</strong> -- Code for the requested ranges as a sparse matrix</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>csc_matrix</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kevent.KEvent.get_description">
+<code class="sig-name descname">get_description</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kevent.KEvent.get_description" title="Permalink to this definition">¶</a></dt>
+<dd><p>Read Sample Description from file</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p><strong>description</strong> -- Returns Sample Description string. If reading from
+file failed, returns None.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kevent.KEvent.get_heatmap">
+<code class="sig-name descname">get_heatmap</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">t_range</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">mz_range</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">img_width</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">img_height</span><span class="o">=</span><span class="default_value">600</span></em>, <em class="sig-param"><span class="n">cache</span><span class="o">=</span><span class="default_value">False</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kevent.KEvent.get_heatmap" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get (generate) heatmap image in given m/z and/or time range</p>
+<p>Generate heatmap image to visualize the MS data. If
+self.spectra_xarray is not None, uses that and otherwise
+loads data from file. If no time or m/z ranges are given,
+full ranges will be used.</p>
+<p>TODO: Read image from file in case of full ranges.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>t_range</strong> (<em>tuple</em><em>, </em><em>optional</em>) -- 2-tuple of floats, time range for heatmap.
+The default is None.</p></li>
+<li><p><strong>mz_range</strong> (<em>tuple</em><em>, </em><em>optional</em>) -- 2-tuple of floats, m/z range or heatmap.
+The default is None.</p></li>
+<li><p><strong>img_width</strong> (<em>int</em><em>, </em><em>optional</em>) -- Heatmap width (px). The default is px/spectrum.</p></li>
+<li><p><strong>img_height</strong> (<em>int</em><em>, </em><em>optional</em>) -- Heatmap height (px). The default is 600.</p></li>
+<li><p><strong>cache</strong> (<em>bool</em><em>, </em><em>optional</em>) -- Load data into spectra_xarray property, to make
+consecutive method calls faster. The default is False.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><strong>heatmap</strong> -- Returns heatmap image</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>Image</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kevent.KEvent.get_peaks">
+<code class="sig-name descname">get_peaks</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kevent.KEvent.get_peaks" title="Permalink to this definition">¶</a></dt>
+<dd><p>Read peaks from file</p>
+<p>Try to read peaks from the file, return None if failed.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p><strong>peaks</strong> -- List of 2-tuples with peak position and height. If
+reading from file failed, returns None.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>list or None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kevent.KEvent.get_ps">
+<code class="sig-name descname">get_ps</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">ppos</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kevent.KEvent.get_ps" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get peakshape at particular position in the TOF space</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>ppos</strong> (<em>float</em>) -- Peak position in TOF sample numbers. Only has effect if
+multiple peakshapes are defined along the TOF axis.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Dictionary with peakshape x and y vectors is returned.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>dict</p>
+</dd>
+<dt class="field-even">Raises</dt>
+<dd class="field-even"><p><strong>Exception</strong> -- In case no peakshape is defined, an exception is raised.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kevent.KEvent.get_ridge_traces">
+<code class="sig-name descname">get_ridge_traces</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kevent.KEvent.get_ridge_traces" title="Permalink to this definition">¶</a></dt>
+<dd><p>Generate Plotly traces for ridges</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>None</strong> -- </p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><strong>traces</strong> -- List of dict with keys 'name', 'x', 'y', containing
+the data for each trace.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>list</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kevent.KEvent.get_sampleid">
+<code class="sig-name descname">get_sampleid</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kevent.KEvent.get_sampleid" title="Permalink to this definition">¶</a></dt>
+<dd><p>Read Sample ID from file</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p><strong>sampleid</strong> -- Returns Sample ID string. If reading from file
+failed, returns None.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kevent.KEvent.get_spec">
+<code class="sig-name descname">get_spec</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">m0</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">m1</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">si0</span><span class="o">=</span><span class="default_value">0</span></em>, <em class="sig-param"><span class="n">si1</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">t0</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">t1</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">dt</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kevent.KEvent.get_spec" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get a single (averaged) spectrum from file</p>
+<p>Calculate average spectrum for a given mass/sample and/or time range.
+Use either m0 &amp; m1 or si0 &amp; si1 to specify the ranges.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>m0</strong> (<em>int</em><em>, </em><em>optional</em>) -- Beginning of mass range. The default is None. If None,
+'si0' will be used instead.</p></li>
+<li><p><strong>m1</strong> (<em>int</em><em>, </em><em>optional</em>) -- End of mass range. The default is None. If None,
+'si1' will be used instead.</p></li>
+<li><p><strong>si0</strong> (<em>int</em><em>, </em><em>optional</em>) -- Beginning of sample number range. The default is 0.</p></li>
+<li><p><strong>si1</strong> (<em>int</em><em>, </em><em>optional</em>) -- End of sample number range. The default is None.</p></li>
+<li><p><strong>t0</strong> (<em>float</em><em>, </em><em>optional</em>) -- Start time of the desired time range. The default is None.
+If None, start time of the acquisition is used.</p></li>
+<li><p><strong>t1</strong> (<em>float</em><em>, </em><em>optional</em>) -- End time of the desired range. The default is None.
+If None, end time of the acquisition is used.</p></li>
+<li><p><strong>dt</strong> (<em>float</em><em>, </em><em>optional</em>) -- Length of the desired range. The default is None.
+If not None, 't0' and 'dt' are used to define the range
+instead of 't0' and 't1'.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><strong>spec</strong> -- Average spectrum for the requested ranges.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>array</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kevent.KEvent.get_spec_stack">
+<code class="sig-name descname">get_spec_stack</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">avg_s</span></em>, <em class="sig-param"><span class="n">t_range</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">mz_range</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">img_width</span><span class="o">=</span><span class="default_value">600</span></em>, <em class="sig-param"><span class="n">img_height</span><span class="o">=</span><span class="default_value">1200</span></em>, <em class="sig-param"><span class="n">cache</span><span class="o">=</span><span class="default_value">False</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kevent.KEvent.get_spec_stack" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get (generate) spec stack image in given m/z and/or time range</p>
+<p>Generate spec stack image to visualize the MS data. If
+self.spectra_xarray is not None, uses that and otherwise
+loads data from file. If no time or m/z ranges are given,
+full ranges will be used.</p>
+<p>TODO: Read image from file in case of full ranges.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>avg_s</strong> (<em>float</em>) -- Averaging window for spectra in the image</p></li>
+<li><p><strong>t_range</strong> (<em>tuple</em><em>, </em><em>optional</em>) -- 2-tuple of floats, time range for heatmap.
+The default is None.</p></li>
+<li><p><strong>mz_range</strong> (<em>tuple</em><em>, </em><em>optional</em>) -- 2-tuple of floats, m/z range or heatmap.
+The default is None.</p></li>
+<li><p><strong>img_width</strong> (<em>int</em><em>, </em><em>optional</em>) -- Heatmap width (px). The default is 600.</p></li>
+<li><p><strong>img_height</strong> (<em>int</em><em>, </em><em>optional</em>) -- Heatmap height (px). The default is 1200.</p></li>
+<li><p><strong>cache</strong> (<em>bool</em><em>, </em><em>optional</em>) -- Load data into spectra_xarray property, to make
+consecutive method calls faster. The default is False.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><strong>spec_stack</strong> -- Returns spec stack image</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>Image</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kevent.KEvent.get_spectra">
+<code class="sig-name descname">get_spectra</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">m0</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">m1</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">si0</span><span class="o">=</span><span class="default_value">0</span></em>, <em class="sig-param"><span class="n">si1</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">t0</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">t1</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">dt</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kevent.KEvent.get_spectra" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get multiple spectra from file</p>
+<p>Load non-averaged spectra for a given mass/sample and/or time range.
+Use either m0 &amp; m1 or si0 &amp; si1 to specify the ranges.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>m0</strong> (<em>int</em><em>, </em><em>optional</em>) -- Beginning of mass range. The default is None.</p></li>
+<li><p><strong>m1</strong> (<em>int</em><em>, </em><em>optional</em>) -- End of mass range. The default is None.</p></li>
+<li><p><strong>si0</strong> (<em>int</em><em>, </em><em>optional</em>) -- Beginning of sample number range. The default is 0.</p></li>
+<li><p><strong>si1</strong> (<em>int</em><em>, </em><em>optional</em>) -- End of sample number range. The default is None.</p></li>
+<li><p><strong>t0</strong> (<em>float</em><em>, </em><em>optional</em>) -- Start time of the desired time range. The default is None.
+If None, start time of the acquisition is used.</p></li>
+<li><p><strong>t1</strong> (<em>float</em><em>, </em><em>optional</em>) -- End time of the desired range. The default is None.
+If None, end time of the acquisition is used.</p></li>
+<li><p><strong>dt</strong> (<em>float</em><em>, </em><em>optional</em>) -- Length of the desired range. The default is None.
+If not None, 't0' and 'dt' are used to define the range
+instead of 't0' and 't1'.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><strong>spectra</strong> -- Spectra for the requested ranges.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>array</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kevent.KEvent.get_stickspec">
+<code class="sig-name descname">get_stickspec</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">pi0</span><span class="o">=</span><span class="default_value">0</span></em>, <em class="sig-param"><span class="n">pi1</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">t0</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">t1</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">dt</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kevent.KEvent.get_stickspec" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get a single (averaged) unit mass resolution (UMR) spectrum from file</p>
+<p>Calculate average UMR spectrum for a given mass/sample and/or time range.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>pi0</strong> (<em>int</em><em>, </em><em>optional</em>) -- Beginning of UM range (amu). The default is None.</p></li>
+<li><p><strong>pi1</strong> (<em>int</em><em>, </em><em>optional</em>) -- End of UM range (amu). The default is 0.</p></li>
+<li><p><strong>t0</strong> (<em>float</em><em>, </em><em>optional</em>) -- Start time of the desired time range. The default is None.
+If None, start time of the acquisition is used.</p></li>
+<li><p><strong>t1</strong> (<em>float</em><em>, </em><em>optional</em>) -- End time of the desired range. The default is None.
+If None, end time of the acquisition is used.</p></li>
+<li><p><strong>dt</strong> (<em>float</em><em>, </em><em>optional</em>) -- Length of the desired range. The default is None.
+If not None, 't0' and 'dt' are used to define the range
+instead of 't0' and 't1'.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><strong>stickspec</strong> -- Average UMR spectrum for the requested ranges.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>array</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kevent.KEvent.get_stickspectra">
+<code class="sig-name descname">get_stickspectra</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">pi0</span><span class="o">=</span><span class="default_value">0</span></em>, <em class="sig-param"><span class="n">pi1</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">t0</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">t1</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">dt</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kevent.KEvent.get_stickspectra" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get multiple unit mass resolution (UMR) spectra from file</p>
+<p>Load non-averaged UMR spectra for a given mass/sample and/or time range.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>pi0</strong> (<em>int</em><em>, </em><em>optional</em>) -- Beginning of UM range (amu). The default is 0.</p></li>
+<li><p><strong>pi1</strong> (<em>int</em><em>, </em><em>optional</em>) -- End of UM range (amu). The default is None.</p></li>
+<li><p><strong>t0</strong> (<em>float</em><em>, </em><em>optional</em>) -- Start time of the desired time range. The default is None.
+If None, start time of the acquisition is used.</p></li>
+<li><p><strong>t1</strong> (<em>float</em><em>, </em><em>optional</em>) -- End time of the desired range. The default is None.
+If None, end time of the acquisition is used.</p></li>
+<li><p><strong>dt</strong> (<em>float</em><em>, </em><em>optional</em>) -- Length of the desired range. The default is None.
+If not None, 't0' and 'dt' are used to define the range
+instead of 't0' and 't1'.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><strong>stickspectra</strong> -- UMR spectra for the requested ranges.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>array</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kevent.KEvent.get_target_list">
+<code class="sig-name descname">get_target_list</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kevent.KEvent.get_target_list" title="Permalink to this definition">¶</a></dt>
+<dd><p>Read target list DataFrame from file</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p><strong>target_list</strong> -- Returns target_list DataFrame, empty if reading failed</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kevent.KEvent.get_tps_data">
+<code class="sig-name descname">get_tps_data</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">t0</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">t1</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">dt</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kevent.KEvent.get_tps_data" title="Permalink to this definition">¶</a></dt>
+<dd><p>Load TPS parameter data from file</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>t0</strong> (<em>float</em><em>, </em><em>optional</em>) -- Start time of the desired time range. The default is None.
+If None, start time of the acquisition is used.</p></li>
+<li><p><strong>t1</strong> (<em>float</em><em>, </em><em>optional</em>) -- End time of the desired range. The default is None.
+If None, end time of the acquisition is used.</p></li>
+<li><p><strong>dt</strong> (<em>float</em><em>, </em><em>optional</em>) -- Length of the desired range. The default is None.
+If not None, 't0' and 'dt' are used to define the range
+instead of 't0' and 't1'.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><strong>data, info</strong> -- Returns TPS parameter data and parameter names</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>array</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kevent.KEvent.get_tps_traces">
+<code class="sig-name descname">get_tps_traces</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">selected_traces</span><span class="o">=</span><span class="default_value">[]</span></em>, <em class="sig-param"><span class="o">**</span><span class="n">kwargs</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kevent.KEvent.get_tps_traces" title="Permalink to this definition">¶</a></dt>
+<dd><p>Generate TPS traces for selected parameters</p>
+<p>Generates plotly scatter compatible traces for selected
+TPS parameters. Loads TPS data from file to generate the
+traces.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>selected_traces</strong> (<em>list</em><em>, </em><em>optional</em>) -- List of int, the indices of desired parameters.
+The default is [].</p></li>
+<li><p><strong>t1</strong><strong>, </strong><strong>dt</strong> (<em>t0</em><em>,</em>) -- use to specify time range. If not specified,
+full ranges are used.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><strong>traces</strong> -- List of dict with keys 'name', 'x', 'y', containing
+the data for each trace.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>list</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kevent.KEvent.load_ps">
+<code class="sig-name descname">load_ps</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">ps_file</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kevent.KEvent.load_ps" title="Permalink to this definition">¶</a></dt>
+<dd><p>Load peakshape from a file generated by tofTools</p>
+<p>TODO: !!! Reconsider ps_file=None behaviour !!!</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>ps_file</strong> (<em>str</em><em>, </em><em>optional</em>) -- Full file path to the peak shape file (.mat),
+by default None.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kevent.KEvent.load_spec">
+<code class="sig-name descname">load_spec</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">ind</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">si0</span><span class="o">=</span><span class="default_value">0</span></em>, <em class="sig-param"><span class="n">si1</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kevent.KEvent.load_spec" title="Permalink to this definition">¶</a></dt>
+<dd><p>Load a single (averaged over a time range) mass spectrum,
+in signal intensity unit mV/ext.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ind</strong> (<em>tuple</em><em>, </em><em>optional</em>) -- 4-tuple with the range: (buf0, buf1, write0, write1),
+by default None. If None, full time range will be used.</p></li>
+<li><p><strong>si0</strong> (<em>int</em><em>, </em><em>optional</em>) -- First sample number of the desired range. The default is 0.</p></li>
+<li><p><strong>si1</strong> (<em>int</em><em>, </em><em>optional</em>) -- Last sample number of the desired range. The default is None.
+If None, si1=nbrSamples.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises</dt>
+<dd class="field-even"><p><strong>Exception</strong> -- If loading data fails</p>
+</dd>
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>Averaged spectrum [mV/ext]</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>array</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kevent.KEvent.load_spectra">
+<code class="sig-name descname">load_spectra</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">ind</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">si0</span><span class="o">=</span><span class="default_value">0</span></em>, <em class="sig-param"><span class="n">si1</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kevent.KEvent.load_spectra" title="Permalink to this definition">¶</a></dt>
+<dd><p>Load multiple mass spectra in a specified time range,
+in signal intensity unit mV/ext.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ind</strong> (<em>tuple</em><em>, </em><em>optional</em>) -- 4-tuple with the range: (buf0, buf1, write0, write1),
+by default None. If None, full time range will be used.</p></li>
+<li><p><strong>si0</strong> (<em>int</em><em>, </em><em>optional</em>) -- First sample number of the desired range. The default is 0.</p></li>
+<li><p><strong>si1</strong> (<em>int</em><em>, </em><em>optional</em>) -- Last sample number of the desired range. The default is None.
+If None, si1=nbrSamples.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises</dt>
+<dd class="field-even"><p><strong>Exception</strong> -- If loading data fails</p>
+</dd>
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>Spectra [mV/ext]</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>array</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kevent.KEvent.load_stickspec">
+<code class="sig-name descname">load_stickspec</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">ind</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">pi0</span><span class="o">=</span><span class="default_value">0</span></em>, <em class="sig-param"><span class="n">pi1</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kevent.KEvent.load_stickspec" title="Permalink to this definition">¶</a></dt>
+<dd><p>Load a single (averaged over a time range) unit mass resolution
+mass spectrum, in signal intensity unit mV/ext.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ind</strong> (<em>tuple</em><em>, </em><em>optional</em>) -- 4-tuple with the range: (buf0, buf1, write0, write1),
+by default None. If None, full time range will be used.</p></li>
+<li><p><strong>pi0</strong> (<em>int</em><em>, </em><em>optional</em>) -- First unit mass to include, by default 0</p></li>
+<li><p><strong>pi1</strong> (<em>int</em><em>, </em><em>optional</em>) -- Last unit mass to include, by default None. If None,
+pi1=nbrPeaks.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises</dt>
+<dd class="field-even"><p><strong>Exception</strong> -- If loading data fails</p>
+</dd>
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>Averaged UMR spectrum (&quot;stick spectrum&quot;) [mV/ext]. Array
+indices correspond to unit masses if pi0=0.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>array</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kevent.KEvent.load_stickspectra">
+<code class="sig-name descname">load_stickspectra</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">ind</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">pi0</span><span class="o">=</span><span class="default_value">0</span></em>, <em class="sig-param"><span class="n">pi1</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kevent.KEvent.load_stickspectra" title="Permalink to this definition">¶</a></dt>
+<dd><p>Load multiple unit mass resolution  mass spectra in a specified
+time range, in signal intensity unit mV/ext.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ind</strong> (<em>tuple</em><em>, </em><em>optional</em>) -- 4-tuple with the range: (buf0, buf1, write0, write1),
+by default None. If None, full time range will be used.</p></li>
+<li><p><strong>pi0</strong> (<em>int</em><em>, </em><em>optional</em>) -- First unit mass to include, by default 0</p></li>
+<li><p><strong>pi1</strong> (<em>int</em><em>, </em><em>optional</em>) -- Last unit mass to include, by default None. If None,
+pi1=nbrPeaks.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises</dt>
+<dd class="field-even"><p><strong>Exception</strong> -- If loading data fails</p>
+</dd>
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>UMR spectra (&quot;stick spectra&quot;) [mV/ext]. Array row
+indices correspond to unit masses if pi0=0.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>array</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kevent.KEvent.load_tps_data">
+<code class="sig-name descname">load_tps_data</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">ind</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">loc</span><span class="o">=</span><span class="default_value">b'TPS2'</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kevent.KEvent.load_tps_data" title="Permalink to this definition">¶</a></dt>
+<dd><p>Load TPS parameter data from the file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ind</strong> (<em>tuple</em><em>, </em><em>optional</em>) -- 4-tuple with the range: (buf0, buf1, write0, write1),
+by default None. If None, full time range will be used.</p></li>
+<li><p><strong>loc</strong> (<em>bytes</em><em>, </em><em>optional</em>) -- Name of the dataset within the file, by default b'TPS2'</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>2-tuple of (array, list) with the parameter data in an array
+and parameter names in a list.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>tuple</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kevent.KEvent.mz">
+<code class="sig-name descname">mz</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">si0</span><span class="o">=</span><span class="default_value">0</span></em>, <em class="sig-param"><span class="n">si1</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kevent.KEvent.mz" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculate m/z axis for given range of TOF sample numbers</p>
+<p>With default parameters, complete m/z vector is returned.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>si0</strong> (<em>int</em><em>, </em><em>optional</em>) -- First sample number of the desired range. The default is 0.</p></li>
+<li><p><strong>si1</strong> (<em>int</em><em>, </em><em>optional</em>) -- Last sample number of the desired range. The default is None.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><strong>mz</strong> -- m/z vector of the requested sample number range</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>array</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kevent.KEvent.mz2sno">
+<code class="sig-name descname">mz2sno</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">mzs</span></em>, <em class="sig-param"><span class="n">roundit</span><span class="o">=</span><span class="default_value">False</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kevent.KEvent.mz2sno" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convert m/z to sample number.</p>
+<p>Conversion is done using the 'mz_mode' and 'mz_par' stored
+as attributes within the object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>mzs</strong> (<em>float</em><em> or </em><em>iterable</em>) -- m/z value(s) to convert</p></li>
+<li><p><strong>roundit</strong> (<em>bool</em><em>, </em><em>optional</em>) -- Whether to round the sample numbers to nearest integer,
+by default False.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Sample number(s) representing the 'mzs'.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>float or int or iterable</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kevent.KEvent.r_at">
+<code class="sig-name descname">r_at</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">x</span></em>, <em class="sig-param"><span class="n">mode</span><span class="o">=</span><span class="default_value">'R'</span></em>, <em class="sig-param"><span class="n">space</span><span class="o">=</span><span class="default_value">'mz'</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kevent.KEvent.r_at" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculate resolution at given m/z or sample number with the
+2-parameter resolution function.</p>
+<p>Can return resolution (m/dm), peak FWHM or peak sigma in either
+tof (sample number) or m/z space.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong> (<em>float</em>) -- Peak position as either m/z or TOF sample number, specified
+by the input parameter 'space'.</p></li>
+<li><p><strong>mode</strong> (<em>str</em><em>, </em><em>optional</em>) -- Allowed values are 'R', 'fwhm' and 'sigma', by default 'R'.</p></li>
+<li><p><strong>space</strong> (<em>str</em><em>, </em><em>optional</em>) -- Allowed values are 'mz' and 'tof', by default 'mz'.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Resolution at 'x'.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kevent.KEvent.r_at_3p">
+<code class="sig-name descname">r_at_3p</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">sno</span></em>, <em class="sig-param"><span class="n">mode</span><span class="o">=</span><span class="default_value">'R'</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kevent.KEvent.r_at_3p" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculate resolution at given sample number with the
+3-parameter resolution function.</p>
+<p>Can return resolution (m/dm), peak FWHM or peak sigma in
+TOF (sample number) space.</p>
+<p>TODO: Should be merged with 'r_at'.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>sno</strong> (<em>float</em>) -- Peak position in sample numbers.</p></li>
+<li><p><strong>mode</strong> (<em>str</em><em>, </em><em>optional</em>) -- Allowed values are 'R', 'fwhm' and 'sigma', by default 'R'.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Resolution at 'sno'.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kevent.KEvent.sno2mz">
+<code class="sig-name descname">sno2mz</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">snos</span></em>, <em class="sig-param"><span class="n">roundit</span><span class="o">=</span><span class="default_value">False</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kevent.KEvent.sno2mz" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convert sample number to m/z.</p>
+<p>Conversion is done using the 'mz_mode' and 'mz_par' stored
+as attributes within the object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>snos</strong> (<em>float</em><em> or </em><em>iterable</em>) -- Sample number(s) to convert</p></li>
+<li><p><strong>roundit</strong> (<em>bool</em><em>, </em><em>optional</em>) -- Whether to round the m/z(s) to nearest integer,
+by default False.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>m/z(s) representing the 'snos'.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>float or int or iterable</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kevent.KEvent.write_description">
+<code class="sig-name descname">write_description</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">description</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kevent.KEvent.write_description" title="Permalink to this definition">¶</a></dt>
+<dd><p>Write Sample Description to file</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>description</strong> (<em>str</em>) -- Sample Description to write</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kevent.KEvent.write_peaks">
+<code class="sig-name descname">write_peaks</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">peaks</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kevent.KEvent.write_peaks" title="Permalink to this definition">¶</a></dt>
+<dd><p>Write peaks to file</p>
+<dl class="simple">
+<dt>Write peak position and height to the h5 file, to datasets:</dt><dd><p>'/Karsa/peaks/pos'
+'/Karsa/peaks/hei'</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>peaks</strong> (<em>list</em>) -- List of 2-tuples with peak position (sample number) and height</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kevent.KEvent.write_sampleid">
+<code class="sig-name descname">write_sampleid</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">sampleid</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kevent.KEvent.write_sampleid" title="Permalink to this definition">¶</a></dt>
+<dd><p>Write Sample ID to file</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>sampleid</strong> (<em>str</em>) -- Sample ID to write</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">Scenthound</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="..\..\frontend.html#http://">Front-end</a></li>
+<li class="toctree-l1"><a class="reference external" href="..\..\frontend_deprecated.html#http://">Front-end deprecated</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="py_code.html">py_code</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="py_code.DataVizService.html">py_code.DataVizService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.FileService.html">py_code.FileService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.InstrumentClient.html">py_code.InstrumentClient</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.InstrumentService.html">py_code.InstrumentService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.MainService.html">py_code.MainService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.UIClasses.html">py_code.UIClasses</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.UIProperties.html">py_code.UIProperties</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.app.html">py_code.app</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.karsaorbi.html">py_code.karsaorbi</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="py_code.karsatof.html">py_code.karsatof</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kchem.html">py_code.karsatof.kchem</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kcode.html">py_code.karsatof.kcode</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kcollector.html">py_code.karsatof.kcollector</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kdatapool.html">py_code.karsatof.kdatapool</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="py_code.karsatof.kevent.html">py_code.karsatof.kevent</a><ul class="current">
+<li class="toctree-l4 current"><a class="current reference internal" href="#">py_code.karsatof.kevent.KEvent</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kfeeder.html">py_code.karsatof.kfeeder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kgenerator.html">py_code.karsatof.kgenerator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kimage.html">py_code.karsatof.kimage</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kinstrument.html">py_code.karsatof.kinstrument</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kpeak.html">py_code.karsatof.kpeak</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.ksegment.html">py_code.karsatof.ksegment</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.ksignalprocessor.html">py_code.karsatof.ksignalprocessor</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kspectra.html">py_code.karsatof.kspectra</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kutil.html">py_code.karsatof.kutil</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kworker.html">py_code.karsatof.kworker</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.lib.html">py_code.karsatof.lib</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.kcassettestation.html">py_code.kcassettestation</a></li>
+</ul>
+</li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="py_code.html">py_code</a><ul>
+  <li><a href="py_code.karsatof.html">py_code.karsatof</a><ul>
+  <li><a href="py_code.karsatof.kevent.html">py_code.karsatof.kevent</a><ul>
+      <li>Previous: <a href="py_code.karsatof.kevent.html" title="previous chapter">py_code.karsatof.kevent</a></li>
+      <li>Next: <a href="py_code.karsatof.kfeeder.html" title="next chapter">py_code.karsatof.kfeeder</a></li>
+  </ul></li>
+  </ul></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Karsa Ltd..
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.1.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/_autosummary/py_code.karsatof.kevent.KEvent.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

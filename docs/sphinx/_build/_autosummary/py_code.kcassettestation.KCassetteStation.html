@@ -1,0 +1,434 @@
+
+<!DOCTYPE html>
+
+<html lang="Python, JavaScript">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>py_code.kcassettestation.KCassetteStation &#8212; Scenthound 0.1 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="prev" title="py_code.kcassettestation" href="py_code.kcassettestation.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="py-code-kcassettestation-kcassettestation">
+<h1>py_code.kcassettestation.KCassetteStation<a class="headerlink" href="#py-code-kcassettestation-kcassettestation" title="Permalink to this headline">¶</a></h1>
+<dl class="py class">
+<dt id="py_code.kcassettestation.KCassetteStation">
+<em class="property">class </em><code class="sig-prename descclassname">py_code.kcassettestation.</code><code class="sig-name descname">KCassetteStation</code><a class="headerlink" href="#py_code.kcassettestation.KCassetteStation" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">threading.Thread</span></code></p>
+<p>Class to interface with Cassette Station hardware</p>
+<dl class="py method">
+<dt id="py_code.kcassettestation.KCassetteStation.__init__">
+<code class="sig-name descname">__init__</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#py_code.kcassettestation.KCassetteStation.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>This constructor should always be called with keyword arguments. Arguments are:</p>
+<p><em>group</em> should be None; reserved for future extension when a ThreadGroup
+class is implemented.</p>
+<p><em>target</em> is the callable object to be invoked by the run()
+method. Defaults to None, meaning nothing is called.</p>
+<p><em>name</em> is the thread name. By default, a unique name is constructed of
+the form &quot;Thread-N&quot; where N is a small decimal number.</p>
+<p><em>args</em> is the argument tuple for the target invocation. Defaults to ().</p>
+<p><em>kwargs</em> is a dictionary of keyword arguments for the target
+invocation. Defaults to {}.</p>
+<p>If a subclass overrides the constructor, it must make sure to invoke
+the base class constructor (Thread.__init__()) before doing anything
+else to the thread.</p>
+</dd></dl>
+
+<p class="rubric">Methods</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.kcassettestation.KCassetteStation.__init__" title="py_code.kcassettestation.KCassetteStation.__init__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code></a>()</p></td>
+<td><p>This constructor should always be called with keyword arguments.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.kcassettestation.KCassetteStation.close_inlet" title="py_code.kcassettestation.KCassetteStation.close_inlet"><code class="xref py py-obj docutils literal notranslate"><span class="pre">close_inlet</span></code></a>()</p></td>
+<td><p>Function to simulate manual/automated inlet closing</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">end_desorption</span></code>()</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">end_verification</span></code>()</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">getName</span></code>()</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.kcassettestation.KCassetteStation.init_inlet" title="py_code.kcassettestation.KCassetteStation.init_inlet"><code class="xref py py-obj docutils literal notranslate"><span class="pre">init_inlet</span></code></a>()</p></td>
+<td><p>Initialize CI inlet: set flows and xray etc.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.kcassettestation.KCassetteStation.init_station" title="py_code.kcassettestation.KCassetteStation.init_station"><code class="xref py py-obj docutils literal notranslate"><span class="pre">init_station</span></code></a>()</p></td>
+<td><p>Make sure station is empty and closed</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.kcassettestation.KCassetteStation.insert_cassette" title="py_code.kcassettestation.KCassetteStation.insert_cassette"><code class="xref py py-obj docutils literal notranslate"><span class="pre">insert_cassette</span></code></a>()</p></td>
+<td><p>Function to simulate manual cassette insertion</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.kcassettestation.KCassetteStation.isAlive" title="py_code.kcassettestation.KCassetteStation.isAlive"><code class="xref py py-obj docutils literal notranslate"><span class="pre">isAlive</span></code></a>()</p></td>
+<td><p>Return whether the thread is alive.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">isDaemon</span></code>()</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.kcassettestation.KCassetteStation.is_alive" title="py_code.kcassettestation.KCassetteStation.is_alive"><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_alive</span></code></a>()</p></td>
+<td><p>Return whether the thread is alive.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.kcassettestation.KCassetteStation.join" title="py_code.kcassettestation.KCassetteStation.join"><code class="xref py py-obj docutils literal notranslate"><span class="pre">join</span></code></a>([timeout])</p></td>
+<td><p>Wait until the thread terminates.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.kcassettestation.KCassetteStation.open_inlet" title="py_code.kcassettestation.KCassetteStation.open_inlet"><code class="xref py py-obj docutils literal notranslate"><span class="pre">open_inlet</span></code></a>()</p></td>
+<td><p>Function to simulate manual/automated inlet opening</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.kcassettestation.KCassetteStation.pop_cassette" title="py_code.kcassettestation.KCassetteStation.pop_cassette"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pop_cassette</span></code></a>()</p></td>
+<td><p>Function to simulate automatic ejection of the cassette</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.kcassettestation.KCassetteStation.read_cassette_in_switch" title="py_code.kcassettestation.KCassetteStation.read_cassette_in_switch"><code class="xref py py-obj docutils literal notranslate"><span class="pre">read_cassette_in_switch</span></code></a>()</p></td>
+<td><p>Read state of physical &quot;cassette in&quot; switch</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.kcassettestation.KCassetteStation.read_cassette_out_switch" title="py_code.kcassettestation.KCassetteStation.read_cassette_out_switch"><code class="xref py py-obj docutils literal notranslate"><span class="pre">read_cassette_out_switch</span></code></a>()</p></td>
+<td><p>Read state of physical &quot;cassette out&quot; switch</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.kcassettestation.KCassetteStation.read_inlet_closed_switch" title="py_code.kcassettestation.KCassetteStation.read_inlet_closed_switch"><code class="xref py py-obj docutils literal notranslate"><span class="pre">read_inlet_closed_switch</span></code></a>()</p></td>
+<td><p>Read state of physical &quot;inlet closed&quot; switch</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.kcassettestation.KCassetteStation.read_inlet_open_switch" title="py_code.kcassettestation.KCassetteStation.read_inlet_open_switch"><code class="xref py py-obj docutils literal notranslate"><span class="pre">read_inlet_open_switch</span></code></a>()</p></td>
+<td><p>Read state of physical &quot;inlet open&quot; switch</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">read_temperature</span></code>()</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.kcassettestation.KCassetteStation.run" title="py_code.kcassettestation.KCassetteStation.run"><code class="xref py py-obj docutils literal notranslate"><span class="pre">run</span></code></a>()</p></td>
+<td><p>Method representing the thread's activity.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">setDaemon</span></code>(daemonic)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">setName</span></code>(name)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_temperature</span></code>(T)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">shutdown</span></code>()</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.kcassettestation.KCassetteStation.start" title="py_code.kcassettestation.KCassetteStation.start"><code class="xref py py-obj docutils literal notranslate"><span class="pre">start</span></code></a>()</p></td>
+<td><p>Start the thread's activity.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">start_desorption</span></code>()</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">start_verification</span></code>()</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.kcassettestation.KCassetteStation.update" title="py_code.kcassettestation.KCassetteStation.update"><code class="xref py py-obj docutils literal notranslate"><span class="pre">update</span></code></a>()</p></td>
+<td><p>Update sensor readings etc</p></td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Attributes</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.kcassettestation.KCassetteStation.daemon" title="py_code.kcassettestation.KCassetteStation.daemon"><code class="xref py py-obj docutils literal notranslate"><span class="pre">daemon</span></code></a></p></td>
+<td><p>A boolean value indicating whether this thread is a daemon thread.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.kcassettestation.KCassetteStation.ident" title="py_code.kcassettestation.KCassetteStation.ident"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ident</span></code></a></p></td>
+<td><p>Thread identifier of this thread or None if it has not been started.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.kcassettestation.KCassetteStation.name" title="py_code.kcassettestation.KCassetteStation.name"><code class="xref py py-obj docutils literal notranslate"><span class="pre">name</span></code></a></p></td>
+<td><p>A string used for identification purposes only.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.kcassettestation.KCassetteStation.native_id" title="py_code.kcassettestation.KCassetteStation.native_id"><code class="xref py py-obj docutils literal notranslate"><span class="pre">native_id</span></code></a></p></td>
+<td><p>Native integral thread ID of this thread, or None if it has not been started.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">states</span></code></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">transitions</span></code></p></td>
+<td><p></p></td>
+</tr>
+</tbody>
+</table>
+<dl class="py method">
+<dt id="py_code.kcassettestation.KCassetteStation.close_inlet">
+<code class="sig-name descname">close_inlet</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#py_code.kcassettestation.KCassetteStation.close_inlet" title="Permalink to this definition">¶</a></dt>
+<dd><p>Function to simulate manual/automated inlet closing</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.kcassettestation.KCassetteStation.daemon">
+<em class="property">property </em><code class="sig-name descname">daemon</code><a class="headerlink" href="#py_code.kcassettestation.KCassetteStation.daemon" title="Permalink to this definition">¶</a></dt>
+<dd><p>A boolean value indicating whether this thread is a daemon thread.</p>
+<p>This must be set before start() is called, otherwise RuntimeError is
+raised. Its initial value is inherited from the creating thread; the
+main thread is not a daemon thread and therefore all threads created in
+the main thread default to daemon = False.</p>
+<p>The entire Python program exits when only daemon threads are left.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.kcassettestation.KCassetteStation.ident">
+<em class="property">property </em><code class="sig-name descname">ident</code><a class="headerlink" href="#py_code.kcassettestation.KCassetteStation.ident" title="Permalink to this definition">¶</a></dt>
+<dd><p>Thread identifier of this thread or None if it has not been started.</p>
+<p>This is a nonzero integer. See the get_ident() function. Thread
+identifiers may be recycled when a thread exits and another thread is
+created. The identifier is available even after the thread has exited.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.kcassettestation.KCassetteStation.init_inlet">
+<code class="sig-name descname">init_inlet</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#py_code.kcassettestation.KCassetteStation.init_inlet" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initialize CI inlet: set flows and xray etc.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.kcassettestation.KCassetteStation.init_station">
+<code class="sig-name descname">init_station</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#py_code.kcassettestation.KCassetteStation.init_station" title="Permalink to this definition">¶</a></dt>
+<dd><p>Make sure station is empty and closed</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.kcassettestation.KCassetteStation.insert_cassette">
+<code class="sig-name descname">insert_cassette</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#py_code.kcassettestation.KCassetteStation.insert_cassette" title="Permalink to this definition">¶</a></dt>
+<dd><p>Function to simulate manual cassette insertion</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.kcassettestation.KCassetteStation.isAlive">
+<code class="sig-name descname">isAlive</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#py_code.kcassettestation.KCassetteStation.isAlive" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return whether the thread is alive.</p>
+<p>This method is deprecated, use is_alive() instead.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.kcassettestation.KCassetteStation.is_alive">
+<code class="sig-name descname">is_alive</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#py_code.kcassettestation.KCassetteStation.is_alive" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return whether the thread is alive.</p>
+<p>This method returns True just before the run() method starts until just
+after the run() method terminates. The module function enumerate()
+returns a list of all alive threads.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.kcassettestation.KCassetteStation.join">
+<code class="sig-name descname">join</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">timeout</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.kcassettestation.KCassetteStation.join" title="Permalink to this definition">¶</a></dt>
+<dd><p>Wait until the thread terminates.</p>
+<p>This blocks the calling thread until the thread whose join() method is
+called terminates -- either normally or through an unhandled exception
+or until the optional timeout occurs.</p>
+<p>When the timeout argument is present and not None, it should be a
+floating point number specifying a timeout for the operation in seconds
+(or fractions thereof). As join() always returns None, you must call
+is_alive() after join() to decide whether a timeout happened -- if the
+thread is still alive, the join() call timed out.</p>
+<p>When the timeout argument is not present or None, the operation will
+block until the thread terminates.</p>
+<p>A thread can be join()ed many times.</p>
+<p>join() raises a RuntimeError if an attempt is made to join the current
+thread as that would cause a deadlock. It is also an error to join() a
+thread before it has been started and attempts to do so raises the same
+exception.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.kcassettestation.KCassetteStation.name">
+<em class="property">property </em><code class="sig-name descname">name</code><a class="headerlink" href="#py_code.kcassettestation.KCassetteStation.name" title="Permalink to this definition">¶</a></dt>
+<dd><p>A string used for identification purposes only.</p>
+<p>It has no semantics. Multiple threads may be given the same name. The
+initial name is set by the constructor.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.kcassettestation.KCassetteStation.native_id">
+<em class="property">property </em><code class="sig-name descname">native_id</code><a class="headerlink" href="#py_code.kcassettestation.KCassetteStation.native_id" title="Permalink to this definition">¶</a></dt>
+<dd><p>Native integral thread ID of this thread, or None if it has not been started.</p>
+<p>This is a non-negative integer. See the get_native_id() function.
+This represents the Thread ID as reported by the kernel.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.kcassettestation.KCassetteStation.open_inlet">
+<code class="sig-name descname">open_inlet</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#py_code.kcassettestation.KCassetteStation.open_inlet" title="Permalink to this definition">¶</a></dt>
+<dd><p>Function to simulate manual/automated inlet opening</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.kcassettestation.KCassetteStation.pop_cassette">
+<code class="sig-name descname">pop_cassette</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#py_code.kcassettestation.KCassetteStation.pop_cassette" title="Permalink to this definition">¶</a></dt>
+<dd><p>Function to simulate automatic ejection of the cassette</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.kcassettestation.KCassetteStation.read_cassette_in_switch">
+<code class="sig-name descname">read_cassette_in_switch</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#py_code.kcassettestation.KCassetteStation.read_cassette_in_switch" title="Permalink to this definition">¶</a></dt>
+<dd><p>Read state of physical &quot;cassette in&quot; switch</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.kcassettestation.KCassetteStation.read_cassette_out_switch">
+<code class="sig-name descname">read_cassette_out_switch</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#py_code.kcassettestation.KCassetteStation.read_cassette_out_switch" title="Permalink to this definition">¶</a></dt>
+<dd><p>Read state of physical &quot;cassette out&quot; switch</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.kcassettestation.KCassetteStation.read_inlet_closed_switch">
+<code class="sig-name descname">read_inlet_closed_switch</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#py_code.kcassettestation.KCassetteStation.read_inlet_closed_switch" title="Permalink to this definition">¶</a></dt>
+<dd><p>Read state of physical &quot;inlet closed&quot; switch</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.kcassettestation.KCassetteStation.read_inlet_open_switch">
+<code class="sig-name descname">read_inlet_open_switch</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#py_code.kcassettestation.KCassetteStation.read_inlet_open_switch" title="Permalink to this definition">¶</a></dt>
+<dd><p>Read state of physical &quot;inlet open&quot; switch</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.kcassettestation.KCassetteStation.run">
+<code class="sig-name descname">run</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#py_code.kcassettestation.KCassetteStation.run" title="Permalink to this definition">¶</a></dt>
+<dd><p>Method representing the thread's activity.</p>
+<p>You may override this method in a subclass. The standard run() method
+invokes the callable object passed to the object's constructor as the
+target argument, if any, with sequential and keyword arguments taken
+from the args and kwargs arguments, respectively.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.kcassettestation.KCassetteStation.start">
+<code class="sig-name descname">start</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#py_code.kcassettestation.KCassetteStation.start" title="Permalink to this definition">¶</a></dt>
+<dd><p>Start the thread's activity.</p>
+<p>It must be called at most once per thread object. It arranges for the
+object's run() method to be invoked in a separate thread of control.</p>
+<p>This method will raise a RuntimeError if called more than once on the
+same thread object.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.kcassettestation.KCassetteStation.update">
+<code class="sig-name descname">update</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#py_code.kcassettestation.KCassetteStation.update" title="Permalink to this definition">¶</a></dt>
+<dd><p>Update sensor readings etc</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">Scenthound</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="..\..\frontend.html#http://">Front-end</a></li>
+<li class="toctree-l1"><a class="reference external" href="..\..\frontend_deprecated.html#http://">Front-end deprecated</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="py_code.html">py_code</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="py_code.DataVizService.html">py_code.DataVizService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.FileService.html">py_code.FileService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.InstrumentClient.html">py_code.InstrumentClient</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.InstrumentService.html">py_code.InstrumentService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.MainService.html">py_code.MainService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.UIClasses.html">py_code.UIClasses</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.UIProperties.html">py_code.UIProperties</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.app.html">py_code.app</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.karsaorbi.html">py_code.karsaorbi</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.karsatof.html">py_code.karsatof</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="py_code.kcassettestation.html">py_code.kcassettestation</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">py_code.kcassettestation.KCassetteStation</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="py_code.html">py_code</a><ul>
+  <li><a href="py_code.kcassettestation.html">py_code.kcassettestation</a><ul>
+      <li>Previous: <a href="py_code.kcassettestation.html" title="previous chapter">py_code.kcassettestation</a></li>
+  </ul></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Karsa Ltd..
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.1.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/_autosummary/py_code.kcassettestation.KCassetteStation.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

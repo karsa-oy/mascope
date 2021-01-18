@@ -1,0 +1,216 @@
+
+<!DOCTYPE html>
+
+<html lang="Python, JavaScript">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>py_code.InstrumentService &#8212; Scenthound 0.1 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="py_code.InstrumentService.getattr_r" href="py_code.InstrumentService.getattr_r.html" />
+    <link rel="prev" title="py_code.InstrumentClient.ObjTraversableProxy" href="py_code.InstrumentClient.ObjTraversableProxy.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="module-py_code.InstrumentService">
+<span id="py-code-instrumentservice"></span><h1>py_code.InstrumentService<a class="headerlink" href="#module-py_code.InstrumentService" title="Permalink to this headline">¶</a></h1>
+<p>Instrument Service</p>
+<p>This script runs the instrument service for Karsa Tarkka TOF system.</p>
+<p>InstrumentService connects to TofDaq Recorder data stream via
+<a class="reference internal" href="py_code.karsatof.kgenerator.KAcquisition.html#py_code.karsatof.kgenerator.KAcquisition" title="py_code.karsatof.kgenerator.KAcquisition"><code class="xref py py-class docutils literal notranslate"><span class="pre">KAcquisition</span></code></a>. It (optionally) starts also
+<a class="reference internal" href="py_code.karsatof.ksignalprocessor.KSignalProcessor.html#py_code.karsatof.ksignalprocessor.KSignalProcessor" title="py_code.karsatof.ksignalprocessor.KSignalProcessor"><code class="xref py py-class docutils literal notranslate"><span class="pre">KSignalProcessor</span></code></a> instance,
+which processes the data in real time.</p>
+<p>Running this script will start Pyro4 nameserver as a subprocess. Then
+it initializes <a class="reference internal" href="py_code.karsatof.kgenerator.KAcquisition.html#py_code.karsatof.kgenerator.KAcquisition" title="py_code.karsatof.kgenerator.KAcquisition"><code class="xref py py-class docutils literal notranslate"><span class="pre">KAcquisition</span></code></a> instance,
+and thus requires TofDaq Recorder to be running. When
+<a class="reference internal" href="py_code.karsatof.kgenerator.KAcquisition.html#py_code.karsatof.kgenerator.KAcquisition" title="py_code.karsatof.kgenerator.KAcquisition"><code class="xref py py-class docutils literal notranslate"><span class="pre">KAcquisition</span></code></a>
+(and <a class="reference internal" href="py_code.karsatof.ksignalprocessor.KSignalProcessor.html#py_code.karsatof.ksignalprocessor.KSignalProcessor" title="py_code.karsatof.ksignalprocessor.KSignalProcessor"><code class="xref py py-class docutils literal notranslate"><span class="pre">KSignalProcessor</span></code></a>) is running,
+it starts a Pyro Daemon to expose proxy objects for the threads. Finally,
+it tries to connect to the <a class="reference internal" href="py_code.MainService.html#module-py_code.MainService" title="py_code.MainService"><code class="xref py py-mod docutils literal notranslate"><span class="pre">MainService</span></code></a> via socket.io until
+succesful. Then the script enters <a class="reference internal" href="py_code.InstrumentService.main.html#py_code.InstrumentService.main" title="py_code.InstrumentService.main"><code class="xref py py-func docutils literal notranslate"><span class="pre">main()</span></code></a> function. After exiting
+<a class="reference internal" href="py_code.InstrumentService.main.html#py_code.InstrumentService.main" title="py_code.InstrumentService.main"><code class="xref py py-func docutils literal notranslate"><span class="pre">main()</span></code></a> it will execute <a class="reference internal" href="py_code.InstrumentService.shutdown.html#py_code.InstrumentService.shutdown" title="py_code.InstrumentService.shutdown"><code class="xref py py-func docutils literal notranslate"><span class="pre">shutdown()</span></code></a>.</p>
+<p>Command line argument --ksp=False can be used to not run
+<a class="reference internal" href="py_code.karsatof.ksignalprocessor.KSignalProcessor.html#py_code.karsatof.ksignalprocessor.KSignalProcessor" title="py_code.karsatof.ksignalprocessor.KSignalProcessor"><code class="xref py py-class docutils literal notranslate"><span class="pre">KSignalProcessor</span></code></a>. For developing
+it is sometimes unnecessary and running without it is faster.</p>
+<p>TODO: Get around requirement of <a class="reference internal" href="py_code.MainService.html#module-py_code.MainService" title="py_code.MainService"><code class="xref py py-mod docutils literal notranslate"><span class="pre">MainService</span></code></a> connection at
+initialization. Instead, if it fails, try to re-connect periodically</p>
+<p>Created on Mon Apr 20 10:40:56 2020</p>
+<p class="rubric">Functions</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="py_code.InstrumentService.getattr_r.html#py_code.InstrumentService.getattr_r" title="py_code.InstrumentService.getattr_r"><code class="xref py py-obj docutils literal notranslate"><span class="pre">getattr_r</span></code></a>(obj, *attrs)</p></td>
+<td><p>Utility function to help access class remotely</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="py_code.InstrumentService.initialize_kacquisition.html#py_code.InstrumentService.initialize_kacquisition" title="py_code.InstrumentService.initialize_kacquisition"><code class="xref py py-obj docutils literal notranslate"><span class="pre">initialize_kacquisition</span></code></a>(barrier, shutdown_event)</p></td>
+<td><p>Initialize KAcquisition instance</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="py_code.InstrumentService.initialize_ksignalprocessor.html#py_code.InstrumentService.initialize_ksignalprocessor" title="py_code.InstrumentService.initialize_ksignalprocessor"><code class="xref py py-obj docutils literal notranslate"><span class="pre">initialize_ksignalprocessor</span></code></a>(barrier, ...)</p></td>
+<td><p>Initialize KSignalProcessor instance</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="py_code.InstrumentService.main.html#py_code.InstrumentService.main" title="py_code.InstrumentService.main"><code class="xref py py-obj docutils literal notranslate"><span class="pre">main</span></code></a>()</p></td>
+<td><p>Main event loop of the service</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="py_code.InstrumentService.read_cmd_arguments.html#py_code.InstrumentService.read_cmd_arguments" title="py_code.InstrumentService.read_cmd_arguments"><code class="xref py py-obj docutils literal notranslate"><span class="pre">read_cmd_arguments</span></code></a>()</p></td>
+<td><p>Parse command line arguments</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="py_code.InstrumentService.shutdown.html#py_code.InstrumentService.shutdown" title="py_code.InstrumentService.shutdown"><code class="xref py py-obj docutils literal notranslate"><span class="pre">shutdown</span></code></a>()</p></td>
+<td><p>Actions to perform at shutdown</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="py_code.InstrumentService.start_pyro_daemon.html#py_code.InstrumentService.start_pyro_daemon" title="py_code.InstrumentService.start_pyro_daemon"><code class="xref py py-obj docutils literal notranslate"><span class="pre">start_pyro_daemon</span></code></a>(kacquisition, ksignalprocessor)</p></td>
+<td><p>Instantiate and start PyroDaemon, returns when the thread is alive</p></td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Classes</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="py_code.InstrumentService.ComplexObjectProxy.html#py_code.InstrumentService.ComplexObjectProxy" title="py_code.InstrumentService.ComplexObjectProxy"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ComplexObjectProxy</span></code></a>(inst)</p></td>
+<td><p>Define a general proxy object for a complex class with nested objects !!! This implementation may open a security vulnerability Dotted name (object traversal) !!!</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="py_code.InstrumentService.InstrumentNamespace.html#py_code.InstrumentService.InstrumentNamespace" title="py_code.InstrumentService.InstrumentNamespace"><code class="xref py py-obj docutils literal notranslate"><span class="pre">InstrumentNamespace</span></code></a>([namespace])</p></td>
+<td><p>python-socket.io Client namespace for InstrumentService</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="py_code.InstrumentService.KAcquisitionProxy.html#py_code.InstrumentService.KAcquisitionProxy" title="py_code.InstrumentService.KAcquisitionProxy"><code class="xref py py-obj docutils literal notranslate"><span class="pre">KAcquisitionProxy</span></code></a>(kacquisition)</p></td>
+<td><p>Define a proxy object for KAcquisition</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="py_code.InstrumentService.KSignalProcessorProxy.html#py_code.InstrumentService.KSignalProcessorProxy" title="py_code.InstrumentService.KSignalProcessorProxy"><code class="xref py py-obj docutils literal notranslate"><span class="pre">KSignalProcessorProxy</span></code></a>(ksignalprocessor)</p></td>
+<td><p>Define a proxy object for KSignalProcessor</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="py_code.InstrumentService.PyroDaemon.html#py_code.InstrumentService.PyroDaemon" title="py_code.InstrumentService.PyroDaemon"><code class="xref py py-obj docutils literal notranslate"><span class="pre">PyroDaemon</span></code></a>(kacquisition, ksignalprocessor)</p></td>
+<td><p>Pyro Daemon thread</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">Scenthound</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="..\..\frontend.html#http://">Front-end</a></li>
+<li class="toctree-l1"><a class="reference external" href="..\..\frontend_deprecated.html#http://">Front-end deprecated</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="py_code.html">py_code</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="py_code.DataVizService.html">py_code.DataVizService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.FileService.html">py_code.FileService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.InstrumentClient.html">py_code.InstrumentClient</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">py_code.InstrumentService</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="py_code.InstrumentService.getattr_r.html">py_code.InstrumentService.getattr_r</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.InstrumentService.initialize_kacquisition.html">py_code.InstrumentService.initialize_kacquisition</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.InstrumentService.initialize_ksignalprocessor.html">py_code.InstrumentService.initialize_ksignalprocessor</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.InstrumentService.main.html">py_code.InstrumentService.main</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.InstrumentService.read_cmd_arguments.html">py_code.InstrumentService.read_cmd_arguments</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.InstrumentService.shutdown.html">py_code.InstrumentService.shutdown</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.InstrumentService.start_pyro_daemon.html">py_code.InstrumentService.start_pyro_daemon</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.InstrumentService.ComplexObjectProxy.html">py_code.InstrumentService.ComplexObjectProxy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.InstrumentService.InstrumentNamespace.html">py_code.InstrumentService.InstrumentNamespace</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.InstrumentService.KAcquisitionProxy.html">py_code.InstrumentService.KAcquisitionProxy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.InstrumentService.KSignalProcessorProxy.html">py_code.InstrumentService.KSignalProcessorProxy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.InstrumentService.PyroDaemon.html">py_code.InstrumentService.PyroDaemon</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.MainService.html">py_code.MainService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.UIClasses.html">py_code.UIClasses</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.UIProperties.html">py_code.UIProperties</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.app.html">py_code.app</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.karsaorbi.html">py_code.karsaorbi</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.karsatof.html">py_code.karsatof</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.kcassettestation.html">py_code.kcassettestation</a></li>
+</ul>
+</li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="py_code.html">py_code</a><ul>
+      <li>Previous: <a href="py_code.InstrumentClient.ObjTraversableProxy.html" title="previous chapter">py_code.InstrumentClient.ObjTraversableProxy</a></li>
+      <li>Next: <a href="py_code.InstrumentService.getattr_r.html" title="next chapter">py_code.InstrumentService.getattr_r</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Karsa Ltd..
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.1.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/_autosummary/py_code.InstrumentService.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

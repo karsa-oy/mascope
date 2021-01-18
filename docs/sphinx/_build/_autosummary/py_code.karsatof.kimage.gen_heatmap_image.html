@@ -1,0 +1,190 @@
+
+<!DOCTYPE html>
+
+<html lang="Python, JavaScript">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>py_code.karsatof.kimage.gen_heatmap_image &#8212; Scenthound 0.1 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="py_code.karsatof.kimage.gen_ridge_traces" href="py_code.karsatof.kimage.gen_ridge_traces.html" />
+    <link rel="prev" title="py_code.karsatof.kimage.convert_to_base64" href="py_code.karsatof.kimage.convert_to_base64.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="py-code-karsatof-kimage-gen-heatmap-image">
+<h1>py_code.karsatof.kimage.gen_heatmap_image<a class="headerlink" href="#py-code-karsatof-kimage-gen-heatmap-image" title="Permalink to this headline">¶</a></h1>
+<dl class="py function">
+<dt id="py_code.karsatof.kimage.gen_heatmap_image">
+<code class="sig-prename descclassname">py_code.karsatof.kimage.</code><code class="sig-name descname">gen_heatmap_image</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">data_xarray</span></em>, <em class="sig-param"><span class="n">t_range</span></em>, <em class="sig-param"><span class="n">mz_range</span></em>, <em class="sig-param"><span class="n">img_width</span><span class="o">=</span><span class="default_value">600</span></em>, <em class="sig-param"><span class="n">img_height</span><span class="o">=</span><span class="default_value">600</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kimage.gen_heatmap_image" title="Permalink to this definition">¶</a></dt>
+<dd><p>Generate heatmap image to visualize spectra in 2D using datashader</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data_xarray</strong> (<em>DataArray</em>) -- Array with the data to visualize</p></li>
+<li><p><strong>t_range</strong> (<em>tuple</em><em>, </em><em>optional</em>) -- 2-tuple with start time and end time of the desired time
+range (seconds), by default None. If None, full range will be used.</p></li>
+<li><p><strong>mz_range</strong> (<em>tuple</em><em>, </em><em>optional</em>) -- 2-tuple with min m/z and max m/z of the desired mass
+range, by default None. If None, full range will be used.</p></li>
+<li><p><strong>img_width</strong> (<em>int</em><em>, </em><em>optional</em>) -- Image width (pixels), by default 600</p></li>
+<li><p><strong>img_height</strong> (<em>int</em><em>, </em><em>optional</em>) -- Image height (pixels), by default 600</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>PIL Image containing the heatmap, time advances from
+left to right,  m/z from bottom to top.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>Image</p>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">Scenthound</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="..\..\frontend.html#http://">Front-end</a></li>
+<li class="toctree-l1"><a class="reference external" href="..\..\frontend_deprecated.html#http://">Front-end deprecated</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="py_code.html">py_code</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="py_code.DataVizService.html">py_code.DataVizService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.FileService.html">py_code.FileService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.InstrumentClient.html">py_code.InstrumentClient</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.InstrumentService.html">py_code.InstrumentService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.MainService.html">py_code.MainService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.UIClasses.html">py_code.UIClasses</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.UIProperties.html">py_code.UIProperties</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.app.html">py_code.app</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.karsaorbi.html">py_code.karsaorbi</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="py_code.karsatof.html">py_code.karsatof</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kchem.html">py_code.karsatof.kchem</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kcode.html">py_code.karsatof.kcode</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kcollector.html">py_code.karsatof.kcollector</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kdatapool.html">py_code.karsatof.kdatapool</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kevent.html">py_code.karsatof.kevent</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kfeeder.html">py_code.karsatof.kfeeder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kgenerator.html">py_code.karsatof.kgenerator</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="py_code.karsatof.kimage.html">py_code.karsatof.kimage</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="py_code.karsatof.kimage.convert_to_base64.html">py_code.karsatof.kimage.convert_to_base64</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">py_code.karsatof.kimage.gen_heatmap_image</a></li>
+<li class="toctree-l4"><a class="reference internal" href="py_code.karsatof.kimage.gen_ridge_traces.html">py_code.karsatof.kimage.gen_ridge_traces</a></li>
+<li class="toctree-l4"><a class="reference internal" href="py_code.karsatof.kimage.gen_spec_image.html">py_code.karsatof.kimage.gen_spec_image</a></li>
+<li class="toctree-l4"><a class="reference internal" href="py_code.karsatof.kimage.gen_spec_stack_image.html">py_code.karsatof.kimage.gen_spec_stack_image</a></li>
+<li class="toctree-l4"><a class="reference internal" href="py_code.karsatof.kimage.gen_timeseries_trace.html">py_code.karsatof.kimage.gen_timeseries_trace</a></li>
+<li class="toctree-l4"><a class="reference internal" href="py_code.karsatof.kimage.merge_heatmap_slices.html">py_code.karsatof.kimage.merge_heatmap_slices</a></li>
+<li class="toctree-l4"><a class="reference internal" href="py_code.karsatof.kimage.read_img_from_h5.html">py_code.karsatof.kimage.read_img_from_h5</a></li>
+<li class="toctree-l4"><a class="reference internal" href="py_code.karsatof.kimage.stack_spec_images.html">py_code.karsatof.kimage.stack_spec_images</a></li>
+<li class="toctree-l4"><a class="reference internal" href="py_code.karsatof.kimage.write_img_to_h5.html">py_code.karsatof.kimage.write_img_to_h5</a></li>
+<li class="toctree-l4"><a class="reference internal" href="py_code.karsatof.kimage.KHeatmapGenerator.html">py_code.karsatof.kimage.KHeatmapGenerator</a></li>
+<li class="toctree-l4"><a class="reference internal" href="py_code.karsatof.kimage.KSpecImageGenerator.html">py_code.karsatof.kimage.KSpecImageGenerator</a></li>
+<li class="toctree-l4"><a class="reference internal" href="py_code.karsatof.kimage.KSpecStacker.html">py_code.karsatof.kimage.KSpecStacker</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kinstrument.html">py_code.karsatof.kinstrument</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kpeak.html">py_code.karsatof.kpeak</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.ksegment.html">py_code.karsatof.ksegment</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.ksignalprocessor.html">py_code.karsatof.ksignalprocessor</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kspectra.html">py_code.karsatof.kspectra</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kutil.html">py_code.karsatof.kutil</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kworker.html">py_code.karsatof.kworker</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.lib.html">py_code.karsatof.lib</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.kcassettestation.html">py_code.kcassettestation</a></li>
+</ul>
+</li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="py_code.html">py_code</a><ul>
+  <li><a href="py_code.karsatof.html">py_code.karsatof</a><ul>
+  <li><a href="py_code.karsatof.kimage.html">py_code.karsatof.kimage</a><ul>
+      <li>Previous: <a href="py_code.karsatof.kimage.convert_to_base64.html" title="previous chapter">py_code.karsatof.kimage.convert_to_base64</a></li>
+      <li>Next: <a href="py_code.karsatof.kimage.gen_ridge_traces.html" title="next chapter">py_code.karsatof.kimage.gen_ridge_traces</a></li>
+  </ul></li>
+  </ul></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Karsa Ltd..
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.1.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/_autosummary/py_code.karsatof.kimage.gen_heatmap_image.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

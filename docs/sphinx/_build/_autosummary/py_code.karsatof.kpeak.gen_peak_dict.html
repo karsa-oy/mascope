@@ -1,0 +1,192 @@
+
+<!DOCTYPE html>
+
+<html lang="Python, JavaScript">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>py_code.karsatof.kpeak.gen_peak_dict &#8212; Scenthound 0.1 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="py_code.karsatof.kpeak.gen_peak_kernel" href="py_code.karsatof.kpeak.gen_peak_kernel.html" />
+    <link rel="prev" title="py_code.karsatof.kpeak.gen_peak" href="py_code.karsatof.kpeak.gen_peak.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="py-code-karsatof-kpeak-gen-peak-dict">
+<h1>py_code.karsatof.kpeak.gen_peak_dict<a class="headerlink" href="#py-code-karsatof-kpeak-gen-peak-dict" title="Permalink to this headline">¶</a></h1>
+<dl class="py function">
+<dt id="py_code.karsatof.kpeak.gen_peak_dict">
+<code class="sig-prename descclassname">py_code.karsatof.kpeak.</code><code class="sig-name descname">gen_peak_dict</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">kinstrument</span></em>, <em class="sig-param"><span class="n">u0</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">u1</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">subsampling</span><span class="o">=</span><span class="default_value">1.0</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kpeak.gen_peak_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Generate peak dictionary.</p>
+<p>Generates a dictionary of peaks (as a sparse matrix) to be utilized
+by the SparseCoder algorithm. It uses the peakshape and resolution
+information from the 'kinstrument' instance and generates a peak
+for every (1 * 'subsampling') sample number.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>kinstrument</strong> (<a class="reference internal" href="py_code.karsatof.kinstrument.KInstrument.html#py_code.karsatof.kinstrument.KInstrument" title="py_code.karsatof.kinstrument.KInstrument"><em>KInstrument</em></a>) -- KInstrument instance for which to generate the dictionary.</p></li>
+<li><p><strong>u0</strong> (<em>int</em><em>, </em><em>optional</em>) -- First unit mass to include, by default None</p></li>
+<li><p><strong>u1</strong> (<em>int</em><em>, </em><em>optional</em>) -- Last unit mass to include, by default None</p></li>
+<li><p><strong>subsampling</strong> (<em>float</em><em>, </em><em>optional</em>) -- Sub-/Supersampling factor, by default 1. Values below 1
+lead to supersampling, whereas above 1 to subsampling.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Sparse matrix where each row represents a peak at a certain position.
+The peak position at row 'i' (in sample numbers) is 'i' * 'subsampling'.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>csr</p>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">Scenthound</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="..\..\frontend.html#http://">Front-end</a></li>
+<li class="toctree-l1"><a class="reference external" href="..\..\frontend_deprecated.html#http://">Front-end deprecated</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="py_code.html">py_code</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="py_code.DataVizService.html">py_code.DataVizService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.FileService.html">py_code.FileService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.InstrumentClient.html">py_code.InstrumentClient</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.InstrumentService.html">py_code.InstrumentService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.MainService.html">py_code.MainService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.UIClasses.html">py_code.UIClasses</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.UIProperties.html">py_code.UIProperties</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.app.html">py_code.app</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.karsaorbi.html">py_code.karsaorbi</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="py_code.karsatof.html">py_code.karsatof</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kchem.html">py_code.karsatof.kchem</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kcode.html">py_code.karsatof.kcode</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kcollector.html">py_code.karsatof.kcollector</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kdatapool.html">py_code.karsatof.kdatapool</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kevent.html">py_code.karsatof.kevent</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kfeeder.html">py_code.karsatof.kfeeder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kgenerator.html">py_code.karsatof.kgenerator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kimage.html">py_code.karsatof.kimage</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kinstrument.html">py_code.karsatof.kinstrument</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="py_code.karsatof.kpeak.html">py_code.karsatof.kpeak</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="py_code.karsatof.kpeak.find_peaks_from_code.html">py_code.karsatof.kpeak.find_peaks_from_code</a></li>
+<li class="toctree-l4"><a class="reference internal" href="py_code.karsatof.kpeak.fit_hat.html">py_code.karsatof.kpeak.fit_hat</a></li>
+<li class="toctree-l4"><a class="reference internal" href="py_code.karsatof.kpeak.fit_peaks.html">py_code.karsatof.kpeak.fit_peaks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="py_code.karsatof.kpeak.fit_single_peak.html">py_code.karsatof.kpeak.fit_single_peak</a></li>
+<li class="toctree-l4"><a class="reference internal" href="py_code.karsatof.kpeak.gen_peak.html">py_code.karsatof.kpeak.gen_peak</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">py_code.karsatof.kpeak.gen_peak_dict</a></li>
+<li class="toctree-l4"><a class="reference internal" href="py_code.karsatof.kpeak.gen_peak_kernel.html">py_code.karsatof.kpeak.gen_peak_kernel</a></li>
+<li class="toctree-l4"><a class="reference internal" href="py_code.karsatof.kpeak.identify_peaks.html">py_code.karsatof.kpeak.identify_peaks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="py_code.karsatof.kpeak.match_peaks.html">py_code.karsatof.kpeak.match_peaks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="py_code.karsatof.kpeak.peak_fwhm.html">py_code.karsatof.kpeak.peak_fwhm</a></li>
+<li class="toctree-l4"><a class="reference internal" href="py_code.karsatof.kpeak.peak_kernel_residual.html">py_code.karsatof.kpeak.peak_kernel_residual</a></li>
+<li class="toctree-l4"><a class="reference internal" href="py_code.karsatof.kpeak.score_peak_id.html">py_code.karsatof.kpeak.score_peak_id</a></li>
+<li class="toctree-l4"><a class="reference internal" href="py_code.karsatof.kpeak.peakshape_spline.html">py_code.karsatof.kpeak.peakshape_spline</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.ksegment.html">py_code.karsatof.ksegment</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.ksignalprocessor.html">py_code.karsatof.ksignalprocessor</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kspectra.html">py_code.karsatof.kspectra</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kutil.html">py_code.karsatof.kutil</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kworker.html">py_code.karsatof.kworker</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.lib.html">py_code.karsatof.lib</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.kcassettestation.html">py_code.kcassettestation</a></li>
+</ul>
+</li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="py_code.html">py_code</a><ul>
+  <li><a href="py_code.karsatof.html">py_code.karsatof</a><ul>
+  <li><a href="py_code.karsatof.kpeak.html">py_code.karsatof.kpeak</a><ul>
+      <li>Previous: <a href="py_code.karsatof.kpeak.gen_peak.html" title="previous chapter">py_code.karsatof.kpeak.gen_peak</a></li>
+      <li>Next: <a href="py_code.karsatof.kpeak.gen_peak_kernel.html" title="next chapter">py_code.karsatof.kpeak.gen_peak_kernel</a></li>
+  </ul></li>
+  </ul></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Karsa Ltd..
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.1.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/_autosummary/py_code.karsatof.kpeak.gen_peak_dict.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,402 @@
+
+<!DOCTYPE html>
+
+<html lang="Python, JavaScript">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>py_code.karsatof.kfeeder.FeederProcessor &#8212; Scenthound 0.1 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="py_code.karsatof.kfeeder.KFeeder" href="py_code.karsatof.kfeeder.KFeeder.html" />
+    <link rel="prev" title="py_code.karsatof.kfeeder" href="py_code.karsatof.kfeeder.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="py-code-karsatof-kfeeder-feederprocessor">
+<h1>py_code.karsatof.kfeeder.FeederProcessor<a class="headerlink" href="#py-code-karsatof-kfeeder-feederprocessor" title="Permalink to this headline">¶</a></h1>
+<dl class="py class">
+<dt id="py_code.karsatof.kfeeder.FeederProcessor">
+<em class="property">class </em><code class="sig-prename descclassname">py_code.karsatof.kfeeder.</code><code class="sig-name descname">FeederProcessor</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">kinstrument</span></em>, <em class="sig-param"><span class="n">u_list</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kfeeder.FeederProcessor" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Class used to define the preprocessing actions performed to a raw
+spectrum before feeding to workers</p>
+<dl class="py attribute">
+<dt id="py_code.karsatof.kfeeder.FeederProcessor.kinst">
+<code class="sig-name descname">kinst</code><a class="headerlink" href="#py_code.karsatof.kfeeder.FeederProcessor.kinst" title="Permalink to this definition">¶</a></dt>
+<dd><p>KInstrument (or KAcquisition) instance</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="py_code.karsatof.kinstrument.KInstrument.html#py_code.karsatof.kinstrument.KInstrument" title="py_code.karsatof.kinstrument.KInstrument">KInstrument</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="py_code.karsatof.kfeeder.FeederProcessor.borders">
+<code class="sig-name descname">borders</code><a class="headerlink" href="#py_code.karsatof.kfeeder.FeederProcessor.borders" title="Permalink to this definition">¶</a></dt>
+<dd><p>List of 2-tuples of ints, with segment borders as indices
+of the data vector</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>list</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="py_code.karsatof.kfeeder.FeederProcessor.accumulators">
+<code class="sig-name descname">accumulators</code><a class="headerlink" href="#py_code.karsatof.kfeeder.FeederProcessor.accumulators" title="Permalink to this definition">¶</a></dt>
+<dd><p>List of KAccumulator instances, one per segment</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>list</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kfeeder.FeederProcessor.__init__">
+<code class="sig-name descname">__init__</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">kinstrument</span></em>, <em class="sig-param"><span class="n">u_list</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kfeeder.FeederProcessor.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initialize self</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>kinstrument</strong> (<a class="reference internal" href="py_code.karsatof.kinstrument.KInstrument.html#py_code.karsatof.kinstrument.KInstrument" title="py_code.karsatof.kinstrument.KInstrument"><em>KInstrument</em></a>) -- KInstrument (or KAcquisition) instance</p></li>
+<li><p><strong>u_list</strong> (<em>list</em>) -- List of integers, unit mass segments to process</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<p class="rubric">Methods</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.karsatof.kfeeder.FeederProcessor.__init__" title="py_code.karsatof.kfeeder.FeederProcessor.__init__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code></a>(kinstrument, u_list)</p></td>
+<td><p>Initialize self</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.karsatof.kfeeder.FeederProcessor.baseline_als" title="py_code.karsatof.kfeeder.FeederProcessor.baseline_als"><code class="xref py py-obj docutils literal notranslate"><span class="pre">baseline_als</span></code></a>(y[, lam, p, niter])</p></td>
+<td><p>Baseline removal from &quot;Asymmetric Least Squares Smoothing&quot; by P.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.karsatof.kfeeder.FeederProcessor.flush" title="py_code.karsatof.kfeeder.FeederProcessor.flush"><code class="xref py py-obj docutils literal notranslate"><span class="pre">flush</span></code></a>(speci)</p></td>
+<td><p>Feed remains from the accumulators</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.karsatof.kfeeder.FeederProcessor.gen_u_borders" title="py_code.karsatof.kfeeder.FeederProcessor.gen_u_borders"><code class="xref py py-obj docutils literal notranslate"><span class="pre">gen_u_borders</span></code></a>(u_list)</p></td>
+<td><p>Generate unit mass borders (convert border m/z to index)</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.karsatof.kfeeder.FeederProcessor.process" title="py_code.karsatof.kfeeder.FeederProcessor.process"><code class="xref py py-obj docutils literal notranslate"><span class="pre">process</span></code></a>(speci, spec)</p></td>
+<td><p>Preprocess one spectrum</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.karsatof.kfeeder.FeederProcessor.split_spec" title="py_code.karsatof.kfeeder.FeederProcessor.split_spec"><code class="xref py py-obj docutils literal notranslate"><span class="pre">split_spec</span></code></a>(speci, spec)</p></td>
+<td><p>Split spectrum into segments by 'borders'</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.karsatof.kfeeder.FeederProcessor.trim_partspec" title="py_code.karsatof.kfeeder.FeederProcessor.trim_partspec"><code class="xref py py-obj docutils literal notranslate"><span class="pre">trim_partspec</span></code></a>(part[, threshold])</p></td>
+<td><p>Trim signal segment before feeding to workers</p></td>
+</tr>
+</tbody>
+</table>
+<dl class="py method">
+<dt id="py_code.karsatof.kfeeder.FeederProcessor.baseline_als">
+<code class="sig-name descname">baseline_als</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">y</span></em>, <em class="sig-param"><span class="n">lam</span><span class="o">=</span><span class="default_value">500000.0</span></em>, <em class="sig-param"><span class="n">p</span><span class="o">=</span><span class="default_value">1e-07</span></em>, <em class="sig-param"><span class="n">niter</span><span class="o">=</span><span class="default_value">10</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kfeeder.FeederProcessor.baseline_als" title="Permalink to this definition">¶</a></dt>
+<dd><p>Baseline removal from
+&quot;Asymmetric Least Squares Smoothing&quot; by P. Eilers and H. Boelens (2005)</p>
+<p>There are two parameters: p for asymmetry and λ for smoothness.
+Both have to be tuned to the data at hand.
+We found that generally 0.001 ≤ p ≤ 0.1 is a good choice
+(for a signal with positive peaks) and 10^2 ≤ λ ≤ 10^9 ,
+but exceptions may occur. In any case one should vary λ on a grid
+that is approximately linear for log λ</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>y</strong> (<em>array</em>) -- Data vector</p></li>
+<li><p><strong>lam</strong> (<em>float</em><em>, </em><em>optional</em>) -- Smoothness, by default 5e5</p></li>
+<li><p><strong>p</strong> (<em>float</em><em>, </em><em>optional</em>) -- Asymmetry, by default 1e-7</p></li>
+<li><p><strong>niter</strong> (<em>int</em><em>, </em><em>optional</em>) -- Number of iterations, by default 10</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Baseline</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>array</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kfeeder.FeederProcessor.flush">
+<code class="sig-name descname">flush</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">speci</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kfeeder.FeederProcessor.flush" title="Permalink to this definition">¶</a></dt>
+<dd><p>Feed remains from the accumulators</p>
+<p>This function is called when KFeeder receives a poison pill, to
+feed potential left-overs from the KAccumulators.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>speci</strong> (<em>int</em>) -- Index of the spectrum</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>List of 4-tuples with (speci (int),</dt><dd><p>start index (sample number, int),
+end index (int),
+spectrum segment (array)
+).</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>list</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kfeeder.FeederProcessor.gen_u_borders">
+<code class="sig-name descname">gen_u_borders</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">u_list</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kfeeder.FeederProcessor.gen_u_borders" title="Permalink to this definition">¶</a></dt>
+<dd><p>Generate unit mass borders (convert border m/z to index)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>u_list</strong> (<em>list</em>) -- List of integers, unit mass segments to process</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>List of 2-tuples with (start index (sample number, int),</dt><dd><p>end index (int)
+)</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>list</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kfeeder.FeederProcessor.process">
+<code class="sig-name descname">process</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">speci</span></em>, <em class="sig-param"><span class="n">spec</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kfeeder.FeederProcessor.process" title="Permalink to this definition">¶</a></dt>
+<dd><p>Preprocess one spectrum</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>speci</strong> (<em>int</em>) -- Index of the spectrum</p></li>
+<li><p><strong>spec</strong> (<em>array</em>) -- Data vector</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>List of 4-tuples with
+(speci (int),
+start index (sample number, int),
+end index (int),
+spectrum segment (array)
+).
+If KAccumulators are used, this function only returns the
+segments which satisfy KAccumulator conditions (threshold).</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>list</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kfeeder.FeederProcessor.split_spec">
+<code class="sig-name descname">split_spec</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">speci</span></em>, <em class="sig-param"><span class="n">spec</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kfeeder.FeederProcessor.split_spec" title="Permalink to this definition">¶</a></dt>
+<dd><p>Split spectrum into segments by 'borders'</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>speci</strong> (<em>int</em>) -- Index of the spectrum</p></li>
+<li><p><strong>spec</strong> (<em>array</em>) -- Data vector</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>List of 4-tuples with (speci (int),</dt><dd><p>start index (sample number, int),
+end index (int),
+spectrum segment (array)
+).</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>list</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kfeeder.FeederProcessor.trim_partspec">
+<code class="sig-name descname">trim_partspec</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">part</span></em>, <em class="sig-param"><span class="n">threshold</span><span class="o">=</span><span class="default_value">0.001</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kfeeder.FeederProcessor.trim_partspec" title="Permalink to this definition">¶</a></dt>
+<dd><p>Trim signal segment before feeding to workers</p>
+<p>NOTE: This function should be improved</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>part</strong> (<em>tuple</em>) -- <dl class="simple">
+<dt>4-tuple with (speci (int),</dt><dd><p>start index (sample number, int),
+end index (int),
+spectrum segment (array)
+)</p>
+</dd>
+</dl>
+</p></li>
+<li><p><strong>threshold</strong> (<em>float</em><em>, </em><em>optional</em>) -- Threshold for trimming noise from segment edges,
+by default 0.001</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>start index (sample number, int),
+end index (int),
+spectrum segment (array)
+)</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>4-tuple with (speci (int),</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">Scenthound</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="..\..\frontend.html#http://">Front-end</a></li>
+<li class="toctree-l1"><a class="reference external" href="..\..\frontend_deprecated.html#http://">Front-end deprecated</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="py_code.html">py_code</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="py_code.DataVizService.html">py_code.DataVizService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.FileService.html">py_code.FileService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.InstrumentClient.html">py_code.InstrumentClient</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.InstrumentService.html">py_code.InstrumentService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.MainService.html">py_code.MainService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.UIClasses.html">py_code.UIClasses</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.UIProperties.html">py_code.UIProperties</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.app.html">py_code.app</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.karsaorbi.html">py_code.karsaorbi</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="py_code.karsatof.html">py_code.karsatof</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kchem.html">py_code.karsatof.kchem</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kcode.html">py_code.karsatof.kcode</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kcollector.html">py_code.karsatof.kcollector</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kdatapool.html">py_code.karsatof.kdatapool</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kevent.html">py_code.karsatof.kevent</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="py_code.karsatof.kfeeder.html">py_code.karsatof.kfeeder</a><ul class="current">
+<li class="toctree-l4 current"><a class="current reference internal" href="#">py_code.karsatof.kfeeder.FeederProcessor</a></li>
+<li class="toctree-l4"><a class="reference internal" href="py_code.karsatof.kfeeder.KFeeder.html">py_code.karsatof.kfeeder.KFeeder</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kgenerator.html">py_code.karsatof.kgenerator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kimage.html">py_code.karsatof.kimage</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kinstrument.html">py_code.karsatof.kinstrument</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kpeak.html">py_code.karsatof.kpeak</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.ksegment.html">py_code.karsatof.ksegment</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.ksignalprocessor.html">py_code.karsatof.ksignalprocessor</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kspectra.html">py_code.karsatof.kspectra</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kutil.html">py_code.karsatof.kutil</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kworker.html">py_code.karsatof.kworker</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.lib.html">py_code.karsatof.lib</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.kcassettestation.html">py_code.kcassettestation</a></li>
+</ul>
+</li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="py_code.html">py_code</a><ul>
+  <li><a href="py_code.karsatof.html">py_code.karsatof</a><ul>
+  <li><a href="py_code.karsatof.kfeeder.html">py_code.karsatof.kfeeder</a><ul>
+      <li>Previous: <a href="py_code.karsatof.kfeeder.html" title="previous chapter">py_code.karsatof.kfeeder</a></li>
+      <li>Next: <a href="py_code.karsatof.kfeeder.KFeeder.html" title="next chapter">py_code.karsatof.kfeeder.KFeeder</a></li>
+  </ul></li>
+  </ul></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Karsa Ltd..
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.1.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/_autosummary/py_code.karsatof.kfeeder.FeederProcessor.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

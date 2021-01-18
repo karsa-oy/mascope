@@ -1,0 +1,151 @@
+{
+	"AcquisitonParameters": {
+		"acquisition_mode": "continuous",
+		"sample_length": 120
+	},
+
+	"DesorptionTemperatureRamp": {
+		"data": [{
+				"time": "0",
+				"temperature": "0"
+			},
+			{
+				"time": "50",
+				"temperature": "60"
+			},
+			{
+				"time": "90",
+				"temperature": "30"
+			},
+			{
+				"time": "120",
+				"temperature": "0"
+			}
+		],
+		"checked_rows": [
+			0,
+			0,
+			1,
+			2
+		]
+	},
+
+	"target_table_columns": [
+        {
+			"field": "target",
+			"label": "Target",
+			"width": 40,
+			"visible": true
+		},
+		{
+			"field": "composition",
+			"label": "Composition",
+			"width": 40,
+			"visible": true
+		},
+		{
+			"field": "signal",
+			"label": "Signal",
+			"width": 40,
+			"visible": true
+		},
+		{
+			"field": "mz_error",
+			"label": "m/z err.",
+			"centered": true,
+			"width": 40,
+			"visible": true
+		},
+		{
+			"field": "abu_score",
+			"label": "Iso.ratio",
+			"width": 40,
+			"visible": true
+		},
+		{
+			"field": "iso_r2",
+			"label": "Iso.R2",
+			"width": 40,
+			"visible": true
+		},
+		{
+			"field": "snos",
+			"label": "Sample numbers",
+			"width": 40,
+			"visible": true
+		},
+		{
+			"field": "mass",
+			"label": "m/z",
+			"width": 40,
+			"visible": true
+		}
+	],
+
+	"target_table_filter_rows": ["target", "composition", "signal", "mz_error", "abu_score", "iso_r2", "snos", "mass"],
+	
+	"desorption_table_columns": [
+        {
+			"field": "time",
+			"label": "t(s)"
+		},
+		{
+			"field": "temperature",
+			"label": "T(c)"
+		}
+	],
+
+	"desorption_data": [
+    {
+		"line": {
+			"shape": "hv"
+		},
+		"mode": "lines",
+		"name": "hv",
+		"type": "scatter",
+		"x": [],
+		"y": [],
+		"hoverinfo": "x,y",
+		"marker": {
+			"color": "#dfdfdf",
+			"size": 10
+		}
+	}],
+
+	"sample_attributes_table_columns": [
+        {
+			"field": "sample id",
+			"label": "Sample ID"
+		},
+		{
+			"field": "description",
+			"label": "Description"
+		},
+		{
+			"field": "file",
+			"label": "File"
+		},
+		{
+			"field": "start time",
+			"label": "Start time"
+		},
+		{
+			"field": "end time",
+			"label": "End time",
+			"centered": true
+		},
+		{
+			"field": "length",
+			"label": "Length"
+		},
+		{
+			"field": "polarity",
+			"label": "Polarity"
+		},
+		{
+			"field": "note",
+			"label": "Note"
+		}
+	],
+	"sample_table_filter_rows": ["sample id", "description", "file", "start time", "end time", "length", "polarity", "note"]
+}

@@ -1,0 +1,44 @@
+{
+    "width": 280,
+    "height": 280,
+    "legend": {
+        "y": 0.5,
+        "font": {
+            "size": 10
+        },
+        "traceorder": "reversed",
+        "color": "#fff"
+    },
+    "font": {
+        "color": "#fff"
+    },
+    "xaxis": {
+        "visible": true,
+        "linecolor": "#999",
+        "tickmode": "linear",
+        "tick0": 0,
+        "dtick": 20
+    },
+    "yaxis": {
+        "visible": true,
+        "linecolor": "#999",
+        "tickmode": "linear",
+        "tick0": 0,
+        "dtick": 10,
+        "gridcolor": "#676565"
+    },
+    "showlegend": false,
+    "commented_out__dragmode": "select",
+    "commented_out__autosize": false,
+    "commented_out__autoscale": false,
+    "hovermode": "closest",
+    "plot_bgcolor": "#29282e",
+    "paper_bgcolor": "#29282e",
+    "margin": {
+        "l": 30,
+        "r": 20,
+        "b": 25,
+        "t": 60,
+        "pad": 0
+    }
+}

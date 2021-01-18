@@ -1,0 +1,204 @@
+
+<!DOCTYPE html>
+
+<html lang="Python, JavaScript">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>py_code.DataVizService &#8212; Scenthound 0.1 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="py_code.DataVizService.init_heatmap_generator" href="py_code.DataVizService.init_heatmap_generator.html" />
+    <link rel="prev" title="py_code" href="py_code.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="module-py_code.DataVizService">
+<span id="py-code-datavizservice"></span><h1>py_code.DataVizService<a class="headerlink" href="#module-py_code.DataVizService" title="Permalink to this headline">¶</a></h1>
+<p>Data Visualization Service</p>
+<p>This script runs the data visualization service for Karsa Tarkka TOF system.</p>
+<p>DataVizService connects to TofDaq Recorder data stream via
+<a class="reference internal" href="py_code.karsatof.kgenerator.KAcquisition.html#py_code.karsatof.kgenerator.KAcquisition" title="py_code.karsatof.kgenerator.KAcquisition"><code class="xref py py-class docutils literal notranslate"><span class="pre">KAcquisition</span></code></a>.
+It collects MS data and generates images out of it in real time. It also
+connectes to the <a class="reference internal" href="py_code.MainService.html#module-py_code.MainService" title="py_code.MainService"><code class="xref py py-mod docutils literal notranslate"><span class="pre">MainService</span></code></a> via socket, and generates images from data
+per request.</p>
+<p>Running this script will start a
+<a class="reference internal" href="py_code.karsatof.kgenerator.KAcquisition.html#py_code.karsatof.kgenerator.KAcquisition" title="py_code.karsatof.kgenerator.KAcquisition"><code class="xref py py-class docutils literal notranslate"><span class="pre">KAcquisition</span></code></a> instance, and thus
+requires  TofDaq Recorder to be running. At initialization, it will also
+connect to the <a class="reference internal" href="py_code.MainService.html#module-py_code.MainService" title="py_code.MainService"><code class="xref py py-mod docutils literal notranslate"><span class="pre">MainService</span></code></a>. Then the script enters <a class="reference internal" href="py_code.DataVizService.main.html#py_code.DataVizService.main" title="py_code.DataVizService.main"><code class="xref py py-func docutils literal notranslate"><span class="pre">main()</span></code></a>
+function.</p>
+<dl class="simple">
+<dt>TODO: Re-organize image emitting within <a class="reference internal" href="py_code.DataVizService.DataVizNamespace.html#py_code.DataVizService.DataVizNamespace" title="py_code.DataVizService.DataVizNamespace"><code class="xref py py-class docutils literal notranslate"><span class="pre">DataVizNamespace</span></code></a>, now there is</dt><dd><p>a lot of repetition.</p>
+</dd>
+</dl>
+<p>Created on Fri Apr 17 11:35:57 2020</p>
+<p class="rubric">Functions</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="py_code.DataVizService.init_heatmap_generator.html#py_code.DataVizService.init_heatmap_generator" title="py_code.DataVizService.init_heatmap_generator"><code class="xref py py-obj docutils literal notranslate"><span class="pre">init_heatmap_generator</span></code></a>(kacq, data_collector, ...)</p></td>
+<td><p>Initialize KHeatmapGenerator instance</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="py_code.DataVizService.init_spec_generator.html#py_code.DataVizService.init_spec_generator" title="py_code.DataVizService.init_spec_generator"><code class="xref py py-obj docutils literal notranslate"><span class="pre">init_spec_generator</span></code></a>(kacq, data_collector, ...)</p></td>
+<td><p>Initialize KSpecImageGenerator instance</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="py_code.DataVizService.init_spec_stacker.html#py_code.DataVizService.init_spec_stacker" title="py_code.DataVizService.init_spec_stacker"><code class="xref py py-obj docutils literal notranslate"><span class="pre">init_spec_stacker</span></code></a>(kacq, ...)</p></td>
+<td><p>Initialize KSpecStacker instance</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="py_code.DataVizService.initialize_timeseries_figure.html#py_code.DataVizService.initialize_timeseries_figure" title="py_code.DataVizService.initialize_timeseries_figure"><code class="xref py py-obj docutils literal notranslate"><span class="pre">initialize_timeseries_figure</span></code></a>(full_t_range[, ...])</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="py_code.DataVizService.initialize_tps_dropdown.html#py_code.DataVizService.initialize_tps_dropdown" title="py_code.DataVizService.initialize_tps_dropdown"><code class="xref py py-obj docutils literal notranslate"><span class="pre">initialize_tps_dropdown</span></code></a>(tps_info)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="py_code.DataVizService.initialize_ui_figures.html#py_code.DataVizService.initialize_ui_figures" title="py_code.DataVizService.initialize_ui_figures"><code class="xref py py-obj docutils literal notranslate"><span class="pre">initialize_ui_figures</span></code></a>(mz_range, t_range)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="py_code.DataVizService.main.html#py_code.DataVizService.main" title="py_code.DataVizService.main"><code class="xref py py-obj docutils literal notranslate"><span class="pre">main</span></code></a>()</p></td>
+<td><p>Main function</p></td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Classes</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="py_code.DataVizService.DataVizNamespace.html#py_code.DataVizService.DataVizNamespace" title="py_code.DataVizService.DataVizNamespace"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DataVizNamespace</span></code></a>([namespace])</p></td>
+<td><p>python-socket.io Client namespace for DataVizService</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="py_code.DataVizService.KtpsCollector.html#py_code.DataVizService.KtpsCollector" title="py_code.DataVizService.KtpsCollector"><code class="xref py py-obj docutils literal notranslate"><span class="pre">KtpsCollector</span></code></a>(kacq)</p></td>
+<td><p>A thread to collect TPS data into plotly traces for visualization</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="py_code.DataVizService.XarrayCollector.html#py_code.DataVizService.XarrayCollector" title="py_code.DataVizService.XarrayCollector"><code class="xref py py-obj docutils literal notranslate"><span class="pre">XarrayCollector</span></code></a>(kacq[, array_module])</p></td>
+<td><p>Thread to collect data from TofDaq shared memory into a xarray to be used to generate images with datashader.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">Scenthound</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="..\..\frontend.html#http://">Front-end</a></li>
+<li class="toctree-l1"><a class="reference external" href="..\..\frontend_deprecated.html#http://">Front-end deprecated</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="py_code.html">py_code</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">py_code.DataVizService</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="py_code.DataVizService.init_heatmap_generator.html">py_code.DataVizService.init_heatmap_generator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.DataVizService.init_spec_generator.html">py_code.DataVizService.init_spec_generator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.DataVizService.init_spec_stacker.html">py_code.DataVizService.init_spec_stacker</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.DataVizService.initialize_timeseries_figure.html">py_code.DataVizService.initialize_timeseries_figure</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.DataVizService.initialize_tps_dropdown.html">py_code.DataVizService.initialize_tps_dropdown</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.DataVizService.initialize_ui_figures.html">py_code.DataVizService.initialize_ui_figures</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.DataVizService.main.html">py_code.DataVizService.main</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.DataVizService.DataVizNamespace.html">py_code.DataVizService.DataVizNamespace</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.DataVizService.KtpsCollector.html">py_code.DataVizService.KtpsCollector</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.DataVizService.XarrayCollector.html">py_code.DataVizService.XarrayCollector</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.FileService.html">py_code.FileService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.InstrumentClient.html">py_code.InstrumentClient</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.InstrumentService.html">py_code.InstrumentService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.MainService.html">py_code.MainService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.UIClasses.html">py_code.UIClasses</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.UIProperties.html">py_code.UIProperties</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.app.html">py_code.app</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.karsaorbi.html">py_code.karsaorbi</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.karsatof.html">py_code.karsatof</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.kcassettestation.html">py_code.kcassettestation</a></li>
+</ul>
+</li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="py_code.html">py_code</a><ul>
+      <li>Previous: <a href="py_code.html" title="previous chapter">py_code</a></li>
+      <li>Next: <a href="py_code.DataVizService.init_heatmap_generator.html" title="next chapter">py_code.DataVizService.init_heatmap_generator</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Karsa Ltd..
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.1.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/_autosummary/py_code.DataVizService.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

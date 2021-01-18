@@ -1,0 +1,276 @@
+
+<!DOCTYPE html>
+
+<html lang="Python, JavaScript">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>py_code.karsatof.kgenerator.KAccumulator &#8212; Scenthound 0.1 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="py_code.karsatof.kgenerator.KAcquisition" href="py_code.karsatof.kgenerator.KAcquisition.html" />
+    <link rel="prev" title="py_code.karsatof.kgenerator.put_all_queues" href="py_code.karsatof.kgenerator.put_all_queues.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="py-code-karsatof-kgenerator-kaccumulator">
+<h1>py_code.karsatof.kgenerator.KAccumulator<a class="headerlink" href="#py-code-karsatof-kgenerator-kaccumulator" title="Permalink to this headline">¶</a></h1>
+<dl class="py class">
+<dt id="py_code.karsatof.kgenerator.KAccumulator">
+<em class="property">class </em><code class="sig-prename descclassname">py_code.karsatof.kgenerator.</code><code class="sig-name descname">KAccumulator</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">step</span></em>, <em class="sig-param"><span class="n">threshold</span><span class="o">=</span><span class="default_value">0.0</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kgenerator.KAccumulator" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Class to accumulate (average) spectra. Can either accumulate a predefined
+number of spectra ('step' parameter) or until the signal norm reaches
+the 'threshold' parameter.</p>
+<dl class="py attribute">
+<dt id="py_code.karsatof.kgenerator.KAccumulator.step">
+<code class="sig-name descname">step</code><a class="headerlink" href="#py_code.karsatof.kgenerator.KAccumulator.step" title="Permalink to this definition">¶</a></dt>
+<dd><p>Minimum number of spectra to accumulate</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="py_code.karsatof.kgenerator.KAccumulator.threshold">
+<code class="sig-name descname">threshold</code><a class="headerlink" href="#py_code.karsatof.kgenerator.KAccumulator.threshold" title="Permalink to this definition">¶</a></dt>
+<dd><p>Accumulate until the norm of the signal reaches threshold</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="py_code.karsatof.kgenerator.KAccumulator.i">
+<code class="sig-name descname">i</code><a class="headerlink" href="#py_code.karsatof.kgenerator.KAccumulator.i" title="Permalink to this definition">¶</a></dt>
+<dd><p>Number of spectra accumulated so far (reset after each True return)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="py_code.karsatof.kgenerator.KAccumulator.avg_spec">
+<code class="sig-name descname">avg_spec</code><a class="headerlink" href="#py_code.karsatof.kgenerator.KAccumulator.avg_spec" title="Permalink to this definition">¶</a></dt>
+<dd><p>The accumulated spectrum</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>array</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kgenerator.KAccumulator.__init__">
+<code class="sig-name descname">__init__</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">step</span></em>, <em class="sig-param"><span class="n">threshold</span><span class="o">=</span><span class="default_value">0.0</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kgenerator.KAccumulator.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initialize self</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>step</strong> (<em>int</em>) -- Number of spectra to accumulate</p></li>
+<li><p><strong>threshold</strong> (<em>float</em><em>, </em><em>optional</em>) -- Accumulate until signal norm reaches the threshold,
+by default 0.0</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<p class="rubric">Methods</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.karsatof.kgenerator.KAccumulator.__init__" title="py_code.karsatof.kgenerator.KAccumulator.__init__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code></a>(step[, threshold])</p></td>
+<td><p>Initialize self</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#py_code.karsatof.kgenerator.KAccumulator.accumulate" title="py_code.karsatof.kgenerator.KAccumulator.accumulate"><code class="xref py py-obj docutils literal notranslate"><span class="pre">accumulate</span></code></a>(spec)</p></td>
+<td><p>Accumulate new data to the average spectrum</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#py_code.karsatof.kgenerator.KAccumulator.flush" title="py_code.karsatof.kgenerator.KAccumulator.flush"><code class="xref py py-obj docutils literal notranslate"><span class="pre">flush</span></code></a>()</p></td>
+<td><p>When acquisition is finished, the accumulator should be flushed in order to make sure all data has been retrieved from the accumulator.</p></td>
+</tr>
+</tbody>
+</table>
+<dl class="py method">
+<dt id="py_code.karsatof.kgenerator.KAccumulator.accumulate">
+<code class="sig-name descname">accumulate</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">spec</span></em><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kgenerator.KAccumulator.accumulate" title="Permalink to this definition">¶</a></dt>
+<dd><p>Accumulate new data to the average spectrum</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>spec</strong> (<em>array</em>) -- New data to accumulate</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>True is returned if accumulation conditions are met,
+False otherwise</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="py_code.karsatof.kgenerator.KAccumulator.flush">
+<code class="sig-name descname">flush</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#py_code.karsatof.kgenerator.KAccumulator.flush" title="Permalink to this definition">¶</a></dt>
+<dd><p>When acquisition is finished, the accumulator should be flushed
+in order to make sure all data has been retrieved from the accumulator.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>True is returned if there was something to flush,
+False otherwise</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">Scenthound</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="..\..\frontend.html#http://">Front-end</a></li>
+<li class="toctree-l1"><a class="reference external" href="..\..\frontend_deprecated.html#http://">Front-end deprecated</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="py_code.html">py_code</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="py_code.DataVizService.html">py_code.DataVizService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.FileService.html">py_code.FileService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.InstrumentClient.html">py_code.InstrumentClient</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.InstrumentService.html">py_code.InstrumentService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.MainService.html">py_code.MainService</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.UIClasses.html">py_code.UIClasses</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.UIProperties.html">py_code.UIProperties</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.app.html">py_code.app</a></li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.karsaorbi.html">py_code.karsaorbi</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="py_code.karsatof.html">py_code.karsatof</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kchem.html">py_code.karsatof.kchem</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kcode.html">py_code.karsatof.kcode</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kcollector.html">py_code.karsatof.kcollector</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kdatapool.html">py_code.karsatof.kdatapool</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kevent.html">py_code.karsatof.kevent</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kfeeder.html">py_code.karsatof.kfeeder</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="py_code.karsatof.kgenerator.html">py_code.karsatof.kgenerator</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="py_code.karsatof.kgenerator.close_all_queues.html">py_code.karsatof.kgenerator.close_all_queues</a></li>
+<li class="toctree-l4"><a class="reference internal" href="py_code.karsatof.kgenerator.put_all_queues.html">py_code.karsatof.kgenerator.put_all_queues</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">py_code.karsatof.kgenerator.KAccumulator</a></li>
+<li class="toctree-l4"><a class="reference internal" href="py_code.karsatof.kgenerator.KAcquisition.html">py_code.karsatof.kgenerator.KAcquisition</a></li>
+<li class="toctree-l4"><a class="reference internal" href="py_code.karsatof.kgenerator.KStreamer.html">py_code.karsatof.kgenerator.KStreamer</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kimage.html">py_code.karsatof.kimage</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kinstrument.html">py_code.karsatof.kinstrument</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kpeak.html">py_code.karsatof.kpeak</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.ksegment.html">py_code.karsatof.ksegment</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.ksignalprocessor.html">py_code.karsatof.ksignalprocessor</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kspectra.html">py_code.karsatof.kspectra</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kutil.html">py_code.karsatof.kutil</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.kworker.html">py_code.karsatof.kworker</a></li>
+<li class="toctree-l3"><a class="reference internal" href="py_code.karsatof.lib.html">py_code.karsatof.lib</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="py_code.kcassettestation.html">py_code.kcassettestation</a></li>
+</ul>
+</li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="py_code.html">py_code</a><ul>
+  <li><a href="py_code.karsatof.html">py_code.karsatof</a><ul>
+  <li><a href="py_code.karsatof.kgenerator.html">py_code.karsatof.kgenerator</a><ul>
+      <li>Previous: <a href="py_code.karsatof.kgenerator.put_all_queues.html" title="previous chapter">py_code.karsatof.kgenerator.put_all_queues</a></li>
+      <li>Next: <a href="py_code.karsatof.kgenerator.KAcquisition.html" title="next chapter">py_code.karsatof.kgenerator.KAcquisition</a></li>
+  </ul></li>
+  </ul></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Karsa Ltd..
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.1.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/_autosummary/py_code.karsatof.kgenerator.KAccumulator.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

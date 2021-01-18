@@ -1,0 +1,118 @@
+<div class="tc-tiddler-title">
+        <div class="tc-titlebar">
+        <h2 class="tc-title">Getting started</h2>
+        </div>
+        </div>
+        <div class=" tc-reveal">First Please check the following requirements are installed in your PC</div>
+        <div class="tc-tiddler-body tc-reveal">
+        <pre>    
+        * Node version &gt;=v12.13.1
+        * Yarn (recommended) or npm 
+        * git 
+        
+        <strong>Installation -</strong> 
+        &gt; open terminal then 
+        &gt; git clone https://bitbucket.org/bikram-karsa/karsa-electron.git
+        &gt; cd to karsa-electron
+        &gt; .\install.bat</pre>
+        </div>
+        <div class="tc-tiddler-title">
+        <div class="tc-titlebar">
+        <h2 class="tc-title">Project Structure</h2>
+        </div>
+        </div>
+        <div class="tc-tiddler-body tc-reveal">
+        <pre>
+        ├── InstallSimple-Portable   (Installation maker portable software)
+        ├── README.md
+        ├── babel.config.js
+        ├── configs                           (Configuration files for electron app, UI configurations are added here eg. initial datatable labels, values of temperature ramp etc.)
+        ├── install.bat                       (Bat File that installs project fetching from repository) 
+        ├── package.json                  (Contains list of node modules needed by the app for installation + other configuration eg. build, run etc.)
+        ├── public                             (File for offline / without server running are injected here)
+        ├── py                                   (Python compiler packaged with portable python, Note - Remember to update or install all the dependencies from requirments.txt)
+        ├── py_code                         (All the python codes goes here)
+        ├── run_scenthound.bat      (Bat file to run services in terminal - datavizservice, fileservice, mainservice, instrument service)
+        ├── src                                 (All the electron codes goes here)
+        ├── vue.config.js                 (Some configurations to include the extra files which is necessary at packaging/building installer stage)
+        <br /><br /></pre>
+        <div class="tc-tiddler-title">
+        <div class="tc-titlebar">
+        <div class="tc-tiddler-title">
+        <div class="tc-titlebar">
+        <h2 class="tc-title">Electron-Vue component Structure</h2>
+        <p>Vue components are placed inside src directory. So contents inside src is mostly what is required to modif the app behaviour or properties.&nbsp;</p>
+        <blockquote>
+        <p>├── App.vue&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;(Main vue app template container and also contains router.)<br /> ├── assets&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; (Contains stylesheet for differnt tabs)<br /> │&nbsp;&nbsp; ├── css<br />│&nbsp;&nbsp; │&nbsp;&nbsp; └── MeasurementTab.css&nbsp; &nbsp;<br /> │&nbsp;&nbsp; └── logo.png<br /> ├── background.js&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; (Main electron Window instance and related configurations)<br /> ├── components<br /> │&nbsp;&nbsp; ├── MainUI.vue&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;(Main container that groups sub components eg. tabs into one by registering it into components. )<br /> │&nbsp;&nbsp; ├── MeasurementTab.vue&nbsp; (Measurement Tab container)<br /> │&nbsp;&nbsp; ├── ServiceStatus.vue&nbsp; &nbsp; &nbsp; &nbsp;(Component that pops up from System tray icon, shows that if the python services are running or not)<br /> │&nbsp;&nbsp; └── SplashWindow.vue (A component that popup showing logo of karsa at start up of app)<br /> ├── main.js&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;(Main entry of Vue app where execution of vue component starts from)<br /> └── templates&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;(Contains templates / html / jsx like html codes for components view displaying data property)<br />&nbsp; &nbsp; &nbsp; └── MeasurementTab.vue</p>
+        <p>&nbsp;</p>
+        <p><strong>Some Notes!!</strong></p>
+        <p>Flow of Electron application - background.js-&gt;main.js-&gt;App.vue-&gt;MainUI.vue-&gt;other components</p>
+        <p>&nbsp;</p>
+        <h3><strong>components in src/</strong></h3>
+        <ul>
+        <li><strong>MainUI.vue</strong> : This component is groups other components inside components directory as tab content. Subcomponets are imported and registered inside this vue component.&nbsp;</li>
+        <li><strong>MeasurementTab.vue</strong>: This component combines Datatab.vue (Deprecated component for processing offline files) and measurementtab component which does realtime processing of data acquired form tofdec recorder.</li>
+        <li><strong>SeviceStatus.vue</strong>: This component displays the status of python services if they are runiing or not, Basically the idea is the backend services should be running before the UI can send the request to do some backend tasks. Therefore UI has to make sure all services in python are running.&nbsp;</li>
+        <li><strong>SpalshWindow.vue</strong> : This component displays a window which loads as soon as the application lauches from yarn. The ideas is that splash window makes sure the python services are loaded successfully and then only the UI launches. This component should make sure that python services are spawn by this vue component and then UI is loaded after.&nbsp;</li>
+        </ul>
+        </blockquote>
+        <h2 class="tc-title">Project environment config</h2>
+        <p>some of the environmental settins are configured in .env file which is copied from py_code directory to the root directory during the installation process using install.bat file. This environmental settings includes configurations needed to run server, towerk recorder simulation software path etc. The .env files is both used by electron and python as storing configurations. However original copy stays in python code. When shipping or building installer this is also necessary and has to be listed in vue.config.js file.</p>
+        <p>Note!! After you have run the project and made some changes in the .env file, the application has to be resarted to refelect the new changes otherwise changes will not be effective.</p>
+        </div>
+        </div>
+        <div class=" tc-reveal">
+        <div class="tc-tiddler-title">
+        <div class="tc-titlebar">
+        <h2 class="tc-title">Electron configurations</h2>
+        <p>The electron application configurations are located in three different files.</p>
+        <ol>
+        <li><strong>packages.json</strong> - contains list of modules required by the node to create and run the project, some compilation/run/build process are configured here.&nbsp;</li>
+        <li><strong>vue.config.js</strong> - This file contains extra configuration which is needed at the phase when installer is needed to create. Basically this file contains configurations that are used to copy extra directories and files which is necessary for electron to run. Eg. in our case when we make installer using yarn<strong> electron:build</strong>&nbsp; it only copies files related to nodejs and vuejs however we might need extra files eg. python code directory, configs directory or some other assets directory. These are listed here.&nbsp;</li>
+        <li><strong>src/background.js</strong> - This is main electron configuration and running instance where electron window related configurations are done. Eg. Either to hide or display default menu of electron, maximize or minimize windows, resize window or not, use node configuration or not etc. In short all the window related behaviour, window appreances style, tray icon style, Window event, parent child window etc. are defined here.&nbsp;</li>
+        </ol>
+        </div>
+        </div>
+        </div>
+        <div class="tc-tiddler-title">
+        <div class="tc-titlebar">
+        <h2 class="tc-title">Web sockets</h2>
+        <p>As a means of communication between the UI and python websocket is used. Currently the socket.io websocket client is used. Since it is not a vuejs component or plugin, but a plain websocket client we need on handle websocket event in <strong>created </strong>property of vuejs otherwise the instances may not work at other properties eg. mounted, methods etc.<br /><br />There are some advantages of using plaing websocket client without using component based module. Eg. simplicity, easy to create multiple websocket clients as necessary, you can write your own code handler in your custom way.&nbsp;</p>
+        <p>For documentation it is recomended to look at <strong>socket.io&nbsp;</strong>&nbsp;website's documentation page in client section.&nbsp;&nbsp; &nbsp;</p>
+        </div>
+        </div>
+        <h2 class="tc-title">Compiling and Making installer file</h2>
+        </div>
+        </div>
+        <div class="tc-tiddler-body tc-reveal">
+        <p>Note: the current version of Plotly javascirpt has a bug after compilation is made. so to compile in right way, please follow the following steps.</p>
+        <h3 class="">Step 1</h3>
+        <ul>
+        <li>Open node_modules\plotly.js-dist\plotly.js</li>
+        <li>Find the script -</li>
+        </ul>
+        <p>if (typeof define === "function" &amp;&amp; define.amd) this.d3 = d3, define(d3); else if (typeof module === "object" &amp;&amp; module.exports) module.exports = d3; else this.d3 = d3; }();</p>
+        <h4>Then replace with</h4>
+        <p>if (typeof define === "function" &amp;&amp; define.amd) this.d3 = d3, define(d3); else if (typeof module === "object" &amp;&amp; module.exports) module.exports = d3; else this.d3 = d3; }.apply(self);</p>
+        <h3 class="">Step 2</h3>
+        <p>cd to the root directory of project and run &gt; yarn electron:build</p>
+        <p>This will create a dist_electron directory if needed, else if it is already there there are auto generated files. It might take several minutes to complete. Once completed the directory will contain the following files.</p>
+        <pre><code>
+                    ├── builder-effective-config.yaml
+                    ├── bundled                                      (For web version, not needed in Karsa's case)
+                    ├── karsa-desktop Setup 0.1.0.exe                (Full distributeable setup file, but has less friendly installation wizard)
+                    ├── karsa-desktop Setup 0.1.0.exe.blockmap       
+                    └── win-unpacked</code></pre>
+        (Contains compiled installation files which can be used as source to custom installer making software eg. simple-install maker software)
+        <h3 class="">(Recommended Method)</h3>
+        <p>Instead of using the desktop setup.exe file in the above list, Use of Simple installer software in the root directory is recommended.</p>
+        <p>The advantages are - It has much more flexibility in installation, small installation size, setting icons, more friendly installation procedure and uninstall feature and more options.</p>
+        <p>To use simple installer, open application&nbsp;<a class="tc-tiddlylink tc-tiddlylink-missing" href="#InstallSimple">InstallSimple</a>-Portable\install simple.exe and go through the guided wizard.</p>
+        <p>When you reach a point where you need to select the source directory Then select -&mdash;&gt; dist_electron\win-unpacked directory.</p>
+        <p>Now after successful compression the installer is created.</p>
+        </div>
+        <pre><br /><br /></pre>
+        </div>
+        <p>Note!!! Remember to remove .git files or will copy those as well, easiest is to cd to win-unpacked then remove all git files and then pack with installation maker software portable.</p>
+
+        <br><br><br>
