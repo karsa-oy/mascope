@@ -318,7 +318,7 @@ export default {
             self.socket.on("acquisition_progress", (value) => self.import_one_way_binding_prop(self, "acquisition_progress", value, true));
             self.socket.on("samples", (value) => self.import_one_way_binding_prop(self, "samples", value));
             self.socket.on("h5_samples", (value) => self.import_one_way_binding_prop(self, "h5_samples", value));
-            self.socket.on("h5_streamer_status", (value) => self.import_one_way_binding_prop(self, "h5_streamer_status", value));
+            self.socket.on("h5_streamer_status", (value) => self.import_one_way_binding_prop(self, "h5_streamer_status", value.value));
             self.socket.on("importable_samples", (value) => self.import_one_way_binding_prop(self, "importable_samples", value));
             self.socket.on("instrument_status", (value) => self.import_one_way_binding_prop(self, "instrument_status", value.value));
             self.socket.on("sample_length", (value) => self.import_two_way_binding_prop(self, "sample_length", value));
@@ -396,7 +396,6 @@ html{
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   /* text-align: center; */
-  color: #2c3e50;
 }
 body::-webkit-scrollbar {
     display: none;
@@ -410,18 +409,18 @@ body {
     /* padding: 2rem; */
 }
 /* Style the tab */
-/* .menubar{
+.menubar{
     -webkit-app-region: drag;
 }
 .tabs{
     padding-top: 5px; 
-    border-top:15px solid #ccc; 
+    /* border-top:15px solid #29282e;  */
 }
-.tabs>ul>li{
+/* .tabs>ul>li{
     -webkit-app-region: no-drag;
 } */
 /* Style the buttons that are used to open the tab content */
-.tab button {
+/* .tab button {
     background-color: inherit;
     float: left;
     border: none;
@@ -429,45 +428,41 @@ body {
     cursor: pointer;
     padding: 14px 16px;
     transition: 0.3s;
-}
+} */
 
 /* Change background color of buttons on hover */
-.tab button:hover {
+/* .tab button:hover {
     background-color: #ddd;
-}
+} */
 
 /* Create an active/current tablink class */
-.tab button.active {
+/* .tab button.active {
     background-color: #ccc;
-}
+} */
 
 /* Style the tab content */
-.tabcontent {
+/* .tabcontent {
     display: none;
     padding: 6px 12px;
     border: 1px solid #ccc;
     border-top: none;
     height: 93vh; 
-}
+} */
 #header-container{
     display:none; 
 }
 #spacer{
     margin-right:10px;
 }
-#peaklist_path{
-    margin-right:10px; 
-    width:400px; 
-}
 .head{
     background-color: #000;
     color: #dfdfdf;
 }
 .b-tabs .tabs {
-    background-color: #000;
+    background-color: #29282e;
 }
 .tabs a{
-    color: #000;
+    color: #dfdfdf;
     padding: .3em 1em;
 }
 .tabs li.is-active a {
@@ -491,12 +486,11 @@ body {
     padding-left:20px;
     padding-bottom:40px;
 }
-.subtitle{
+/* .subtitle{
     color:#dfdfdf;
-}
+} */
 .label, .gl-container, .ytick, .xtick, span, label{
     user-select:none;
-    color: #dfdfdf;
 }
 .modebar, .modebar--hover, .ease-bg{
     user-select:none;
@@ -505,7 +499,6 @@ body {
     font-size:.3rem;
 }
 .label {
-    color: #dfdfdf;
     display: block;
     font-size: .8rem;
     text-align:center;
@@ -514,6 +507,9 @@ body {
 .label:not(:last-child) {
     color: #dfdfdf;
     margin-bottom: 0px;
+}
+.modal-card .label {
+    color: #666;
 }
 tr>th{
     background-color:rgb(51, 50, 50); 
@@ -649,17 +645,6 @@ a.pagination-link.is-current {
     float: left; 
     margin-right:20px;
 }
-#data-filter-row{
-    border: 1px solid #a7a7a7;
-    margin: 5px;
-    -webkit-border-radius: 5px; 
-    /* Firefox 1-3.6 */
-    -moz-border-radius: 5px; 
-    border-radius: 5px;
-    padding: 5px;
-    height: 100px;
-    clear: both;
-}
 #threshold-slider-,
 #mz-error-slider,
 #isotope-error-ratio-slider,
@@ -685,9 +670,6 @@ a.pagination-link.is-current {
         background: #167df0;
         color: #fff;
 }
-Label{
-    color: #000;
-}
 #data-table, #target-table{
     overflow:hidden; 
     border: 1px solid #a7a7a7;
@@ -698,10 +680,6 @@ Label{
 }
 #data-figures-row-1, #data-figures-row-2{
     clear: both;
-}
-#hitmap-fig{
-    width: 50%;
-    float:left; 
 }
 #data-figures-row-1-col-1, #data-figures-row-1-col-2,
 #data-figures-row-2-col-1, #data-figures-row-2-col-2
@@ -754,18 +732,6 @@ Label{
     margin-right: 20px;
     /* min-height:70vh; */
 }
-#data-table, #compound-table {
-    /* margin: 10px 5px 5px 5px;
-    padding: 10px 10px 10px 10px;
-    border: 1px solid #ccc; */
-    min-height: 200px;
-}
-/* #data-table, #compound-table{
-    margin: 20px 16px 5px 15px;
-    padding: 15px 0px 0 0px;
-    border: 1px solid #a7a7a7;
-    min-height:200px;
-} */
 
 
 progress {
@@ -809,11 +775,6 @@ progress::-webkit-progress-value {
 }
 .b-slider-tick-label{
     user-select: none; 
-}
-.pagination-link.is-current {
-    /* background-color: #7957d5; */
-    /* border-color: #d4d4d4;
-    color: #525252; */
 }
 .edit-peaklist-modal>.modal-card-body{
     padding: 0px;

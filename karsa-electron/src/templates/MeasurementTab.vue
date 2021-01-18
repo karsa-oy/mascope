@@ -277,6 +277,7 @@
 
         <section class="loading">
             <!-- Placeholder for loading div -->
+            
         </section>
 
         <!-- Main content  area-->
@@ -526,8 +527,13 @@
                                             @click="is_import_h5_modal_active=true"
                                             outlined
                                             inverted
-                                            :disabled="acquisition_status=='not_running' ? false : true">
+                                            :disabled="(h5_streamer_status=='ready' && 
+                                                        acquisition_status=='not_running') ? false : true">
                                             Import h5 file
+                                            <b-loading
+                                                :active="h5_streamer_status=='ready' ? false : true"
+                                                :is-full-page="false">
+                                            </b-loading>
                                         </b-button>
                                     </div>
                                 </div>

@@ -233,7 +233,7 @@
                     <div class="row">
                         <!-- Header -->
                         <section style="width:100%;">
-                            <p class="card-header-title" style=text-align: center>
+                            <p class="card-header-title">
                                 Project
                             </p>
                         </section>

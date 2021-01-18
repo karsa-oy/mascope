@@ -40,7 +40,7 @@ class TWh5StreamerNamespace(BaseClientNamespace):
              ]
 
     service_state = dict(
-        h5_streamer_status = 'not_ready'
+        h5_streamer_status = dict(value='not_ready')
     )
 
     async def on_import_h5_table_datetime_range(self, data):
@@ -116,13 +116,17 @@ async def init_service(url):
             print('Failed')
     root_ns = sio.namespace_handlers['/']
 
-    await emit_client_notification('h5_streamer_status', 'not_ready')
+    await emit_client_notification('h5_streamer_status',
+                                   dict(value='not_ready')
+                                   )
     # Initialize KStreamer
     kacq = await initialize_kacquisition(KStreamer)
     # Scan given directory for h5 files
     await h5_pool.scan_dir(h5_path)
     # Ready
-    await emit_client_notification('h5_streamer_status', 'ready')
+    await emit_client_notification('h5_streamer_status',
+                                   dict(value='ready')
+                                   )
     return sio, kacq
 
 
