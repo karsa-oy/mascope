@@ -4,6 +4,7 @@
 import asyncio
 import configparser
 import io
+import numpy as np
 import pandas as pd
 import socketio
 
@@ -74,6 +75,8 @@ def get_target_table(target_df, cols=None):
     if cols is None:
         cols = target_df.columns
     sub_df = target_df[cols]
+    # Replace NaNs with Nones for JSON compatibility
+    sub_df = sub_df.replace({np.nan: None})
     target_table = {'rows': list( sub_df.to_dict('index').values() ),
                     'cols': [ {'field': col,
                                'label': col.capitalize(),

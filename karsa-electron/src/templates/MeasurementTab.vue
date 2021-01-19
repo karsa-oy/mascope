@@ -559,20 +559,22 @@
                                             :columns="sample_table_cols"
                                             :data="sample_table_rows"
                                             :checkable="acquisition_status=='not_running' ? true : false"
+                                            :header-checkable="false"
                                             :checked-rows.sync="sample_table_checked_rows">
                                         </b-table>
                                         <div><br></div>
                                         <b-button
                                             type="is-dark"
                                             @click="is_import_sample_modal_active=true"
+                                            size="is-small"
                                             outlined
                                             inverted>
                                             Import sample
                                         </b-button>
-                                        <div><br></div>
                                         <b-button
                                             type="is-dark"
                                             @click="is_import_h5_modal_active=true"
+                                            size="is-small"
                                             outlined
                                             inverted
                                             :disabled="(h5_streamer_status=='ready' && 
