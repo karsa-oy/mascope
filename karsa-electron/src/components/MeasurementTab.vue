@@ -57,9 +57,9 @@ export default {
             sample_table_cols: [],
             sample_table_checked_rows: [],
             // Target table 
-            selected_target_table_rows: [],
-            target_table_columns: [],
-            target_table_filter_rows: [],
+            target_table_rows: [],
+            target_table_cols: [],
+            target_table_checked_rows: [],
             // Sample metadata for selected sample
             sample_file: "",
             sample_name: "",
@@ -76,14 +76,6 @@ export default {
             // data read and write path
             data_read_path: "",
             data_read_path_recursive: true,
-            // variables for apply filter and sliders
-            apply_filters: true,
-            enable_save_new_slider_values: false,
-            threshold_value: 0,
-            mz_value: 0,
-            iso_err_tol_value: 0,
-            iso_corr_err_value: 0,
-            detection_parameters: {},
             // variable for acquisition button style  and progress bar
             acquisition_button_type: "is-primary",
             // variables for import modals
@@ -118,7 +110,7 @@ export default {
                     'projects',
                     'project_selected',
                     'samples',
-                    'target_table_data',
+                    'targets',
                     ]),
         acquisition_status: {
             get() {
@@ -219,12 +211,8 @@ export default {
             try {
                 if (fs.existsSync('configs/measurementtab_config.json')) {
                     var measurementtab_layout = JSON.parse(fs.readFileSync('configs/measurementtab_config.json', 'utf8'));
-                    this.target_table_columns = measurementtab_layout.target_table_columns || [];
-                    this.target_table_filter_rows = measurementtab_layout.target_table_filter_rows || [];
                     this.desorption_table_columns = measurementtab_layout.desorption_table_columns || [];
                     this.desorption_data = measurementtab_layout.desorption_data || [];
-                    // this.sample_attributes_table_columns = measurementtab_layout.sample_attributes_table_columns || [];
-                    // this.sample_table_filter_rows = measurementtab_layout.sample_table_filter_rows || [];
                 }
             } catch (err) {
                 console.error(err)
@@ -272,11 +260,8 @@ export default {
                     "data": self.desorption_table_data,
                     "checked_rows": checked_indexes
                 },
-                "target_table_columns": self.target_table_columns,
-                "target_table_filter_rows": self.target_table_filter_rows,
                 "desorption_table_columns": self.desorption_table_columns,
                 "desorption_data": self.desorption_data,
-                "sample_table_filter_rows": self.sample_table_filter_rows,
             };
             self.write_to_config_file(JSON.stringify(new_configurations, null, 3));
         },
@@ -412,15 +397,6 @@ export default {
             this.sample_attributes = sample;
             this.is_sample_attribute_modal_active = false;
         },
-        
-        update_slider_values_and_process_data: function(){
-            this.detection_parameters = {
-                "threshold_value": this.threshold_value,
-                "mz_value": this.mz_value,
-                "iso_err_tol_value": this.iso_err_tol_value,
-                "iso_corr_err_value": this.iso_corr_err_value
-            };
-        }, 
         FetchH5s() {
             if (this.import_start_time == null || 
                 this.import_end_time == null) {
@@ -608,7 +584,6 @@ export default {
 
             // TODO: clean up figures
             // check if the vuex props should be mapped to local props
-            this.$store.commit('target_table_data', []);
             this.$store.commit('heatmap_figure_data', {});
             this.$store.commit('timeseries_figure_data', {});
             this.$store.commit('tps_parameters_selected', []);
@@ -626,7 +601,7 @@ export default {
                 this.sample_to_load = {'filename': ""};
             }
         },
-        selected_target_table_rows:function(new_value, old_value) {
+        target_table_checked_rows:function(new_value, old_value) {
             if ( _.isEqual(new_value, old_value) ) {
                 return false;
             }
@@ -634,20 +609,15 @@ export default {
             if ( this.selected_target_table_rows.length > 1 ) {
                 this.selected_target_table_rows = [last_selection,];
             }
-
             // TODO: check if the vuex prop should be mapped to local props
             this.target_to_load = [last_selection, ];
         },
-        // TODO: Placeholder: detection_parameters is local, but it will generate some global prop
-        detection_parameters: function(new_value, old_value) {
-            if ( _.isEqual(new_value, old_value) ) {
+        targets: function(new_data, old_data){
+            if ( _.isEqual(new_data, old_data) ) {
                 return false;
             }
-        },
-        sample_table_filter_rows: function() {
-            if (this.data_updated_from_loading === false) {
-                this.save_all_values_to_configuration_file();
-            }
+            this.target_table_cols = new_data.cols;
+            this.target_table_rows = new_data.rows;
         },
         instrument_status: function(new_value, old_value) {
             if ( _.isEqual(new_value, old_value) ) {

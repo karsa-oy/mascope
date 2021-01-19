@@ -160,6 +160,7 @@
                                 <b-datetimepicker
                                     v-model="import_start_time"
                                     placeholder="Start datetime"
+                                    :timepicker="{'hour-format': '24'}"
                                     :min-datetime="import_min_datetime"
                                     :max-datetime="import_max_datetime">
                                 </b-datetimepicker>
@@ -168,6 +169,7 @@
                                 <b-datetimepicker
                                     v-model="import_end_time"
                                     placeholder="End datetime"
+                                    :timepicker="{'hour-format': '24'}"
                                     :min-datetime="import_start_time"
                                     :max-datetime="import_max_datetime">
                                 </b-datetimepicker>
@@ -177,10 +179,10 @@
                                 type="button"
                                 @click="FetchH5s()"
                                 is-dark
-                                :disabled="(h5_streamer_status=='ready' &&
-                                            import_start_time != null &&
-                                            import_end_time != null
-                                            ) ? false : true">
+                                :disabled="(h5_streamer_status==='not_ready' ||
+                                            import_start_time === null ||
+                                            import_end_time === null
+                                            ) ? true : false">
                                 Fetch h5 list
                             </button>
                             <div><br></div>
@@ -199,7 +201,10 @@
                                 type="button"
                                 @click="ImportH5s()"
                                 is-dark
-                                :disabled="!import_h5_table_checked_rows.length">
+                                :disabled="(!import_h5_table_checked_rows.length ||
+                                            import_start_time === null ||
+                                            import_end_time === null
+                                            ) ? true : false">
                                 Import
                             </button>
                             <button
@@ -234,6 +239,7 @@
                                 <b-datetimepicker
                                     v-model="import_start_time"
                                     placeholder="Start datetime"
+                                    :timepicker="{'hour-format': '24'}"
                                     :min-datetime="import_min_datetime"
                                     :max-datetime="import_max_datetime">
                                 </b-datetimepicker>
@@ -242,6 +248,7 @@
                                 <b-datetimepicker
                                     v-model="import_end_time"
                                     placeholder="End datetime"
+                                    :timepicker="{'hour-format': '24'}"
                                     :min-datetime="import_start_time"
                                     :max-datetime="import_max_datetime">
                                 </b-datetimepicker>
@@ -310,7 +317,8 @@
                         v-bind:value="acquisition_progress"
                         show-value
                         format="percent"
-                        type="is-success"
+                        :precision="1"
+                        type="is-primary"
                         size="is-large">
                     </b-progress>
                     <!-- <div hidden> -->
@@ -606,8 +614,8 @@
                                     <div class="targetlist-datatable">
                                         <b-table 
                                             id="targets-datatable"
-                                            :columns="target_table_columns"
-                                            :data="target_table_data" 
+                                            :columns="target_table_cols"
+                                            :data="target_table_rows" 
                                             type="is-white" 
                                             :narrowed="true" 
                                             :bordered="true" 
@@ -616,7 +624,7 @@
                                             :pagination-simple="false" 
                                             sort-icon="arrow-up"
                                             default-sort-direction="asc"
-                                            :checked-rows.sync="selected_target_table_rows" 
+                                            :checked-rows.sync="target_table_checked_rows" 
                                             :header-checkable="false"
                                             :checkable="acquisition_status=='not_running' ? true:false"
                                             focusable

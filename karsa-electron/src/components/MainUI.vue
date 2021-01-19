@@ -733,42 +733,6 @@ a.pagination-link.is-current {
     /* min-height:70vh; */
 }
 
-
-progress {
-	width: 250px;
-	height: 14px;
-	margin: 10px auto;
-	display: block;
-	/* Important Thing */
-	-webkit-appearance: none;
-	border: none;
-}
-
-/* All good till now. Now we'll style the background */
-progress::-webkit-progress-bar {
-	background: black;
-	border-radius: 50px;
-	padding: 2px;
-	box-shadow: 0 1px 0px 0 rgba(255, 255, 255, 0.2);
-}
-
-/* Now the value part */
-progress::-webkit-progress-value {
-	border-radius: 50px;
-	box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.4);
-	background:
-		-webkit-linear-gradient(45deg, transparent, transparent 33%, rgba(0, 0, 0, 0.1) 33%, rgba(0, 0, 0, 0.1) 66%, transparent 66%),
-		-webkit-linear-gradient(top, rgba(255, 255, 255, 0.25), rgba(0, 0, 0, 0.2)),
-		-webkit-linear-gradient(left, #ba7448, #c4672d);
-	
-	/* Looks great, now animating it */
-	background-size: 25px 14px, 100% 100%, 100% 100%;
-	-webkit-animation: move 5s linear 0 infinite;
-}
-@-webkit-keyframes move {
-	0% {background-position: 0px 0px, 0 0, 0 0}
-	100% {background-position: -100px 0px, 0 0, 0 0}
-}
 .label {
     user-select: none;
     cursor:default; 
