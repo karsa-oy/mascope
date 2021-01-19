@@ -81,7 +81,6 @@ async def init_service(addr):
             print('Connecting to Router...')
             await sio.connect(addr, namespaces=['/',])
             print("Connected!")
-            await sio.sleep(.1)      # TODO: TBR workaround for python-socketio connection bug
             break
         except socketio.exceptions.ConnectionRefusedError as e:
             print("Failed.", e)
@@ -90,9 +89,17 @@ async def init_service(addr):
     global root_ns
     root_ns = sio.namespace_handlers['/']
 
-    await emit_client_notification('instrument_status',
-                                   dict(value='not_ready')
-                                   )
+    while True:
+        # TODO: TBR workaround for python-socketio connection bug
+        try:
+            await emit_client_notification('instrument_status',
+                                           dict(value='not_ready')
+                                           )
+            break
+        except socketio.exceptions.BadNamespaceError:
+            await sio.sleep(.1)
+            continue
+
     kacq = await initialize_kacquisition()
     await emit_client_notification('instrument_status',
                                    dict(value='ready')
