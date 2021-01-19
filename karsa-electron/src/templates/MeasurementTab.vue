@@ -612,6 +612,13 @@
                             <div class="card-content">
                                 <div class="content">
                                     <div class="targetlist-datatable">
+                                        <b-button
+                                            type="is-dark"
+                                            @click="FetchTargets()"
+                                            outlined
+                                            inverted>
+                                            Fetch target list
+                                        </b-button>
                                         <b-table 
                                             id="targets-datatable"
                                             :columns="target_table_cols"

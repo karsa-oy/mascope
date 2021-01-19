@@ -163,6 +163,14 @@ export default {
                 this.$store.commit('sample_to_load', value);
             }
         },
+        target_list_request: {
+            get() {
+                return this.$store.state.target_list_request;
+            },
+            set(value) {
+                this.$store.commit('target_list_request', value);
+            }
+        },
         target_to_load: {
             get() {
                 return this.$store.state.target_to_load;
@@ -450,6 +458,9 @@ export default {
                 'dt1': dt1.toJSON()
             }
             this.import_sample_table_datetime_range = fetch_request;
+        },
+        FetchTargets() {
+            this.target_list_request = {'uid': Math.random()};
         },
         ImportH5s() {
             this.h5_to_import = this.import_h5_table_checked_rows;

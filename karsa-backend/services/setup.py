@@ -28,6 +28,8 @@ setuptools.setup(
         'dask[array]',
         'environs',
         'numpy',
+        'Office365-REST-Python-Client',
+        'openpyxl',
         'python-socketio',
         'xarray',
         'zarr',
