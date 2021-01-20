@@ -33,6 +33,7 @@ class BaseClientNamespace(AsyncClientNamespace):
         self.app_name = self.__class__.__name__
         self.log(f"connected to namespace {self.namespace}")
         await self.join_rooms()
+        await self.on_service_state(dict(no_data_logging=False))
 
     def on_disconnect(self):
         self.log(f"disconnected from namespace {self.namespace}")
@@ -40,7 +41,6 @@ class BaseClientNamespace(AsyncClientNamespace):
     async def on_service_state(self, data):
         no_logging = data.get('no_logging', NO_LOGGING_DEFAULT)
         no_data_logging = data.get('no_data_logging', NO_DATA_LOGGING_DEFAULT)
-        cookies = data['cookies']
         for k, v in self.service_state.items():
             if no_logging:
                 pass
@@ -48,9 +48,17 @@ class BaseClientNamespace(AsyncClientNamespace):
                 self.log(f"{k}: ...")
             else:
                 self.log(f"{k}: {v}")
-            await self.emit('client_notification', {'name': k, 'value': v, 'cookies': cookies})
+            await self.emit('client_notification',
+                            {**data, 'name': k, 'value': v})
 
     async def emit_client_notification(self, name, value, **kwarg):
+        """
+        client_notification is sent to subscribers via Router, 
+        name:  a property name;
+        value: property value;
+        other key arguments are optional and forwarded to subscriber as such,
+        e.g. no_logging/no_data_logging=True - skip logging/data_logging in Router; default: False,
+        """
         no_logging = kwarg.get('no_logging', NO_LOGGING_DEFAULT)
         no_data_logging = kwarg.get('no_data_logging', NO_DATA_LOGGING_DEFAULT)
         if no_logging:
@@ -108,7 +116,7 @@ class BaseServerNamespace(AsyncNamespace):
         """
         Initialize client subscriptions. 
         Subscriptions contain prop names the client subscribes for.
-        data: dict(app_name=client_name, [app_name=client_type,] subscriptions=subscription_list)
+        data: dict(app_name=client_name, [app_type=client_type,] subscriptions=subscription_list)
         """
         app_name = data['app_name']
         app_type = data.get('app_type', 'client')
@@ -129,26 +137,26 @@ class BaseServerNamespace(AsyncNamespace):
         """
         client_notifications are forwarded by Router from providers
         to subscribers via corresponding rooms, where a room is a property name.
-        data: dict(name=prop_name, value=prop_value)
+        data: dict(name=prop_name, value=prop_value, no_logging=bool, no_data_logging=bool, ...)
+              all key-value pairs in data dict are forwarded to subscriber,
+              no_logging/no_data_logging - skip logging/data logging in subscriber; default: False,
         """
         no_logging = data.get('no_logging', False)
         no_data_logging = data.get('no_data_logging', False)
+        subscription = data['name']
         if no_logging:
             pass
         elif no_data_logging:
-            self.log(f"{data['name']}: ...")
+            self.log(f"{subscription}: ...")
         else:
-            self.log(f"{data['name']}:", data.get('value'))
+            self.log(data)
 
-        subscription = data['name']
+        if 'cookies' not in data:
+            data['cookies'] = dict(src_sid=[])
+        cookies = data['cookies']
         if subscription not in self.subscription_sids:
             self.log(f"{subscription}: no handlers - notification dropped.")
             return
-
-        if 'cookies' not in data['value']:
-            data['value']['cookies'] = dict(src_sid=[])
-
-        cookies = data['value']['cookies']
         src_sids = cookies['src_sid']
         # sids are added to the cookies only by this procedure
         src_sids.append(sid)
@@ -172,7 +180,7 @@ class BaseServerNamespace(AsyncNamespace):
             sent_to = len(src_sids) * '>'
             self.log(f"{subscription}: {self.sid_to_app[sid]['name']} {sent_to} {self.sid_to_app[target_sid]['name']}")
             room = f"{subscription}_{target_sid}"
-            await self.emit(subscription, data['value'], room=room)
+            await self.emit(subscription, data, room=room)
 
 
     def remove_twin_app_sids(self, sids, sids_to_stay):

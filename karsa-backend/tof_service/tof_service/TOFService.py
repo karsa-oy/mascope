@@ -19,6 +19,7 @@ from karsatof.lib.TofDaq import (
                     TwStopAcquisition,
                     )
 
+NO_DATA_LOGGING_DEFAULT = True
 root_ns = None
 cookies = None
 
@@ -32,8 +33,8 @@ class TOFServiceNamespace(BaseClientNamespace):
              ]
 
     service_state = dict(
-        acquisition_status = dict(value='not_running'),
-        instrument_status = dict(value='not_ready'),
+        acquisition_status = 'not_running',
+        instrument_status = 'not_ready',
         )
 
     async def on_acquisition_status(self, data):
@@ -93,7 +94,8 @@ async def init_service(addr):
         # TODO: TBR workaround for python-socketio connection bug
         try:
             await emit_client_notification('instrument_status',
-                                           dict(value='not_ready')
+                                           'not_ready',
+                                           no_data_logging=False
                                            )
             break
         except socketio.exceptions.BadNamespaceError:
@@ -102,7 +104,8 @@ async def init_service(addr):
 
     kacq = await initialize_kacquisition()
     await emit_client_notification('instrument_status',
-                                   dict(value='ready')
+                                   'ready',
+                                   no_data_logging=False
                                    )
     return sio, kacq
 
@@ -163,7 +166,9 @@ async def main(sio, kacq):
             break
         # Acquisition started
         await emit_client_notification('acquisition_status',
-                                       dict(value='running', cookies=cookies)
+                                       'running',
+                                       cookies=cookies,
+                                       no_data_logging=False
                                        )
 
         # Acquisition supplementary information
@@ -179,28 +184,28 @@ async def main(sio, kacq):
                         )
 
         await emit_client_notification('acquisition_started', 
-                                       {'filename': filename_base,
-                                        'cookies': cookies,
-                                        }
+                                       {'filename': filename_base},
+                                       cookies=cookies,
+                                       no_data_logging=False
                                        )
         await emit_client_notification('acquisition_coordinates',
                                        {'filename': filename_base,
                                         'mz': mz.tobytes(),
                                         'time': t.tobytes(),
-                                        'cookies': cookies,
                                         # 't_range': [ float(t[0]), float(t[-1]) ]
                                         },
-                                       no_data_logging=True
+                                       cookies=cookies,
+                                       no_data_logging=NO_DATA_LOGGING_DEFAULT
                                        )
         # TPS parameter info
         tps_info = kacq.tps_info
         await emit_client_notification('tps_parameter_info',
                                        {'filename': filename_base,
                                         'tps_info': tps_info,
-                                        'cookies': cookies,
                                         # 'time': t.tobytes()
                                         },
-                                       no_data_logging=True
+                                       cookies=cookies,
+                                       no_data_logging=NO_DATA_LOGGING_DEFAULT
                                        )
 
         # Acquisition loop
@@ -221,16 +226,17 @@ async def main(sio, kacq):
                                                 'i': speci,
                                                 't': ti,
                                                 'spec': spec.tobytes(),
-                                                'cookies': cookies,
                                                 },
-                                               no_data_logging=True
+                                               cookies=cookies,
+                                               no_data_logging=NO_DATA_LOGGING_DEFAULT
                                                )
                 progress = ((speci+1) / kacq.nspectra) * 100. # [%]
                 await emit_client_notification('acquisition_progress', 
                                                {'sync': speci,
                                                 'progress': progress,
-                                                'cookies': cookies,
-                                                }
+                                                },
+                                               cookies=cookies,
+                                               no_data_logging=NO_DATA_LOGGING_DEFAULT
                                                )
                 # TPS data
                 speci, tps_data = tps_data
@@ -240,9 +246,9 @@ async def main(sio, kacq):
                                          'i': speci,
                                          't': ti,
                                          'tps_data': tps_data.tobytes(),
-                                         'cookies': cookies,
                                          },
-                                        no_data_logging=True
+                                        cookies=cookies,
+                                        no_data_logging=NO_DATA_LOGGING_DEFAULT
                                         )
             # Got poison pill
             else:
@@ -250,16 +256,19 @@ async def main(sio, kacq):
                 await emit_client_notification('acquisition_progress', 
                                                {'filename': filename_base,
                                                 'progress': progress,
-                                                'cookies': cookies,
-                                                }
+                                                },
+                                               cookies=cookies,
+                                               no_data_logging=NO_DATA_LOGGING_DEFAULT
                                                )
                 await emit_client_notification('acquisition_finished', 
-                                               {'filename': filename_base,
-                                                'cookies': cookies,
-                                                }
+                                               {'filename': filename_base},
+                                               cookies=cookies,
+                                               no_data_logging=False
                                                )
                 await emit_client_notification('acquisition_status',
-                                               dict(value='not_running', cookies=cookies)
+                                               'not_running',
+                                               cookies=cookies,
+                                               no_data_logging=False
                                                )
                 break
     # Kill KAcquisition

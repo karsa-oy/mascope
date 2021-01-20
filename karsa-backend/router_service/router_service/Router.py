@@ -1,15 +1,9 @@
 import sys
 import getopt
-
-# from flask import Flask
-# from flask_socketio import SocketIO
-# flask_cors import CORS
-
 import asyncio
 import socketio
 from aiohttp import web
 import aiohttp_cors
-
 from helpers import BaseServerNamespace
 
 
