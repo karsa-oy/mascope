@@ -27,6 +27,9 @@ from karsatof.kcollector import ExtendableDataArray
 from karsatof.kdatapool import DataPool
 from helpers import BaseClientNamespace
 
+
+NO_DATA_LOGGING_DEFAULT = True
+
 # TODO: Make configuration file for the paths
 data_path = 'Data'
 projects_path = 'Projects'
@@ -55,23 +58,23 @@ class FileServiceNamespace(BaseClientNamespace):
         ]
 
     service_state = dict(
-        projects = dict(value=datapool.get_projects()),
+        projects = datapool.get_projects(),
     )
 
     # ========== UI requests ==========
     async def on_data_request(self, data):
-        
-        print("Data request: %s" %str(data))
+        # print("Data request:", data)
 
         global datapool
         global signal_cache
 
-        filename = data.get('filename', None)
+        value = data['value']
+        filename = value.get('filename', None)
         if filename is None:
             raise ValueError("Received data_request without filename")
         
-        mz_range = data.get('mz_range', None)
-        t_range = data.get('t_range', None)
+        mz_range = value.get('mz_range', None)
+        t_range = value.get('t_range', None)
         
         if filename not in signal_cache.keys():
             filename_zarr = base_to_zarr_filename(filename, 'signal')
@@ -111,9 +114,9 @@ class FileServiceNamespace(BaseClientNamespace):
                              'mz_range': mz_range,
                              't_range': t_range,
                              'set_figure_ranges': set_figure_ranges,
-                             'cookies': cookies,
                              },
-                            no_data_logging=True
+                            cookies=cookies,
+                            no_data_logging=NO_DATA_LOGGING_DEFAULT
                             )
         await asyncio.sleep(0)
         for i, spec_array in enumerate(signal.transpose()):
@@ -126,35 +129,36 @@ class FileServiceNamespace(BaseClientNamespace):
                                             'mz_range': mz_range,
                                             't_range': t_range,
                                             't': ti,
-                                            'cookies': cookies,
                                             },
-                                           no_data_logging=True
+                                           cookies=cookies,
+                                           no_data_logging=NO_DATA_LOGGING_DEFAULT
                                            )
             await asyncio.sleep(0)
         await emit_client_notification('data_stream_finished',
                                        {'filename': filename,
                                         'mz_range': mz_range,
                                         't_range': t_range,
-                                        'cookies': cookies,
                                         },
-                                       no_data_logging=True
+                                       cookies=cookies,
+                                       no_data_logging=False
                                        )
     
     async def on_experiment_selected(self, data):
-        experiment = data.get('id', '')
-        cookies = data.get('cookies', {})
+        value = data['value']
+        cookies = data['cookies']
+        experiment = value.get('id', '')
         if experiment == '':
             await self.emit_client_notification(
                             'samples',
                             {'rows': [],
                              'cols': [],
-                             'cookies': cookies
                              },
-                            no_data_logging=False
+                            cookies=cookies,
+                            no_data_logging=NO_DATA_LOGGING_DEFAULT
                             )
             return
 
-        attributes = data.get('attributes')
+        attributes = value.get('attributes')
         project = attributes.get('project')
         global datapool
         if project not in datapool.pool.keys():
@@ -168,48 +172,56 @@ class FileServiceNamespace(BaseClientNamespace):
             # Update UI
             project_experiments = datapool.get_experiments(project)
             await emit_client_notification('experiments',
-                                           dict(value=project_experiments,
-                                                cookies=cookies
-                                                )
+                                           project_experiments,
+                                           cookies=cookies,
+                                           no_data_logging=NO_DATA_LOGGING_DEFAULT
                                            )
         # Update sample table data
         await self.emit_client_notification(
                             'samples',
-                            {**datapool.get_sample_table(project, experiment),
-                             'cookies': cookies
-                             },
-                            no_data_logging=False
+                            datapool.get_sample_table(project, experiment),
+                            cookies=cookies,
+                            no_data_logging=NO_DATA_LOGGING_DEFAULT
                             )
 
     async def on_import_sample_table_datetime_range(self, data):
         global datapool
-        cookies = data.get('cookies', {})
+        cookies = data['cookies']
         # Update sample table data
         await self.emit_client_notification(
                             'importable_samples',
-                            {**datapool.get_sample_table(),
-                             'cookies': cookies
-                             },
-                            no_data_logging=False
+                            datapool.get_sample_table(),
+                            cookies=cookies,
+                            no_data_logging=NO_DATA_LOGGING_DEFAULT
                             )
 
     async def on_project_selected(self, data):
         global datapool
-        project = data.get('id', '')
-        cookies = data.get('cookies', {})
+        value = data['value']
+        cookies = data['cookies']
+        project = value.get('id', '')
         if project == '':
-            await emit_client_notification('experiments', dict(value=[], cookies=cookies))
+            await emit_client_notification('experiments',
+                                        [],
+                                        cookies=cookies,
+                                        no_data_logging=False)
             return
 
-        attributes = data.get('attributes')
+        attributes = value.get('attributes')
         if project not in datapool.pool.keys():
             print("Starting new project: %s" %project)
             datapool.new_project(project, attributes)
             projects = datapool.get_projects()
-            await emit_client_notification('projects', dict(value=projects, cookies=cookies))
+            await emit_client_notification('projects',
+                                        projects,
+                                        cookies=cookies,
+                                        no_data_logging=NO_DATA_LOGGING_DEFAULT)
 
         experiments = datapool.get_experiments(project)
-        await emit_client_notification('experiments', dict(value=experiments, cookies=cookies))
+        await emit_client_notification('experiments',
+                                       experiments,
+                                       cookies=cookies,
+                                       no_data_logging=NO_DATA_LOGGING_DEFAULT)
 
     async def on_sample_attributes(self, data):
         """Write attributes of a sample to disk. Make a symbolic link from
@@ -229,9 +241,9 @@ class FileServiceNamespace(BaseClientNamespace):
         global projects_path
         global datapool
 
-        sample = data.get('id', '')
-        attributes = data.get('attributes')
-        cookies = data.get('cookies', {})
+        value = data['value']
+        sample = value.get('id', '')
+        attributes = value.get('attributes')
         if sample == '':
             raise ValueError("Received write_sample_attributes without 'id'")
         project = attributes.get('project', '')
@@ -245,24 +257,22 @@ class FileServiceNamespace(BaseClientNamespace):
         datapool.new_sample(project, experiment, sample, attributes)
 
         # Force experiment update to push sample data to UI
-        data.update( {'id': experiment, 'cookies': cookies} )
-        await self.on_experiment_selected(data)
+        value['id'] = experiment
+        await self.on_experiment_selected({**data, 'name': 'experiment_selected'})
 
     async def on_tps_data_request(self, data):
-        
-        print("TPS data request: %s" %str(data))
-
         global tps_cache
         
-        figure_ranges = data.pop('figure_ranges', {})
+        value = data['value']
+        figure_ranges = value.pop('figure_ranges', {})
         filename = figure_ranges.get('filename', None)
         if filename is None:
             raise ValueError("Received data_request without filename")
         
-        selected = data.get('tps_parameters_selected', None) 
+        selected = value.get('tps_parameters_selected', None)
         if selected is None:
             return   
-        parameters = [ val.get('label') for key, val in selected.items() ]   
+        parameters = [ v.get('label') for _, v in selected.items() ]
 
         if filename not in tps_cache.keys():
             filename = base_to_zarr_filename(filename, '_tps')
@@ -283,16 +293,15 @@ class FileServiceNamespace(BaseClientNamespace):
                                     ]
         t = tps_data.time.values.astype(np.float32)
 
-        cookies = data['cookies']
         await emit_client_notification(
                             'tps_data_stream_coordinates',
                             {'filename': filename,
                              'parameters': parameters,
                              'time': t.tobytes(),
                              'set_tps_parameters': False,
-                             'cookies': cookies,
                              },
-                            no_data_logging=True
+                            cookies=data['cookies'],
+                            no_data_logging=NO_DATA_LOGGING_DEFAULT
                             )
         await asyncio.sleep(0)
         for i, param_array in enumerate(tps_data.transpose()):
@@ -303,16 +312,15 @@ class FileServiceNamespace(BaseClientNamespace):
                                             'i': i,
                                             'tps_data': param_ys.tobytes(),
                                             't': ti,
-                                            'cookies': cookies,
                                             },
-                                           no_data_logging=True
+                                           cookies=data['cookies'],
+                                           no_data_logging=NO_DATA_LOGGING_DEFAULT
                                            )
             await asyncio.sleep(0)
         await emit_client_notification('tps_data_stream_finished',
-                                       {'filename': filename,
-                                        'cookies': cookies,
-                                       },
-                                       no_data_logging=True
+                                       {'filename': filename},
+                                       cookies=data['cookies'],
+                                       no_data_logging=False
                                       )
     
     # ---------------------------------
@@ -326,10 +334,10 @@ class FileServiceNamespace(BaseClientNamespace):
         data : dict
             keys: 'mz' and 'time'
         """
-
         global signal_cache
 
-        filename_base = data.get('filename')
+        value = data['value']
+        filename_base = value.get('filename')
         print("Start acquiring sample: %s" %filename_base)
         filename = base_to_zarr_filename(filename_base, 'signal')
         
@@ -349,7 +357,7 @@ class FileServiceNamespace(BaseClientNamespace):
         
         print("Writing signal into: %s" %filename)
 
-        mz = np.frombuffer( data.get('mz'), dtype=np.float32 )
+        mz = np.frombuffer( value.get('mz'), dtype=np.float32 )
         signal_array = ExtendableDataArray(path=filename,
                                            array_module=da
                                            )
@@ -367,16 +375,16 @@ class FileServiceNamespace(BaseClientNamespace):
         data : dict
             keys: 'filename', 'i', 't' and 'spec'
         """
-        
         global signal_cache
 
         # Get package index
-        i = data.get('i')
+        value = data['value']
+        i = value.get('i')
         print(i)
-        filename_base = data.get('filename')
+        filename_base = value.get('filename')
 
-        ti = np.array( [data.get('t')], dtype=np.float32 )
-        spec = np.frombuffer(data.get('spec'), dtype=np.float32)
+        ti = np.array( [value.get('t')], dtype=np.float32 )
+        spec = np.frombuffer(value.get('spec'), dtype=np.float32)
         spec = spec.reshape(-1, 1)
         signal_array = signal_cache.get(filename_base)
         mz = signal_array.data_array.mz
@@ -389,7 +397,8 @@ class FileServiceNamespace(BaseClientNamespace):
         global signal_cache
         global tps_cache
 
-        filename_base = data.get('filename')
+        value = data['value']
+        filename_base = value.get('filename')
         filename = base_to_zarr_filename(filename_base, 'signal')
         print("Finished acquiring file: %s" %filename)
 
@@ -403,10 +412,10 @@ class FileServiceNamespace(BaseClientNamespace):
     
     # ========== TPS data ==========
     async def on_tps_parameter_info(self, data):
-        
         global tps_cache
 
-        filename_base = data.get('filename')
+        value = data['value']
+        filename_base = value.get('filename')
         filename = base_to_zarr_filename(filename_base, 'tps')
 
         # Check if sample and dataset with given name exists
@@ -425,7 +434,7 @@ class FileServiceNamespace(BaseClientNamespace):
 
         print("Writing TPS data into: %s" %filename)
 
-        tps_info = data.get('tps_info')
+        tps_info = value.get('tps_info')
         
         tps_array = ExtendableDataArray(path=filename,
                                         array_module=da
@@ -437,11 +446,11 @@ class FileServiceNamespace(BaseClientNamespace):
         tps_cache.update({filename_base: tps_array})
 
     async def on_acquired_tps_data(self, data):
-
         global tps_cache
-        filename_base = data.get('filename')
-        ti = np.array( [data.get('t')], dtype=np.float32 )
-        tps_data = np.frombuffer( data.get('tps_data'), dtype=np.float32)
+        value = data['value']
+        filename_base = value.get('filename')
+        ti = np.array( [value.get('t')], dtype=np.float32 )
+        tps_data = np.frombuffer( value.get('tps_data'), dtype=np.float32)
         tps_data = tps_data.reshape(-1, 1)
         tps_array = tps_cache.get(filename_base)
         tps_info = tps_array.data_array.parameter

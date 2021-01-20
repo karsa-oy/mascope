@@ -80,7 +80,6 @@ export default {
                 'samples',
                 'spec_stack_figure_data',
                 'target_table_data',
-                'targets',
                 'timeseries_figure_data',
                 'tps_parameters',
                 ],
@@ -95,7 +94,6 @@ export default {
             'import_sample_table_datetime_range',
             'project_selected',
             'sample_attributes',
-            'target_list_request',
             'target_to_load',
             'tps_parameters_selected',
             'visualize_range',
@@ -220,12 +218,12 @@ export default {
                 this.$store.commit('spec_stack_figure_data', value);
             }
         },
-        targets: {
+        target_table_data: {
             get() {
-                return this.$store.state.targets;
+                return this.$store.state.target_table_data;
             },
             set(value) {
-                this.$store.commit('targets', value);
+                this.$store.commit('target_table_data', value);
             }
         },
         timeseries_figure_data: {
@@ -244,6 +242,16 @@ export default {
                 this.$store.commit('tps_parameters', value);
             }
         },
+
+
+        // sample_cache: {
+        //     get() {
+        //         return this.$store.state.sample_cache;
+        //     },
+        //     set(value) {
+        //         this.$store.commit('sample_cache', value);
+        //     }
+        // },
     },
     methods: {
         log: function(...args) {
@@ -305,22 +313,22 @@ export default {
                              {'app_name': self.$options.name,
                               'subscriptions': self.rooms});
             // handlers for for external notifications:
-            self.socket.on("acquisition_started", (value) => self.import_one_way_binding_prop(self, "acquisition_started", value));
+            // input value as object {name, value, cookies, no_data_logging...}
+            self.socket.on("acquisition_started", (value) => self.import_one_way_binding_prop(self, "acquisition_started", value.value));
             self.socket.on("acquisition_status", (value) => self.import_two_way_binding_prop(self, "acquisition_status", value.value));
-            self.socket.on("acquisition_progress", (value) => self.import_one_way_binding_prop(self, "acquisition_progress", value, true));
-            self.socket.on("samples", (value) => self.import_one_way_binding_prop(self, "samples", value));
-            self.socket.on("h5_samples", (value) => self.import_one_way_binding_prop(self, "h5_samples", value));
+            self.socket.on("acquisition_progress", (value) => self.import_one_way_binding_prop(self, "acquisition_progress", value.value, true));
+            self.socket.on("samples", (value) => self.import_one_way_binding_prop(self, "samples", value.value));
+            self.socket.on("h5_samples", (value) => self.import_one_way_binding_prop(self, "h5_samples", value.value));
             self.socket.on("h5_streamer_status", (value) => self.import_one_way_binding_prop(self, "h5_streamer_status", value.value));
-            self.socket.on("importable_samples", (value) => self.import_one_way_binding_prop(self, "importable_samples", value));
+            self.socket.on("importable_samples", (value) => self.import_one_way_binding_prop(self, "importable_samples", value.value));
             self.socket.on("instrument_status", (value) => self.import_one_way_binding_prop(self, "instrument_status", value.value));
-            self.socket.on("sample_length", (value) => self.import_two_way_binding_prop(self, "sample_length", value));
-            self.socket.on("target_table_data", (value) => self.import_one_way_binding_prop(self, "target_table_data", value));
-            self.socket.on("targets", (value) => self.import_one_way_binding_prop(self, "targets", value));
-            self.socket.on("figure_ranges", (value) => self.import_one_way_binding_prop(self, "figure_ranges", {...value, 'uid': Math.random()}));
+            self.socket.on("sample_length", (value) => self.import_two_way_binding_prop(self, "sample_length", value.value));
+            self.socket.on("target_table_data", (value) => self.import_one_way_binding_prop(self, "target_table_data", value.value));
+            self.socket.on("figure_ranges", (value) => self.import_one_way_binding_prop(self, "figure_ranges", {...value.value, 'uid': Math.random()}));
             self.socket.on("tps_parameters", (value) => self.import_one_way_binding_prop(self, "tps_parameters", value.value));
-            self.socket.on("heatmap_figure_data", (value) => self.import_one_way_binding_prop(self, "heatmap_figure_data", value));
-            self.socket.on("timeseries_figure_data", (value) => self.import_one_way_binding_prop(self, "timeseries_figure_data", value));
-            self.socket.on("spec_stack_figure_data", (value) => self.import_one_way_binding_prop(self, "spec_stack_figure_data", value));
+            self.socket.on("heatmap_figure_data", (value) => self.import_one_way_binding_prop(self, "heatmap_figure_data", value.value));
+            self.socket.on("timeseries_figure_data", (value) => self.import_one_way_binding_prop(self, "timeseries_figure_data", value.value));
+            self.socket.on("spec_stack_figure_data", (value) => self.import_one_way_binding_prop(self, "spec_stack_figure_data", value.value));
             self.socket.on("projects", (value) => self.import_two_way_binding_prop(self, "projects", value.value));
             self.socket.on("experiments", (value) => self.import_two_way_binding_prop(self, "experiments", value.value));
             // if MainUI was restarted, get latest state variables from other running services
@@ -337,7 +345,7 @@ export default {
     // watchers also see changes from external notifications, if any
     watch: {
         acquisition_status: function(new_value, old_value) {
-            return this.export_two_way_binding_prop(this, 'acquisition_status', {'value': new_value}, old_value);
+            return this.export_two_way_binding_prop(this, 'acquisition_status', new_value, old_value);
         },
         experiment_selected: function(new_value, old_value) {
             return this.export_one_way_binding_prop(this, 'experiment_selected', new_value, old_value);
@@ -359,9 +367,6 @@ export default {
         },
         sample_length: function(new_value, old_value) {
             return this.export_two_way_binding_prop(this, 'sample_length', new_value, old_value);
-        },
-        target_list_request: function(new_value, old_value) {
-            return this.export_one_way_binding_prop(this, 'target_list_request', new_value, old_value);
         },
         target_to_load: function(new_value, old_value) {
             return this.export_one_way_binding_prop(this, 'target_to_load', new_value, old_value);

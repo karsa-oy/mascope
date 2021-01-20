@@ -195,16 +195,16 @@ class DataPool():
             directories
         """
 
-        self.data_root = data_path
-        self.projects_root = projects_path
+        self.data_root = os.path.abspath(data_path)
+        self.projects_root = os.path.abspath(projects_path)
         self.pool = {}
 
         # If given projects root does not exist, create
-        if not os.path.isdir(projects_path):
-            os.mkdir(projects_path)
+        if not os.path.isdir(self.projects_root):
+            os.mkdir(self.projects_root)
 
         # Project directories in projects_path
-        projects = next( os.walk(projects_path) )[1]
+        projects = next( os.walk(self.projects_root) )[1]
         for project in projects:
             self.pool.update({ project: {} })
             project_path = os.path.join(projects_path, project)
@@ -232,9 +232,9 @@ class DataPool():
         if not os.path.isdir(target_path):
             # TODO: Is this a safe way to do it? Windows dependent at least
             subprocess.check_call(
-                        'mklink /J "%s" "%s"' % (target_path, source_path),
-                        shell=True
-                        )
+                'mklink /J "%s" "%s"' % (os.path.abspath(target_path), os.path.abspath(source_path)),
+                shell=True
+                )
             # Alternative way (requires elevated privileges)
             # os.symlink(source_path, target_path, target_is_directory=True)
 

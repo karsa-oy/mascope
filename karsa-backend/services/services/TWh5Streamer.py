@@ -40,7 +40,7 @@ class TWh5StreamerNamespace(BaseClientNamespace):
              ]
 
     service_state = dict(
-        h5_streamer_status = dict(value='not_ready')
+        h5_streamer_status = 'not_ready',
     )
 
     async def on_import_h5_table_datetime_range(self, data):

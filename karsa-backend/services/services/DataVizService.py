@@ -51,6 +51,7 @@ from karsatof.kutil import (SubscriptableQueue,
                             QueueSubscription
                             )
 
+NO_DATA_LOGGING_DEFAULT = True
 class DataVizRouterNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to Router """
 
@@ -77,25 +78,23 @@ class DataVizRouterNamespace(BaseClientNamespace):
 
         Parameters
         ----------
-        new_ranges : dict
-            JSON data from UI, keys: 'filename', 't_range', 'mz_range'
+        data : dict(name, value, cookies, no_logging, no_data_logging...)
+               value: JSON data from UI, keys: 'filename', 't_range', 'mz_range'
         """
-
-        cookies = data['cookies']
-        await emit_client_notification('data_request', {**data, 'cookies': cookies})
+        await emit_client_notification('data_request', data['value'], cookies=data['cookies'], no_data_logging=NO_DATA_LOGGING_DEFAULT)
     
     async def on_tps_parameters_selected(self, data):
-    # async def on_visualize_tps_parameters(self, data):
         """TPS parameters selected from the dropdown
         """
-        await emit_client_notification('tps_data_request', data)
+        await emit_client_notification('tps_data_request', data['value'], cookies=data['cookies'], no_data_logging=NO_DATA_LOGGING_DEFAULT)
 
     # ---------------------------------
 
     # ========== FileService notifications ==========
     async def on_data_stream_coordinates(self, data):
-        set_figure_ranges = data.get('set_figure_ranges', False)
-        await self.on_acquisition_coordinates(data, set_figure_ranges)
+        set_figure_ranges = data['value'].get('set_figure_ranges', False)
+        data['value']['set_figure_range'] = set_figure_ranges
+        await self.on_acquisition_coordinates(data)
 
     async def on_loaded_spectrum(self, data):
         await self.on_acquired_spectrum(data)
@@ -114,13 +113,14 @@ class DataVizRouterNamespace(BaseClientNamespace):
     # -----------------------------------------------
 
     # ========== TOFService notifications ==========
-    async def on_acquisition_coordinates(self, data, set_figure_ranges=True):
+    async def on_acquisition_coordinates(self, data):
+        value = data['value']
+        set_figure_ranges = value.get('set_figure_ranges', True)
+        filename = value.get('filename')
 
-        filename = data.get('filename')
-
-        mz = np.frombuffer( data.get('mz'), dtype=np.float32 )
-        t = np.frombuffer( data.get('time'), dtype=np.float32 )
-        # t_range = data.get('t_range')
+        mz = np.frombuffer( value.get('mz'), dtype=np.float32 )
+        t = np.frombuffer( value.get('time'), dtype=np.float32 )
+        # t_range = value.get('t_range')
         
         mz_range = [ float(mz[0]), float(mz[-1]) ]
         t_range =  [ float(t[0]),  float(t[-1])  ]
@@ -139,7 +139,7 @@ class DataVizRouterNamespace(BaseClientNamespace):
                               name='signal'
                               )
 
-        cache_key = derive_cache_key(data)
+        cache_key = derive_cache_key(value)
 
         if cache_key in visualizers.keys():
             raise Exception("on_acquisition_coordinates: key %s " % cache_key + 
@@ -151,41 +151,40 @@ class DataVizRouterNamespace(BaseClientNamespace):
 
         if set_figure_ranges:
             # Set UI figure ranges
-            cookies = data['cookies']
             await emit_client_notification('figure_ranges',
                                            {'filename': filename,
                                             'mz_range': mz_range,
                                             't_range': t_range,
-                                            'cookies': cookies,
-                                            }
+                                            },
+                                            cookies=data['cookies'],
+                                            no_data_logging=NO_DATA_LOGGING_DEFAULT
                                            )
     
     async def on_acquired_spectrum(self, data):
-
-        speci = data.get('i')
-        self.log(speci)
+        value = data['value']
+        # speci = value.get('i')
+        # self.log(speci)
 
         global visualizers
-        cache_key = derive_cache_key(data)
+        cache_key = derive_cache_key(value)
         visualizer = visualizers.get(cache_key)
         # Extend signal cache
-        spec = np.frombuffer( data.get('spec'), dtype=np.float32 )
+        spec = np.frombuffer( value.get('spec'), dtype=np.float32 )
         spec = spec.reshape(-1, 1)
-        ti = data.get('t')
+        ti = value.get('t')
         td = np.array( [timedelta(seconds=ti)] ) # Convert to timedelta
         mz = visualizer.data_array.mz
         await visualizer.extend_array(spec,
                                       [mz, td],
                                       'time'
                                       )
-        
-        cookies = data['cookies']
-        await visualizer.extend_visualizations(cookies)
+        await visualizer.extend_visualizations(data['cookies'])
 
 
-    async def on_tps_parameter_info(self, data, set_tps_parameters=True):
-        
-        tps_info = data.get('tps_info')
+    async def on_tps_parameter_info(self, data):
+        value = data['value']
+        tps_info = value.get('tps_info')
+        set_tps_parameters = value.get('set_tps_parameters', True)
 
         visualizer = TPSVisualizer()
 
@@ -197,7 +196,7 @@ class DataVizRouterNamespace(BaseClientNamespace):
                               )
 
         global tps_visualizers
-        cache_key = derive_cache_key(data)
+        cache_key = derive_cache_key(value)
         tps_visualizers.update({cache_key: visualizer
                                 })
 
@@ -206,24 +205,25 @@ class DataVizRouterNamespace(BaseClientNamespace):
                                'value': i
                                } for i, info in enumerate(tps_info)
                             ]            
-            cookies = data['cookies']
             await emit_client_notification('tps_parameters',
-                                           dict(value=dropdown_items, cookies=cookies),
-                                           no_data_logging=True
+                                           dropdown_items,
+                                           cookies=data['cookies'],
+                                           no_data_logging=NO_DATA_LOGGING_DEFAULT
                                            )
 
     async def on_acquired_tps_data(self, data):
-        speci = data.get('i')
-        self.log(speci)
+        value = data['value']
+        # speci = value.get('i')
+        # self.log(speci)
 
         global tps_data
 
         global tps_visualizers
-        visualizer = tps_visualizers.get( derive_cache_key(data) )
+        visualizer = tps_visualizers.get( derive_cache_key(value) )
         # Extend signal cache
-        tps_data = np.frombuffer( data.get('tps_data'), dtype=np.float32 )
+        tps_data = np.frombuffer( value.get('tps_data'), dtype=np.float32 )
         tps_data = tps_data.reshape(-1, 1)
-        ti = data.get('t')
+        ti = value.get('t')
         td = np.array( [timedelta(seconds=ti)] ) # Convert to timedelta
         parameter = visualizer.data_array.parameter
 
@@ -233,18 +233,15 @@ class DataVizRouterNamespace(BaseClientNamespace):
                                       [parameter, td],
                                       'time',
                                       )
-        
-        cookies = data['cookies']
-        await visualizer.extend_visualizations(cookies)
+        await visualizer.extend_visualizations(data['cookies'])
 
 
     async def on_acquisition_finished(self, data):
         global visualizers
-        cache_key = derive_cache_key(data)
+        cache_key = derive_cache_key(data['value'])
         visualizer = visualizers.pop(cache_key)
         # Flush visualizer
-        cookies = data['cookies']
-        await visualizer.flush_visualizations(cookies)
+        await visualizer.flush_visualizations(data['cookies'])
     # ----------------------------------------------
 
         
@@ -256,6 +253,7 @@ class DataVizRouterNamespace(BaseClientNamespace):
 #                        'traces': traces}
 #     await emit_client_notification('timeseries_figure_data',
 #                                    timeseries_data,
+#                                    cookies=?
 #                                    no_data_logging=True
 #                                    )
     
@@ -317,11 +315,11 @@ class SignalVisualizer(ExtendableDataArray):
                         )
         timeseries_data = {'traces': [ts_trace],
                            'mz_range': mz_range,
-                           'cookies': cookies,
                            }
         await emit_client_notification('timeseries_figure_data',
                                        timeseries_data,
-                                       no_data_logging=True
+                                       cookies=cookies,
+                                       no_data_logging=NO_DATA_LOGGING_DEFAULT
                                        )
         await self.reset_array()
 
@@ -386,12 +384,11 @@ class TPSVisualizer(ExtendableDataArray):
                          'yaxis': 'y2'
                          }
                         )
-        timeseries_data = {'traces': [ts_trace],
-                           'cookies': cookies,
-                           }
+        timeseries_data = {'traces': [ts_trace], }
         await emit_client_notification('timeseries_figure_data',
                                        timeseries_data,
-                                       no_data_logging=True
+                                       cookies=cookies,
+                                       no_data_logging=NO_DATA_LOGGING_DEFAULT
                                        )
 
         # Reset signal cache, leave the last column
@@ -539,16 +536,20 @@ async def main():
         # Got at least something
         if heatmap_slice is not None:
             #heatmap_slices.append(heatmap_slice)
+            cookies = heatmap_slice.pop('cookies')
             await emit_client_notification(
                             'heatmap_figure_data',
                             heatmap_slice,
+                            cookies=cookies,
                             no_data_logging=True
                             )
         if spec_trace is not None:
             # spec_traces.append(spec_trace)
+            cookies = spec_trace.pop('cookies')
             await emit_client_notification(
                             'spec_stack_figure_data',
                             spec_trace,
+                            cookies=cookies,
                             no_data_logging=True
                             )
 
