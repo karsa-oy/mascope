@@ -53,7 +53,7 @@ class BaseClientNamespace(AsyncClientNamespace):
 
     async def emit_client_notification(self, name, value, **kwarg):
         """
-        client_notification is sent to subscribers via Router, 
+        client_notification is sent to subscribers via Router,
         name:  a property name;
         value: property value;
         other key arguments are optional and forwarded to subscriber as such,

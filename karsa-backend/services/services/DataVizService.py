@@ -162,7 +162,7 @@ class DataVizRouterNamespace(BaseClientNamespace):
     
     async def on_acquired_spectrum(self, data):
         value = data['value']
-        speci = value.get('i')
+        # speci = value.get('i')
         # self.log(speci)
 
         global visualizers
@@ -541,7 +541,7 @@ async def main():
                             'heatmap_figure_data',
                             heatmap_slice,
                             cookies=cookies,
-                            no_data_logging=NO_DATA_LOGGING_DEFAULT
+                            no_data_logging=True
                             )
         if spec_trace is not None:
             # spec_traces.append(spec_trace)
@@ -550,7 +550,7 @@ async def main():
                             'spec_stack_figure_data',
                             spec_trace,
                             cookies=cookies,
-                            no_data_logging=NO_DATA_LOGGING_DEFAULT
+                            no_data_logging=True
                             )
 
     # heatmap = merge_heatmap_slices(heatmap_slices)
