@@ -300,26 +300,7 @@ export default {
                     ranges.t_range = [x0, x1];
                     ranges.mz_range = [y0, y1];
 
-                    if ( !_.isEmpty(ranges) ) {
-                        let min_mz = 2*10**(-self.cache_index_rank);
-                        let min_t = 1
-                        let [px0, px1] = prev_ranges.t_range;
-                        let [py0, py1] = prev_ranges.mz_range;
-                        //zooming and panning limits along t and mz axes
-                        if ( prev_ranges &&
-                             (x1-x0 < min_t || y1-y0 < min_mz) ||
-                             ((Math.abs((px1-px0) - (x1-x0)) < min_t && Math.abs((py1-py0) - (y1-y0)) < min_mz) && 
-                              (Math.abs(px0-x0) < min_t/16 && Math.abs(py0-y0) < min_mz)) ) {
-                            self.beep()
-                            self.update_figures(prev_ranges);
-                            return;
-                        }
-                        self.figure_cache_add_ref(ranges.mz_range);
-                        self.zoom_stack.push(new self.ZoomStackItem(ranges.t_range, ranges.mz_range));
-                        let cur_ranges = self.shallow_copy(self.zoom_stack.slice(-1)[0]);
-                        self.update_figures(cur_ranges);
-                        self.visualize_range_on_zoom_in(prev_ranges, ranges);
-                    }
+                    self.visualize_range_on_zoom_in(prev_ranges, ranges);
                 }
             });
 
@@ -395,26 +376,7 @@ export default {
                     ranges.mz_range = [x0, x1];
                     ranges.t_range = [y0, y1];
 
-                    if ( !_.isEmpty(ranges) ) {
-                        let min_mz = 2*10**(-self.cache_index_rank);
-                        let min_t = 1
-                        let [px0, px1] = prev_ranges.mz_range;
-                        let [py0, py1] = prev_ranges.t_range;
-                        //zooming and panning limits along t and mz axes
-                        if ( prev_ranges &&
-                             (x1-x0 < min_t || y1-y0 < min_mz) ||
-                             ((Math.abs((px1-px0) - (x1-x0)) < min_t && Math.abs((py1-py0) - (y1-y0)) < min_mz) && 
-                              (Math.abs(px0-x0) < min_t/16 && Math.abs(py0-y0) < min_mz)) ) {
-                            self.beep()
-                            self.update_figures(prev_ranges);
-                            return;
-                        }
-                        self.figure_cache_add_ref(ranges.mz_range);
-                        self.zoom_stack.push(new self.ZoomStackItem(ranges.t_range, ranges.mz_range));
-                        let cur_ranges = self.shallow_copy(self.zoom_stack.slice(-1)[0]);
-                        self.update_figures(cur_ranges);
-                        self.visualize_range_on_zoom_in(prev_ranges, ranges);
-                    }
+                    self.visualize_range_on_zoom_in(prev_ranges, ranges);
                 }
             });
             // Double click event
@@ -717,24 +679,39 @@ export default {
             );
         },
 
-
-        visualize_range_on_zoom_in(prev_ranges, cur_ranges) {
-            if ( _.isUndefined(prev_ranges) || _.isUndefined(cur_ranges) )
-                return;
-            let prev_mz = prev_ranges.mz_range;
-            let cur_mz = cur_ranges.mz_range;
-            let min_zoom = 10**(-this.cache_index_rank);
-            if ( Math.abs(prev_mz[0] - cur_mz[0]) <= min_zoom &&
-                 Math.abs(prev_mz[1] - cur_mz[1]) <= min_zoom ) {
+        visualize_range_on_zoom_in(prev_ranges, new_ranges) {
+            let self = this;
+            if ( _.isUndefined(prev_ranges) || _.isUndefined(new_ranges) ) {
+                self.log("visualize_range_on_zoom_in: some of the ranges undefined!");
+                return
+            }
+            let [mz0, mz1] = new_ranges.mz_range;
+            let [t0, t1] = new_ranges.t_range;
+            let [pmz0, pmz1] = prev_ranges.mz_range;
+            let [pt0, pt1] = prev_ranges.t_range;
+            // Set min zoom ranges
+            let min_mz = 2*10**(-self.cache_index_rank);
+            let min_t = 1;
+            //zooming and panning limits along t and mz axes
+            if ( (t1-t0 < min_t || mz1-mz0 < min_mz) ||
+                 ( (Math.abs((pt1-pt0) - (t1-t0)) < min_t && 
+                    Math.abs((pmz1-pmz0) - (mz1-mz0)) < min_mz) && 
+                   (Math.abs(pt0-t0) < min_t/16 && 
+                    Math.abs(pmz0-mz0) < min_mz)
+                   )
+                 ) {
+                self.beep()
+                self.update_figures(prev_ranges);
                 return;
             }
-            // retro-visualization
+            // Add figure cache and zoom stack items
+            self.figure_cache_add_ref(new_ranges.mz_range);
+            self.zoom_stack.push(new self.ZoomStackItem(new_ranges.t_range, new_ranges.mz_range));
+            let cur_ranges = self.shallow_copy(self.zoom_stack.slice(-1)[0]);
+            self.update_figures(cur_ranges);
+            // Visualize
             this.visualize_range = {...cur_ranges, 'filename': this.filename};
-            // acq_visualization
-            // TODO: would be better to introduce separate var for acq.viz.
-            // this.visualize_acquisition = {'mz_range': cur_mz, 'filename': this.filename};
         },
-
 
         visualize_range_on_zoom_out(prev_ranges, cur_ranges) {
             if ( _.isUndefined(prev_ranges) || _.isUndefined(cur_ranges) )
