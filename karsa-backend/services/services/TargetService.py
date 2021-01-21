@@ -8,6 +8,8 @@ import numpy as np
 import pandas as pd
 import socketio
 
+from karsatof import kchem
+
 from helpers import BaseClientNamespace
 
 from office365.runtime.auth.authentication_context import AuthenticationContext
@@ -77,6 +79,8 @@ def get_target_table(target_df, cols=None):
     sub_df = target_df[cols]
     # Replace NaNs with Nones for JSON compatibility
     sub_df = sub_df.replace({np.nan: None})
+    # Calculate ion m/z
+    sub_df['Measured Ion m/z'] = [ kchem.get_exact_mass(comp) for comp in sub_df['Ion composition'] ]
     target_table = {'rows': list( sub_df.to_dict('index').values() ),
                     'cols': [ {'field': col,
                                'label': col.capitalize(),

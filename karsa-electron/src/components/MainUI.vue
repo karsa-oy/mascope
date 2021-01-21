@@ -96,7 +96,7 @@ export default {
             'project_selected',
             'sample_attributes',
             'target_list_request',
-            'target_to_load',
+            'target_to_display',
             'tps_parameters_selected',
             'visualize_range',
             ]),
@@ -364,8 +364,8 @@ export default {
         target_list_request: function(new_value, old_value) {
             return this.export_one_way_binding_prop(this, 'target_list_request', new_value, old_value);
         },
-        target_to_load: function(new_value, old_value) {
-            return this.export_one_way_binding_prop(this, 'target_to_load', new_value, old_value);
+        target_to_display: function(new_value, old_value) {
+            return this.export_one_way_binding_prop(this, 'target_to_display', new_value, old_value);
         },
         tps_parameters_selected: function(new_value, old_value) {
             return this.export_one_way_binding_prop(this, 'tps_parameters_selected', new_value, old_value);

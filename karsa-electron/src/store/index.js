@@ -30,7 +30,7 @@ export default new Vuex.Store({
 		spec_stack_figure_data: {},
 		target_list_request: {},
 		target_table_data: [],
-		target_to_load: [],
+		target_to_display: [],
 		targets: [],
 		timeseries_figure_data: {},
 		tps_parameters: [],
@@ -104,8 +104,8 @@ export default new Vuex.Store({
 		target_table_data(state, payload) {
 			state.target_table_data = payload;
 		},
-		target_to_load(state, payload) {
-			state.target_to_load = payload;
+		target_to_display(state, payload) {
+			state.target_to_display = payload;
 		},
 		targets(state, payload) {
 			state.targets = payload;

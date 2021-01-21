@@ -36,7 +36,7 @@ def get_exact_mass(molComp):
         
     mass = np.zeros((1,))
     if TwGetMoleculeMass(molComp.encode(), mass) == 4:
-        return mass
+        return np.asscalar(mass)
     else:
         raise ValueError
         

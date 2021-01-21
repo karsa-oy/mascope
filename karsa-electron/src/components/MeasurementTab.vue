@@ -171,12 +171,12 @@ export default {
                 this.$store.commit('target_list_request', value);
             }
         },
-        target_to_load: {
+        target_to_display: {
             get() {
-                return this.$store.state.target_to_load;
+                return this.$store.state.target_to_display;
             },
             set(value) {
-                this.$store.commit('target_to_load', value);
+                this.$store.commit('target_to_display', value);
             }
         },
         sample_attributes: {
@@ -617,11 +617,11 @@ export default {
                 return false;
             }
             var last_selection = [...new_value].pop();
-            if ( this.selected_target_table_rows.length > 1 ) {
-                this.selected_target_table_rows = [last_selection,];
+            if ( this.target_table_checked_rows.length > 1 ) {
+                this.target_table_checked_rows = [last_selection,];
             }
             // TODO: check if the vuex prop should be mapped to local props
-            this.target_to_load = [last_selection, ];
+            this.target_to_display = last_selection['Measured Ion m/z'];
         },
         targets: function(new_data, old_data){
             if ( _.isEqual(new_data, old_data) ) {

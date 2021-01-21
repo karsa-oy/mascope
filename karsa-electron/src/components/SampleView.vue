@@ -91,8 +91,14 @@ export default {
     props: {
     },
     computed: {
-        ...mapState(['acquisition_status', 'sample_to_load', 'data_source_path',
-                     'heatmap_figure_data', 'timeseries_figure_data', 'spec_stack_figure_data', ]),
+        ...mapState(['acquisition_status',
+                     'data_source_path',
+                     'heatmap_figure_data',
+                     'sample_to_load',
+                     'spec_stack_figure_data',
+                     'target_to_display',
+                     'timeseries_figure_data',
+                     ]),
         figure_ranges: {
             get() {
                 return this.$store.state.figure_ranges;
@@ -138,21 +144,20 @@ export default {
     data: function() {
         return {
             // State variables
+            cache_index_rank: 0, // actual value calculated in "mounted"
+            figure_cache: {'t_maxrange': [0, 0], 'mz_maxrange': [0, 0]},
             figure_layouts: {},
+            filename: '',
+            grid_spacing: 0.0049,
             heatmap_data: [],
             heatmap_layout: {},
-            timeseries_data: [],
-            timeseries_layout: {},
+            heatmap_queue: Promise.resolve(),
             spec_stack_data: [],
             spec_stack_layout: {},
-            heatmap_queue: Promise.resolve(),
-             // figure_cache: {'t_maxrange': [Number.MAX_SAFE_INTEGER, 0], 'mz_maxrange': [Number.MAX_SAFE_INTEGER, 0], },
-            figure_cache: {'t_maxrange': [0, 0], 'mz_maxrange': [0, 0], },
-            zoom_stack: [],
-            filename: '',
+            timeseries_data: [],
+            timeseries_layout: {},
             zooming_out: false,
-            grid_spacing: 0.0049,
-            cache_index_rank: 0, // actual value calculated in "mounted"
+            zoom_stack: [],
         }
     },
     created: function(){
@@ -251,6 +256,7 @@ export default {
                            );
             // Relayout event
             heatmap_figure.on("plotly_relayout", function(eventData) {
+console.log(eventData);
                 if ( self.zooming_out === true ) {
                     // zoom_out
 
@@ -929,10 +935,17 @@ export default {
             this.reset_figure_cache();
             this.reset_figures();
         },
-        target_table_data: function(new_value, old_value) {
+        target_to_display: function(new_value, old_value) {
+            console.log("target_to_display: ", new_value);
             if ( _.isEqual(new_value, old_value) ) {
                 return false;
             }
+            let target_mz_range = [new_value-.5, new_value+.5];
+            this.visualize_range = {
+                'filename': this.filename,
+                't_range': null, // TODO: Use current t_range
+                'mz_range': target_mz_range
+                };
         },
         tps_parameters: function(new_value, old_value) {
             if ( _.isEmpty(new_value) || _.isEqual(new_value, old_value) ) {
