@@ -91,8 +91,14 @@ export default {
     props: {
     },
     computed: {
-        ...mapState(['acquisition_status', 'sample_to_load', 'data_source_path',
-                     'heatmap_figure_data', 'timeseries_figure_data', 'spec_stack_figure_data', ]),
+        ...mapState(['acquisition_status',
+                     'data_source_path',
+                     'heatmap_figure_data',
+                     'sample_to_load',
+                     'spec_stack_figure_data',
+                     'target_to_display',
+                     'timeseries_figure_data',
+                     ]),
         figure_ranges: {
             get() {
                 return this.$store.state.figure_ranges;
@@ -118,14 +124,6 @@ export default {
                 this.$store.commit('tps_parameters_selected', new_value);
             }
         },
-        target_table_data: {
-            get() {
-                return this.$store.state.target_table_data;
-            },
-            set(value) {
-                this.$store.commit('target_table_data', value);
-            }
-        },
         tps_parameters: {
             get() {
                 return this.$store.state.tps_parameters;
@@ -138,21 +136,19 @@ export default {
     data: function() {
         return {
             // State variables
+            cache_index_rank: 0, // actual value calculated in "mounted"
+            figure_cache: {'t_maxrange': [0, 0], 'mz_maxrange': [0, 0]},
             figure_layouts: {},
+            filename: '',
+            grid_spacing: 0.0049,
             heatmap_data: [],
             heatmap_layout: {},
-            timeseries_data: [],
-            timeseries_layout: {},
+            heatmap_queue: Promise.resolve(),
             spec_stack_data: [],
             spec_stack_layout: {},
-            heatmap_queue: Promise.resolve(),
-             // figure_cache: {'t_maxrange': [Number.MAX_SAFE_INTEGER, 0], 'mz_maxrange': [Number.MAX_SAFE_INTEGER, 0], },
-            figure_cache: {'t_maxrange': [0, 0], 'mz_maxrange': [0, 0], },
+            timeseries_data: [],
+            timeseries_layout: {},
             zoom_stack: [],
-            filename: '',
-            zooming_out: false,
-            grid_spacing: 0.0049,
-            cache_index_rank: 0, // actual value calculated in "mounted"
         }
     },
     created: function(){
@@ -251,25 +247,12 @@ export default {
                            );
             // Relayout event
             heatmap_figure.on("plotly_relayout", function(eventData) {
-                if ( self.zooming_out === true ) {
-                    // zoom_out
-
-                    self.zooming_out = false;
-                    if ( self.zoom_stack.length <= 1 ) {
-                        self.log("Zoom stack is empty.");
-                        self.beep();
-                        return;
-                    }
-
-                    // remove last zoom and take current zoom into view
-                    let prev_ranges = self.zoom_stack.pop();
-                    self.log("Zoom stack frames left:", self.zoom_stack.length - 1);
-                    let cur_ranges = self.shallow_copy(self.zoom_stack.slice(-1)[0]);
-                    self.update_figures(cur_ranges);
-                    // visualize missing frames and acquisition frames
-                    self.visualize_range_on_zoom_out(prev_ranges, cur_ranges);
-                    // remove cache item, if not used anymore
-                    self.figure_cache_release_ref(prev_ranges.mz_range);
+                if ( _.isEmpty(eventData) ) {
+                    // Likely a double-click event
+                    return;
+                }
+                if ( _.isEqual(eventData, {'autosize': true}) ) {
+                    // Figure resize event
                     return;
                 }
 
@@ -300,7 +283,8 @@ export default {
 
             // Double click event
             heatmap_figure.on('plotly_doubleclick', function(){
-                self.on_double_click_figure();
+                // On double-click, zoom one step out
+                self.visualize_range_on_zoom_out();
             });
 
             // Right click event
@@ -321,28 +305,14 @@ export default {
                            );
             // Relayout event
             spec_stack_figure.on("plotly_relayout", function(eventData) {
-                if ( self.zooming_out === true ) {
-                    // zoom_out
-
-                    self.zooming_out = false;
-                    if ( self.zoom_stack.length <= 1 ) {
-                        self.log("Zoom stack is empty.");
-                        self.beep();
-                        return;
-                    }
-
-                    // remove last zoom and take current zoom into view
-                    let prev_ranges = self.zoom_stack.pop();
-                    self.log("Zoom stack frames left:", self.zoom_stack.length - 1);
-                    let cur_ranges = self.shallow_copy(self.zoom_stack.slice(-1)[0]);
-                    self.update_figures(cur_ranges);
-                    // visualize missing frames and acquisition frames
-                    self.visualize_range_on_zoom_out(prev_ranges, cur_ranges);
-                    // remove cache item, if not used anymore
-                    self.figure_cache_release_ref(prev_ranges.mz_range);
+                if ( _.isEmpty(eventData) ) {
+                    // Likely a double-click event
                     return;
                 }
-                
+                if ( _.isEqual(eventData, {'autosize': true}) ) {
+                    // Figure resize event
+                    return;
+                }
                 if ( Object.keys(eventData).length ) {
                     // zoom_in
                     let prev_ranges = self.shallow_copy(self.zoom_stack.slice(-1)[0]);
@@ -368,7 +338,8 @@ export default {
             });
             // Double click event
             spec_stack_figure.on('plotly_doubleclick', function(){
-                self.on_double_click_figure();
+                // On double-click, zoom one step out
+                self.visualize_range_on_zoom_out();
             });
             // Right click event
             spec_stack_figure.addEventListener('contextmenu', function(ev) {
@@ -559,7 +530,7 @@ export default {
                     "x": x0,
                     "y": y0,
                     "sizex": x1 - x0,
-                    "sizey": 1e4,
+                    "sizey": 1e4,           // number >= actual image height [px]
                     "xanchor": "left",
                     "yanchor": "bottom",
                     "sizing": "contain",    // to display native height
@@ -684,51 +655,74 @@ export default {
             t1 = Math.min(t1, self.figure_cache.t_maxrange[1]);
             // Adjust new ranges to grid spacing
             [mz0, mz1, t0, t1] = self.adjust_ranges_to_grid_spacing(mz0, mz1, t0, t1);
-            // Set min zoom ranges
-            let min_mz = 2*10**(-self.cache_index_rank);
-            let min_t = 1;
-            //zooming and panning limits along t and mz axes
-            if ( (t1-t0 < min_t || mz1-mz0 < min_mz) ||
-                 ( (Math.abs((pt1-pt0) - (t1-t0)) < min_t && 
-                    Math.abs((pmz1-pmz0) - (mz1-mz0)) < min_mz) && 
-                   (Math.abs(pt0-t0) < min_t/16 && 
-                    Math.abs(pmz0-mz0) < min_mz)
-                   )
-                 ) {
+            // Set min significant zoom ranges
+            let min_dmz = 10**(-self.cache_index_rank);
+            let min_dt = 1;
+            // Check if mz_range has changed
+            let mz_range_updated = true;
+            if ( (Math.abs(mz1-pmz1) < min_dmz && Math.abs(mz0-pmz0) < min_dmz)
+                ) {
+                // mz_range has not changed significantly, reset to original
+                mz0 = pmz0;
+                mz1 = pmz1;
+                mz_range_updated = false;
+            }
+            // Check if t_range has changed
+            let t_range_updated = true;
+            if ( (Math.abs(t1-pt1) < min_dt && Math.abs(t0-pt0) < min_dt)
+                ) {
+                // t_range has not changed significantly, reset to original
+                t0 = pt0;
+                t1 = pt1;
+                t_range_updated = false;
+            }
+            if (!mz_range_updated && !t_range_updated) {
+                // No need to zoom, reset to original ranges
                 self.beep()
                 self.update_figures(prev_ranges);
-                return;
+                return
             }
-            // Add figure cache and zoom stack items
+            // Zoom in
+            // Add figure cache ref and zoom stack item
             self.figure_cache_add_ref([mz0, mz1]);
             self.zoom_stack.push(new self.ZoomStackItem([t0, t1], [mz0, mz1]));
             let cur_ranges = self.shallow_copy(self.zoom_stack.slice(-1)[0]);
+            // Set new ranges
             self.update_figures(cur_ranges);
-            // Visualize
-            this.visualize_range = {...cur_ranges, 'filename': this.filename};
+            // Request new visualizations if needed
+            if (mz_range_updated) {
+                this.visualize_range = {...cur_ranges, 'filename': this.filename};
+            }
         },
 
-        visualize_range_on_zoom_out(prev_ranges, cur_ranges) {
+        visualize_range_on_zoom_out() {
+            let self = this;
+            if ( this.zoom_stack.length <= 1 ) {
+                this.log("Zoom stack is empty.");
+                this.beep();
+                return
+            }
+            // remove last zoom and take current zoom into view
+            let prev_ranges = self.zoom_stack.pop();
+            self.log("Zoom stack frames left:", self.zoom_stack.length - 1);
+            let cur_ranges = self.shallow_copy(self.zoom_stack.slice(-1)[0]);
             if ( _.isUndefined(prev_ranges) || _.isUndefined(cur_ranges) )
                 return;
+            self.update_figures(cur_ranges);
+            // visualize missing frames and acquisition frames
             let prev_mz = prev_ranges.mz_range;
             let cur_mz = cur_ranges.mz_range;
-            let min_zoom = 10**(-this.cache_index_rank);
-            if ( Math.abs(prev_mz[0] - cur_mz[0]) <= min_zoom &&
-                 Math.abs(prev_mz[1] - cur_mz[1]) <= min_zoom ) {
-                return;
-            }
             let prev_t_filled = this.get_figure_cache_item(prev_mz).t_filled_range;
             let cur_t_filled = this.get_figure_cache_item(cur_mz).t_filled_range;
             // retro-visualization
-            if ( prev_t_filled[1] - cur_t_filled[1] > 1) {
+            let min_t_gap = 1;
+            if ( prev_t_filled[1] - cur_t_filled[1] > min_t_gap) {
                 this.visualize_range = {'t_range': [cur_t_filled[1], prev_t_filled[1]],
                                         'mz_range': cur_mz,
                                         'filename': this.filename};
             }
-            // acq_visualization
-            // TODO: would be better to introduce separate var for acq.viz.
-            // this.visualize_acquisition = {'mz_range': cur_mz, 'filename': this.filename};
+            // remove cache item, if not used anymore
+            self.figure_cache_release_ref(prev_ranges.mz_range);
         },
 
 
@@ -782,11 +776,6 @@ export default {
                 y1 = _y1_r.toFixed(this.cache_index_rank);
             return [parseFloat(x0), parseFloat(x1), parseFloat(y0), parseFloat(y1)];
         },
-
-        on_double_click_figure() {
-            this.zooming_out = true;
-        },
-
 
         async update_figures(zoom_stack_item=null) {
             // the function is destructive for zoom_stack_item - don't use refs
@@ -901,9 +890,13 @@ export default {
             this.reset_figure_cache();
             this.reset_figures();
         },
-        target_table_data: function(new_value, old_value) {
+        target_to_display: function(new_value, old_value) {
             if ( _.isEqual(new_value, old_value) ) {
                 return false;
+            }
+            if (new_value == null) {
+                this.visualize_range_on_zoom_out();
+                return
             }
             let target_mz_range = [new_value-.5, new_value+.5];
             let prev_ranges = this.shallow_copy(this.zoom_stack.slice(-1)[0]);

@@ -616,12 +616,16 @@ export default {
             if ( _.isEqual(new_value, old_value) ) {
                 return false;
             }
-            var last_selection = [...new_value].pop();
+            let last_selection = [...new_value].pop();
             if ( this.target_table_checked_rows.length > 1 ) {
                 this.target_table_checked_rows = [last_selection,];
             }
-            // TODO: check if the vuex prop should be mapped to local props
-            this.target_to_display = last_selection['Measured Ion m/z'];
+            if (last_selection != null) {
+                this.target_to_display = last_selection['Measured Ion m/z'];
+            } else {
+                this.target_to_display = null;
+            }
+            
         },
         targets: function(new_data, old_data){
             if ( _.isEqual(new_data, old_data) ) {
