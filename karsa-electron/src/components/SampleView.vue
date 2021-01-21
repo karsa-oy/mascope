@@ -276,27 +276,21 @@ export default {
                 if ( Object.keys(eventData).length ) {
                     // zoom_in
 
-                    var prev_ranges = self.shallow_copy(self.zoom_stack.slice(-1)[0]);
-                    var x0 = eventData["xaxis.range[0]"];
-                    var x1 = eventData["xaxis.range[1]"];
-                    var y0 = eventData["yaxis.range[0]"];
-                    var y1 = eventData["yaxis.range[1]"];
+                    let prev_ranges = self.shallow_copy(self.zoom_stack.slice(-1)[0]);
+                    let x0 = eventData["xaxis.range[0]"];
+                    let x1 = eventData["xaxis.range[1]"];
+                    let y0 = eventData["yaxis.range[0]"];
+                    let y1 = eventData["yaxis.range[1]"];
                     if( _.isUndefined(prev_ranges) &&
                         _.isUndefined(x0) && _.isUndefined(x1) &&
                         _.isUndefined(y0) && _.isUndefined(y1) )
                         return;
 
-                    var ranges = {};
                     x0 = (x0 === undefined) ? prev_ranges.t_range[0] : x0;
                     x1 = (x1 === undefined) ? prev_ranges.t_range[1] : x1;
                     y0 = (y0 === undefined) ? prev_ranges.mz_range[0] : y0;
                     y1 = (y1 === undefined) ? prev_ranges.mz_range[1] : y1;
-                    x0 = Math.max(x0, self.figure_cache.t_maxrange[0]);
-                    x1 = Math.min(x1, self.figure_cache.t_maxrange[1]);
-                    y0 = Math.max(y0, self.figure_cache.mz_maxrange[0]);
-                    y1 = Math.min(y1, self.figure_cache.mz_maxrange[1]);
-                    [x0, x1, y0, y1] = self.adjust_ranges_to_grid_spacing(x0, x1, y0, y1);
-
+                    let ranges = {};
                     ranges.t_range = [x0, x1];
                     ranges.mz_range = [y0, y1];
 
@@ -351,28 +345,21 @@ export default {
                 
                 if ( Object.keys(eventData).length ) {
                     // zoom_in
-
-                    var prev_ranges = self.shallow_copy(self.zoom_stack.slice(-1)[0]);
-                    var x0 = eventData["xaxis.range[0]"];
-                    var x1 = eventData["xaxis.range[1]"];
-                    var y0 = eventData["yaxis.range[0]"];
-                    var y1 = eventData["yaxis.range[1]"];
+                    let prev_ranges = self.shallow_copy(self.zoom_stack.slice(-1)[0]);
+                    let x0 = eventData["xaxis.range[0]"];
+                    let x1 = eventData["xaxis.range[1]"];
+                    let y0 = eventData["yaxis.range[0]"];
+                    let y1 = eventData["yaxis.range[1]"];
                     if( _.isUndefined(prev_ranges) &&
                         _.isUndefined(x0) && _.isUndefined(x1) &&
                         _.isUndefined(y0) && _.isUndefined(y1) )
                         return;
 
-                    var ranges = {};
                     x0 = (x0 === undefined) ? prev_ranges.mz_range[0] : x0;
                     x1 = (x1 === undefined) ? prev_ranges.mz_range[1] : x1;
                     y0 = (y0 === undefined) ? prev_ranges.t_range[0] : y0;
                     y1 = (y1 === undefined) ? prev_ranges.t_range[1] : y1;
-                    x0 = Math.max(x0, self.figure_cache.mz_maxrange[0]);
-                    x1 = Math.min(x1, self.figure_cache.mz_maxrange[1]);
-                    y0 = Math.max(y0, self.figure_cache.t_maxrange[0]);
-                    y1 = Math.min(y1, self.figure_cache.t_maxrange[1]);
-                    [x0, x1, y0, y1] = self.adjust_ranges_to_grid_spacing(x0, x1, y0, y1);
-
+                    let ranges = {};
                     ranges.mz_range = [x0, x1];
                     ranges.t_range = [y0, y1];
 
@@ -685,10 +672,18 @@ export default {
                 self.log("visualize_range_on_zoom_in: some of the ranges undefined!");
                 return
             }
+            // Unpack ranges
             let [mz0, mz1] = new_ranges.mz_range;
             let [t0, t1] = new_ranges.t_range;
             let [pmz0, pmz1] = prev_ranges.mz_range;
             let [pt0, pt1] = prev_ranges.t_range;
+            // Make sure new ranges are within bounds
+            mz0 = Math.max(mz0, self.figure_cache.mz_maxrange[0]);
+            mz1 = Math.min(mz1, self.figure_cache.mz_maxrange[1]);
+            t0 = Math.max(t0, self.figure_cache.t_maxrange[0]);
+            t1 = Math.min(t1, self.figure_cache.t_maxrange[1]);
+            // Adjust new ranges to grid spacing
+            [mz0, mz1, t0, t1] = self.adjust_ranges_to_grid_spacing(mz0, mz1, t0, t1);
             // Set min zoom ranges
             let min_mz = 2*10**(-self.cache_index_rank);
             let min_t = 1;
@@ -705,8 +700,8 @@ export default {
                 return;
             }
             // Add figure cache and zoom stack items
-            self.figure_cache_add_ref(new_ranges.mz_range);
-            self.zoom_stack.push(new self.ZoomStackItem(new_ranges.t_range, new_ranges.mz_range));
+            self.figure_cache_add_ref([mz0, mz1]);
+            self.zoom_stack.push(new self.ZoomStackItem([t0, t1], [mz0, mz1]));
             let cur_ranges = self.shallow_copy(self.zoom_stack.slice(-1)[0]);
             self.update_figures(cur_ranges);
             // Visualize
@@ -910,6 +905,11 @@ export default {
             if ( _.isEqual(new_value, old_value) ) {
                 return false;
             }
+            let target_mz_range = [new_value-.5, new_value+.5];
+            let prev_ranges = this.shallow_copy(this.zoom_stack.slice(-1)[0]);
+            let new_ranges = {'mz_range': target_mz_range,
+                              't_range': prev_ranges.t_range};
+            this.visualize_range_on_zoom_in(prev_ranges, new_ranges);
         },
         tps_parameters: function(new_value, old_value) {
             if ( _.isEmpty(new_value) || _.isEqual(new_value, old_value) ) {
