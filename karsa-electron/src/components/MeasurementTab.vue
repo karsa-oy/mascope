@@ -59,7 +59,7 @@ export default {
             // Target table 
             target_table_rows: [],
             target_table_cols: [],
-            target_table_checked_rows: [],
+            target_table_selected_row: {},
             // Sample metadata for selected sample
             sample_file: "",
             sample_name: "",
@@ -612,16 +612,13 @@ export default {
                 this.sample_to_load = {'filename': ""};
             }
         },
-        target_table_checked_rows:function(new_value, old_value) {
+        target_table_selected_row:function(new_value, old_value) {
             if ( _.isEqual(new_value, old_value) ) {
                 return false;
             }
-            let last_selection = [...new_value].pop();
-            if ( this.target_table_checked_rows.length > 1 ) {
-                this.target_table_checked_rows = [last_selection,];
-            }
-            if (last_selection != null) {
-                this.target_to_display = last_selection['Measured Ion m/z'];
+            if (new_value != null) {
+                let mz = new_value['Measured Ion m/z'];
+                this.target_to_display = mz;
             } else {
                 this.target_to_display = null;
             }

@@ -633,9 +633,7 @@
                                             :pagination-simple="false" 
                                             sort-icon="arrow-up"
                                             default-sort-direction="asc"
-                                            :checked-rows.sync="target_table_checked_rows" 
-                                            :header-checkable="false"
-                                            :checkable="acquisition_status=='not_running' ? true:false"
+                                            :selected.sync="target_table_selected_row" 
                                             focusable
                                             sortable>
                                         </b-table>

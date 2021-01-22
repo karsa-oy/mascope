@@ -30,7 +30,7 @@ export default new Vuex.Store({
 		spec_stack_figure_data: {},
 		target_list_request: {},
 		target_table_data: [],
-		target_to_display: [],
+		target_to_display: {},
 		targets: [],
 		timeseries_figure_data: {},
 		tps_parameters: [],
