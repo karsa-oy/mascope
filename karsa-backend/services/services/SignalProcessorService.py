@@ -15,7 +15,7 @@ from multiprocessing import (Barrier,
                              cpu_count)
 from queue import Empty
 
-from helpers import BaseClientNamespace
+from karsalib import BaseClientNamespace
 from karsatof.kfeeder import KFeeder, FeederProcessor
 from karsatof.kworker import KEncoder
 from karsatof.kcollector import KCollector

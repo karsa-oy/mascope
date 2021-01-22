@@ -6,18 +6,16 @@ This script runs the data visualization service for Karsa Tarkka TOF system.
 DataVizService gets acquisition notifications from TOFService
 It collects MS data, generates images in real time and pushes them to subscribers.
 
-Running this script will start a client socket to receive acquisition notifications
-and run figure generators in corresponding threads.
+The script runs a client socket to connect to a Router; via the Router it receives
+acquisition notifications, run figure generators in corresponding threads, and sends
+the images to subscribers
 
 Created on Fri Apr 17 11:35:57 2020
 """
 
 import os
-import sys
-import getopt
 import inspect
 import xarray
-import socketio
 import asyncio
 import numpy as np
 import dask.array as da
@@ -32,7 +30,7 @@ from multiprocessing import (
 from datetime import timedelta
 from queue import Empty
 
-from helpers import BaseClientNamespace
+from karsalib import BaseClientNamespace, BaseServiceClient, parse_cmd_args
 from karsatof.kevent import KEvent
 from karsatof.kworker import HeatmapGenerator, SpecTraceGenerator
 from karsatof.kcollector import ExtendableDataArray
@@ -52,7 +50,10 @@ from karsatof.kutil import (SubscriptableQueue,
                             )
 
 NO_DATA_LOGGING_DEFAULT = True
-class DataVizRouterNamespace(BaseClientNamespace):
+client = None
+
+
+class DataVizServiceNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to Router """
 
     rooms = ['acquisition_coordinates',
@@ -81,12 +82,12 @@ class DataVizRouterNamespace(BaseClientNamespace):
         data : dict(name, value, cookies, no_logging, no_data_logging...)
                value: JSON data from UI, keys: 'filename', 't_range', 'mz_range'
         """
-        await emit_client_notification('data_request', data['value'], cookies=data['cookies'], no_data_logging=NO_DATA_LOGGING_DEFAULT)
+        await self.emit_client_notification('data_request', data['value'], cookies=data['cookies'], no_data_logging=NO_DATA_LOGGING_DEFAULT)
     
     async def on_tps_parameters_selected(self, data):
         """TPS parameters selected from the dropdown
         """
-        await emit_client_notification('tps_data_request', data['value'], cookies=data['cookies'], no_data_logging=NO_DATA_LOGGING_DEFAULT)
+        await self.emit_client_notification('tps_data_request', data['value'], cookies=data['cookies'], no_data_logging=NO_DATA_LOGGING_DEFAULT)
 
     # ---------------------------------
 
@@ -114,6 +115,10 @@ class DataVizRouterNamespace(BaseClientNamespace):
 
     # ========== TOFService notifications ==========
     async def on_acquisition_coordinates(self, data):
+        global visualizers
+        global heatmap_generator_q
+        global spec_trace_generator_q
+
         value = data['value']
         set_figure_ranges = value.get('set_figure_ranges', True)
         filename = value.get('filename')
@@ -125,10 +130,6 @@ class DataVizRouterNamespace(BaseClientNamespace):
         mz_range = [ float(mz[0]), float(mz[-1]) ]
         t_range =  [ float(t[0]),  float(t[-1])  ]
 
-        global visualizers
-        global heatmap_generator_q
-        global spec_trace_generator_q
-
         visualizer = SignalVisualizer(heatmap_generator_q,
                                       spec_trace_generator_q
                                       )
@@ -138,20 +139,15 @@ class DataVizRouterNamespace(BaseClientNamespace):
                               coords=[mz, []],
                               name='signal'
                               )
-
         cache_key = derive_cache_key(value)
-
         if cache_key in visualizers.keys():
             raise Exception("on_acquisition_coordinates: key %s " % cache_key + 
                             "already in cache."
                             )
-        
-        visualizers.update({cache_key: visualizer
-                            })
-
+        visualizers.update({cache_key: visualizer, })
         if set_figure_ranges:
             # Set UI figure ranges
-            await emit_client_notification('figure_ranges',
+            await self.emit_client_notification('figure_ranges',
                                            {'filename': filename,
                                             'mz_range': mz_range,
                                             't_range': t_range,
@@ -159,7 +155,8 @@ class DataVizRouterNamespace(BaseClientNamespace):
                                             cookies=data['cookies'],
                                             no_data_logging=NO_DATA_LOGGING_DEFAULT
                                            )
-    
+
+
     async def on_acquired_spectrum(self, data):
         value = data['value']
         # speci = value.get('i')
@@ -205,11 +202,12 @@ class DataVizRouterNamespace(BaseClientNamespace):
                                'value': i
                                } for i, info in enumerate(tps_info)
                             ]            
-            await emit_client_notification('tps_parameters',
+            await self.emit_client_notification('tps_parameters',
                                            dropdown_items,
                                            cookies=data['cookies'],
                                            no_data_logging=NO_DATA_LOGGING_DEFAULT
                                            )
+
 
     async def on_acquired_tps_data(self, data):
         value = data['value']
@@ -244,26 +242,10 @@ class DataVizRouterNamespace(BaseClientNamespace):
         await visualizer.flush_visualizations(data['cookies'])
     # ----------------------------------------------
 
-        
-
-# ---------- Functions to emit to UI ----------
-# async def initialize_timeseries_figure(full_t_range, traces=[]):
-#     timeseries_data = {"xrange": full_t_range, 
-#                        "yrange": [0, 1],
-#                        'traces': traces}
-#     await emit_client_notification('timeseries_figure_data',
-#                                    timeseries_data,
-#                                    cookies=?
-#                                    no_data_logging=True
-#                                    )
-    
-
-# ========== Class definitions ==========
 
 class SignalVisualizer(ExtendableDataArray):
 
     def __init__(self, heatmap_generator_q, spec_trace_generator_q, step=10):
-
         ExtendableDataArray.__init__(self, array_module=da)
         self.heatmap_generator_q = heatmap_generator_q
         self.spec_trace_generator_q = spec_trace_generator_q
@@ -316,7 +298,7 @@ class SignalVisualizer(ExtendableDataArray):
         timeseries_data = {'traces': [ts_trace],
                            'mz_range': mz_range,
                            }
-        await emit_client_notification('timeseries_figure_data',
+        await client.emit_client_notification('timeseries_figure_data',
                                        timeseries_data,
                                        cookies=cookies,
                                        no_data_logging=NO_DATA_LOGGING_DEFAULT
@@ -385,7 +367,7 @@ class TPSVisualizer(ExtendableDataArray):
                          }
                         )
         timeseries_data = {'traces': [ts_trace], }
-        await emit_client_notification('timeseries_figure_data',
+        await client.emit_client_notification('timeseries_figure_data',
                                        timeseries_data,
                                        cookies=cookies,
                                        no_data_logging=NO_DATA_LOGGING_DEFAULT
@@ -410,9 +392,6 @@ class TPSVisualizer(ExtendableDataArray):
                                 )
 
 
-# ---------------------------------------
-
-# ========== Helper functions ==========
 def derive_cache_key(data):
     """Generate cache key by combining filename and mz_range
 
@@ -446,131 +425,9 @@ def derive_cache_key(data):
 
     return cache_key
 
-async def emit_client_notification(name, value, **kwarg):
-    global root_ns
-    await root_ns.emit_client_notification(name, value, **kwarg)
-
-async def init_service(addr):
-    global sio
-    global root_ns
-    # global tps_collector
-
-    while True:
-        try:
-            print('Connecting to Router...')
-            await sio.connect(addr, namespaces=['/', ])
-            break
-        except:
-            print('Failed')
-            await sio.sleep(1)
-
-    global heatmap_generator_q
-    global spec_trace_generator_q
-    global heatmap_q
-    global spec_trace_q
-    global hm_ps
-    global st_ps
-
-    n_jobs = int( cpu_count() / 2 )
-
-    for i in range(n_jobs):
-        print("Spawning HeatmapGenerator %s/%s" %(i+1, n_jobs))
-        hm_p = HeatmapGenerator(heatmap_generator_q, heatmap_q)
-        hm_p.start()
-        hm_ps.append(hm_p)
-        await asyncio.sleep(1)
-        print("Spawning SpecTraceGenerator %s/%s" %(i+1, n_jobs))
-        st_p = SpecTraceGenerator(spec_trace_generator_q, spec_trace_q)
-        st_p.start()
-        st_ps.append(st_p)
-        await asyncio.sleep(1)
-
-    # tps_collector = KtpsCollector()
-
-
-async def run_service(url, port):
-    addr = f'{url}:{port}'
-    if not addr.startswith('http'):
-        addr = 'http://' + addr
-    await init_service(addr)
-    await main()
-# --------------------------------------
-
-
-async def main():
-    """Main function
-    
-    Loop infinitely synchronized with acquisition
-    
-    Returns
-    -------
-    None.
-
-    """
-    global sio
-    global heatmap_q
-    global spec_trace_q
-
-    heatmap_slices = []
-    spec_traces = []
-
-
-    # Main loop
-    while True:
-        # Check queues for new images
-        try:
-            heatmap_slice = heatmap_q.get_nowait()
-        except Empty:
-            heatmap_slice = None
-        try:
-            spec_trace = spec_trace_q.get_nowait()
-        except Empty:
-            spec_trace = None
-        if heatmap_slice is None and spec_trace is None:
-            # No new images, try again soon
-            await sio.sleep(.1)
-            continue
-
-        # continue
-
-        # Got at least something
-        if heatmap_slice is not None:
-            #heatmap_slices.append(heatmap_slice)
-            cookies = heatmap_slice.pop('cookies')
-            await emit_client_notification(
-                            'heatmap_figure_data',
-                            heatmap_slice,
-                            cookies=cookies,
-                            no_data_logging=True
-                            )
-        if spec_trace is not None:
-            # spec_traces.append(spec_trace)
-            cookies = spec_trace.pop('cookies')
-            await emit_client_notification(
-                            'spec_stack_figure_data',
-                            spec_trace,
-                            cookies=cookies,
-                            no_data_logging=True
-                            )
-
-    # heatmap = merge_heatmap_slices(heatmap_slices)
-    # heatmap.save('heatmap.png')
-
-    global hm_ps
-    [p.terminate() for p in hm_ps]
-    global st_ps
-    [p.terminate() for p in st_ps]
-
-    await sio.disconnect()
-
-
-sio = socketio.AsyncClient()
-sio.register_namespace(DataVizRouterNamespace('/'))
-root_ns = sio.namespace_handlers['/']
 
 visualizers = {}
 tps_visualizers = {}
-
 heatmap_generator_q = Queue()
 spec_trace_generator_q = Queue()
 heatmap_q = Queue()
@@ -579,37 +436,87 @@ hm_ps = []
 st_ps = []
 
 
-def parse_cmd_args():
-    """Parse command line arguments
-    Allowed command line arguments
-    ------------------------------
-    --url : string
-        IP address (localhost)
-    --port : int
-        Server port (5010)
-    """
-    url = 'localhost'
-    port = 5010
-    opts, _ = getopt.getopt(
-                    sys.argv[1:],
-                    'o:v',
-                    ['url=', 'port=', ]
-                    )
-    for opt, arg in opts:
-        if opt=='--url':
-            url = arg
-        if opt=='--port':
+class DataVizServiceClient(BaseServiceClient):
+    async def init_service(self):
+        # TODO: avoid global vars
+        global heatmap_generator_q
+        global spec_trace_generator_q
+        global heatmap_q
+        global spec_trace_q
+        global hm_ps
+        global st_ps
+
+        n_jobs = int( cpu_count() / 2 )
+        for i in range(n_jobs):
+            self.log("Spawning HeatmapGenerator %s/%s" %(i+1, n_jobs))
+            hm_p = HeatmapGenerator(heatmap_generator_q, heatmap_q)
+            hm_p.start()
+            hm_ps.append(hm_p)
+            await self.sio.sleep(1)
+            self.log("Spawning SpecTraceGenerator %s/%s" %(i+1, n_jobs))
+            st_p = SpecTraceGenerator(spec_trace_generator_q, spec_trace_q)
+            st_p.start()
+            st_ps.append(st_p)
+            await self.sio.sleep(1)
+        # tps_collector = KtpsCollector()
+
+
+    async def service_main(self):
+        # TODO: avoid global vars
+        global heatmap_q
+        global spec_trace_q
+        global hm_ps
+        global st_ps
+
+        # heatmap_slices = []
+        # spec_traces = []
+        while True:
+            # Check queues for new images
             try:
-                port = int(arg)
-            except:
-                print('Invalid command line argument: %s=%s' %(opt, arg))
-    return url, port
+                heatmap_slice = heatmap_q.get_nowait()
+            except Empty:
+                heatmap_slice = None
+            try:
+                spec_trace = spec_trace_q.get_nowait()
+            except Empty:
+                spec_trace = None
+            if heatmap_slice is None and spec_trace is None:
+                # No new images, try again soon
+                await self.sio.sleep(.1)
+                continue
+
+            # Got at least something
+            if heatmap_slice is not None:
+                #heatmap_slices.append(heatmap_slice)
+                cookies = heatmap_slice.pop('cookies')
+                await self.emit_client_notification(
+                                'heatmap_figure_data',
+                                heatmap_slice,
+                                cookies=cookies,
+                                no_data_logging=True
+                                )
+            if spec_trace is not None:
+                # spec_traces.append(spec_trace)
+                cookies = spec_trace.pop('cookies')
+                await self.emit_client_notification(
+                                'spec_stack_figure_data',
+                                spec_trace,
+                                cookies=cookies,
+                                no_data_logging=True
+                                )
+        # heatmap = merge_heatmap_slices(heatmap_slices)
+        # heatmap.save('heatmap.png')
+
+        [p.terminate() for p in hm_ps]
+        [p.terminate() for p in st_ps]
+        await self.sio.disconnect()
 
 
 def run():
-    url, port = parse_cmd_args()
+    global client
+    client = DataVizServiceClient(*parse_cmd_args(), DataVizServiceNamespace)
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(run_service(url, port))
+    loop.run_until_complete(client.run())
 
 
 if __name__=='__main__':

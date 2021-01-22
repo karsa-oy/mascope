@@ -1,8 +1,8 @@
-"""TOF Service
+"""
+TWh5Streamer Service
 """
 
 import asyncio
-import socketio
 import os
 import numpy as np
 
@@ -10,19 +10,15 @@ from multiprocessing import Queue
 from queue import Empty
 from datetime import datetime
 
-from helpers import BaseClientNamespace
-
+from karsalib import BaseClientNamespace, parse_cmd_args
+from tof_service.TOFService import TOFServiceClient
 from karsatof.kgenerator import KStreamer
 from karsatof.kdatapool import H5Pool
 
-from tof_service.TOFService import initialize_kacquisition, main
 
-
-sio = None
-root_ns = None
 kacq = None
-shutdown_event = None
 
+# TODO: make platform-agnostic (move to settings file)
 drive_letter = 'Z:\\'
 h5_dir = os.path.join('Data', 'raw_KLTOF2')
 h5_path = os.path.join(drive_letter, h5_dir)
@@ -90,59 +86,36 @@ class TWh5StreamerNamespace(BaseClientNamespace):
         kacq.file_queue.put(filename)
 
 
+class TWh5StreamerServiceClient(TOFServiceClient):
+    async def  init_service(self):
+        global kacq
 
-async def run_service():
-    global kacq
-    global sio
-    sio, kacq = await init_service('http://localhost:5010')
-    await main(sio, kacq)
+        while True:
+            # TODO: TBR python-socketio BadNamespaceError connection bug
+            from socketio.exceptions import BadNamespaceError
+            try:
+                await self.emit_client_notification('h5_streamer_status', 
+                                             'not_ready',
+                                             no_data_logging=False)
+                break
+            except BadNamespaceError:
+                await self.sio.sleep(.1)
+                continue
+        kacq = self.kacq = await self.initialize_kacquisition(KStreamer)
+        await h5_pool.scan_dir(h5_path)
+        await self.emit_client_notification('h5_streamer_status',
+                                    'ready',
+                                    no_data_logging=False)
 
-
-async def init_service(url):
-    global root_ns
-    global h5_pool
-
-    sio = socketio.AsyncClient()
-    sio.register_namespace(TWh5StreamerNamespace('/'))
-
-    while True:
-        try:
-            print('Connecting to Router...')
-            await sio.connect(url, namespaces=['/',])
-            await sio.sleep(.1)
-            print("Connected!")
-            break
-        except:
-            print('Failed')
-    root_ns = sio.namespace_handlers['/']
-
-    await emit_client_notification('h5_streamer_status',
-                                   dict(value='not_ready')
-                                   )
-    # Initialize KStreamer
-    kacq = await initialize_kacquisition(KStreamer)
-    # Scan given directory for h5 files
-    await h5_pool.scan_dir(h5_path)
-    # Ready
-    await emit_client_notification('h5_streamer_status',
-                                   dict(value='ready')
-                                   )
-    return sio, kacq
-
-
-async def emit_client_notification(name, value, **kwarg):
-    global root_ns
-    await root_ns.emit_client_notification(name,
-                                           value,
-                                           **kwarg
-                                           )
 
 def run():
+    client = TWh5StreamerServiceClient(*parse_cmd_args(), TWh5StreamerNamespace)
     loop = asyncio.get_event_loop()
     try:
-        loop.run_until_complete(run_service())
+        loop.run_until_complete(client.run())
     except KeyboardInterrupt:
         kacq.shutdown()
+
 
 if __name__=='__main__':
     run()

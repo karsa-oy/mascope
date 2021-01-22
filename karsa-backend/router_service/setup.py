@@ -25,8 +25,6 @@ setuptools.setup(
     install_requires=[
         'aiohttp',
         'aiohttp_cors',
-        'asyncio',
-        'environs',
         'python-socketio',
     ],
     entry_points={

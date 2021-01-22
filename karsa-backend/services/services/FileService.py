@@ -3,37 +3,37 @@
 
 This script runs the file service for Karsa Tarkka TOF system.
 
-FileService connects to the :mod:`~py_code.MainService` via socket.io, and handles
-file i/o synchronization. It holds in memory a :class:`~py_code.karsatof.kdatapool.KDataPool`
-instance of the currently selected data path.
+FileService connects to the :mod:`~router_service.router_service.Router`
+via socket.io, and handles file i/o synchronization. It holds in memory
+a :class:`~karsa_hw_interfaces.karsatof.kdatapool.KDataPool` instance
+of the currently selected data path.
       
 Created on Thu May  7 12:43:13 2020
 """
 
 import os
-import sys
-import getopt
 import subprocess
 import asyncio
-import socketio
 import xarray
 import zarr
 import numpy as np
 import dask.array as da
-
 from multiprocessing import Lock
 
+from karsalib import BaseClientNamespace, BaseServiceClient, parse_cmd_args
 from karsatof.kcollector import ExtendableDataArray
 from karsatof.kdatapool import DataPool
-from helpers import BaseClientNamespace
 
 
 NO_DATA_LOGGING_DEFAULT = True
 
 # TODO: Make configuration file for the paths
+# TODO: Change the global vars to class vars
 data_path = 'Data'
 projects_path = 'Projects'
 datapool = DataPool(data_path, projects_path)
+signal_cache = {}
+tps_cache = {}
 
 
 class FileServiceNamespace(BaseClientNamespace):
@@ -106,7 +106,7 @@ class FileServiceNamespace(BaseClientNamespace):
         t = signal.time.values.astype(np.float32)
 
         cookies = data['cookies']
-        await emit_client_notification(
+        await self.emit_client_notification(
                             'data_stream_coordinates',
                             {'filename': filename,
                              'mz': mz.tobytes(),
@@ -118,11 +118,11 @@ class FileServiceNamespace(BaseClientNamespace):
                             cookies=cookies,
                             no_data_logging=NO_DATA_LOGGING_DEFAULT
                             )
-        await asyncio.sleep(0)
+        # await asyncio.sleep(0)
         for i, spec_array in enumerate(signal.transpose()):
             spec = spec_array.values
             ti = float( spec_array.time )
-            await emit_client_notification('loaded_spectrum',
+            await self.emit_client_notification('loaded_spectrum',
                                            {'filename': filename,
                                             'i': i,
                                             'spec': spec.tobytes(),
@@ -133,8 +133,8 @@ class FileServiceNamespace(BaseClientNamespace):
                                            cookies=cookies,
                                            no_data_logging=NO_DATA_LOGGING_DEFAULT
                                            )
-            await asyncio.sleep(0)
-        await emit_client_notification('data_stream_finished',
+            # await asyncio.sleep(0)
+        await self.emit_client_notification('data_stream_finished',
                                        {'filename': filename,
                                         'mz_range': mz_range,
                                         't_range': t_range,
@@ -171,7 +171,7 @@ class FileServiceNamespace(BaseClientNamespace):
             datapool.new_experiment(project, experiment, attributes)
             # Update UI
             project_experiments = datapool.get_experiments(project)
-            await emit_client_notification('experiments',
+            await self.emit_client_notification('experiments',
                                            project_experiments,
                                            cookies=cookies,
                                            no_data_logging=NO_DATA_LOGGING_DEFAULT
@@ -201,7 +201,7 @@ class FileServiceNamespace(BaseClientNamespace):
         cookies = data['cookies']
         project = value.get('id', '')
         if project == '':
-            await emit_client_notification('experiments',
+            await self.emit_client_notification('experiments',
                                         [],
                                         cookies=cookies,
                                         no_data_logging=False)
@@ -212,13 +212,13 @@ class FileServiceNamespace(BaseClientNamespace):
             print("Starting new project: %s" %project)
             datapool.new_project(project, attributes)
             projects = datapool.get_projects()
-            await emit_client_notification('projects',
+            await self.emit_client_notification('projects',
                                         projects,
                                         cookies=cookies,
                                         no_data_logging=NO_DATA_LOGGING_DEFAULT)
 
         experiments = datapool.get_experiments(project)
-        await emit_client_notification('experiments',
+        await self.emit_client_notification('experiments',
                                        experiments,
                                        cookies=cookies,
                                        no_data_logging=NO_DATA_LOGGING_DEFAULT)
@@ -293,7 +293,7 @@ class FileServiceNamespace(BaseClientNamespace):
                                     ]
         t = tps_data.time.values.astype(np.float32)
 
-        await emit_client_notification(
+        await self.emit_client_notification(
                             'tps_data_stream_coordinates',
                             {'filename': filename,
                              'parameters': parameters,
@@ -303,11 +303,11 @@ class FileServiceNamespace(BaseClientNamespace):
                             cookies=data['cookies'],
                             no_data_logging=NO_DATA_LOGGING_DEFAULT
                             )
-        await asyncio.sleep(0)
+        # await asyncio.sleep(0)
         for i, param_array in enumerate(tps_data.transpose()):
             param_ys = param_array.values
             ti = float( param_array.time )
-            await emit_client_notification('loaded_tps_data',
+            await self.emit_client_notification('loaded_tps_data',
                                            {'filename': filename,
                                             'i': i,
                                             'tps_data': param_ys.tobytes(),
@@ -316,8 +316,8 @@ class FileServiceNamespace(BaseClientNamespace):
                                            cookies=data['cookies'],
                                            no_data_logging=NO_DATA_LOGGING_DEFAULT
                                            )
-            await asyncio.sleep(0)
-        await emit_client_notification('tps_data_stream_finished',
+            # await asyncio.sleep(0)
+        await self.emit_client_notification('tps_data_stream_finished',
                                        {'filename': filename},
                                        cookies=data['cookies'],
                                        no_data_logging=False
@@ -492,86 +492,14 @@ def write_zarr_attributes(filepath, attributes):
     z.attrs.update(attributes)
 # ---------------------------------------
 
-async def emit_client_notification(name, value, **kwarg):
-    global root_ns
-    await root_ns.emit_client_notification(name, value, **kwarg)
 
-async def init_service(addr):
-    global sio
-    global root_ns
-
-    while True:
-        try:
-            print('Connecting Router...')
-            await sio.connect(addr, namespaces=['/',])
-            break
-        except Exception as e:
-            print("Failed.", e)
-            await sio.sleep(2)
-    root_ns = sio.namespace_handlers['/']
-    
-
-
-async def main():
-    global sio
-    while True:
-        await sio.sleep(1)
-
-
-sio = None
-root_ns = None
-
-acquired_file = None
-acquired_file_lock = Lock()
-acquired_file_lock.acquire()
-
-signal_cache = {}
-tps_cache = {}
-
-
-def parse_cmd_args():
-    """Parse command line arguments
-    Allowed command line arguments
-    ------------------------------
-    --url : string
-        IP address (localhost)
-    --port : int
-        Server port (5010)
-    """
-    url = 'localhost'
-    port = 5010
-    opts, _ = getopt.getopt(
-                    sys.argv[1:],
-                    'o:v',
-                    ['url=', 'port=', ]
-                    )
-    for opt, arg in opts:
-        if opt=='--url':
-            url = arg
-        if opt=='--port':
-            try:
-                port = int(arg)
-            except:
-                print('Invalid command line argument: %s=%s' %(opt, arg))
-    return url, port
-
-
-async def run_service(url, port):
-    addr = f'{url}:{port}'
-    if not addr.startswith('http'):
-        addr = 'http://' + addr
-    await init_service(addr)
-    await main()
-
+class FileServiceClient(BaseServiceClient):
+    pass
 
 def run():
-    global sio
-
-    url, port = parse_cmd_args()
+    client = FileServiceClient(*parse_cmd_args(), FileServiceNamespace)
     loop = asyncio.get_event_loop()
-    sio = socketio.AsyncClient()
-    sio.register_namespace(FileServiceNamespace('/'))
-    loop.run_until_complete(run_service(url, port))
+    loop.run_until_complete(client.run())
 
 
 if __name__=='__main__':

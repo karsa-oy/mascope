@@ -1,7 +1,10 @@
+import sys
+import getopt
+import asyncio
 import inspect
 from copy import deepcopy
 import random
-from socketio import AsyncClientNamespace, AsyncNamespace
+from socketio import AsyncClientNamespace, AsyncNamespace, AsyncClient
 
 NO_LOGGING_DEFAULT = False
 NO_DATA_LOGGING_DEFAULT = True
@@ -204,3 +207,73 @@ class BaseServerNamespace(AsyncNamespace):
         twin_sids_to_remove = self.app_name_to_sids[self.sid_to_app[sid_to_remove]['name']]
         for s in twin_sids_to_remove:
             sids.remove(s)
+
+
+def parse_cmd_args():
+    """
+    Parse command line arguments for the service application:
+    ------------------------------
+    --url : string
+        Karsa Router url/ip  (default: localhost)
+    --port : int
+        Karsa Router port (default: 5010)
+    """
+    url = 'localhost'
+    port = 5010
+    opts, _ = getopt.getopt(sys.argv[1:], 'o:v', ['url=', 'port=', ])
+    for opt, arg in opts:
+        if opt=='--url':
+            url = arg
+        if opt=='--port':
+            try:
+                port = int(arg)
+            except:
+                raise SyntaxError(f'Invalid command line argument: {opt}={arg}')
+    return url, port
+
+
+class BaseServiceClient:
+
+    def log(self, *arg, **kwarg):
+        if not NO_LOGGING_DEFAULT:
+            print(f"[{self.__class__.__name__}.{inspect.stack()[1].function}]", *arg, **kwarg)
+
+    def __init__(self, url, port, client_namespace):
+        self.addr = f'{url}:{port}'
+        if not self.addr.startswith('http'):
+            self.addr = 'http://' + self.addr
+        self.sio = AsyncClient()
+        self.sio.register_namespace(client_namespace('/'))
+        self.root_ns = self.sio.namespace_handlers['/']
+
+    async def emit_client_notification(self, name, value, **kwarg):
+        await self.root_ns.emit_client_notification(name, value, **kwarg)
+
+    async def connect(self):
+        while True:
+            try:
+                self.log('Connecting to Router...')
+                await self.sio.connect(self.addr, namespaces=['/',])
+                self.log("Connected!")
+                break
+            except Exception as e:
+                self.log(f"Failed: {e}\nRetrying...")
+                await self.sio.sleep(1)
+
+    async def init_service(self):
+        """
+        Overridable initialization function of the service
+        """
+        await self.sio.sleep(0.01)
+
+    async def service_main(self):
+        """
+        Overridable main function of the service
+        """
+        while True:
+            await self.sio.sleep(1)
+
+    async def run(self):
+        await self.connect()
+        await self.init_service()
+        await self.service_main()
