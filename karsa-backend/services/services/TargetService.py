@@ -10,16 +10,12 @@ import socketio
 
 from karsatof import kchem
 
-from helpers import BaseClientNamespace
+from karsalib import BaseClientNamespace, BaseServiceClient, parse_cmd_args
 
 from office365.runtime.auth.authentication_context import AuthenticationContext
 from office365.sharepoint.client_context import ClientContext
 from office365.sharepoint.files.file import File
 
-
-sio = None
-root_ns = None
-target_df = pd.DataFrame()
 
 class TargetServiceNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for
@@ -34,11 +30,12 @@ class TargetServiceNamespace(BaseClientNamespace):
     async def on_target_list_request(self, data):
         global target_df
         cookies = data['cookies']
+        target_df = read_remote_target_list()
         targets = get_target_table(target_df)
         targets.update({'cookies': cookies})
-        await emit_client_notification('targets',
-                                       targets
-                                       )
+        await self.emit_client_notification('targets',
+                                            targets
+                                            )
 
 
 def read_remote_target_list():
@@ -89,52 +86,14 @@ def get_target_table(target_df, cols=None):
                     }
     return target_table
 
-async def run_service():
-    await init_service('http://localhost:5010')
-    await main()
 
-
-async def init_service(url):
-    global root_ns
-    global sio
-    global target_df
-
-    sio = socketio.AsyncClient()
-    sio.register_namespace(TargetServiceNamespace('/'))
-
-    while True:
-        try:
-            print('Connecting to Router...')
-            await sio.connect(url, namespaces=['/',])
-            print("Connected!")
-            break
-        except:
-            print('Failed')
-
-    root_ns = sio.namespace_handlers['/']
-    target_df = read_remote_target_list()
-
-
-async def emit_client_notification(name, value, **kwarg):
-    global root_ns
-    await root_ns.emit_client_notification(name,
-                                           value,
-                                           **kwarg
-                                           )
-
-
-async def main():
-    global sio
-    while True:
-        try:
-            await sio.sleep(1)
-        except KeyboardInterrupt:
-            break
-
+class TargetServiceClient(BaseServiceClient):
+    pass
 
 def run():
+    client = TargetServiceClient(*parse_cmd_args(), TargetServiceNamespace)
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(run_service())
+    loop.run_until_complete(client.run())
 
 if __name__=='__main__':
     run()
