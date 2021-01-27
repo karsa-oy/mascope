@@ -119,7 +119,10 @@ class FileServiceNamespace(BaseClientNamespace):
                             no_data_logging=NO_DATA_LOGGING_DEFAULT
                             )
         # await asyncio.sleep(0)
+        self.speci = 0
         for i, spec_array in enumerate(signal.transpose()):
+            while i - self.speci > 5:
+                await asyncio.sleep(.15)
             spec = spec_array.values
             ti = float( spec_array.time )
             await self.emit_client_notification('loaded_spectrum',
@@ -131,9 +134,10 @@ class FileServiceNamespace(BaseClientNamespace):
                                             't': ti,
                                             },
                                            cookies=cookies,
-                                           no_data_logging=NO_DATA_LOGGING_DEFAULT
+                                           no_data_logging=NO_DATA_LOGGING_DEFAULT,
+                                           callback="speci_callback"
                                            )
-            # await asyncio.sleep(0)
+            # await asyncio.sleep(0.2)
         await self.emit_client_notification('data_stream_finished',
                                        {'filename': filename,
                                         'mz_range': mz_range,
@@ -142,7 +146,10 @@ class FileServiceNamespace(BaseClientNamespace):
                                        cookies=cookies,
                                        no_data_logging=False
                                        )
-    
+
+    def speci_callback(self, n):
+        self.speci = n
+
     async def on_experiment_selected(self, data):
         value = data['value']
         cookies = data['cookies']

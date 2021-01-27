@@ -99,6 +99,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
 
     async def on_loaded_spectrum(self, data):
         await self.on_acquired_spectrum(data)
+        return data['value'].get('i')
 
     async def on_data_stream_finished(self, data):
         await self.on_acquisition_finished(data)
@@ -158,11 +159,8 @@ class DataVizServiceNamespace(BaseClientNamespace):
 
 
     async def on_acquired_spectrum(self, data):
-        value = data['value']
-        # speci = value.get('i')
-        # self.log(speci)
-
         global visualizers
+        value = data['value']
         cache_key = derive_cache_key(value)
         visualizer = visualizers.get(cache_key)
         # Extend signal cache

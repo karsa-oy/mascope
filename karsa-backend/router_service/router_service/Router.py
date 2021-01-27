@@ -10,7 +10,8 @@ class RouterNamespace(BaseServerNamespace):
 
 def run():
     url, port = parse_cmd_args()
-    sio = socketio.AsyncServer(async_mode='aiohttp', cors_allowed_origins='*')
+    sio = socketio.AsyncServer(async_mode='aiohttp', cors_allowed_origins='*',
+                               ping_timeout=60)
     sio.register_namespace(RouterNamespace('/'))
     app = web.Application()
     sio.attach(app)

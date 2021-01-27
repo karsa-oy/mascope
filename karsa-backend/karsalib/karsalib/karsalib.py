@@ -54,6 +54,15 @@ class BaseClientNamespace(AsyncClientNamespace):
             await self.emit('client_notification',
                             {**data, 'name': k, 'value': v})
 
+    def on_client_notification_callback(self, data):
+        subscription = data['subscription']
+        cb_name = data['cb_name']
+        arg = data['arg']
+        kwarg = data['kwarg']
+        self.log(f"{subscription} callback: {cb_name}(*{arg}, **{kwarg})")
+        fn_cb = self.__getattribute__(cb_name)
+        fn_cb(*arg, **kwarg)
+
     async def emit_client_notification(self, name, value, **kwarg):
         """
         client_notification is sent to subscribers via Router,
@@ -136,6 +145,7 @@ class BaseServerNamespace(AsyncNamespace):
         for d in data['subscriptions']:
             self.remove_subscription(sid, d)
 
+
     async def on_client_notification(self, sid, data):
         """
         client_notifications are forwarded by Router from providers
@@ -147,6 +157,7 @@ class BaseServerNamespace(AsyncNamespace):
         no_logging = data.get('no_logging', False)
         no_data_logging = data.get('no_data_logging', False)
         subscription = data['name']
+        cb = data.pop('callback', None)
         if no_logging:
             pass
         elif no_data_logging:
@@ -179,11 +190,17 @@ class BaseServerNamespace(AsyncNamespace):
         if not ( len(src_sids) == 1 and self.sid_to_app[sid]['type'] == 'service' ):
             # only one twin app gets notified
             subscription_sids = self.remove_twin_app_sids(subscription_sids, src_sids)
+
+        async def srv_callback(*arg, **kwarg):
+            await self.emit('client_notification_callback',
+                            dict(subscription=subscription, cb_name=cb, arg=arg, kwarg=kwarg),
+                            room=sid)
+
         for target_sid in subscription_sids:
             sent_to = len(src_sids) * '>'
             self.log(f"{subscription}: {self.sid_to_app[sid]['name']} {sent_to} {self.sid_to_app[target_sid]['name']}")
             room = f"{subscription}_{target_sid}"
-            await self.emit(subscription, data, room=room)
+            await self.emit(subscription, data, room=room, callback=cb and srv_callback)
 
 
     def remove_twin_app_sids(self, sids, sids_to_stay):
