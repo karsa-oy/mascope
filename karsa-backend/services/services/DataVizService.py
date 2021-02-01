@@ -115,6 +115,49 @@ class DataVizServiceNamespace(BaseClientNamespace):
     # -----------------------------------------------
 
     # ========== TOFService notifications ==========
+    def viz_cache_get_keys(self, viz_cache, data):
+        sid = data['cookies']['src_sid'][0]
+        fname = data['value'].get('filename')
+        mz_range = data['value'].get('mz_range')
+        t_range = data['value'].get('t_range')
+        ranges = str([(mz_range or []) , (t_range or [])])
+        return sid, fname, ranges, mz_range, t_range
+
+    def viz_cache_contains(self, viz_cache, data):
+        sid, fname, ranges, _, _ = self.viz_cache_get_keys(viz_cache, data)
+        return sid in viz_cache and \
+               fname in viz_cache[sid] and \
+               ranges in viz_cache[sid][fname]
+
+    def viz_cache_get(self, viz_cache, data):
+        sid, fname, ranges, _, _ = self.viz_cache_get_keys(viz_cache, data)
+        return viz_cache[sid][fname][ranges]
+
+    def viz_cache_put(self, viz_cache, data, viz):
+        sid, fname, ranges, _, _ = self.viz_cache_get_keys(viz_cache, data)
+        if sid not in viz_cache:
+            viz_cache[sid] = {}
+        if fname not in viz_cache[sid]:
+            viz_cache[sid][fname] = {}
+        viz_cache[sid][fname][ranges] = viz
+
+    def viz_cache_pop(self, viz_cache, data):
+        """
+        Method for releasing viz_cached resource. The value is released
+        by presence of a corresponding sid/fname/ranges key in the data
+        """
+        sid, fname, ranges, mz_range, t_range = self.viz_cache_get_keys(viz_cache, data)
+        res = None
+        if fname:
+            if not mz_range and not t_range:
+                res = viz_cache[sid].pop(fname)
+            else:
+                res = viz_cache[sid][fname].pop(ranges)
+        else:
+            res = viz_cache.pop(sid)
+        return res
+
+
     async def on_acquisition_coordinates(self, data):
         global visualizers
         global heatmap_generator_q
@@ -126,7 +169,6 @@ class DataVizServiceNamespace(BaseClientNamespace):
 
         mz = np.frombuffer( value.get('mz'), dtype=np.float32 )
         t = np.frombuffer( value.get('time'), dtype=np.float32 )
-        # t_range = value.get('t_range')
         
         mz_range = [ float(mz[0]), float(mz[-1]) ]
         t_range =  [ float(t[0]),  float(t[-1])  ]
@@ -140,12 +182,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                               coords=[mz, []],
                               name='signal'
                               )
-        cache_key = derive_cache_key(value)
-        if cache_key in visualizers.keys():
-            raise Exception("on_acquisition_coordinates: key %s " % cache_key + 
-                            "already in cache."
-                            )
-        visualizers.update({cache_key: visualizer, })
+        self.viz_cache_put(visualizers, data, visualizer)
         if set_figure_ranges:
             # Set UI figure ranges
             await self.emit_client_notification('figure_ranges',
@@ -161,8 +198,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
     async def on_acquired_spectrum(self, data):
         global visualizers
         value = data['value']
-        cache_key = derive_cache_key(value)
-        visualizer = visualizers.get(cache_key)
+        visualizer = self.viz_cache_get(visualizers, data)
         # Extend signal cache
         spec = np.frombuffer( value.get('spec'), dtype=np.float32 )
         spec = spec.reshape(-1, 1)
@@ -191,9 +227,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                               )
 
         global tps_visualizers
-        cache_key = derive_cache_key(value)
-        tps_visualizers.update({cache_key: visualizer
-                                })
+        self.viz_cache_put(tps_visualizers, data, visualizer)
 
         if set_tps_parameters:
             dropdown_items = [{'label': info,
@@ -215,7 +249,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
         global tps_data
 
         global tps_visualizers
-        visualizer = tps_visualizers.get( derive_cache_key(value) )
+        visualizer = self.viz_cache_get(tps_visualizers, data)
         # Extend signal cache
         tps_data = np.frombuffer( value.get('tps_data'), dtype=np.float32 )
         tps_data = tps_data.reshape(-1, 1)
@@ -234,9 +268,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
 
     async def on_acquisition_finished(self, data):
         global visualizers
-        cache_key = derive_cache_key(data['value'])
-        visualizer = visualizers.pop(cache_key)
-        # Flush visualizer
+        visualizer = self.viz_cache_pop(visualizers, data)
         await visualizer.flush_visualizations(data['cookies'])
     # ----------------------------------------------
 
@@ -388,40 +420,6 @@ class TPSVisualizer(ExtendableDataArray):
                                 ],
                                 'time'
                                 )
-
-
-def derive_cache_key(data):
-    """Generate cache key by combining filename and mz_range
-
-    Parameters
-    ----------
-    data : dict
-        JSON data with keys 'filename' (required) and
-        'mz_range' (optional).
-
-    Returns
-    -------
-    str
-        Cache key
-    """
-
-    filename = data.get('filename')
-    
-    mz_range = data.get('mz_range', None)
-    t_range = data.get('t_range', None)
-
-    cache_key = filename
-    if mz_range is None:
-        cache_key += '[]'
-    else:
-        cache_key += '[%.1f,%.1f]' % (mz_range[0], mz_range[1])
-
-    if t_range is None:
-        cache_key += '[]'
-    else:
-        cache_key += '[%.1f,%.1f]' % (t_range[0], t_range[1])
-
-    return cache_key
 
 
 visualizers = {}

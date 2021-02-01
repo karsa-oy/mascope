@@ -59,7 +59,14 @@ class BaseClientNamespace(AsyncClientNamespace):
         cb_name = data['cb_name']
         arg = data['arg']
         kwarg = data['kwarg']
-        self.log(f"{subscription} callback: {cb_name}(*{arg}, **{kwarg})")
+        no_logging = data.get('no_logging', NO_LOGGING_DEFAULT)
+        no_data_logging = data.get('no_data_logging', NO_DATA_LOGGING_DEFAULT)
+        if no_logging:
+            pass
+        elif no_data_logging:
+            self.log(f"{subscription} callback: ...")
+        else:
+            self.log(f"{subscription} callback: {cb_name}(*{arg}, **{kwarg})")
         fn_cb = self.__getattribute__(cb_name)
         fn_cb(*arg, **kwarg)
 
@@ -193,7 +200,7 @@ class BaseServerNamespace(AsyncNamespace):
 
         async def srv_callback(*arg, **kwarg):
             await self.emit('client_notification_callback',
-                            dict(subscription=subscription, cb_name=cb, arg=arg, kwarg=kwarg),
+                            dict(subscription=subscription, cb_name=cb, arg=arg, kwarg=kwarg, no_logging=True),
                             room=sid)
 
         for target_sid in subscription_sids:

@@ -62,6 +62,42 @@ class FileServiceNamespace(BaseClientNamespace):
     )
 
     # ========== UI requests ==========
+    def cache_get_keys(self, cache, data):
+        sid = data['cookies']['src_sid'][0]
+        fname = data['value'].get('filename')
+        return sid, fname
+
+    def cache_contains(self, cache, data):
+        sid, fname = self.cache_get_keys(cache, data)
+        return sid in cache and fname in cache[sid]
+
+    def cache_get(self, cache, data):
+        sid, fname = self.cache_get_keys(cache, data)
+        return cache[sid][fname]
+
+    def cache_put(self, cache, data, array):
+        sid, fname = self.cache_get_keys(cache, data)
+        if sid not in cache:
+            cache[sid] = {}
+        cache[sid][fname] = array
+
+    def cache_pop(self, cache, data):
+        """
+        Method for releasing cached resource. The value is released
+        by presence of a corresponding sid/fname key in the data
+        """
+        sid, fname = self.cache_get_keys(cache, data)
+        res = None
+        if fname:
+            res = cache[sid].pop(fname)
+        else:
+            res = cache.pop(sid)
+        return res
+
+    def data_request_cancelled(self, data):
+        return not self.cache_contains(signal_cache, data)
+
+
     async def on_data_request(self, data):
         # print("Data request:", data)
 
@@ -73,19 +109,18 @@ class FileServiceNamespace(BaseClientNamespace):
         if filename is None:
             raise ValueError("Received data_request without filename")
         
-        mz_range = value.get('mz_range', None)
-        t_range = value.get('t_range', None)
-        
-        if filename not in signal_cache.keys():
-            filename_zarr = base_to_zarr_filename(filename, 'signal')
-            signal_array = open_mfzarr(filename_zarr)
-            signal_cache.update({filename: signal_array})
-        else:
-            signal_array = signal_cache.get(filename)
+        if self.cache_contains(signal_cache, data):
+            signal_array = self.cache_get(signal_cache, data)
             if isinstance(signal_array, ExtendableDataArray):
                 signal_array = signal_array.data_array.to_dataset()
+        else:
+            filename_zarr = base_to_zarr_filename(filename, 'signal')
+            signal_array = open_mfzarr(filename_zarr)
+            self.cache_put(signal_cache, data, signal_array)
 
         set_figure_ranges = False
+        mz_range = value.get('mz_range', None)
+        t_range = value.get('t_range', None)
         if mz_range is None:
             mz0 = float( signal_array.mz[0] )
             mz1 = float( signal_array.mz[-1] )
@@ -95,13 +130,12 @@ class FileServiceNamespace(BaseClientNamespace):
             t0 = float( signal_array.time[0] )
             t1 = float( signal_array.time[-1] )
             t_range = [t0, t1]
-            print("t_range: %s" %str(t_range))
-            
-        signal = signal_array.signal.sel(
-                    mz=slice(mz_range[0], mz_range[1]),
-                    time=slice(t_range[0], t_range[1])
-                    )
+            # print(f"t_range: {t_range}")
 
+        signal = signal_array.signal.sel(
+                    mz=slice(*mz_range),
+                    time=slice(*t_range)
+                    )
         mz = signal.mz.values.astype(np.float32)
         t = signal.time.values.astype(np.float32)
 
@@ -121,6 +155,8 @@ class FileServiceNamespace(BaseClientNamespace):
         # await asyncio.sleep(0)
         self.speci = 0
         for i, spec_array in enumerate(signal.transpose()):
+            if self.data_request_cancelled(data):
+                break
             while i - self.speci > 5:
                 await asyncio.sleep(.15)
             spec = spec_array.values
@@ -281,12 +317,12 @@ class FileServiceNamespace(BaseClientNamespace):
             return   
         parameters = [ v.get('label') for _, v in selected.items() ]
 
-        if filename not in tps_cache.keys():
+        if self.cache_contains(tps_cache, data):
+            sample_array = self.cache_get(tps_cache, data)
+        else:
             filename = base_to_zarr_filename(filename, '_tps')
             sample_array = open_mfzarr(filename)
-            tps_cache.update({filename: sample_array})
-        else:
-            sample_array = tps_cache.get(filename)
+            self.cache_put(tps_cache, data, sample_array)
 
         t_range = figure_ranges.get('t_range', None)
         if t_range is None:
@@ -372,7 +408,7 @@ class FileServiceNamespace(BaseClientNamespace):
                                 coords=[mz, []],
                                 name='signal'
                                 )
-        signal_cache.update({filename_base: signal_array})
+        self.cache_put(signal_cache, data, signal_array)
 
     async def on_acquired_spectrum(self, data):
         """Receive new spectrum, add to cache
@@ -393,7 +429,7 @@ class FileServiceNamespace(BaseClientNamespace):
         ti = np.array( [value.get('t')], dtype=np.float32 )
         spec = np.frombuffer(value.get('spec'), dtype=np.float32)
         spec = spec.reshape(-1, 1)
-        signal_array = signal_cache.get(filename_base)
+        signal_array = self.cache_get(signal_cache, data)
         mz = signal_array.data_array.mz
         await signal_array.extend_array(spec,
                                         [mz, ti],
@@ -409,10 +445,10 @@ class FileServiceNamespace(BaseClientNamespace):
         filename = base_to_zarr_filename(filename_base, 'signal')
         print("Finished acquiring file: %s" %filename)
 
-        signal_array = signal_cache.get(filename_base)
+        signal_array = self.cache_get(signal_cache, data)
         await signal_array.flush()
 
-        tps_array = tps_cache.get(filename_base)
+        tps_array = self.cache_get(tps_cache, data)
         await tps_array.flush()
 
     # ------------------------------
@@ -450,7 +486,7 @@ class FileServiceNamespace(BaseClientNamespace):
                              coords=[tps_info, []],
                              name='tps'
                              )
-        tps_cache.update({filename_base: tps_array})
+        self.cache_put(tps_cache, data, tps_array)
 
     async def on_acquired_tps_data(self, data):
         global tps_cache
@@ -459,7 +495,7 @@ class FileServiceNamespace(BaseClientNamespace):
         ti = np.array( [value.get('t')], dtype=np.float32 )
         tps_data = np.frombuffer( value.get('tps_data'), dtype=np.float32)
         tps_data = tps_data.reshape(-1, 1)
-        tps_array = tps_cache.get(filename_base)
+        tps_array = self.cache_get(tps_cache, data)
         tps_info = tps_array.data_array.parameter
         await tps_array.extend_array(tps_data,
                                      [tps_info, ti],
