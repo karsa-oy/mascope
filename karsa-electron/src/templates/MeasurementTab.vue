@@ -292,6 +292,60 @@
             </b-modal>
         </section>
         <!-- End of sample import modal -->
+
+        <!-- Modal for Excel import -->
+        <section class="excel-import-modal">
+            <b-modal :active.sync="is_excel_clipboard_modal_active"
+                has-modal-card
+                trap-focus
+                :can-cancel="true"
+                aria-role="dialog"
+                aria-modal>
+                <div class="columns">
+                    <div class="modal-card" style="width: 500px; height: 700px">
+                        <header class="modal-card-head">
+                            <p class="modal-card-title">Import from Excel clipboard</p>
+                        </header>
+                        <section class="modal-card-body" style="text-align: center">
+                            <b-field label="Paste clipboard">
+                                <b-input
+                                    v-model="excel_clipboard_text"
+                                    type="textarea">
+                                </b-input>
+                            </b-field>
+                            <b-field label="Use first row as a header" >
+                                <b-checkbox v-model="excel_clipboard_use_header" size="is-medium">
+                                </b-checkbox>
+                            </b-field>
+                            <div><br></div>
+                            <b-table 
+                                id="excel-clipboard-table"
+                                :columns="excel_clipboard_table_cols"
+                                :data="excel_clipboard_table_rows">
+                            </b-table>
+                            <div><br></div>
+                        </section>
+                        <footer class="modal-card-foot">
+                            <button
+                                class="button"
+                                type="button"
+                                @click="ImportExcelTargets()"
+                                is-dark>
+                                Import
+                            </button>
+                            <button
+                                class="button"
+                                type="button"
+                                is-dark
+                                @click="is_excel_clipboard_modal_active=false">
+                                Cancel
+                            </button>
+                        </footer>
+                    </div>
+                </div>
+            </b-modal>
+        </section>
+        <!-- End of sample import modal -->
         <!-- All modals should not be after this -->
 
         <section class="loading">
@@ -616,23 +670,17 @@
                                     <div class="targetlist-datatable">
                                         <b-button
                                             type="is-dark"
-                                            @click="FetchTargets()"
+                                            @click="is_excel_clipboard_modal_active=true"
                                             outlined
                                             inverted>
-                                            Fetch target list
+                                            Import targets
                                         </b-button>
                                         <b-table 
                                             id="targets-datatable"
                                             :columns="target_table_cols"
                                             :data="target_table_rows" 
-                                            type="is-white" 
-                                            :narrowed="true" 
+                                            :sticky-header="true"
                                             :bordered="true" 
-                                            :paginated="true" 
-                                            :per-page="5" 
-                                            :pagination-simple="false" 
-                                            sort-icon="arrow-up"
-                                            default-sort-direction="asc"
                                             :selected.sync="target_table_selected_row" 
                                             focusable
                                             sortable>

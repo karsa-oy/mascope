@@ -35,6 +35,7 @@ export default {
         return {
             // variables for modal / Popup boxes
             is_edit_temperature_ramp_modal_active: false,
+            is_excel_clipboard_modal_active: false,
             is_sample_attribute_modal_active: false,
             is_import_h5_modal_active: false,
             is_import_sample_modal_active: false,
@@ -52,6 +53,11 @@ export default {
             desorption_table_selected_row: null,
             desorption_table_checked_rows: [],
             desorption_data: [],
+            // variables for excel clipboard import
+            excel_clipboard_text: "",
+            excel_clipboard_table_cols: [],
+            excel_clipboard_table_rows: [],
+            excel_clipboard_use_header: false,
             // variables for sample table
             sample_table_rows: [],
             sample_table_cols: [],
@@ -459,8 +465,10 @@ export default {
             }
             this.import_sample_table_datetime_range = fetch_request;
         },
-        FetchTargets() {
-            this.target_list_request = {'uid': Math.random()};
+        ImportExcelTargets() {
+            this.target_table_cols = this.excel_clipboard_table_cols;
+            this.target_table_rows = this.excel_clipboard_table_rows;
+            this.is_excel_clipboard_modal_active = false;
         },
         ImportH5s() {
             this.h5_to_import = this.import_h5_table_checked_rows;
@@ -483,7 +491,48 @@ export default {
             this.sample_attributes = sample;
             this.is_import_sample_modal_active = false;
         },
-        
+        ParseExcelClipboard: function(clipboard_text) {
+            // Split full text to rows
+            let clip_rows = clipboard_text.split(String.fromCharCode(10));
+            // Split each row to columns
+            for (let i=0; i < clip_rows.length; i++) {
+                clip_rows[i] = clip_rows[i].split(String.fromCharCode(9));
+            }
+            let cols = [];
+            let rows = [];
+            // Parse into b-table format
+            // Loop through rows
+            for (let i=0; i < clip_rows.length; i++) {
+                let row = {};
+                // Loop through row cells
+                for (let j=0; j < clip_rows[i].length; j++) {
+                    if (i==0) {
+                        // New column
+                        let field = j.toString();
+                        let label = j.toString();
+                        if (this.excel_clipboard_use_header) {
+                            // Use first row as a header
+                            label = clip_rows[i][j];
+                        }
+                        cols.push({
+                            'field': field, 
+                            'label': label
+                            });
+                    }
+                    // Construct row
+                    row[j] = clip_rows[i][j];
+                }
+                // Add row
+                if (!_.isEmpty(row)) {
+                    if (i>0 || !this.excel_clipboard_use_header) {
+                        rows.push(row);
+                    }
+                }
+            }
+            this.excel_clipboard_table_cols = cols;
+            this.excel_clipboard_table_rows = rows;
+            this.excel_clipboard_text = "";
+        },  
     },
     watch: {
         acquisition_mode: function(new_value, old_value) {
@@ -528,6 +577,22 @@ export default {
             this.sample_name = sample_no.toString().padStart(3, '0') + '_';
             this.sample_description = "";
             this.is_sample_attribute_modal_active = true;
+        },
+        excel_clipboard_text: function(new_value, old_value) {
+            if (new_value === old_value || !new_value.length) {
+                return
+            }
+            this.ParseExcelClipboard(new_value);
+        },
+        excel_clipboard_use_header: function(new_value) {
+            if (new_value) {
+                let header = this.excel_clipboard_table_rows.slice(0, 1)[0];
+                for (let i=0; i<this.excel_clipboard_table_cols.length; i++) {
+                    let label = header[i];
+                    this.excel_clipboard_table_cols[i]['label'] = label.slice(0);
+                }
+                this.excel_clipboard_table_rows = this.excel_clipboard_table_rows.slice(1);
+            }
         },
         h5_table_checked_rows: function(new_value, old_value) {
             if ( _.isEqual(new_value, old_value) ) {
@@ -617,8 +682,15 @@ export default {
                 return false;
             }
             if (new_value != null) {
-                let mz = new_value['Measured Ion m/z'];
-                this.target_to_display = mz;
+                let keys = Object.keys(new_value);
+                let mz = null;
+                for (let i=0; keys.length; i++) {
+                    mz = parseFloat( new_value[keys[i]] );
+                    if (mz) {
+                        this.target_to_display = parseFloat(mz);
+                        return
+                    }
+                }
             } else {
                 this.target_to_display = null;
             }
