@@ -99,6 +99,7 @@ export default {
             'target_to_display',
             'tps_parameters_selected',
             'visualize_range',
+            'stop_visualize_range',
             ]),
         active_tab: {
             get() {
@@ -372,6 +373,9 @@ export default {
         },
         visualize_range: function(new_value, old_value) {
             return this.export_one_way_binding_prop(this, 'visualize_range', {...new_value, 'uid': Math.random()}, old_value);
+        },
+        stop_visualize_range: function(new_value, old_value) {
+            return this.export_one_way_binding_prop(this, 'stop_visualize_range', {...new_value, 'uid': Math.random()}, old_value);
         },
     }
 }

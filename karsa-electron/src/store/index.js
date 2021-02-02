@@ -36,6 +36,7 @@ export default new Vuex.Store({
 		tps_parameters: [],
 		tps_parameters_selected: [],
 		visualize_range: {},
+		stop_visualize_range: {},
 	},
 	mutations: {
 		active_tab(state, payload) {
@@ -121,6 +122,9 @@ export default new Vuex.Store({
 		},
 		visualize_range(state, payload) {
 			state.visualize_range = payload;
+		},
+		stop_visualize_range(state, payload) {
+			state.stop_visualize_range = payload;
 		},
 		project_selected(state, payload) {
 			state.project_selected = payload;

@@ -70,7 +70,8 @@ class DataVizServiceNamespace(BaseClientNamespace):
              'tps_data_stream_finished',
              'tps_parameter_info',
              'tps_parameters_selected',
-             'visualize_range'
+             'visualize_range',
+             'stop_visualize_range',
              ]
 
     # ========== UI requests ==========
@@ -84,6 +85,29 @@ class DataVizServiceNamespace(BaseClientNamespace):
         """
         await self.emit_client_notification('data_request', data['value'], cookies=data['cookies'], no_data_logging=NO_DATA_LOGGING_DEFAULT)
     
+    async def on_stop_visualize_range(self, data):
+        """ Stop visualization, if still running; use filename and ranges as input:
+            - if none specified, stop all visualizations for the client;
+            - with file name specified, stop the file visualization;
+            - with ranges specified, stop visualizing current ranges;
+
+        Parameters
+        ----------
+        data : dict(name, value, cookies, no_logging, no_data_logging...)
+               value: JSON data from UI, keys: 'filename', 't_range', 'mz_range'
+        """
+        await self.emit_client_notification('stop_data_request', data['value'], cookies=data['cookies'], no_data_logging=NO_DATA_LOGGING_DEFAULT)
+        global visualizers
+        global tps_visualizers
+
+        visualizer = self.viz_cache_pop(visualizers, data)
+        if isinstance(visualizer, SignalVisualizer):
+            await visualizer.flush_visualizations(data['cookies'])
+        tps_visualizer = self.viz_cache_pop(tps_visualizers, data)
+        if isinstance(tps_visualizer, TPSVisualizer):
+            await visualizer.flush_visualizations(data['cookies'])
+
+
     async def on_tps_parameters_selected(self, data):
         """TPS parameters selected from the dropdown
         """
@@ -109,6 +133,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
 
     async def on_loaded_tps_data(self, data):
         await self.on_acquired_tps_data(data)
+        return data['value'].get('i')
 
     async def on_tps_data_stream_finished(self, data):
         return
@@ -123,15 +148,12 @@ class DataVizServiceNamespace(BaseClientNamespace):
         ranges = str([(mz_range or []) , (t_range or [])])
         return sid, fname, ranges, mz_range, t_range
 
-    def viz_cache_contains(self, viz_cache, data):
-        sid, fname, ranges, _, _ = self.viz_cache_get_keys(viz_cache, data)
-        return sid in viz_cache and \
-               fname in viz_cache[sid] and \
-               ranges in viz_cache[sid][fname]
-
     def viz_cache_get(self, viz_cache, data):
         sid, fname, ranges, _, _ = self.viz_cache_get_keys(viz_cache, data)
-        return viz_cache[sid][fname][ranges]
+        try:
+            return viz_cache[sid][fname][ranges]
+        except KeyError:
+            return None
 
     def viz_cache_put(self, viz_cache, data, viz):
         sid, fname, ranges, _, _ = self.viz_cache_get_keys(viz_cache, data)
@@ -148,13 +170,16 @@ class DataVizServiceNamespace(BaseClientNamespace):
         """
         sid, fname, ranges, mz_range, t_range = self.viz_cache_get_keys(viz_cache, data)
         res = None
-        if fname:
-            if not mz_range and not t_range:
-                res = viz_cache[sid].pop(fname)
+        try:
+            if fname:
+                if not mz_range and not t_range:
+                    res = viz_cache[sid].pop(fname)
+                else:
+                    res = viz_cache[sid][fname].pop(ranges)
             else:
-                res = viz_cache[sid][fname].pop(ranges)
-        else:
-            res = viz_cache.pop(sid)
+                res = viz_cache.pop(sid)
+        except KeyError:
+            res = None
         return res
 
 
@@ -199,6 +224,8 @@ class DataVizServiceNamespace(BaseClientNamespace):
         global visualizers
         value = data['value']
         visualizer = self.viz_cache_get(visualizers, data)
+        if not visualizer:  # data request was cancelled
+            return
         # Extend signal cache
         spec = np.frombuffer( value.get('spec'), dtype=np.float32 )
         spec = spec.reshape(-1, 1)
@@ -250,6 +277,8 @@ class DataVizServiceNamespace(BaseClientNamespace):
 
         global tps_visualizers
         visualizer = self.viz_cache_get(tps_visualizers, data)
+        if not visualizer:  # data request was cancelled
+            return
         # Extend signal cache
         tps_data = np.frombuffer( value.get('tps_data'), dtype=np.float32 )
         tps_data = tps_data.reshape(-1, 1)
@@ -269,7 +298,8 @@ class DataVizServiceNamespace(BaseClientNamespace):
     async def on_acquisition_finished(self, data):
         global visualizers
         visualizer = self.viz_cache_pop(visualizers, data)
-        await visualizer.flush_visualizations(data['cookies'])
+        if isinstance(visualizer, SignalVisualizer):
+            await visualizer.flush_visualizations(data['cookies'])
     # ----------------------------------------------
 
 

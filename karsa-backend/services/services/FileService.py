@@ -46,6 +46,7 @@ class FileServiceNamespace(BaseClientNamespace):
         'acquisition_started',
         'acquisition_finished',
         'data_request',
+        'stop_data_request',
         'experiment_selected',
         'experiments',
         'import_sample_table_datetime_range',
@@ -73,7 +74,10 @@ class FileServiceNamespace(BaseClientNamespace):
 
     def cache_get(self, cache, data):
         sid, fname = self.cache_get_keys(cache, data)
-        return cache[sid][fname]
+        try:
+            return cache[sid][fname]
+        except KeyError:
+            return None
 
     def cache_put(self, cache, data, array):
         sid, fname = self.cache_get_keys(cache, data)
@@ -88,13 +92,16 @@ class FileServiceNamespace(BaseClientNamespace):
         """
         sid, fname = self.cache_get_keys(cache, data)
         res = None
-        if fname:
-            res = cache[sid].pop(fname)
-        else:
-            res = cache.pop(sid)
+        try:
+            if fname:
+                res = cache[sid].pop(fname)
+            else:
+                res = cache.pop(sid)
+        except KeyError:
+            res = None
         return res
 
-    def data_request_cancelled(self, data):
+    def data_request_stopped(self, data):
         return not self.cache_contains(signal_cache, data)
 
 
@@ -109,14 +116,21 @@ class FileServiceNamespace(BaseClientNamespace):
         if filename is None:
             raise ValueError("Received data_request without filename")
         
-        if self.cache_contains(signal_cache, data):
-            signal_array = self.cache_get(signal_cache, data)
-            if isinstance(signal_array, ExtendableDataArray):
-                signal_array = signal_array.data_array.to_dataset()
-        else:
+        # if self.cache_contains(signal_cache, data):
+        #     signal_array = self.cache_get(signal_cache, data)
+        #     if isinstance(signal_array, ExtendableDataArray):
+        #         signal_array = signal_array.data_array.to_dataset()
+        # else:
+        #     filename_zarr = base_to_zarr_filename(filename, 'signal')
+        #     signal_array = open_mfzarr(filename_zarr)
+        #     self.cache_put(signal_cache, data, signal_array)
+        signal_array = self.cache_get(signal_cache, data)
+        if not signal_array:
             filename_zarr = base_to_zarr_filename(filename, 'signal')
             signal_array = open_mfzarr(filename_zarr)
             self.cache_put(signal_cache, data, signal_array)
+        if isinstance(signal_array, ExtendableDataArray):
+            signal_array = signal_array.data_array.to_dataset()
 
         set_figure_ranges = False
         mz_range = value.get('mz_range', None)
@@ -152,10 +166,9 @@ class FileServiceNamespace(BaseClientNamespace):
                             cookies=cookies,
                             no_data_logging=NO_DATA_LOGGING_DEFAULT
                             )
-        # await asyncio.sleep(0)
         self.speci = 0
         for i, spec_array in enumerate(signal.transpose()):
-            if self.data_request_cancelled(data):
+            if self.data_request_stopped(data):
                 break
             while i - self.speci > 5:
                 await asyncio.sleep(.15)
@@ -173,7 +186,7 @@ class FileServiceNamespace(BaseClientNamespace):
                                            no_data_logging=NO_DATA_LOGGING_DEFAULT,
                                            callback="speci_callback"
                                            )
-            # await asyncio.sleep(0.2)
+        self.cache_pop(signal_cache, data)
         await self.emit_client_notification('data_stream_finished',
                                        {'filename': filename,
                                         'mz_range': mz_range,
@@ -185,6 +198,18 @@ class FileServiceNamespace(BaseClientNamespace):
 
     def speci_callback(self, n):
         self.speci = n
+
+
+    async def on_stop_data_request(self, data):
+        global signal_cache
+        global tps_cache
+        signal_array = self.cache_pop(signal_cache, data)
+        if isinstance(signal_array, ExtendableDataArray):
+            await signal_array.flush()
+        tps_array = self.cache_pop(tps_cache, data)
+        if isinstance(tps_array, ExtendableDataArray):
+            await tps_array.flush()
+
 
     async def on_experiment_selected(self, data):
         value = data['value']
@@ -317,9 +342,8 @@ class FileServiceNamespace(BaseClientNamespace):
             return   
         parameters = [ v.get('label') for _, v in selected.items() ]
 
-        if self.cache_contains(tps_cache, data):
-            sample_array = self.cache_get(tps_cache, data)
-        else:
+        sample_array = self.cache_get(tps_cache, data)
+        if not sample_array:
             filename = base_to_zarr_filename(filename, '_tps')
             sample_array = open_mfzarr(filename)
             self.cache_put(tps_cache, data, sample_array)
@@ -346,8 +370,12 @@ class FileServiceNamespace(BaseClientNamespace):
                             cookies=data['cookies'],
                             no_data_logging=NO_DATA_LOGGING_DEFAULT
                             )
-        # await asyncio.sleep(0)
+        self.tps_speci = 0
         for i, param_array in enumerate(tps_data.transpose()):
+            if self.data_request_stopped(data):
+                break
+            while i - self.tps_speci > 5:
+                await asyncio.sleep(.15)
             param_ys = param_array.values
             ti = float( param_array.time )
             await self.emit_client_notification('loaded_tps_data',
@@ -357,15 +385,19 @@ class FileServiceNamespace(BaseClientNamespace):
                                             't': ti,
                                             },
                                            cookies=data['cookies'],
-                                           no_data_logging=NO_DATA_LOGGING_DEFAULT
+                                           no_data_logging=NO_DATA_LOGGING_DEFAULT,
+                                           callback="tps_speci_callback"
                                            )
-            # await asyncio.sleep(0)
+        self.cache_pop(tps_cache, data)
         await self.emit_client_notification('tps_data_stream_finished',
                                        {'filename': filename},
                                        cookies=data['cookies'],
                                        no_data_logging=False
                                       )
-    
+ 
+    def tps_speci_callback(self, n):
+        self.tps_speci = n
+   
     # ---------------------------------
 
     # ========== MS data ==========

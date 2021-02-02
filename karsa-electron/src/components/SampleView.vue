@@ -115,6 +115,14 @@ export default {
                 this.$store.commit('visualize_range', value);
             }
         },
+        stop_visualize_range: {
+            get() {
+                return this.$store.state.stop_visualize_range;
+            },
+            set(value) {
+                this.$store.commit('stop_visualize_range', value);
+            }
+        },
         tps_parameters_selected_ui: {
             get() {
                 return this.$store.state.tps_parameters_selected['tps_parameters_selected'];
@@ -897,6 +905,8 @@ export default {
             }
             this.reset_figure_cache();
             this.reset_figures();
+            if ( !_.isEmpty(this.filename) )
+                this.stop_visualize_range = {'filename': this.filename, };
             if ( _.isEmpty(new_value) || _.isEmpty(new_value.filename)) {
                 this.filename = '';
                 this.update_figures();
