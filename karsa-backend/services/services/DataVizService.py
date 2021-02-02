@@ -13,17 +13,13 @@ the images to subscribers
 Created on Fri Apr 17 11:35:57 2020
 """
 
-import os
 import inspect
-import xarray
 import asyncio
 import numpy as np
 import dask.array as da
 
-from copy import copy, deepcopy
-from threading import Thread
+from copy import deepcopy
 from multiprocessing import (
-                        Event,
                         Queue,
                         cpu_count
                         )
@@ -31,26 +27,20 @@ from datetime import timedelta
 from queue import Empty
 
 from karsalib import BaseClientNamespace, BaseServiceClient, parse_cmd_args
-from karsatof.kevent import KEvent
 from karsatof.kworker import HeatmapGenerator, SpecTraceGenerator
 from karsatof.kcollector import ExtendableDataArray
 from karsatof.kimage import (
                     DEFAULT_TRACE,
-                    gen_timeseries_trace,
-                    gen_ridge_traces,
-                    gen_heatmap_image,
-                    gen_spec_image,
-                    stack_spec_images,
-                    gen_spec_stack_image,
+                    convert_base64_to_img,
                     convert_to_base64,
-                    merge_heatmap_slices,
+                    hstack_imgs,
                     )
-from karsatof.kutil import (SubscriptableQueue,
-                            QueueSubscription
-                            )
+
 
 NO_DATA_LOGGING_DEFAULT = True
 client = None
+visualizers = {}
+tps_visualizers = {}
 
 
 class DataVizServiceNamespace(BaseClientNamespace):
@@ -61,17 +51,17 @@ class DataVizServiceNamespace(BaseClientNamespace):
              'acquired_tps_data',
              'acquisition_finished',
              'data_stream_coordinates',
+             'data_stream_finished',
              'loaded_spectrum',
              'loaded_tps_data',
-             'data_stream_finished',
              'service_state',
+             'stop_visualize_range',
              'target_to_load',
              'tps_data_stream_coordinates',
              'tps_data_stream_finished',
              'tps_parameter_info',
              'tps_parameters_selected',
              'visualize_range',
-             'stop_visualize_range',
              ]
 
     # ========== UI requests ==========
@@ -83,7 +73,11 @@ class DataVizServiceNamespace(BaseClientNamespace):
         data : dict(name, value, cookies, no_logging, no_data_logging...)
                value: JSON data from UI, keys: 'filename', 't_range', 'mz_range'
         """
-        await self.emit_client_notification('data_request', data['value'], cookies=data['cookies'], no_data_logging=NO_DATA_LOGGING_DEFAULT)
+        await self.emit_client_notification('data_request',
+                                            data['value'],
+                                            cookies=data['cookies'],
+                                            no_data_logging=NO_DATA_LOGGING_DEFAULT
+                                            )
     
     async def on_stop_visualize_range(self, data):
         """ Stop visualization, if still running; use filename and ranges as input:
@@ -111,7 +105,11 @@ class DataVizServiceNamespace(BaseClientNamespace):
     async def on_tps_parameters_selected(self, data):
         """TPS parameters selected from the dropdown
         """
-        await self.emit_client_notification('tps_data_request', data['value'], cookies=data['cookies'], no_data_logging=NO_DATA_LOGGING_DEFAULT)
+        await self.emit_client_notification('tps_data_request',
+                                            data['value'],
+                                            cookies=data['cookies'],
+                                            no_data_logging=NO_DATA_LOGGING_DEFAULT
+                                            )
 
     # ---------------------------------
 
@@ -139,7 +137,6 @@ class DataVizServiceNamespace(BaseClientNamespace):
         return
     # -----------------------------------------------
 
-    # ========== TOFService notifications ==========
     def viz_cache_get_keys(self, viz_cache, data):
         sid = data['cookies']['src_sid'][0]
         fname = data['value'].get('filename')
@@ -168,7 +165,10 @@ class DataVizServiceNamespace(BaseClientNamespace):
         Method for releasing viz_cached resource. The value is released
         by presence of a corresponding sid/fname/ranges key in the data
         """
-        sid, fname, ranges, mz_range, t_range = self.viz_cache_get_keys(viz_cache, data)
+        sid, fname, ranges, mz_range, t_range = self.viz_cache_get_keys(
+                                                                viz_cache,
+                                                                data
+                                                                )
         res = None
         try:
             if fname:
@@ -182,11 +182,10 @@ class DataVizServiceNamespace(BaseClientNamespace):
             res = None
         return res
 
-
+    # ========== TOFService notifications ==========
     async def on_acquisition_coordinates(self, data):
+        global client
         global visualizers
-        global heatmap_generator_q
-        global spec_trace_generator_q
 
         value = data['value']
         set_figure_ranges = value.get('set_figure_ranges', True)
@@ -198,8 +197,9 @@ class DataVizServiceNamespace(BaseClientNamespace):
         mz_range = [ float(mz[0]), float(mz[-1]) ]
         t_range =  [ float(t[0]),  float(t[-1])  ]
 
-        visualizer = SignalVisualizer(heatmap_generator_q,
-                                      spec_trace_generator_q
+        visualizer = SignalVisualizer(filename,
+                                      client.heatmap_gen_input_q,
+                                      client.spec_trace_gen_input_q
                                       )
         # Initialize visualizer cache
         visualizer.init_array(dims=('mz', 'time'),
@@ -210,14 +210,15 @@ class DataVizServiceNamespace(BaseClientNamespace):
         self.viz_cache_put(visualizers, data, visualizer)
         if set_figure_ranges:
             # Set UI figure ranges
-            await self.emit_client_notification('figure_ranges',
-                                           {'filename': filename,
-                                            'mz_range': mz_range,
-                                            't_range': t_range,
-                                            },
-                                            cookies=data['cookies'],
-                                            no_data_logging=NO_DATA_LOGGING_DEFAULT
-                                           )
+            await self.emit_client_notification(
+                                'figure_ranges',
+                                {'filename': filename,
+                                 'mz_range': mz_range,
+                                 't_range': t_range,
+                                 },
+                                cookies=data['cookies'],
+                                no_data_logging=NO_DATA_LOGGING_DEFAULT
+                                )
 
 
     async def on_acquired_spectrum(self, data):
@@ -261,11 +262,12 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                'value': i
                                } for i, info in enumerate(tps_info)
                             ]            
-            await self.emit_client_notification('tps_parameters',
-                                           dropdown_items,
-                                           cookies=data['cookies'],
-                                           no_data_logging=NO_DATA_LOGGING_DEFAULT
-                                           )
+            await self.emit_client_notification(
+                            'tps_parameters',
+                            dropdown_items,
+                            cookies=data['cookies'],
+                            no_data_logging=NO_DATA_LOGGING_DEFAULT
+                            )
 
 
     async def on_acquired_tps_data(self, data):
@@ -305,15 +307,23 @@ class DataVizServiceNamespace(BaseClientNamespace):
 
 class SignalVisualizer(ExtendableDataArray):
 
-    def __init__(self, heatmap_generator_q, spec_trace_generator_q, step=10):
+    def __init__(self,
+                 filename,
+                 heatmap_generator_q,
+                 spec_trace_generator_q,
+                 step=10
+                 ):
         ExtendableDataArray.__init__(self, array_module=da)
+        self.filename = filename
         self.heatmap_generator_q = heatmap_generator_q
         self.spec_trace_generator_q = spec_trace_generator_q
-        
         self.step = step
 
     def log(self, *arg, **kwarg):
-        print(f"[{self.__class__.__name__}.{inspect.stack()[1].function}]", *arg, **kwarg)
+        print(f"[{self.__class__.__name__}.{inspect.stack()[1].function}]",
+              *arg,
+              **kwarg
+              )
 
     async def extend_visualizations(self, cookies):
         """Generate visualizations for new data.
@@ -323,7 +333,7 @@ class SignalVisualizer(ExtendableDataArray):
             return
 
         # Set ranges
-        t0 = float( self.data_array.time[0] ) * 1e-9
+        t0 = float( self.data_array.time[0] ) * 1e-9 # [ns]->[s]
         t1 = float( self.data_array.time[-1] ) * 1e-9
         t_range = [t0, t1]
 
@@ -336,11 +346,13 @@ class SignalVisualizer(ExtendableDataArray):
 
         # Put to queue
         self.heatmap_generator_q.put({'data': arr_to_viz,
+                                      'filename': self.filename,
                                       'mz_range': mz_range,
                                       't_range': t_range,
                                       'cookies': cookies,
                                       })
         self.spec_trace_generator_q.put({'data': arr_to_viz,
+                                         'filename': self.filename,
                                          'mz_range': mz_range,
                                          't_range': t_range,
                                          'cookies': cookies,
@@ -452,58 +464,45 @@ class TPSVisualizer(ExtendableDataArray):
                                 )
 
 
-visualizers = {}
-tps_visualizers = {}
-heatmap_generator_q = Queue()
-spec_trace_generator_q = Queue()
-heatmap_q = Queue()
-spec_trace_q = Queue()
-hm_ps = []
-st_ps = []
-
 
 class DataVizServiceClient(BaseServiceClient):
     async def init_service(self):
-        # TODO: avoid global vars
-        global heatmap_generator_q
-        global spec_trace_generator_q
-        global heatmap_q
-        global spec_trace_q
-        global hm_ps
-        global st_ps
+        self.heatmap_gen_input_q = Queue()
+        self.spec_trace_gen_input_q = Queue()
+        self.heatmap_q = Queue()
+        self.spec_trace_q = Queue()
+        self.heatmap_generators = []
+        self.spec_trace_generators = []
 
         n_jobs = int( cpu_count() / 2 )
         for i in range(n_jobs):
             self.log("Spawning HeatmapGenerator %s/%s" %(i+1, n_jobs))
-            hm_p = HeatmapGenerator(heatmap_generator_q, heatmap_q)
-            hm_p.start()
-            hm_ps.append(hm_p)
+            hm_gen = HeatmapGenerator(self.heatmap_gen_input_q,
+                                      self.heatmap_q
+                                      )
+            hm_gen.start()
+            self.heatmap_generators.append(hm_gen)
             await self.sio.sleep(1)
             self.log("Spawning SpecTraceGenerator %s/%s" %(i+1, n_jobs))
-            st_p = SpecTraceGenerator(spec_trace_generator_q, spec_trace_q)
-            st_p.start()
-            st_ps.append(st_p)
+            st_gen = SpecTraceGenerator(self.spec_trace_gen_input_q,
+                                        self.spec_trace_q
+                                        )
+            st_gen.start()
+            self.spec_trace_generators.append(st_gen)
             await self.sio.sleep(1)
-        # tps_collector = KtpsCollector()
 
 
     async def service_main(self):
-        # TODO: avoid global vars
-        global heatmap_q
-        global spec_trace_q
-        global hm_ps
-        global st_ps
-
-        # heatmap_slices = []
+        heatmap_slices = []
         # spec_traces = []
         while True:
             # Check queues for new images
             try:
-                heatmap_slice = heatmap_q.get_nowait()
+                heatmap_slice = self.heatmap_q.get_nowait()
             except Empty:
                 heatmap_slice = None
             try:
-                spec_trace = spec_trace_q.get_nowait()
+                spec_trace = self.spec_trace_q.get_nowait()
             except Empty:
                 spec_trace = None
             if heatmap_slice is None and spec_trace is None:
@@ -513,7 +512,7 @@ class DataVizServiceClient(BaseServiceClient):
 
             # Got at least something
             if heatmap_slice is not None:
-                #heatmap_slices.append(heatmap_slice)
+                heatmap_slices.append(heatmap_slice)
                 cookies = heatmap_slice.pop('cookies')
                 await self.emit_client_notification(
                                 'heatmap_figure_data',
@@ -530,17 +529,30 @@ class DataVizServiceClient(BaseServiceClient):
                                 cookies=cookies,
                                 no_data_logging=True
                                 )
-        # heatmap = merge_heatmap_slices(heatmap_slices)
+        full_heatmap = merge_heatmap_slices(heatmap_slices)
         # heatmap.save('heatmap.png')
 
-        [p.terminate() for p in hm_ps]
-        [p.terminate() for p in st_ps]
+        # Terminate image generators
+        [p.terminate() for p in self.heatmap_generators]
+        [p.terminate() for p in self.spec_trace_generators]
         await self.sio.disconnect()
 
 
+def merge_heatmap_slices(slices):
+    slice_images = []
+    for slc in slices:
+        img_str = slc.get('img')
+        img = convert_base64_to_img(img_str)
+        slice_images.append(img)
+    full_img = hstack_imgs(slice_images)
+    #full_img_str = convert_to_base64(full_img)
+    return full_img
+
 def run():
     global client
-    client = DataVizServiceClient(*parse_cmd_args(), DataVizServiceNamespace)
+    client = DataVizServiceClient(*parse_cmd_args(),
+                                  DataVizServiceNamespace
+                                  )
     loop = asyncio.get_event_loop()
     loop.run_until_complete(client.run())
 

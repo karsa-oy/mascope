@@ -284,6 +284,9 @@ class BaseServiceClient:
                 self.log(f"Failed: {e}\nRetrying...")
                 await self.sio.sleep(1)
 
+    async def disconnect(self):
+        await self.sio.disconnect()
+
     async def init_service(self):
         """
         Overridable initialization function of the service
