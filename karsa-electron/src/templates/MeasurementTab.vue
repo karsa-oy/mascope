@@ -235,37 +235,12 @@
                             <p class="modal-card-title">Import samples</p>
                         </header>
                         <section class="modal-card-body">
-                            <b-field label="Start">
-                                <b-datetimepicker
-                                    v-model="import_start_time"
-                                    placeholder="Start datetime"
-                                    :timepicker="{'hour-format': '24'}"
-                                    :min-datetime="import_min_datetime"
-                                    :max-datetime="import_max_datetime">
-                                </b-datetimepicker>
-                            </b-field>
-                            <b-field label="End">
-                                <b-datetimepicker
-                                    v-model="import_end_time"
-                                    placeholder="End datetime"
-                                    :timepicker="{'hour-format': '24'}"
-                                    :min-datetime="import_start_time"
-                                    :max-datetime="import_max_datetime">
-                                </b-datetimepicker>
-                            </b-field>
-                            <button
-                                class="button"
-                                type="button"
-                                @click="FetchSamples()"
-                                is-dark>
-                                Fetch sample list
-                            </button>
-                            <div><br></div>
                             <b-table 
-                                id="h5-samples-table"
+                                id="import-sample-table"
                                 :columns="import_sample_table_cols"
                                 :data="import_sample_table_rows"
                                 :checkable="true"
+                                :header-checkable="false"
                                 :checked-rows.sync="import_sample_table_checked_rows">
                             </b-table>
                             <div><br></div>
@@ -289,6 +264,10 @@
                         </footer>
                     </div>
                 </div>
+            <b-loading
+                :is-full-page="false"
+                v-model="import_sample_table_loading">
+            </b-loading>
             </b-modal>
         </section>
         <!-- End of sample import modal -->
@@ -346,12 +325,7 @@
             </b-modal>
         </section>
         <!-- End of sample import modal -->
-        <!-- All modals should not be after this -->
-
-        <section class="loading">
-            <!-- Placeholder for loading div -->
-            
-        </section>
+        <!-- No modals below -->
 
         <!-- Main content  area-->
         <section class="main-content">
@@ -599,12 +573,13 @@
                             </div>
                             <div class="card-content">
                                 <div class="content">
-                                    <div class="collected-sample-attributes">
+                                    <div class="left-panel-collapsable">
                                         <b-button
                                             type="is-dark"
                                             @click="is_sample_attribute_modal_active=true"
                                             outlined
-                                            inverted>
+                                            inverted
+                                            size="is-small">
                                             Sample attributes
                                         </b-button>
                                         <div><br></div>
@@ -619,7 +594,7 @@
                                         <div><br></div>
                                         <b-button
                                             type="is-dark"
-                                            @click="is_import_sample_modal_active=true"
+                                            @click="LaunchSampleImport()"
                                             size="is-small"
                                             outlined
                                             inverted>
@@ -634,10 +609,6 @@
                                             :disabled="(h5_streamer_status=='ready' && 
                                                         acquisition_status=='not_running') ? false : true">
                                             Import h5 file
-                                            <b-loading
-                                                :active="h5_streamer_status=='ready' ? false : true"
-                                                :is-full-page="false">
-                                            </b-loading>
                                         </b-button>
                                     </div>
                                 </div>
@@ -667,20 +638,21 @@
                             </div>
                             <div class="card-content">
                                 <div class="content">
-                                    <div class="targetlist-datatable">
+                                    <div class="left-panel-collapsable">
                                         <b-button
                                             type="is-dark"
                                             @click="is_excel_clipboard_modal_active=true"
                                             outlined
-                                            inverted>
+                                            inverted
+                                            size="is-small">
                                             Import targets
                                         </b-button>
+                                        <div><br></div>
                                         <b-table 
                                             id="targets-datatable"
                                             :columns="target_table_cols"
                                             :data="target_table_rows" 
                                             :sticky-header="true"
-                                            :bordered="true" 
                                             :selected.sync="target_table_selected_row" 
                                             focusable
                                             sortable>

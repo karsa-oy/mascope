@@ -917,7 +917,7 @@ export default {
             this.reset_figures();
         },
         target_to_display: function(new_value, old_value) {
-            if ( _.isEqual(new_value, old_value) ) {
+            if ( _.isEqual(new_value, old_value) || _.isEmpty(this.filename) ) {
                 return false;
             }
             if (new_value == null) {
@@ -934,13 +934,13 @@ export default {
                             'x': new_ranges.t_range,
                             'y': [mz, mz],
                             'mode': 'lines',
-                            'line': {'color': '#720dde'}
+                            'line': {'color': '#8c67ef'}
                             }];
             this.spec_stack_data = [{
                             'x': [mz, mz],
                             'y': new_ranges.t_range,
                             'mode': 'lines',
-                            'line': {'color': '#720dde'}
+                            'line': {'color': '#8c67ef'}
                             }];
             // Make volatile zoom-in
             this.visualize_range_on_zoom_in(prev_ranges, new_ranges, true);

@@ -90,6 +90,7 @@ export default {
             import_min_datetime: null,
             import_max_datetime: new Date(),
             // variables for sample import modal
+            import_sample_table_loading: true,
             import_sample_table_rows: [],
             import_sample_table_cols: [],
             import_sample_table_checked_rows: [],
@@ -438,33 +439,6 @@ export default {
             }
             this.import_h5_table_datetime_range = fetch_request;
         },
-        FetchSamples() {
-            if (this.import_start_time == null || 
-                this.import_end_time == null) {
-                this.$buefy.toast.open({
-                    duration: 3000,
-                    message: "You must select datetime range first!",
-                    type: 'is-danger',
-                    queue: false,
-                })
-                return
-            }
-            // Revert automatic timezone adjustment
-            let dt0 = new Date(this.import_start_time.getTime()); // copy
-            let start_hours_diff = dt0.getHours() - dt0.getTimezoneOffset() / 60;
-            dt0.setHours(start_hours_diff);
-
-            let dt1 = new Date(this.import_end_time.getTime()); // copy
-            let end_hours_diff = dt1.getHours() - dt1.getTimezoneOffset() / 60;
-            dt1.setHours(end_hours_diff);
-            
-            // Request list of h5 files in given range
-            let fetch_request = {
-                'dt0': dt0.toJSON(),
-                'dt1': dt1.toJSON()
-            }
-            this.import_sample_table_datetime_range = fetch_request;
-        },
         ImportExcelTargets() {
             this.target_table_cols = this.excel_clipboard_table_cols;
             this.target_table_rows = this.excel_clipboard_table_rows;
@@ -490,6 +464,14 @@ export default {
             // Export sample attributes to link into current experiment
             this.sample_attributes = sample;
             this.is_import_sample_modal_active = false;
+        },
+        LaunchSampleImport() {
+            // Request list of samples from FileService
+            this.import_sample_table_datetime_range = Math.random();
+            // Set loading state
+            this.import_sample_table_loading = true;
+            // Launch modal
+            this.is_import_sample_modal_active = true;
         },
         ParseExcelClipboard: function(clipboard_text) {
             // Split full text to rows
@@ -630,6 +612,7 @@ export default {
             }
             this.import_sample_table_cols = new_data.cols;
             this.import_sample_table_rows = new_data.rows;
+            this.import_sample_table_loading = false;
         },
         samples: function(new_data, old_data){
             if ( _.isEqual(new_data, old_data) ) {

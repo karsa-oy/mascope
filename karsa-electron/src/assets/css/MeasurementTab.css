@@ -17,16 +17,14 @@ body{
 a.dropdown-item.is-active, .dropdown .dropdown-menu .has-link a.is-active, button.dropdown-item.is-active {
     background-color: #fff;
 }
-#samples-datatable, #targets-datatable{
-      max-width: 500px;
-}
+
 #filter-checkboxes{
     padding: 5px 15px 5px 15px;  
 }
 #filter-checkboxes>label {
     padding-left: 10px;
 }
-.collected-sample-attributes{
+.left-panel-collapsable{
     padding: 10px;
 }
 
@@ -64,11 +62,11 @@ a.dropdown-item.is-active, .dropdown .dropdown-menu .has-link a.is-active, butto
 .table-wrapper:not(:last-child) {
     margin-bottom: 0.5rem;
 }
-.b-table .table.is-bordered th.is-current-sort, .b-table .table.is-bordered th.is-sortable:hover {
+/* .b-table .table.is-bordered th.is-current-sort, .b-table .table.is-bordered th.is-sortable:hover {
     color: #fff; 
     border-color: #5f5e5e;
     background: #5f5e5e;
-}
+} */
 
 .b-radio.radio {
     align-items: end;
@@ -116,7 +114,7 @@ a.dropdown-item.is-active, .dropdown .dropdown-menu .has-link a.is-active, butto
 }
 .card-header{
     border-bottom: 1px solid #fff; 
-    /* background-color: #3d3d3d; */
+    background-color: #151418;
 }
 .card-content{
     padding: 0px;

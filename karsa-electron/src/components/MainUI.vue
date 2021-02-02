@@ -508,18 +508,7 @@ body {
 .modal-card .label {
     color: #666;
 }
-tr>th{
-    background-color:rgb(51, 50, 50); 
-}
-.table thead td:hover, .table thead th:hover {
-    color: #666;
-}
-th>input{
-    color:#dfdfdf; 
-}
-.table thead td, .table thead th {
-    color: #dfdfdf;
-}
+
 .pagination-previous[disabled], .pagination-next[disabled], .pagination-link[disabled] {
     background-color: #545454;
     border-color: #dbdbdb;
@@ -546,10 +535,6 @@ a.pagination-link.is-current {
 }
 .main-tab>ul>li.is-active>a>span {
     color: #000;
-}
-.table tr.is-selected {
-    background-color: #5a5a5a;
-    color: white;
 }
 .button:hover>span, .button:hover>.icon, .button:hover>.mdi, .button:hover>:first-child, .button:hover>.icon>.mdi{
     color:#000; 
@@ -583,14 +568,41 @@ a.pagination-link.is-current {
 /* .tabs.is-boxed li.is-active a {
     background-color:#29282e!important;
     border-color: #ddd;
-}
+}*/
 .table {
-    background-color: #29282e!important2f; 
-    color: #ddd;
+    background-color:transparent; 
+    color: inherit;
 }
-.table td, .table th {
-    border: 1px solid #fff;
+.table:focus {
+    outline: none;
+}
+.table th{
+    background-color: transparent;
+}
+.b-table .table-wrapper.has-sticky-header tr:first-child th {
+    background-color: #29282e;
+}
+.table tr.is-selected {
+    background-color: #7c5bd6;
+    color: black;
+}
+/* tr>th{
+    background-color:rgb(51, 50, 50); 
 } */
+.table thead td:hover, .table thead th:hover {
+    color: #666;
+}
+.table tr:hover {
+    color: black;
+    background-color: white;
+}
+th>input{
+    color:#dfdfdf; 
+}
+.table thead td, .table thead th {
+    color: inherit;
+}
+
 .b-slider.is-small .b-slider-tick-label {
     color: aliceblue;
 }
