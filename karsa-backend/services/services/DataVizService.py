@@ -43,6 +43,66 @@ visualizers = {}
 tps_visualizers = {}
 
 
+
+def viz_cache_get_keys(viz_cache, data):
+    sid = data['cookies']['src_sid'][0]
+    fname = data['value'].get('filename')
+    mz_range = data['value'].get('mz_range')
+    t_range = data['value'].get('t_range')
+    ranges = str([(mz_range or []) , (t_range or [])])
+    return sid, fname, ranges, mz_range, t_range
+
+def viz_cache_get(viz_cache, data):
+    sid, fname, ranges, _, _ = viz_cache_get_keys(viz_cache, data)
+    try:
+        return viz_cache[sid][fname][ranges]
+    except KeyError:
+        return None
+
+def viz_cache_put(viz_cache, data, viz):
+    sid, fname, ranges, _, _ = viz_cache_get_keys(viz_cache, data)
+    if sid not in viz_cache:
+        viz_cache[sid] = {}
+    if fname not in viz_cache[sid]:
+        viz_cache[sid][fname] = {}
+    viz_cache[sid][fname][ranges] = viz
+
+def viz_cache_pop(viz_cache, data):
+    """
+    Method for releasing viz_cached resource. The value is released
+    by presence of a corresponding sid/fname/ranges key in the data
+    """
+    sid, fname, ranges, mz_range, t_range = viz_cache_get_keys(
+                                                            viz_cache,
+                                                            data
+                                                            )
+    res = None
+    try:
+        if fname:
+            if not mz_range and not t_range:
+                res = viz_cache[sid].pop(fname)
+            else:
+                res = viz_cache[sid][fname].pop(ranges)
+        else:
+            res = viz_cache.pop(sid)
+    except KeyError:
+        res = None
+    return res
+
+
+def merge_heatmap_slices(slices):
+    slice_images = []
+    for slc in slices:
+        img_str = slc.get('img')
+        img = convert_base64_to_img(img_str)
+        slice_images.append(img)
+    full_img = hstack_imgs(slice_images)
+    #full_img_str = convert_to_base64(full_img)
+    return full_img
+
+
+
+
 class DataVizServiceNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to Router """
 
@@ -94,10 +154,10 @@ class DataVizServiceNamespace(BaseClientNamespace):
         global visualizers
         global tps_visualizers
 
-        visualizer = self.viz_cache_pop(visualizers, data)
+        visualizer = viz_cache_pop(visualizers, data)
         if isinstance(visualizer, SignalVisualizer):
             await visualizer.flush_visualizations(data['cookies'])
-        tps_visualizer = self.viz_cache_pop(tps_visualizers, data)
+        tps_visualizer = viz_cache_pop(tps_visualizers, data)
         if isinstance(tps_visualizer, TPSVisualizer):
             await visualizer.flush_visualizations(data['cookies'])
 
@@ -137,50 +197,6 @@ class DataVizServiceNamespace(BaseClientNamespace):
         return
     # -----------------------------------------------
 
-    def viz_cache_get_keys(self, viz_cache, data):
-        sid = data['cookies']['src_sid'][0]
-        fname = data['value'].get('filename')
-        mz_range = data['value'].get('mz_range')
-        t_range = data['value'].get('t_range')
-        ranges = str([(mz_range or []) , (t_range or [])])
-        return sid, fname, ranges, mz_range, t_range
-
-    def viz_cache_get(self, viz_cache, data):
-        sid, fname, ranges, _, _ = self.viz_cache_get_keys(viz_cache, data)
-        try:
-            return viz_cache[sid][fname][ranges]
-        except KeyError:
-            return None
-
-    def viz_cache_put(self, viz_cache, data, viz):
-        sid, fname, ranges, _, _ = self.viz_cache_get_keys(viz_cache, data)
-        if sid not in viz_cache:
-            viz_cache[sid] = {}
-        if fname not in viz_cache[sid]:
-            viz_cache[sid][fname] = {}
-        viz_cache[sid][fname][ranges] = viz
-
-    def viz_cache_pop(self, viz_cache, data):
-        """
-        Method for releasing viz_cached resource. The value is released
-        by presence of a corresponding sid/fname/ranges key in the data
-        """
-        sid, fname, ranges, mz_range, t_range = self.viz_cache_get_keys(
-                                                                viz_cache,
-                                                                data
-                                                                )
-        res = None
-        try:
-            if fname:
-                if not mz_range and not t_range:
-                    res = viz_cache[sid].pop(fname)
-                else:
-                    res = viz_cache[sid][fname].pop(ranges)
-            else:
-                res = viz_cache.pop(sid)
-        except KeyError:
-            res = None
-        return res
 
     # ========== TOFService notifications ==========
     async def on_acquisition_coordinates(self, data):
@@ -207,7 +223,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                               coords=[mz, []],
                               name='signal'
                               )
-        self.viz_cache_put(visualizers, data, visualizer)
+        viz_cache_put(visualizers, data, visualizer)
         if set_figure_ranges:
             # Set UI figure ranges
             await self.emit_client_notification(
@@ -224,7 +240,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
     async def on_acquired_spectrum(self, data):
         global visualizers
         value = data['value']
-        visualizer = self.viz_cache_get(visualizers, data)
+        visualizer = viz_cache_get(visualizers, data)
         if not visualizer:  # data request was cancelled
             return
         # Extend signal cache
@@ -255,7 +271,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                               )
 
         global tps_visualizers
-        self.viz_cache_put(tps_visualizers, data, visualizer)
+        viz_cache_put(tps_visualizers, data, visualizer)
 
         if set_tps_parameters:
             dropdown_items = [{'label': info,
@@ -278,7 +294,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
         global tps_data
 
         global tps_visualizers
-        visualizer = self.viz_cache_get(tps_visualizers, data)
+        visualizer = viz_cache_get(tps_visualizers, data)
         if not visualizer:  # data request was cancelled
             return
         # Extend signal cache
@@ -299,9 +315,32 @@ class DataVizServiceNamespace(BaseClientNamespace):
 
     async def on_acquisition_finished(self, data):
         global visualizers
-        visualizer = self.viz_cache_pop(visualizers, data)
+        #visualizer = viz_cache_pop(visualizers, data)
+        visualizer = viz_cache_get(visualizers, data)
         if isinstance(visualizer, SignalVisualizer):
             await visualizer.flush_visualizations(data['cookies'])
+            
+            full_heatmap = merge_heatmap_slices(visualizer.heatmap_slices)
+            full_heatmap_str = convert_to_base64(full_heatmap)
+            image_data = {'filename': visualizer.filename,
+                          'img_filename': 'heatmap.png',
+                          'img': full_heatmap_str
+                          }
+            await self.emit_client_notification(
+                                    'image_to_save',
+                                    image_data,
+                                    cookies=data['cookies'],
+                                    no_data_logging=NO_DATA_LOGGING_DEFAULT)
+            for i, spec_trace in enumerate(visualizer.spec_traces):
+                image_data.update({'img_filename': 'spec%s.png' %i,
+                                   'img': spec_trace['img']
+                                   })
+                await self.emit_client_notification(
+                                    'image_to_save',
+                                    image_data,
+                                    cookies=data['cookies'],
+                                    no_data_logging=NO_DATA_LOGGING_DEFAULT)
+            
     # ----------------------------------------------
 
 
@@ -318,6 +357,9 @@ class SignalVisualizer(ExtendableDataArray):
         self.heatmap_generator_q = heatmap_generator_q
         self.spec_trace_generator_q = spec_trace_generator_q
         self.step = step
+        
+        self.heatmap_slices = []
+        self.spec_traces = []
 
     def log(self, *arg, **kwarg):
         print(f"[{self.__class__.__name__}.{inspect.stack()[1].function}]",
@@ -493,8 +535,8 @@ class DataVizServiceClient(BaseServiceClient):
 
 
     async def service_main(self):
-        heatmap_slices = []
-        # spec_traces = []
+        global visualizers
+        
         while True:
             # Check queues for new images
             try:
@@ -512,7 +554,11 @@ class DataVizServiceClient(BaseServiceClient):
 
             # Got at least something
             if heatmap_slice is not None:
-                heatmap_slices.append(heatmap_slice)
+                cache_ref = dict(cookies = heatmap_slice['cookies'],
+                                 value = dict(filename=heatmap_slice['filename'])
+                                 )
+                visualizer = viz_cache_get(visualizers, cache_ref)
+                visualizer.heatmap_slices.append(heatmap_slice)
                 cookies = heatmap_slice.pop('cookies')
                 await self.emit_client_notification(
                                 'heatmap_figure_data',
@@ -521,7 +567,11 @@ class DataVizServiceClient(BaseServiceClient):
                                 no_data_logging=True
                                 )
             if spec_trace is not None:
-                # spec_traces.append(spec_trace)
+                cache_ref = dict(cookies = spec_trace['cookies'],
+                                 value = dict(filename=spec_trace['filename'])
+                                 )
+                visualizer = viz_cache_get(visualizers, cache_ref)
+                visualizer.spec_traces.append(spec_trace)
                 cookies = spec_trace.pop('cookies')
                 await self.emit_client_notification(
                                 'spec_stack_figure_data',
@@ -529,8 +579,6 @@ class DataVizServiceClient(BaseServiceClient):
                                 cookies=cookies,
                                 no_data_logging=True
                                 )
-        full_heatmap = merge_heatmap_slices(heatmap_slices)
-        # heatmap.save('heatmap.png')
 
         # Terminate image generators
         [p.terminate() for p in self.heatmap_generators]
@@ -538,15 +586,6 @@ class DataVizServiceClient(BaseServiceClient):
         await self.sio.disconnect()
 
 
-def merge_heatmap_slices(slices):
-    slice_images = []
-    for slc in slices:
-        img_str = slc.get('img')
-        img = convert_base64_to_img(img_str)
-        slice_images.append(img)
-    full_img = hstack_imgs(slice_images)
-    #full_img_str = convert_to_base64(full_img)
-    return full_img
 
 def run():
     global client

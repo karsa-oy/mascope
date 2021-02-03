@@ -23,6 +23,7 @@ from multiprocessing import Lock
 from karsalib import BaseClientNamespace, BaseServiceClient, parse_cmd_args
 from karsatof.kcollector import ExtendableDataArray
 from karsatof.kdatapool import DataPool
+from karsatof.kimage import convert_base64_to_img
 
 
 NO_DATA_LOGGING_DEFAULT = True
@@ -49,6 +50,7 @@ class FileServiceNamespace(BaseClientNamespace):
         'stop_data_request',
         'experiment_selected',
         'experiments',
+        'image_to_save',
         'import_sample_table_datetime_range',
         'project_selected',
         'projects',
@@ -251,6 +253,16 @@ class FileServiceNamespace(BaseClientNamespace):
                             cookies=cookies,
                             no_data_logging=NO_DATA_LOGGING_DEFAULT
                             )
+
+    async def on_image_to_save(self, data):
+        global datapool
+        value = data['value']
+        filename = value['filename']
+        img_filename = value['img_filename']
+        img_str = value['img']
+        img_path = os.path.join(datapool.data_root, filename, img_filename)
+        img = convert_base64_to_img(img_str)
+        img.save(img_path)
 
     async def on_import_sample_table_datetime_range(self, data):
         global datapool
