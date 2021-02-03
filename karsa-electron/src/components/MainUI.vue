@@ -339,7 +339,7 @@ export default {
     // watchers also see changes from external notifications, if any
     watch: {
         acquisition_status: function(new_value, old_value) {
-            return this.export_two_way_binding_prop(this, 'acquisition_status', {'value': new_value}, old_value);
+            return this.export_two_way_binding_prop(this, 'acquisition_status', new_value, old_value);
         },
         experiment_selected: function(new_value, old_value) {
             return this.export_one_way_binding_prop(this, 'experiment_selected', new_value, old_value);
