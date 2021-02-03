@@ -114,22 +114,31 @@ class BaseServerNamespace(AsyncNamespace):
     def on_connect(self, sid, environ):
         self.log("connected to namespace", self.namespace)
 
-    def on_disconnect(self, sid):
+    async def on_disconnect(self, sid):
         if sid not in self.sid_to_app:
             # don't unsubscribe anonimous clients (UI:renderer?)
             return
         app_name = self.sid_to_app[sid]['name']
         app_type = self.sid_to_app[sid].get('type', 'client')
         self.log(app_type, app_name, "disconnected from namespace", self.namespace)
+        # clear the app caches, if any, in all app services
+        await self.on_client_notification(sid,
+                        dict(name='stop_visualize_range',
+                             value={},
+                             notify_twin_apps=True,
+                             no_data_logging=False) )
+        # remove the app from all rooms/subscriptions
         for room in self.subscription_sids:
             try:
                 self.remove_subscription(sid, room)
             except:
                 pass
         del self.sid_to_app[sid]
+        # remove the app from twin apps list
         self.app_name_to_sids[app_name].remove(sid)
         if not self.app_name_to_sids[app_name]:
             del self.app_name_to_sids[app_name]
+
 
     def on_subscribe(self, sid, data):
         """
@@ -162,7 +171,8 @@ class BaseServerNamespace(AsyncNamespace):
               no_logging/no_data_logging - skip logging/data logging in subscriber; default: False,
         """
         no_logging = data.get('no_logging', False)
-        no_data_logging = data.get('no_data_logging', False)
+        no_data_logging = data.get('no_data_logging', True)
+        notify_twin_apps = data.get('notify_twin_apps', None)   # overriding rule, if defined
         subscription = data['name']
         cb = data.pop('callback', None)
         if no_logging:
@@ -192,10 +202,14 @@ class BaseServerNamespace(AsyncNamespace):
             except:
                 # self may not be subscribed to this notification: ignore
                 pass
-        # when service is the owner of the first notification, it notifies all twins,
-        # else client always notifies only one of the twins
-        if not ( len(src_sids) == 1 and self.sid_to_app[sid]['type'] == 'service' ):
-            # only one twin app gets notified
+        # when defined, notify_twin_apps manages the twin apps notification rule,
+        # otherwise, if 1st notification, and owner is a service app, then notify all twins,
+        #            else client always notifies only one of the twins
+        if notify_twin_apps is None:
+            if not ( len(src_sids) == 1 and self.sid_to_app[sid]['type'] == 'service' ):
+                # only one twin app gets notified
+                subscription_sids = self.remove_twin_app_sids(subscription_sids, src_sids)
+        elif notify_twin_apps == False:
             subscription_sids = self.remove_twin_app_sids(subscription_sids, src_sids)
 
         async def srv_callback(*arg, **kwarg):

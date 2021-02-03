@@ -714,9 +714,9 @@ export default {
 
         visualize_range_on_zoom_out() {
             let self = this;
-            if ( this.zoom_stack.length <= 1 ) {
-                this.log("Zoom stack is empty.");
-                this.beep();
+            if ( self.zoom_stack.length <= 1 ) {
+                self.log("Zoom stack is empty.");
+                self.beep();
                 return
             }
             // reset traces
@@ -724,6 +724,9 @@ export default {
             self.spec_stack_data = [];
             // remove last zoom and take current zoom into view
             let zoom_stack_item_to_remove = self.zoom_stack.pop();
+            self.stop_visualize_range = {'filename': self.filename,
+                                         'mz_range': zoom_stack_item_to_remove.mz_range,
+                                         't_range': zoom_stack_item_to_remove.t_range};
             let zoom_stack_item_to_restore = self.shallow_copy(self.zoom_stack.slice(-1)[0]);
             // Loop until persistent item found from zoom stack
             while (zoom_stack_item_to_restore.volatile) {
@@ -740,14 +743,14 @@ export default {
             // visualize missing frames and acquisition frames
             let prev_mz = zoom_stack_item_to_remove.mz_range;
             let cur_mz = zoom_stack_item_to_restore.mz_range;
-            let prev_t_filled = this.get_figure_cache_item(prev_mz).t_filled_range;
-            let cur_t_filled = this.get_figure_cache_item(cur_mz).t_filled_range;
+            let prev_t_filled = self.get_figure_cache_item(prev_mz).t_filled_range;
+            let cur_t_filled = self.get_figure_cache_item(cur_mz).t_filled_range;
             // retro-visualization
             let min_t_gap = 1;
             if ( prev_t_filled[1] - cur_t_filled[1] > min_t_gap) {
-                this.visualize_range = {'t_range': [cur_t_filled[1], prev_t_filled[1]],
+                self.visualize_range = {'t_range': [cur_t_filled[1], prev_t_filled[1]],
                                         'mz_range': cur_mz,
-                                        'filename': this.filename};
+                                        'filename': self.filename};
             }
             // remove cache item, if not used anymore
             self.figure_cache_release_ref(zoom_stack_item_to_remove.mz_range);
