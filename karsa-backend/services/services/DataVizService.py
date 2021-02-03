@@ -319,18 +319,19 @@ class DataVizServiceNamespace(BaseClientNamespace):
         visualizer = viz_cache_get(visualizers, data)
         if isinstance(visualizer, SignalVisualizer):
             await visualizer.flush_visualizations(data['cookies'])
-            
-            full_heatmap = merge_heatmap_slices(visualizer.heatmap_slices)
-            full_heatmap_str = convert_to_base64(full_heatmap)
-            image_data = {'filename': visualizer.filename,
-                          'img_filename': 'heatmap.png',
-                          'img': full_heatmap_str
-                          }
-            await self.emit_client_notification(
+            if len(visualizer.heatmap_slices):
+                full_heatmap = merge_heatmap_slices(visualizer.heatmap_slices)
+                full_heatmap_str = convert_to_base64(full_heatmap)
+                image_data = {'filename': visualizer.filename,
+                              'img_filename': 'heatmap.png',
+                              'img': full_heatmap_str
+                              }
+                await self.emit_client_notification(
                                     'image_to_save',
                                     image_data,
                                     cookies=data['cookies'],
-                                    no_data_logging=NO_DATA_LOGGING_DEFAULT)
+                                    no_data_logging=NO_DATA_LOGGING_DEFAULT
+                                    )
             for i, spec_trace in enumerate(visualizer.spec_traces):
                 image_data.update({'img_filename': 'spec%s.png' %i,
                                    'img': spec_trace['img']
@@ -558,7 +559,8 @@ class DataVizServiceClient(BaseServiceClient):
                                  value = dict(filename=heatmap_slice['filename'])
                                  )
                 visualizer = viz_cache_get(visualizers, cache_ref)
-                visualizer.heatmap_slices.append(heatmap_slice)
+                if visualizer:
+                    visualizer.heatmap_slices.append(heatmap_slice)
                 cookies = heatmap_slice.pop('cookies')
                 await self.emit_client_notification(
                                 'heatmap_figure_data',
@@ -571,7 +573,8 @@ class DataVizServiceClient(BaseServiceClient):
                                  value = dict(filename=spec_trace['filename'])
                                  )
                 visualizer = viz_cache_get(visualizers, cache_ref)
-                visualizer.spec_traces.append(spec_trace)
+                if visualizer:
+                    visualizer.spec_traces.append(spec_trace)
                 cookies = spec_trace.pop('cookies')
                 await self.emit_client_notification(
                                 'spec_stack_figure_data',
