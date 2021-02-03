@@ -33,6 +33,7 @@ export default {
     },
     data() {
         return {
+            acquisition_control_active: false,
             // variables for modal / Popup boxes
             is_edit_temperature_ramp_modal_active: false,
             is_excel_clipboard_modal_active: false,
@@ -232,6 +233,19 @@ export default {
             } catch (err) {
                 console.error(err)
             }
+        },
+
+        confirmAcquisitionControl() {
+            this.$buefy.dialog.confirm({
+                title: 'Instrument control',
+                message: `You have requested access to instrument controls.
+                          Please proceed only if you know what you are doing.`,
+                cancelText: 'Cancel',
+                confirmText: 'Proceed',
+                type: 'is-danger',
+                onCancel: () => this.acquisition_control_active = false,
+                onConfirm: () => this.$buefy.toast.open('Instrument control granted')
+            })
         },
         
         display_notification(msg, type = "is-success") {
@@ -517,6 +531,11 @@ export default {
         },  
     },
     watch: {
+        acquisition_control_active: function(new_value) {
+            if (new_value) {
+                this.confirmAcquisitionControl();
+            }
+        },
         acquisition_mode: function(new_value, old_value) {
             if (new_value === old_value) {
                 return false;
@@ -526,6 +545,9 @@ export default {
             }
         },
         acquisition_status: function(new_value, old_value){
+            if (!this.acquisition_control_active) {
+                return
+            }
             if (new_value === old_value) {
                 return false;
             }
@@ -551,6 +573,9 @@ export default {
             }
         },
         acquisition_started: function(new_value, old_value) {
+            if (!this.acquisition_control_active) {
+                return
+            }
             if (new_value === old_value) {
                 return false;
             }
@@ -677,7 +702,6 @@ export default {
             } else {
                 this.target_to_display = null;
             }
-            
         },
         targets: function(new_data, old_data){
             if ( _.isEqual(new_data, old_data) ) {
@@ -687,6 +711,9 @@ export default {
             this.target_table_rows = new_data.rows;
         },
         instrument_status: function(new_value, old_value) {
+            if (!this.acquisition_control_active) {
+                return
+            }
             if ( _.isEqual(new_value, old_value) ) {
                 return false;
             }
@@ -710,7 +737,7 @@ export default {
             }
             this.sample_experiment = new_value.id;
         },
-    }
+    },
 }
 </script>
 

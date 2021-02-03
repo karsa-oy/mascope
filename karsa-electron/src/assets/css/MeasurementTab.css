@@ -209,6 +209,7 @@ a.dropdown-item.is-active, .dropdown .dropdown-menu .has-link a.is-active, butto
     padding-bottom: 10px;
 }
 .acquisition-parameters-h2, .desorption-temprature-ramp-h2{
+    color: white;
     font-size: 1.1rem; 
     border-bottom:1px solid #a7a7a7; 
     padding:5px 0px 5px 0px; 

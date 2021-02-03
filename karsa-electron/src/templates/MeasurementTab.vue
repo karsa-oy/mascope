@@ -332,49 +332,14 @@
             <div class="columns">
                 <!-- Left column -->
                 <div class="column is-one-quarter">
-                    <!-- scenthound status column --> 
-                    <div class="acquisition-parameters" style="margin-bottom:0.4rem;">
-                        <h2 class="acquisition-parameters-h2">
-                            Scenthound status: {{ scenthound_status }}
-                        </h2>
-                    </div>
-                    <!-- End of scenthound status column -->
-
-                    <!-- Acquisiton and write sample button -->
-                    <b-progress
-                        v-bind:value="acquisition_progress"
-                        show-value
-                        format="percent"
-                        :precision="1"
-                        type="is-primary"
-                        size="is-large">
-                    </b-progress>
-                    <!-- <div hidden> -->
-                    <div class="acquisition-parameters"
-                         style="margin-bottom:0.4rem;padding:10px;">
-                        <b-field>
-                            <b-button
-                                v-bind:icon-left="acquisition_status=='starting' || 
-                                                  acquisition_status=='stopping' ||
-                                                  instrument_status=='not_ready' ? 'flattr' : ''"
-                                :type="acquisition_button_type"
-                                :disabled="acquisition_mode=='triggered' ||
-                                           instrument_status=='not_ready'"
-                                @click="on_button_change_acquisition_status()">
-                                {{ acquisition_control_label }}
-                            </b-button>
-                        </b-field>
-                    </div>
-                    <!-- </div> -->
-                    <!-- End of acquisiton and write sample button -->
-
                     <!-- Acquisiton parameters collapsable -->
-<div hidden>
+<!-- <div hidden> -->
                     <section style="width:100%;">
                         <b-collapse
                             class="card"
                             animation="slide"
-                            aria-id="contentIdForA11y3">
+                            aria-id="contentIdForA11y3"
+                            :open.sync="acquisition_control_active">
                             <div
                                 slot="trigger" 
                                 slot-scope="props"
@@ -382,7 +347,7 @@
                                 role="button"
                                 aria-controls="contentIdForA11y3">
                                 <p class="card-header-title">
-                                    Acquisition Parameters
+                                    Acquisition
                                 </p>
                                 <a class="card-header-icon">
                                 <b-icon
@@ -392,6 +357,35 @@
                             </div>
                             <div class="card-content">
                                 <div class="content">
+                                    <div style="text-align:center; margin-top:.4rem; margin-bottom:1rem">
+                                        <h1 class="acquisition-parameters-h1">
+                                            Scenthound status: {{ scenthound_status }}
+                                        </h1>
+                                    </div>
+                                    <div style="margin-left:1rem; margin-right:1rem; margin-bottom:1rem">
+                                        <b-progress
+                                            v-bind:value="acquisition_progress"
+                                            show-value
+                                            format="percent"
+                                            :precision="1"
+                                            type="is-primary"
+                                            size="is-large">
+                                        </b-progress>
+                                    </div>
+                                    <div style="text-align: center">
+                                        <b-button
+                                            v-bind:icon-left="acquisition_status=='starting' || 
+                                                            acquisition_status=='stopping' ||
+                                                            instrument_status=='not_ready' ? 'flattr' : ''"
+                                            :type="acquisition_button_type"
+                                            :disabled="acquisition_mode=='triggered' ||
+                                                    instrument_status=='not_ready'"
+                                            @click="on_button_change_acquisition_status()">
+                                            {{ acquisition_control_label }}
+                                        </b-button>
+                                    </div>
+                                    <div><br></div>
+<div hidden>
                                     <h1 class="acquisition-parameters-h1">
                                         Measurement Mode
                                     </h1>
@@ -547,10 +541,11 @@
                                     </section>
                                     <!-- End of Desorption collapsable -->
                                 </div>
+</div>
                             </div>
                         </b-collapse>
                     </section>
-</div>
+<!-- </div> -->
                     <!-- End of  Acquisition parameters collapsable -->
 
                     <!-- Samples datatable collapsable -->
@@ -587,7 +582,8 @@
                                             id="samples-datatable"
                                             :columns="sample_table_cols"
                                             :data="sample_table_rows"
-                                            :checkable="acquisition_status=='not_running' ? true : false"
+                                            :checkable="(!acquisition_control_active ||
+                                                         acquisition_status=='not_running') ? true : false"
                                             :header-checkable="false"
                                             :checked-rows.sync="sample_table_checked_rows">
                                         </b-table>
@@ -607,7 +603,9 @@
                                             outlined
                                             inverted
                                             :disabled="(h5_streamer_status=='ready' && 
-                                                        acquisition_status=='not_running') ? false : true">
+                                                        (!acquisition_control_active ||
+                                                         acquisition_status=='not_running')
+                                                        ) ? false : true">
                                             Import h5 file
                                         </b-button>
                                     </div>
