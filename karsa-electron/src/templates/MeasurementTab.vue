@@ -331,10 +331,10 @@
         <section class="main-content">
             <div class="columns">
                 <!-- Left column -->
-                <div class="column is-one-quarter">
+                <div class="column">
                     <!-- Acquisiton parameters collapsable -->
 <!-- <div hidden> -->
-                    <section style="width:100%;">
+                    <section>
                         <b-collapse
                             class="card"
                             animation="slide"
@@ -549,7 +549,7 @@
                     <!-- End of  Acquisition parameters collapsable -->
 
                     <!-- Samples datatable collapsable -->
-                    <section style="width:100%;">
+                    <section>
                         <b-collapse class="card" animation="slide" aria-id="contentIdForA11y3">
                             <div
                                 slot="trigger" 
@@ -617,7 +617,7 @@
 
 <!-- <div hidden> -->
                     <!-- Targetlist datatable collapable -->
-                    <section style="width:100%;">
+                    <section>
                         <b-collapse class="card" animation="slide" aria-id="contentIdForA11y3">
                             <div
                                 slot="trigger" 
@@ -665,11 +665,6 @@
                 </div>
                 <!-- End of left column -->
 
-                <!-- Right side content -->
-                <div class="column is-three-quarters">
-                    <SampleView></SampleView>
-                </div>
-                <!-- End of Right side content -->
             </div>
         </section>
         <!-- End of Main content -->

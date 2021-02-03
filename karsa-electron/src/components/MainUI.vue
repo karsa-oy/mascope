@@ -1,45 +1,37 @@
 <template>
-    <!-- <div id="app"> -->
     <div>
-        <div class="columns" id="header-container">
-            <div class="column">
-                <div class="head">
-                    <nav class="level">
-                        <div class="level-left">
-                            <div class="level-item" id="logo">
-                                <h3 class="subtitle is-3">Karsa</h3>                        
-                            </div>
-                        </div>
-                        <!-- Right side -->
-                        <div class="level-right">
-                            <!-- <p class="level-item"><strong>All</strong></p>
-                            <p class="level-item"><a>Published</a></p>
-                            <p class="level-item"><a>Drafts</a></p>
-                            <p class="level-item"><a>Deleted</a></p>
-                            <p class="level-item"><a class="button is-success">New</a></p> -->
-                        </div>
-                    </nav>
+        <b-tabs
+            class="tabs-main"
+            v-model="active_tab"
+            :animated="false"
+            type="is-boxed main-tab">
+        <!-- Tabs -->
+            <!-- Start tab -->
+            <b-tab-item
+                icon=""
+                label="Start">
+                <WorkflowTab></WorkflowTab>
+            </b-tab-item>
+            <!-- Experiment tab -->
+            <b-tab-item
+                icon=""
+                :label="this.experiment_selected.id"
+                :visible="this.experiment_selected.id !== ''">
+                <div class="columns">
+                    <!-- Left column -->
+                    <div class="column is-one-quarter" style="padding-left:2rem">
+                        <MeasurementTab></MeasurementTab>
+                    </div>
+                    <!-- End of left column -->
+                    <!-- Right side content -->
+                    <div class="column is-three-quarters" style="padding-right:2rem">
+                        <SampleView></SampleView>
+                    </div>
+                    <!-- End of Right side content -->
                 </div>
-            </div>
-        </div>
-
-        <div class="columns">
-            <div class="column menubar" is-full>
-            <b-tabs class="tabs-main" v-model="active_tab" :animated="false" type="is-boxed main-tab">
-                <b-tab-item
-                    icon=""
-                    label="Start">
-                    <WorkflowTab></WorkflowTab>
-                </b-tab-item>
-                <b-tab-item
-                    icon=""
-                    :label="this.experiment_selected.id"
-                    :visible="this.experiment_selected.id !== ''">
-                    <MeasurementTab></MeasurementTab>
-                </b-tab-item>
-            </b-tabs>
-            </div>
-        </div>
+            </b-tab-item>
+        <!-- End of tabs -->
+        </b-tabs>
     </div>
 </template>
 
@@ -47,6 +39,7 @@
 import { mapState } from 'vuex';
 import WorkflowTab from "./WorkflowTab.vue";
 import MeasurementTab from "./MeasurementTab.vue";
+import SampleView from "./SampleView.vue"
 import store from '../store';
 
 var remote = require('electron').remote;
@@ -59,6 +52,7 @@ export default {
     components: {
         WorkflowTab,
         MeasurementTab,
+        SampleView,
     },
     data() {
         return {
