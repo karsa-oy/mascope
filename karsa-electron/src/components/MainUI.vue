@@ -10,7 +10,7 @@
             <b-tab-item
                 icon=""
                 label="Start">
-                <WorkflowTab></WorkflowTab>
+                <StartTab></StartTab>
             </b-tab-item>
             <!-- Experiment tab -->
             <b-tab-item
@@ -20,7 +20,9 @@
                 <div class="columns">
                     <!-- Left column -->
                     <div class="column is-one-quarter" style="padding-left:2rem">
-                        <MeasurementTab></MeasurementTab>
+                        <TOFControl></TOFControl>
+                        <SampleBrowser></SampleBrowser>
+                        <TargetBrowser></TargetBrowser>
                     </div>
                     <!-- End of left column -->
                     <!-- Right side content -->
@@ -37,9 +39,11 @@
 
 <script type="text/javascript">
 import { mapState } from 'vuex';
-import WorkflowTab from "./WorkflowTab.vue";
-import MeasurementTab from "./MeasurementTab.vue";
+import StartTab from "./StartTab.vue";
+import TargetBrowser from "./TargetBrowser.vue";
 import SampleView from "./SampleView.vue"
+import SampleBrowser from "./SampleBrowser.vue"
+import TOFControl from "./TOFControl.vue"
 import store from '../store';
 
 var remote = require('electron').remote;
@@ -50,9 +54,11 @@ export default {
     name: "MainUi", //used as app_name - keep it unique
     store,
     components: {
-        WorkflowTab,
-        MeasurementTab,
+        StartTab,
+        TargetBrowser,
+        SampleBrowser,
         SampleView,
+        TOFControl,
     },
     data() {
         return {

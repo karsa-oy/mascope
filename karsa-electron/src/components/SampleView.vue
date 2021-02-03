@@ -10,9 +10,6 @@
                     <!-- Heatmap section -->
                     <section class="heatmap-section">
                         <div class="column datashader-heatmap">
-                            <div class="loading-heatmap">
-                                <!-- placeholder for headmap loading div -->
-                            </div>
                             <div id="heatmap-figure"></div>
                         </div>                                    
                     </section>
