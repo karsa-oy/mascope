@@ -88,22 +88,17 @@ export default {
     props: {
     },
     computed: {
-        ...mapState(['acquisition_status',
-                     'data_source_path',
+        ...mapState(['acquisition_control_active',
+                     'acquisition_started',
+                     'acquisition_status',
+                     'figure_ranges',
                      'heatmap_figure_data',
                      'sample_to_load',
                      'spec_stack_figure_data',
                      'target_to_display',
                      'timeseries_figure_data',
+                     'tps_parameters',
                      ]),
-        figure_ranges: {
-            get() {
-                return this.$store.state.figure_ranges;
-            },
-            set(value) {
-                this.$store.commit('figure_ranges', value);
-            }
-        },
         visualize_range: {
             get() {
                 return this.$store.state.visualize_range;
@@ -127,14 +122,6 @@ export default {
             set(value) {
                 let new_value = {'tps_parameters_selected': value, 'figure_ranges': this.figure_ranges};
                 this.$store.commit('tps_parameters_selected', new_value);
-            }
-        },
-        tps_parameters: {
-            get() {
-                return this.$store.state.tps_parameters;
-            },
-            set(value) {
-                this.$store.commit('tps_parameters', value);
             }
         },
     },
@@ -581,7 +568,6 @@ export default {
             );
         },
 
-
         async _on_timeseries_figure_data(json_data) {
             var self = this;
             if ( _.isEmpty(json_data) ) {
@@ -875,12 +861,17 @@ export default {
             cache_item.ref_count--;
             if ( cache_item.ref_count <= 0 )
                 delete this.figure_cache[_mz_range];
-        }
+        },
 
     },
 
     watch: {
         acquisition_status: function(new_value, old_value) {
+            // TODO: quick&dirty fix to dismiss acquisition notifications
+            if (!this.acquisition_control_active) {
+                return
+            }
+            //
             if ( _.isEqual(new_value, old_value) ) {
                 return false;
             }
@@ -890,15 +881,37 @@ export default {
             }
         },
         figure_ranges: function(new_value, old_value) {
+            // TODO: quick&dirty fix to dismiss acquisition notifications
+            if (new_value.filename !== this.filename &&
+                !this.acquisition_control_active) {
+                console.log("figure ranges dismissed: ", new_value.filename, this.filename);
+                return
+            }
+            //
             this.on_figure_ranges(new_value, old_value);
         },
         heatmap_figure_data: function(new_value) {
+            // TODO: quick&dirty fix to dismiss acquisition notifications
+            if (new_value.filename !== this.filename) {
+                return
+            }
+            //
             this.on_heatmap_figure_data(new_value);
         },
         timeseries_figure_data: function(new_value) {
+            // TODO: quick&dirty fix to dismiss acquisition notifications
+            if (new_value.filename !== this.filename) {
+                return
+            }
+            //
             this.on_timeseries_figure_data(new_value);
         },
         spec_stack_figure_data: function(new_value) {
+            // TODO: quick&dirty fix to dismiss acquisition notifications
+            if (new_value.filename !== this.filename) {
+                return
+            }
+            //
             this.on_spec_stack_figure_data(new_value);
         },
         sample_to_load: function(new_value, old_value) {
@@ -920,13 +933,6 @@ export default {
                 't_range': null,
                 'mz_range': null
                 };
-        },
-        data_source_path: function(new_value, old_value) {
-            if ( _.isEqual(new_value, old_value) ) {
-                return false;
-            }
-            this.reset_figure_cache();
-            this.reset_figures();
         },
         target_to_display: function(new_value, old_value) {
             if ( _.isEqual(new_value, old_value) || _.isEmpty(this.filename) ) {

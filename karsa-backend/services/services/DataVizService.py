@@ -333,7 +333,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                     no_data_logging=NO_DATA_LOGGING_DEFAULT
                                     )
             for i, spec_trace in enumerate(visualizer.spec_traces):
-                image_data.update({'img_filename': 'spec%s.png' %i,
+                image_data.update({'img_filename': 'spec%.2f.png' %spec_trace.get('t_range')[0],
                                    'img': spec_trace['img']
                                    })
                 await self.emit_client_notification(
@@ -410,7 +410,8 @@ class SignalVisualizer(ExtendableDataArray):
                          'y': y
                          }
                         )
-        timeseries_data = {'traces': [ts_trace],
+        timeseries_data = {'filename': self.filename,
+                           'traces': [ts_trace],
                            'mz_range': mz_range,
                            }
         await client.emit_client_notification('timeseries_figure_data',

@@ -507,9 +507,6 @@ export default {
             }
         },
         acquisition_status: function(new_value, old_value){
-            if (!this.acquisition_control_active) {
-                return
-            }
             if (new_value === old_value) {
                 return false;
             }

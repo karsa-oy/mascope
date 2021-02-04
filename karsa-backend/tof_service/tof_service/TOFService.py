@@ -16,8 +16,7 @@ from karsatof.lib.TofDaq import (
                     )
 
 NO_DATA_LOGGING_DEFAULT = True
-cookies = None
-kacq = None
+# cookies = None
 
 class TOFServiceNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for
@@ -34,31 +33,13 @@ class TOFServiceNamespace(BaseClientNamespace):
         )
 
     async def on_acquisition_status(self, data):
-        global cookies
-        cookies = data['cookies']
+        # global cookies
+        # cookies = data['cookies'] #TODO: does not work like this
         self.log(data['value'])
         if data['value'] == "starting":
             TwStartAcquisition()
         elif data['value'] == "stopping":
             TwStopAcquisition()
-
-    async def on_data_write_path(self, new_path):
-        """Change TofDaq Recorder write path
-
-        Parameters
-        ----------
-        new_path : str or bytes
-            New write path
-        """
-
-        global kacq
-        self.log(new_path)
-        try:
-            if type(new_path) == str:
-                new_path = new_path.encode()
-            kacq.set_save_path(new_path)
-        except Exception as e:
-            self.log(f'Failed: {e}')
 
     
 class TOFServiceClient(BaseServiceClient):
@@ -86,8 +67,6 @@ class TOFServiceClient(BaseServiceClient):
 
 
     async def init_service(self):
-        global kacq
-
         while True:
             # TODO: TBR python-socketio BadNamespaceError connection bug
             from socketio.exceptions import BadNamespaceError
@@ -99,7 +78,7 @@ class TOFServiceClient(BaseServiceClient):
             except BadNamespaceError:
                 await self.sio.sleep(.1)
                 continue
-        kacq = self.kacq = await self.initialize_kacquisition()
+        self.kacq = await self.initialize_kacquisition()
         await self.emit_client_notification('instrument_status',
                                     'ready',
                                     no_data_logging=False)
@@ -117,7 +96,7 @@ class TOFServiceClient(BaseServiceClient):
                 break
             await self.emit_client_notification('acquisition_status',
                                         'running',
-                                        cookies=cookies,
+                                        # cookies=cookies, #TODO: cookies not properly defined
                                         no_data_logging=False
                                         )
 
@@ -134,7 +113,7 @@ class TOFServiceClient(BaseServiceClient):
                             )
             await self.emit_client_notification('acquisition_started', 
                                         {'filename': filename_base},
-                                        cookies=cookies,
+                                        # cookies=cookies,
                                         no_data_logging=False
                                         )
             await self.emit_client_notification('acquisition_coordinates',
@@ -143,7 +122,7 @@ class TOFServiceClient(BaseServiceClient):
                                         'time': t.tobytes(),
                                         # 't_range': [ float(t[0]), float(t[-1]) ]
                                         },
-                                        cookies=cookies,
+                                        # cookies=cookies,
                                         no_data_logging=NO_DATA_LOGGING_DEFAULT
                                         )
             tps_info = self.kacq.tps_info
@@ -152,7 +131,7 @@ class TOFServiceClient(BaseServiceClient):
                                          'tps_info': tps_info,
                                          # 'time': t.tobytes()
                                         },
-                                        cookies=cookies,
+                                        # cookies=cookies,
                                         no_data_logging=NO_DATA_LOGGING_DEFAULT
                                         )
             # Acquisition loop
@@ -174,7 +153,7 @@ class TOFServiceClient(BaseServiceClient):
                                                 't': ti,
                                                 'spec': spec.tobytes(),
                                                 },
-                                                cookies=cookies,
+                                                # cookies=cookies,
                                                 no_data_logging=NO_DATA_LOGGING_DEFAULT
                                                 )
                     progress = ((speci+1) / self.kacq.nspectra) * 100. # [%]
@@ -182,7 +161,7 @@ class TOFServiceClient(BaseServiceClient):
                                                 {'sync': speci,
                                                 'progress': progress,
                                                 },
-                                                cookies=cookies,
+                                                # cookies=cookies,
                                                 no_data_logging=NO_DATA_LOGGING_DEFAULT
                                                 )
                     # TPS data
@@ -194,7 +173,7 @@ class TOFServiceClient(BaseServiceClient):
                                             't': ti,
                                             'tps_data': tps_data.tobytes(),
                                             },
-                                            cookies=cookies,
+                                            # cookies=cookies,
                                             no_data_logging=NO_DATA_LOGGING_DEFAULT
                                             )
                 # Got poison pill
@@ -204,17 +183,17 @@ class TOFServiceClient(BaseServiceClient):
                                                 {'filename': filename_base,
                                                  'progress': progress,
                                                 },
-                                                cookies=cookies,
+                                                # cookies=cookies,
                                                 no_data_logging=NO_DATA_LOGGING_DEFAULT
                                                 )
                     await self.emit_client_notification('acquisition_finished', 
                                                 {'filename': filename_base},
-                                                cookies=cookies,
+                                                # cookies=cookies,
                                                 no_data_logging=False
                                                 )
                     await self.emit_client_notification('acquisition_status',
                                                 'not_running',
-                                                cookies=cookies,
+                                                # cookies=cookies,
                                                 no_data_logging=False
                                                 )
                     break
