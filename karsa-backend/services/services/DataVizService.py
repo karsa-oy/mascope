@@ -112,9 +112,11 @@ class DataVizServiceNamespace(BaseClientNamespace):
              'acquisition_finished',
              'data_stream_coordinates',
              'data_stream_finished',
+             'heatmap_image',
              'loaded_spectrum',
              'loaded_tps_data',
              'service_state',
+             'spec_trace_image',
              'stop_visualize_range',
              'target_to_load',
              'tps_data_stream_coordinates',
@@ -174,6 +176,26 @@ class DataVizServiceNamespace(BaseClientNamespace):
     # ---------------------------------
 
     # ========== FileService notifications ==========
+    async def on_heatmap_image(self, data):
+        value = data['value']
+        cookies = data['cookies']
+        await self.emit_client_notification(
+                                'heatmap_figure_data',
+                                value,
+                                cookies=cookies,
+                                no_data_logging=True
+                                )
+    
+    async def on_spec_trace_image(self, data):
+        value = data['value']
+        cookies = data['cookies']
+        await self.emit_client_notification(
+                        'spec_stack_figure_data',
+                        value,
+                        cookies=cookies,
+                        no_data_logging=True
+                        )
+
     async def on_data_stream_coordinates(self, data):
         set_figure_ranges = data['value'].get('set_figure_ranges', False)
         data['value']['set_figure_range'] = set_figure_ranges
@@ -232,7 +254,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                  'mz_range': mz_range,
                                  't_range': t_range,
                                  },
-                                cookies=data['cookies'],
+                                # cookies=data['cookies'], # TODO: ? filtered in the front-end
                                 no_data_logging=NO_DATA_LOGGING_DEFAULT
                                 )
 
@@ -254,6 +276,35 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                       'time'
                                       )
         await visualizer.extend_visualizations(data['cookies'])
+
+    async def on_acquisition_finished(self, data):
+        global visualizers
+        #visualizer = viz_cache_pop(visualizers, data)
+        visualizer = viz_cache_get(visualizers, data)
+        if isinstance(visualizer, SignalVisualizer):
+            await visualizer.flush_visualizations(data['cookies'])
+            if len(visualizer.heatmap_slices):
+                full_heatmap = merge_heatmap_slices(visualizer.heatmap_slices)
+                full_heatmap_str = convert_to_base64(full_heatmap)
+                image_data = {'filename': visualizer.filename,
+                              'img_filename': 'heatmap.png',
+                              'img': full_heatmap_str
+                              }
+                await self.emit_client_notification(
+                                    'image_to_save',
+                                    image_data,
+                                    cookies=data['cookies'],
+                                    no_data_logging=NO_DATA_LOGGING_DEFAULT
+                                    )
+            for i, spec_trace in enumerate(visualizer.spec_traces):
+                image_data.update({'img_filename': 'spec%.2f.png' %spec_trace.get('t_range')[0],
+                                   'img': spec_trace['img']
+                                   })
+                await self.emit_client_notification(
+                                    'image_to_save',
+                                    image_data,
+                                    cookies=data['cookies'],
+                                    no_data_logging=NO_DATA_LOGGING_DEFAULT)
 
 
     async def on_tps_parameter_info(self, data):
@@ -311,36 +362,6 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                       'time',
                                       )
         await visualizer.extend_visualizations(data['cookies'])
-
-
-    async def on_acquisition_finished(self, data):
-        global visualizers
-        #visualizer = viz_cache_pop(visualizers, data)
-        visualizer = viz_cache_get(visualizers, data)
-        if isinstance(visualizer, SignalVisualizer):
-            await visualizer.flush_visualizations(data['cookies'])
-            if len(visualizer.heatmap_slices):
-                full_heatmap = merge_heatmap_slices(visualizer.heatmap_slices)
-                full_heatmap_str = convert_to_base64(full_heatmap)
-                image_data = {'filename': visualizer.filename,
-                              'img_filename': 'heatmap.png',
-                              'img': full_heatmap_str
-                              }
-                await self.emit_client_notification(
-                                    'image_to_save',
-                                    image_data,
-                                    cookies=data['cookies'],
-                                    no_data_logging=NO_DATA_LOGGING_DEFAULT
-                                    )
-            for i, spec_trace in enumerate(visualizer.spec_traces):
-                image_data.update({'img_filename': 'spec%.2f.png' %spec_trace.get('t_range')[0],
-                                   'img': spec_trace['img']
-                                   })
-                await self.emit_client_notification(
-                                    'image_to_save',
-                                    image_data,
-                                    cookies=data['cookies'],
-                                    no_data_logging=NO_DATA_LOGGING_DEFAULT)
             
     # ----------------------------------------------
 
@@ -416,7 +437,7 @@ class SignalVisualizer(ExtendableDataArray):
                            }
         await client.emit_client_notification('timeseries_figure_data',
                                        timeseries_data,
-                                       cookies=cookies,
+                                    #    cookies=cookies, # TODO: ? filtered in the front-end
                                        no_data_logging=NO_DATA_LOGGING_DEFAULT
                                        )
         await self.reset_array()
@@ -566,7 +587,7 @@ class DataVizServiceClient(BaseServiceClient):
                 await self.emit_client_notification(
                                 'heatmap_figure_data',
                                 heatmap_slice,
-                                cookies=cookies,
+                                # cookies=cookies, # TODO: ? filtered in the front-end
                                 no_data_logging=True
                                 )
             if spec_trace is not None:
@@ -580,7 +601,7 @@ class DataVizServiceClient(BaseServiceClient):
                 await self.emit_client_notification(
                                 'spec_stack_figure_data',
                                 spec_trace,
-                                cookies=cookies,
+                                # cookies=cookies, # TODO: ? filtered in the front-end
                                 no_data_logging=True
                                 )
 

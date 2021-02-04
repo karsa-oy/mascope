@@ -14,17 +14,19 @@ Created on Thu May  7 12:43:13 2020
 import os
 import subprocess
 import asyncio
+import fnmatch
 import xarray
 import zarr
 import numpy as np
 import dask.array as da
 from multiprocessing import Lock
 from collections import namedtuple
+from PIL import Image
 
 from karsalib import BaseClientNamespace, BaseServiceClient, parse_cmd_args
 from karsatof.kcollector import ExtendableDataArray
 from karsatof.kdatapool import DataPool
-from karsatof.kimage import convert_base64_to_img
+from karsatof.kimage import (convert_base64_to_img, convert_to_base64)
 
 
 NO_DATA_LOGGING_DEFAULT = True
@@ -142,9 +144,14 @@ class FileServiceNamespace(BaseClientNamespace):
         global signal_cache
 
         value = data['value']
+        cookies = data['cookies']
+
         filename = value.get('filename', None)
         if filename is None:
             raise ValueError("Received data_request without filename")
+
+        mz_range = value.get('mz_range', None)
+        t_range = value.get('t_range', None)
         
         signal_array = cache_get(signal_cache, data)
         if not signal_array:
@@ -155,8 +162,6 @@ class FileServiceNamespace(BaseClientNamespace):
             signal_array = signal_array.data_array.to_dataset()
 
         set_figure_ranges = False
-        mz_range = value.get('mz_range', None)
-        t_range = value.get('t_range', None)
         if mz_range is None:
             mz0 = float( signal_array.mz[0] )
             mz1 = float( signal_array.mz[-1] )
@@ -175,7 +180,6 @@ class FileServiceNamespace(BaseClientNamespace):
         mz = signal.mz.values.astype(np.float32)
         t = signal.time.values.astype(np.float32)
 
-        cookies = data['cookies']
         await self.emit_client_notification(
                             'data_stream_coordinates',
                             {'filename': filename,
@@ -188,35 +192,68 @@ class FileServiceNamespace(BaseClientNamespace):
                             cookies=cookies,
                             no_data_logging=NO_DATA_LOGGING_DEFAULT
                             )
-        self.speci = 0
-        for i, spec_array in enumerate(signal.transpose()):
-            if data_request_stopped(data):
-                break
-            while i - self.speci > 5:
-                await asyncio.sleep(.15)
-            spec = spec_array.values
-            ti = float( spec_array.time )
-            await self.emit_client_notification('loaded_spectrum',
-                                           {'filename': filename,
-                                            'i': i,
-                                            'spec': spec.tobytes(),
-                                            'mz_range': mz_range,
-                                            't_range': t_range,
-                                            't': ti,
-                                            },
-                                           cookies=cookies,
-                                           no_data_logging=NO_DATA_LOGGING_DEFAULT,
-                                           callback="speci_callback"
-                                           )
+        
+        stream_data = True
+        if set_figure_ranges:
+            # Full range request, try to load images from file and send to DataViz
+            try:
+                heatmap_img = load_heatmap_image(filename)
+                spec_imgs = load_spec_trace_images(filename)
+                await self.emit_client_notification('heatmap_image',
+                                                    {'filename': filename,
+                                                     'mz_range': mz_range,
+                                                     't_range': t_range,
+                                                     'img': heatmap_img
+                                                     },
+                                                    cookies=cookies,
+                                                    no_data_logging=NO_DATA_LOGGING_DEFAULT
+                                                    )
+                for t0, spec_img in spec_imgs:
+                    await self.emit_client_notification('spec_trace_image',
+                                                        {'filename': filename,
+                                                         'mz_range': mz_range,
+                                                         't_range': [t0, t0], # t1 does not matter
+                                                         'img': spec_img
+                                                         },
+                                                        cookies=cookies,
+                                                        no_data_logging=NO_DATA_LOGGING_DEFAULT
+                                                        )
+                # No need to send data to DataViz
+                stream_data = False
+            except Exception as e:
+                print(e)
+
+        if stream_data:
+            self.speci = 0
+            for i, spec_array in enumerate(signal.transpose()):
+                if data_request_stopped(data):
+                    break
+                while i - self.speci > 5:
+                    await asyncio.sleep(.15)
+                spec = spec_array.values
+                ti = float( spec_array.time )
+                await self.emit_client_notification('loaded_spectrum',
+                                                    {'filename': filename,
+                                                     'i': i,
+                                                     'spec': spec.tobytes(),
+                                                     'mz_range': mz_range,
+                                                     't_range': t_range,
+                                                     't': ti,
+                                                     },
+                                                    cookies=cookies,
+                                                    no_data_logging=NO_DATA_LOGGING_DEFAULT,
+                                                    callback="speci_callback"
+                                                    )
+
         cache_pop(signal_cache, data)
         await self.emit_client_notification('data_stream_finished',
-                                       {'filename': filename,
-                                        'mz_range': mz_range,
-                                        't_range': t_range,
-                                        },
-                                       cookies=cookies,
-                                       no_data_logging=False
-                                       )
+                                            {'filename': filename,
+                                             'mz_range': mz_range,
+                                             't_range': t_range,
+                                             },
+                                            cookies=cookies,
+                                            no_data_logging=False
+                                            )
 
     def speci_callback(self, n):
         self.speci = n
@@ -573,6 +610,28 @@ def base_to_zarr_filename(base_filename, variable):
     filepath = os.path.join(data_path, base_filename)
     zarr_filename = variable + os.extsep + 'zarr'
     return os.path.join(filepath, zarr_filename)
+
+def load_heatmap_image(base_filename):
+    global data_path
+    filepath = os.path.join(data_path, base_filename)
+    heatmap_filename = 'heatmap.png'
+    heatmap_file = os.path.join(filepath, heatmap_filename)
+    img = Image.open(heatmap_file)
+    img_str = convert_to_base64(img)
+    return img_str
+
+def load_spec_trace_images(base_filename):
+    global data_path
+    filepath = os.path.join(data_path, base_filename)
+    all_files = next( os.walk(filepath) )[2]
+    imgs = []
+    for spec_filename in fnmatch.filter(all_files, 'spec*.png'):
+        spec_file = os.path.join(filepath, spec_filename)
+        img = Image.open(spec_file)
+        img_str = convert_to_base64(img)
+        t0 = float( spec_file.split('spec')[1].split('.png')[0] )
+        imgs.append( (t0, img_str) )
+    return imgs
 
 def open_mfzarr(path, mode='r', concat_dim='time'):    
     if not os.path.exists(path):
