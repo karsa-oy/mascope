@@ -296,12 +296,20 @@ export default {
     name: "TOFControl",
     components: {
     },
-    props: {
-    },
+    props: [
+    ],
     computed: {
         ...mapState([
             'instrument_status',
         ]),
+        acquisition_control_active: {
+            get() {
+                return this.$store.state.acquisition_control_active;
+            },
+            set(value) {
+                this.$store.commit('acquisition_control_active', value);
+            }
+        },
         acquisition_status: {
             get() {
                 return this.$store.state.acquisition_status;
@@ -327,7 +335,6 @@ export default {
             is_edit_temperature_ramp_modal_active: false,
             // variable for acquisition button style  and progress bar
             acquisition_button_type: "is-primary",
-            acquisition_control_active: false,
             // variables for desoprtion collapsable
             acquisition_mode: "continuous",
             time: "",

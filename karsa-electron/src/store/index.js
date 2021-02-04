@@ -6,6 +6,7 @@ Vue.use(Vuex)
 export default new Vuex.Store({
 	state: {
 		active_tab: 0,
+		acquisition_control_active: false,
 		acquisition_started: {},
 		acquisition_status: "not_running",		// not_running/starting/running/stopping
 		acquisition_progress: {"sync": '', "progress": 0},
@@ -41,6 +42,9 @@ export default new Vuex.Store({
 	mutations: {
 		active_tab(state, payload) {
 			state.active_tab = payload;
+		},
+		acquisition_control_active(state, payload) {
+			state.acquisition_control_active = payload;
 		},
 		acquisition_started(state, payload) {
 			state.acquisition_started = payload;

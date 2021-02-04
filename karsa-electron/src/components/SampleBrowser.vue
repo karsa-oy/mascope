@@ -253,8 +253,8 @@
                                     id="samples-datatable"
                                     :columns="sample_table_cols"
                                     :data="sample_table_rows"
-                                    :checkable="(//!acquisition_control_active ||
-                                                    acquisition_status=='not_running') ? true : false"
+                                    :checkable="(!acquisition_control_active ||
+                                                 acquisition_status=='not_running') ? true : false"
                                     :header-checkable="false"
                                     :checked-rows.sync="sample_table_checked_rows">
                                 </b-table>
@@ -274,8 +274,8 @@
                                     outlined
                                     inverted
                                     :disabled="(h5_streamer_status=='ready' && 
-                                                (//!acquisition_control_active ||
-                                                    acquisition_status=='not_running')
+                                                (!acquisition_control_active ||
+                                                 acquisition_status=='not_running')
                                                 ) ? false : true">
                                     Import h5 file
                                 </b-button>
@@ -312,6 +312,7 @@ export default {
     },
     computed: {
         ...mapState([
+            'acquisition_control_active',
             'acquisition_started',
             'acquisition_status',
             'experiments',
@@ -480,9 +481,9 @@ export default {
     },
     watch: {
         acquisition_started: function(new_value, old_value) {
-            // if (!this.acquisition_control_active) {
-            //     return
-            // }
+            if (!this.acquisition_control_active) {
+                return
+            }
             if (new_value === old_value) {
                 return false;
             }

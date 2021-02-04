@@ -352,6 +352,7 @@ export default {
                 this.log("Right click event....");
                 return false;
             }, false);
+            // ----- End of spec stack -----
 
             // ----- Timeseries figure -----
             Plotly.newPlot("timeseries-figure",
@@ -359,6 +360,7 @@ export default {
                         self.timeseries_layout,
                         self.figure_config
                         );
+            // ----- End of timeseries figure -----
         },
 
 
