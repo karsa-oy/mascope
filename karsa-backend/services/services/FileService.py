@@ -22,6 +22,7 @@ import dask.array as da
 from multiprocessing import Lock
 from collections import namedtuple
 from PIL import Image
+from copy import deepcopy
 
 from karsalib import BaseClientNamespace, BaseServiceClient, parse_cmd_args
 from karsatof.kcollector import ExtendableDataArray
@@ -260,6 +261,17 @@ class FileServiceNamespace(BaseClientNamespace):
 
 
     async def on_stop_data_request(self, data):
+        d = deepcopy(data)
+        ranges = d['value'].pop('ranges', None)
+        if not ranges:
+            await self.kill_cache(data)
+            return
+        for r in ranges:
+            d['value']['mz_range'] = r[0]
+            d['value']['t_range'] = r[1]
+            await self.kill_cache(d)
+
+    async def kill_cache(self, data):
         global signal_cache
         global tps_cache
         signal_array = cache_pop(signal_cache, data)

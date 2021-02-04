@@ -709,12 +709,15 @@ export default {
             self.spec_stack_data = [];
             // remove last zoom and take current zoom into view
             let zoom_stack_item_to_remove = self.zoom_stack.pop();
-            self.stop_visualize_range = {'filename': self.filename,
-                                         'mz_range': zoom_stack_item_to_remove.mz_range,
-                                         't_range': zoom_stack_item_to_remove.t_range};
             let zoom_stack_item_to_restore = self.shallow_copy(self.zoom_stack.slice(-1)[0]);
+            // collect ranges for stop_visualize_range call
+            let ranges = [];
+            ranges.push([self.shallow_copy(zoom_stack_item_to_remove.mz_range),
+                         self.shallow_copy(zoom_stack_item_to_remove.t_range)]);
             // Loop until persistent item found from zoom stack
             while (zoom_stack_item_to_restore.volatile) {
+                ranges.push([self.shallow_copy(zoom_stack_item_to_restore.mz_range),
+                             self.shallow_copy(zoom_stack_item_to_restore.t_range)]);
                 // Release reference of popped item
                 self.figure_cache_release_ref(zoom_stack_item_to_restore.mz_range);
                 // Get next item from stack
@@ -724,6 +727,8 @@ export default {
             self.log("Zoom stack frames left:", self.zoom_stack.length - 1);
             if ( _.isUndefined(zoom_stack_item_to_remove) || _.isUndefined(zoom_stack_item_to_restore) )
                 return;
+            self.stop_visualize_range = {'filename': self.filename,
+                                         'ranges': ranges};
             self.update_figures(zoom_stack_item_to_restore);
             // visualize missing frames and acquisition frames
             let prev_mz = zoom_stack_item_to_remove.mz_range;

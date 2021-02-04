@@ -140,6 +140,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                             cookies=data['cookies'],
                                             no_data_logging=NO_DATA_LOGGING_DEFAULT
                                             )
+
     
     async def on_stop_visualize_range(self, data):
         """ Stop visualization, if still running; use filename and ranges as input:
@@ -150,12 +151,24 @@ class DataVizServiceNamespace(BaseClientNamespace):
         Parameters
         ----------
         data : dict(name, value, cookies, no_logging, no_data_logging...)
-               value: JSON data from UI, keys: 'filename', 't_range', 'mz_range'
+               value: JSON data from UI,
+                      keys: 'filename', 't_range', 'mz_range';  or
+                      keys: 'filename', 'ranges';
         """
         await self.emit_client_notification('stop_data_request', data['value'], cookies=data['cookies'], no_data_logging=NO_DATA_LOGGING_DEFAULT)
+        d = deepcopy(data)
+        ranges = d['value'].pop('ranges', None)
+        if not ranges:
+            await self.kill_cache(data)
+            return
+        for r in ranges:
+            d['value']['mz_range'] = r[0]
+            d['value']['t_range'] = r[1]
+            await self.kill_cache(d)
+
+    async def kill_cache(self, data):
         global visualizers
         global tps_visualizers
-
         visualizer = viz_cache_pop(visualizers, data)
         if isinstance(visualizer, SignalVisualizer):
             await visualizer.flush_visualizations(data['cookies'])
