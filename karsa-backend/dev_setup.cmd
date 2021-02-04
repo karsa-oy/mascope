@@ -2,12 +2,12 @@
 setlocal EnableDelayedExpansion
 
 REM   Backend services development setup (created in virtual environment);
-REM   Prerequisites:  python version > 3.6 and virtualenv installed;
+REM   Prerequisites:  python version >3.6 and <3.9 installed;
 
 echo ========================
 echo   1. Create and activate virtual environment:
 echo ========================
-  virtualenv .venv || goto :error
+  python -m venv .venv || goto :error
   call .venv\Scripts\activate || goto :error
 
 echo ========================
