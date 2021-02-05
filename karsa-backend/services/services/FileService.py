@@ -178,6 +178,9 @@ class FileServiceNamespace(BaseClientNamespace):
                     mz=slice(*mz_range),
                     time=slice(*t_range)
                     )
+        if signal.shape[1] == 0:
+            print("No data available in the requested time range!")
+            return
         mz = signal.mz.values.astype(np.float32)
         t = signal.time.values.astype(np.float32)
         await self.emit_client_notification(
@@ -406,7 +409,7 @@ class FileServiceNamespace(BaseClientNamespace):
 
         # Force experiment update to push sample data to UI
         value['id'] = experiment
-        await self.on_experiment_selected({**data, 'name': 'experiment_selected'})
+        await self.on_experiment_selected(data)
 
     async def on_tps_data_request(self, data):
         global tps_cache
