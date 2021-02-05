@@ -875,9 +875,9 @@ export default {
     watch: {
         acquisition_status: function(new_value, old_value) {
             // TODO: quick&dirty fix to dismiss acquisition notifications
-            if (!this.acquisition_control_active) {
-                return
-            }
+            // if (!this.acquisition_control_active) {
+            //     return
+            // }
             //
             if ( _.isEqual(new_value, old_value) ) {
                 return false;
@@ -889,34 +889,34 @@ export default {
         },
         figure_ranges: function(new_value, old_value) {
             // TODO: quick&dirty fix to dismiss acquisition notifications
-            if (new_value.filename !== this.filename &&
-                !this.acquisition_control_active) {
-                return
-            }
+            // if (new_value.filename !== this.filename &&
+            //     !this.acquisition_control_active) {
+            //     return
+            // }
             //
             this.on_figure_ranges(new_value, old_value);
         },
         heatmap_figure_data: function(new_value) {
             // TODO: quick&dirty fix to dismiss acquisition notifications
-            if (new_value.filename !== this.filename) {
-                return
-            }
+            // if (new_value.filename !== this.filename) {
+            //     return
+            // }
             //
             this.on_heatmap_figure_data(new_value);
         },
         timeseries_figure_data: function(new_value) {
             // TODO: quick&dirty fix to dismiss acquisition notifications
-            if (new_value.filename !== this.filename) {
-                return
-            }
+            // if (new_value.filename !== this.filename) {
+            //     return
+            // }
             //
             this.on_timeseries_figure_data(new_value);
         },
         spec_stack_figure_data: function(new_value) {
             // TODO: quick&dirty fix to dismiss acquisition notifications
-            if (new_value.filename !== this.filename) {
-                return
-            }
+            // if (new_value.filename !== this.filename) {
+            //     return
+            // }
             //
             this.on_spec_stack_figure_data(new_value);
         },

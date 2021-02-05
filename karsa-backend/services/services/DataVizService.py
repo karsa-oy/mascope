@@ -267,7 +267,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                  'mz_range': mz_range,
                                  't_range': t_range,
                                  },
-                                # cookies=data['cookies'], # TODO: ? filtered in the front-end
+                                cookies=data['cookies'], # TODO: ? filtered in the front-end
                                 no_data_logging=NO_DATA_LOGGING_DEFAULT
                                 )
 
@@ -450,7 +450,7 @@ class SignalVisualizer(ExtendableDataArray):
                            }
         await client.emit_client_notification('timeseries_figure_data',
                                        timeseries_data,
-                                    #    cookies=cookies, # TODO: ? filtered in the front-end
+                                       cookies=cookies, # TODO: ? filtered in the front-end
                                        no_data_logging=NO_DATA_LOGGING_DEFAULT
                                        )
         await self.reset_array()
@@ -600,7 +600,7 @@ class DataVizServiceClient(BaseServiceClient):
                 await self.emit_client_notification(
                                 'heatmap_figure_data',
                                 heatmap_slice,
-                                # cookies=cookies, # TODO: ? filtered in the front-end
+                                cookies=cookies, # TODO: ? filtered in the front-end
                                 no_data_logging=True
                                 )
             if spec_trace is not None:
@@ -614,7 +614,7 @@ class DataVizServiceClient(BaseServiceClient):
                 await self.emit_client_notification(
                                 'spec_stack_figure_data',
                                 spec_trace,
-                                # cookies=cookies, # TODO: ? filtered in the front-end
+                                cookies=cookies, # TODO: ? filtered in the front-end
                                 no_data_logging=True
                                 )
 
