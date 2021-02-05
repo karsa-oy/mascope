@@ -180,7 +180,6 @@ class FileServiceNamespace(BaseClientNamespace):
                     )
         mz = signal.mz.values.astype(np.float32)
         t = signal.time.values.astype(np.float32)
-
         await self.emit_client_notification(
                             'data_stream_coordinates',
                             {'filename': filename,
@@ -188,8 +187,8 @@ class FileServiceNamespace(BaseClientNamespace):
                              'time': t.tobytes(),
                              'mz_range': mz_range,
                              't_range': t_range,
-                             'set_figure_ranges': set_figure_ranges,
                              },
+                            set_figure_ranges=set_figure_ranges,
                             cookies=cookies,
                             no_data_logging=NO_DATA_LOGGING_DEFAULT
                             )
@@ -543,11 +542,12 @@ class FileServiceNamespace(BaseClientNamespace):
         spec = np.frombuffer(value.get('spec'), dtype=np.float32)
         spec = spec.reshape(-1, 1)
         signal_array = cache_get(signal_cache, data)
-        mz = signal_array.data_array.mz
-        await signal_array.extend_array(spec,
-                                        [mz, ti],
-                                        'time'
-                                        )
+        if signal_array:       # TODO: signal_array is None on killing acquisition from MainUI
+            mz = signal_array.data_array.mz
+            await signal_array.extend_array(spec,
+                                            [mz, ti],
+                                            'time'
+                                            )
 
     async def on_acquisition_finished(self, data):
         global signal_cache
@@ -559,10 +559,10 @@ class FileServiceNamespace(BaseClientNamespace):
         print("Finished acquiring file: %s" %filename)
 
         signal_array = cache_get(signal_cache, data)
-        await signal_array.flush()
+        signal_array and await signal_array.flush()  # TODO: signal_array is None on killing acquisition from MainUI
 
         tps_array = cache_get(tps_cache, data)
-        await tps_array.flush()
+        tps_array and await tps_array.flush()      # TODO: tps_array is None on killing acquisition from MainUI
 
     # ------------------------------
     
@@ -609,11 +609,12 @@ class FileServiceNamespace(BaseClientNamespace):
         tps_data = np.frombuffer( value.get('tps_data'), dtype=np.float32)
         tps_data = tps_data.reshape(-1, 1)
         tps_array = cache_get(tps_cache, data)
-        tps_info = tps_array.data_array.parameter
-        await tps_array.extend_array(tps_data,
-                                     [tps_info, ti],
-                                     'time'
-                                     )
+        if tps_array:   # TODO: tps_array is None on killing acquisition from MainUI
+            tps_info = tps_array.data_array.parameter
+            await tps_array.extend_array(tps_data,
+                                        [tps_info, ti],
+                                        'time'
+                                        )
     # ------------------------------
 
 # ---------- Utility functions ----------

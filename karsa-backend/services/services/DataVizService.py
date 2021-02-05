@@ -210,8 +210,8 @@ class DataVizServiceNamespace(BaseClientNamespace):
                         )
 
     async def on_data_stream_coordinates(self, data):
-        set_figure_ranges = data['value'].get('set_figure_ranges', False)
-        data['value']['set_figure_range'] = set_figure_ranges
+        # set_figure_ranges = data['value'].get('set_figure_ranges', False)
+        # data['value']['set_figure_ranges'] = set_figure_ranges
         await self.on_acquisition_coordinates(data)
 
     async def on_loaded_spectrum(self, data):
@@ -239,8 +239,8 @@ class DataVizServiceNamespace(BaseClientNamespace):
         global visualizers
 
         value = data['value']
-        set_figure_ranges = value.get('set_figure_ranges', True)
         filename = value.get('filename')
+        set_figure_ranges = data.get('set_figure_ranges', True)
 
         mz = np.frombuffer( value.get('mz'), dtype=np.float32 )
         t = np.frombuffer( value.get('time'), dtype=np.float32 )
