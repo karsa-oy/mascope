@@ -809,13 +809,15 @@ export default {
             var self = this;
             if ( !_.isNull(zoom_stack_item) ) {
                 let cache_item = self.get_figure_cache_item(zoom_stack_item.mz_range);
-                cache_item.heatmap_layout.xaxis.range = zoom_stack_item.t_range;
-                cache_item.heatmap_layout.yaxis.range = zoom_stack_item.mz_range;
+                let mz_range = zoom_stack_item.mz_range;
+                let t_range = zoom_stack_item.t_range;
+                cache_item.heatmap_layout.xaxis.range = t_range;
+                cache_item.heatmap_layout.yaxis.range = mz_range;
                 self.heatmap_layout = cache_item.heatmap_layout;
-                cache_item.spec_stack_layout.xaxis.range = zoom_stack_item.mz_range;
-                cache_item.spec_stack_layout.yaxis.range = zoom_stack_item.t_range;
+                cache_item.spec_stack_layout.xaxis.range = mz_range;
+                cache_item.spec_stack_layout.yaxis.range = [ t_range[0], t_range[1]+5];
                 self.spec_stack_layout = cache_item.spec_stack_layout;
-                cache_item.timeseries_layout.xaxis.range = zoom_stack_item.t_range;
+                cache_item.timeseries_layout.xaxis.range = t_range;
                 self.timeseries_data = cache_item.timeseries_data || [];
                 self.timeseries_layout = cache_item.timeseries_layout;
             }
@@ -889,7 +891,6 @@ export default {
             // TODO: quick&dirty fix to dismiss acquisition notifications
             if (new_value.filename !== this.filename &&
                 !this.acquisition_control_active) {
-                console.log("figure ranges dismissed: ", new_value.filename, this.filename);
                 return
             }
             //
