@@ -24,7 +24,8 @@ from collections import namedtuple
 from PIL import Image
 from copy import deepcopy
 
-from karsalib import BaseClientNamespace, BaseServiceClient, parse_cmd_args
+from karsalib import BaseClientNamespace, BaseServiceClient, \
+                     parse_cmd_args, get_client_notification_args
 from karsatof.kcollector import ExtendableDataArray
 from karsatof.kdatapool import DataPool
 from karsatof.kimage import (convert_base64_to_img, convert_to_base64)
@@ -145,7 +146,7 @@ class FileServiceNamespace(BaseClientNamespace):
         global signal_cache
 
         value = data['value']
-        cookies = data['cookies']
+        kwargs = get_client_notification_args(data)
 
         filename = value.get('filename', None)
         if filename is None:
@@ -192,8 +193,7 @@ class FileServiceNamespace(BaseClientNamespace):
                              't_range': t_range,
                              },
                             set_figure_ranges=set_figure_ranges,
-                            cookies=cookies,
-                            no_data_logging=NO_DATA_LOGGING_DEFAULT
+                            **kwargs
                             )
         
         stream_data = True
@@ -208,8 +208,7 @@ class FileServiceNamespace(BaseClientNamespace):
                                                      't_range': t_range,
                                                      'img': heatmap_img
                                                      },
-                                                    cookies=cookies,
-                                                    no_data_logging=NO_DATA_LOGGING_DEFAULT
+                                                    **kwargs
                                                     )
                 for t0, spec_img in spec_imgs:
                     await self.emit_client_notification('spec_trace_image',
@@ -218,8 +217,7 @@ class FileServiceNamespace(BaseClientNamespace):
                                                          't_range': [t0, t0], # t1 does not matter
                                                          'img': spec_img
                                                          },
-                                                        cookies=cookies,
-                                                        no_data_logging=NO_DATA_LOGGING_DEFAULT
+                                                        **kwargs
                                                         )
                 # No need to send data to DataViz
                 stream_data = False
@@ -243,9 +241,8 @@ class FileServiceNamespace(BaseClientNamespace):
                                                      't_range': t_range,
                                                      't': ti,
                                                      },
-                                                    cookies=cookies,
-                                                    no_data_logging=NO_DATA_LOGGING_DEFAULT,
-                                                    callback="speci_callback"
+                                                    callback="speci_callback",
+                                                    **kwargs
                                                     )
 
         cache_pop(signal_cache, data)
@@ -254,8 +251,7 @@ class FileServiceNamespace(BaseClientNamespace):
                                              'mz_range': mz_range,
                                              't_range': t_range,
                                              },
-                                            cookies=cookies,
-                                            no_data_logging=False
+                                            **kwargs
                                             )
 
     def speci_callback(self, n):
@@ -286,7 +282,7 @@ class FileServiceNamespace(BaseClientNamespace):
 
     async def on_experiment_selected(self, data):
         value = data['value']
-        cookies = data['cookies']
+        kwargs = get_client_notification_args(data)
         experiment = value.get('id', '')
         if experiment == '':
             await self.emit_client_notification(
@@ -294,8 +290,7 @@ class FileServiceNamespace(BaseClientNamespace):
                             {'rows': [],
                              'cols': [],
                              },
-                            cookies=cookies,
-                            no_data_logging=NO_DATA_LOGGING_DEFAULT
+                            **kwargs
                             )
             return
 
@@ -314,15 +309,13 @@ class FileServiceNamespace(BaseClientNamespace):
             project_experiments = datapool.get_experiments(project)
             await self.emit_client_notification('experiments',
                                            project_experiments,
-                                           cookies=cookies,
-                                           no_data_logging=NO_DATA_LOGGING_DEFAULT
+                                           **kwargs
                                            )
         # Update sample table data
         await self.emit_client_notification(
                             'samples',
                             datapool.get_sample_table(project, experiment),
-                            cookies=cookies,
-                            no_data_logging=NO_DATA_LOGGING_DEFAULT
+                            **kwargs
                             )
 
     async def on_image_to_save(self, data):
@@ -337,25 +330,22 @@ class FileServiceNamespace(BaseClientNamespace):
 
     async def on_import_sample_table_datetime_range(self, data):
         global datapool
-        cookies = data['cookies']
         # Update sample table data
         await self.emit_client_notification(
                             'importable_samples',
                             datapool.get_sample_table(),
-                            cookies=cookies,
-                            no_data_logging=NO_DATA_LOGGING_DEFAULT
+                            **get_client_notification_args(data)
                             )
 
     async def on_project_selected(self, data):
         global datapool
         value = data['value']
-        cookies = data['cookies']
+        kwargs = get_client_notification_args(data)
         project = value.get('id', '')
         if project == '':
             await self.emit_client_notification('experiments',
                                         [],
-                                        cookies=cookies,
-                                        no_data_logging=False)
+                                        **kwargs)
             return
 
         attributes = value.get('attributes')
@@ -365,14 +355,12 @@ class FileServiceNamespace(BaseClientNamespace):
             projects = datapool.get_projects()
             await self.emit_client_notification('projects',
                                         projects,
-                                        cookies=cookies,
-                                        no_data_logging=NO_DATA_LOGGING_DEFAULT)
+                                        **kwargs)
 
         experiments = datapool.get_experiments(project)
         await self.emit_client_notification('experiments',
                                        experiments,
-                                       cookies=cookies,
-                                       no_data_logging=NO_DATA_LOGGING_DEFAULT)
+                                       **kwargs)
 
     async def on_sample_attributes(self, data):
         """Write attributes of a sample to disk. Make a symbolic link from
@@ -442,7 +430,7 @@ class FileServiceNamespace(BaseClientNamespace):
                                     t_range[0]:t_range[1],
                                     ]
         t = tps_data.time.values.astype(np.float32)
-
+        kwargs = get_client_notification_args(data)
         await self.emit_client_notification(
                             'tps_data_stream_coordinates',
                             {'filename': filename,
@@ -450,8 +438,7 @@ class FileServiceNamespace(BaseClientNamespace):
                              'time': t.tobytes(),
                              'set_tps_parameters': False,
                              },
-                            cookies=data['cookies'],
-                            no_data_logging=NO_DATA_LOGGING_DEFAULT
+                            **kwargs
                             )
         self.tps_speci = 0
         for i, param_array in enumerate(tps_data.transpose()):
@@ -467,16 +454,14 @@ class FileServiceNamespace(BaseClientNamespace):
                                             'tps_data': param_ys.tobytes(),
                                             't': ti,
                                             },
-                                           cookies=data['cookies'],
-                                           no_data_logging=NO_DATA_LOGGING_DEFAULT,
-                                           callback="tps_speci_callback"
+                                           callback="tps_speci_callback",
+                                           **kwargs
                                            )
         cache_pop(tps_cache, data)
         await self.emit_client_notification('tps_data_stream_finished',
                                        {'filename': filename},
-                                       cookies=data['cookies'],
-                                       no_data_logging=False
-                                      )
+                                       **kwargs
+                                       )
  
     def tps_speci_callback(self, n):
         self.tps_speci = n
