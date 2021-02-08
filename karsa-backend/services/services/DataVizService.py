@@ -90,6 +90,15 @@ def viz_cache_pop(viz_cache, data):
         res = None
     return res
 
+async def kill_cache(data):
+    global visualizers
+    global tps_visualizers
+    visualizer = viz_cache_pop(visualizers, data)
+    if isinstance(visualizer, SignalVisualizer):
+        await visualizer.flush_visualizations(**get_client_notification_args(data))
+    tps_visualizer = viz_cache_pop(tps_visualizers, data)
+    if isinstance(tps_visualizer, TPSVisualizer):
+        await visualizer.flush_visualizations(**get_client_notification_args(data))
 
 def merge_heatmap_slices(slices):
     slice_images = []
@@ -161,23 +170,12 @@ class DataVizServiceNamespace(BaseClientNamespace):
         d = deepcopy(data)
         ranges = d['value'].pop('ranges', None)
         if not ranges:
-            await self.kill_cache(data)
+            await kill_cache(data)
             return
         for r in ranges:
             d['value']['mz_range'] = r[0]
             d['value']['t_range'] = r[1]
-            await self.kill_cache(d)
-
-    async def kill_cache(self, data):
-        global visualizers
-        global tps_visualizers
-        visualizer = viz_cache_pop(visualizers, data)
-        if isinstance(visualizer, SignalVisualizer):
-            await visualizer.flush_visualizations(**get_client_notification_args(data))
-        tps_visualizer = viz_cache_pop(tps_visualizers, data)
-        if isinstance(tps_visualizer, TPSVisualizer):
-            await visualizer.flush_visualizations(**get_client_notification_args(data))
-
+            await kill_cache(d)
 
     async def on_tps_parameters_selected(self, data):
         """TPS parameters selected from the dropdown
@@ -255,6 +253,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                               coords=[mz, []],
                               name='signal'
                               )
+        visualizer.y_max = value.get('y_range', [0, 0])[1]
         viz_cache_put(visualizers, data, visualizer)
         kwargs = get_client_notification_args(data)
         if set_figure_ranges:
@@ -289,8 +288,8 @@ class DataVizServiceNamespace(BaseClientNamespace):
 
     async def on_acquisition_finished(self, data):
         global visualizers
-        #visualizer = viz_cache_pop(visualizers, data)
-        visualizer = viz_cache_get(visualizers, data)
+        visualizer = viz_cache_pop(visualizers, data)
+        #visualizer = viz_cache_get(visualizers, data)
         kwargs = get_client_notification_args(data)
         if isinstance(visualizer, SignalVisualizer):
             await visualizer.flush_visualizations(**kwargs)
@@ -388,6 +387,7 @@ class SignalVisualizer(ExtendableDataArray):
         self.spec_trace_generator_q = spec_trace_generator_q
         self.step = step
         
+        self.y_max = 0
         self.heatmap_slices = []
         self.spec_traces = []
 
@@ -403,6 +403,9 @@ class SignalVisualizer(ExtendableDataArray):
 
         if self.data_array.shape[1] < (self.step + 1):
             return
+
+        if self.y_max == 0:
+            self.y_max = self.data_array.max().compute().item()
 
         # Set ranges
         t0 = float( self.data_array.time[0] ) * 1e-9 # [ns]->[s]
@@ -427,6 +430,7 @@ class SignalVisualizer(ExtendableDataArray):
                                          'filename': self.filename,
                                          'mz_range': mz_range,
                                          't_range': t_range,
+                                         'y_range': [0, self.y_max],
                                          'kwargs': kwargs,
                                          })
 

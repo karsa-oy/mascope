@@ -317,7 +317,7 @@ def gen_spec_image(data_xarray,
     # Flatten
     if 'time' in data_xarray.dims:
         # Sum timewise to get y
-        y = data_xarray.sum(dim='time')
+        y = data_xarray.mean(dim='time')
     else:
         y = data_xarray.values
 

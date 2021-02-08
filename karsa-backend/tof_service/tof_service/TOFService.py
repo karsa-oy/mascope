@@ -97,7 +97,7 @@ class TOFServiceClient(BaseServiceClient):
             await self.emit_client_notification('acquisition_status',
                                         'running',
                                         notify_twin_clients=True,  # acquisition should go to all UIs
-                                        cookies=cookies, #TODO: cookies not properly defined
+                                        cookies=cookies,
                                         no_data_logging=False
                                         )
 
@@ -188,7 +188,7 @@ class TOFServiceClient(BaseServiceClient):
                     # Finalize acquisition
                     await self.emit_client_notification('acquisition_progress', 
                                                 {'filename': filename_base,
-                                                 'progress': progress,
+                                                 'progress': 100.,
                                                 },
                                                 notify_twin_clients=True,
                                                 cookies=cookies,

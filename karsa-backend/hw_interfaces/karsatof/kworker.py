@@ -204,7 +204,8 @@ class SpecTraceGenerator(Process):
             data = self.queue_in.get()
             if data is not None:
                 data_array = data.pop('data')
-                img = gen_spec_image(data_array)
+                y_range = data.pop('y_range', None)
+                img = gen_spec_image(data_array, y_range)
                 img_b = convert_to_base64(img)
                 data.update({'img': img_b})
                 self.queue_out.put(data)

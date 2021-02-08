@@ -109,6 +109,16 @@ def cache_pop(cache, data):
 def data_request_stopped(data):
     return not cache_contains(signal_cache, data)
 
+async def kill_cache(data):
+    global signal_cache
+    global tps_cache
+    signal_array = cache_pop(signal_cache, data)
+    if isinstance(signal_array, ExtendableDataArray):
+        await signal_array.flush()
+    tps_array = cache_pop(tps_cache, data)
+    if isinstance(tps_array, ExtendableDataArray):
+        await tps_array.flush()
+
 
 class FileServiceNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to MainService """
@@ -184,6 +194,8 @@ class FileServiceNamespace(BaseClientNamespace):
             return
         mz = signal.mz.values.astype(np.float32)
         t = signal.time.values.astype(np.float32)
+        y_range = [0, signal.max().compute().item()]
+
         await self.emit_client_notification(
                             'data_stream_coordinates',
                             {'filename': filename,
@@ -191,6 +203,7 @@ class FileServiceNamespace(BaseClientNamespace):
                              'time': t.tobytes(),
                              'mz_range': mz_range,
                              't_range': t_range,
+                             'y_range': y_range
                              },
                             set_figure_ranges=set_figure_ranges,
                             **kwargs
@@ -257,28 +270,16 @@ class FileServiceNamespace(BaseClientNamespace):
     def speci_callback(self, n):
         self.speci = n
 
-
     async def on_stop_data_request(self, data):
         d = deepcopy(data)
         ranges = d['value'].pop('ranges', None)
         if not ranges:
-            await self.kill_cache(data)
+            await kill_cache(data)
             return
         for r in ranges:
             d['value']['mz_range'] = r[0]
             d['value']['t_range'] = r[1]
-            await self.kill_cache(d)
-
-    async def kill_cache(self, data):
-        global signal_cache
-        global tps_cache
-        signal_array = cache_pop(signal_cache, data)
-        if isinstance(signal_array, ExtendableDataArray):
-            await signal_array.flush()
-        tps_array = cache_pop(tps_cache, data)
-        if isinstance(tps_array, ExtendableDataArray):
-            await tps_array.flush()
-
+            await kill_cache(d)
 
     async def on_experiment_selected(self, data):
         value = data['value']
@@ -350,11 +351,12 @@ class FileServiceNamespace(BaseClientNamespace):
 
         attributes = value.get('attributes')
         if project not in datapool.pool.keys():
-            print("Starting new project: %s" %project)
+            # New project
             datapool.new_project(project, attributes)
             projects = datapool.get_projects()
             await self.emit_client_notification('projects',
                                         projects,
+                                        notify_twin_clients=True,
                                         **kwargs)
 
         experiments = datapool.get_experiments(project)
