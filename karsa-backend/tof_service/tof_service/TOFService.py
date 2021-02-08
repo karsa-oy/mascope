@@ -73,7 +73,7 @@ class TOFServiceClient(BaseServiceClient):
             try:
                 await self.emit_client_notification('instrument_status',
                                              'not_ready',
-                                             notify_twin_apps=True,
+                                             notify_twin_clients=True,
                                              no_data_logging=False)
                 break
             except BadNamespaceError:
@@ -82,7 +82,7 @@ class TOFServiceClient(BaseServiceClient):
         self.kacq = await self.initialize_kacquisition()
         await self.emit_client_notification('instrument_status',
                                     'ready',
-                                    notify_twin_apps=True,
+                                    notify_twin_clients=True,
                                     no_data_logging=False)
 
 
@@ -99,7 +99,7 @@ class TOFServiceClient(BaseServiceClient):
             cookies = dict(src_sid=[])  # make tofservice originator of the request
             await self.emit_client_notification('acquisition_status',
                                         'running',
-                                        notify_twin_apps=True,  # acquisition should go to all UIs
+                                        notify_twin_clients=True,  # acquisition should go to all UIs
                                         cookies=cookies, #TODO: cookies not properly defined
                                         no_data_logging=False
                                         )
@@ -117,7 +117,7 @@ class TOFServiceClient(BaseServiceClient):
                             )
             await self.emit_client_notification('acquisition_started',
                                         {'filename': filename_base},
-                                        notify_twin_apps=True, 
+                                        notify_twin_clients=True,
                                         cookies=cookies,
                                         no_data_logging=False
                                         )
@@ -127,7 +127,7 @@ class TOFServiceClient(BaseServiceClient):
                                         'time': t.tobytes(),
                                         # 't_range': [ float(t[0]), float(t[-1]) ]
                                         },
-                                        notify_twin_apps=True,
+                                        notify_twin_clients=True,
                                         cookies=cookies,
                                         no_data_logging=NO_DATA_LOGGING_DEFAULT
                                         )
@@ -137,7 +137,7 @@ class TOFServiceClient(BaseServiceClient):
                                          'tps_info': tps_info,
                                          # 'time': t.tobytes()
                                         },
-                                        notify_twin_apps=True,
+                                        notify_twin_clients=True,
                                         cookies=cookies,
                                         no_data_logging=NO_DATA_LOGGING_DEFAULT
                                         )
@@ -160,7 +160,7 @@ class TOFServiceClient(BaseServiceClient):
                                                 't': ti,
                                                 'spec': spec.tobytes(),
                                                 },
-                                                notify_twin_apps=True,
+                                                notify_twin_clients=True,
                                                 cookies=cookies,
                                                 no_data_logging=NO_DATA_LOGGING_DEFAULT
                                                 )
@@ -169,7 +169,7 @@ class TOFServiceClient(BaseServiceClient):
                                                 {'sync': speci,
                                                 'progress': progress,
                                                 },
-                                                notify_twin_apps=True,
+                                                notify_twin_clients=True,
                                                 cookies=cookies,
                                                 no_data_logging=NO_DATA_LOGGING_DEFAULT
                                                 )
@@ -182,7 +182,7 @@ class TOFServiceClient(BaseServiceClient):
                                             't': ti,
                                             'tps_data': tps_data.tobytes(),
                                             },
-                                            notify_twin_apps=True,
+                                            notify_twin_clients=True,
                                             cookies=cookies,
                                             no_data_logging=NO_DATA_LOGGING_DEFAULT
                                             )
@@ -193,19 +193,19 @@ class TOFServiceClient(BaseServiceClient):
                                                 {'filename': filename_base,
                                                  'progress': progress,
                                                 },
-                                                notify_twin_apps=True,
+                                                notify_twin_clients=True,
                                                 cookies=cookies,
                                                 no_data_logging=NO_DATA_LOGGING_DEFAULT
                                                 )
                     await self.emit_client_notification('acquisition_finished', 
                                                 {'filename': filename_base},
-                                                notify_twin_apps=True,
+                                                notify_twin_clients=True,
                                                 cookies=cookies,
-                                                no_data_logging=False
+                                                no_data_logging=NO_DATA_LOGGING_DEFAULT
                                                 )
                     await self.emit_client_notification('acquisition_status',
                                                 'not_running',
-                                                notify_twin_apps=True,
+                                                notify_twin_clients=True,
                                                 cookies=cookies,
                                                 no_data_logging=False
                                                 )

@@ -9,6 +9,18 @@ from socketio import AsyncClientNamespace, AsyncNamespace, AsyncClient
 NO_LOGGING_DEFAULT = False
 NO_DATA_LOGGING_DEFAULT = True
 
+
+def copy_dict(d, ignore_keys=[]):
+    return {k: v for k, v in d.items() if k not in ignore_keys}
+
+def get_client_notification_args(data):
+    """
+    Get shallow copy of client_notificaiton arguments
+    ignoring 'name' and 'value' fields.
+    """
+    return copy_dict(data, ignore_keys=['name', 'value'])
+
+
 class BaseClientNamespace(AsyncClientNamespace):
     """ python-socket.io client namespace for connecting to Router """
     # rooms - list of notifications the client wants to receive from socket server
@@ -36,7 +48,10 @@ class BaseClientNamespace(AsyncClientNamespace):
         self.app_name = self.__class__.__name__
         self.log(f"connected to namespace {self.namespace}")
         await self.join_rooms()
-        await self.on_service_state(dict(no_data_logging=False))
+        await self.on_service_state(dict(value={},
+                                         notify_twin_clients=True,
+                                         notify_twin_services=True,
+                                         no_data_logging=False, ))
 
     def on_disconnect(self):
         self.log(f"disconnected from namespace {self.namespace}")
@@ -125,7 +140,7 @@ class BaseServerNamespace(AsyncNamespace):
         await self.on_client_notification(sid,
                         dict(name='stop_visualize_range',
                              value={},
-                             notify_twin_apps=True,
+                             notify_twin_services=True,
                              no_data_logging=False) )
         # remove the app from all rooms/subscriptions
         for room in self.subscription_sids:
@@ -172,7 +187,8 @@ class BaseServerNamespace(AsyncNamespace):
         """
         no_logging = data.get('no_logging', False)
         no_data_logging = data.get('no_data_logging', True)
-        notify_twin_apps = data.get('notify_twin_apps', None)   # overriding rule, if defined
+        notify_twin_clients = data.get('notify_twin_clients', False)   # overriding rule, if defined
+        notify_twin_services = data.get('notify_twin_services', False)   # overriding rule, if defined
         subscription = data['name']
         cb = data.pop('callback', None)
         if no_logging:
@@ -202,16 +218,13 @@ class BaseServerNamespace(AsyncNamespace):
             except:
                 # self may not be subscribed to this notification: ignore
                 pass
-        # when defined, notify_twin_apps manages the twin apps notification rule,
-        # otherwise, if 1st notification, and owner is a service app, then notify all twins,
-        #            else client always notifies only one of the twins
-        if notify_twin_apps is None:
-            if not ( len(src_sids) == 1 and self.sid_to_app[sid]['type'] == 'service' ):
-                # only one twin app gets notified
-                subscription_sids = self.remove_twin_app_sids(subscription_sids, src_sids)
-        elif notify_twin_apps == False:
-            subscription_sids = self.remove_twin_app_sids(subscription_sids, src_sids)
-
+        # by default, namespace client (both app client, and app service)
+        # notifies only one of the subscriber twins (if any); when defined, the flags
+        # notify_twin_clients/services alter subscriber notification rule for twins
+        subscription_sids = self.remove_twin_app_sids(sids=subscription_sids,
+                                                    sids_to_stay=src_sids,
+                                                    notify_twin_clients=notify_twin_clients,
+                                                    notify_twin_services=notify_twin_services)
         async def srv_callback(*arg, **kwarg):
             await self.emit('client_notification_callback',
                             dict(subscription=subscription, cb_name=cb, arg=arg, kwarg=kwarg, no_logging=True),
@@ -224,20 +237,29 @@ class BaseServerNamespace(AsyncNamespace):
             await self.emit(subscription, data, room=room, callback=cb and srv_callback)
 
 
-    def remove_twin_app_sids(self, sids, sids_to_stay):
+    def remove_twin_app_sids(self, sids, sids_to_stay,
+                             notify_twin_clients=False,
+                             notify_twin_services=False):
         """
            Remove socket_ids of twin applications from sids array;
            If sids_to_stay contain the twin app socket_id, then leave
            it in resulting array and remove the twin sid.
         """
         res = []
+        # don't send notifications to twins of source sids (sids_to_stay)
         for s in sids_to_stay:
             if s in sids:
                 res.append(s)
                 self.remove_sid_with_twins(sids, s)
+        # override twin notification rules due to corresponding flags
         while sids:
-            res.append(sids[0])
-            self.remove_sid_with_twins(sids, sids[0])
+            s = sids[0]
+            res.append(s)
+            if (self.sid_to_app[s]['type'] == 'client' and notify_twin_clients) or \
+               (self.sid_to_app[s]['type'] == 'service' and notify_twin_services) :
+                sids.pop(0)
+            else:
+                self.remove_sid_with_twins(sids, s)
         return res
 
 

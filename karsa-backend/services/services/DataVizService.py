@@ -26,7 +26,8 @@ from multiprocessing import (
 from datetime import timedelta
 from queue import Empty
 
-from karsalib import BaseClientNamespace, BaseServiceClient, parse_cmd_args
+from karsalib import BaseClientNamespace, BaseServiceClient, \
+                     parse_cmd_args, get_client_notification_args
 from karsatof.kworker import HeatmapGenerator, SpecTraceGenerator
 from karsatof.kcollector import ExtendableDataArray
 from karsatof.kimage import (
@@ -137,8 +138,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
         """
         await self.emit_client_notification('data_request',
                                             data['value'],
-                                            cookies=data['cookies'],
-                                            no_data_logging=NO_DATA_LOGGING_DEFAULT
+                                            **get_client_notification_args(data)
                                             )
 
     
@@ -155,7 +155,9 @@ class DataVizServiceNamespace(BaseClientNamespace):
                       keys: 'filename', 't_range', 'mz_range';  or
                       keys: 'filename', 'ranges';
         """
-        await self.emit_client_notification('stop_data_request', data['value'], cookies=data['cookies'], no_data_logging=NO_DATA_LOGGING_DEFAULT)
+        await self.emit_client_notification('stop_data_request',
+                                            data['value'],
+                                            **get_client_notification_args(data))
         d = deepcopy(data)
         ranges = d['value'].pop('ranges', None)
         if not ranges:
@@ -171,10 +173,10 @@ class DataVizServiceNamespace(BaseClientNamespace):
         global tps_visualizers
         visualizer = viz_cache_pop(visualizers, data)
         if isinstance(visualizer, SignalVisualizer):
-            await visualizer.flush_visualizations(data['cookies'])
+            await visualizer.flush_visualizations(**get_client_notification_args(data))
         tps_visualizer = viz_cache_pop(tps_visualizers, data)
         if isinstance(tps_visualizer, TPSVisualizer):
-            await visualizer.flush_visualizations(data['cookies'])
+            await visualizer.flush_visualizations(**get_client_notification_args(data))
 
 
     async def on_tps_parameters_selected(self, data):
@@ -182,8 +184,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
         """
         await self.emit_client_notification('tps_data_request',
                                             data['value'],
-                                            cookies=data['cookies'],
-                                            no_data_logging=NO_DATA_LOGGING_DEFAULT
+                                            **get_client_notification_args(data)
                                             )
 
     # ---------------------------------
@@ -191,22 +192,18 @@ class DataVizServiceNamespace(BaseClientNamespace):
     # ========== FileService notifications ==========
     async def on_heatmap_image(self, data):
         value = data['value']
-        cookies = data['cookies']
         await self.emit_client_notification(
                                 'heatmap_figure_data',
                                 value,
-                                cookies=cookies,
-                                no_data_logging=True
+                                **get_client_notification_args(data)
                                 )
     
     async def on_spec_trace_image(self, data):
         value = data['value']
-        cookies = data['cookies']
         await self.emit_client_notification(
                         'spec_stack_figure_data',
                         value,
-                        cookies=cookies,
-                        no_data_logging=True
+                        **get_client_notification_args(data)
                         )
 
     async def on_data_stream_coordinates(self, data):
@@ -259,6 +256,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                               name='signal'
                               )
         viz_cache_put(visualizers, data, visualizer)
+        kwargs = get_client_notification_args(data)
         if set_figure_ranges:
             # Set UI figure ranges
             await self.emit_client_notification(
@@ -267,8 +265,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                  'mz_range': mz_range,
                                  't_range': t_range,
                                  },
-                                cookies=data['cookies'], # TODO: ? filtered in the front-end
-                                no_data_logging=NO_DATA_LOGGING_DEFAULT
+                                 **kwargs
                                 )
 
 
@@ -288,14 +285,15 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                       [mz, td],
                                       'time'
                                       )
-        await visualizer.extend_visualizations(data['cookies'])
+        await visualizer.extend_visualizations(**get_client_notification_args(data))
 
     async def on_acquisition_finished(self, data):
         global visualizers
         #visualizer = viz_cache_pop(visualizers, data)
         visualizer = viz_cache_get(visualizers, data)
+        kwargs = get_client_notification_args(data)
         if isinstance(visualizer, SignalVisualizer):
-            await visualizer.flush_visualizations(data['cookies'])
+            await visualizer.flush_visualizations(**kwargs)
             if len(visualizer.heatmap_slices):
                 full_heatmap = merge_heatmap_slices(visualizer.heatmap_slices)
                 full_heatmap_str = convert_to_base64(full_heatmap)
@@ -306,9 +304,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                 await self.emit_client_notification(
                                     'image_to_save',
                                     image_data,
-                                    cookies=data['cookies'],
-                                    no_data_logging=NO_DATA_LOGGING_DEFAULT
-                                    )
+                                    **kwargs )
             for i, spec_trace in enumerate(visualizer.spec_traces):
                 image_data.update({'img_filename': 'spec%.2f.png' %spec_trace.get('t_range')[0],
                                    'img': spec_trace['img']
@@ -316,8 +312,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                 await self.emit_client_notification(
                                     'image_to_save',
                                     image_data,
-                                    cookies=data['cookies'],
-                                    no_data_logging=NO_DATA_LOGGING_DEFAULT)
+                                    **kwargs )
 
 
     async def on_tps_parameter_info(self, data):
@@ -341,12 +336,12 @@ class DataVizServiceNamespace(BaseClientNamespace):
             dropdown_items = [{'label': info,
                                'value': i
                                } for i, info in enumerate(tps_info)
-                            ]            
+                            ]
+            kwargs = get_client_notification_args(data)
             await self.emit_client_notification(
                             'tps_parameters',
                             dropdown_items,
-                            cookies=data['cookies'],
-                            no_data_logging=NO_DATA_LOGGING_DEFAULT
+                            **kwargs
                             )
 
 
@@ -374,7 +369,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                       [parameter, td],
                                       'time',
                                       )
-        await visualizer.extend_visualizations(data['cookies'])
+        await visualizer.extend_visualizations(**get_client_notification_args(data))
             
     # ----------------------------------------------
 
@@ -402,7 +397,7 @@ class SignalVisualizer(ExtendableDataArray):
               **kwarg
               )
 
-    async def extend_visualizations(self, cookies):
+    async def extend_visualizations(self, **kwargs):
         """Generate visualizations for new data.
         """
 
@@ -426,13 +421,13 @@ class SignalVisualizer(ExtendableDataArray):
                                       'filename': self.filename,
                                       'mz_range': mz_range,
                                       't_range': t_range,
-                                      'cookies': cookies,
+                                      'kwargs': kwargs,
                                       })
         self.spec_trace_generator_q.put({'data': arr_to_viz,
                                          'filename': self.filename,
                                          'mz_range': mz_range,
                                          't_range': t_range,
-                                         'cookies': cookies,
+                                         'kwargs': kwargs,
                                          })
 
         # Timeseries trace
@@ -450,8 +445,7 @@ class SignalVisualizer(ExtendableDataArray):
                            }
         await client.emit_client_notification('timeseries_figure_data',
                                        timeseries_data,
-                                       cookies=cookies, # TODO: ? filtered in the front-end
-                                       no_data_logging=NO_DATA_LOGGING_DEFAULT
+                                       **kwargs
                                        )
         await self.reset_array()
 
@@ -470,26 +464,25 @@ class SignalVisualizer(ExtendableDataArray):
                                 'time'
                                 )
 
-    async def flush_visualizations(self, cookies):
+    async def flush_visualizations(self, **kwargs):
         if self.data_array.shape[1] <= 1:
             return
         self.step = 0
-        await self.extend_visualizations(cookies)
+        await self.extend_visualizations(**kwargs)
         
 
 class TPSVisualizer(ExtendableDataArray):
 
     def __init__(self, tps_trace_queue=Queue(), step=10):
-
         ExtendableDataArray.__init__(self, array_module=da)
-
         self.trace_queue = tps_trace_queue
         self.step = step
 
     def log(self, *arg, **kwarg):
         print(f"[{self.__class__.__name__}.{inspect.stack()[1].function}]", *arg, **kwarg)
 
-    async def extend_visualizations(self, cookies):
+
+    async def extend_visualizations(self, **kwargs):
         """Generate visualizations for new data.
         """
 
@@ -519,8 +512,7 @@ class TPSVisualizer(ExtendableDataArray):
         timeseries_data = {'traces': [ts_trace], }
         await client.emit_client_notification('timeseries_figure_data',
                                        timeseries_data,
-                                       cookies=cookies,
-                                       no_data_logging=NO_DATA_LOGGING_DEFAULT
+                                       **kwargs
                                        )
 
         # Reset signal cache, leave the last column
@@ -590,32 +582,30 @@ class DataVizServiceClient(BaseServiceClient):
 
             # Got at least something
             if heatmap_slice is not None:
-                cache_ref = dict(cookies = heatmap_slice['cookies'],
+                cache_ref = dict(cookies = heatmap_slice['kwargs']['cookies'],
                                  value = dict(filename=heatmap_slice['filename'])
                                  )
                 visualizer = viz_cache_get(visualizers, cache_ref)
                 if visualizer:
                     visualizer.heatmap_slices.append(heatmap_slice)
-                cookies = heatmap_slice.pop('cookies')
+                kwargs = heatmap_slice.pop('kwargs')
                 await self.emit_client_notification(
                                 'heatmap_figure_data',
                                 heatmap_slice,
-                                cookies=cookies, # TODO: ? filtered in the front-end
-                                no_data_logging=True
+                                **kwargs
                                 )
             if spec_trace is not None:
-                cache_ref = dict(cookies = spec_trace['cookies'],
+                cache_ref = dict(cookies = spec_trace['kwargs']['cookies'],
                                  value = dict(filename=spec_trace['filename'])
                                  )
                 visualizer = viz_cache_get(visualizers, cache_ref)
                 if visualizer:
                     visualizer.spec_traces.append(spec_trace)
-                cookies = spec_trace.pop('cookies')
+                kwargs = spec_trace.pop('kwargs')
                 await self.emit_client_notification(
                                 'spec_stack_figure_data',
                                 spec_trace,
-                                cookies=cookies, # TODO: ? filtered in the front-end
-                                no_data_logging=True
+                                **kwargs
                                 )
 
         # Terminate image generators
