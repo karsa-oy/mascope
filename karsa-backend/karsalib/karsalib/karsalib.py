@@ -223,8 +223,8 @@ class BaseServerNamespace(AsyncNamespace):
         # notify_twin_clients/services alter subscriber notification rule for twins
         subscription_sids = self.remove_twin_app_sids(sids=subscription_sids,
                                                     sids_to_stay=src_sids,
-                                                    notify_twin_clients=notify_twin_clients,
-                                                    notify_twin_services=notify_twin_services)
+                                                    keep_twin_clients=notify_twin_clients,
+                                                    keep_twin_services=notify_twin_services)
         async def srv_callback(*arg, **kwarg):
             await self.emit('client_notification_callback',
                             dict(subscription=subscription, cb_name=cb, arg=arg, kwarg=kwarg, no_logging=True),
@@ -238,30 +238,33 @@ class BaseServerNamespace(AsyncNamespace):
 
 
     def remove_twin_app_sids(self, sids, sids_to_stay,
-                             notify_twin_clients=False,
-                             notify_twin_services=False):
+                             keep_twin_clients=False,
+                             keep_twin_services=False):
         """
            Remove socket_ids of twin applications from sids array;
            If sids_to_stay contain the twin app socket_id, then leave
            it in resulting array and remove the twin sid.
         """
         res = []
-        # don't send notifications to twins of source sids (sids_to_stay)
+        # make sure relevant sids_to_stay members get to a result array
         for s in sids_to_stay:
             if s in sids:
                 res.append(s)
-                self.remove_sid_with_twins(sids, s)
-        # override twin notification rules due to corresponding flags
+                if (self.sid_to_app[s]['type'] == 'client' and keep_twin_clients) or \
+                   (self.sid_to_app[s]['type'] == 'service' and keep_twin_services) :
+                    sids.remove(s)
+                else:
+                    self.remove_sid_with_twins(sids, s)
+        # check the rest of sids array
         while sids:
             s = sids[0]
             res.append(s)
-            if (self.sid_to_app[s]['type'] == 'client' and notify_twin_clients) or \
-               (self.sid_to_app[s]['type'] == 'service' and notify_twin_services) :
+            if (self.sid_to_app[s]['type'] == 'client' and keep_twin_clients) or \
+               (self.sid_to_app[s]['type'] == 'service' and keep_twin_services) :
                 sids.pop(0)
             else:
                 self.remove_sid_with_twins(sids, s)
         return res
-
 
     def remove_sid_with_twins(self, sids, sid_to_remove):
         twin_sids_to_remove = self.app_name_to_sids[self.sid_to_app[sid_to_remove]['name']]

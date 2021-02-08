@@ -356,13 +356,13 @@ class FileServiceNamespace(BaseClientNamespace):
             projects = datapool.get_projects()
             await self.emit_client_notification('projects',
                                         projects,
-                                        notify_twin_clients=True,
-                                        **kwargs)
+                                        **{**kwargs, 'notify_twin_clients': True, })
 
         experiments = datapool.get_experiments(project)
         await self.emit_client_notification('experiments',
                                        experiments,
-                                       **kwargs)
+                                       **{**kwargs, 'notify_twin_clients': True, })
+
 
     async def on_sample_attributes(self, data):
         """Write attributes of a sample to disk. Make a symbolic link from
