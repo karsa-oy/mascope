@@ -16,7 +16,6 @@ from karsatof.lib.TofDaq import (
                     )
 
 NO_DATA_LOGGING_DEFAULT = True
-cookies = None
 
 class TOFServiceNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for
@@ -33,8 +32,6 @@ class TOFServiceNamespace(BaseClientNamespace):
         )
 
     async def on_acquisition_status(self, data):
-        global cookies
-        cookies = data['cookies'] #TODO: does not work like this
         self.log(data['value'])
         if data['value'] == "starting":
             TwStartAcquisition()
