@@ -1,9 +1,12 @@
 ### Description 
 This project contains karsa-electron - Karsa desktop client application.
 
-Front-end/back-end prototypes can be found here:
-1. Karsa Desktop client application - https://bitbucket.org/kausiala/karsa-electron/
-2. Karsa Router and backend services - https://gitlab.com/karsa_dev/karsa-backend
+Front-end/back-end sources can be found here:
+1. Karsa Desktop client application - https://gitlab.com/karsa_dev/karsa_msview/karsa-electron/
+2. Karsa Router and backend services - https://gitlab.com/karsa_dev/karsa_msview/karsa-backend/
+
+Front-end builds are found here:
+https://github.com/aleu/karsa/releases
 
 
 ### Setup Requirements 
@@ -29,9 +32,19 @@ yarn build
 yarn lint
 
 ### Compile and build distribution package
+1) run checklist.cmd to make sure all build pre-requisits are in place
+
+2) build the application
+
 yarn electron:build
 
 ### Compile, build and publish distribution package (to github.com)
+1) run checklist.cmd to make sure all build pre-requisits are in place
+
+2) update package.json
+
+3) build and publish the application
+
 yarn electron:publish
 
 ### Customize configuration
