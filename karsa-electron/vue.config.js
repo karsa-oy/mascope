@@ -10,7 +10,7 @@ module.exports = {
           appId: "karsa_desktop.com",
           publish: ['github'],
           win: {
-            // icon: "public/img/favicon.ico",
+            // icon: "public/img/k.ico",
             icon: "public/img/icon256x256.png",
             target: "nsis",     //target should be nsis for autoupdate
             certificateFile: "cert/karsa_cacert.pfx",   //alt: use CSC_LINK env.var.

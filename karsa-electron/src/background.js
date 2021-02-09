@@ -114,7 +114,7 @@ function createWindow() {
         webPreferences: {
             nodeIntegration: true,
         },
-        // frame: false,
+        frame: isDevelopment,
         // fullscreen: false,
     });
 
@@ -176,7 +176,7 @@ function createWindow() {
 //     window_.show();
 // }
 // function createTray() {
-//     var trayIcnName = "test_ico.ico";
+//     var trayIcnName = "k.ico";
 //     const trayIcnPath = process.env.WEBPACK_DEV_SERVER_URL ? path.join(__dirname, '../public/img/', trayIcnName) : path.join(__dirname, '../app.asar/img/', trayIcnName);
 //     tray = new Tray(trayIcnPath)
 //     const contextMenu = Menu.buildFromTemplate([
