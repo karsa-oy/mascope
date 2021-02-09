@@ -284,17 +284,16 @@ class FileServiceNamespace(BaseClientNamespace):
     async def on_experiment_selected(self, data):
         value = data['value']
         kwargs = get_client_notification_args(data)
-        experiment = value.get('id', '')
-        if experiment == '':
-            await self.emit_client_notification(
-                            'samples',
-                            {'rows': [],
-                             'cols': [],
-                             },
-                            **kwargs
-                            )
-            return
-
+        experiment = value.get('id')
+        # if experiment == '':
+        #     await self.emit_client_notification(
+        #                     'samples',
+        #                     {'rows': [],
+        #                      'cols': [],
+        #                      },
+        #                     **kwargs
+        #                     )
+        #     return
         attributes = value.get('attributes')
         project = attributes.get('project')
         global datapool
@@ -308,10 +307,11 @@ class FileServiceNamespace(BaseClientNamespace):
             datapool.new_experiment(project, experiment, attributes)
             # Update UI
             project_experiments = datapool.get_experiments(project)
-            await self.emit_client_notification('experiments',
-                                           project_experiments,
-                                           **kwargs
-                                           )
+            await self.emit_client_notification(
+                                    'experiments',
+                                    project_experiments,
+                                    **{**kwargs, 'notify_twin_clients': True, }
+                                    )
         # Update sample table data
         await self.emit_client_notification(
                             'samples',
@@ -342,27 +342,28 @@ class FileServiceNamespace(BaseClientNamespace):
         global datapool
         value = data['value']
         kwargs = get_client_notification_args(data)
-        project = value.get('id', '')
-        if project == '':
-            await self.emit_client_notification('experiments',
-                                        [],
-                                        **kwargs)
-            return
+        project = value.get('id')
+        # if project == '':
+        #     await self.emit_client_notification('experiments',
+        #                                 {'project': project, 'experiments': []},
+        #                                 **kwargs)
+        #     return
 
-        attributes = value.get('attributes')
         if project not in datapool.pool.keys():
             # New project
+            attributes = value.get('attributes')
             datapool.new_project(project, attributes)
             projects = datapool.get_projects()
-            await self.emit_client_notification('projects',
-                                        projects,
-                                        **{**kwargs, 'notify_twin_clients': True, })
+            await self.emit_client_notification(
+                                    'projects',
+                                    projects,
+                                    **{**kwargs, 'notify_twin_clients': True, })
 
         experiments = datapool.get_experiments(project)
-        await self.emit_client_notification('experiments',
-                                       experiments,
-                                       **{**kwargs, 'notify_twin_clients': True, })
-
+        await self.emit_client_notification(
+                                    'experiments',
+                                    experiments,
+                                    **kwargs)
 
     async def on_sample_attributes(self, data):
         """Write attributes of a sample to disk. Make a symbolic link from
@@ -383,23 +384,22 @@ class FileServiceNamespace(BaseClientNamespace):
         global datapool
 
         value = data['value']
-        sample = value.get('id', '')
+        kwargs = get_client_notification_args(data)
+
+        sample = value['id']
         attributes = value.get('attributes')
-        if sample == '':
-            raise ValueError("Received write_sample_attributes without 'id'")
-        project = attributes.get('project', '')
-        if project == '':
-            raise ValueError("Received write_sample_attributes without 'project'")
-        experiment = attributes.get('experiment', '')
-        if experiment == '':
-            raise ValueError("Received write_sample_attributes without 'experiment'")
+        project = attributes['project']
+        experiment = attributes['experiment']
 
         attributes.update({'id': sample})
         datapool.new_sample(project, experiment, sample, attributes)
 
-        # Force experiment update to push sample data to UI
-        value['id'] = experiment
-        await self.on_experiment_selected(data)
+        # Update sample table data in UIs
+        await self.emit_client_notification(
+                            'samples',
+                            datapool.get_sample_table(project, experiment),
+                            **{**kwargs, 'notify_twin_clients': True, }
+                            )
 
     async def on_tps_data_request(self, data):
         global tps_cache

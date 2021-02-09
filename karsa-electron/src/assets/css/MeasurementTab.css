@@ -243,7 +243,7 @@ fieldset[disabled] .multiselect{
 .datashader-heatmap{
     border: 1px solid #a7a7a7;; 
     border-radius: 5px;
-    min-height:400px; 
+    min-height:482px; 
 }
 .tps-multiselect{
     /* border:1px solid #a7a7a7;;  */
@@ -256,7 +256,7 @@ fieldset[disabled] .multiselect{
 .tps-chart{
     border:1px solid #a7a7a7;; 
     border-radius: 5px; 
-    min-height:400px;
+    min-height:482px;
 }
 .spec-stack-holder{
     margin-top:0px;

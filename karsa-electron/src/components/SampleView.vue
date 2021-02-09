@@ -16,6 +16,10 @@
                     <!-- End of heatmap section-->
                     <!-- Multiselect section -->
                     <section class="multiselect-section">
+                        <div>
+                            <br>
+                        </div>
+<div hidden>
                         <div class="column tps-multiselect">
                             <h2 class="multiselect-title">Select parameter to display</h2>
                             <multiselect 
@@ -26,9 +30,10 @@
                             track-by="value" 
                             :options="tps_parameters" 
                             :multiple="true" 
-                            :taggable="true"
-                            ></multiselect>
-                        </div>                                    
+                            :taggable="true">
+                            </multiselect>
+                        </div>   
+</div>
                     </section>
                     <!-- End of multiselect section -->
                     <!-- Timeseries section -->
@@ -73,7 +78,6 @@ Vue.use([Buefy]);
 var fs = require('fs');
 var Plotly = require('plotly.js-dist');
 var _ = require('underscore');
-var mergeImages = require('merge-base64');
 
 //var dialog = require("electron").remote.dialog;
 //var remote = require('electron').remote;
@@ -91,6 +95,7 @@ export default {
         ...mapState(['acquisition_control_active',
                      'acquisition_started',
                      'acquisition_status',
+                     'experiment_selected',
                      'figure_ranges',
                      'heatmap_figure_data',
                      'sample_to_load',
@@ -155,6 +160,34 @@ export default {
         log: function(...args) {
             console.log('[' + this.$options.name + ']',  ...args);
         },
+        adjust_ranges_to_grid_spacing(x0, x1, y0, y1) {
+            let _x0_l = x0 - this.grid_spacing;
+            let _x0_r = x0 + this.grid_spacing;
+            if ( _x0_l.toFixed(this.cache_index_rank) != _x0_r.toFixed(this.cache_index_rank) ) {
+                x0 = _x0_l.toFixed(this.cache_index_rank);
+                x0 = parseFloat(Math.abs(x0)); // abs to avoid -0
+            }
+            let _x1_l = x1 - this.grid_spacing;
+            let _x1_r = x1 + this.grid_spacing;
+            if ( _x1_l.toFixed(this.cache_index_rank) != _x1_r.toFixed(this.cache_index_rank) ) {
+                x1 = _x1_r.toFixed(this.cache_index_rank);
+                x1 = parseFloat(x1);
+            }
+            let _y0_l = y0 - this.grid_spacing;
+            let _y0_r = y0 + this.grid_spacing;
+            if ( _y0_l.toFixed(this.cache_index_rank) != _y0_r.toFixed(this.cache_index_rank) ) {
+                y0 = _y0_l.toFixed(this.cache_index_rank)
+                y0 = parseFloat(y0);
+            }
+            let _y1_l = y1 - this.grid_spacing;
+            let _y1_r = y1 + this.grid_spacing;
+            if ( _y1_l.toFixed(this.cache_index_rank) != _y1_r.toFixed(this.cache_index_rank) ) {
+                y1 = _y1_r.toFixed(this.cache_index_rank);
+                y1 = parseFloat(y1);
+            }
+            return [x0, x1, y0, y1];
+        },
+
         beep: function() {
             var snd = new Audio("data:audio/mp3;base64,//uQRAAAAWMSLwUIYAAsYkXgoQwAEaYLWfkWgAI0wWs\
             /ItAAAGDgYtAgAyN+QWaAAihwMWm4G8QQRDiMcCBcH3Cc+CDv/7xA4Tvh9Rz/y8QADBwMWgQAZG/ILNAARQ4GL\
@@ -206,6 +239,38 @@ export default {
             AAAAAAAAAAAAAAAAAMjAwNGh0dHA6Ly93d3cuc291bmRib3kuZGUAAAAAAAAAACU=");
             snd.play();
         },
+
+        figure_cache_add_ref(mz_range) {
+            let _mz_range = this.to_figure_cache_index(mz_range);
+            if ( Object.keys(this.figure_cache).includes(_mz_range.toString()) ) {
+                ++this.figure_cache[_mz_range].ref_count;
+                return this.figure_cache[_mz_range];
+            }
+            this.figure_cache[_mz_range] = {'ref_count': 1,
+                                           'mz_range': _mz_range,
+                                        //    't_filled_range': [Number.MAX_SAFE_INTEGER, 0],
+                                           't_filled_range': [0, 0],
+                                           'heatmap_layout': this.shallow_copy(this.figure_layouts.heatmap_layout),
+                                           'spec_stack_layout': this.shallow_copy(this.figure_layouts.spec_stack_layout),
+                                           'timeseries_layout': this.shallow_copy(this.figure_layouts.timeseries_layout),
+                                           'timeseries_data': [], };
+            return this.figure_cache[_mz_range];
+        },
+
+        figure_cache_release_ref(mz_range) {
+            let _mz_range = this.to_figure_cache_index(mz_range);
+            let cache_item = this.figure_cache[_mz_range];
+            cache_item.ref_count--;
+            if ( cache_item.ref_count <= 0 )
+                delete this.figure_cache[_mz_range];
+        },
+
+        get_figure_cache_item(mz_range) {
+            if ( _.isUndefined(mz_range) )
+                return mz_range;
+            return this.figure_cache[this.to_figure_cache_index(mz_range)];
+        },
+
         init_figures() {
             // This function reads figure layouts from config file, creates
             // the Plotly figures and configures event handlers
@@ -350,7 +415,6 @@ export default {
             // ----- End of timeseries figure -----
         },
 
-
         async _on_figure_ranges(new_value, old_value) {
             // if ( !_.isEmpty(this.filename) && this.filename != new_value.filename ) {
             //     this.log("Error: figure_ranges notification for invalid file:", new_value.filename)
@@ -393,7 +457,6 @@ export default {
                 return self._on_figure_ranges(new_value, old_value); }
             );
         },
-
 
         async _on_heatmap_figure_data(json_data) {
             var self = this;
@@ -471,31 +534,6 @@ export default {
             self.heatmap_queue = self.heatmap_queue.then(function() {
                 return self._on_heatmap_figure_data(json_data); }
             );
-        },
-
-
-        async merge_heatmap_layout(nimg, img_to_append) {
-        // merge last nimg images from heatmap_layout and append img_to_append
-            var self = this;
-            let [ , x1, y0, y1, img] = img_to_append;
-            let _x = self.heatmap_layout.images.slice(-nimg)[0].x;
-            let _sizex = x1 - _x;
-            var _y = y0;
-            var _sizey = y1 - y0;
-            var images = [];
-            var prefix = ['data:image/png;base64,', 'data:image/jpeg;base64,'];
-            for (let i=0; i<nimg; ++i) {
-                let image = self.heatmap_layout.images.pop();
-                if ( _.isEmpty(image) )
-                    break;
-                _y = Math.min(image.y, _y);
-                _sizey = Math.max(image.sizey, _sizey);
-                images = [image.source.replace(prefix[0], '').replace(prefix[1], ''), ...images];
-            }
-            images = [...images, img.replace(prefix[0], '').replace(prefix[1], '')];
-            let opts = {direction: false, align: 'start'};
-            let _source = await mergeImages(images, opts);
-            return [_x, _sizex, _y, _sizey, _source];
         },
 
         async _on_spec_stack_figure_data(json_data) {
@@ -630,6 +668,71 @@ export default {
             );
         },
 
+        reset_view() {
+            this.reset_figure_cache();
+            this.reset_figures();
+            this.update_figures();
+        },
+
+        reset_figures() {
+            this.heatmap_layout = this.shallow_copy(this.figure_layouts.heatmap_layout);
+            this.heatmap_data = [];
+            this.spec_stack_layout = this.shallow_copy(this.figure_layouts.spec_stack_layout);
+            this.spec_stack_data = [];
+            this.timeseries_layout = this.shallow_copy(this.figure_layouts.timeseries_layout);
+            this.timeseries_data = [];
+        },
+
+        reset_figure_cache() {
+            // this.figure_cache = {'t_maxrange': [Number.MAX_SAFE_INTEGER, 0],
+            //                      'mz_maxrange': [Number.MAX_SAFE_INTEGER, 0], };
+            this.figure_cache = {'t_maxrange': [0, 0],
+                                 'mz_maxrange': [0, 0], };
+            this.zoom_stack = [];
+        },
+
+        shallow_copy(o) {
+            let _o = JSON.stringify(o);
+            if ( _.isUndefined(_o) )
+                return _o;
+            return JSON.parse(_o);
+        },
+
+        to_figure_cache_index(mz_range) {
+            return [mz_range[0].toFixed(this.cache_index_rank), mz_range[1].toFixed(this.cache_index_rank)];
+        },
+
+        async update_figures(zoom_stack_item=null) {
+            // the function is destructive for zoom_stack_item - don't use refs
+            var self = this;
+            if ( !_.isNull(zoom_stack_item) ) {
+                let cache_item = self.get_figure_cache_item(zoom_stack_item.mz_range);
+                let mz_range = zoom_stack_item.mz_range;
+                let t_range = zoom_stack_item.t_range;
+                cache_item.heatmap_layout.xaxis.range = t_range;
+                cache_item.heatmap_layout.yaxis.range = mz_range;
+                self.heatmap_layout = cache_item.heatmap_layout;
+                cache_item.spec_stack_layout.xaxis.range = mz_range;
+                cache_item.spec_stack_layout.yaxis.range = [ t_range[0], t_range[1]+5];
+                self.spec_stack_layout = cache_item.spec_stack_layout;
+                cache_item.timeseries_layout.xaxis.range = t_range;
+                self.timeseries_data = cache_item.timeseries_data || [];
+                self.timeseries_layout = cache_item.timeseries_layout;
+            }
+            await Plotly.react("heatmap-figure",
+                                self.heatmap_data,
+                                self.heatmap_layout
+                                );
+            await Plotly.react("spec-stack-figure",
+                                self.spec_stack_data,
+                                self.spec_stack_layout
+                                );
+            await Plotly.react("timeseries-figure",
+                                self.timeseries_data,
+                                self.timeseries_layout
+                                );
+        },
+
         visualize_range_on_zoom_in(prev_ranges, new_ranges, volatile=false) {
             let self = this;
             if ( _.isUndefined(prev_ranges) || _.isUndefined(new_ranges) ) {
@@ -746,128 +849,10 @@ export default {
             self.figure_cache_release_ref(zoom_stack_item_to_remove.mz_range);
         },
 
-        shallow_copy(o) {
-            let _o = JSON.stringify(o);
-            if ( _.isUndefined(_o) )
-                return _o;
-            return JSON.parse(_o);
-        },
-
         ZoomStackItem: function(t_range, mz_range, volatile=false) {
             this.t_range = t_range;
             this.mz_range = mz_range;
             this.volatile = volatile;
-        },
-
-        reset_figures() {
-            this.heatmap_layout = this.shallow_copy(this.figure_layouts.heatmap_layout);
-            this.heatmap_data = [];
-            this.spec_stack_layout = this.shallow_copy(this.figure_layouts.spec_stack_layout);
-            this.spec_stack_data = [];
-            this.timeseries_layout = this.shallow_copy(this.figure_layouts.timeseries_layout);
-            this.timeseries_data = [];
-        },
-
-        reset_figure_cache() {
-            // this.figure_cache = {'t_maxrange': [Number.MAX_SAFE_INTEGER, 0],
-            //                      'mz_maxrange': [Number.MAX_SAFE_INTEGER, 0], };
-            this.figure_cache = {'t_maxrange': [0, 0],
-                                 'mz_maxrange': [0, 0], };
-            this.zoom_stack = [];
-        },
-
-        adjust_ranges_to_grid_spacing(x0, x1, y0, y1) {
-            let _x0_l = x0 - this.grid_spacing;
-            let _x0_r = x0 + this.grid_spacing;
-            if ( _x0_l.toFixed(this.cache_index_rank) != _x0_r.toFixed(this.cache_index_rank) ) {
-                x0 = _x0_l.toFixed(this.cache_index_rank);
-                x0 = parseFloat(Math.abs(x0)); // abs to avoid -0
-            }
-            let _x1_l = x1 - this.grid_spacing;
-            let _x1_r = x1 + this.grid_spacing;
-            if ( _x1_l.toFixed(this.cache_index_rank) != _x1_r.toFixed(this.cache_index_rank) ) {
-                x1 = _x1_r.toFixed(this.cache_index_rank);
-                x1 = parseFloat(x1);
-            }
-            let _y0_l = y0 - this.grid_spacing;
-            let _y0_r = y0 + this.grid_spacing;
-            if ( _y0_l.toFixed(this.cache_index_rank) != _y0_r.toFixed(this.cache_index_rank) ) {
-                y0 = _y0_l.toFixed(this.cache_index_rank)
-                y0 = parseFloat(y0);
-            }
-            let _y1_l = y1 - this.grid_spacing;
-            let _y1_r = y1 + this.grid_spacing;
-            if ( _y1_l.toFixed(this.cache_index_rank) != _y1_r.toFixed(this.cache_index_rank) ) {
-                y1 = _y1_r.toFixed(this.cache_index_rank);
-                y1 = parseFloat(y1);
-            }
-            return [x0, x1, y0, y1];
-        },
-
-        async update_figures(zoom_stack_item=null) {
-            // the function is destructive for zoom_stack_item - don't use refs
-            var self = this;
-            if ( !_.isNull(zoom_stack_item) ) {
-                let cache_item = self.get_figure_cache_item(zoom_stack_item.mz_range);
-                let mz_range = zoom_stack_item.mz_range;
-                let t_range = zoom_stack_item.t_range;
-                cache_item.heatmap_layout.xaxis.range = t_range;
-                cache_item.heatmap_layout.yaxis.range = mz_range;
-                self.heatmap_layout = cache_item.heatmap_layout;
-                cache_item.spec_stack_layout.xaxis.range = mz_range;
-                cache_item.spec_stack_layout.yaxis.range = [ t_range[0], t_range[1]+5];
-                self.spec_stack_layout = cache_item.spec_stack_layout;
-                cache_item.timeseries_layout.xaxis.range = t_range;
-                self.timeseries_data = cache_item.timeseries_data || [];
-                self.timeseries_layout = cache_item.timeseries_layout;
-            }
-            await Plotly.react("heatmap-figure",
-                                self.heatmap_data,
-                                self.heatmap_layout
-                                );
-            await Plotly.react("spec-stack-figure",
-                                self.spec_stack_data,
-                                self.spec_stack_layout
-                                );
-            await Plotly.react("timeseries-figure",
-                                self.timeseries_data,
-                                self.timeseries_layout
-                                );
-        },
-
-        to_figure_cache_index(mz_range) {
-            return [mz_range[0].toFixed(this.cache_index_rank), mz_range[1].toFixed(this.cache_index_rank)];
-        },
-
-        get_figure_cache_item(mz_range) {
-            if ( _.isUndefined(mz_range) )
-                return mz_range;
-            return this.figure_cache[this.to_figure_cache_index(mz_range)];
-        },
-
-        figure_cache_add_ref(mz_range) {
-            let _mz_range = this.to_figure_cache_index(mz_range);
-            if ( Object.keys(this.figure_cache).includes(_mz_range.toString()) ) {
-                ++this.figure_cache[_mz_range].ref_count;
-                return this.figure_cache[_mz_range];
-            }
-            this.figure_cache[_mz_range] = {'ref_count': 1,
-                                           'mz_range': _mz_range,
-                                        //    't_filled_range': [Number.MAX_SAFE_INTEGER, 0],
-                                           't_filled_range': [0, 0],
-                                           'heatmap_layout': this.shallow_copy(this.figure_layouts.heatmap_layout),
-                                           'spec_stack_layout': this.shallow_copy(this.figure_layouts.spec_stack_layout),
-                                           'timeseries_layout': this.shallow_copy(this.figure_layouts.timeseries_layout),
-                                           'timeseries_data': [], };
-            return this.figure_cache[_mz_range];
-        },
-
-        figure_cache_release_ref(mz_range) {
-            let _mz_range = this.to_figure_cache_index(mz_range);
-            let cache_item = this.figure_cache[_mz_range];
-            cache_item.ref_count--;
-            if ( cache_item.ref_count <= 0 )
-                delete this.figure_cache[_mz_range];
         },
 
     },
@@ -878,7 +863,7 @@ export default {
             if (!this.acquisition_control_active) {
                 return
             }
-            
+            //
             if ( _.isEqual(new_value, old_value) ) {
                 return false;
             }
@@ -887,13 +872,16 @@ export default {
                 this.reset_figures();
             }
         },
+        experiment_selected: function() {
+            this.reset_view();
+        },
         figure_ranges: function(new_value, old_value) {
             // TODO: quick&dirty fix to dismiss acquisition notifications
             if (new_value.filename !== this.filename &&
                 !this.acquisition_control_active) {
                 return
             }
-
+            //
             this.on_figure_ranges(new_value, old_value);
         },
         heatmap_figure_data: function(new_value) {
@@ -901,24 +889,8 @@ export default {
             if (new_value.filename !== this.filename) {
                 return
             }
-
+            //
             this.on_heatmap_figure_data(new_value);
-        },
-        timeseries_figure_data: function(new_value) {
-            // TODO: quick&dirty fix to dismiss acquisition notifications
-            if (new_value.filename !== this.filename) {
-                return
-            }
-
-            this.on_timeseries_figure_data(new_value);
-        },
-        spec_stack_figure_data: function(new_value) {
-            // TODO: quick&dirty fix to dismiss acquisition notifications
-            if (new_value.filename !== this.filename) {
-                return
-            }
-
-            this.on_spec_stack_figure_data(new_value);
         },
         sample_to_load: function(new_value, old_value) {
             if ( _.isEqual(new_value, old_value) ) {
@@ -939,6 +911,14 @@ export default {
                 't_range': null,
                 'mz_range': null
                 };
+        },
+        spec_stack_figure_data: function(new_value) {
+            // TODO: quick&dirty fix to dismiss acquisition notifications
+            if (new_value.filename !== this.filename) {
+                return
+            }
+            //
+            this.on_spec_stack_figure_data(new_value);
         },
         target_to_display: function(new_value, old_value) {
             if ( _.isEqual(new_value, old_value) || _.isEmpty(this.filename) ) {
@@ -968,6 +948,14 @@ export default {
                             }];
             // Make volatile zoom-in
             this.visualize_range_on_zoom_in(prev_ranges, new_ranges, true);
+        },
+        timeseries_figure_data: function(new_value) {
+            // TODO: quick&dirty fix to dismiss acquisition notifications
+            if (new_value.filename !== this.filename) {
+                return
+            }
+            //
+            this.on_timeseries_figure_data(new_value);
         },
         tps_parameters: function(new_value, old_value) {
             if ( _.isEmpty(new_value) || _.isEqual(new_value, old_value) ) {

@@ -38,7 +38,8 @@
                                     placeholder="Select a project"
                                     v-model="sample_project"
                                     required
-                                    expanded>
+                                    expanded
+                                    disabled>
                                     <option
                                         v-for="p in projects"
                                         :value="p.id"
@@ -53,9 +54,10 @@
                                     placeholder="Select an experiment"
                                     v-model="sample_experiment"
                                     required
-                                    expanded>
+                                    expanded
+                                    disabled>
                                     <option
-                                        v-for="e in experiments"
+                                        v-for="e in experiments_ui"
                                         :value="e.id"
                                         :key="e.id">
                                         {{ e.id }}
@@ -245,7 +247,8 @@
                                     @click="is_sample_attribute_modal_active=true"
                                     outlined
                                     inverted
-                                    size="is-small">
+                                    size="is-small"
+                                    :disabled="!sample_file.length">
                                     Sample attributes
                                 </b-button>
                                 <div><br></div>
@@ -376,6 +379,7 @@ export default {
             import_min_datetime: null,
             import_max_datetime: new Date(),
             // variables for sample import modal
+            experiments_ui: [],
             import_sample_table_loading: true,
             import_sample_table_rows: [],
             import_sample_table_cols: [],
@@ -493,6 +497,22 @@ export default {
             this.sample_description = "";
             this.is_sample_attribute_modal_active = true;
         },
+        experiment_selected: function(new_value, old_value) {
+            if ( _.isEqual(new_value, old_value) ) {
+                return false;
+            }
+            this.sample_file = "";
+            this.sample_name = "";
+            this.sample_description = "";
+            this.sample_project = this.project_selected.id;
+            this.sample_experiment = new_value.id;
+        },
+        experiments: function(new_value) {
+            if (!_.isEqual(new_value.project, this.project_selected.id)) {
+                return
+            }
+            this.experiments_ui = new_value.experiments;
+        },
         h5_table_checked_rows: function(new_value, old_value) {
             if ( _.isEqual(new_value, old_value) ) {
                 return false;
@@ -520,10 +540,7 @@ export default {
                 this.import_sample_table_checked_rows = [last_selection,];
             }
         },
-        importable_samples: function(new_data, old_data){
-            if ( _.isEqual(new_data, old_data) ) {
-                return false;
-            }
+        importable_samples: function(new_data){
             for (let i=0; i<new_data.cols.length; i++) {
                 new_data.cols[i]['searchable'] = true;
             }
@@ -531,10 +548,35 @@ export default {
             this.import_sample_table_rows = new_data.rows;
             this.import_sample_table_loading = false;
         },
-        samples: function(new_data, old_data){
-            if ( _.isEqual(new_data, old_data) ) {
+        project_selected: function(new_value, old_value) {
+            if ( _.isEqual(new_value, old_value) ) {
                 return false;
             }
+            this.sample_project = new_value.id;
+        },
+        samples: function(new_data){
+            // TODO: quick&dirty fix to close sample attribute popup in acquisition mode
+            // if another client saved them first
+            if (this.acquisition_control_active) {
+                let sample_in_new_data = false;
+                for (let i=0; i<new_data.rows.length; i++) {
+                    if (_.isEqual(new_data.rows[i].id, this.sample_file)) {
+                        sample_in_new_data = true;
+                        break;
+                    }
+                }
+                if (sample_in_new_data) {
+                    // Close pop-up
+                    this.is_sample_attribute_modal_active = false;
+                }
+            }
+            // TODO: quick&dirty fix to drop undesired sample update
+            if ( !_.isEqual(new_data.project, this.project_selected.id) ||
+                 !_.isEqual(new_data.experiment, this.experiment_selected.id) ) {
+                     console.log("samples update ignored");
+                return
+            }
+            //
             this.sample_table_cols = new_data.cols;
             this.sample_table_rows = new_data.rows;
         },
@@ -543,13 +585,11 @@ export default {
                 return false;
             }
             var last_selection = [...new_value].pop();
-
             // sample_table_checked_rows manipulates multi-row selection,
             // but by design limitation, it should be a single row selection
             if ( this.sample_table_checked_rows.length > 1 ) {
                 this.sample_table_checked_rows = [last_selection,];
             }
-
             // TODO: clean up figures
             // check if the vuex props should be mapped to local props
             this.$store.commit('heatmap_figure_data', {});
@@ -568,18 +608,6 @@ export default {
             } else {
                 this.sample_to_load = {'filename': ""};
             }
-        },
-        project_selected: function(new_value, old_value) {
-            if ( _.isEqual(new_value, old_value) ) {
-                return false;
-            }
-            this.sample_project = new_value.id;
-        },
-        experiment_selected: function(new_value, old_value) {
-            if ( _.isEqual(new_value, old_value) ) {
-                return false;
-            }
-            this.sample_experiment = new_value.id;
         },
     }
 };

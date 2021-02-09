@@ -323,7 +323,7 @@
                                                     required 
                                                     expanded>
                                                     <option
-                                                        v-for="e in experiments"
+                                                        v-for="e in experiments_ui"
                                                         :value="e.id"
                                                         :key="e.id">
                                                         {{ e.id }}
@@ -358,6 +358,7 @@
 <script type = "text/javascript" >
 "use strict";
 import Vue from "vue";
+import { mapState } from 'vuex'
 import Buefy from "buefy";
 
 import "buefy/dist/buefy.css";
@@ -365,7 +366,7 @@ import '@mdi/font/css/materialdesignicons.min.css';
 
 Vue.use([Buefy]);
 
-// var _ = require('underscore');
+var _ = require('underscore');
 // var dialog = require("electron").remote.dialog;
 //var remote = require('electron').remote;
 
@@ -423,6 +424,7 @@ export default {
                 description: ""
                 },
             // Experiment metadata
+            experiments_ui: [],
             experiment: {
                 title: "",
                 description: ""
@@ -440,6 +442,10 @@ export default {
         }
     },
     computed: {
+        ...mapState([
+                'experiments',
+                'projects',
+                ]),
         active_tab: {
             get() {
                 return this.$store.state.active_tab;
@@ -464,14 +470,6 @@ export default {
                 this.$store.commit('project_selected', value);
             }
         },
-        projects: {
-            get() {
-                return this.$store.state.projects;
-            },
-            set(value) {
-                this.$store.commit('projects', value);
-            }
-        },
         experiment_selected: {
             get() {
                 return this.$store.state.experiment_selected;
@@ -480,16 +478,14 @@ export default {
                 this.$store.commit('experiment_selected', value);
             }
         },
-        experiments: {
-            get() {
-                return this.$store.state.experiments;
-            },
-            set(value) {
-                this.$store.commit('experiments', value);
-            }
-        },
     },
     watch: {
+        experiments: function(new_value) {
+            if (!_.isEqual(new_value.project, this.project_selected.id)) {
+                return
+            }
+            this.experiments_ui = new_value.experiments;
+        },
         'instrument.polarity': function(polarity) {
             this.reagents = all_reagents.filter(function(el){
                 return el.polarity === polarity
@@ -581,9 +577,9 @@ export default {
                 return
             }
             // Find experiment description
-            for (let i in this.experiments) {
-                if(this.experiments[i].id === this.experiment.title){
-                    this.experiment.description = this.experiments[i].attributes.description;
+            for (let i in this.experiments_ui) {
+                if(this.experiments_ui[i].id === this.experiment.title){
+                    this.experiment.description = this.experiments_ui[i].attributes.description;
                 }
             }
             this.experiment_selected = {'id': this.experiment.title,

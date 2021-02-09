@@ -264,7 +264,7 @@ class DataPool():
             experiments.append({'id': experiment,
                                 'attributes': experiment_attrs
                                 })
-        return experiments
+        return {'project': project, 'experiments': experiments}
 
     def get_projects(self):
         project_titles = self.pool.keys()
@@ -309,9 +309,14 @@ class DataPool():
                          }
                         for attr in attrs
                         ]
-        return {'rows': sample_table_rows,
-                'cols': sample_table_cols
-                }
+        sample_table_data = {'rows': sample_table_rows,
+                             'cols': sample_table_cols
+                             }
+        if project is not None:
+            sample_table_data.update({'project': project})
+        if experiment is not None:
+            sample_table_data.update({'experiment': experiment})
+        return sample_table_data
 
     def new_project(self, project, attributes):
         project_path = os.path.join(self.projects_root, project)
