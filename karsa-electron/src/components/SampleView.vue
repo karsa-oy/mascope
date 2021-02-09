@@ -248,8 +248,8 @@ export default {
             }
             this.figure_cache[_mz_range] = {'ref_count': 1,
                                            'mz_range': _mz_range,
-                                        //    't_filled_range': [Number.MAX_SAFE_INTEGER, 0],
-                                           't_filled_range': [0, 0],
+                                           't_filled_range': [Number.MAX_SAFE_INTEGER, 0],
+                                        //    't_filled_range': [0, 0],
                                            'heatmap_layout': this.shallow_copy(this.figure_layouts.heatmap_layout),
                                            'spec_stack_layout': this.shallow_copy(this.figure_layouts.spec_stack_layout),
                                            'timeseries_layout': this.shallow_copy(this.figure_layouts.timeseries_layout),
@@ -796,7 +796,30 @@ export default {
             self.update_figures(cur_ranges);
             // Request new visualizations if needed
             if (mz_range_updated) {
+                // mz_range changed, request full t_range in the new mz_range
                 this.visualize_range = {...cur_ranges, 'filename': this.filename};
+                return
+            }
+            if (t_range_updated) {
+                // Fill in t gap (range extended by dragging the axis from corner)
+                let t_filled_range = cache_item.t_filled_range;
+                let mz_range = cur_ranges.mz_range;
+                if (t0 < t_filled_range[0]) {
+                    let t_range_to_fill = [t0, t_filled_range[0]];
+                    this.visualize_range = {'mz_range': mz_range,
+                                            't_range': t_range_to_fill, 
+                                            'filename': this.filename
+                                            };
+                    return
+                }
+                if (t1 > t_filled_range[1]) {
+                    let t_range_to_fill = [t_filled_range[1], t1];
+                    this.visualize_range = {'mz_range': mz_range,
+                                            't_range': t_range_to_fill, 
+                                            'filename': this.filename
+                                            };
+                    return
+                }
             }
         },
 

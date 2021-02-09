@@ -288,8 +288,8 @@ class DataVizServiceNamespace(BaseClientNamespace):
 
     async def on_acquisition_finished(self, data):
         global visualizers
-        visualizer = viz_cache_pop(visualizers, data)
-        #visualizer = viz_cache_get(visualizers, data)
+        #visualizer = viz_cache_pop(visualizers, data)
+        visualizer = viz_cache_get(visualizers, data)
         kwargs = get_client_notification_args(data)
         if isinstance(visualizer, SignalVisualizer):
             await visualizer.flush_visualizations(**kwargs)
@@ -312,7 +312,6 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                     'image_to_save',
                                     image_data,
                                     **kwargs )
-
 
     async def on_tps_parameter_info(self, data):
         value = data['value']
