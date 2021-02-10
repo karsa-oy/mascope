@@ -161,7 +161,16 @@ def gen_heatmap_image(data_xarray,
         mz_range = (mz0, mz1)
 
     # Replace values < 0 with nan (not to be visualized, not to blow up the scale)
-    data_xarray = data_xarray.where(data_xarray >= 0) 
+    data_xarray = data_xarray.where(data_xarray >= 0)
+    
+    # Check if only zeros in the range
+    sum_signal = data_xarray.sel(time=slice(*t_range),
+                                 mz=slice(*mz_range)
+                                 ).sum().compute().item()
+    if sum_signal == 0:
+        # No need to compute, just return black
+        img = Image.new('RGBA', (img_width, img_height), (0, 0, 0))
+        return img
 
     cvs = ds.Canvas(x_range=t_range,
                     y_range=mz_range,
@@ -323,10 +332,12 @@ def gen_spec_image(data_xarray,
 
     if y_range is None:
         # Set y_range[1] to max of signal
-        ymax = float( y.max() )
-        # Make sure yrange[1] not zero
-        ymax = max(1e-5, ymax)
-        y_range = (0, ymax)
+        y_max = float( y.max() )
+        y_range = (0, y_max)
+    # Make sure yrange[1] not zero
+    y1 = max(1e-5, y_range[1])
+    y_range = (y_range[0], y1)
+
     # mz axis
     mz = data_xarray.mz.data
     # Generate image for single trace
