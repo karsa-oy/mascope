@@ -41,32 +41,48 @@ datapool = DataPool(data_path, projects_path)
 
 # signal_cache = {
 #     'filename': {'array': signal_array,
-#                  'sids': {sid: {'ctx': {'speci': speci}
-#                                 }
+#                  'owners': {
+#                             sid: {'ranges': ['ranges_1', 'ranges_2', ...],
+#                                   'ctx': {'speci': speci, ...},
+#                                  }
 #                           }
 #                  }
 #     }
+# signal_cache = dict(fname= dict(array= None,
+#                                 owners= dict(sid=dict(ranges=[],
+#                                                       env=dict()))
 
 signal_cache = {}
 tps_cache = {}
 
-cache_item = namedtuple('cache_item', 'ranges, array')
+# cache_item = namedtuple('cache_item', 'ranges, array')
 
 def cache_get_keys(cache, data):
     sid = data['cookies']['src_sid'][0]
     fname = data['value'].get('filename')
-    return sid, fname
+    mz_range = data['value'].get('mz_range')
+    t_range = data['value'].get('t_range')
+    ranges = str([(mz_range or []) , (t_range or [])])
+    return sid, fname, ranges, mz_range, t_range
 
 def cache_contains(cache, data):
-    sid, fname = cache_get_keys(cache, data)
-    return sid in cache and fname in cache[sid]
+    sid, fname, ranges, _, _ = cache_get_keys(cache, data)
+    return fname in cache and \
+           sid in cache[fname]['owners'] and \
+           ranges in cache[fname]['owners'][sid][ranges]
 
 def cache_get(cache, data):
-    sid, fname = cache_get_keys(cache, data)
+    sid, fname, ranges, _, _  = cache_get_keys(cache, data)
     try:
-        return cache[sid][fname].array
+        res = cache[fname]['array']
     except KeyError:
         return None
+    # add refs to the array, if missing
+    if sid not in cache[fname]['owners']:
+        cache[fname]['owners'][sid] = dict(ranges=[], env=dict())
+    if ranges not in cache[fname]['owners'][sid]['ranges']:
+        cache[fname]['owners'][sid]['ranges'].append(ranges)
+    return res
 
 def cache_put(cache, data, array):
     """
@@ -75,18 +91,15 @@ def cache_put(cache, data, array):
     while ranges may differ (zoom in/out), array must be the same.
     Only ranges at first put are stored (in order to track corresponding pop)
     """
-    sid, fname = cache_get_keys(cache, data)
-    if sid not in cache:
-        cache[sid] = {}
-    if fname in cache[sid]:
-        if array != cache[sid][fname].array:
+    sid, fname, ranges, _, _ = cache_get_keys(cache, data)
+    if fname in cache[fname] and cache[fname]['array']:
+        if array != cache[fname]['array']:
             raise ValueError("Putting new array on top of existing one not allowed:",
-                             f"{array} vs. {cache[sid][fname].array}")
-        return
-    mz_range = data['value'].get('mz_range', [])
-    t_range = data['value'].get('t_range', [])
-    ranges = [mz_range, t_range]
-    cache[sid][fname] = cache_item(str(ranges), array)
+                             f"{array} vs. {cache[fname]['array']}")
+    else:
+        cache[fname] = dict(array= array,
+                            owners= dict(sid=dict(ranges=[ranges, ], env=dict()))
+    return cache_get(data)
 
 def cache_release(cache, data):
     """
@@ -96,18 +109,14 @@ def cache_release(cache, data):
     equal to that stored in the cache_item(range, array); thus, cache_release for
     zoom-in ranges in effect do not release the value.
     """
-    sid, fname = cache_get_keys(cache, data)
-    mz_range = data['value'].get('mz_range', [])
-    t_range = data['value'].get('t_range', [])
-    ranges = [mz_range, t_range]
+    sid, fname, ranges, _, _ = cache_get_keys(cache, data)
     try:
-        if mz_range or t_range:
-            if cache[sid][fname].ranges == str(ranges):
-                cache[sid].pop(fname)
-        elif fname:
-            cache[sid].pop(fname)
+        if ranges:
+            cache[fname]['owners'][sid]['ranges'].remove(ranges):
         elif sid:
-            cache.pop(sid)
+            cache[fname]['owners'].pop(sid)
+        elif fname:
+            cache.pop(fname)
     except KeyError:
         pass
 
