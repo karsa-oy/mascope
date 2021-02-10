@@ -60,16 +60,16 @@ tps_cache = {}
 def cache_get_keys(cache, data):
     sid = data['cookies']['src_sid'][0]
     fname = data['value'].get('filename')
-    mz_range = data['value'].get('mz_range')
-    t_range = data['value'].get('t_range')
-    ranges = str([(mz_range or []) , (t_range or [])])
+    mz_range = data['value'].get('mz_range', [])
+    t_range = data['value'].get('t_range', [])
+    ranges = str( [mz_range, t_range] )
     return sid, fname, ranges, mz_range, t_range
 
 def cache_contains(cache, data):
     sid, fname, ranges, _, _ = cache_get_keys(cache, data)
     return fname in cache and \
            sid in cache[fname]['owners'] and \
-           ranges in cache[fname]['owners'][sid][ranges]
+           ranges in cache[fname]['owners'][sid]['ranges']
 
 def cache_get(cache, data):
     sid, fname, ranges, _, _  = cache_get_keys(cache, data)
@@ -92,14 +92,18 @@ def cache_put(cache, data, array):
     Only ranges at first put are stored (in order to track corresponding pop)
     """
     sid, fname, ranges, _, _ = cache_get_keys(cache, data)
-    if fname in cache[fname] and cache[fname]['array']:
+    if fname in cache.keys() and cache[fname].get('array'):
         if array != cache[fname]['array']:
             raise ValueError("Putting new array on top of existing one not allowed:",
                              f"{array} vs. {cache[fname]['array']}")
     else:
-        cache[fname] = dict(array= array,
-                            owners= dict(sid=dict(ranges=[ranges, ], env=dict()))
-    return cache_get(data)
+        cache[fname] = dict(array=array,
+                            owners=dict(sid=dict(ranges=[ranges],
+                                                 env=dict()
+                                                 )
+                                        )
+                            )
+    return cache_get(cache, data)
 
 def cache_release(cache, data):
     """
@@ -112,7 +116,7 @@ def cache_release(cache, data):
     sid, fname, ranges, _, _ = cache_get_keys(cache, data)
     try:
         if ranges:
-            cache[fname]['owners'][sid]['ranges'].remove(ranges):
+            cache[fname]['owners'][sid]['ranges'].remove(ranges)
         elif sid:
             cache[fname]['owners'].pop(sid)
         elif fname:
