@@ -39,81 +39,76 @@ data_path = 'Data'
 projects_path = 'Projects'
 datapool = DataPool(data_path, projects_path)
 
-# signal_cache = {
-#     'filename': {'array': signal_array,
-#                  'owners': {
-#                             sid: {'ranges': ['ranges_1', 'ranges_2', ...],
-#                                   'ctx': {'speci': speci, ...},
-#                                  }
-#                           }
-#                  }
-#     }
-# signal_cache = dict(fname= dict(array= None,
-#                                 owners= dict(sid=dict(ranges=[],
-#                                                       env=dict()))
+# signal_cache = dict(fname = dict(array=None,
+#                                  owners=dict(sid=dict(ranges=[],
+#                                                       env=dict()
+#                                                       )
+#                                              )
 
 signal_cache = {}
 tps_cache = {}
 
-# cache_item = namedtuple('cache_item', 'ranges, array')
-
 def cache_get_keys(cache, data):
     sid = data['cookies']['src_sid'][0]
-    fname = data['value'].get('filename')
+    fname = data['value']['filename']
     mz_range = data['value'].get('mz_range', [])
     t_range = data['value'].get('t_range', [])
     ranges = str( [mz_range, t_range] )
-    return sid, fname, ranges, mz_range, t_range
+    return fname, sid, ranges
 
 def cache_contains(cache, data):
-    sid, fname, ranges, _, _ = cache_get_keys(cache, data)
+    fname, sid, ranges = cache_get_keys(cache, data)
     return fname in cache and \
            sid in cache[fname]['owners'] and \
            ranges in cache[fname]['owners'][sid]['ranges']
 
 def cache_get(cache, data):
-    sid, fname, ranges, _, _  = cache_get_keys(cache, data)
+    fname, sid, ranges = cache_get_keys(cache, data)
     try:
-        res = cache[fname]['array']
+        array = cache[fname]['array']
     except KeyError:
         return None
     # add refs to the array, if missing
     if sid not in cache[fname]['owners']:
-        cache[fname]['owners'][sid] = dict(ranges=[], env=dict())
+        # Add sid
+        cache[fname]['owners'][sid] = {'ranges': [], 'env': dict()}
     if ranges not in cache[fname]['owners'][sid]['ranges']:
+        # Add ranges
         cache[fname]['owners'][sid]['ranges'].append(ranges)
-    return res
+    return array
 
 def cache_put(cache, data, array):
     """
-    There may be only one cache element per cache_keys combination.
-    Adding element for same keys is allowed (in effect does nothing), but
-    while ranges may differ (zoom in/out), array must be the same.
-    Only ranges at first put are stored (in order to track corresponding pop)
+    Add a new cache item under 'fname' key, with references to 'sid' and 'ranges'.
     """
-    sid, fname, ranges, _, _ = cache_get_keys(cache, data)
+    fname, sid, ranges = cache_get_keys(cache, data)
     if fname in cache.keys() and cache[fname].get('array'):
+        # Cache item exists already
         if array != cache[fname]['array']:
             raise ValueError("Putting new array on top of existing one not allowed:",
                              f"{array} vs. {cache[fname]['array']}")
     else:
-        cache[fname] = dict(array=array,
-                            owners=dict(sid=dict(ranges=[ranges],
-                                                 env=dict()
-                                                 )
-                                        )
-                            )
-    return cache_get(cache, data)
+        # Add new item to cache
+        cache[fname] = {'array': array,
+                        'owners': {sid: {'ranges': [ranges],
+                                         'env': dict()
+                                         }
+                                   }
+                        }
 
 def cache_release(cache, data):
     """
-    Method for releasing cached resource. The value is released
-    by presence of a corresponding sid/fname key in the data.
-    If range is given in data, the value is released only if the range is
-    equal to that stored in the cache_item(range, array); thus, cache_release for
-    zoom-in ranges in effect do not release the value.
+    Method for releasing references to a cached resource, based on the presence of
+    'fname'/'sid'/'ranges' keys in 'data'.
+
+    If 'ranges' are given in 'data', only the reference to these particular ranges 
+    in 'fname' is removed.
+    If no 'ranges' but 'sid' is given, all references of the 'sid' to 'fname' are 
+    removed.
+    If only 'filename' is given, all references to the corresponding cache item are
+    removed.
     """
-    sid, fname, ranges, _, _ = cache_get_keys(cache, data)
+    fname, sid, ranges = cache_get_keys(cache, data)
     try:
         if ranges:
             cache[fname]['owners'][sid]['ranges'].remove(ranges)
