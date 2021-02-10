@@ -38,6 +38,15 @@ NO_DATA_LOGGING_DEFAULT = True
 data_path = 'Data'
 projects_path = 'Projects'
 datapool = DataPool(data_path, projects_path)
+
+# signal_cache = {
+#     'filename': {'array': signal_array,
+#                  'sids': {sid: {'ctx': {'speci': speci}
+#                                 }
+#                           }
+#                  }
+#     }
+
 signal_cache = {}
 tps_cache = {}
 
@@ -74,48 +83,43 @@ def cache_put(cache, data, array):
             raise ValueError("Putting new array on top of existing one not allowed:",
                              f"{array} vs. {cache[sid][fname].array}")
         return
-    mz_range = data['value'].get('mz_range')
-    t_range = data['value'].get('t_range')
-    ranges = [(mz_range or []) , (t_range or [])]
+    mz_range = data['value'].get('mz_range', [])
+    t_range = data['value'].get('t_range', [])
+    ranges = [mz_range, t_range]
     cache[sid][fname] = cache_item(str(ranges), array)
 
-def cache_pop(cache, data):
+def cache_release(cache, data):
     """
     Method for releasing cached resource. The value is released
     by presence of a corresponding sid/fname key in the data.
     If range is given in data, the value is released only if the range is
-    equal to that stored in the cache_item(range, array); thus, cache_pop for
+    equal to that stored in the cache_item(range, array); thus, cache_release for
     zoom-in ranges in effect do not release the value.
     """
     sid, fname = cache_get_keys(cache, data)
-    mz_range = data['value'].get('mz_range')
-    t_range = data['value'].get('t_range')
-    ranges = [(mz_range or []) , (t_range or [])]
-    res = None
+    mz_range = data['value'].get('mz_range', [])
+    t_range = data['value'].get('t_range', [])
+    ranges = [mz_range, t_range]
     try:
         if mz_range or t_range:
             if cache[sid][fname].ranges == str(ranges):
-                res = cache[sid].pop(fname)
-            else:
-                res = None
+                cache[sid].pop(fname)
         elif fname:
-            res = cache[sid].pop(fname)
+            cache[sid].pop(fname)
         elif sid:
-            res = cache.pop(sid)
+            cache.pop(sid)
     except KeyError:
-        res = None
-    return res
-
-def data_request_stopped(data):
-    return not cache_contains(signal_cache, data)
+        pass
 
 async def kill_cache(data):
     global signal_cache
     global tps_cache
-    signal_array = cache_pop(signal_cache, data)
+    signal_array = cache_get(signal_cache, data)
+    cache_release(signal_cache, data)
     if isinstance(signal_array, ExtendableDataArray):
         await signal_array.flush()
-    tps_array = cache_pop(tps_cache, data)
+    tps_array = cache_get(tps_cache, data)
+    cache_release(tps_cache, data)
     if isinstance(tps_array, ExtendableDataArray):
         await tps_array.flush()
 
@@ -183,7 +187,6 @@ class FileServiceNamespace(BaseClientNamespace):
             t0 = float( signal_array.time[0] )
             t1 = float( signal_array.time[-1] )
             t_range = [t0, t1]
-            # print(f"t_range: {t_range}")
 
         signal = signal_array.signal.sel(
                     mz=slice(*mz_range),
@@ -240,7 +243,8 @@ class FileServiceNamespace(BaseClientNamespace):
         if stream_data:
             self.speci = 0
             for i, spec_array in enumerate(signal.transpose()):
-                if data_request_stopped(data):
+                if not cache_contains(signal_cache, data):
+                    # Request has been cancelled
                     break
                 while i - self.speci > 5:
                     await asyncio.sleep(.15)
@@ -257,8 +261,6 @@ class FileServiceNamespace(BaseClientNamespace):
                                                     callback="speci_callback",
                                                     **kwargs
                                                     )
-
-        cache_pop(signal_cache, data)
         await self.emit_client_notification('data_stream_finished',
                                             {'filename': filename,
                                              'mz_range': mz_range,
@@ -271,15 +273,13 @@ class FileServiceNamespace(BaseClientNamespace):
         self.speci = n
 
     async def on_stop_data_request(self, data):
-        d = deepcopy(data)
-        ranges = d['value'].pop('ranges', None)
-        if not ranges:
-            await kill_cache(data)
-            return
+        global signal_cache
+        ranges = data['value'].pop('ranges', [])
         for r in ranges:
-            d['value']['mz_range'] = r[0]
-            d['value']['t_range'] = r[1]
-            await kill_cache(d)
+            data['value'].update({'mz_range': r['mz_range']})
+            data['value'].update({'t_range': r['t_range']})
+            await kill_cache(data)
+        await kill_cache(data)
 
     async def on_experiment_selected(self, data):
         value = data['value']
@@ -444,7 +444,8 @@ class FileServiceNamespace(BaseClientNamespace):
                             )
         self.tps_speci = 0
         for i, param_array in enumerate(tps_data.transpose()):
-            if data_request_stopped(data):
+            if not cache_contains(tps_cache, data):
+                # Request has been cancelled
                 break
             while i - self.tps_speci > 5:
                 await asyncio.sleep(.15)
@@ -547,12 +548,13 @@ class FileServiceNamespace(BaseClientNamespace):
         filename_base = value.get('filename')
         filename = base_to_zarr_filename(filename_base, 'signal')
         print("Finished acquiring file: %s" %filename)
-
         signal_array = cache_get(signal_cache, data)
-        signal_array and await signal_array.flush()  # TODO: signal_array is None on killing acquisition from MainUI
-
+        cache_release(signal_cache, data)
+        if signal_array:
+            await signal_array.flush()  # TODO: signal_array is None on killing acquisition from MainUI
         tps_array = cache_get(tps_cache, data)
-        tps_array and await tps_array.flush()      # TODO: tps_array is None on killing acquisition from MainUI
+        if tps_array:
+            await tps_array.flush()      # TODO: tps_array is None on killing acquisition from MainUI
 
     # ------------------------------
     

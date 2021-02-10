@@ -496,6 +496,7 @@ export default {
             this.sample_name = sample_no.toString().padStart(3, '0') + '_';
             this.sample_description = "";
             this.is_sample_attribute_modal_active = true;
+            this.sample_table_checked_rows = [];
         },
         experiment_selected: function(new_value, old_value) {
             if ( _.isEqual(new_value, old_value) ) {

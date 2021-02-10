@@ -21,7 +21,7 @@
 
     "heatmap_layout": {
 		"images": [],
-		"height": 425,
+		"height": 440,
 		"title": "",
 		"margin": {
 			"l": 40,
@@ -58,7 +58,7 @@
     },
     
 	"timeseries_layout": {
-		"height": 425,
+		"height": 440,
 		"font": {
 			"color": "#fff"
 		},

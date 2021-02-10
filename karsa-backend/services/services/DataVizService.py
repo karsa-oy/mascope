@@ -68,7 +68,7 @@ def viz_cache_put(viz_cache, data, viz):
         viz_cache[sid][fname] = {}
     viz_cache[sid][fname][ranges] = viz
 
-def viz_cache_pop(viz_cache, data):
+def viz_cache_release(viz_cache, data):
     """
     Method for releasing viz_cached resource. The value is released
     by presence of a corresponding sid/fname/ranges key in the data
@@ -77,26 +77,26 @@ def viz_cache_pop(viz_cache, data):
                                                             viz_cache,
                                                             data
                                                             )
-    res = None
     try:
         if fname:
             if not mz_range and not t_range:
-                res = viz_cache[sid].pop(fname)
+                viz_cache[sid].pop(fname)
             else:
-                res = viz_cache[sid][fname].pop(ranges)
+                viz_cache[sid][fname].pop(ranges)
         else:
-            res = viz_cache.pop(sid)
+            viz_cache.pop(sid)
     except KeyError:
-        res = None
-    return res
+        pass
 
 async def kill_cache(data):
     global visualizers
     global tps_visualizers
-    visualizer = viz_cache_pop(visualizers, data)
+    visualizer = viz_cache_get(visualizers, data)
+    viz_cache_release(visualizers, data)
     if isinstance(visualizer, SignalVisualizer):
         await visualizer.flush_visualizations(**get_client_notification_args(data))
-    tps_visualizer = viz_cache_pop(tps_visualizers, data)
+    tps_visualizer = viz_cache_get(tps_visualizers, data)
+    viz_cache_release(tps_visualizers, data)
     if isinstance(tps_visualizer, TPSVisualizer):
         await visualizer.flush_visualizations(**get_client_notification_args(data))
 
@@ -173,8 +173,8 @@ class DataVizServiceNamespace(BaseClientNamespace):
             await kill_cache(data)
             return
         for r in ranges:
-            d['value']['mz_range'] = r[0]
-            d['value']['t_range'] = r[1]
+            d['value']['mz_range'] = r['mz_range']
+            d['value']['t_range'] = r['t_range']
             await kill_cache(d)
 
     async def on_tps_parameters_selected(self, data):
@@ -288,8 +288,8 @@ class DataVizServiceNamespace(BaseClientNamespace):
 
     async def on_acquisition_finished(self, data):
         global visualizers
-        #visualizer = viz_cache_pop(visualizers, data)
         visualizer = viz_cache_get(visualizers, data)
+        viz_cache_release(visualizers, data)
         kwargs = get_client_notification_args(data)
         if isinstance(visualizer, SignalVisualizer):
             await visualizer.flush_visualizations(**kwargs)
