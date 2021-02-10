@@ -87,6 +87,12 @@ def cache_put(cache, data, array):
         if array != cache[fname]['array']:
             raise ValueError("Putting new array on top of existing one not allowed:",
                              f"{array} vs. {cache[fname]['array']}")
+        if sid not in cache[fname]['owners']:
+            # Add sid
+            cache[fname]['owners'][sid] = {'ranges': [], 'env': dict()}
+        if ranges not in cache[fname]['owners'][sid]['ranges']:
+            # Add ranges
+            cache[fname]['owners'][sid]['ranges'].append(ranges)
     else:
         # Add new item to cache
         cache[fname] = {'array': array,
