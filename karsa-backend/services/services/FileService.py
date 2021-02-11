@@ -39,16 +39,18 @@ data_path = 'Data'
 projects_path = 'Projects'
 datapool = DataPool(data_path, projects_path)
 
-# signal_cache = dict(fname = dict(array=None,
-#                                  owners=dict(sid=dict(ranges=[],
-#                                                       env=dict()
-#                                                       )
-#                                              )
+# cache = dict(fname=dict(object_name={'item'=None,
+#                                      'owners'=dict(sid={'ranges': [],
+#                                                        'env': dict()
+#                                                         }
+#                                                    )
+#                                      }
+#                         )
+#              )
 
-signal_cache = {}
-tps_cache = {}
+cache = {}
 
-def cache_get_keys(cache, data):
+def cache_get_keys(data):
     sid = data['cookies']['src_sid'][0]
     fname = data['value'].get('filename', None)
     mz_range = data['value'].get('mz_range', None)
@@ -56,108 +58,131 @@ def cache_get_keys(cache, data):
     ranges = str( [mz_range, t_range] )
     return fname, sid, ranges
 
-def cache_contains(cache, data):
-    fname, sid, ranges = cache_get_keys(cache, data)
-    return fname in cache and \
-           sid in cache[fname]['owners'] and \
-           ranges in cache[fname]['owners'][sid]['ranges']
+def cache_contains(data, obj_name):
+    fname, sid, ranges = cache_get_keys(data)
+    return (fname in cache and
+            obj_name in cache[fname] and
+            sid in cache[fname][obj_name]['owners'] and
+            ranges in cache[fname][obj_name]['owners'][sid]['ranges']
+            )
 
-def cache_get(cache, data):
-    fname, sid, ranges = cache_get_keys(cache, data)
+def cache_get(data, obj_name):
+    fname, sid, ranges = cache_get_keys(data)
     try:
-        array = cache[fname]['array']
+        obj = cache[fname][obj_name]['item']
     except KeyError:
         return None
-    # add refs to the array, if missing
-    if sid not in cache[fname]['owners']:
+    # add refs to the object, if missing
+    if sid not in cache[fname][obj_name]['owners']:
         # Add sid
-        cache[fname]['owners'][sid] = {'ranges': [], 'env': dict()}
-    if ranges not in cache[fname]['owners'][sid]['ranges']:
+        cache[fname][obj_name]['owners'][sid] = {'ranges': [], 'env': dict()}
+    if ranges not in cache[fname][obj_name]['owners'][sid]['ranges']:
         # Add ranges
-        cache[fname]['owners'][sid]['ranges'].append(ranges)
-    return array
+        cache[fname][obj_name]['owners'][sid]['ranges'].append(ranges)
+    return obj
 
-def cache_put(cache, data, array):
+def cache_put(data, obj_name, obj):
     """
     Add a new cache item under 'fname' key, with references to 'sid' and 'ranges'.
     """
-    fname, sid, ranges = cache_get_keys(cache, data)
-    if fname in cache.keys() and cache[fname].get('array'):
+    fname, sid, ranges = cache_get_keys(data)
+    if fname in cache and cache[fname].get(obj_name):
         # Cache item exists already
-        if array != cache[fname]['array']:
-            raise ValueError("Putting new array on top of existing one not allowed:",
-                             f"{array} vs. {cache[fname]['array']}")
-        if sid not in cache[fname]['owners']:
+        if obj != cache[fname][obj_name]['item']:
+            raise ValueError("Putting new object on top of existing one not allowed:",
+                             f"{obj} vs. {cache[fname][obj_name]['item']}")
+        if sid not in cache[fname][obj_name]['owners']:
             # Add sid
-            cache[fname]['owners'][sid] = {'ranges': [], 'env': dict()}
-        if ranges not in cache[fname]['owners'][sid]['ranges']:
+            cache[fname][obj_name]['owners'][sid] = {'ranges': [], 'env': dict()}
+        if ranges not in cache[fname][obj_name]['owners'][sid]['ranges']:
             # Add ranges
-            cache[fname]['owners'][sid]['ranges'].append(ranges)
+            cache[fname][obj_name]['owners'][sid]['ranges'].append(ranges)
     else:
         # Add new item to cache
-        cache[fname] = {'array': array,
-                        'owners': {sid: {'ranges': [ranges],
-                                         'env': dict()
-                                         }
-                                   }
-                        }
+        if fname not in cache:
+            cache[fname] = {}
+        cache[fname][obj_name] = {'item': obj,
+                                  'owners': {sid: {'ranges': [ranges],
+                                                   'env': dict()
+                                                   }
+                                             }
+                                  }
 
-def cache_release(cache, data):
+def cache_release(data, obj_name=None):
     """
     Method for releasing references to a cached resource, based on the presence of
-    'fname'/'sid'/'ranges' keys in 'data'.
+    'fname'/'obj_name'/'sid'/'ranges' keys in 'data'.
 
-    If 'ranges' are given in 'data', only the reference to these particular ranges 
-    in 'fname' is removed.
-    If no 'ranges' but 'sid' is given, all references of the 'sid' to 'fname' are 
-    removed.
-    If only 'filename' is given, all references to the corresponding cache item are
-    removed.
-    If no references to 'fname' are left, it is removed from the cache.
+    If 'obj_name' is given, references are only released to the specified object.
+    Otherwise references to all objects are released under the following conditions:
+
+    If 'ranges' are given in 'data', only the references to the particular ranges 
+    in 'fname'/'obj_name' are released.
+    If no 'ranges' but 'sid' is given, all references of the 'sid' in 'fname'/'obj_name'
+    are released.
+    If only 'filename' is given, all references to the file are released.
+    If no references to 'fname' or 'object' are left, they are released from the cache.
     """
     # print("[cache_release]: %s" %str(data))
     # print(cache)
-    fname, sid, ranges = cache_get_keys(cache, data)
+    fname, sid, ranges = cache_get_keys(data)
 
     if fname:
         # Release references to specific file
         keys = [fname]
     else:
-        # Release sid references to all files
+        # Release references to all files
         keys = list(cache.keys())
 
+    # Loop through file(s)
     for key in keys:
-        try:
-            if ranges != '[None, None]':
-                # Remove ref to specific ranges
-                # print("remove ranges")
-                cache[key]['owners'][sid]['ranges'].remove(ranges)                    
-            elif sid:
-                # Remove all sid refs to the cache item
-                # print("remove sid")
-                cache[key]['owners'].pop(sid)
-            elif fname:
-                # Remove file completely from cache
-                # print("remove filename")
-                cache.pop(fname)
-            # Remove cache item if it does not have any references anymore
-            if len( cache[key]['owners'] ) == 0:
-                cache.pop(key)
-        except KeyError:
-            pass
+        if obj_name:
+            # Release references to specific object
+            objs = [obj_name]
+        else:
+            # Release references to all objects
+            objs = list(cache[key].keys())
+        # Loop through object(s)
+        for obj in objs:
+            try:
+                if ranges != '[None, None]':
+                    # Remove ref to specific ranges
+                    # print("remove ranges")
+                    cache[key][obj]['owners'][sid]['ranges'].remove(ranges)   
+                    # Check if 'sid' still has some refs to the object    
+                    if ( len(cache[key][obj]['owners'][sid]['ranges']) == 0 and
+                        len(cache[key][obj]['owners'][sid]['env']) == 0
+                        ):
+                        # print("remove sid")
+                        # After removing specifief range, no refs left
+                        # for this sid, remove from owners
+                        cache[key][obj]['owners'].pop(sid)
+                elif sid:
+                    # Remove all sid refs to the cache item
+                    # print("remove sid")
+                    cache[key][obj]['owners'].pop(sid)
+                elif fname:
+                    # Remove file completely from cache
+                    # print("remove filename")
+                    cache.pop(fname)
+                # Remove object if it does not have any references anymore
+                if len( cache[key][obj]['owners'] ) == 0:
+                    cache[key].pop(obj)
+            except KeyError:
+                pass
+        # Remove file from cache if it has no objects
+        if len( cache[key] ) == 0:
+            cache.pop(key)
     # print(cache)
     
 
 async def kill_cache(data):
     # print("[kill_cache]: %s" %str(data))
-    global signal_cache
-    global tps_cache
-    signal_array = cache_get(signal_cache, data)
-    cache_release(signal_cache, data)
+    signal_array = cache_get(data, 'signal')
+    tps_array = cache_get(data, 'tps')
+    cache_release(data)
     if isinstance(signal_array, ExtendableDataArray):
         await signal_array.flush()
-    tps_array = cache_get(tps_cache, data)
-    cache_release(tps_cache, data)
     if isinstance(tps_array, ExtendableDataArray):
         await tps_array.flush()
 
@@ -195,7 +220,7 @@ class FileServiceNamespace(BaseClientNamespace):
         # print("Data request:", data)
 
         global datapool
-        global signal_cache
+        global cache
 
         value = data['value']
         kwargs = get_client_notification_args(data)
@@ -207,11 +232,11 @@ class FileServiceNamespace(BaseClientNamespace):
         mz_range = value.get('mz_range', None)
         t_range = value.get('t_range', None)
         
-        signal_array = cache_get(signal_cache, data)
+        signal_array = cache_get(data, 'signal')
         if not signal_array:
             filename_zarr = base_to_zarr_filename(filename, 'signal')
             signal_array = open_mfzarr(filename_zarr)
-            cache_put(signal_cache, data, signal_array)
+            cache_put(data, 'signal', signal_array)
         if isinstance(signal_array, ExtendableDataArray):
             signal_array = signal_array.data_array.to_dataset()
 
@@ -281,7 +306,7 @@ class FileServiceNamespace(BaseClientNamespace):
         if stream_data:
             self.speci = 0
             for i, spec_array in enumerate(signal.transpose()):
-                if not cache_contains(signal_cache, data):
+                if not cache_contains(data, 'signal'):
                     # Request has been cancelled
                     break
                 while i - self.speci > 5:
@@ -311,7 +336,6 @@ class FileServiceNamespace(BaseClientNamespace):
         self.speci = n
 
     async def on_stop_data_request(self, data):
-        global signal_cache
         ranges = data['value'].pop('ranges', [])
         for r in ranges:
             data['value'].update({'mz_range': r['mz_range']})
@@ -440,9 +464,7 @@ class FileServiceNamespace(BaseClientNamespace):
                             **{**kwargs, 'notify_twin_clients': True, }
                             )
 
-    async def on_tps_data_request(self, data):
-        global tps_cache
-        
+    async def on_tps_data_request(self, data):        
         value = data['value']
         figure_ranges = value.pop('figure_ranges', {})
         filename = figure_ranges.get('filename', None)
@@ -454,11 +476,11 @@ class FileServiceNamespace(BaseClientNamespace):
             return   
         parameters = [ v.get('label') for _, v in selected.items() ]
 
-        sample_array = cache_get(tps_cache, data)
+        sample_array = cache_get(data, 'tps')
         if not sample_array:
             filename = base_to_zarr_filename(filename, '_tps')
             sample_array = open_mfzarr(filename)
-            cache_put(tps_cache, data, sample_array)
+            cache_put(data, 'tps', sample_array)
 
         t_range = figure_ranges.get('t_range', None)
         if t_range is None:
@@ -483,7 +505,7 @@ class FileServiceNamespace(BaseClientNamespace):
                             )
         self.tps_speci = 0
         for i, param_array in enumerate(tps_data.transpose()):
-            if not cache_contains(tps_cache, data):
+            if not cache_contains(data, 'tps'):
                 # Request has been cancelled
                 break
             while i - self.tps_speci > 5:
@@ -499,7 +521,7 @@ class FileServiceNamespace(BaseClientNamespace):
                                            callback="tps_speci_callback",
                                            **kwargs
                                            )
-        cache_pop(tps_cache, data)
+        cache_pop(data)
         await self.emit_client_notification('tps_data_stream_finished',
                                        {'filename': filename},
                                        **kwargs
@@ -519,7 +541,7 @@ class FileServiceNamespace(BaseClientNamespace):
         data : dict
             keys: 'mz' and 'time'
         """
-        global signal_cache
+        global cache
 
         value = data['value']
         filename_base = value.get('filename')
@@ -550,7 +572,7 @@ class FileServiceNamespace(BaseClientNamespace):
                                 coords=[mz, []],
                                 name='signal'
                                 )
-        cache_put(signal_cache, data, signal_array)
+        cache_put(data, 'signal', signal_array)
 
     async def on_acquired_spectrum(self, data):
         """Receive new spectrum, add to cache
@@ -560,8 +582,6 @@ class FileServiceNamespace(BaseClientNamespace):
         data : dict
             keys: 'filename', 'i', 't' and 'spec'
         """
-        global signal_cache
-
         # Get package index
         value = data['value']
         i = value.get('i')
@@ -571,7 +591,7 @@ class FileServiceNamespace(BaseClientNamespace):
         ti = np.array( [value.get('t')], dtype=np.float32 )
         spec = np.frombuffer(value.get('spec'), dtype=np.float32)
         spec = spec.reshape(-1, 1)
-        signal_array = cache_get(signal_cache, data)
+        signal_array = cache_get(data, 'signal')
         if signal_array:       # TODO: signal_array is None on killing acquisition from MainUI
             mz = signal_array.data_array.mz
             await signal_array.extend_array(spec,
@@ -580,18 +600,16 @@ class FileServiceNamespace(BaseClientNamespace):
                                             )
 
     async def on_acquisition_finished(self, data):
-        global signal_cache
-        global tps_cache
-
+        global cache
         value = data['value']
         filename_base = value.get('filename')
         filename = base_to_zarr_filename(filename_base, 'signal')
         print("Finished acquiring file: %s" %filename)
-        signal_array = cache_get(signal_cache, data)
-        cache_release(signal_cache, data)
+        signal_array = cache_get(data, 'signal')
+        tps_array = cache_get(data, 'tps')
+        cache_release(data)
         if signal_array:
             await signal_array.flush()  # TODO: signal_array is None on killing acquisition from MainUI
-        tps_array = cache_get(tps_cache, data)
         if tps_array:
             await tps_array.flush()      # TODO: tps_array is None on killing acquisition from MainUI
 
@@ -599,8 +617,6 @@ class FileServiceNamespace(BaseClientNamespace):
     
     # ========== TPS data ==========
     async def on_tps_parameter_info(self, data):
-        global tps_cache
-
         value = data['value']
         filename_base = value.get('filename')
         filename = base_to_zarr_filename(filename_base, 'tps')
@@ -630,16 +646,15 @@ class FileServiceNamespace(BaseClientNamespace):
                              coords=[tps_info, []],
                              name='tps'
                              )
-        cache_put(tps_cache, data, tps_array)
+        cache_put(data, 'tps', tps_array)
 
     async def on_acquired_tps_data(self, data):
-        global tps_cache
         value = data['value']
         filename_base = value.get('filename')
         ti = np.array( [value.get('t')], dtype=np.float32 )
         tps_data = np.frombuffer( value.get('tps_data'), dtype=np.float32)
         tps_data = tps_data.reshape(-1, 1)
-        tps_array = cache_get(tps_cache, data)
+        tps_array = cache_get(data, 'tps')
         if tps_array:   # TODO: tps_array is None on killing acquisition from MainUI
             tps_info = tps_array.data_array.parameter
             await tps_array.extend_array(tps_data,
