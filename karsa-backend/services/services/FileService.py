@@ -50,9 +50,9 @@ tps_cache = {}
 
 def cache_get_keys(cache, data):
     sid = data['cookies']['src_sid'][0]
-    fname = data['value']['filename']
-    mz_range = data['value'].get('mz_range', [])
-    t_range = data['value'].get('t_range', [])
+    fname = data['value'].get('filename', None)
+    mz_range = data['value'].get('mz_range', None)
+    t_range = data['value'].get('t_range', None)
     ranges = str( [mz_range, t_range] )
     return fname, sid, ranges
 
@@ -113,19 +113,43 @@ def cache_release(cache, data):
     removed.
     If only 'filename' is given, all references to the corresponding cache item are
     removed.
+    If no references to 'fname' are left, it is removed from the cache.
     """
+    # print("[cache_release]: %s" %str(data))
+    # print(cache)
     fname, sid, ranges = cache_get_keys(cache, data)
-    try:
-        if ranges:
-            cache[fname]['owners'][sid]['ranges'].remove(ranges)
-        elif sid:
-            cache[fname]['owners'].pop(sid)
-        elif fname:
-            cache.pop(fname)
-    except KeyError:
-        pass
+
+    if fname:
+        # Release references to specific file
+        keys = [fname]
+    else:
+        # Release sid references to all files
+        keys = list(cache.keys())
+
+    for key in keys:
+        try:
+            if ranges != '[None, None]':
+                # Remove ref to specific ranges
+                # print("remove ranges")
+                cache[key]['owners'][sid]['ranges'].remove(ranges)                    
+            elif sid:
+                # Remove all sid refs to the cache item
+                # print("remove sid")
+                cache[key]['owners'].pop(sid)
+            elif fname:
+                # Remove file completely from cache
+                # print("remove filename")
+                cache.pop(fname)
+            # Remove cache item if it does not have any references anymore
+            if len( cache[key]['owners'] ) == 0:
+                cache.pop(key)
+        except KeyError:
+            pass
+    # print(cache)
+    
 
 async def kill_cache(data):
+    # print("[kill_cache]: %s" %str(data))
     global signal_cache
     global tps_cache
     signal_array = cache_get(signal_cache, data)
@@ -293,6 +317,7 @@ class FileServiceNamespace(BaseClientNamespace):
             data['value'].update({'mz_range': r['mz_range']})
             data['value'].update({'t_range': r['t_range']})
             await kill_cache(data)
+            return
         await kill_cache(data)
 
     async def on_experiment_selected(self, data):
