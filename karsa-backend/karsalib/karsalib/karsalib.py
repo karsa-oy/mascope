@@ -72,6 +72,7 @@ class BaseClientNamespace(AsyncClientNamespace):
     def on_client_notification_callback(self, data):
         subscription = data['subscription']
         cb_name = data['cb_name']
+        cb_ctx = data['cb_ctx']
         arg = data['arg']
         kwarg = data['kwarg']
         no_logging = data.get('no_logging', NO_LOGGING_DEFAULT)
@@ -83,7 +84,10 @@ class BaseClientNamespace(AsyncClientNamespace):
         else:
             self.log(f"{subscription} callback: {cb_name}(*{arg}, **{kwarg})")
         fn_cb = self.__getattribute__(cb_name)
-        fn_cb(*arg, **kwarg)
+        if cb_ctx:
+            fn_cb(cb_ctx, *arg, **kwarg)
+        else:
+            fn_cb(*arg, **kwarg)
 
     async def emit_client_notification(self, name, value, **kwarg):
         """
@@ -191,6 +195,7 @@ class BaseServerNamespace(AsyncNamespace):
         notify_twin_services = data.get('notify_twin_services', False)   # overriding rule, if defined
         subscription = data['name']
         cb = data.pop('callback', None)
+        cb_ctx = data.pop('callback_context', None)
         if no_logging:
             pass
         elif no_data_logging:
@@ -227,7 +232,10 @@ class BaseServerNamespace(AsyncNamespace):
                                                     keep_twin_services=notify_twin_services)
         async def srv_callback(*arg, **kwarg):
             await self.emit('client_notification_callback',
-                            dict(subscription=subscription, cb_name=cb, arg=arg, kwarg=kwarg, no_logging=True),
+                            dict(subscription=subscription,
+                                 cb_name=cb, cb_ctx=cb_ctx,
+                                 arg=arg, kwarg=kwarg,
+                                 **get_client_notification_args(data)),
                             room=sid)
 
         for target_sid in subscription_sids:
