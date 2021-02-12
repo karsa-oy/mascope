@@ -50,6 +50,23 @@ datapool = DataPool(data_path, projects_path)
 
 cache = {}
 
+def log_cache(func):
+    def wrapper(*args, **kwargs):
+        print("="*50)
+        print("[%s](fname=%s, sid=%s, ranges=%s, obj_name=%s)"
+              %(func.__name__, *cache_get_keys(args[0]), args[1])
+              )
+        print("cache before: %s" %str(cache))
+        res = func(*args, **kwargs)
+        print("-"*50)
+        print("cache after: %s" %str(cache))
+        print("-"*50)
+        print("return: %s" %str(res))
+        print("="*50)
+        print(" "*50)
+        return res
+    return wrapper
+
 def cache_get_keys(data):
     sid = data['cookies']['src_sid'][0]
     fname = data['value'].get('filename', None)
@@ -66,21 +83,25 @@ def cache_contains(data, obj_name):
             ranges in cache[fname][obj_name]['owners'][sid]['ranges']
             )
 
+# @log_cache
 def cache_get(data, obj_name):
     if isinstance(data, list):
         fname, sid, ranges = data
     else:
         fname, sid, ranges = cache_get_keys(data)
     try:
+        # Get object
         obj = cache[fname][obj_name]['item']
-        # sid-specific env
+    except KeyError:
+        # Object not in cache
+        return None, None
+    try:
+        # Get sid-specific env
         env = cache[fname][obj_name]['owners'][sid]['env']
     except KeyError:
-        return None, None
-    # add refs to the array, if missing
-    if sid not in cache[fname][obj_name]['owners']:
-        # Add sid
-        cache[fname][obj_name]['owners'][sid] = {'ranges': {}, 'env': {}}
+        # sid-level reference missing, add
+        env = {}
+        cache[fname][obj_name]['owners'][sid] = {'ranges': {}, 'env': env}
     if ranges:
         if ranges not in cache[fname][obj_name]['owners'][sid]['ranges']:
             # Add ranges
@@ -89,6 +110,7 @@ def cache_get(data, obj_name):
         env = cache[fname][obj_name]['owners'][sid]['ranges'][ranges]
     return obj, env
 
+# @log_cache
 def cache_put(data, obj_name, obj):
     """
     Add a new cache item under 'fname' key, with references to 'sid' and 'ranges'.
@@ -118,7 +140,7 @@ def cache_put(data, obj_name, obj):
                       },
         }
 
-
+# @log_cache
 def cache_release(data, obj_name=None):
     """
     Method for releasing references to a cached resource, based on the presence of
@@ -319,22 +341,23 @@ class FileServiceNamespace(BaseClientNamespace):
                 if not cache_contains(data, 'signal'):
                     # Request has been cancelled
                     break
-                while i - signal_env['speci'] > 10:     # TODO: sync with spectra bundle size
+                while i - signal_env['speci'] > 10: # TODO: sync with spectra bundle size
                     await asyncio.sleep(.15)
                 spec = spec_array.values
                 ti = float( spec_array.time )
-                await self.emit_client_notification('loaded_spectrum',
-                                                    {'filename': filename,
-                                                     'i': i,
-                                                     'spec': spec.tobytes(),
-                                                     'mz_range': mz_range,
-                                                     't_range': t_range,
-                                                     't': ti,
-                                                     },
-                                                    callback="speci_callback",
-                                                    callback_context=cache_get_keys(data),
-                                                    **kwargs
-                                                    )
+                await self.emit_client_notification(
+                                            'loaded_spectrum',
+                                            {'filename': filename,
+                                             'i': i,
+                                             'spec': spec.tobytes(),
+                                             'mz_range': mz_range,
+                                             't_range': t_range,
+                                             't': ti,
+                                             },
+                                            callback="speci_callback",
+                                            callback_context=cache_get_keys(data),
+                                            **kwargs
+                                            )
         # cache_release(data, 'signal')     # TODO: is it needed here?
         await self.emit_client_notification('data_stream_finished',
                                             {'filename': filename,
