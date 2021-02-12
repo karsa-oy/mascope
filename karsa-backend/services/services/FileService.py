@@ -38,6 +38,7 @@ NO_DATA_LOGGING_DEFAULT = True
 data_path = 'Data'
 projects_path = 'Projects'
 datapool = DataPool(data_path, projects_path)
+cache = {}
 
 # cache = dict(fname=dict(object_name={'item'=None,
 #                                      'owners'=dict(sid={'ranges': [],
@@ -48,10 +49,10 @@ datapool = DataPool(data_path, projects_path)
 #                         )
 #              )
 
-cache = {}
 
 def log_cache(func):
     def wrapper(*args, **kwargs):
+        global cache
         print("="*50)
         print("[%s](fname=%s, sid=%s, ranges=%s, obj_name=%s)"
               %(func.__name__, *cache_get_keys(args[0]), args[1])
@@ -76,6 +77,7 @@ def cache_get_keys(data):
     return fname, sid, ranges
 
 def cache_contains(data, obj_name):
+    global cache
     fname, sid, ranges = cache_get_keys(data)
     return (fname in cache and
             obj_name in cache[fname] and
@@ -85,6 +87,7 @@ def cache_contains(data, obj_name):
 
 # @log_cache
 def cache_get(data, obj_name):
+    global cache
     if isinstance(data, list):
         fname, sid, ranges = data
     else:
@@ -115,6 +118,7 @@ def cache_put(data, obj_name, obj):
     """
     Add a new cache item under 'fname' key, with references to 'sid' and 'ranges'.
     """
+    global cache
     fname, sid, ranges = cache_get_keys(data)
 
     if fname in cache and cache[fname].get(obj_name):
@@ -156,8 +160,7 @@ def cache_release(data, obj_name=None):
     If only 'filename' is given, all references to the file are released.
     If no references to 'fname' or 'object' are left, they are released from the cache.
     """
-    # print("[cache_release]: %s" %str(data))
-    # print(cache)
+    global cache
     fname, sid, ranges = cache_get_keys(data)
 
     if fname:
@@ -180,21 +183,17 @@ def cache_release(data, obj_name=None):
             try:
                 if ranges != '[None, None]':
                     # Remove ref to specific ranges
-                    # print("remove ranges")
                     cache[key][obj]['owners'][sid]['ranges'].pop(ranges)
                     # Check if 'sid' still has some refs to the object    
                     if not cache[key][obj]['owners'][sid]['ranges']:
-                        # print("remove sid")
                         # After removing specifief range, no refs left
                         # for this sid, remove from owners
                         cache[key][obj]['owners'].pop(sid)
                 elif sid:
                     # Remove all sid refs to the cache item
-                    # print("remove sid")
                     cache[key][obj]['owners'].pop(sid)
                 elif fname:
                     # Remove file completely from cache
-                    # print("remove filename")
                     cache.pop(fname)
                 # Remove object if it does not have any references anymore
                 if not cache[key][obj]['owners']:
@@ -204,11 +203,9 @@ def cache_release(data, obj_name=None):
         # Remove file from cache if it has no objects
         if not cache.get(key):
             cache.pop(key, None)
-    # print(cache)
     
 
 async def kill_cache(data):
-    # print("[kill_cache]: %s" %str(data))
     signal_array, _ = cache_get(data, 'signal')
     tps_array, _ = cache_get(data, 'tps')
     cache_release(data)

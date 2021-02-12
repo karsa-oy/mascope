@@ -38,14 +38,31 @@ from karsatof.kimage import (
                     )
 
 
-NO_DATA_LOGGING_DEFAULT = True
+NO_DATA_LOGGING_DEAULT = True
 client = None
-visualizers = {}
-tps_visualizers = {}
+cache = {}
 
 
+def log_viz_cache(func):
+    def wrapper(*args, **kwargs):
+        global cache
+        print("="*50)
+        print("[%s](sid=%s, fname=%s, ranges=%s, mz_range=%s, t_range=%s)"
+              %(func.__name__, *viz_cache_get_keys(args[0]))
+              )
+        print("cache before: %s" %str(cache))
+        res = func(*args, **kwargs)
+        print("-"*50)
+        print("cache after: %s" %str(cache))
+        print("-"*50)
+        print("return: %s" %str(res))
+        print("="*50)
+        print(" "*50)
+        return res
+    return wrapper
 
-def viz_cache_get_keys(viz_cache, data):
+
+def viz_cache_get_keys(data):
     sid = data['cookies']['src_sid'][0]
     fname = data['value'].get('filename')
     mz_range = data['value'].get('mz_range')
@@ -53,52 +70,70 @@ def viz_cache_get_keys(viz_cache, data):
     ranges = str([(mz_range or []) , (t_range or [])])
     return sid, fname, ranges, mz_range, t_range
 
-def viz_cache_get(viz_cache, data):
-    sid, fname, ranges, _, _ = viz_cache_get_keys(viz_cache, data)
+# @log_viz_cache
+def viz_cache_get(data, obj_name):
+    global cache
+    sid, fname, ranges, _, _ = viz_cache_get_keys(data)
     try:
-        return viz_cache[sid][fname][ranges]
+        return cache[sid][fname][obj_name][ranges]
     except KeyError:
         return None
 
-def viz_cache_put(viz_cache, data, viz):
-    sid, fname, ranges, _, _ = viz_cache_get_keys(viz_cache, data)
-    if sid not in viz_cache:
-        viz_cache[sid] = {}
-    if fname not in viz_cache[sid]:
-        viz_cache[sid][fname] = {}
-    viz_cache[sid][fname][ranges] = viz
+# @log_viz_cache
+def viz_cache_put(data, obj_name, obj):
+    global cache
+    sid, fname, ranges, _, _ = viz_cache_get_keys(data)
+    if sid not in cache:
+        cache[sid] = {}
+    if fname not in cache[sid]:
+        cache[sid][fname] = {}
+    if obj_name not in cache[sid][fname]:
+        cache[sid][fname][obj_name] = {}
+    cache[sid][fname][obj_name][ranges] = obj
 
-def viz_cache_release(viz_cache, data):
+# @log_viz_cache
+def viz_cache_release(data, obj_name=None):
     """
-    Method for releasing viz_cached resource. The value is released
+    Method for releasing cached resource. The value is released
     by presence of a corresponding sid/fname/ranges key in the data
     """
-    sid, fname, ranges, mz_range, t_range = viz_cache_get_keys(
-                                                            viz_cache,
-                                                            data
-                                                            )
+    global cache
+    sid, fname, ranges, mz_range, t_range = viz_cache_get_keys(data)
     try:
         if fname:
-            if not mz_range and not t_range:
-                viz_cache[sid].pop(fname)
+            # Release references to specific file
+            if obj_name:
+                # Release references to specific object
+                objs = [obj_name]
             else:
-                viz_cache[sid][fname].pop(ranges)
+                # Release references to all objects in file
+                objs = list( cache[sid][fname].keys() )
+            # Loop through object(s)
+            for obj in objs:
+                if not mz_range and not t_range:
+                    # Pop object
+                    cache[sid][fname].pop(obj)
+                else:
+                    # Pop specific ranges of object
+                    cache[sid][fname][obj].pop(ranges)
+                    if len(cache[sid][fname][obj]) == 0:
+                        # No refs to object left, pop
+                        cache[sid][fname].pop(obj)
+            if len(cache[sid][fname]) == 0:
+                # No objects in file left, pop
+                cache[sid].pop(fname)
+            if len(cache[sid]) == 0:
+                # sid has no more cached files, pop
+                cache.pop(sid)
         else:
-            viz_cache.pop(sid)
+            # Release all sid references
+            cache.pop(sid)
     except KeyError:
         pass
 
 async def kill_cache(data):
-    global visualizers
-    global tps_visualizers
-    visualizer = viz_cache_get(visualizers, data)
-    viz_cache_release(visualizers, data)
-    if isinstance(visualizer, SignalVisualizer):
-        await visualizer.flush_visualizations(**get_client_notification_args(data))
-    tps_visualizer = viz_cache_get(tps_visualizers, data)
-    viz_cache_release(tps_visualizers, data)
-    if isinstance(tps_visualizer, TPSVisualizer):
-        await visualizer.flush_visualizations(**get_client_notification_args(data))
+    viz_cache_release(data)
+
 
 def merge_heatmap_slices(slices):
     slice_images = []
@@ -109,7 +144,6 @@ def merge_heatmap_slices(slices):
     full_img = hstack_imgs(slice_images)
     #full_img_str = convert_to_base64(full_img)
     return full_img
-
 
 
 
@@ -254,7 +288,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                               name='signal'
                               )
         visualizer.y_max = value.get('y_range', [0, 0])[1]
-        viz_cache_put(visualizers, data, visualizer)
+        viz_cache_put(data, 'signal', visualizer)
         kwargs = get_client_notification_args(data)
         if set_figure_ranges:
             # Set UI figure ranges
@@ -271,7 +305,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
     async def on_acquired_spectrum(self, data):
         global visualizers
         value = data['value']
-        visualizer = viz_cache_get(visualizers, data)
+        visualizer = viz_cache_get(data, 'signal')
         if not visualizer:  # data request was cancelled
             return
         # Extend signal cache
@@ -287,10 +321,8 @@ class DataVizServiceNamespace(BaseClientNamespace):
         await visualizer.extend_visualizations(**get_client_notification_args(data))
 
     async def on_acquisition_finished(self, data):
-        global visualizers
-        visualizer = viz_cache_get(visualizers, data)
-        viz_cache_release(visualizers, data)
         kwargs = get_client_notification_args(data)
+        visualizer = viz_cache_get(data, 'signal')
         if isinstance(visualizer, SignalVisualizer):
             await visualizer.flush_visualizations(**kwargs)
             if len(visualizer.heatmap_slices):
@@ -305,13 +337,20 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                     image_data,
                                     **kwargs )
             for i, spec_trace in enumerate(visualizer.spec_traces):
-                image_data.update({'img_filename': 'spec%.2f.png' %spec_trace.get('t_range')[0],
-                                   'img': spec_trace['img']
-                                   })
+                image_data.update({
+                    'img_filename': 'spec%.2f.png' %spec_trace.get('t_range')[0],
+                    'img': spec_trace['img']
+                    })
                 await self.emit_client_notification(
                                     'image_to_save',
                                     image_data,
-                                    **kwargs )
+                                    **kwargs
+                                    )
+        # TODO: TPSVisualizer flushing not implemented
+        # visualizer = viz_cache_get(data, 'tps')
+        # if isinstance(visualizer, TPSVisualizer):
+        #     await visualizer.flush_visualizations(**kwargs)
+        viz_cache_release(data)
 
     async def on_tps_parameter_info(self, data):
         value = data['value']
@@ -327,8 +366,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                               name='tps'
                               )
 
-        global tps_visualizers
-        viz_cache_put(tps_visualizers, data, visualizer)
+        viz_cache_put(data, 'tps', visualizer)
 
         if set_tps_parameters:
             dropdown_items = [{'label': info,
@@ -351,7 +389,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
         global tps_data
 
         global tps_visualizers
-        visualizer = viz_cache_get(tps_visualizers, data)
+        visualizer = viz_cache_get(data, 'tps')
         if not visualizer:  # data request was cancelled
             return
         # Extend signal cache
@@ -361,7 +399,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
         td = np.array( [timedelta(seconds=ti)] ) # Convert to timedelta
         parameter = visualizer.data_array.parameter
 
-        return #XXX
+        return #TODO: TPS visualizations not implemented
 
         await visualizer.extend_array(tps_data,
                                       [parameter, td],
@@ -588,7 +626,7 @@ class DataVizServiceClient(BaseServiceClient):
                 cache_ref = dict(cookies = heatmap_slice['kwargs']['cookies'],
                                  value = dict(filename=heatmap_slice['filename'])
                                  )
-                visualizer = viz_cache_get(visualizers, cache_ref)
+                visualizer = viz_cache_get(cache_ref, 'signal')
                 if visualizer:
                     visualizer.heatmap_slices.append(heatmap_slice)
                 kwargs = heatmap_slice.pop('kwargs')
@@ -601,7 +639,7 @@ class DataVizServiceClient(BaseServiceClient):
                 cache_ref = dict(cookies = spec_trace['kwargs']['cookies'],
                                  value = dict(filename=spec_trace['filename'])
                                  )
-                visualizer = viz_cache_get(visualizers, cache_ref)
+                visualizer = viz_cache_get(cache_ref, 'signal')
                 if visualizer:
                     visualizer.spec_traces.append(spec_trace)
                 kwargs = spec_trace.pop('kwargs')
