@@ -804,7 +804,7 @@ export default {
                 // Fill in t gap (range extended by dragging the axis from corner)
                 let t_filled_range = cache_item.t_filled_range;
                 let mz_range = cur_ranges.mz_range;
-                if (t0 < t_filled_range[0]) {
+                if (Math.abs(t0 - t_filled_range[0]) > min_dt) {
                     let t_range_to_fill = [t0, t_filled_range[0]];
                     this.visualize_range = {'mz_range': mz_range,
                                             't_range': t_range_to_fill, 
@@ -812,7 +812,7 @@ export default {
                                             };
                     return
                 }
-                if (t1 > t_filled_range[1]) {
+                if (Math.abs(t1 - t_filled_range[1]) > min_dt) {
                     let t_range_to_fill = [t_filled_range[1], t1];
                     this.visualize_range = {'mz_range': mz_range,
                                             't_range': t_range_to_fill, 
