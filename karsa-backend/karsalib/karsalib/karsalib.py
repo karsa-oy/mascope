@@ -235,6 +235,7 @@ class BaseServerNamespace(AsyncNamespace):
                             dict(subscription=subscription,
                                  cb_name=cb, cb_ctx=cb_ctx,
                                  arg=arg, kwarg=kwarg,
+                                 no_logging=True,
                                  **get_client_notification_args(data)),
                             room=sid)
 
