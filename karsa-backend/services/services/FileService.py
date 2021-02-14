@@ -355,6 +355,9 @@ class FileServiceNamespace(BaseClientNamespace):
                                             callback_context=cache_get_keys(data),
                                             **kwargs
                                             )
+            # wait till last series of notifications (mod 10 in size) is processed by subscriber
+            while i > signal_env['speci']:
+               await asyncio.sleep(.15)
         # cache_release(data, 'signal')     # TODO: is it needed here?
         await self.emit_client_notification('data_stream_finished',
                                             {'filename': filename,
@@ -558,6 +561,9 @@ class FileServiceNamespace(BaseClientNamespace):
                                            callback_context=cache_get_keys(data),
                                            **kwargs
                                            )
+        # wait till last series of notifications (mod 10 in size) is processed by subscriber
+        while i > tps_env['tps_speci']:
+            await asyncio.sleep(.15)
         # cache_release(data, 'tps')     # TODO: is it needed here?
         await self.emit_client_notification('tps_data_stream_finished',
                                        {'filename': filename},
