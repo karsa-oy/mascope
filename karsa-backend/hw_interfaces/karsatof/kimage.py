@@ -86,6 +86,7 @@ def gen_timeseries_trace(data_xarray,
 def gen_heatmap_image(data_xarray,
                       t_range=None,
                       mz_range=None,
+                      y_range=None,
                       img_width=None,
                       img_height=600
                       ):
@@ -164,10 +165,10 @@ def gen_heatmap_image(data_xarray,
     data_xarray = data_xarray.where(data_xarray >= 0)
     
     # Check if only zeros in the range
-    sum_signal = data_xarray.sel(time=slice(*t_range),
-                                 mz=slice(*mz_range)
-                                 ).sum().compute().item()
-    if sum_signal == 0:
+    sig_max = data_xarray.sel(time=slice(*t_range),
+                              mz=slice(*mz_range)
+                              ).max().compute().item()
+    if sig_max == 0:
         # No need to compute, just return black
         img = Image.new('RGBA', (img_width, img_height), (0, 0, 0))
         return img
@@ -178,6 +179,11 @@ def gen_heatmap_image(data_xarray,
                     plot_width=img_width
                     )
     agg = cvs.quadmesh(data_xarray, x='time', y='mz')
+
+    if y_range is not None:
+        # Bottom left corner pixel to y_range[1] for scaling
+        agg[0, 0] = y_range[1]
+
     img = tf.shade(agg, cmap=fire)
     #img = tf.set_background(img, "black")
     return img.to_pil()

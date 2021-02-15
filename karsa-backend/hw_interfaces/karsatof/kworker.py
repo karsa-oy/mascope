@@ -205,7 +205,9 @@ class SpecTraceGenerator(Process):
             if data is not None:
                 data_array = data.pop('data')
                 y_range = data.pop('y_range', None)
-                img = gen_spec_image(data_array, y_range)
+                img = gen_spec_image(data_array,
+                                     y_range=y_range
+                                     )
                 img_b = convert_to_base64(img)
                 data.update({'img': img_b})
                 self.queue_out.put(data)
@@ -224,7 +226,10 @@ class HeatmapGenerator(Process):
             data = self.queue_in.get()
             if data is not None:
                 data_array = data.pop('data')
-                img = gen_heatmap_image(data_array)
+                y_range = data.pop('y_range', None)
+                img = gen_heatmap_image(data_array,
+                                        y_range=y_range
+                                        )
                 img_b = convert_to_base64(img)
                 data.update({'img': img_b})
                 self.queue_out.put(data)

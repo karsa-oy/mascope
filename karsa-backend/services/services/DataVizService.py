@@ -480,6 +480,7 @@ class SignalVisualizer(ExtendableDataArray):
                                       'filename': self.filename,
                                       'mz_range': mz_range,
                                       't_range': t_range,
+                                      'y_range': [0, self.y_max],
                                       'i': self.i,
                                       'kwargs': kwargs,
                                       })
