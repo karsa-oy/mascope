@@ -146,7 +146,6 @@ def merge_heatmap_slices(slices):
     return full_img
 
 
-
 class DataVizServiceNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to Router """
 
@@ -184,7 +183,6 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                             **get_client_notification_args(data)
                                             )
 
-    
     async def on_stop_visualize_range(self, data):
         """ Stop visualization, if still running; use filename and ranges as input:
             - if none specified, stop all visualizations for the client;
@@ -239,8 +237,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                         )
 
     async def on_data_stream_coordinates(self, data):
-        # set_figure_ranges = data['value'].get('set_figure_ranges', False)
-        # data['value']['set_figure_ranges'] = set_figure_ranges
+        data.update({'acquisition': False})
         await self.on_acquisition_coordinates(data)
 
     async def on_loaded_spectrum(self, data):
@@ -261,14 +258,13 @@ class DataVizServiceNamespace(BaseClientNamespace):
         return
     # -----------------------------------------------
 
-
     # ========== TOFService notifications ==========
     async def on_acquisition_coordinates(self, data):
         global client
-        global visualizers
 
         value = data['value']
         filename = value.get('filename')
+        acquisition = data.get('acquisition', True) # Distinguish loaded data from acquisition
         set_figure_ranges = data.get('set_figure_ranges', True)
 
         mz = np.frombuffer( value.get('mz'), dtype=np.float32 )
@@ -279,7 +275,8 @@ class DataVizServiceNamespace(BaseClientNamespace):
 
         visualizer = SignalVisualizer(filename,
                                       client.heatmap_gen_input_q,
-                                      client.spec_trace_gen_input_q
+                                      client.spec_trace_gen_input_q,
+                                      collect=acquisition
                                       )
         # Initialize visualizer cache
         visualizer.init_array(dims=('mz', 'time'),
@@ -301,9 +298,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                  **kwargs
                                 )
 
-
     async def on_acquired_spectrum(self, data):
-        global visualizers
         value = data['value']
         visualizer = viz_cache_get(data, 'signal')
         if not visualizer:  # data request was cancelled
@@ -318,34 +313,55 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                       [mz, td],
                                       'time'
                                       )
+        visualizer.i += 1
+        print("[on_acquired_spectrum] i: %s" %visualizer.i)
         await visualizer.extend_visualizations(**get_client_notification_args(data))
 
     async def on_acquisition_finished(self, data):
         kwargs = get_client_notification_args(data)
         visualizer = viz_cache_get(data, 'signal')
         if isinstance(visualizer, SignalVisualizer):
-            await visualizer.flush_visualizations(**kwargs)
-            if len(visualizer.heatmap_slices):
-                full_heatmap = merge_heatmap_slices(visualizer.heatmap_slices)
-                full_heatmap_str = convert_to_base64(full_heatmap)
-                image_data = {'filename': visualizer.filename,
-                              'img_filename': 'heatmap.png',
-                              'img': full_heatmap_str
-                              }
-                await self.emit_client_notification(
-                                    'image_to_save',
-                                    image_data,
-                                    **kwargs )
-            for i, spec_trace in enumerate(visualizer.spec_traces):
-                image_data.update({
-                    'img_filename': 'spec%.2f.png' %spec_trace.get('t_range')[0],
-                    'img': spec_trace['img']
-                    })
-                await self.emit_client_notification(
-                                    'image_to_save',
-                                    image_data,
-                                    **kwargs
-                                    )
+            last_i = visualizer.i
+            if last_i >= 0:
+                # Flush last batch of spectra to be visualized
+                await visualizer.flush_visualizations(**kwargs)
+                # During acquisition, images are collected for saving
+                if visualizer.collect:
+                    # Wait for all visualizations to be generated and send to 
+                    # FileService for saving
+                    slice_count = np.ceil( last_i / visualizer.step )
+                    # Wait until all heatmap slices are ready
+                    while len(visualizer.heatmap_slices) < slice_count:
+                        await asyncio.sleep(.1)
+                    # Merge slices into one image
+                    full_heatmap = merge_heatmap_slices(
+                        [slc for i, slc in visualizer.heatmap_slices.items()]
+                        )
+                    full_heatmap_str = convert_to_base64(full_heatmap)
+                    # Send to FileService to be saves
+                    image_data = {'filename': visualizer.filename,
+                                'img_filename': 'heatmap.png',
+                                'img': full_heatmap_str
+                                }
+                    await self.emit_client_notification(
+                                        'image_to_save',
+                                        image_data,
+                                        **kwargs
+                                        )
+                    # Wait until all spec traces are ready
+                    while len(visualizer.spec_traces) < slice_count:
+                        await asyncio.sleep(.1)
+                    # Send one by one to FileService to be saved
+                    for i, (speci, spec_trace) in enumerate(visualizer.spec_traces.items()):
+                        image_data.update({
+                            'img_filename': 'spec%.2f.png' %spec_trace.get('t_range')[0],
+                            'img': spec_trace['img']
+                            })
+                        await self.emit_client_notification(
+                                            'image_to_save',
+                                            image_data,
+                                            **kwargs
+                                            )
         # TODO: TPSVisualizer flushing not implemented
         # visualizer = viz_cache_get(data, 'tps')
         # if isinstance(visualizer, TPSVisualizer):
@@ -380,7 +396,6 @@ class DataVizServiceNamespace(BaseClientNamespace):
                             **kwargs
                             )
 
-
     async def on_acquired_tps_data(self, data):
         value = data['value']
         # speci = value.get('i')
@@ -405,8 +420,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                       [parameter, td],
                                       'time',
                                       )
-        await visualizer.extend_visualizations(**get_client_notification_args(data))
-            
+        await visualizer.extend_visualizations(**get_client_notification_args(data))            
     # ----------------------------------------------
 
 
@@ -416,17 +430,22 @@ class SignalVisualizer(ExtendableDataArray):
                  filename,
                  heatmap_generator_q,
                  spec_trace_generator_q,
-                 step=10
+                 step=10,
+                 collect=False
                  ):
         ExtendableDataArray.__init__(self, array_module=da)
         self.filename = filename
         self.heatmap_generator_q = heatmap_generator_q
         self.spec_trace_generator_q = spec_trace_generator_q
-        self.step = step
         
-        self.y_max = 0
-        self.heatmap_slices = []
-        self.spec_traces = []
+        self.step = step
+
+        self.y_max = 0 # Intensity range high value
+
+        self.collect = collect
+        self.i = -1 # Index of last spectrum received
+        self.heatmap_slices = {}
+        self.spec_traces = {}
 
     def log(self, *arg, **kwarg):
         print(f"[{self.__class__.__name__}.{inspect.stack()[1].function}]",
@@ -461,6 +480,7 @@ class SignalVisualizer(ExtendableDataArray):
                                       'filename': self.filename,
                                       'mz_range': mz_range,
                                       't_range': t_range,
+                                      'i': self.i,
                                       'kwargs': kwargs,
                                       })
         self.spec_trace_generator_q.put({'data': arr_to_viz,
@@ -468,6 +488,7 @@ class SignalVisualizer(ExtendableDataArray):
                                          'mz_range': mz_range,
                                          't_range': t_range,
                                          'y_range': [0, self.y_max],
+                                         'i': self.i,
                                          'kwargs': kwargs,
                                          })
 
@@ -508,8 +529,10 @@ class SignalVisualizer(ExtendableDataArray):
     async def flush_visualizations(self, **kwargs):
         if self.data_array.shape[1] <= 1:
             return
-        self.step = 0
+        step = self.step
+        self.step = 0 # Set step to zero to force visualization
         await self.extend_visualizations(**kwargs)
+        self.step = step
         
 
 class TPSVisualizer(ExtendableDataArray):
@@ -623,12 +646,13 @@ class DataVizServiceClient(BaseServiceClient):
 
             # Got at least something
             if heatmap_slice is not None:
+                i = heatmap_slice.pop('i')
                 cache_ref = dict(cookies = heatmap_slice['kwargs']['cookies'],
                                  value = dict(filename=heatmap_slice['filename'])
                                  )
                 visualizer = viz_cache_get(cache_ref, 'signal')
-                if visualizer:
-                    visualizer.heatmap_slices.append(heatmap_slice)
+                if visualizer and visualizer.collect:
+                    visualizer.heatmap_slices.update({i: heatmap_slice})
                 kwargs = heatmap_slice.pop('kwargs')
                 await self.emit_client_notification(
                                 'heatmap_figure_data',
@@ -636,12 +660,13 @@ class DataVizServiceClient(BaseServiceClient):
                                 **kwargs
                                 )
             if spec_trace is not None:
+                i = spec_trace.pop('i')
                 cache_ref = dict(cookies = spec_trace['kwargs']['cookies'],
                                  value = dict(filename=spec_trace['filename'])
                                  )
                 visualizer = viz_cache_get(cache_ref, 'signal')
-                if visualizer:
-                    visualizer.spec_traces.append(spec_trace)
+                if visualizer and visualizer.collect:
+                    visualizer.spec_traces.update({i: spec_trace})
                 kwargs = spec_trace.pop('kwargs')
                 await self.emit_client_notification(
                                 'spec_stack_figure_data',

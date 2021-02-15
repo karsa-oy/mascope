@@ -339,7 +339,8 @@ class FileServiceNamespace(BaseClientNamespace):
                     # Request has been cancelled
                     break
                 while i - signal_env['speci'] > 10: # TODO: sync with spectra bundle size
-                    await asyncio.sleep(.15)
+                    # TODO: Add safety mechanism to break out in case client becomes unresponsive
+                    await asyncio.sleep(.1)
                 spec = spec_array.values
                 ti = float( spec_array.time )
                 await self.emit_client_notification(
@@ -357,7 +358,7 @@ class FileServiceNamespace(BaseClientNamespace):
                                             )
             # wait till last series of notifications (mod 10 in size) is processed by subscriber
             while i > signal_env['speci']:
-               await asyncio.sleep(.15)
+                await asyncio.sleep(.1)
         # cache_release(data, 'signal')     # TODO: is it needed here?
         await self.emit_client_notification('data_stream_finished',
                                             {'filename': filename,
@@ -548,7 +549,7 @@ class FileServiceNamespace(BaseClientNamespace):
                 # Request has been cancelled
                 break
             while i - tps_env['tps_speci'] > 10:    # TODO: sync with spectra bundle size
-                await asyncio.sleep(.15)
+                await asyncio.sleep(.1)
             param_ys = param_array.values
             ti = float( param_array.time )
             await self.emit_client_notification('loaded_tps_data',
@@ -563,7 +564,7 @@ class FileServiceNamespace(BaseClientNamespace):
                                            )
         # wait till last series of notifications (mod 10 in size) is processed by subscriber
         while i > tps_env['tps_speci']:
-            await asyncio.sleep(.15)
+            await asyncio.sleep(.1)
         # cache_release(data, 'tps')     # TODO: is it needed here?
         await self.emit_client_notification('tps_data_stream_finished',
                                        {'filename': filename},
