@@ -367,12 +367,13 @@ export default {
             this.$buefy.dialog.confirm({
                 title: 'Instrument control',
                 message: `You have requested access to instrument controls.
-                          Please proceed only if you know what you are doing.`,
+                          Please proceed only if are willing to operate the instrument.`,
                 cancelText: 'Cancel',
                 confirmText: 'Proceed',
                 type: 'is-danger',
                 onCancel: () => this.acquisition_control_active = false,
-                onConfirm: () => this.$buefy.toast.open('Instrument control granted')
+                onConfirm: () => this.$buefy.toast.open({message: 'Instrument control granted',
+                                                         type: 'is-success'})
             })
         },
         delete_row_in_config_desorption_table() {

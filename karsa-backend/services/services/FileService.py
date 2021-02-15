@@ -256,7 +256,6 @@ class FileServiceNamespace(BaseClientNamespace):
         t_range = value.get('t_range', None)
         
         signal_array, signal_env = cache_get(data, 'signal')
-        print("signal_env: %s" %str(signal_env))
         if not signal_array:
             # File not in cache, load and put
             filename_zarr = base_to_zarr_filename(filename, 'signal')
@@ -503,8 +502,13 @@ class FileServiceNamespace(BaseClientNamespace):
         project = attributes['project']
         experiment = attributes['experiment']
 
-        attributes.update({'id': sample})
-        datapool.new_sample(project, experiment, sample, attributes)
+        if attributes.get('title') and attributes.get('description'):
+            # New sample
+            attributes.update({'id': sample})
+            datapool.new_sample(project, experiment, sample, attributes)
+        else:
+            # Remove sample (link)
+            datapool.delete_sample(project, experiment, sample)
 
         # Update sample table data in UIs
         await self.emit_client_notification(

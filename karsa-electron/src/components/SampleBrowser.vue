@@ -67,20 +67,34 @@
 
                         </section>
                         <footer class="modal-card-foot">
-                            <button
-                                class="button"
-                                type="button"
-                                @click="write_sample_attributes"
-                                is-dark>
-                                Save
-                            </button>
-                            <button
-                                class="button"
-                                type="button"
-                                is-dark
-                                @click="is_sample_attribute_modal_active=false">
-                                Close
-                            </button>
+                            <div class="columns">
+                                <div class="column is-five-fifths">
+                                    <button
+                                        class="button"
+                                        type="button"
+                                        @click="write_sample_attributes"
+                                        is-dark
+                                        :disabled="!sample_name.length">
+                                        Save
+                                    </button>
+                                    <button
+                                        class="button"
+                                        type="button"
+                                        is-dark
+                                        @click="is_sample_attribute_modal_active=false">
+                                        Close
+                                    </button>
+                                </div>
+                                <div class="column is-one-fifth">
+                                    <button
+                                        class="button"
+                                        type="button"
+                                        is-dark
+                                        @click="remove_sample">
+                                        Delete
+                                    </button>
+                                </div>
+                            </div>
                         </footer>
                     </div>
                 </div>
@@ -460,6 +474,17 @@ export default {
             this.import_sample_table_loading = true;
             // Launch modal
             this.is_import_sample_modal_active = true;
+        },
+        remove_sample: function() {
+            let sample = {
+                'id': this.sample_file,
+                'attributes': {
+                    'project': this.sample_project,
+                    'experiment': this.sample_experiment
+                    }
+            };
+            this.sample_attributes = sample;
+            this.is_sample_attribute_modal_active = false;
         },
         write_sample_attributes: function() {
             if ( !(this.sample_project.length && this.sample_experiment.length) ) {

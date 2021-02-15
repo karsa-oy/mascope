@@ -238,6 +238,12 @@ class DataPool():
             # Alternative way (requires elevated privileges)
             # os.symlink(source_path, target_path, target_is_directory=True)
 
+    def _remove_link(self, path):
+        try:
+            os.remove(path)
+        except Exception as e:
+            print(e)
+
     def _read_attributes(self, path):
         attr_path = os.path.join(path, '.attrs')
         if not os.path.exists(attr_path):
@@ -254,6 +260,17 @@ class DataPool():
         with open(attr_path, 'w') as f:
             json.dump(attributes, f, indent=4)
     
+    def delete_sample(self, project, experiment, sample):
+        sample_link_path = os.path.join(
+                                self.projects_root,
+                                project,
+                                experiment,
+                                sample
+                                )
+        self._remove_link(sample_link_path)
+        # Update self.pool
+        self.update_experiment_samples(project, experiment)
+
     def get_experiments(self, project):
         project_path = os.path.join(self.projects_root, project)
         experiment_titles = self.pool.get(project).keys()
