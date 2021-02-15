@@ -332,14 +332,24 @@ class FileServiceNamespace(BaseClientNamespace):
             except Exception as e:
                 print(e)
 
+        def stop_task():
+            cache_release(data, 'signal')
+            self.log(f"{data['name']} was cancelled due to a timeout.")
+        TASK_TTL = 1200     # 2 min
+
         if stream_data:
             signal_env['speci'] = 0
+            ttl_count = 0
             for i, spec_array in enumerate(signal.transpose()):
                 if not cache_contains(data, 'signal'):
                     # Request has been cancelled
                     break
+                ttl_count = 0
                 while i - signal_env['speci'] > 10: # TODO: sync with spectra bundle size
-                    # TODO: Add safety mechanism to break out in case client becomes unresponsive
+                    ttl_count += 1
+                    if ttl_count > TASK_TTL:
+                        stop_task()
+                        break
                     await asyncio.sleep(.1)
                 spec = spec_array.values
                 ti = float( spec_array.time )
@@ -357,7 +367,7 @@ class FileServiceNamespace(BaseClientNamespace):
                                             **kwargs
                                             )
             # wait till last series of notifications (mod 10 in size) is processed by subscriber
-            while i > signal_env['speci']:
+            while i > signal_env['speci'] and ttl_count < TASK_TTL:
                 await asyncio.sleep(.1)
         # cache_release(data, 'signal')     # TODO: is it needed here?
         await self.emit_client_notification('data_stream_finished',
@@ -543,12 +553,24 @@ class FileServiceNamespace(BaseClientNamespace):
                              },
                             **kwargs
                             )
+
+        def stop_task():
+            cache_release(data, 'tps')
+            self.log(f"{data['name']} was cancelled due to a timeout.")
+        TASK_TTL = 1200     # 2 min
+
         tps_env['tps_speci'] = 0
+        ttl_count = 0
         for i, param_array in enumerate(tps_data.transpose()):
             if not cache_contains(data, 'tps'):
                 # Request has been cancelled
                 break
+            ttl_count = 0
             while i - tps_env['tps_speci'] > 10:    # TODO: sync with spectra bundle size
+                ttl_count += 1
+                if ttl_count > TASK_TTL:
+                    stop_task()
+                    break
                 await asyncio.sleep(.1)
             param_ys = param_array.values
             ti = float( param_array.time )
@@ -563,7 +585,7 @@ class FileServiceNamespace(BaseClientNamespace):
                                            **kwargs
                                            )
         # wait till last series of notifications (mod 10 in size) is processed by subscriber
-        while i > tps_env['tps_speci']:
+        while i > tps_env['tps_speci'] and ttl_count < TASK_TTL:
             await asyncio.sleep(.1)
         # cache_release(data, 'tps')     # TODO: is it needed here?
         await self.emit_client_notification('tps_data_stream_finished',
