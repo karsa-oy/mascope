@@ -128,7 +128,9 @@ def cache_put(data, obj_name, obj):
                              f"{obj} vs. {cache[fname][obj_name]['item']}")
         if sid not in cache[fname][obj_name]['owners']:
             # Add sid
-            cache[fname][obj_name]['owners'][sid] = {'ranges': {}, 'env': {},}
+            cache[fname][obj_name]['owners'][sid] = {'ranges': {},
+                                                     'env': {}
+                                                     }
         if ranges not in cache[fname][obj_name]['owners'][sid]['ranges']:
             # Add ranges
             cache[fname][obj_name]['owners'][sid]['ranges'][ranges] = {}
@@ -138,10 +140,10 @@ def cache_put(data, obj_name, obj):
             cache[fname] = {}
         cache[fname][obj_name] = {
             'item': obj,
-            'owners': {sid: { 'ranges': {ranges: {}} if ranges else {},
-                              'env': {},
-                            },
-                      },
+            'owners': {sid: {'ranges': {ranges: {}} if ranges else {},
+                             'env': {},
+                             },
+                       },
         }
 
 # @log_cache
@@ -246,22 +248,17 @@ class FileServiceNamespace(BaseClientNamespace):
 
     async def on_data_request(self, data):
         # print("Data request:", data)
-
-        global datapool
-        global cache
-
         value = data['value']
         kwargs = get_client_notification_args(data)
 
-        filename = value.get('filename', None)
-        if filename is None:
-            raise ValueError("Received data_request without filename")
-
+        filename = value['filename']
         mz_range = value.get('mz_range', None)
         t_range = value.get('t_range', None)
         
         signal_array, signal_env = cache_get(data, 'signal')
+        print("signal_env: %s" %str(signal_env))
         if not signal_array:
+            # File not in cache, load and put
             filename_zarr = base_to_zarr_filename(filename, 'signal')
             signal_array = open_mfzarr(filename_zarr)
             cache_put(data, 'signal', signal_array)
@@ -276,9 +273,12 @@ class FileServiceNamespace(BaseClientNamespace):
             mz_range = [mz0, mz1]
             set_figure_ranges = True
         if t_range is None:
-            t0 = float( signal_array.time[0] )
-            t1 = float( signal_array.time[-1] )
-            t_range = [t0, t1]
+             # In case of incomplete acquisition, set to full_t_range
+            t_range, _ = cache_get(data, 'full_t_range')
+            if not t_range:
+                t0 = float( signal_array.time[0] )
+                t1 = float( signal_array.time[-1] )
+                t_range = [t0, t1]
 
         signal = signal_array.signal.sel(
                     mz=slice(*mz_range),
@@ -295,7 +295,7 @@ class FileServiceNamespace(BaseClientNamespace):
                             'data_stream_coordinates',
                             {'filename': filename,
                              'mz': mz.tobytes(),
-                             'time': t.tobytes(),
+                            #  'time': t.tobytes(),
                              'mz_range': mz_range,
                              't_range': t_range,
                              'y_range': y_range
@@ -548,7 +548,7 @@ class FileServiceNamespace(BaseClientNamespace):
                             'tps_data_stream_coordinates',
                             {'filename': filename,
                              'parameters': parameters,
-                             'time': t.tobytes(),
+                            #  'time': t.tobytes(),
                              'set_tps_parameters': False,
                              },
                             **kwargs
@@ -640,7 +640,14 @@ class FileServiceNamespace(BaseClientNamespace):
                                 coords=[mz, []],
                                 name='signal'
                                 )
-        cache_put(data, 'signal', signal_array)
+        cache_put(data,
+                  'signal',
+                  signal_array,
+                  )
+        cache_put(data,
+                  'full_t_range',
+                  value.get('t_range')
+                  )
 
     async def on_acquired_spectrum(self, data):
         """Receive new spectrum, add to cache

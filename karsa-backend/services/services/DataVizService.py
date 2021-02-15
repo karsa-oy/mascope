@@ -268,10 +268,11 @@ class DataVizServiceNamespace(BaseClientNamespace):
         set_figure_ranges = data.get('set_figure_ranges', True)
 
         mz = np.frombuffer( value.get('mz'), dtype=np.float32 )
-        t = np.frombuffer( value.get('time'), dtype=np.float32 )
-        
+        # t = np.frombuffer( value.get('time'), dtype=np.float32 )
+        t_range = value['t_range']
+
         mz_range = [ float(mz[0]), float(mz[-1]) ]
-        t_range =  [ float(t[0]),  float(t[-1])  ]
+        # t_range =  [ float(t[0]),  float(t[-1])  ]
 
         visualizer = SignalVisualizer(filename,
                                       client.heatmap_gen_input_q,
@@ -285,6 +286,9 @@ class DataVizServiceNamespace(BaseClientNamespace):
                               name='signal'
                               )
         visualizer.y_max = value.get('y_range', [0, 0])[1]
+        if acquisition:
+            # Pop t_range from cache key 
+            value.pop('t_range')
         viz_cache_put(data, 'signal', visualizer)
         kwargs = get_client_notification_args(data)
         if set_figure_ranges:
@@ -314,7 +318,6 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                       'time'
                                       )
         visualizer.i += 1
-        print("[on_acquired_spectrum] i: %s" %visualizer.i)
         await visualizer.extend_visualizations(**get_client_notification_args(data))
 
     async def on_acquisition_finished(self, data):

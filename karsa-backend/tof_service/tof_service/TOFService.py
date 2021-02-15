@@ -121,8 +121,8 @@ class TOFServiceClient(BaseServiceClient):
             await self.emit_client_notification('acquisition_coordinates',
                                         {'filename': filename_base,
                                         'mz': mz.tobytes(),
-                                        'time': t.tobytes(),
-                                        # 't_range': [ float(t[0]), float(t[-1]) ]
+                                        # 'time': t.tobytes(),
+                                        't_range': [ float(t[0]), float(t[-1]) ]
                                         },
                                         notify_twin_clients=True,
                                         cookies=cookies,
