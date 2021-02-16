@@ -7,5 +7,8 @@ findstr /C:"}.apply(self);" node_modules\plotly.js-dist\plotly.js || (echo Not r
 :: GH_TOKEN is a github repository access token 
 set GH_TOKEN || (echo Not ready to publish karsa-desktop: GH_TOKEN variable was not set && exit /b 1)
 
+:: signed certificate to sign a binary
+if not exist "cert\karsa_cacert.pfx" (echo Not ready to publish karsa-desktop: cert\karsa_cacert.pfx missing && exit /b 1)
+
 echo Ready to build and publish karsa-desktop
 exit /b 0
