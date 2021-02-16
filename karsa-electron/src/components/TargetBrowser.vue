@@ -120,6 +120,7 @@ import '@mdi/font/css/materialdesignicons.min.css';
 Vue.use([Buefy]);
 
 var _ = require('underscore');
+var fs = require('fs');
 
 export default {
     name: "TargetBrowser",
@@ -165,12 +166,14 @@ export default {
     created: function() {
     },
     mounted: function() {
+        this.ReadTargetsFromFile();
     },
     methods: {
         ImportExcelTargets() {
             this.target_table_cols = this.excel_clipboard_table_cols;
             this.target_table_rows = this.excel_clipboard_table_rows;
             this.is_excel_clipboard_modal_active = false;
+            this.WriteTargetsToFile();
         },
         ParseExcelClipboard: function(clipboard_text) {
             // Split full text to rows
@@ -214,6 +217,21 @@ export default {
             this.excel_clipboard_table_rows = rows;
             this.excel_clipboard_text = "";
         },  
+        ReadTargetsFromFile() {
+            let target_table_data = JSON.parse(
+                                        fs.readFileSync('configs/target_list.json')
+                                        );
+            this.target_table_cols = target_table_data.cols;
+            this.target_table_rows = target_table_data.rows;
+        },
+        WriteTargetsToFile() {
+            let target_table_data = {"cols": this.target_table_cols,
+                                     "rows": this.target_table_rows
+                                     };
+            fs.writeFileSync('configs/target_list.json',
+                             JSON.stringify(target_table_data, null, 3)
+                             );
+        },
     },
     watch: {
         excel_clipboard_text: function(new_value, old_value) {
