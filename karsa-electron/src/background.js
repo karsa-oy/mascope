@@ -7,24 +7,7 @@ import { autoUpdater } from "electron-updater";
 
 // const {Tray, Menu} = require("electron")
 const isDevelopment = process.env.NODE_ENV !== 'production'; 
-var dot_env_config = require('dotenv').config();
 var _ = require('underscore');
-
-var dotenv = {}; 
-for (var key in dot_env_config.parsed ){
-    var key_val = {}
-    key_val[key] = dot_env_config.parsed[key]; 
-    Object.assign(dotenv, key_val); 
-}
-// TODO: workaround, till url selection via UI is added
-if ( !_.isEmpty(process.env.karsa_router_address) ) {
-    const url = new URL(process.env.karsa_router_address);
-    dotenv.protocol = url.protocol.replace(':', '');
-    dotenv.host = url.hostname;
-    dotenv.scenthound_service_port = url.port;
-}
-// make it global so other windows can use it
-global.dot_env_vars = dotenv;
 
 let parent_win;
 let splash_win; 

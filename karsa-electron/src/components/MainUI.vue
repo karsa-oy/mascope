@@ -53,10 +53,10 @@ import SampleBrowser from "./SampleBrowser.vue"
 import TOFControl from "./TOFControl.vue"
 import store from '../store';
 
-var remote = require('electron').remote;
-var dot_env_vars = remote.getGlobal('dot_env_vars');
-var _ = require('underscore');
-var io = require("socket.io-client");
+const _ = require('underscore');
+const io = require("socket.io-client");
+const fs = require('fs');
+const envfile = require('envfile');
 
 export default {
     name: "MainUi", //used as app_name - keep it unique
@@ -72,6 +72,7 @@ export default {
     data() {
         return {
             socket: null,
+            dotenv: {},
             // rooms - list of notifications the MainUI wants to receive
             rooms: [
                 'acquisition_started',
@@ -314,28 +315,6 @@ export default {
                 self.socket_is_connected = false;
             });
         },
-        log: function(...args) {
-            console.log('[' + this.$options.name + ']',  ...args);
-        },
-        import_one_way_binding_prop: (ctx, name, value, no_logging=false) => {
-            if ( _.isEqual(value, ctx[name]) ) {
-                return;
-            }
-            if ( no_logging === false ) {
-                ctx.log("import", name, value);
-            }
-            ctx[name] = value;
-         },
-        import_two_way_binding_prop: (ctx, name, value, no_logging=false) => {
-            if ( _.isEqual(value, ctx[name]) ) {
-                return;
-            }
-            if ( no_logging === false ) {
-                ctx.log("import", name, value);
-            }
-            ctx.external_notifications.push([name, value]);
-            ctx[name] = value;
-         },
         export_one_way_binding_prop: (ctx, name, new_value, old_value, no_logging=false) => {
             if ( _.isEqual(new_value, old_value) ) {
                 return false;
@@ -360,10 +339,46 @@ export default {
                 ctx.external_notifications.splice(i, 1);
             }
         },
+        import_one_way_binding_prop: (ctx, name, value, no_logging=false) => {
+            if ( _.isEqual(value, ctx[name]) ) {
+                return;
+            }
+            if ( no_logging === false ) {
+                ctx.log("import", name, value);
+            }
+            ctx[name] = value;
+        },
+        import_two_way_binding_prop: (ctx, name, value, no_logging=false) => {
+            if ( _.isEqual(value, ctx[name]) ) {
+                return;
+            }
+            if ( no_logging === false ) {
+                ctx.log("import", name, value);
+            }
+            ctx.external_notifications.push([name, value]);
+            ctx[name] = value;
+        },
+        log: function(...args) {
+            console.log('[' + this.$options.name + ']',  ...args);
+        },
+        read_dotenv() {
+            let env_string = fs.readFileSync('.env');
+            let env_parsed = envfile.parse(env_string);
+            for (var key in env_parsed){
+                var key_val = {}
+                key_val[key] = env_parsed[key]; 
+                Object.assign(this.dotenv, key_val); 
+            }
+        },
+        write_dotenv() {
+            let env_string = envfile.stringify(this.dotenv);
+            fs.writeFileSync('.env', env_string);
+        },
     },
 
     created() {
-        this.url = dot_env_vars.protocol + "://" + dot_env_vars.host + ":" + dot_env_vars.scenthound_service_port;
+        this.read_dotenv();
+        this.url = this.dotenv.protocol + "//" + this.dotenv.host + ":" + this.dotenv.port;
         this.connect_socket();
     },
 
@@ -406,9 +421,16 @@ export default {
         tps_parameters_selected: function(new_value, old_value) {
             return this.export_one_way_binding_prop(this, 'tps_parameters_selected', new_value, old_value);
         },
-        url: function() {
+        url: function(new_url) {
+            // Connect to new url
             this.socket.disconnect();
             this.connect_socket();
+            // Parse url into dotenv format and write to file
+            let url_obj = new URL(new_url);
+            this.dotenv.protocol = url_obj.protocol;
+            this.dotenv.host = url_obj.hostname;
+            this.dotenv.port = url_obj.port;
+            this.write_dotenv();
         },
         visualize_range: function(new_value, old_value) {
             return this.export_one_way_binding_prop(this, 'visualize_range', {...new_value, 'uid': Math.random()}, old_value);
