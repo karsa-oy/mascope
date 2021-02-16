@@ -8,7 +8,7 @@
         <!-- Tabs -->
             <!-- Config tab -->
             <b-tab-item
-                icon=""
+                icon="settings"
                 label="">
                 <ConfigVue></ConfigVue>
             </b-tab-item>
@@ -222,6 +222,14 @@ export default {
                 this.$store.commit('sample_length', value);
             }
         },
+        socket_is_connected: {
+            get() {
+                return this.$store.state.socket_is_connected;
+            },
+            set(value) {
+                this.$store.commit('socket_is_connected', value);
+            }
+        },
         spec_stack_figure_data: {
             get() {
                 return this.$store.state.spec_stack_figure_data;
@@ -294,10 +302,12 @@ export default {
                 self.socket.on("experiments", (value) => self.import_two_way_binding_prop(self, "experiments", value.value));
                 // if MainUI was restarted, get latest state variables from other running services
                 self.socket.emit('client_notification', {'name': 'service_state', 'value': {}});
+                self.socket_is_connected = true;
             });
             // no need to unsubscribe on disconnect - client is unsubscribed by flask
             self.socket.on("disconnect", () => {
                 self.log("socket disconnected");
+                self.socket_is_connected = false;
             });
         },
         log: function(...args) {
