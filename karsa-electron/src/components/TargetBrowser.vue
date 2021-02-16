@@ -90,6 +90,7 @@
                                 <div><br></div>
                                 <b-table 
                                     id="targets-datatable"
+                                    style="max-height:400px"
                                     :columns="target_table_cols"
                                     :data="target_table_rows" 
                                     :sticky-header="true"

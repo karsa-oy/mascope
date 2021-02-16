@@ -67,38 +67,32 @@
 
                         </section>
                         <footer class="modal-card-foot">
-                            <div class="columns">
-                                <div class="column is-five-fifths">
-                                    <button
-                                        class="button"
-                                        type="button"
-                                        @click="write_sample_attributes"
-                                        is-dark
-                                        :disabled="!sample_name.length">
-                                        Save
-                                    </button>
-                                    <button
-                                        class="button"
-                                        type="button"
-                                        is-dark
-                                        @click="is_sample_attribute_modal_active=false">
-                                        Close
-                                    </button>
-                                </div>
-                                <div class="column is-one-fifth">
-                                    <b-tooltip
-                                        label="Remove sample from this experiment"
-                                        position="is-left"
-                                        :delay="1000">
-                                        <button
-                                            class="button"
-                                            type="button"
-                                            is-dark
-                                            @click="remove_sample">
-                                            Remove
-                                        </button>
-                                    </b-tooltip>
-                                </div>
+                            <button
+                                class="button"
+                                type="button"
+                                @click="write_sample_attributes"
+                                is-dark
+                                :disabled="!sample_name.length">
+                                Save
+                            </button>
+                            <button
+                                class="button"
+                                type="button"
+                                is-dark
+                                @click="is_sample_attribute_modal_active=false">
+                                Close
+                            </button>
+                            <div style="position:absolute; right:20px">
+                                <b-tooltip
+                                    label="Remove sample from this experiment"
+                                    position="is-left"
+                                    :delay="1000">
+                                    <b-button
+                                        type="is-danger"
+                                        icon-left="delete"
+                                        @click="remove_sample">
+                                    </b-button>
+                                </b-tooltip>
                             </div>
                         </footer>
                     </div>
@@ -273,8 +267,10 @@
                                 <div><br></div>
                                 <b-table 
                                     id="samples-datatable"
+                                    style="max-height:400px"
                                     :columns="sample_table_cols"
                                     :data="sample_table_rows"
+                                    :sticky-header="true"
                                     :checkable="(!acquisition_control_active ||
                                                  acquisition_status=='not_running') ? true : false"
                                     :header-checkable="false"

@@ -249,7 +249,8 @@
                                                 type="is-dark"
                                                 size="is-medium"
                                                 outlined
-                                                inverted>
+                                                inverted
+                                                expanded>
                                             New project
                                             </b-button>
                                         </div>
@@ -308,7 +309,8 @@
                                                 type="is-dark" 
                                                 size="is-medium" 
                                                 outlined 
-                                                inverted>
+                                                inverted
+                                                expanded>
                                                 New experiment
                                             </b-button>
                                         </div>
