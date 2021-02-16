@@ -752,15 +752,15 @@ export default {
             // Adjust new ranges to grid spacing
             [mz0, mz1, t0, t1] = self.adjust_ranges_to_grid_spacing(mz0, mz1, t0, t1);
             // Set min significant zoom ranges
-            // let min_dmz = 10**(-self.cache_index_rank);
-            let max_mz_range = self.figure_cache.mz_maxrange[1] - self.figure_cache.mz_maxrange[0]
-            let min_dmz_factor = 0.2;   //don't zoom-in for more than 80% of orig.size
+            let min_dmz = 10**(-self.cache_index_rank);
+            // let max_mz_range = self.figure_cache.mz_maxrange[1] - self.figure_cache.mz_maxrange[0]
+            // let min_dmz_factor = 0.2;   //don't zoom-in for more than 80% of orig.size
             let min_dt = 1;
             // Check if mz_range has changed
             let mz_range_updated = true;
-            // if ( (Math.abs(mz1-pmz1) < min_dmz && Math.abs(mz0-pmz0) < min_dmz) ) {
-            if ( Math.abs((Math.abs(mz1-mz0) - Math.abs(pmz1-pmz0))) * max_mz_range /
-                 (Math.abs(mz1-mz0))**2 < min_dmz_factor ) {
+            if ( (Math.abs(mz1-pmz1) < min_dmz && Math.abs(mz0-pmz0) < min_dmz) ) {
+            // if ( Math.abs((Math.abs(mz1-mz0) - Math.abs(pmz1-pmz0))) * max_mz_range /
+            //      (Math.abs(mz1-mz0))**2 < min_dmz_factor ) {
                 // mz_range has not changed significantly, reset to original
                 mz0 = pmz0;
                 mz1 = pmz1;
