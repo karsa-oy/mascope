@@ -303,6 +303,10 @@ export default {
                 // if MainUI was restarted, get latest state variables from other running services
                 self.socket.emit('client_notification', {'name': 'service_state', 'value': {}});
                 self.socket_is_connected = true;
+                this.$buefy.toast.open({
+                    message: 'Socket connected!',
+                    type: 'is-success'
+                })
             });
             // no need to unsubscribe on disconnect - client is unsubscribed by flask
             self.socket.on("disconnect", () => {
