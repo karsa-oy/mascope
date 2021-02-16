@@ -7,7 +7,7 @@
   "description": "Karsa UI applicaiton",
   "homepage": "https://www.karsa.fi",
   "license": "To be added; check the list https://spdx.org/licenses/",
-  "version": "0.1.1",
+  "version": "0.1.0",
   "private": true,
   "scripts": {
     "serve": "vue-cli-service serve",
@@ -21,7 +21,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/aleu/karsa.git"
+    "url": "https://github.com/karsa-dev/karsa-electron.git"
   },
   "autoDownload": true,
   "main": "background.js",

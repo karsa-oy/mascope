@@ -1,19 +1,32 @@
 @echo off
 
-:: Activate virtual environment
-call .venv\Scripts\activate
+if defined CONDA_EXE (
+  echo Running karsa services in conda environment
+) else (
+  echo Running karsa services locally
+  :: Activate virtual environment
+  call .venv\Scripts\activate || goto :error
+)
 
 :: Start Router locally, if not already running
 powershell Test-NetConnection 127.0.0.1 -p 5010 | find /i "failed" && start cmd /k karsa-router-service
 
 :: Start TOFService
-start cmd /k karsa-tof-service
+start cmd /k karsa-tof-service || goto :error
 
 :: Set working directory to virtual environment dir
-pushd .venv
+pushd .venv || goto :error
 
 :: Start other services
-start cmd /k karsa-file-service
-start cmd /k karsa-dataviz-service
-::start cmd /k python SignalProcessorService.py
+start cmd /k karsa-file-service || goto :error
+start cmd /k karsa-dataviz-service || goto :error
+::start cmd /k python SignalProcessorService.py || goto :error
 popd
+
+exit /b 0
+
+
+:error
+set err=%ERRORLEVEL%
+echo Failed with error %err%
+exit /b %err%

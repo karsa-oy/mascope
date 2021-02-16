@@ -1,14 +1,14 @@
 @echo off
 setlocal EnableDelayedExpansion
 
-REM   Backend services development setup (created in virtual environment);
+REM   Backend services development setup with python venv or miniconda;
 REM   Prerequisites:  python version >3.6 and <3.9 installed;
 
-echo ========================
-echo   1. Create and activate virtual environment:
-echo ========================
-  python -m venv .venv || goto :error
-  call .venv\Scripts\activate || goto :error
+if defined CONDA_EXE (
+  call :conda_here
+) else (
+  call :venv_here
+)
 
 echo ========================
 echo   2. Install hw_interfaces package:
@@ -34,6 +34,22 @@ echo   6. To start the services, run the script:
 echo     run_services.cmd
 echo ========================
 
+  exit /b 0
+
+
+:conda_here
+echo ========================
+echo   1. Create development setup in conda environment:
+echo ========================
+  exit /b 0
+
+
+:venv_here
+echo ========================
+echo   1. Create and activate virtual environment:
+echo ========================
+  python -m venv .venv01 || goto :error
+  call .venv01\Scripts\activate || goto :error
   exit /b 0
 
 
