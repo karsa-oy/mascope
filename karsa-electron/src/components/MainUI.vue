@@ -6,6 +6,12 @@
             :animated="false"
             type="is-boxed main-tab">
         <!-- Tabs -->
+            <!-- Config tab -->
+            <b-tab-item
+                icon=""
+                label="">
+                <ConfigVue></ConfigVue>
+            </b-tab-item>
             <!-- Start tab -->
             <b-tab-item
                 icon=""
@@ -39,6 +45,7 @@
 
 <script type="text/javascript">
 import { mapState } from 'vuex';
+import ConfigVue from './ConfigVue'; 
 import StartTab from "./StartTab.vue";
 import TargetBrowser from "./TargetBrowser.vue";
 import SampleView from "./SampleView.vue"
@@ -49,11 +56,13 @@ import store from '../store';
 var remote = require('electron').remote;
 var dot_env_vars = remote.getGlobal('dot_env_vars');
 var _ = require('underscore');
+var io = require("socket.io-client");
 
 export default {
     name: "MainUi", //used as app_name - keep it unique
     store,
     components: {
+        ConfigVue,
         StartTab,
         TargetBrowser,
         SampleBrowser,
@@ -245,8 +254,52 @@ export default {
                 this.$store.commit('tps_parameters', value);
             }
         },
+        url: {
+            get() {
+                return this.$store.state.url;
+            },
+            set(value) {
+                this.$store.commit('url', value);
+            }
+        },
     },
     methods: {
+        connect_socket() {
+            var self = this;
+            self.log("Connecting to url: ", self.url);
+            self.socket = io.connect(self.url);
+            self.socket.on("connect", () => {
+                self.socket.emit('subscribe',
+                                {'app_name': self.$options.name,
+                                'subscriptions': self.rooms});
+                // handlers for for external notifications:
+                // input value as object {name, value, cookies, no_data_logging...}
+                self.socket.on("acquisition_started", (value) => self.import_one_way_binding_prop(self, "acquisition_started", value.value));
+                self.socket.on("acquisition_status", (value) => self.import_two_way_binding_prop(self, "acquisition_status", value.value));
+                self.socket.on("acquisition_progress", (value) => self.import_one_way_binding_prop(self, "acquisition_progress", value.value, true));
+                self.socket.on("samples", (value) => self.import_one_way_binding_prop(self, "samples", value.value));
+                self.socket.on("h5_samples", (value) => self.import_one_way_binding_prop(self, "h5_samples", value.value));
+                self.socket.on("h5_streamer_status", (value) => self.import_one_way_binding_prop(self, "h5_streamer_status", value.value));
+                self.socket.on("importable_samples", (value) => self.import_one_way_binding_prop(self, "importable_samples", value.value));
+                self.socket.on("instrument_status", (value) => self.import_one_way_binding_prop(self, "instrument_status", value.value));
+                self.socket.on("sample_length", (value) => self.import_two_way_binding_prop(self, "sample_length", value.value));
+                self.socket.on("target_table_data", (value) => self.import_one_way_binding_prop(self, "target_table_data", value.value));
+                self.socket.on("targets", (value) => self.import_one_way_binding_prop(self, "targets", value.value));
+                self.socket.on("figure_ranges", (value) => self.import_one_way_binding_prop(self, "figure_ranges", {...value.value, 'uid': Math.random()}));
+                self.socket.on("tps_parameters", (value) => self.import_one_way_binding_prop(self, "tps_parameters", value.value));
+                self.socket.on("heatmap_figure_data", (value) => self.import_one_way_binding_prop(self, "heatmap_figure_data", value.value));
+                self.socket.on("timeseries_figure_data", (value) => self.import_one_way_binding_prop(self, "timeseries_figure_data", value.value));
+                self.socket.on("spec_stack_figure_data", (value) => self.import_one_way_binding_prop(self, "spec_stack_figure_data", value.value));
+                self.socket.on("projects", (value) => self.import_two_way_binding_prop(self, "projects", value.value));
+                self.socket.on("experiments", (value) => self.import_two_way_binding_prop(self, "experiments", value.value));
+                // if MainUI was restarted, get latest state variables from other running services
+                self.socket.emit('client_notification', {'name': 'service_state', 'value': {}});
+            });
+            // no need to unsubscribe on disconnect - client is unsubscribed by flask
+            self.socket.on("disconnect", () => {
+                self.log("socket disconnected");
+            });
+        },
         log: function(...args) {
             console.log('[' + this.$options.name + ']',  ...args);
         },
@@ -296,43 +349,8 @@ export default {
     },
 
     created() {
-        var self = this;
-        var url = dot_env_vars.protocol + "://" + dot_env_vars.host + ":" + dot_env_vars.scenthound_service_port;
-
-        var io = require("socket.io-client");
-        self.socket = io.connect(url);
-        self.socket.on("connect", () => {
-            self.socket.emit('subscribe',
-                             {'app_name': self.$options.name,
-                              'subscriptions': self.rooms});
-            // handlers for for external notifications:
-            // input value as object {name, value, cookies, no_data_logging...}
-            self.socket.on("acquisition_started", (value) => self.import_one_way_binding_prop(self, "acquisition_started", value.value));
-            self.socket.on("acquisition_status", (value) => self.import_two_way_binding_prop(self, "acquisition_status", value.value));
-            self.socket.on("acquisition_progress", (value) => self.import_one_way_binding_prop(self, "acquisition_progress", value.value, true));
-            self.socket.on("samples", (value) => self.import_one_way_binding_prop(self, "samples", value.value));
-            self.socket.on("h5_samples", (value) => self.import_one_way_binding_prop(self, "h5_samples", value.value));
-            self.socket.on("h5_streamer_status", (value) => self.import_one_way_binding_prop(self, "h5_streamer_status", value.value));
-            self.socket.on("importable_samples", (value) => self.import_one_way_binding_prop(self, "importable_samples", value.value));
-            self.socket.on("instrument_status", (value) => self.import_one_way_binding_prop(self, "instrument_status", value.value));
-            self.socket.on("sample_length", (value) => self.import_two_way_binding_prop(self, "sample_length", value.value));
-            self.socket.on("target_table_data", (value) => self.import_one_way_binding_prop(self, "target_table_data", value.value));
-            self.socket.on("targets", (value) => self.import_one_way_binding_prop(self, "targets", value.value));
-            self.socket.on("figure_ranges", (value) => self.import_one_way_binding_prop(self, "figure_ranges", {...value.value, 'uid': Math.random()}));
-            self.socket.on("tps_parameters", (value) => self.import_one_way_binding_prop(self, "tps_parameters", value.value));
-            self.socket.on("heatmap_figure_data", (value) => self.import_one_way_binding_prop(self, "heatmap_figure_data", value.value));
-            self.socket.on("timeseries_figure_data", (value) => self.import_one_way_binding_prop(self, "timeseries_figure_data", value.value));
-            self.socket.on("spec_stack_figure_data", (value) => self.import_one_way_binding_prop(self, "spec_stack_figure_data", value.value));
-            self.socket.on("projects", (value) => self.import_two_way_binding_prop(self, "projects", value.value));
-            self.socket.on("experiments", (value) => self.import_two_way_binding_prop(self, "experiments", value.value));
-            // if MainUI was restarted, get latest state variables from other running services
-            self.socket.emit('client_notification', {'name': 'service_state', 'value': {}});
-        });
-        // no need to unsubscribe on disconnect - client is unsubscribed by flask
-        self.socket.on("disconnect", () => {
-            self.log("socket disconnected");
-        });
-
+        this.url = dot_env_vars.protocol + "://" + dot_env_vars.host + ":" + dot_env_vars.scenthound_service_port;
+        this.connect_socket();
     },
 
     // watchers for internal notifications 
@@ -362,6 +380,9 @@ export default {
         sample_length: function(new_value, old_value) {
             return this.export_two_way_binding_prop(this, 'sample_length', new_value, old_value);
         },
+        stop_visualize_range: function(new_value, old_value) {
+            return this.export_one_way_binding_prop(this, 'stop_visualize_range', {...new_value, 'uid': Math.random()}, old_value);
+        },
         target_list_request: function(new_value, old_value) {
             return this.export_one_way_binding_prop(this, 'target_list_request', new_value, old_value);
         },
@@ -371,11 +392,12 @@ export default {
         tps_parameters_selected: function(new_value, old_value) {
             return this.export_one_way_binding_prop(this, 'tps_parameters_selected', new_value, old_value);
         },
+        url: function() {
+            this.socket.disconnect();
+            this.connect_socket();
+        },
         visualize_range: function(new_value, old_value) {
             return this.export_one_way_binding_prop(this, 'visualize_range', {...new_value, 'uid': Math.random()}, old_value);
-        },
-        stop_visualize_range: function(new_value, old_value) {
-            return this.export_one_way_binding_prop(this, 'stop_visualize_range', {...new_value, 'uid': Math.random()}, old_value);
         },
     }
 }

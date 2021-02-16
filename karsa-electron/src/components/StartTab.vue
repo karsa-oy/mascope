@@ -591,7 +591,7 @@ export default {
                                             }
                                         };
             this.is_modal_new_experiment_active = false;
-            this.active_tab = 1;
+            this.active_tab = 2;
         },
     }
 }

@@ -86,13 +86,18 @@
                                     </button>
                                 </div>
                                 <div class="column is-one-fifth">
-                                    <button
-                                        class="button"
-                                        type="button"
-                                        is-dark
-                                        @click="remove_sample">
-                                        Delete
-                                    </button>
+                                    <b-tooltip
+                                        label="Remove sample from this experiment"
+                                        position="is-left"
+                                        :delay="1000">
+                                        <button
+                                            class="button"
+                                            type="button"
+                                            is-dark
+                                            @click="remove_sample">
+                                            Remove
+                                        </button>
+                                    </b-tooltip>
                                 </div>
                             </div>
                         </footer>

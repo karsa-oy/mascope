@@ -5,7 +5,7 @@ Vue.use(Vuex)
 
 export default new Vuex.Store({
 	state: {
-		active_tab: 0,
+		active_tab: 1,
 		acquisition_control_active: false,
 		acquisition_started: {},
 		acquisition_status: "not_running",		// not_running/starting/running/stopping
@@ -36,6 +36,7 @@ export default new Vuex.Store({
 		timeseries_figure_data: {},
 		tps_parameters: [],
 		tps_parameters_selected: [],
+		url: "",
 		visualize_range: {},
 		stop_visualize_range: {},
 	},
@@ -123,6 +124,9 @@ export default new Vuex.Store({
 		},
 		tps_parameters_selected(state, payload) {
 			state.tps_parameters_selected = payload;
+		},
+		url(state, payload) {
+			state.url = payload;
 		},
 		visualize_range(state, payload) {
 			state.visualize_range = payload;
