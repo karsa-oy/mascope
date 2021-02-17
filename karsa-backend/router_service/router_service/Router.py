@@ -13,6 +13,7 @@ def run():
     sio = socketio.AsyncServer(async_mode='aiohttp', cors_allowed_origins='*',
                                ping_timeout=60)
     sio.register_namespace(RouterNamespace('/'))
+    sio.register_namespace(RouterNamespace('/tof')) #TODO: Register dynamically
     app = web.Application()
     sio.attach(app)
     cors = aiohttp_cors.setup(app)

@@ -49,6 +49,7 @@ cache = {}
 #                         )
 #              )
 
+# ========== Cache functions ==========
 
 def log_cache(func):
     def wrapper(*args, **kwargs):
@@ -206,7 +207,6 @@ def cache_release(data, obj_name=None):
         if not cache.get(key):
             cache.pop(key, None)
     
-
 async def kill_cache(data):
     signal_array, _ = cache_get(data, 'signal')
     tps_array, _ = cache_get(data, 'tps')
@@ -216,28 +216,22 @@ async def kill_cache(data):
     if isinstance(tps_array, ExtendableDataArray):
         await tps_array.flush()
 
+# -------------------------------------
 
-class FileServiceNamespace(BaseClientNamespace):
+
+class MetadataServiceNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to MainService """
 
     rooms = [
-        'acquisition_coordinates',
-        'acquired_spectrum',
-        'acquired_tps_data',
-        'acquisition_started',
-        'acquisition_finished',
-        'data_request',
-        'stop_data_request',
+        # UI
         'experiment_selected',
         'experiments',
-        'image_to_save',
         'import_sample_table_datetime_range',
         'project_selected',
         'projects',
         'sample_attributes',
+        # Router
         'service_state',
-        'tps_data_request',
-        'tps_parameter_info',
         ]
 
     service_state = dict(
@@ -245,7 +239,138 @@ class FileServiceNamespace(BaseClientNamespace):
     )
 
     # ========== UI requests ==========
+    async def on_experiment_selected(self, data):
+        value = data['value']
+        kwargs = get_client_notification_args(data)
+        experiment = value.get('id')
+        # if experiment == '':
+        #     await self.emit_client_notification(
+        #                     'samples',
+        #                     {'rows': [],
+        #                      'cols': [],
+        #                      },
+        #                     **kwargs
+        #                     )
+        #     return
+        attributes = value.get('attributes')
+        project = attributes.get('project')
+        global datapool
+        if project not in datapool.pool.keys():
+            raise ValueError("Requested project does not exist!")
 
+        project_experiments = datapool.pool.get(project).keys()
+        # If experiment does not exist, create it
+        if experiment not in project_experiments:
+            # Create new experiment directory
+            datapool.new_experiment(project, experiment, attributes)
+            # Update UI
+            project_experiments = datapool.get_experiments(project)
+            await self.emit_client_notification(
+                                    'experiments',
+                                    project_experiments,
+                                    **{**kwargs, 'notify_twin_clients': True, }
+                                    )
+        # Update sample table data
+        await self.emit_client_notification(
+                            'samples',
+                            datapool.get_sample_table(project, experiment),
+                            **kwargs
+                            )
+
+    async def on_import_sample_table_datetime_range(self, data):
+        global datapool
+        # Update sample table data
+        await self.emit_client_notification(
+                            'importable_samples',
+                            datapool.get_sample_table(),
+                            **get_client_notification_args(data)
+                            )
+
+    async def on_project_selected(self, data):
+        global datapool
+        value = data['value']
+        kwargs = get_client_notification_args(data)
+        project = value.get('id')
+        # if project == '':
+        #     await self.emit_client_notification('experiments',
+        #                                 {'project': project, 'experiments': []},
+        #                                 **kwargs)
+        #     return
+
+        if project not in datapool.pool.keys():
+            # New project
+            attributes = value.get('attributes')
+            datapool.new_project(project, attributes)
+            projects = datapool.get_projects()
+            await self.emit_client_notification(
+                                    'projects',
+                                    projects,
+                                    **{**kwargs, 'notify_twin_clients': True, })
+
+        experiments = datapool.get_experiments(project)
+        await self.emit_client_notification(
+                                    'experiments',
+                                    experiments,
+                                    **kwargs)
+
+    async def on_sample_attributes(self, data):
+        """Write attributes of a sample to disk. Make a symbolic link from
+        the sample directory in 'data_path' to 'project_path'/experiment 
+
+        Parameters
+        ----------
+        data : [type]
+            [description]
+
+        Raises
+        ------
+        ValueError
+            [description]
+        """
+        global data_path
+        global projects_path
+        global datapool
+
+        value = data['value']
+        kwargs = get_client_notification_args(data)
+
+        sample = value['id']
+        attributes = value.get('attributes')
+        project = attributes['project']
+        experiment = attributes['experiment']
+
+        if attributes.get('title') or attributes.get('description'):
+            # New sample
+            attributes.update({'id': sample})
+            datapool.new_sample(project, experiment, sample, attributes)
+        else:
+            # Remove sample (link)
+            datapool.delete_sample(project, experiment, sample)
+
+        # Update sample table data in UIs
+        await self.emit_client_notification(
+                            'samples',
+                            datapool.get_sample_table(project, experiment),
+                            **{**kwargs, 'notify_twin_clients': True, }
+                            )
+    # ---------------------------------
+   
+class FileIoGlobalNamespace(BaseClientNamespace):
+    """ python-socket.io client namespace for connecting to MainService """
+
+    rooms = [
+        # DataViz
+        'data_request',
+        'image_to_save',
+        'stop_data_request',
+        'tps_data_request',
+        # Router
+        'service_state',
+        ]
+
+    service_state = dict()
+
+    # ========== DataViz requests ==========
     async def on_data_request(self, data):
         # print("Data request:", data)
         value = data['value']
@@ -376,59 +501,10 @@ class FileServiceNamespace(BaseClientNamespace):
                                              },
                                             **kwargs
                                             )
-
     def speci_callback(self, ctx, n):
         _, signal_env = cache_get(ctx, 'signal')
         if not signal_env is None:
             signal_env['speci'] = n
-
-
-    async def on_stop_data_request(self, data):
-        ranges = data['value'].pop('ranges', [])
-        for r in ranges:
-            data['value'].update({'mz_range': r['mz_range']})
-            data['value'].update({'t_range': r['t_range']})
-            await kill_cache(data)
-            return
-        await kill_cache(data)
-
-    async def on_experiment_selected(self, data):
-        value = data['value']
-        kwargs = get_client_notification_args(data)
-        experiment = value.get('id')
-        # if experiment == '':
-        #     await self.emit_client_notification(
-        #                     'samples',
-        #                     {'rows': [],
-        #                      'cols': [],
-        #                      },
-        #                     **kwargs
-        #                     )
-        #     return
-        attributes = value.get('attributes')
-        project = attributes.get('project')
-        global datapool
-        if project not in datapool.pool.keys():
-            raise ValueError("Requested project does not exist!")
-
-        project_experiments = datapool.pool.get(project).keys()
-        # If experiment does not exist, create it
-        if experiment not in project_experiments:
-            # Create new experiment directory
-            datapool.new_experiment(project, experiment, attributes)
-            # Update UI
-            project_experiments = datapool.get_experiments(project)
-            await self.emit_client_notification(
-                                    'experiments',
-                                    project_experiments,
-                                    **{**kwargs, 'notify_twin_clients': True, }
-                                    )
-        # Update sample table data
-        await self.emit_client_notification(
-                            'samples',
-                            datapool.get_sample_table(project, experiment),
-                            **kwargs
-                            )
 
     async def on_image_to_save(self, data):
         global datapool
@@ -440,82 +516,14 @@ class FileServiceNamespace(BaseClientNamespace):
         img = convert_base64_to_img(img_str)
         img.save(img_path)
 
-    async def on_import_sample_table_datetime_range(self, data):
-        global datapool
-        # Update sample table data
-        await self.emit_client_notification(
-                            'importable_samples',
-                            datapool.get_sample_table(),
-                            **get_client_notification_args(data)
-                            )
-
-    async def on_project_selected(self, data):
-        global datapool
-        value = data['value']
-        kwargs = get_client_notification_args(data)
-        project = value.get('id')
-        # if project == '':
-        #     await self.emit_client_notification('experiments',
-        #                                 {'project': project, 'experiments': []},
-        #                                 **kwargs)
-        #     return
-
-        if project not in datapool.pool.keys():
-            # New project
-            attributes = value.get('attributes')
-            datapool.new_project(project, attributes)
-            projects = datapool.get_projects()
-            await self.emit_client_notification(
-                                    'projects',
-                                    projects,
-                                    **{**kwargs, 'notify_twin_clients': True, })
-
-        experiments = datapool.get_experiments(project)
-        await self.emit_client_notification(
-                                    'experiments',
-                                    experiments,
-                                    **kwargs)
-
-    async def on_sample_attributes(self, data):
-        """Write attributes of a sample to disk. Make a symbolic link from
-        the sample directory in 'data_path' to 'project_path'/experiment 
-
-        Parameters
-        ----------
-        data : [type]
-            [description]
-
-        Raises
-        ------
-        ValueError
-            [description]
-        """
-        global data_path
-        global projects_path
-        global datapool
-
-        value = data['value']
-        kwargs = get_client_notification_args(data)
-
-        sample = value['id']
-        attributes = value.get('attributes')
-        project = attributes['project']
-        experiment = attributes['experiment']
-
-        if attributes.get('title') or attributes.get('description'):
-            # New sample
-            attributes.update({'id': sample})
-            datapool.new_sample(project, experiment, sample, attributes)
-        else:
-            # Remove sample (link)
-            datapool.delete_sample(project, experiment, sample)
-
-        # Update sample table data in UIs
-        await self.emit_client_notification(
-                            'samples',
-                            datapool.get_sample_table(project, experiment),
-                            **{**kwargs, 'notify_twin_clients': True, }
-                            )
+    async def on_stop_data_request(self, data):
+        ranges = data['value'].pop('ranges', [])
+        for r in ranges:
+            data['value'].update({'mz_range': r['mz_range']})
+            data['value'].update({'t_range': r['t_range']})
+            await kill_cache(data)
+            return
+        await kill_cache(data)
 
     async def on_tps_data_request(self, data):        
         value = data['value']
@@ -596,15 +604,29 @@ class FileServiceNamespace(BaseClientNamespace):
                                        {'filename': filename},
                                        **kwargs
                                        )
- 
     def tps_speci_callback(self, ctx, n):
         _, tps_env = cache_get(ctx, 'tps')
         if not tps_env is None:
             tps_env['tps_speci'] = n
-   
-    # ---------------------------------
+    # --------------------------------------
 
-    # ========== MS data ==========
+class FileIoTofNamespace(BaseClientNamespace):
+    """ python-socket.io client namespace for connecting to MainService """
+
+    rooms = [
+        # TOFService
+        'acquisition_coordinates',
+        'acquired_spectrum',
+        'acquired_tps_data',
+        'acquisition_finished',
+        'tps_parameter_info',
+        # Router
+        'service_state',
+        ]
+
+    service_state = dict()
+
+    # ========== TOFService requests ==========
     async def on_acquisition_coordinates(self, data):
         """Initialize acquisition cache with received coordinates
 
@@ -678,6 +700,20 @@ class FileServiceNamespace(BaseClientNamespace):
                                             'time'
                                             )
 
+    async def on_acquired_tps_data(self, data):
+        value = data['value']
+        filename_base = value.get('filename')
+        ti = np.array( [value.get('t')], dtype=np.float32 )
+        tps_data = np.frombuffer( value.get('tps_data'), dtype=np.float32)
+        tps_data = tps_data.reshape(-1, 1)
+        tps_array, _ = cache_get(data, 'tps')
+        if tps_array:   # TODO: tps_array is None on killing acquisition from MainUI
+            tps_info = tps_array.data_array.parameter
+            await tps_array.extend_array(tps_data,
+                                        [tps_info, ti],
+                                        'time'
+                                        )
+
     async def on_acquisition_finished(self, data):
         global cache
         value = data['value']
@@ -692,9 +728,6 @@ class FileServiceNamespace(BaseClientNamespace):
         if tps_array:
             await tps_array.flush()      # TODO: tps_array is None on killing acquisition from MainUI
 
-    # ------------------------------
-    
-    # ========== TPS data ==========
     async def on_tps_parameter_info(self, data):
         value = data['value']
         filename_base = value.get('filename')
@@ -726,23 +759,10 @@ class FileServiceNamespace(BaseClientNamespace):
                              name='tps'
                              )
         cache_put(data, 'tps', tps_array)
+    # -----------------------------------------
 
-    async def on_acquired_tps_data(self, data):
-        value = data['value']
-        filename_base = value.get('filename')
-        ti = np.array( [value.get('t')], dtype=np.float32 )
-        tps_data = np.frombuffer( value.get('tps_data'), dtype=np.float32)
-        tps_data = tps_data.reshape(-1, 1)
-        tps_array, _ = cache_get(data, 'tps')
-        if tps_array:   # TODO: tps_array is None on killing acquisition from MainUI
-            tps_info = tps_array.data_array.parameter
-            await tps_array.extend_array(tps_data,
-                                        [tps_info, ti],
-                                        'time'
-                                        )
-    # ------------------------------
 
-# ---------- Utility functions ----------
+# ========= File I/O functions =========
 def base_to_zarr_filename(base_filename, variable):
     global data_path
     filepath = os.path.join(data_path, base_filename)
@@ -801,7 +821,9 @@ class FileServiceClient(BaseServiceClient):
     pass
 
 def run():
-    client = FileServiceClient(*parse_cmd_args(), FileServiceNamespace)
+    namespaces = [('/', MetadataServiceNamespace),
+                  ]
+    client = FileServiceClient(*parse_cmd_args(), namespaces)
     loop = asyncio.get_event_loop()
     loop.run_until_complete(client.run())
 

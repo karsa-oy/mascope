@@ -315,8 +315,15 @@ class BaseServiceClient:
         if not self.addr.startswith('http'):
             self.addr = 'http://' + self.addr
         self.sio = AsyncClient()
-        self.sio.register_namespace(client_namespace('/'))
-        self.root_ns = self.sio.namespace_handlers['/']
+        self.namespaces = []
+        if not isinstance(client_namespace, list):
+            self.sio.register_namespace(client_namespace('/'))
+            self.namespaces.append('/')
+        else:
+            for namespace, handlers in client_namespace:
+                self.sio.register_namespace( handlers(namespace) )
+                self.namespaces.append(namespace)
+        self.root_ns = self.sio.namespace_handlers.get(self.namespaces[0])
 
     async def emit_client_notification(self, name, value, **kwarg):
         await self.root_ns.emit_client_notification(name, value, **kwarg)
@@ -325,7 +332,7 @@ class BaseServiceClient:
         while True:
             try:
                 self.log('Connecting to Router...')
-                await self.sio.connect(self.addr, namespaces=['/',])
+                await self.sio.connect(self.addr, namespaces=self.namespaces)
                 self.log("Connected!")
                 break
             except Exception as e:
