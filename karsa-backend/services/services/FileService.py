@@ -502,7 +502,7 @@ class FileServiceNamespace(BaseClientNamespace):
         project = attributes['project']
         experiment = attributes['experiment']
 
-        if attributes.get('title') or attributes.get('description'):
+        if not attributes.get('remove'):
             # New sample
             attributes.update({'id': sample})
             datapool.new_sample(project, experiment, sample, attributes)
