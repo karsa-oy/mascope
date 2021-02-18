@@ -18,9 +18,10 @@ start cmd /k karsa-tof-service || goto :error
 pushd .venv || goto :error
 
 :: Start other services
-start cmd /k karsa-file-service || goto :error
+start cmd /k karsa-fileio-service || goto :error
+start cmd /k karsa-sample-service || goto :error
 start cmd /k karsa-dataviz-service || goto :error
-::start cmd /k python SignalProcessorService.py || goto :error
+::start cmd /k karsa-signal-service || goto :error
 popd
 
 exit /b 0

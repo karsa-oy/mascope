@@ -33,8 +33,10 @@ setuptools.setup(
     ],
     entry_points={
         'console_scripts': [
-            'karsa-file-service = services.FileService:run',
+            'karsa-fileio-service = services.FileIoService:run',
+            'karsa-sample-service = services.SampleManagerService:run',
             'karsa-dataviz-service = services.DataVizService:run',
+            'karsa-signal-service = services.SignalProcessorService:run',
             'karsa-h5-streamer = services.TWh5Streamer:run',
         ],
     }
