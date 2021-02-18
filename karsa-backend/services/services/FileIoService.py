@@ -499,6 +499,7 @@ class FileIoTofNamespace(BaseClientNamespace):
             keys: 'mz' and 'time'
         """
         global cache
+        global client
 
         value = data['value']
         filename_base = value.get('filename')
@@ -537,6 +538,8 @@ class FileIoTofNamespace(BaseClientNamespace):
                   'full_t_range',
                   value.get('t_range')
                   )
+        # Forward to global namespace
+        await client.emit_client_notification('acquisition_coordinates', value)
 
     async def on_acquired_spectrum(self, data):
         """Receive new spectrum, add to cache
@@ -546,6 +549,7 @@ class FileIoTofNamespace(BaseClientNamespace):
         data : dict
             keys: 'filename', 'i', 't' and 'spec'
         """
+        global client
         # Get package index
         value = data['value']
         i = value.get('i')
@@ -562,6 +566,8 @@ class FileIoTofNamespace(BaseClientNamespace):
                                             [mz, ti],
                                             'time'
                                             )
+        # Forward to global namespace
+        await client.emit_client_notification('acquired_spectrum', value)
 
     async def on_acquired_tps_data(self, data):
         value = data['value']
@@ -579,6 +585,7 @@ class FileIoTofNamespace(BaseClientNamespace):
 
     async def on_acquisition_finished(self, data):
         global cache
+        global client
         value = data['value']
         filename_base = value.get('filename')
         filename = base_to_zarr_filename(filename_base, 'signal')
@@ -590,6 +597,8 @@ class FileIoTofNamespace(BaseClientNamespace):
             await signal_array.flush()  # TODO: signal_array is None on killing acquisition from MainUI
         if tps_array:
             await tps_array.flush()      # TODO: tps_array is None on killing acquisition from MainUI
+        # Forward to global namespace
+        await client.emit_client_notification('acquisition_finished', value)
 
     async def on_tps_parameter_info(self, data):
         value = data['value']
@@ -684,6 +693,7 @@ class FileServiceClient(BaseServiceClient):
     pass
 
 def run():
+    global client
     namespaces = [('/', FileIoGlobalNamespace),
                   ('/tof', FileIoTofNamespace)
                   ]
@@ -693,4 +703,5 @@ def run():
 
 
 if __name__=='__main__':
+    client = None
     run()
