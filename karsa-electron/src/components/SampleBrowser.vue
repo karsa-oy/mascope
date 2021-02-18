@@ -480,6 +480,7 @@ export default {
             let sample = {
                 'id': this.sample_file,
                 'attributes': {
+                    'remove': true,
                     'project': this.sample_project,
                     'experiment': this.sample_experiment
                     }
@@ -627,8 +628,8 @@ export default {
 
             if (last_selection) {
                 this.sample_file = last_selection.id;
-                this.sample_name = last_selection.title;
-                this.sample_description = last_selection.description;
+                this.sample_name = last_selection.title || "";
+                this.sample_description = last_selection.description || "";
                 this.sample_project = last_selection.project;
                 this.sample_experiment = last_selection.experiment;
                 this.sample_to_load = {'filename': this.sample_file};
