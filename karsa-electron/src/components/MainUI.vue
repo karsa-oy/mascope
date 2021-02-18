@@ -75,18 +75,18 @@ export default {
             dotenv: {},
             // rooms - list of notifications the MainUI wants to receive
             rooms: [
-                'acquisition_started',
-                'acquisition_status',
-                'acquisition_progress',
+                // 'acquisition_started',
+                // 'acquisition_status',
+                // 'acquisition_progress',
                 'experiments',
                 'figure_ranges',
                 'h5_samples',
                 'h5_streamer_status',
                 'heatmap_figure_data',
                 'importable_samples',
-                'instrument_status',
+                // 'instrument_status',
                 'projects',
-                'sample_length',
+                // 'sample_length',
                 'samples',
                 'spec_stack_figure_data',
                 'target_table_data',
@@ -94,6 +94,13 @@ export default {
                 'timeseries_figure_data',
                 'tps_parameters',
                 ],
+            rooms_tof: [
+                'acquisition_started',
+                'acquisition_status',
+                'acquisition_progress',
+                'instrument_status',
+                'sample_length',
+            ],
             external_notifications: [],
         };
     },
@@ -276,6 +283,7 @@ export default {
         connect_socket() {
             var self = this;
             self.log("Connecting to url: ", self.url);
+            // Global namespace
             self.socket = io.connect(self.url);
             self.socket.on("connect", () => {
                 self.socket.emit('subscribe',
@@ -283,15 +291,10 @@ export default {
                                 'subscriptions': self.rooms});
                 // handlers for for external notifications:
                 // input value as object {name, value, cookies, no_data_logging...}
-                self.socket.on("acquisition_started", (value) => self.import_one_way_binding_prop(self, "acquisition_started", value.value));
-                self.socket.on("acquisition_status", (value) => self.import_two_way_binding_prop(self, "acquisition_status", value.value));
-                self.socket.on("acquisition_progress", (value) => self.import_one_way_binding_prop(self, "acquisition_progress", value.value, true));
                 self.socket.on("samples", (value) => self.import_one_way_binding_prop(self, "samples", value.value));
                 self.socket.on("h5_samples", (value) => self.import_one_way_binding_prop(self, "h5_samples", value.value));
                 self.socket.on("h5_streamer_status", (value) => self.import_one_way_binding_prop(self, "h5_streamer_status", value.value));
                 self.socket.on("importable_samples", (value) => self.import_one_way_binding_prop(self, "importable_samples", value.value));
-                self.socket.on("instrument_status", (value) => self.import_one_way_binding_prop(self, "instrument_status", value.value));
-                self.socket.on("sample_length", (value) => self.import_two_way_binding_prop(self, "sample_length", value.value));
                 self.socket.on("target_table_data", (value) => self.import_one_way_binding_prop(self, "target_table_data", value.value));
                 self.socket.on("targets", (value) => self.import_one_way_binding_prop(self, "targets", value.value));
                 self.socket.on("figure_ranges", (value) => self.import_one_way_binding_prop(self, "figure_ranges", {...value.value, 'uid': Math.random()}));
@@ -308,11 +311,27 @@ export default {
                     message: 'Socket connected!',
                     type: 'is-success'
                 })
-            });
             // no need to unsubscribe on disconnect - client is unsubscribed by flask
             self.socket.on("disconnect", () => {
                 self.log("socket disconnected");
                 self.socket_is_connected = false;
+            });
+            // /tof namespace
+            self.socket_tof = io.connect(self.url+'/tof');
+            self.socket_tof.on("connect", () => {
+                self.socket_tof.emit('subscribe',
+                                {'app_name': self.$options.name,
+                                'subscriptions': self.rooms_tof});
+                // handlers for for external notifications:
+                // input value as object {name, value, cookies, no_data_logging...}
+                self.socket_tof.on("acquisition_started", (value) => self.import_one_way_binding_prop(self, "acquisition_started", value.value));
+                self.socket_tof.on("acquisition_status", (value) => self.import_two_way_binding_prop(self, "acquisition_status", value.value));
+                self.socket_tof.on("acquisition_progress", (value) => self.import_one_way_binding_prop(self, "acquisition_progress", value.value, true));
+                self.socket_tof.on("instrument_status", (value) => self.import_one_way_binding_prop(self, "instrument_status", value.value));
+                self.socket_tof.on("sample_length", (value) => self.import_two_way_binding_prop(self, "sample_length", value.value));
+         
+                self.socket_tof.emit('client_notification', {'name': 'service_state', 'value': {}});
+                })
             });
         },
         export_one_way_binding_prop: (ctx, name, new_value, old_value, no_logging=false) => {
@@ -385,9 +404,22 @@ export default {
     // watchers for internal notifications 
     // watchers also see changes from external notifications, if any
     watch: {
+        // /tof namespace notifications
         acquisition_status: function(new_value, old_value) {
-            return this.export_two_way_binding_prop(this, 'acquisition_status', new_value, old_value);
+            // TODO: Very hacky way to deal with /tof namespace
+            let ctx = {'external_notifications': this.external_notifications,
+                       'socket': this.socket_tof
+                       };
+            return this.export_two_way_binding_prop(ctx, 'acquisition_status', new_value, old_value, true);
         },
+        sample_length: function(new_value, old_value) {
+            // TODO: Very hacky way to deal with /tof namespace
+            let ctx = {'external_notifications': this.external_notifications,
+                       'socket': this.socket_tof
+                       };
+            return this.export_two_way_binding_prop(ctx, 'sample_length', new_value, old_value);
+        },
+        // Global namespace notifications
         experiment_selected: function(new_value, old_value) {
             return this.export_one_way_binding_prop(this, 'experiment_selected', new_value, old_value);
         },
@@ -405,9 +437,6 @@ export default {
         },
         sample_attributes: function(new_value, old_value) {
             return this.export_one_way_binding_prop(this, 'sample_attributes', new_value, old_value);
-        },
-        sample_length: function(new_value, old_value) {
-            return this.export_two_way_binding_prop(this, 'sample_length', new_value, old_value);
         },
         stop_visualize_range: function(new_value, old_value) {
             return this.export_one_way_binding_prop(this, 'stop_visualize_range', {...new_value, 'uid': Math.random()}, old_value);

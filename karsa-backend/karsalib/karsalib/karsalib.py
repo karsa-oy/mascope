@@ -214,22 +214,22 @@ class BaseServerNamespace(AsyncNamespace):
         src_sids.append(sid)
         # shuffle for naive balance loading in case of twin services
         subscription_sids = deepcopy(self.subscription_sids[subscription])
-        random.shuffle(subscription_sids)
-        # do not forward notification to self and self twins
-        the_twin_app_sids = self.app_name_to_sids[self.sid_to_app[sid]['name']]
-        for s in the_twin_app_sids:
-            try:
-                subscription_sids.remove(s)
-            except:
-                # self may not be subscribed to this notification: ignore
-                pass
+        # random.shuffle(subscription_sids)
+        # # do not forward notification to self and self twins
+        # the_twin_app_sids = self.app_name_to_sids[self.sid_to_app[sid]['name']]
+        # for s in the_twin_app_sids:
+        #     try:
+        #         subscription_sids.remove(s)
+        #     except:
+        #         # self may not be subscribed to this notification: ignore
+        #         pass
         # by default, namespace client (both app client, and app service)
         # notifies only one of the subscriber twins (if any); when defined, the flags
         # notify_twin_clients/services alter subscriber notification rule for twins
-        subscription_sids = self.remove_twin_app_sids(sids=subscription_sids,
-                                                    sids_to_stay=src_sids,
-                                                    keep_twin_clients=notify_twin_clients,
-                                                    keep_twin_services=notify_twin_services)
+        # subscription_sids = self.remove_twin_app_sids(sids=subscription_sids,
+        #                                             sids_to_stay=src_sids,
+        #                                             keep_twin_clients=notify_twin_clients,
+        #                                             keep_twin_services=notify_twin_services)
         async def srv_callback(*arg, **kwarg):
             await self.emit('client_notification_callback',
                             dict(subscription=subscription,
