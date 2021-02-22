@@ -687,8 +687,10 @@ class DataVizServiceClient(BaseServiceClient):
 
 def run():
     global client
-    client = DataVizServiceClient(*parse_cmd_args(),
-                                  DataVizServiceNamespace
+    url, port, namespace = parse_cmd_args()
+    client = DataVizServiceClient(url,
+                                  port,
+                                  (namespace, DataVizServiceNamespace)
                                   )
     loop = asyncio.get_event_loop()
     loop.run_until_complete(client.run())

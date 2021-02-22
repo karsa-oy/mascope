@@ -212,9 +212,8 @@ class TOFServiceClient(BaseServiceClient):
 
 
 def run():
-    namespaces = [('/tof', TOFServiceNamespace)
-                  ]
-    client = TOFServiceClient(*parse_cmd_args(), namespaces)
+    url, port, namespace = parse_cmd_args()
+    client = TOFServiceClient(url, port, (namespace, TOFServiceNamespace))
     loop = asyncio.get_event_loop()
     loop.run_until_complete(client.run())
 

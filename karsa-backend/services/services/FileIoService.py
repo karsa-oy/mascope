@@ -217,23 +217,169 @@ async def kill_cache(data):
         await tps_array.flush()
 
 # -------------------------------------
-  
-class FileIoGlobalNamespace(BaseClientNamespace):
+
+class FileIoNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to MainService """
 
     rooms = [
+        # TOFService
+        'acquisition_coordinates',
+        'acquired_spectrum',
+        'acquired_tps_data',
+        'acquisition_finished',
+        'tps_parameter_info',
+        #
         # DataViz
         'data_request',
         'image_to_save',
         'stop_data_request',
         'tps_data_request',
+        #
         # Router
         'service_state',
+        #
         ]
 
     service_state = dict()
 
-    # ========== DataViz requests ==========
+    # ========== TOFService requests ==========
+    async def on_acquisition_coordinates(self, data):
+        """Initialize acquisition cache with received coordinates
+
+        Parameters
+        ----------
+        data : dict
+            keys: 'mz' and 'time'
+        """
+        global cache
+        global client
+
+        value = data['value']
+        filename_base = value.get('filename')
+        print("Start acquiring sample: %s" %filename_base)
+        filename = base_to_zarr_filename(filename_base, 'signal')
+        
+        # Check if sample and dataset with given name exists
+        # if os.path.isdir(filename):
+        #     print("Dataset %s exists already" %filename)
+        #     i = 0
+        #     while True:
+        #         new_filename_base = filename_base + '_%s' % i
+        #         filename = base_to_zarr_filename(new_filename_base, 'signal')
+        #         if os.path.isdir(filename):
+        #             i += 1
+        #             continue
+        #         else:
+        #             filename_base = new_filename_base
+        #             break
+        
+        print("Writing signal into: %s" %filename)
+
+        mz = np.frombuffer( value.get('mz'), dtype=np.float32 )
+        signal_array = ExtendableDataArray(path=filename,
+                                           array_module=da
+                                           )
+        signal_array.init_array(dims=('mz', 'time'),
+                                coords=[mz, []],
+                                name='signal'
+                                )
+        cache_put(data,
+                  'signal',
+                  signal_array,
+                  )
+        cache_put(data,
+                  'full_t_range',
+                  value.get('t_range')
+                  )
+
+    async def on_acquired_spectrum(self, data):
+        """Receive new spectrum, add to cache
+
+        Parameters
+        ----------
+        data : dict
+            keys: 'filename', 'i', 't' and 'spec'
+        """
+        global client
+        # Get package index
+        value = data['value']
+        i = value.get('i')
+        # print(i)
+        filename_base = value.get('filename')
+
+        ti = np.array( [value.get('t')], dtype=np.float32 )
+        spec = np.frombuffer(value.get('spec'), dtype=np.float32)
+        spec = spec.reshape(-1, 1)
+        signal_array, _ = cache_get(data, 'signal')
+        if signal_array:       # TODO: signal_array is None on killing acquisition from MainUI
+            mz = signal_array.data_array.mz
+            await signal_array.extend_array(spec,
+                                            [mz, ti],
+                                            'time'
+                                            )
+
+    async def on_acquired_tps_data(self, data):
+        value = data['value']
+        filename_base = value.get('filename')
+        ti = np.array( [value.get('t')], dtype=np.float32 )
+        tps_data = np.frombuffer( value.get('tps_data'), dtype=np.float32)
+        tps_data = tps_data.reshape(-1, 1)
+        tps_array, _ = cache_get(data, 'tps')
+        if tps_array:   # TODO: tps_array is None on killing acquisition from MainUI
+            tps_info = tps_array.data_array.parameter
+            await tps_array.extend_array(tps_data,
+                                        [tps_info, ti],
+                                        'time'
+                                        )
+
+    async def on_acquisition_finished(self, data):
+        global cache
+        global client
+        value = data['value']
+        filename_base = value.get('filename')
+        filename = base_to_zarr_filename(filename_base, 'signal')
+        print("Finished acquiring file: %s" %filename)
+        signal_array, _ = cache_get(data, 'signal')
+        tps_array, _ = cache_get(data, 'tps')
+        cache_release(data)
+        if signal_array:
+            await signal_array.flush()  # TODO: signal_array is None on killing acquisition from MainUI
+        if tps_array:
+            await tps_array.flush()      # TODO: tps_array is None on killing acquisition from MainUI
+
+    async def on_tps_parameter_info(self, data):
+        value = data['value']
+        filename_base = value.get('filename')
+        filename = base_to_zarr_filename(filename_base, 'tps')
+
+        # Check if sample and dataset with given name exists
+        # if os.path.isdir(filename):
+        #     print("Dataset %s exists already" %filename)
+        #     i = 0
+        #     while True:
+        #         new_filename_base = filename_base + '_%s' % i
+        #         filename = base_to_zarr_filename(new_filename_base, 'tps')
+        #         if os.path.isdir(filename):
+        #             i += 1
+        #             continue
+        #         else:
+        #             filename_base = new_filename_base
+        #             break
+
+        print("Writing TPS data into: %s" %filename)
+
+        tps_info = value.get('tps_info')
+        
+        tps_array = ExtendableDataArray(path=filename,
+                                        array_module=da
+                                        )
+        tps_array.init_array(dims=('parameter', 'time'),
+                             coords=[tps_info, []],
+                             name='tps'
+                             )
+        cache_put(data, 'tps', tps_array)
+    # -----------------------------------------
+    # =========== DataViz requests ===========
     async def on_data_request(self, data):
         # print("Data request:", data)
         value = data['value']
@@ -471,167 +617,7 @@ class FileIoGlobalNamespace(BaseClientNamespace):
         _, tps_env = cache_get(ctx, 'tps')
         if not tps_env is None:
             tps_env['tps_speci'] = n
-    # --------------------------------------
-
-class FileIoTofNamespace(BaseClientNamespace):
-    """ python-socket.io client namespace for connecting to MainService """
-
-    rooms = [
-        # TOFService
-        'acquisition_coordinates',
-        'acquired_spectrum',
-        'acquired_tps_data',
-        'acquisition_finished',
-        'tps_parameter_info',
-        # Router
-        'service_state',
-        ]
-
-    service_state = dict()
-
-    # ========== TOFService requests ==========
-    async def on_acquisition_coordinates(self, data):
-        """Initialize acquisition cache with received coordinates
-
-        Parameters
-        ----------
-        data : dict
-            keys: 'mz' and 'time'
-        """
-        global cache
-        global client
-
-        value = data['value']
-        filename_base = value.get('filename')
-        print("Start acquiring sample: %s" %filename_base)
-        filename = base_to_zarr_filename(filename_base, 'signal')
-        
-        # Check if sample and dataset with given name exists
-        # if os.path.isdir(filename):
-        #     print("Dataset %s exists already" %filename)
-        #     i = 0
-        #     while True:
-        #         new_filename_base = filename_base + '_%s' % i
-        #         filename = base_to_zarr_filename(new_filename_base, 'signal')
-        #         if os.path.isdir(filename):
-        #             i += 1
-        #             continue
-        #         else:
-        #             filename_base = new_filename_base
-        #             break
-        
-        print("Writing signal into: %s" %filename)
-
-        mz = np.frombuffer( value.get('mz'), dtype=np.float32 )
-        signal_array = ExtendableDataArray(path=filename,
-                                           array_module=da
-                                           )
-        signal_array.init_array(dims=('mz', 'time'),
-                                coords=[mz, []],
-                                name='signal'
-                                )
-        cache_put(data,
-                  'signal',
-                  signal_array,
-                  )
-        cache_put(data,
-                  'full_t_range',
-                  value.get('t_range')
-                  )
-        # Forward to global namespace
-        await client.emit_client_notification('acquisition_coordinates', value)
-
-    async def on_acquired_spectrum(self, data):
-        """Receive new spectrum, add to cache
-
-        Parameters
-        ----------
-        data : dict
-            keys: 'filename', 'i', 't' and 'spec'
-        """
-        global client
-        # Get package index
-        value = data['value']
-        i = value.get('i')
-        # print(i)
-        filename_base = value.get('filename')
-
-        ti = np.array( [value.get('t')], dtype=np.float32 )
-        spec = np.frombuffer(value.get('spec'), dtype=np.float32)
-        spec = spec.reshape(-1, 1)
-        signal_array, _ = cache_get(data, 'signal')
-        if signal_array:       # TODO: signal_array is None on killing acquisition from MainUI
-            mz = signal_array.data_array.mz
-            await signal_array.extend_array(spec,
-                                            [mz, ti],
-                                            'time'
-                                            )
-        # Forward to global namespace
-        await client.emit_client_notification('acquired_spectrum', value)
-
-    async def on_acquired_tps_data(self, data):
-        value = data['value']
-        filename_base = value.get('filename')
-        ti = np.array( [value.get('t')], dtype=np.float32 )
-        tps_data = np.frombuffer( value.get('tps_data'), dtype=np.float32)
-        tps_data = tps_data.reshape(-1, 1)
-        tps_array, _ = cache_get(data, 'tps')
-        if tps_array:   # TODO: tps_array is None on killing acquisition from MainUI
-            tps_info = tps_array.data_array.parameter
-            await tps_array.extend_array(tps_data,
-                                        [tps_info, ti],
-                                        'time'
-                                        )
-
-    async def on_acquisition_finished(self, data):
-        global cache
-        global client
-        value = data['value']
-        filename_base = value.get('filename')
-        filename = base_to_zarr_filename(filename_base, 'signal')
-        print("Finished acquiring file: %s" %filename)
-        signal_array, _ = cache_get(data, 'signal')
-        tps_array, _ = cache_get(data, 'tps')
-        cache_release(data)
-        if signal_array:
-            await signal_array.flush()  # TODO: signal_array is None on killing acquisition from MainUI
-        if tps_array:
-            await tps_array.flush()      # TODO: tps_array is None on killing acquisition from MainUI
-        # Forward to global namespace
-        await client.emit_client_notification('acquisition_finished', value)
-
-    async def on_tps_parameter_info(self, data):
-        value = data['value']
-        filename_base = value.get('filename')
-        filename = base_to_zarr_filename(filename_base, 'tps')
-
-        # Check if sample and dataset with given name exists
-        # if os.path.isdir(filename):
-        #     print("Dataset %s exists already" %filename)
-        #     i = 0
-        #     while True:
-        #         new_filename_base = filename_base + '_%s' % i
-        #         filename = base_to_zarr_filename(new_filename_base, 'tps')
-        #         if os.path.isdir(filename):
-        #             i += 1
-        #             continue
-        #         else:
-        #             filename_base = new_filename_base
-        #             break
-
-        print("Writing TPS data into: %s" %filename)
-
-        tps_info = value.get('tps_info')
-        
-        tps_array = ExtendableDataArray(path=filename,
-                                        array_module=da
-                                        )
-        tps_array.init_array(dims=('parameter', 'time'),
-                             coords=[tps_info, []],
-                             name='tps'
-                             )
-        cache_put(data, 'tps', tps_array)
-    # -----------------------------------------
+    # ----------------------------------------
 
 
 # ========= File I/O functions =========
@@ -689,15 +675,13 @@ def write_zarr_attributes(filepath, attributes):
 # ---------------------------------------
 
 
-class FileServiceClient(BaseServiceClient):
+class FileIoClient(BaseServiceClient):
     pass
 
 def run():
     global client
-    namespaces = [('/', FileIoGlobalNamespace),
-                  ('/tof', FileIoTofNamespace)
-                  ]
-    client = FileServiceClient(*parse_cmd_args(), namespaces)
+    url, port, namespace = parse_cmd_args()
+    client = FileIoClient(url, port, (namespace, FileIoNamespace))
     loop = asyncio.get_event_loop()
     loop.run_until_complete(client.run())
 

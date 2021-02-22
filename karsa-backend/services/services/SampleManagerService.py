@@ -180,9 +180,11 @@ class FileServiceClient(BaseServiceClient):
     pass
 
 def run():
-    namespaces = [('/', MetadataServiceNamespace),
-                  ]
-    client = FileServiceClient(*parse_cmd_args(), namespaces)
+    url, port, namespace = parse_cmd_args()
+    client = FileServiceClient(url,
+                               port,
+                               (namespace, MetadataServiceNamespace)
+                               )
     loop = asyncio.get_event_loop()
     loop.run_until_complete(client.run())
 

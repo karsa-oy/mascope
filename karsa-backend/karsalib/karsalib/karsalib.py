@@ -290,18 +290,23 @@ def parse_cmd_args():
     --port : int
         Karsa Router port (default: 5010)
     """
+    # Set defaults
     url = 'localhost'
     port = 5010
-    opts, _ = getopt.getopt(sys.argv[1:], 'o:v', ['url=', 'port=', ])
+    namespace = '/'
+    # Parse cmd arguments
+    opts, _ = getopt.getopt(sys.argv[1:], 'o:v', ['url=', 'port=', 'ns='])
     for opt, arg in opts:
         if opt=='--url':
             url = arg
+        if opt=='--ns':
+            namespace = arg
         if opt=='--port':
             try:
                 port = int(arg)
             except:
                 raise SyntaxError(f'Invalid command line argument: {opt}={arg}')
-    return url, port
+    return url, port, namespace
 
 
 class BaseServiceClient:
@@ -315,24 +320,40 @@ class BaseServiceClient:
         if not self.addr.startswith('http'):
             self.addr = 'http://' + self.addr
         self.sio = AsyncClient()
-        self.namespaces = []
-        if not isinstance(client_namespace, list):
-            self.sio.register_namespace(client_namespace('/'))
-            self.namespaces.append('/')
-        else:
-            for namespace, handlers in client_namespace:
-                self.sio.register_namespace( handlers(namespace) )
-                self.namespaces.append(namespace)
-        self.root_ns = self.sio.namespace_handlers.get(self.namespaces[0])
+        namespace, handlers = client_namespace
+        if not namespace.startswith('/'):
+            namespace = '/' + namespace
+        self.sio.register_namespace( handlers(namespace) )
+        self.root_ns = self.sio.namespace_handlers.get(namespace)
 
     async def emit_client_notification(self, name, value, **kwarg):
         await self.root_ns.emit_client_notification(name, value, **kwarg)
 
-    async def connect(self):
+    async def register_router_namespaces(self, namespaces):
+        self.log("Connecting to '/' to register %s" %namespaces)
+        await self.connect(['/'])
+        # TODO: TBR python-socketio BadNamespaceError connection bug
+        from socketio.exceptions import BadNamespaceError
+        while True:
+            try:
+                for namespace in namespaces:
+                    await self.sio.emit('register_namespace',
+                                        namespace,
+                                        callback=self.disconnect
+                                        )
+                    self.log("Registering %s in Router" %namespace)
+                break
+            except BadNamespaceError:
+                await self.sio.sleep(.1)
+
+    async def connect(self, namespaces):
         while True:
             try:
                 self.log('Connecting to Router...')
-                await self.sio.connect(self.addr, namespaces=self.namespaces)
+                await self.sio.connect(
+                            self.addr,
+                            namespaces=namespaces
+                            )
                 self.log("Connected!")
                 break
             except Exception as e:
@@ -340,7 +361,9 @@ class BaseServiceClient:
                 await self.sio.sleep(1)
 
     async def disconnect(self):
+        self.log("Disconnecting from Router...")
         await self.sio.disconnect()
+        self.log("Disconnected")
 
     async def init_service(self):
         """
@@ -356,6 +379,9 @@ class BaseServiceClient:
             await self.sio.sleep(1)
 
     async def run(self):
-        await self.connect()
+        namespaces = list( self.sio.namespace_handlers.keys() )
+        if namespaces[0] != '/':
+            await self.register_router_namespaces(namespaces)
+        await self.connect(namespaces)
         await self.init_service()
         await self.service_main()
