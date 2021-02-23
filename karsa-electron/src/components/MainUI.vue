@@ -398,7 +398,6 @@ export default {
     created() {
         this.read_dotenv();
         this.url = this.dotenv.protocol + "//" + this.dotenv.host + ":" + this.dotenv.port;
-        this.connect_socket();
     },
 
     // watchers for internal notifications 
@@ -452,7 +451,9 @@ export default {
         },
         url: function(new_url) {
             // Connect to new url
-            this.socket.disconnect();
+            if (this.socket_is_connected) {
+                this.socket.disconnect();
+            }
             this.connect_socket();
             // Parse url into dotenv format and write to file
             let url_obj = new URL(new_url);
