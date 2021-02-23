@@ -29,25 +29,35 @@ class BaseClientNamespace(AsyncClientNamespace):
     service_state = {}
     # app_name is used to detect twin apps
     app_name = __file__
-    # type is used to diff service app from client app (python apps are normally services)
-    app_type = 'service'
+    # # type is used to diff service app from client app (python apps are normally services)
+    # app_type = 'service'
 
     def log(self, *arg, **kwarg):
         if not NO_LOGGING_DEFAULT:
             print(f"[{self.__class__.__name__}.{inspect.stack()[1].function}]", *arg, **kwarg)
 
-    async def join_rooms(self):
+    async def subscribe(self, endpoints=self.rooms, room=None):
         data = dict(
             app_name = self.app_name,
-            app_type = self.app_type,
-            subscriptions = self.rooms,
+            # app_type = self.app_type,
+            endpoints = endpoints,
+            room = room,
         )
         await self.emit('subscribe', data)
+
+    async def unsubscribe(self, endpoints=self.rooms, room=None):
+        data = dict(
+            app_name = self.app_name,
+            # app_type = self.app_type,
+            endpoints = endpoints,
+            room = room,
+        )
+        await self.emit('unsubscribe', data)
 
     async def on_connect(self):
         self.app_name = self.__class__.__name__
         self.log(f"connected to namespace {self.namespace}")
-        await self.join_rooms()
+        await self.subscribe()
         await self.on_service_state(dict(value={},
                                          notify_twin_clients=True,
                                          notify_twin_services=True,
@@ -112,51 +122,54 @@ class BaseClientNamespace(AsyncClientNamespace):
 
 class BaseServerNamespace(AsyncNamespace):
     """ socketio server base namespace class """
-    subscription_sids = dict()
-    sid_to_app = dict()
-    app_name_to_sids = dict()   # for tracing service/app twins
+    subscriptions = dict()  # endpoints to rooms
+    sid_to_rooms = dict()   # for housekeeping
+    # sid_to_app = dict()
+    # app_name_to_sids = dict()   # for tracing service/app twins
 
     def log(self, *arg, **kwarg):
         print(f"[{self.__class__.__name__}.{inspect.stack()[1].function}]", *arg, **kwarg)
 
-    def add_subscription(self, sid, room):
-        if room not in self.subscription_sids:
-            self.subscription_sids[room] = []
-        if sid not in self.subscription_sids[room]:
-            self.subscription_sids[room].append(sid)
-        self.enter_room(sid, f'{room}_{sid}')
+    def add_subscription(self, endpoint, room):
+        if endpoint not in self.subscriptions:
+            self.subscriptions[endpoint] = []
+        if room not in self.subscriptions[endpoint]:
+            self.subscriptions[endpoint].append(room)
 
-    def remove_subscription(self, sid, room):
-        self.leave_room(sid, f'{room}_{sid}')
-        self.subscription_sids[room].remove(sid)
+    def remove_subscription(self, endpoint, room):
+        self.subscriptions[endpoint].remove(room)
+        if not self.subscriptions[endpoint]:
+            self.subscriptions.pop(endpoint)
     
     def on_connect(self, sid, environ):
         self.log("connected to namespace", self.namespace)
+        self.sid_to_rooms[sid] = []
 
     async def on_disconnect(self, sid):
-        if sid not in self.sid_to_app:
-            # don't unsubscribe anonimous clients (UI:renderer?)
-            return
+        # if sid not in self.sid_to_app:
+        #     # don't unsubscribe anonimous clients (UI:renderer?)
+        #     return
         app_name = self.sid_to_app[sid]['name']
-        app_type = self.sid_to_app[sid].get('type', 'client')
-        self.log(app_type, app_name, "disconnected from namespace", self.namespace)
+        # app_type = self.sid_to_app[sid].get('type', 'client')
+        self.log(app_name, "disconnected from namespace", self.namespace)
         # clear the app caches, if any, in all app services
         await self.on_client_notification(sid,
                         dict(name='stop_visualize_range',
                              value={},
                              notify_twin_services=True,
                              no_data_logging=False) )
-        # remove the app from all rooms/subscriptions
-        for room in self.subscription_sids:
-            try:
-                self.remove_subscription(sid, room)
-            except:
-                pass
-        del self.sid_to_app[sid]
-        # remove the app from twin apps list
-        self.app_name_to_sids[app_name].remove(sid)
-        if not self.app_name_to_sids[app_name]:
-            del self.app_name_to_sids[app_name]
+        # remove the app rooms from all subscriptions
+        self.sid_to_rooms[sid].append(sid)
+        for s in self.subscriptions:
+            self.subscriptions[s] = [i for i in self.subscriptions[s] if 
+                                     i not in self.sid_to_rooms[sid]]
+            if not self.subscriptions[s]:
+                del self.subscriptions[s]
+        del self.sid_to_rooms[sid]
+        # # remove the app from twin apps list
+        # self.app_name_to_sids[app_name].remove(sid)
+        # if not self.app_name_to_sids[app_name]:
+        #     del self.app_name_to_sids[app_name]
 
 
     def on_subscribe(self, sid, data):
@@ -166,19 +179,27 @@ class BaseServerNamespace(AsyncNamespace):
         data: dict(app_name=client_name, [app_type=client_type,] subscriptions=subscription_list)
         """
         app_name = data['app_name']
-        app_type = data.get('app_type', 'client')
-        self.log(f"{app_type} {app_name}:{sid} joined rooms {data['subscriptions']}")
-        self.sid_to_app[sid] = dict(name=app_name, type=app_type)
-        if app_name not in self.app_name_to_sids:
-            self.app_name_to_sids[app_name] = []
-        self.app_name_to_sids[app_name].append(sid)
-        for d in data['subscriptions']:
-            self.add_subscription(sid, d)
+        room = data.get('room') or sid
+        self.log(f"{app_name}: {room} signed up for endpoints {data['endpoints']}")
+        # self.sid_to_app[sid] = dict(name=app_name, type=app_type)
+        # if app_name not in self.app_name_to_sids:
+        #     self.app_name_to_sids[app_name] = []
+        # self.app_name_to_sids[app_name].append(sid)
+        for d in data['endpoints']:
+            self.add_subscription(d, room)
+        if sid != room:
+            self.enter_room(sid, room)
+            self.sid_to_rooms[sid].append(room)
 
     def on_unsubscribe(self, sid, data):
-        self.log(f"client {data['app_name']} leaved rooms {data['subscriptions']}")
-        for d in data['subscriptions']:
-            self.remove_subscription(sid, d)
+        app_name = data['app_name']
+        room = data.get('room') or sid
+        self.log(f"{app_name}: {room} unsigned from {data['endpoints']}")
+        if sid != room:
+            self.leave_room(sid, room)
+            self.sid_to_rooms[sid].remove(room)
+        for d in data['endpoints']:
+            self.remove_subscription(d, room)
 
 
     async def on_client_notification(self, sid, data):
@@ -206,27 +227,27 @@ class BaseServerNamespace(AsyncNamespace):
         if 'cookies' not in data:
             data['cookies'] = dict(src_sid=[])
         cookies = data['cookies']
-        if subscription not in self.subscription_sids:
+        if subscription not in self.subscriptions:
             self.log(f"{subscription}: no handlers - notification dropped.")
             return
         src_sids = cookies['src_sid']
         # sids are added to the cookies only by this procedure
         src_sids.append(sid)
         # shuffle for naive balance loading in case of twin services
-        subscription_sids = deepcopy(self.subscription_sids[subscription])
-        # random.shuffle(subscription_sids)
+        subscriptions = deepcopy(self.subscriptions[subscription])
+        # random.shuffle(subscriptions)
         # # do not forward notification to self and self twins
         # the_twin_app_sids = self.app_name_to_sids[self.sid_to_app[sid]['name']]
         # for s in the_twin_app_sids:
         #     try:
-        #         subscription_sids.remove(s)
+        #         subscriptions.remove(s)
         #     except:
         #         # self may not be subscribed to this notification: ignore
         #         pass
         # by default, namespace client (both app client, and app service)
         # notifies only one of the subscriber twins (if any); when defined, the flags
         # notify_twin_clients/services alter subscriber notification rule for twins
-        # subscription_sids = self.remove_twin_app_sids(sids=subscription_sids,
+        # subscriptions = self.remove_twin_app_sids(sids=subscriptions,
         #                                             sids_to_stay=src_sids,
         #                                             keep_twin_clients=notify_twin_clients,
         #                                             keep_twin_services=notify_twin_services)
@@ -239,7 +260,7 @@ class BaseServerNamespace(AsyncNamespace):
                                  **get_client_notification_args(data)),
                             room=sid)
 
-        for target_sid in subscription_sids:
+        for target_sid in subscriptions:
             sent_to = len(src_sids) * '>'
             self.log(f"{subscription}: {self.sid_to_app[sid]['name']} {sent_to} {self.sid_to_app[target_sid]['name']}")
             room = f"{subscription}_{target_sid}"
