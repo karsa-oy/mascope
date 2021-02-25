@@ -39,7 +39,10 @@ from .lib.TofDaq import (
     TwGetDaqParameterInt,
     TwAddAttributeInt,
     TwAddAttributeDouble,
-    TwAddAttributeString)
+    TwAddAttributeString,
+    TwStartAcquisition,
+    TwStopAcquisition
+    )
 from .lib.TwH5 import TwH5Desc, TwGetH5Descriptor
 
 from .kinstrument import KInstrument
@@ -306,9 +309,11 @@ class KAcquisition(Thread, KInstrument):
                         self.acq_active.clear()
                         # Feed Nones to all queues
                         put_all_queues(self, None)
-                        # Wait until active flag is reset
-                        while TwDaqActive():
-                            sleep(.1)
+                        # If not in triggered mode, wait until active flag is reset
+                        if TwGetDaqParameter(b'DioStartEnable').decode() != 'true':
+                            # TODO: if above is for legacy compatibility only
+                            while TwDaqActive():
+                                sleep(.1)
                         # Wait for other threads to finish
                         print('KAcquisition waiting for other threads')
                         self.barrier.wait()
@@ -568,6 +573,178 @@ class KAcquisition(Thread, KInstrument):
         # If not TwSuccess
         if ret != 4:
             raise Exception('Failed to write attribute: %s' %TwRetVal(ret).name)
+
+
+class Acquisition(Thread, KInstrument):
+    def __init__(self):
+        print("Acquisition initializing")
+
+        Thread.__init__(self)
+
+        self.desc = TSharedMemoryDesc() # TW shared memory descriptor
+        # Check if TofDaq Recorder is running
+        if not TwTofDaqRunning():
+            raise Exception("TofDaq Recorder not running.")
+        # Try to fetch shared memory descriptor and pointer
+        ret = TwGetDescriptor(self.desc)
+        if ret == 4:
+            KInstrument.__init__(self, self.desc)
+            self.ptr = TSharedMemoryPointer() # Shared memory pointer
+        else:
+            raise Exception("Trying to fetch shared memory " +
+                            "descriptor failed: %s" %TwRetVal(ret).name)
+
+        self.timeout = 500 # [ms]
+
+        self.shutdown_event = Event()
+        self.active = Event()
+        self.spec_queue = Queue()
+
+        self.filename = None
+        self.progress = 0
+        self.speci = -1
+
+    def _check(self):
+        curr_filename = self.desc.currentDataFileName.decode()
+        curr_speci = (self.desc.iWrite * self.desc.nbrBufs) + self.desc.iBuf
+        if self.filename != curr_filename:
+            # New file
+            return 2
+        elif self.speci < curr_speci:
+            # New data
+            return 1
+        else:
+            # Nothing new
+            return 0 
+    
+    def _finalize(self):
+        self.active.clear()
+        self._reset()
+        # Feed poison pill
+        self.spec_queue.put(None)
+
+    def _get_and_feed_data(self):
+        """ Read data from the shared memory and put to queues
+        """
+        print("Feed")
+        return # TODO:
+        # Time
+        ti = np.zeros((1,))
+        TwGetBufTimeFromShMem(ti, self.desc.iBuf, self.desc.iWrite)
+        # Signal
+        spec = np.zeros((self.desc.nbrSamples, ), dtype=np.float32)
+        TwGetTofSpectrumFromShMem(spec, 0, 0, self.desc.iBuf, True)  # [mV/ext]
+        # Collect data
+        spec_data = {'filename': self.filename,
+                     'i': self.speci,
+                     't': float(ti),
+                     'spec': spec.tobytes()
+                     }
+        # Feed
+        self.spec_queue.put(spec_data)
+
+    def _reset(self):
+        print("Reset")
+        self.filename = None
+        self.progress = 0
+        self.speci = -1
+
+    def _update(self):
+        print("Update")
+        state = self._check()
+
+        if state == 0:
+            # No update
+            print("Nothing new")
+            return
+
+        # Update
+        if state == 2:
+            # New file
+            print("Acquisition started")
+            self.filename = self.desc.currentDataFileName.decode()
+            # Check again for new data
+            state = self._check()
+
+        if state == 1:
+            # New data
+            print("New data")
+            self.speci = (self.desc.iWrite * self.desc.nbrBufs) + self.desc.iBuf
+            print(self.speci)
+            self._get_and_feed_data()
+            # Acquisition progress
+            n = self.desc.nbrWrites * self.desc.nbrBufs # Total number of spectra
+            self.progress = ((self.speci+1) / n) * 100. # [%]
+         
+    def run(self):
+        print("Acquisition running")
+        timeout_counter = 0
+        while not self.shutdown_event.is_set():
+            ret = TwWaitForNewData(self.timeout,
+                                   self.desc,
+                                   self.ptr,
+                                   True
+                                   )
+            if ret == 8:
+                # Timeout
+                timeout_counter += 1 # Increment counter
+                if self.active.is_set():
+                    if not TwDaqActive():
+                        # No active acquisition
+                        # Acquisition has ended
+                        print("Acquisition ended 'normal mode'")
+                        self._finalize()
+                    else:
+                        # Acquition active, but got timed out
+
+                        # Here we may end up from three scenarios:
+                        # 1) Acquisition active, but interval is longer than 'self.timeout'
+                        # 2) TwDaqActive not yet cleared after just finished acquisition
+                        # 3) DAQ configured to HW trigger mode, no actual acquisition (legacy feature)
+                        
+                        # All three cases should be handled by this block
+                        # Wait time so far
+                        tot_wait = timeout_counter * self.timeout * 1e-3 # [s]
+                        # Calculate acquisition interval
+                        tof_period_ns = self.desc.tofPeriod
+                        if tof_period_ns < 1:
+                            # Make sure unit is correct
+                            tof_period_ns *= 1e9
+                        acquisition_interval = (tof_period_ns * 1e-9) * self.desc.nbrWaveforms # [s]
+                        # Check if waited long enough already
+                        if tot_wait > (acquisition_interval + 1):
+                            # Acquisition has ended
+                            print("Acquisition ended 'long interval'")
+                            self._finalize()
+
+            elif ret == 4:
+                # New data
+                # Reset timeout counter
+                timeout_counter = 0
+                # Make sure active flag is set
+                self.active.set()
+                # Update self and feed data into queue
+                self._update()
+                continue
+
+            else:
+                raise Exception("Unexpected return value: %s"
+                                 %TwRetVal(ret).name
+                                 )
+        print('Acquisition exiting')
+        self.shutdown()
+        
+    def shutdown(self):
+        self.shutdown_event.set()
+        # Close queues
+        self.spec_queue.close()
+        self.spec_queue.join_thread()
+
+    def start_acquisition(self):
+        TwStartAcquisition()
+
+    def stop_acquisition(self):
+        TwStopAcquisition()
 
 
 class KStreamer(Thread, KInstrument):
