@@ -71,7 +71,7 @@ export default {
     },
     data() {
         return {
-            socket: null,
+            // socket: null,
             dotenv: {},
             // rooms - list of notifications the MainUI wants to receive
             rooms: [
@@ -93,14 +93,20 @@ export default {
                 'targets',
                 'timeseries_figure_data',
                 'tps_parameters',
-                ],
-            rooms_tof: [
+
                 'acquisition_started',
                 'acquisition_status',
                 'acquisition_progress',
                 'instrument_status',
                 'sample_length',
             ],
+            // rooms_tof: [
+            //     'acquisition_started',
+            //     'acquisition_status',
+            //     'acquisition_progress',
+            //     'instrument_status',
+            //     'sample_length',
+            // ],
             external_notifications: [],
         };
     },
@@ -230,12 +236,12 @@ export default {
                 this.$store.commit('sample_length', value);
             }
         },
-        socket_is_connected: {
+        socket: {
             get() {
-                return this.$store.state.socket_is_connected;
+                return this.$store.state.socket;
             },
             set(value) {
-                this.$store.commit('socket_is_connected', value);
+                this.$store.commit('socket', value);
             }
         },
         spec_stack_figure_data: {
@@ -288,7 +294,8 @@ export default {
             self.socket.on("connect", () => {
                 self.socket.emit('subscribe',
                                 {'app_name': self.$options.name,
-                                'subscriptions': self.rooms});
+                                 'endpoints': self.rooms,
+                                 'room': self.socket.id});
                 // handlers for for external notifications:
                 // input value as object {name, value, cookies, no_data_logging...}
                 self.socket.on("samples", (value) => self.import_one_way_binding_prop(self, "samples", value.value));
@@ -304,35 +311,44 @@ export default {
                 self.socket.on("spec_stack_figure_data", (value) => self.import_one_way_binding_prop(self, "spec_stack_figure_data", value.value));
                 self.socket.on("projects", (value) => self.import_two_way_binding_prop(self, "projects", value.value));
                 self.socket.on("experiments", (value) => self.import_two_way_binding_prop(self, "experiments", value.value));
+
+
+                self.socket.on("acquisition_started", (value) => self.import_one_way_binding_prop(self, "acquisition_started", value.value));
+                self.socket.on("acquisition_status", (value) => self.import_two_way_binding_prop(self, "acquisition_status", value.value));
+                self.socket.on("acquisition_progress", (value) => self.import_one_way_binding_prop(self, "acquisition_progress", value.value, true));
+                self.socket.on("instrument_status", (value) => self.import_one_way_binding_prop(self, "instrument_status", value.value));
+                self.socket.on("sample_length", (value) => self.import_two_way_binding_prop(self, "sample_length", value.value));
+
+
                 // if MainUI was restarted, get latest state variables from other running services
-                self.socket.emit('client_notification', {'name': 'service_state', 'value': {}});
-                self.socket_is_connected = true;
+                self.socket.emit('client_notification', {'name': 'service_state', 'value': {}, 'room': self.socket.id});
                 this.$buefy.toast.open({
                     message: 'Socket connected!',
                     type: 'is-success'
                 })
-            // no need to unsubscribe on disconnect - client is unsubscribed by flask
+            });
+            // no need to unsubscribe on disconnect - client is unsubscribed by framework
             self.socket.on("disconnect", () => {
                 self.log("socket disconnected");
-                self.socket_is_connected = false;
             });
-            // /tof namespace
-            self.socket_tof = io.connect(self.url+'/tof');
-            self.socket_tof.on("connect", () => {
-                self.socket_tof.emit('subscribe',
-                                {'app_name': self.$options.name,
-                                'subscriptions': self.rooms_tof});
-                // handlers for for external notifications:
-                // input value as object {name, value, cookies, no_data_logging...}
-                self.socket_tof.on("acquisition_started", (value) => self.import_one_way_binding_prop(self, "acquisition_started", value.value));
-                self.socket_tof.on("acquisition_status", (value) => self.import_two_way_binding_prop(self, "acquisition_status", value.value));
-                self.socket_tof.on("acquisition_progress", (value) => self.import_one_way_binding_prop(self, "acquisition_progress", value.value, true));
-                self.socket_tof.on("instrument_status", (value) => self.import_one_way_binding_prop(self, "instrument_status", value.value));
-                self.socket_tof.on("sample_length", (value) => self.import_two_way_binding_prop(self, "sample_length", value.value));
+
+            // // /tof namespace
+            // self.socket_tof = io.connect(self.url+'/tof');
+            // self.socket_tof.on("connect", () => {
+            //     self.socket_tof.emit('subscribe',
+            //                     {'app_name': self.$options.name,
+            //                      'endpoints': self.rooms_tof,
+            //                      'room': self.socket_tof.id});
+            //     // handlers for for external notifications:
+            //     // input value as object {name, value, cookies, no_data_logging...}
+            //     self.socket_tof.on("acquisition_started", (value) => self.import_one_way_binding_prop(self, "acquisition_started", value.value));
+            //     self.socket_tof.on("acquisition_status", (value) => self.import_two_way_binding_prop(self, "acquisition_status", value.value));
+            //     self.socket_tof.on("acquisition_progress", (value) => self.import_one_way_binding_prop(self, "acquisition_progress", value.value, true));
+            //     self.socket_tof.on("instrument_status", (value) => self.import_one_way_binding_prop(self, "instrument_status", value.value));
+            //     self.socket_tof.on("sample_length", (value) => self.import_two_way_binding_prop(self, "sample_length", value.value));
          
-                self.socket_tof.emit('client_notification', {'name': 'service_state', 'value': {}});
-                })
-            });
+            //     self.socket_tof.emit('client_notification', {'name': 'service_state', 'value': {}, 'room': self.socket.id});
+            // });
         },
         export_one_way_binding_prop: (ctx, name, new_value, old_value, no_logging=false) => {
             if ( _.isEqual(new_value, old_value) ) {
@@ -341,7 +357,8 @@ export default {
             if ( no_logging === false ) {
                 ctx.log('export', name, old_value, new_value);
             }
-            ctx.socket.emit('client_notification', {'name': name, 'value': new_value});
+            ctx.socket.emit('client_notification',
+                            {'name': name, 'value': new_value, 'room': ctx.socket.id});
         },
         export_two_way_binding_prop: (ctx, name, new_value, old_value, no_logging=false) => {
             if ( _.isEqual(new_value, old_value) ) {
@@ -353,7 +370,7 @@ export default {
                 if ( no_logging === false )
                     ctx.log('export', name, old_value, new_value);
                 ctx.socket.emit('client_notification',
-                                 {'name': name, 'value': new_value});
+                                {'name': name, 'value': new_value, 'room': ctx.socket.id});
             } else {
                 ctx.external_notifications.splice(i, 1);
             }
@@ -385,8 +402,8 @@ export default {
             let env_parsed = envfile.parse(env_string);
             for (var key in env_parsed){
                 var key_val = {}
-                key_val[key] = env_parsed[key]; 
-                Object.assign(this.dotenv, key_val); 
+                key_val[key] = env_parsed[key];
+                Object.assign(this.dotenv, key_val);
             }
         },
         write_dotenv() {
@@ -406,18 +423,20 @@ export default {
     watch: {
         // /tof namespace notifications
         acquisition_status: function(new_value, old_value) {
-            // TODO: Very hacky way to deal with /tof namespace
-            let ctx = {'external_notifications': this.external_notifications,
-                       'socket': this.socket_tof
-                       };
-            return this.export_two_way_binding_prop(ctx, 'acquisition_status', new_value, old_value, true);
+            // // TODO: Very hacky way to deal with /tof namespace
+            // let ctx = {'external_notifications': this.external_notifications,
+            //            'socket': this.socket_tof
+            //            };
+            // return this.export_two_way_binding_prop(ctx, 'acquisition_status', new_value, old_value, true);
+            return this.export_two_way_binding_prop(this, 'acquisition_status', new_value, old_value, true);
         },
         sample_length: function(new_value, old_value) {
-            // TODO: Very hacky way to deal with /tof namespace
-            let ctx = {'external_notifications': this.external_notifications,
-                       'socket': this.socket_tof
-                       };
-            return this.export_two_way_binding_prop(ctx, 'sample_length', new_value, old_value);
+            // // TODO: Very hacky way to deal with /tof namespace
+            // let ctx = {'external_notifications': this.external_notifications,
+            //            'socket': this.socket_tof
+            //            };
+            // return this.export_two_way_binding_prop(ctx, 'sample_length', new_value, old_value);
+            return this.export_two_way_binding_prop(this, 'sample_length', new_value, old_value);
         },
         // Global namespace notifications
         experiment_selected: function(new_value, old_value) {

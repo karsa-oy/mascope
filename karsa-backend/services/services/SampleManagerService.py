@@ -43,7 +43,7 @@ datapool = DataPool(data_path, projects_path)
 class MetadataServiceNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to MainService """
 
-    rooms = [
+    endpoints = [
         # UI
         'experiment_selected',
         'experiments',
@@ -126,7 +126,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
             await self.emit_client_notification(
                                     'projects',
                                     projects,
-                                    **{**kwargs, 'notify_twin_clients': True, })
+                                    **kwargs)
 
         experiments = datapool.get_experiments(project)
         await self.emit_client_notification(

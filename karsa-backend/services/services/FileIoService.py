@@ -221,7 +221,7 @@ async def kill_cache(data):
 class FileIoNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to MainService """
 
-    rooms = [
+    endpoints = [
         # TOFService
         'acquisition_coordinates',
         'acquired_spectrum',
