@@ -21,7 +21,7 @@
             <!-- Experiment tab -->
             <b-tab-item
                 icon=""
-                :label="this.experiment_selected.id"
+                :label="this.project_selected.id + '/' + this.experiment_selected.id"
                 :visible="this.experiment_selected.id !== ''">
                 <div class="columns">
                     <!-- Left column -->
