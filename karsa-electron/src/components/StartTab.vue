@@ -284,72 +284,72 @@
                                         </b-field>
                                         <div><br></div>
                                     </div>
+                                    <!-- Bottom row (Experiment) -->
+                                    <div class="row" style="width:90%; margin:0 auto;">
+                                        <!-- Header -->
+                                        <section>
+                                            <p class="card-header-title" style=text-align: center>
+                                                Experiment
+                                            </p>
+                                        </section>
+                                        <!-- Container -->
+                                        <section>
+                                            <div class="columns new-experiment-container">
+                                                <div class="column">
+                                                    <div class="row">
+                                                        <!-- New experiment -->
+                                                        <div class="column" style="text-align:center">
+                                                            <b-button 
+                                                                @click="LaunchNewExperimentModal()" 
+                                                                :disabled="project_selected==={} || project_selected.id===''"
+                                                                type="is-dark" 
+                                                                size="is-medium" 
+                                                                outlined 
+                                                                inverted
+                                                                expanded>
+                                                                New experiment
+                                                            </b-button>
+                                                        </div>
+                                                        <!-- Select box -->
+                                                        <div class="column">
+                                                            <b-field label="Select experiment">
+                                                                <b-select 
+                                                                    placeholder="Select an experiment" 
+                                                                    v-model="experiment.title" 
+                                                                    v-on:input="SetExperiment"
+                                                                    :disabled="project_selected==={} || project_selected.id===''"
+                                                                    required 
+                                                                    expanded>
+                                                                    <option
+                                                                        v-for="e in experiments_ui"
+                                                                        :value="e.id"
+                                                                        :key="e.id">
+                                                                        {{ e.id }}
+                                                                    </option>
+                                                                </b-select>
+                                                            </b-field>
+                                                            <div><br></div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="row">
+                                                        <b-field label="Description">
+                                                            <b-message>
+                                                                {{experiment.description}}
+                                                            </b-message>
+                                                        </b-field>
+                                                        <div><br></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </section>
+                                    </div>
+                                    <!-- End of bottom row -->
+                                    <div><br><br></div>
                                 </div>
                             </div>
+                            
                         </section>
                     </div>
-                    <!-- End of top row -->
-                    <div><br><br><br></div>
-                    <!-- Bottom row (Experiment) -->
-                    <div class="row">
-                        <!-- Header -->
-                        <section style="width:100%;">
-                            <p class="card-header-title" style=text-align: center>
-                                Experiment
-                            </p>
-                        </section>
-                        <!-- Container -->
-                        <section style="width:100%;">
-                            <div class="columns new-experiment-container">
-                                <div class="column">
-                                    <div class="row">
-                                        <!-- New experiment -->
-                                        <div class="column" style="text-align:center">
-                                            <b-button 
-                                                @click="LaunchNewExperimentModal()" 
-                                                :disabled="project_selected==={} || project_selected.id===''"
-                                                type="is-dark" 
-                                                size="is-medium" 
-                                                outlined 
-                                                inverted
-                                                expanded>
-                                                New experiment
-                                            </b-button>
-                                        </div>
-                                        <!-- Select box -->
-                                        <div class="column">
-                                            <b-field label="Select experiment">
-                                                <b-select 
-                                                    placeholder="Select an experiment" 
-                                                    v-model="experiment.title" 
-                                                    v-on:input="SetExperiment"
-                                                    :disabled="project_selected==={} || project_selected.id===''"
-                                                    required 
-                                                    expanded>
-                                                    <option
-                                                        v-for="e in experiments_ui"
-                                                        :value="e.id"
-                                                        :key="e.id">
-                                                        {{ e.id }}
-                                                    </option>
-                                                </b-select>
-                                            </b-field>
-                                            <div><br></div>
-                                        </div>
-                                    </div>
-                                    <div class="row">
-                                        <b-field label="Description">
-                                            <b-message>
-                                                {{experiment.description}}
-                                            </b-message>
-                                        </b-field>
-                                        <div><br></div>
-                                    </div>
-                                </div>
-                            </div>
-                        </section>
-                    </div>
-                    <!-- End of bottom row -->
                 </div>
                 <!-- Empty column -->
                 <div class="column is-one-third">
