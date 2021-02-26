@@ -246,7 +246,7 @@
                                         <div class="column" style="text-align:center">
                                             <b-button
                                                 @click="LaunchNewProjectModal()"
-                                                :disabled="!socket.connected"
+                                                :disabled="!socket || !socket.connected"
                                                 type="is-dark"
                                                 size="is-medium"
                                                 outlined
@@ -262,7 +262,7 @@
                                                     placeholder="Select a project"
                                                     v-model="project.title"
                                                     v-on:input="SetProject"
-                                                    :disabled="!socket.connected"
+                                                    :disabled="!socket || !socket.connected"
                                                     required
                                                     expanded>
                                                     <option

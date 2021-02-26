@@ -6,7 +6,7 @@
             <div class="column is-on-third">
                 <b-field
                     label="URL"
-                    :type="socket.connected ? 'is-success' : 'is-danger'">
+                    :type="socket && socket.connected ? 'is-success' : 'is-danger'">
                     <b-input
                         v-model="url"
                         lazy>
