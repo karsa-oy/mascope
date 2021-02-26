@@ -16,17 +16,17 @@ from karsatof.lib.TofDaq import (
                     )
 
 NO_DATA_LOGGING_DEFAULT = True
-
-room = 'TOF'    # instrument name: given via prompt
+INSTRUMENT_NAME = ""
 
 class TOFServiceNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for
         connecting to Router """
 
-    endpoints = ['acquisition_status',
-             'data_write_path',
-             'service_state'
-             ]
+    endpoints = [
+            'acquisition_status',
+            'data_write_path',
+            'service_state'
+            ]
 
     service_state = dict(
         acquisition_status = 'not_running',
@@ -70,20 +70,23 @@ class TOFServiceClient(BaseServiceClient):
             # TODO: TBR python-socketio BadNamespaceError connection bug
             from socketio.exceptions import BadNamespaceError
             try:
-                await self.emit_client_notification('instrument_status',
-                                             'not_ready',
-                                             room=room,
-                                             no_data_logging=False)
+                await self.emit_client_notification(
+                                            'instrument_status',
+                                            'not_ready',
+                                            room=INSTRUMENT_NAME,
+                                            no_data_logging=False
+                                            )
                 break
             except BadNamespaceError:
                 await self.sio.sleep(.1)
                 continue
         self.kacq = await self.initialize_kacquisition()
-        await self.emit_client_notification('instrument_status',
+        await self.emit_client_notification(
+                                    'instrument_status',
                                     'ready',
-                                    room=room,
-                                    no_data_logging=False)
-
+                                    room=INSTRUMENT_NAME,
+                                    no_data_logging=False
+                                    )
 
     async def service_main(self):
         global cookies
@@ -96,9 +99,10 @@ class TOFServiceClient(BaseServiceClient):
             except KeyboardInterrupt:
                 break
             cookies = dict(src_sid=[])  # make tofservice originator of the request
-            await self.emit_client_notification('acquisition_status',
+            await self.emit_client_notification(
+                                        'acquisition_status',
                                         'running',
-                                        room=room,
+                                        room=INSTRUMENT_NAME,
                                         cookies=cookies,
                                         no_data_logging=False
                                         )
@@ -114,29 +118,33 @@ class TOFServiceClient(BaseServiceClient):
                             self.kacq.nspectra,
                             dtype=np.float32
                             )
-            await self.emit_client_notification('acquisition_started',
-                                        {'filename': filename_base},
-                                        room=room,
+            await self.emit_client_notification(
+                                        'acquisition_started',
+                                        {'filename': filename_base
+                                         },
+                                        room=INSTRUMENT_NAME,
                                         cookies=cookies,
                                         no_data_logging=False
                                         )
-            await self.emit_client_notification('acquisition_coordinates',
+            await self.emit_client_notification(
+                                        'acquisition_coordinates',
                                         {'filename': filename_base,
-                                        'mz': mz.tobytes(),
-                                        # 'time': t.tobytes(),
-                                        't_range': [ float(t[0]), float(t[-1]) ]
-                                        },
-                                        room=room,
+                                         'mz': mz.tobytes(),
+                                         # 'time': t.tobytes(),
+                                         't_range': [ float(t[0]), float(t[-1]) ]
+                                         },
+                                        room=INSTRUMENT_NAME,
                                         cookies=cookies,
                                         no_data_logging=NO_DATA_LOGGING_DEFAULT
                                         )
             tps_info = self.kacq.tps_info
-            await self.emit_client_notification('tps_parameter_info',
+            await self.emit_client_notification(
+                                        'tps_parameter_info',
                                         {'filename': filename_base,
                                          'tps_info': tps_info,
                                          # 'time': t.tobytes()
-                                        },
-                                        room=room,
+                                         },
+                                        room=INSTRUMENT_NAME,
                                         cookies=cookies,
                                         no_data_logging=NO_DATA_LOGGING_DEFAULT
                                         )
@@ -153,68 +161,84 @@ class TOFServiceClient(BaseServiceClient):
                 if spec_data is not None:
                     # Spectrum data
                     speci, ti, spec = spec_data
-                    await self.emit_client_notification('acquired_spectrum',
-                                                {'filename': filename_base,
-                                                'i': speci,
-                                                't': ti,
-                                                'spec': spec.tobytes(),
-                                                },
-                                                room=room,
-                                                cookies=cookies,
-                                                no_data_logging=NO_DATA_LOGGING_DEFAULT
-                                                )
+                    await self.emit_client_notification(
+                                            'acquired_spectrum',
+                                            {'filename': filename_base,
+                                             'i': speci,
+                                             't': ti,
+                                             'spec': spec.tobytes(),
+                                             },
+                                            room=INSTRUMENT_NAME,
+                                            cookies=cookies,
+                                            no_data_logging=NO_DATA_LOGGING_DEFAULT
+                                            )
                     progress = ((speci+1) / self.kacq.nspectra) * 100. # [%]
-                    await self.emit_client_notification('acquisition_progress', 
-                                                {'sync': speci,
-                                                'progress': progress,
-                                                },
-                                                room=room,
-                                                cookies=cookies,
-                                                no_data_logging=NO_DATA_LOGGING_DEFAULT
-                                                )
+                    await self.emit_client_notification(
+                                            'acquisition_progress', 
+                                            {'sync': speci,
+                                             'progress': progress,
+                                             },
+                                            room=INSTRUMENT_NAME,
+                                            cookies=cookies,
+                                            no_data_logging=NO_DATA_LOGGING_DEFAULT
+                                            )
                     # TPS data
                     speci, tps_data = tps_data
                     await self.emit_client_notification(
                                             'acquired_tps_data',
                                             {'filename': filename_base,
-                                            'i': speci,
-                                            't': ti,
-                                            'tps_data': tps_data.tobytes(),
-                                            },
-                                            room=room,
+                                             'i': speci,
+                                             't': ti,
+                                             'tps_data': tps_data.tobytes(),
+                                             },
+                                            room=INSTRUMENT_NAME,
                                             cookies=cookies,
                                             no_data_logging=NO_DATA_LOGGING_DEFAULT
                                             )
                 # Got poison pill
                 else:
                     # Finalize acquisition
-                    await self.emit_client_notification('acquisition_progress', 
-                                                {'filename': filename_base,
-                                                 'progress': 100.,
-                                                },
-                                                room=room,
-                                                cookies=cookies,
-                                                no_data_logging=NO_DATA_LOGGING_DEFAULT
-                                                )
-                    await self.emit_client_notification('acquisition_finished', 
-                                                {'filename': filename_base},
-                                                room=room,
-                                                cookies=cookies,
-                                                no_data_logging=NO_DATA_LOGGING_DEFAULT
-                                                )
-                    await self.emit_client_notification('acquisition_status',
-                                                'not_running',
-                                                room=room,
-                                                cookies=cookies,
-                                                no_data_logging=False
-                                                )
+                    await self.emit_client_notification(
+                                            'acquisition_progress', 
+                                            {'filename': filename_base,
+                                                'progress': 100.,
+                                            },
+                                            room=INSTRUMENT_NAME,
+                                            cookies=cookies,
+                                            no_data_logging=NO_DATA_LOGGING_DEFAULT
+                                            )
+                    await self.emit_client_notification(
+                                            'acquisition_finished', 
+                                            {'filename': filename_base},
+                                            room=INSTRUMENT_NAME,
+                                            cookies=cookies,
+                                            no_data_logging=NO_DATA_LOGGING_DEFAULT
+                                            )
+                    await self.emit_client_notification(
+                                            'acquisition_status',
+                                            'not_running',
+                                            room=INSTRUMENT_NAME,
+                                            cookies=cookies,
+                                            no_data_logging=False
+                                            )
                     break
         # Kill KAcquisition
         self.kacq.shutdown()
 
 
 def run():
+    global INSTRUMENT_NAME
+
     url, port, namespace = parse_cmd_args()
+    # TODO: TOFService should always be in private namespace with FileIo
+    # if namespace == '/':
+    #     print("TOFService must be in a private namespace. " +
+    #           "Please restart the service with --ns option."
+    #           )
+    #     return
+    # INSTRUMENT_NAME = namespace.strip('/')
+    INSTRUMENT_NAME = "TOF"
+
     client = TOFServiceClient(url, port, (namespace, TOFServiceNamespace))
     loop = asyncio.get_event_loop()
     loop.run_until_complete(client.run())

@@ -259,20 +259,6 @@ class FileIoNamespace(BaseClientNamespace):
         print("Start acquiring sample: %s" %filename_base)
         filename = base_to_zarr_filename(filename_base, 'signal')
         
-        # Check if sample and dataset with given name exists
-        # if os.path.isdir(filename):
-        #     print("Dataset %s exists already" %filename)
-        #     i = 0
-        #     while True:
-        #         new_filename_base = filename_base + '_%s' % i
-        #         filename = base_to_zarr_filename(new_filename_base, 'signal')
-        #         if os.path.isdir(filename):
-        #             i += 1
-        #             continue
-        #         else:
-        #             filename_base = new_filename_base
-        #             break
-        
         print("Writing signal into: %s" %filename)
 
         mz = np.frombuffer( value.get('mz'), dtype=np.float32 )
@@ -304,7 +290,7 @@ class FileIoNamespace(BaseClientNamespace):
         # Get package index
         value = data['value']
         i = value.get('i')
-        # print(i)
+        print(i)
         filename_base = value.get('filename')
 
         ti = np.array( [value.get('t')], dtype=np.float32 )
@@ -351,20 +337,6 @@ class FileIoNamespace(BaseClientNamespace):
         value = data['value']
         filename_base = value.get('filename')
         filename = base_to_zarr_filename(filename_base, 'tps')
-
-        # Check if sample and dataset with given name exists
-        # if os.path.isdir(filename):
-        #     print("Dataset %s exists already" %filename)
-        #     i = 0
-        #     while True:
-        #         new_filename_base = filename_base + '_%s' % i
-        #         filename = base_to_zarr_filename(new_filename_base, 'tps')
-        #         if os.path.isdir(filename):
-        #             i += 1
-        #             continue
-        #         else:
-        #             filename_base = new_filename_base
-        #             break
 
         print("Writing TPS data into: %s" %filename)
 
@@ -681,6 +653,12 @@ class FileIoClient(BaseServiceClient):
 def run():
     global client
     url, port, namespace = parse_cmd_args()
+    # TODO: FileIo should always be in private namespace with data producer
+    # if namespace == '/':
+    #     print("FileIoService must be in a private namespace. " +
+    #           "Please restart the service with --ns option."
+    #           )
+    #     return
     client = FileIoClient(url, port, (namespace, FileIoNamespace))
     loop = asyncio.get_event_loop()
     loop.run_until_complete(client.run())
