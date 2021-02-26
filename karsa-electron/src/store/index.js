@@ -28,7 +28,7 @@ export default new Vuex.Store({
 		sample_selected: {},
 		sample_to_load: {},
 		samples: [],
-		socket_is_connected: false,
+		socket: null,
 		spec_stack_figure_data: {},
 		target_list_request: {},
 		target_table_data: [],
@@ -102,8 +102,8 @@ export default new Vuex.Store({
 		samples(state, payload) {
 			state.samples = payload;
 		},
-		socket_is_connected(state, payload) {
-			state.socket_is_connected = payload;
+		socket(state, payload) {
+			state.socket = payload;
 		},
 		spec_stack_figure_data(state, payload) {
 			state.spec_stack_figure_data = payload;

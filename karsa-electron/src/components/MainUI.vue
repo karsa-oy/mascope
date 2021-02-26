@@ -21,7 +21,7 @@
             <!-- Experiment tab -->
             <b-tab-item
                 icon=""
-                :label="this.experiment_selected.id"
+                :label="this.project_selected.id + '/' + this.experiment_selected.id"
                 :visible="this.experiment_selected.id !== ''">
                 <div class="columns">
                     <!-- Left column -->
@@ -53,10 +53,15 @@ import SampleBrowser from "./SampleBrowser.vue"
 import TOFControl from "./TOFControl.vue"
 import store from '../store';
 
-const _ = require('underscore');
+import {export_one_way_binding_prop,
+        export_two_way_binding_prop,
+        import_one_way_binding_prop,
+        import_two_way_binding_prop,
+        log,
+        read_dotenv,
+        write_dotenv} from "../karsalib.js"
+
 const io = require("socket.io-client");
-const fs = require('fs');
-const envfile = require('envfile');
 
 export default {
     name: "MainUi", //used as app_name - keep it unique
@@ -71,35 +76,28 @@ export default {
     },
     data() {
         return {
-            socket: null,
+            // socket: null,
             dotenv: {},
             // rooms - list of notifications the MainUI wants to receive
             rooms: [
-                // 'acquisition_started',
-                // 'acquisition_status',
-                // 'acquisition_progress',
+                'acquisition_started',
+                'acquisition_status',
+                'acquisition_progress',
                 'experiments',
                 'figure_ranges',
                 'h5_samples',
                 'h5_streamer_status',
                 'heatmap_figure_data',
                 'importable_samples',
-                // 'instrument_status',
+                'instrument_status',
                 'projects',
-                // 'sample_length',
+                'sample_length',
                 'samples',
                 'spec_stack_figure_data',
                 'target_table_data',
                 'targets',
                 'timeseries_figure_data',
                 'tps_parameters',
-                ],
-            rooms_tof: [
-                'acquisition_started',
-                'acquisition_status',
-                'acquisition_progress',
-                'instrument_status',
-                'sample_length',
             ],
             external_notifications: [],
         };
@@ -230,12 +228,12 @@ export default {
                 this.$store.commit('sample_length', value);
             }
         },
-        socket_is_connected: {
+        socket: {
             get() {
-                return this.$store.state.socket_is_connected;
+                return this.$store.state.socket;
             },
             set(value) {
-                this.$store.commit('socket_is_connected', value);
+                this.$store.commit('socket', value);
             }
         },
         spec_stack_figure_data: {
@@ -282,121 +280,55 @@ export default {
     methods: {
         connect_socket() {
             var self = this;
-            self.log("Connecting to url: ", self.url);
+            log(this.$options.name, "Connecting to url: ", self.url);
             // Global namespace
             self.socket = io.connect(self.url);
             self.socket.on("connect", () => {
                 self.socket.emit('subscribe',
                                 {'app_name': self.$options.name,
-                                'subscriptions': self.rooms});
+                                 'endpoints': self.rooms,
+                                 'room': self.socket.id});
                 // handlers for for external notifications:
                 // input value as object {name, value, cookies, no_data_logging...}
-                self.socket.on("samples", (value) => self.import_one_way_binding_prop(self, "samples", value.value));
-                self.socket.on("h5_samples", (value) => self.import_one_way_binding_prop(self, "h5_samples", value.value));
-                self.socket.on("h5_streamer_status", (value) => self.import_one_way_binding_prop(self, "h5_streamer_status", value.value));
-                self.socket.on("importable_samples", (value) => self.import_one_way_binding_prop(self, "importable_samples", value.value));
-                self.socket.on("target_table_data", (value) => self.import_one_way_binding_prop(self, "target_table_data", value.value));
-                self.socket.on("targets", (value) => self.import_one_way_binding_prop(self, "targets", value.value));
-                self.socket.on("figure_ranges", (value) => self.import_one_way_binding_prop(self, "figure_ranges", {...value.value, 'uid': Math.random()}));
-                self.socket.on("tps_parameters", (value) => self.import_one_way_binding_prop(self, "tps_parameters", value.value));
-                self.socket.on("heatmap_figure_data", (value) => self.import_one_way_binding_prop(self, "heatmap_figure_data", value.value));
-                self.socket.on("timeseries_figure_data", (value) => self.import_one_way_binding_prop(self, "timeseries_figure_data", value.value));
-                self.socket.on("spec_stack_figure_data", (value) => self.import_one_way_binding_prop(self, "spec_stack_figure_data", value.value));
-                self.socket.on("projects", (value) => self.import_two_way_binding_prop(self, "projects", value.value));
-                self.socket.on("experiments", (value) => self.import_two_way_binding_prop(self, "experiments", value.value));
+                self.socket.on("samples", (value) => import_one_way_binding_prop(self, "samples", value.value));
+                self.socket.on("h5_samples", (value) => import_one_way_binding_prop(self, "h5_samples", value.value));
+                self.socket.on("h5_streamer_status", (value) => import_one_way_binding_prop(self, "h5_streamer_status", value.value));
+                self.socket.on("importable_samples", (value) => import_one_way_binding_prop(self, "importable_samples", value.value));
+                self.socket.on("target_table_data", (value) => import_one_way_binding_prop(self, "target_table_data", value.value));
+                self.socket.on("targets", (value) => import_one_way_binding_prop(self, "targets", value.value));
+                self.socket.on("figure_ranges", (value) => import_one_way_binding_prop(self, "figure_ranges", {...value.value, 'uid': Math.random()}));
+                self.socket.on("tps_parameters", (value) => import_one_way_binding_prop(self, "tps_parameters", value.value));
+                self.socket.on("heatmap_figure_data", (value) => import_one_way_binding_prop(self, "heatmap_figure_data", value.value));
+                self.socket.on("timeseries_figure_data", (value) => import_one_way_binding_prop(self, "timeseries_figure_data", value.value));
+                self.socket.on("spec_stack_figure_data", (value) => import_one_way_binding_prop(self, "spec_stack_figure_data", value.value));
+                self.socket.on("projects", (value) => import_two_way_binding_prop(self, "projects", value.value));
+                self.socket.on("experiments", (value) => import_two_way_binding_prop(self, "experiments", value.value));
+
+
+                self.socket.on("acquisition_started", (value) => import_one_way_binding_prop(self, "acquisition_started", value.value));
+                self.socket.on("acquisition_status", (value) => import_two_way_binding_prop(self, "acquisition_status", value.value));
+                self.socket.on("acquisition_progress", (value) => import_one_way_binding_prop(self, "acquisition_progress", value.value, true));
+                self.socket.on("instrument_status", (value) => import_one_way_binding_prop(self, "instrument_status", value.value));
+                self.socket.on("sample_length", (value) => import_two_way_binding_prop(self, "sample_length", value.value));
+
+
                 // if MainUI was restarted, get latest state variables from other running services
-                self.socket.emit('client_notification', {'name': 'service_state', 'value': {}});
-                self.socket_is_connected = true;
+                self.socket.emit('client_notification', {'name': 'service_state', 'value': {}, 'room': self.socket.id});
                 this.$buefy.toast.open({
                     message: 'Socket connected!',
                     type: 'is-success'
                 })
-            // no need to unsubscribe on disconnect - client is unsubscribed by flask
+            });
+            // no need to unsubscribe on disconnect - client is unsubscribed by framework
             self.socket.on("disconnect", () => {
-                self.log("socket disconnected");
-                self.socket_is_connected = false;
-            });
-            // /tof namespace
-            self.socket_tof = io.connect(self.url+'/tof');
-            self.socket_tof.on("connect", () => {
-                self.socket_tof.emit('subscribe',
-                                {'app_name': self.$options.name,
-                                'subscriptions': self.rooms_tof});
-                // handlers for for external notifications:
-                // input value as object {name, value, cookies, no_data_logging...}
-                self.socket_tof.on("acquisition_started", (value) => self.import_one_way_binding_prop(self, "acquisition_started", value.value));
-                self.socket_tof.on("acquisition_status", (value) => self.import_two_way_binding_prop(self, "acquisition_status", value.value));
-                self.socket_tof.on("acquisition_progress", (value) => self.import_one_way_binding_prop(self, "acquisition_progress", value.value, true));
-                self.socket_tof.on("instrument_status", (value) => self.import_one_way_binding_prop(self, "instrument_status", value.value));
-                self.socket_tof.on("sample_length", (value) => self.import_two_way_binding_prop(self, "sample_length", value.value));
-         
-                self.socket_tof.emit('client_notification', {'name': 'service_state', 'value': {}});
-                })
+                log(this.$options.name, "socket disconnected");
             });
         },
-        export_one_way_binding_prop: (ctx, name, new_value, old_value, no_logging=false) => {
-            if ( _.isEqual(new_value, old_value) ) {
-                return false;
-            }
-            if ( no_logging === false ) {
-                ctx.log('export', name, old_value, new_value);
-            }
-            ctx.socket.emit('client_notification', {'name': name, 'value': new_value});
-        },
-        export_two_way_binding_prop: (ctx, name, new_value, old_value, no_logging=false) => {
-            if ( _.isEqual(new_value, old_value) ) {
-                return false;
-            }
-            let i = ctx.external_notifications.findIndex(
-                        (e) => _.isEqual(e, [name, new_value]))
-            if ( i === -1 ) {
-                if ( no_logging === false )
-                    ctx.log('export', name, old_value, new_value);
-                ctx.socket.emit('client_notification',
-                                 {'name': name, 'value': new_value});
-            } else {
-                ctx.external_notifications.splice(i, 1);
-            }
-        },
-        import_one_way_binding_prop: (ctx, name, value, no_logging=false) => {
-            if ( _.isEqual(value, ctx[name]) ) {
-                return;
-            }
-            if ( no_logging === false ) {
-                ctx.log("import", name, value);
-            }
-            ctx[name] = value;
-        },
-        import_two_way_binding_prop: (ctx, name, value, no_logging=false) => {
-            if ( _.isEqual(value, ctx[name]) ) {
-                return;
-            }
-            if ( no_logging === false ) {
-                ctx.log("import", name, value);
-            }
-            ctx.external_notifications.push([name, value]);
-            ctx[name] = value;
-        },
-        log: function(...args) {
-            console.log('[' + this.$options.name + ']',  ...args);
-        },
-        read_dotenv() {
-            let env_string = fs.readFileSync('.env');
-            let env_parsed = envfile.parse(env_string);
-            for (var key in env_parsed){
-                var key_val = {}
-                key_val[key] = env_parsed[key]; 
-                Object.assign(this.dotenv, key_val); 
-            }
-        },
-        write_dotenv() {
-            let env_string = envfile.stringify(this.dotenv);
-            fs.writeFileSync('.env', env_string);
-        },
+
     },
 
     created() {
-        this.read_dotenv();
+        this.dotenv = read_dotenv();
         this.url = this.dotenv.protocol + "//" + this.dotenv.host + ":" + this.dotenv.port;
     },
 
@@ -405,49 +337,51 @@ export default {
     watch: {
         // /tof namespace notifications
         acquisition_status: function(new_value, old_value) {
-            // TODO: Very hacky way to deal with /tof namespace
-            let ctx = {'external_notifications': this.external_notifications,
-                       'socket': this.socket_tof
-                       };
-            return this.export_two_way_binding_prop(ctx, 'acquisition_status', new_value, old_value, true);
+            // // TODO: Very hacky way to deal with /tof namespace
+            // let ctx = {'external_notifications': this.external_notifications,
+            //            'socket': this.socket_tof
+            //            };
+            // return export_two_way_binding_prop(ctx, 'acquisition_status', new_value, old_value, true);
+            return export_two_way_binding_prop(this, 'acquisition_status', new_value, old_value, true);
         },
         sample_length: function(new_value, old_value) {
-            // TODO: Very hacky way to deal with /tof namespace
-            let ctx = {'external_notifications': this.external_notifications,
-                       'socket': this.socket_tof
-                       };
-            return this.export_two_way_binding_prop(ctx, 'sample_length', new_value, old_value);
+            // // TODO: Very hacky way to deal with /tof namespace
+            // let ctx = {'external_notifications': this.external_notifications,
+            //            'socket': this.socket_tof
+            //            };
+            // return export_two_way_binding_prop(ctx, 'sample_length', new_value, old_value);
+            return export_two_way_binding_prop(this, 'sample_length', new_value, old_value);
         },
         // Global namespace notifications
         experiment_selected: function(new_value, old_value) {
-            return this.export_one_way_binding_prop(this, 'experiment_selected', new_value, old_value);
+            return export_one_way_binding_prop(this, 'experiment_selected', new_value, old_value);
         },
         h5_to_import: function(new_value, old_value) {
-            return this.export_one_way_binding_prop(this, 'h5_to_import', new_value, old_value);
+            return export_one_way_binding_prop(this, 'h5_to_import', new_value, old_value);
         },
         import_h5_table_datetime_range: function(new_value, old_value) {
-            return this.export_one_way_binding_prop(this, 'import_h5_table_datetime_range', new_value, old_value);
+            return export_one_way_binding_prop(this, 'import_h5_table_datetime_range', new_value, old_value);
         },
         import_sample_table_datetime_range: function(new_value, old_value) {
-            return this.export_one_way_binding_prop(this, 'import_sample_table_datetime_range', new_value, old_value);
+            return export_one_way_binding_prop(this, 'import_sample_table_datetime_range', new_value, old_value);
         },
         project_selected: function(new_value, old_value) {
-            return this.export_one_way_binding_prop(this, 'project_selected', new_value, old_value);
+            return export_one_way_binding_prop(this, 'project_selected', new_value, old_value);
         },
         sample_attributes: function(new_value, old_value) {
-            return this.export_one_way_binding_prop(this, 'sample_attributes', new_value, old_value);
+            return export_one_way_binding_prop(this, 'sample_attributes', new_value, old_value);
         },
         stop_visualize_range: function(new_value, old_value) {
-            return this.export_one_way_binding_prop(this, 'stop_visualize_range', {...new_value, 'uid': Math.random()}, old_value);
+            return export_one_way_binding_prop(this, 'stop_visualize_range', {...new_value, 'uid': Math.random()}, old_value);
         },
         target_list_request: function(new_value, old_value) {
-            return this.export_one_way_binding_prop(this, 'target_list_request', new_value, old_value);
+            return export_one_way_binding_prop(this, 'target_list_request', new_value, old_value);
         },
         target_to_display: function(new_value, old_value) {
-            return this.export_one_way_binding_prop(this, 'target_to_display', new_value, old_value);
+            return export_one_way_binding_prop(this, 'target_to_display', new_value, old_value);
         },
         tps_parameters_selected: function(new_value, old_value) {
-            return this.export_one_way_binding_prop(this, 'tps_parameters_selected', new_value, old_value);
+            return export_one_way_binding_prop(this, 'tps_parameters_selected', new_value, old_value);
         },
         url: function(new_url) {
             // Connect to new url
@@ -460,10 +394,10 @@ export default {
             this.dotenv.protocol = url_obj.protocol;
             this.dotenv.host = url_obj.hostname;
             this.dotenv.port = url_obj.port;
-            this.write_dotenv();
+            write_dotenv(this.dotenv);
         },
         visualize_range: function(new_value, old_value) {
-            return this.export_one_way_binding_prop(this, 'visualize_range', {...new_value, 'uid': Math.random()}, old_value);
+            return export_one_way_binding_prop(this, 'visualize_range', {...new_value, 'uid': Math.random()}, old_value);
         },
     }
 }

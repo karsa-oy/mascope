@@ -29,7 +29,7 @@ class TWh5StreamerNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for
         connecting to Router """
 
-    rooms = ['h5_to_import',
+    endpoints = ['h5_to_import',
              'h5_stream_request',
              'import_h5_table_datetime_range',
              'service_state'

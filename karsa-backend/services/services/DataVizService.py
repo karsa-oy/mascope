@@ -149,7 +149,7 @@ def merge_heatmap_slices(slices):
 class DataVizServiceNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to Router """
 
-    rooms = ['acquisition_coordinates',
+    endpoints = ['acquisition_coordinates',
              'acquired_spectrum',
              'acquired_tps_data',
              'acquisition_finished',

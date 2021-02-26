@@ -300,7 +300,7 @@ export default {
     ],
     computed: {
         ...mapState([
-            'instrument_status',
+            'instrument_status', 'socket',
         ]),
         acquisition_control_active: {
             get() {
@@ -356,13 +356,38 @@ export default {
             // flag to separate if data was changed by user or by loading
             // config file in the 
             data_updated_from_loading: true,
-            }
+            room: 'TOF',
+            rooms: [
+                'acquisition_started',
+                'acquisition_status',
+                'acquisition_progress',
+                'instrument_status',
+                'sample_length',
+                'figure_ranges',
+                'heatmap_figure_data',
+                'spec_stack_figure_data',
+                'timeseries_figure_data',
+            ],
+        }
     },
     created: function() {
     },
     mounted: function() {
     },
     methods: {
+        subscribe() {
+            this.socket.emit('subscribe',
+                             {'app_name': this.$options.name,
+                              'endpoints': this.rooms,
+                              'room': this.room});
+            this.socket.emit('client_notification', {'name': 'service_state', 'value': {}, 'room': this.room});
+        },
+        unsubscribe() {
+            this.socket.emit('unsubscribe',
+                             {'app_name': this.$options.name,
+                              'endpoints': this.rooms,
+                              'room': this.room});
+        },
         confirmAcquisitionControl() {
             this.$buefy.dialog.confirm({
                 title: 'Instrument control',
@@ -372,8 +397,9 @@ export default {
                 confirmText: 'Proceed',
                 type: 'is-danger',
                 onCancel: () => this.acquisition_control_active = false,
-                onConfirm: () => this.$buefy.toast.open({message: 'Instrument control granted',
-                                                         type: 'is-success'})
+                onConfirm: () => { this.$buefy.toast.open({message: 'Instrument control granted',
+                                                          type: 'is-success'});
+                                   this.subscribe(); }
             })
         },
         delete_row_in_config_desorption_table() {
@@ -496,6 +522,9 @@ export default {
         acquisition_control_active: function(new_value) {
             if (new_value) {
                 this.confirmAcquisitionControl();
+            }
+            else {
+                this.unsubscribe();
             }
         },
         acquisition_mode: function(new_value, old_value) {

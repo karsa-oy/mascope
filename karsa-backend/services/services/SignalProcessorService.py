@@ -28,7 +28,7 @@ from karsatof.kutil import (read_peaklist,
 class SignalProcessorNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to Router """
 
-    rooms = ['acquisition_coordinates',
+    endpoints = ['acquisition_coordinates',
              'acquired_spectrum',
              'acquisition_finished'
              ]
