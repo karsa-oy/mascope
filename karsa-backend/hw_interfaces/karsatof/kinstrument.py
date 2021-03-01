@@ -65,8 +65,13 @@ class KInstrument():
             self.desc.tofPeriod *= 1e9
 
         self.time_res = self.desc.nbrWaveforms * self.desc.tofPeriod * 1e-9  # s
+        
         self.mz_par = self.desc.p
         self.mz_mode = self.desc.massCalibMode
+        self._mz = np.array([self.sno2mz(s) for s in range(self.desc.nbrSamples)],
+                            dtype=np.float32
+                            )
+
         self.ps = None
         self.peakshapes = None
 
@@ -76,6 +81,10 @@ class KInstrument():
         self.R0 = None
         self.m0 = None
         self.dm = None
+
+    @property
+    def mz(self):
+        return self._mz
 
     def R(self, m, r0, r1):
         """Calculate resolution at a m/z with the 2-parameter function

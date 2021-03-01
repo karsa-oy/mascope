@@ -488,13 +488,13 @@ class KAcquisition(Thread, KInstrument):
         nel = np.zeros((1,), dtype=int)
         if TwQueryRegUserDataSize(b'/TPS2', nel) == 4:
             # Parameter description buffer
-            infobuf = create_string_buffer(b'', 256 * nel[0])
+            infobuf = create_string_buffer(b'', 256 * nel.item())
             if TwGetRegUserDataDesc(b'/TPS2', nel, infobuf) == 4:
-            # Parameter descriptions retrieved succesfully
-                # Convert char array to string array
+                # Parameter descriptions retrieved succesfully
+                # Convert char array to bytes array
                 info = np.asarray(infobuf).view('S256').ravel()
-                info = info.tolist()
-                info = [ i.decode('unicode_escape') for i in info ]
+                info = info.tolist() # Array to list
+                info = [ i.decode('unicode_escape') for i in info ] # bytes to str
         return info
 
     def get_save_path(self):
@@ -577,98 +577,194 @@ class KAcquisition(Thread, KInstrument):
 
 class Acquisition(Thread, KInstrument):
     def __init__(self):
-        print("Acquisition initializing")
+        """Initialize self
 
+        Inherits 'karsatof.kinstrument.KInstrument' which provides some
+        convenience methods for instrument functions. TofDaq Recorder must 
+        be running before initializing.
+
+        Raises
+        ------
+        Exception
+            Exception is raised if TofDaq Recorder is not running, or if
+            fetching 'TwSharedMemoryDesc' fails for another reason.
+        """
+        print("Acquisition initializing")
         Thread.__init__(self)
 
-        self.desc = TSharedMemoryDesc() # TW shared memory descriptor
-        # Check if TofDaq Recorder is running
+        # Initialize TW API related structures 'desc' and 'ptr'
         if not TwTofDaqRunning():
             raise Exception("TofDaq Recorder not running.")
-        # Try to fetch shared memory descriptor and pointer
+        self.desc = TSharedMemoryDesc() # TW shared memory descriptor
         ret = TwGetDescriptor(self.desc)
         if ret == 4:
+            # Success
+            # Initialize karsatof.kinstrument.KInstrument
             KInstrument.__init__(self, self.desc)
-            self.ptr = TSharedMemoryPointer() # Shared memory pointer
+            self.ptr = TSharedMemoryPointer() # TW shared memory pointer
         else:
+            # Failed
             raise Exception("Trying to fetch shared memory " +
                             "descriptor failed: %s" %TwRetVal(ret).name)
+        # Parameters
+        self.timeout = 500 # [ms], timeout for TwWaitForNewData
+        # Synchronization primitives
+        self.shutdown_event = Event()   # Set to break out from main loop
+        self.active = Event()           # Acquisition active event
+        self.spec_queue = Queue()       # Signal output queue
+        self.tps_queue = Queue()        # TPS output queue
+        # Per acquisition attributes
+        self.filename = None            # Filename base from TW h5 file
+        self.interval = None            # Acquisition interval [s]
+        self.length = None              # Acquisition length [s]
+        self.progress = 0               # Acquisition progress [%]
+        self.speci = -1                 # Index of last received spectrum,
+                                        # -1 when there is no active acquisition
 
-        self.timeout = 500 # [ms]
-
-        self.shutdown_event = Event()
-        self.active = Event()
-        self.spec_queue = Queue()
-
-        self.filename = None
-        self.progress = 0
-        self.speci = -1
+    @property
+    def tps_info(self):
+        """List of TPS  names
+        """
+        return self._get_tps_info()
 
     def _check(self):
-        curr_filename = self.desc.currentDataFileName.decode()
-        curr_speci = (self.desc.iWrite * self.desc.nbrBufs) + self.desc.iBuf
+        """Check for state change
+
+        Returns
+        -------
+        int
+            State change: 2 new file, 1 new data, 0 nothing new
+        """
+        curr_filename = self._strip_filepath( self.desc.currentDataFileName.decode() )
         if self.filename != curr_filename:
             # New file
             return 2
-        elif self.speci < curr_speci:
+        curr_speci = (self.desc.iWrite * self.desc.nbrBufs) + self.desc.iBuf
+        if self.speci < curr_speci:
             # New data
             return 1
-        else:
-            # Nothing new
-            return 0 
+        # Nothing new
+        return 0 
     
     def _finalize(self):
-        self.active.clear()
+        """Finalize acquisition
+        """
+        # Reset self
         self._reset()
         # Feed poison pill
         self.spec_queue.put(None)
+        self.tps_queue.put(None)
 
     def _get_and_feed_data(self):
-        """ Read data from the shared memory and put to queues
+        """Read data from the shared memory and put to queues
         """
-        print("Feed")
-        return # TODO:
-        # Time
+        # Get timestamp from TW shared memory
         ti = np.zeros((1,))
         TwGetBufTimeFromShMem(ti, self.desc.iBuf, self.desc.iWrite)
-        # Signal
+
+        # == Get and feed mass spectrum data ==
+        # Get most recent spectrum from TW shared memory
         spec = np.zeros((self.desc.nbrSamples, ), dtype=np.float32)
-        TwGetTofSpectrumFromShMem(spec, 0, 0, self.desc.iBuf, True)  # [mV/ext]
-        # Collect data
-        spec_data = {'filename': self.filename,
-                     'i': self.speci,
-                     't': float(ti),
-                     'spec': spec.tobytes()
-                     }
-        # Feed
-        self.spec_queue.put(spec_data)
+        ret = TwGetTofSpectrumFromShMem(spec, 0, 0, self.desc.iBuf, True)  # [mV/ext]
+        if ret == 4: # Success
+            # Combine data for output
+            spec_data = {
+                    'filename': self.filename, # Current file basename
+                    'i': self.speci, # Current spectrum integer index
+                    't': float(ti), # Timestamp [s]
+                    'spec': spec.tobytes() # Serialized spectrum [float32]
+                    }
+            # Feed
+            self.spec_queue.put(spec_data)
+
+        # == Get and feed TPS data ==
+        # Query data size
+        nel = np.zeros((1,), dtype=int)
+        TwQueryRegUserDataSize(b'/TPS2', nel)
+        # Get most recent TPS data from TW shared memory
+        data = np.zeros((nel.item(), 1),
+                        dtype=np.double
+                        )
+        ret = TwReadRegUserData(b'/TPS2', nel.item(), data)
+        if ret == 4: # Success
+            # Combine data for output
+            tps_data = {
+                'filename': self.filename,          # Current file basename
+                'i': self.speci,                    # Current spectrum integer index
+                't': float(ti),                     # Timestamp [s]
+                'data': data.astype(np.float32  # convert to float32
+                                ).reshape(-1    # reshape to (-1,)
+                                ).tobytes(      # serialize
+                                )                   # Serialized TPS data [float32]
+                }
+            # Feed
+            self.tps_queue.put(tps_data)
+
+
+    def _get_tps_info(self):
+        """Get TPS parameter descriptions from TofDaq Recorder
+
+        Returns
+        -------
+        list of str
+            List of TPS parameter names
+        """
+        info = []
+        # Query number of parameters
+        nel = np.zeros((1,), dtype=int)
+        if TwQueryRegUserDataSize(b'/TPS2', nel) == 4:
+            # Parameter description buffer
+            infobuf = create_string_buffer(b'', 256 * nel.item())
+            if TwGetRegUserDataDesc(b'/TPS2', nel, infobuf) == 4:
+                # Parameter descriptions retrieved succesfully
+                # Convert char array to bytes array
+                info = np.asarray(infobuf).view('S256').ravel()
+                info = info.tolist() # Array to list
+                info = [ i.decode('unicode_escape') for i in info ] # bytes to str
+        return info
 
     def _reset(self):
-        print("Reset")
+        """Reset per acquisition attributes
+        """
         self.filename = None
         self.progress = 0
         self.speci = -1
 
-    def _update(self):
-        print("Update")
-        state = self._check()
+    def _strip_filepath(self, h5_filepath):
+        """Strip path and file extension
 
+        Parameters
+        ----------
+        h5_filepath : str
+            Full file path
+
+        Returns
+        -------
+        str
+            Base filename
+        """
+        return os.path.splitext(os.path.basename(h5_filepath))[0]
+
+    def _update(self):
+        """Update per acquisition attributes, if updates are available.
+        """
+        # Check for updates
+        state = self._check()
         if state == 0:
             # No update
-            print("Nothing new")
             return
-
         # Update
         if state == 2:
-            # New file
-            print("Acquisition started")
-            self.filename = self.desc.currentDataFileName.decode()
+            # New file, update attributes
+            h5_filepath = self.desc.currentDataFileName.decode() # TW h5 file full path
+            self.filename = self._strip_filepath(h5_filepath)
+            self.interval = (self.desc.tofPeriod * 1e-9) * self.desc.nbrWaveforms # [s]
+            self.length = (self.desc.nbrWrites * self.desc.nbrBufs) * self.interval # [s]
+            print("Acquisition started: %s" %self.filename)
             # Check again for new data
             state = self._check()
-
         if state == 1:
             # New data
-            print("New data")
             self.speci = (self.desc.iWrite * self.desc.nbrBufs) + self.desc.iBuf
             print(self.speci)
             self._get_and_feed_data()
@@ -677,22 +773,28 @@ class Acquisition(Thread, KInstrument):
             self.progress = ((self.speci+1) / n) * 100. # [%]
          
     def run(self):
+        """Main loop
+
+        Poll TW API for new data at interval set by 'self.timeout'. 
+        Loop until 'self.shutdown_event' is set.
+        """
+
         print("Acquisition running")
         timeout_counter = 0
+        # Main loop
         while not self.shutdown_event.is_set():
             ret = TwWaitForNewData(self.timeout,
                                    self.desc,
                                    self.ptr,
                                    True
                                    )
+            # Timeout
             if ret == 8:
-                # Timeout
                 timeout_counter += 1 # Increment counter
                 if self.active.is_set():
                     if not TwDaqActive():
                         # No active acquisition
                         # Acquisition has ended
-                        print("Acquisition ended 'normal mode'")
                         self._finalize()
                     else:
                         # Acquition active, but got timed out
@@ -706,19 +808,19 @@ class Acquisition(Thread, KInstrument):
                         # Wait time so far
                         tot_wait = timeout_counter * self.timeout * 1e-3 # [s]
                         # Calculate acquisition interval
-                        tof_period_ns = self.desc.tofPeriod
-                        if tof_period_ns < 1:
-                            # Make sure unit is correct
-                            tof_period_ns *= 1e9
-                        acquisition_interval = (tof_period_ns * 1e-9) * self.desc.nbrWaveforms # [s]
+                        acquisition_interval = (self.desc.tofPeriod * 1e-9) * self.desc.nbrWaveforms # [s]
                         # Check if waited long enough already
                         if tot_wait > (acquisition_interval + 1):
                             # Acquisition has ended
-                            print("Acquisition ended 'long interval'")
                             self._finalize()
-
+                        else:
+                            # Wait some more
+                            continue
+                    # Clear active flag
+                    self.active.clear()
+                    print("Acquisition finished")
+            # New data
             elif ret == 4:
-                # New data
                 # Reset timeout counter
                 timeout_counter = 0
                 # Make sure active flag is set
@@ -726,24 +828,29 @@ class Acquisition(Thread, KInstrument):
                 # Update self and feed data into queue
                 self._update()
                 continue
-
+            # Unexpected return value
             else:
-                raise Exception("Unexpected return value: %s"
-                                 %TwRetVal(ret).name
-                                 )
+                print("Unexpected return value: %s" %TwRetVal(ret).name)
+        # Out of main loop
         print('Acquisition exiting')
         self.shutdown()
         
     def shutdown(self):
+        """Shutdown procedure
+        """
         self.shutdown_event.set()
         # Close queues
         self.spec_queue.close()
         self.spec_queue.join_thread()
 
     def start_acquisition(self):
+        """Start acquisition by calling TW API
+        """
         TwStartAcquisition()
 
     def stop_acquisition(self):
+        """Stop acquisition by calling TW API
+        """
         TwStopAcquisition()
 
 
