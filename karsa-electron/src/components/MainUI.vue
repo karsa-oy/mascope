@@ -34,7 +34,7 @@
                     <!-- End of left column -->
                     <!-- Right side content -->
                     <div class="column is-three-quarters" style="padding-right:2rem">
-                        <SampleView  v-bind:room="this.socket.id + '_' + this.project_selected.id + '_' + this.experiment_selected.id">
+                        <SampleView  v-bind:room="this.socket_connected && this.socket.id + '_' + this.project_selected.id + '_' + this.experiment_selected.id">
                         </SampleView>
                     </div>
                     <!-- End of Right side content -->
@@ -279,6 +279,14 @@ export default {
                 this.$store.commit('url', value);
             }
         },
+        socket_connected: {
+            get() {
+                return this.$store.state.socket_connected;
+            },
+            set(value) {
+                this.$store.commit('socket_connected', value);
+            }
+        },
     },
     methods: {
         connect_socket() {
@@ -289,6 +297,7 @@ export default {
             self.socket.on("connect", () => {
                 // handlers for for external notifications (endpoint imports), if any:
 
+                self.socket_connected = true;
                 subscribe();
 
                 // self.socket.emit('subscribe',
@@ -321,13 +330,14 @@ export default {
 
                 // // if MainUI was restarted, get latest state variables from other running services
                 // self.socket.emit('client_notification', {'name': 'service_state', 'value': {}, 'room': self.socket.id});
-                this.$buefy.toast.open({
+                self.$buefy.toast.open({
                     message: 'Socket connected!',
                     type: 'is-success'
                 })
             });
             // no need to unsubscribe on disconnect - client is unsubscribed by framework
             self.socket.on("disconnect", () => {
+                this.socket_connected = false;
                 log(this.$options.name, "socket disconnected");
             });
         },

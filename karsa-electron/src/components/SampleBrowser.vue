@@ -350,6 +350,7 @@ export default {
             'project_selected',
             // 'samples',
             'socket',
+            'socket_connected',
         ]),
         // import_h5_table_datetime_range: {
         //     get() {
@@ -442,20 +443,21 @@ export default {
         }
     },
     created: function() {
-
-//==============================
         get_parent_context(this);
-        var self = this;
-        self.socket.on("connect", () => {
-            self.socket.on('acquisition_started', (value) => import_one_way_binding_prop('acquisition_started', value.value));
-            self.socket.on("h5_samples", (value) => import_one_way_binding_prop("h5_samples", value.value));
-            self.socket.on("h5_streamer_status", (value) => import_one_way_binding_prop("h5_streamer_status", value.value));
-            self.socket.on("importable_samples", (value) => import_one_way_binding_prop("importable_samples", value.value));
-            self.socket.on("samples", (value) => import_one_way_binding_prop("samples", value.value));
 
-            subscribe();
-        });
-// =============================
+// //==============================
+//         get_parent_context(this);
+//         var self = this;
+//         self.socket.on("connect", () => {
+//             self.socket.on('acquisition_started', (value) => import_one_way_binding_prop('acquisition_started', value.value));
+//             self.socket.on("h5_samples", (value) => import_one_way_binding_prop("h5_samples", value.value));
+//             self.socket.on("h5_streamer_status", (value) => import_one_way_binding_prop("h5_streamer_status", value.value));
+//             self.socket.on("importable_samples", (value) => import_one_way_binding_prop("importable_samples", value.value));
+//             self.socket.on("samples", (value) => import_one_way_binding_prop("samples", value.value));
+
+//             subscribe();
+//         });
+// // =============================
 
     },
     mounted: function() {
@@ -690,6 +692,19 @@ export default {
         },
         sample_attributes: function(new_value, old_value) {
             return export_one_way_binding_prop('sample_attributes', new_value, old_value);
+        },
+        socket_connected: function(new_value) {
+            if ( new_value === true )
+            {
+                // handlers for for external notifications:
+                this.socket.on('acquisition_started', (value) => import_one_way_binding_prop('acquisition_started', value.value));
+                this.socket.on("h5_samples", (value) => import_one_way_binding_prop("h5_samples", value.value));
+                this.socket.on("h5_streamer_status", (value) => import_one_way_binding_prop("h5_streamer_status", value.value));
+                this.socket.on("importable_samples", (value) => import_one_way_binding_prop("importable_samples", value.value));
+                this.socket.on("samples", (value) => import_one_way_binding_prop("samples", value.value));
+
+                subscribe();
+            }
         },
     }
 };

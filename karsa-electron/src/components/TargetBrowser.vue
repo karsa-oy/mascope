@@ -134,6 +134,8 @@ export default {
     },
     computed: {
         ...mapState([
+            'socket',
+            'socket_connected',
             // 'targets',
         ]),
         // target_list_request: {
@@ -172,17 +174,18 @@ export default {
         }
     },
     created: function() {
-
-//==============================
         get_parent_context(this);
-        var self = this;
-        self.socket.on("connect", () => {
-            // handlers for for external notifications:
-            self.socket.on("targets", (value) => import_one_way_binding_prop("targets", value.value));
 
-            subscribe();
-        });
-// =============================
+// //==============================
+//         get_parent_context(this);
+//         var self = this;
+//         self.socket.on("connect", () => {
+//             // handlers for for external notifications:
+//             self.socket.on("targets", (value) => import_one_way_binding_prop("targets", value.value));
+
+//             subscribe();
+//         });
+// // =============================
 
     },
     mounted: function() {
@@ -297,6 +300,14 @@ export default {
         },
         target_to_display: function(new_value, old_value) {
             return export_one_way_binding_prop('target_to_display', new_value, old_value);
+        },
+        socket_connected: function(new_value) {
+            if ( new_value === true )
+            {
+                // handlers for for external notifications:
+                this.socket.on("targets", (value) => import_one_way_binding_prop("targets", value.value));
+                subscribe();
+            }
         },
     }
 };

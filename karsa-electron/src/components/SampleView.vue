@@ -112,6 +112,8 @@ export default {
                      'target_to_display',
                     //  'timeseries_figure_data',
                     //  'tps_parameters',
+                     'socket',
+                     'socket_connected'
                      ]),
         // visualize_range: {
         //     get() {
@@ -175,20 +177,21 @@ export default {
     },
 
     created: function(){
-
-//==============================
         get_parent_context(this);
-        var self = this;
-        self.socket.on("connect", () => {
-            self.socket.on("figure_ranges", (value) => import_one_way_binding_prop("figure_ranges", {...value.value, 'uid': Math.random()}));
-            self.socket.on("heatmap_figure_data", (value) => import_one_way_binding_prop("heatmap_figure_data", value.value));
-            self.socket.on("spec_stack_figure_data", (value) => import_one_way_binding_prop("spec_stack_figure_data", value.value));
-            self.socket.on("timeseries_figure_data", (value) => import_one_way_binding_prop("timeseries_figure_data", value.value));
-            self.socket.on("tps_parameters", (value) => import_one_way_binding_prop("tps_parameters", value.value));
 
-            subscribe();
-        });
-// =============================
+// //==============================
+//         get_parent_context(this);
+//         var self = this;
+//         self.socket.on("connect", () => {
+//             self.socket.on("figure_ranges", (value) => import_one_way_binding_prop("figure_ranges", {...value.value, 'uid': Math.random()}));
+//             self.socket.on("heatmap_figure_data", (value) => import_one_way_binding_prop("heatmap_figure_data", value.value));
+//             self.socket.on("spec_stack_figure_data", (value) => import_one_way_binding_prop("spec_stack_figure_data", value.value));
+//             self.socket.on("timeseries_figure_data", (value) => import_one_way_binding_prop("timeseries_figure_data", value.value));
+//             self.socket.on("tps_parameters", (value) => import_one_way_binding_prop("tps_parameters", value.value));
+
+//             subscribe();
+//         });
+// // =============================
 
 
 },
@@ -1048,6 +1051,19 @@ export default {
         },
         tps_parameters_selected: function(new_value, old_value) {
             return export_one_way_binding_prop('tps_parameters_selected', new_value, old_value);
+        },
+        socket_connected: function(new_value) {
+            if ( new_value === true )
+            {
+                // handlers for for external notifications:
+                this.socket.on("figure_ranges", (value) => import_one_way_binding_prop("figure_ranges", {...value.value, 'uid': Math.random()}));
+                this.socket.on("heatmap_figure_data", (value) => import_one_way_binding_prop("heatmap_figure_data", value.value));
+                this.socket.on("spec_stack_figure_data", (value) => import_one_way_binding_prop("spec_stack_figure_data", value.value));
+                this.socket.on("timeseries_figure_data", (value) => import_one_way_binding_prop("timeseries_figure_data", value.value));
+                this.socket.on("tps_parameters", (value) => import_one_way_binding_prop("tps_parameters", value.value));
+
+                subscribe();
+            }
         },
     },
 };

@@ -6,7 +6,7 @@
             <div class="column is-on-third">
                 <b-field
                     label="URL"
-                    :type="socket && socket.connected ? 'is-success' : 'is-danger'">
+                    :type="socket_connected ? 'is-success' : 'is-danger'">
                     <b-input
                         v-model="url"
                         lazy>
@@ -39,6 +39,7 @@ export default {
     computed: {
         ...mapState([
             'socket',
+            'socket_connected',
         ]),
         url: {
             get() {

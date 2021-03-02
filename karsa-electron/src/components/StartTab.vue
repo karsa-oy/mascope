@@ -462,6 +462,7 @@ export default {
                 // 'experiments',
                 // 'projects',
                 'socket',
+                'socket_connected',
                 ]),
         active_tab: {
             get() {
@@ -516,18 +517,19 @@ export default {
     created() {
         // Initialize project_selected
         this.project_selected = {'id': ""};
-
-//==============================
         get_parent_context(this);
-        var self = this;
-        self.socket.on("connect", () => {
-            self.room = this.socket.id;
-            self.socket.on("projects", (value) => import_two_way_binding_prop("projects", value.value));
-            self.socket.on('experiments', (value) => import_two_way_binding_prop('experiments', value.value));
 
-            subscribe();    //TODO: ?? subscribe from within experiment_selected?
-        });
-// =============================
+// //==============================
+//         get_parent_context(this);
+//         var self = this;
+//         self.socket.on("connect", () => {
+//             self.room = this.socket.id;
+//             self.socket.on("projects", (value) => import_two_way_binding_prop("projects", value.value));
+//             self.socket.on('experiments', (value) => import_two_way_binding_prop('experiments', value.value));
+
+//             subscribe();    //TODO: ?? subscribe from within experiment_selected?
+//         });
+// // =============================
 
     },
     methods: {
@@ -633,6 +635,16 @@ export default {
         },
         project_selected: function(new_value, old_value) {
             return export_one_way_binding_prop('project_selected', new_value, old_value);
+        },
+        socket_connected: function(new_value) {
+            if ( new_value === true )
+            {
+                this.room = this.socket.id;
+                this.socket.on("projects", (value) => import_two_way_binding_prop("projects", value.value));
+                this.socket.on('experiments', (value) => import_two_way_binding_prop('experiments', value.value));
+
+                subscribe();    //TODO: ?? subscribe from within experiment_selected?
+            }
         },
         'instrument.polarity': function(polarity) {
             this.reagents = all_reagents.filter(function(el){

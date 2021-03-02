@@ -38,6 +38,7 @@ export default new Vuex.Store({
 		// tps_parameters: [],
 		// tps_parameters_selected: [],
 		url: "",
+		socket_connected: false,
 		// visualize_range: {},
 		// stop_visualize_range: {},
 	},
@@ -134,6 +135,9 @@ export default new Vuex.Store({
 		// },
 		url(state, payload) {
 			state.url = payload;
+		},
+		socket_connected(state, payload) {
+			state.socket_connected = payload;
 		},
 		// visualize_range(state, payload) {
 		// 	state.visualize_range = payload;

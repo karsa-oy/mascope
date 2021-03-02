@@ -310,6 +310,7 @@ export default {
         ...mapState([
             // 'instrument_status',
             'socket',
+            'socket_connected',
         ]),
         acquisition_control_active: {
             get() {
@@ -385,20 +386,21 @@ export default {
         }
     },
     created: function() {
-
-//==============================
         get_parent_context(this);
-        var self = this;
-        self.socket.on("connect", () => {
-            // handlers for for external notifications:
-            self.socket.on("acquisition_status", (value) => import_two_way_binding_prop("acquisition_status", value.value));
-            self.socket.on("acquisition_progress", (value) => import_one_way_binding_prop("acquisition_progress", value.value.progress, true));
-            self.socket.on("instrument_status", (value) => import_one_way_binding_prop("instrument_status", value.value));
-            self.socket.on("sample_length", (value) => import_two_way_binding_prop("sample_length", value.value));
 
-            // dynamic subscription thru AcquisitionControl dialog
-        });
-// =============================
+// //==============================
+//         get_parent_context(this);
+//         var self = this;
+//         self.socket.on("connect", () => {
+//             // handlers for for external notifications:
+//             self.socket.on("acquisition_status", (value) => import_two_way_binding_prop("acquisition_status", value.value));
+//             self.socket.on("acquisition_progress", (value) => import_one_way_binding_prop("acquisition_progress", value.value.progress, true));
+//             self.socket.on("instrument_status", (value) => import_one_way_binding_prop("instrument_status", value.value));
+//             self.socket.on("sample_length", (value) => import_two_way_binding_prop("sample_length", value.value));
+
+//             // dynamic subscription thru AcquisitionControl dialog
+//         });
+// // =============================
 
 
     },
@@ -589,6 +591,18 @@ export default {
             else {
                 this.scenthound_status = 'Offline';
                 this.acquisition_status = 'not_running';
+            }
+        },
+        socket_connected: function(new_value) {
+            if ( new_value === true )
+            {
+                // handlers for for external notifications:
+                this.socket.on("acquisition_status", (value) => import_two_way_binding_prop("acquisition_status", value.value));
+                this.socket.on("acquisition_progress", (value) => import_one_way_binding_prop("acquisition_progress", value.value.progress, true));
+                this.socket.on("instrument_status", (value) => import_one_way_binding_prop("instrument_status", value.value));
+                this.socket.on("sample_length", (value) => import_two_way_binding_prop("sample_length", value.value));
+
+                // dynamic subscription thru AcquisitionControl dialog
             }
         },
     }
