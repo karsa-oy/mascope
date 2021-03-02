@@ -184,7 +184,7 @@ class DataPool():
     ---sample0
 
     """
-    def __init__(self, data_path, projects_path):
+    def __init__(self, projects_path):
         """Initialize self
 
         Parameters
@@ -195,7 +195,6 @@ class DataPool():
             directories
         """
 
-        self.data_root = os.path.abspath(data_path)
         self.projects_root = os.path.abspath(projects_path)
         self.pool = {}
 
@@ -244,16 +243,16 @@ class DataPool():
         except Exception as e:
             print(e)
 
-    def _read_attributes(self, path):
-        attr_path = os.path.join(path, '.attrs')
+    def _read_attributes(self, path, prefix=''):
+        attr_path = os.path.join(path, prefix+'.attrs')
         if not os.path.exists(attr_path):
             return {}
         with open(attr_path, 'r') as f:
             attributes = json.load(f)
         return attributes
 
-    def _write_attributes(self, path, attributes, overwrite=True):
-        attr_path = os.path.join(path, '.attrs')
+    def _write_attributes(self, path, attributes, prefix='', overwrite=True):
+        attr_path = os.path.join(path, prefix+'.attrs')
         if os.path.exists(attr_path) and not overwrite:
             raise ValueError("Attribute file %s exists already!" % attr_path)
         # Write attributes
@@ -297,16 +296,25 @@ class DataPool():
     def get_samples(self, project, experiment):
         if project is None and experiment is None:
             # All samples
-            sample_titles = next( os.walk(self.data_root) )[1]
+            # sample_titles = next( os.walk(self.data_root) )[1] # TODO: How to get importable samples
+            sample_titles = [] # :TODO
         else:
             # Samples in given project and experiment
             sample_titles = self.pool.get(project).get(experiment)
         samples = []
         for sample in sample_titles:
-            sample_path = os.path.join(self.data_root, sample)
-            sample_attrs = self._read_attributes(sample_path)
+            experiment_path = os.path.join(self.projects_root,
+                                           project,
+                                           experiment
+                                           )
+            sample_attrs = self._read_attributes(experiment_path, prefix=sample)
+            if len(sample_attrs) == 0: # For backwards compatibility
+                sample_path = os.path.join(experiment_path, sample)
+                sample_attrs = self._read_attributes(sample_path)
+
             if 'id' not in sample_attrs.keys():
                 sample_attrs.update( {'id': sample} )
+                
             samples.append({'id': sample,
                             'attributes': sample_attrs
                             })
@@ -356,16 +364,10 @@ class DataPool():
         self.pool[project].update({ experiment: [] })
 
     def new_sample(self, project, experiment, sample, attributes):
-        sample_data_path = os.path.join(
-                                self.data_root,
-                                sample
-                                )
-        sample_experiment_path = os.path.join(
-                                self.projects_root,
-                                project,
-                                experiment,
-                                sample
-                                )
+        experiment_path = os.path.join(self.projects_root, project, experiment)
+        instrument = sample.split('_')[0]
+        sample_data_path = os.path.join(instrument, sample)
+        sample_experiment_path = os.path.join(experiment_path, sample)
         # Check if sample exists
         if not os.path.isdir(sample_data_path):
             raise ValueError("Sample %s does not exist!" % sample_data_path)
@@ -373,7 +375,7 @@ class DataPool():
         if not os.path.isdir(sample_experiment_path):
             self._make_link(sample_data_path, sample_experiment_path)
         # Write attributes
-        self._write_attributes(sample_data_path, attributes)
+        self._write_attributes(experiment_path, attributes, prefix=sample)
         # Update self.pool
         self.update_experiment_samples(project, experiment)
 

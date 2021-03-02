@@ -33,12 +33,6 @@ from karsatof.kimage import (convert_base64_to_img, convert_to_base64)
 
 NO_DATA_LOGGING_DEFAULT = True
 
-# TODO: Make configuration file for the paths
-# TODO: Change the global vars to class vars
-data_path = 'Data'
-projects_path = 'Projects'
-datapool = DataPool(data_path, projects_path)
-cache = {}
 
 # cache = dict(fname=dict(object_name={'item'=None,
 #                                      'owners'=dict(sid={'ranges': [],
@@ -49,7 +43,11 @@ cache = {}
 #                         )
 #              )
 
-# ========== Cache functions ==========
+cache = {}
+client = None
+data_path = 'Data'
+
+# ========== Cache methods ==========
 
 def log_cache(func):
     def wrapper(*args, **kwargs):
@@ -251,8 +249,6 @@ class FileIoNamespace(BaseClientNamespace):
         data : dict
             keys: 'mz' and 'time'
         """
-        global cache
-        global client
 
         value = data['value']
         filename_base = value.get('filename')
@@ -286,11 +282,9 @@ class FileIoNamespace(BaseClientNamespace):
         data : dict
             keys: 'filename', 'i', 't' and 'spec'
         """
-        global client
         # Get package index
         value = data['value']
         i = value.get('i')
-        print(i)
         filename_base = value.get('filename')
 
         ti = np.array( [value.get('t')], dtype=np.float32 )
@@ -298,17 +292,20 @@ class FileIoNamespace(BaseClientNamespace):
         spec = spec.reshape(-1, 1)
         signal_array, _ = cache_get(data, 'signal')
         if signal_array:       # TODO: signal_array is None on killing acquisition from MainUI
+            print(i)
             mz = signal_array.data_array.mz
             await signal_array.extend_array(spec,
                                             [mz, ti],
                                             'time'
                                             )
+        else:
+            Warning("[on_acquired_spectrum]: signal_array is None")
 
     async def on_acquired_tps_data(self, data):
         value = data['value']
         filename_base = value.get('filename')
         ti = np.array( [value.get('t')], dtype=np.float32 )
-        tps_data = np.frombuffer( value.get('tps_data'), dtype=np.float32)
+        tps_data = np.frombuffer( value.get('data'), dtype=np.float32)
         tps_data = tps_data.reshape(-1, 1)
         tps_array, _ = cache_get(data, 'tps')
         if tps_array:   # TODO: tps_array is None on killing acquisition from MainUI
@@ -320,7 +317,6 @@ class FileIoNamespace(BaseClientNamespace):
 
     async def on_acquisition_finished(self, data):
         global cache
-        global client
         value = data['value']
         filename_base = value.get('filename')
         filename = base_to_zarr_filename(filename_base, 'signal')
@@ -330,8 +326,12 @@ class FileIoNamespace(BaseClientNamespace):
         cache_release(data)
         if signal_array:
             await signal_array.flush()  # TODO: signal_array is None on killing acquisition from MainUI
+        else:
+            Warning("[on_acquistion_finished]: signal_array is None")
         if tps_array:
             await tps_array.flush()      # TODO: tps_array is None on killing acquisition from MainUI
+        else:
+            Warning("[on_acquistion_finished]: tps_array is None")
 
     async def on_tps_parameter_info(self, data):
         value = data['value']
@@ -488,12 +488,12 @@ class FileIoNamespace(BaseClientNamespace):
             signal_env['speci'] = n
 
     async def on_image_to_save(self, data):
-        global datapool
+        global data_path
         value = data['value']
         filename = value['filename']
         img_filename = value['img_filename']
         img_str = value['img']
-        img_path = os.path.join(datapool.data_root, filename, img_filename)
+        img_path = os.path.join(data_path, filename, img_filename)
         img = convert_base64_to_img(img_str)
         img.save(img_path)
 
@@ -652,6 +652,8 @@ class FileIoClient(BaseServiceClient):
 
 def run():
     global client
+    global data_path
+
     url, port, namespace = parse_cmd_args()
     # TODO: FileIo should always be in private namespace with data producer
     # if namespace == '/':
@@ -659,11 +661,13 @@ def run():
     #           "Please restart the service with --ns option."
     #           )
     #     return
+
+    # data_path = namespace.strip('/')  # :TODO
+
     client = FileIoClient(url, port, (namespace, FileIoNamespace))
     loop = asyncio.get_event_loop()
     loop.run_until_complete(client.run())
 
 
 if __name__=='__main__':
-    client = None
     run()

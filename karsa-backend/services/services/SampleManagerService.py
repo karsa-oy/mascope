@@ -33,12 +33,8 @@ from karsatof.kimage import (convert_base64_to_img, convert_to_base64)
 
 NO_DATA_LOGGING_DEFAULT = True
 
-# TODO: Make configuration file for the paths
-# TODO: Change the global vars to class vars
-data_path = 'Data'
-projects_path = 'Projects'
-datapool = DataPool(data_path, projects_path)
-
+projects_path = 'Projects' # TODO: make configurable
+datapool = DataPool(projects_path)
 
 class MetadataServiceNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to MainService """
@@ -47,7 +43,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
         # UI
         'experiment_selected',
         'experiments',
-        'import_sample_table_datetime_range',
+        'import_sample_table_datetime_range', # TODO: Should be routed to FileIoService
         'project_selected',
         'projects',
         'sample_attributes',
@@ -161,11 +157,11 @@ class MetadataServiceNamespace(BaseClientNamespace):
         experiment = attributes['experiment']
 
         if not attributes.get('remove'):
-            # New sample
+            # Update (or create) sample attributes
             attributes.update({'id': sample})
             datapool.new_sample(project, experiment, sample, attributes)
         else:
-            # Remove sample (link)
+            # Remove sample (link from experiment)
             datapool.delete_sample(project, experiment, sample)
 
         # Update sample table data in UIs
@@ -176,15 +172,20 @@ class MetadataServiceNamespace(BaseClientNamespace):
                             )
     # ---------------------------------
 
-class FileServiceClient(BaseServiceClient):
+class SampleManagerClient(BaseServiceClient):
     pass
 
+
 def run():
+    global projects_path
+
     url, port, namespace = parse_cmd_args()
-    client = FileServiceClient(url,
-                               port,
-                               (namespace, MetadataServiceNamespace)
-                               )
+
+    client = SampleManagerClient(url,
+                                 port,
+                                 (namespace, MetadataServiceNamespace)
+                                 )
+
     loop = asyncio.get_event_loop()
     loop.run_until_complete(client.run())
 
