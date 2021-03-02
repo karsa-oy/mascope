@@ -27,14 +27,14 @@
                     <!-- Left column -->
                     <div class="column is-one-quarter" style="padding-left:2rem">
                         <TOFControl></TOFControl>
-                        <SampleBrowser  v-bind:room="this.project_selected.id + '_' + this.experiment_selected.id">
+                        <SampleBrowser  v-bind:id="this.project_selected.id + '_' + this.experiment_selected.id">
                         </SampleBrowser>
                         <TargetBrowser></TargetBrowser>
                     </div>
                     <!-- End of left column -->
                     <!-- Right side content -->
                     <div class="column is-three-quarters" style="padding-right:2rem">
-                        <SampleView  v-bind:room="this.socket_connected && this.socket.id + '_' + this.project_selected.id + '_' + this.experiment_selected.id">
+                        <SampleView  v-bind:id="this.project_selected.id + '_' + this.experiment_selected.id">
                         </SampleView>
                     </div>
                     <!-- End of Right side content -->
@@ -54,16 +54,7 @@ import SampleView from "./SampleView.vue"
 import SampleBrowser from "./SampleBrowser.vue"
 import TOFControl from "./TOFControl.vue"
 import store from '../store';
-import {get_parent_context,
-        subscribe,
-        // unsubscribe,
-        // export_one_way_binding_prop,
-        // export_two_way_binding_prop,
-        // import_one_way_binding_prop,
-        // import_two_way_binding_prop,
-        log,
-        read_dotenv,
-        write_dotenv} from "../karsalib.js"
+import {BECom, read_dotenv, write_dotenv} from "../karsalib.js"
 
 const io = require("socket.io-client");
 
@@ -80,8 +71,8 @@ export default {
     },
     data() {
         return {
-            // socket: null,
             dotenv: {},
+            be: null,
             // endpoints - list of notifications the MainUI wants to receive
             endpoints: [
                 // 'acquisition_status',
@@ -290,15 +281,15 @@ export default {
     },
     methods: {
         connect_socket() {
+            this.be.log(this.$options.name, "Connecting to url: ", this.url);
             var self = this;
-            log(this.$options.name, "Connecting to url: ", self.url);
-            // Global namespace
             self.socket = io.connect(self.url);
             self.socket.on("connect", () => {
+                self.room = self.socket.id;
+                self.socket_connected = true;
                 // handlers for for external notifications (endpoint imports), if any:
 
-                self.socket_connected = true;
-                subscribe();
+                this.be.subscribe();
 
                 // self.socket.emit('subscribe',
                 //                 {'app_name': self.$options.name,
@@ -338,14 +329,14 @@ export default {
             // no need to unsubscribe on disconnect - client is unsubscribed by framework
             self.socket.on("disconnect", () => {
                 this.socket_connected = false;
-                log(this.$options.name, "socket disconnected");
+                this.be.log(this.$options.name, "socket disconnected");
             });
         },
 
     },
 
     created() {
-        get_parent_context(this);
+        this.be = new BECom(this);
         this.dotenv = read_dotenv();
         this.url = this.dotenv.protocol + "//" + this.dotenv.host + ":" + this.dotenv.port;
     },

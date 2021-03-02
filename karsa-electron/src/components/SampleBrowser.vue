@@ -316,15 +316,7 @@ import { mapState } from 'vuex'
 import Buefy from "buefy";
 import "buefy/dist/buefy.css";
 import '@mdi/font/css/materialdesignicons.min.css';
-import {get_parent_context,
-        subscribe,
-        // unsubscribe,
-        export_one_way_binding_prop,
-        // export_two_way_binding_prop,
-        import_one_way_binding_prop,
-        // import_two_way_binding_prop,
-        // log
-        } from "../karsalib.js"
+import { BECom } from "../karsalib.js"
 
 Vue.use([Buefy]);
 
@@ -335,7 +327,7 @@ export default {
     components: {
     },
     props: {
-        room: String,
+        id: String,
     },
     computed: {
         ...mapState([
@@ -395,6 +387,7 @@ export default {
     },
     data: function() {
         return {
+            be: null,
             acquisition_started: false,
             h5_samples: [],
             h5_streamer_status: "not_ready",		// not_ready/ready
@@ -432,6 +425,7 @@ export default {
             sample_table_cols: [],
             sample_table_checked_rows: [],
             sample_attributes: {},
+            room: null,
             endpoints: [
                 'acquisition_started',
                 'h5_samples',
@@ -443,7 +437,7 @@ export default {
         }
     },
     created: function() {
-        get_parent_context(this);
+        this.be = new BECom(this);
 
 // //==============================
 //         get_parent_context(this);
@@ -577,6 +571,11 @@ export default {
             this.sample_description = "";
             this.sample_project = this.project_selected.id;
             this.sample_experiment = new_value.id;
+
+            if ( !_.isEmpty(new_value.id) ) {
+                this.room = this.id;
+                this.be.subscribe(this.room);
+            }
         },
         experiments: function(new_value) {
             if (!_.isEqual(new_value.project, this.project_selected.id)) {
@@ -644,7 +643,7 @@ export default {
             // TODO: quick&dirty fix to drop undesired sample update
             if ( !_.isEqual(new_data.project, this.project_selected.id) ||
                  !_.isEqual(new_data.experiment, this.experiment_selected.id) ) {
-                     console.log("samples update ignored");
+                     this.be.log("samples update ignored");
                 return
             }
             //
@@ -682,28 +681,26 @@ export default {
             }
         },
         h5_to_import: function(new_value, old_value) {
-            return export_one_way_binding_prop('h5_to_import', new_value, old_value);
+            return this.be.export_one_way_binding_prop('h5_to_import', new_value, old_value);
         },
         import_h5_table_datetime_range: function(new_value, old_value) {
-            return export_one_way_binding_prop('import_h5_table_datetime_range', new_value, old_value);
+            return this.be.export_one_way_binding_prop('import_h5_table_datetime_range', new_value, old_value);
         },
         import_sample_table_datetime_range: function(new_value, old_value) {
-            return export_one_way_binding_prop('import_sample_table_datetime_range', new_value, old_value);
+            return this.be.export_one_way_binding_prop('import_sample_table_datetime_range', new_value, old_value);
         },
         sample_attributes: function(new_value, old_value) {
-            return export_one_way_binding_prop('sample_attributes', new_value, old_value);
+            return this.be.export_one_way_binding_prop('sample_attributes', new_value, old_value);
         },
         socket_connected: function(new_value) {
             if ( new_value === true )
             {
                 // handlers for for external notifications:
-                this.socket.on('acquisition_started', (value) => import_one_way_binding_prop('acquisition_started', value.value));
-                this.socket.on("h5_samples", (value) => import_one_way_binding_prop("h5_samples", value.value));
-                this.socket.on("h5_streamer_status", (value) => import_one_way_binding_prop("h5_streamer_status", value.value));
-                this.socket.on("importable_samples", (value) => import_one_way_binding_prop("importable_samples", value.value));
-                this.socket.on("samples", (value) => import_one_way_binding_prop("samples", value.value));
-
-                subscribe();
+                this.socket.on('acquisition_started', (value) => this.be.import_one_way_binding_prop('acquisition_started', value.value));
+                this.socket.on("h5_samples", (value) => this.be.import_one_way_binding_prop("h5_samples", value.value));
+                this.socket.on("h5_streamer_status", (value) => this.be.import_one_way_binding_prop("h5_streamer_status", value.value));
+                this.socket.on("importable_samples", (value) => this.be.import_one_way_binding_prop("importable_samples", value.value));
+                this.socket.on("samples", (value) => this.be.import_one_way_binding_prop("samples", value.value));
             }
         },
     }

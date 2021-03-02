@@ -285,15 +285,7 @@ import { mapState } from 'vuex'
 import Buefy from "buefy";
 import "buefy/dist/buefy.css";
 import '@mdi/font/css/materialdesignicons.min.css';
-import {get_parent_context,
-        subscribe,
-        unsubscribe,
-        // export_one_way_binding_prop,
-        export_two_way_binding_prop,
-        import_one_way_binding_prop,
-        import_two_way_binding_prop,
-        // log
-        } from "../karsalib.js"
+import { BECom } from "../karsalib.js"
 
 Vue.use([Buefy]);
 
@@ -342,6 +334,7 @@ export default {
     },
     data: function() {
         return {
+            be: null,
             acquisition_progress: 0,
             instrument_status: "not_ready",			// not_ready/ready
             is_edit_temperature_ramp_modal_active: false,
@@ -386,7 +379,7 @@ export default {
         }
     },
     created: function() {
-        get_parent_context(this);
+        this.be = new BECom(this);
 
 // //==============================
 //         get_parent_context(this);
@@ -418,7 +411,7 @@ export default {
                 onCancel: () => this.acquisition_control_active = false,
                 onConfirm: () => { this.$buefy.toast.open({message: 'Instrument control granted',
                                                           type: 'is-success'});
-                                   subscribe(); }
+                                   this.be.subscribe(); }
             })
         },
         delete_row_in_config_desorption_table() {
@@ -543,7 +536,7 @@ export default {
                 this.confirmAcquisitionControl();
             }
             else {
-                unsubscribe();
+                this.be.unsubscribe();
             }
         },
         acquisition_mode: function(new_value, old_value) {
@@ -579,7 +572,7 @@ export default {
                 this.acquisition_button_type = "is-primary";
                 this.scenthound_status = 'Ready';
             }
-            export_two_way_binding_prop('acquisition_status', new_value, old_value, true);
+            return this.be.export_two_way_binding_prop('acquisition_status', new_value, old_value, true);
         },
         instrument_status: function(new_value, old_value) {
             if ( _.isEqual(new_value, old_value) ) {
@@ -597,10 +590,10 @@ export default {
             if ( new_value === true )
             {
                 // handlers for for external notifications:
-                this.socket.on("acquisition_status", (value) => import_two_way_binding_prop("acquisition_status", value.value));
-                this.socket.on("acquisition_progress", (value) => import_one_way_binding_prop("acquisition_progress", value.value.progress, true));
-                this.socket.on("instrument_status", (value) => import_one_way_binding_prop("instrument_status", value.value));
-                this.socket.on("sample_length", (value) => import_two_way_binding_prop("sample_length", value.value));
+                this.socket.on("acquisition_status", (value) => this.be.import_two_way_binding_prop("acquisition_status", value.value));
+                this.socket.on("acquisition_progress", (value) => this.be.import_one_way_binding_prop("acquisition_progress", value.value.progress, true));
+                this.socket.on("instrument_status", (value) => this.be.import_one_way_binding_prop("instrument_status", value.value));
+                this.socket.on("sample_length", (value) => this.be.import_two_way_binding_prop("sample_length", value.value));
 
                 // dynamic subscription thru AcquisitionControl dialog
             }

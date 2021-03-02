@@ -366,15 +366,7 @@ import { mapState } from 'vuex'
 import Buefy from "buefy";
 import "buefy/dist/buefy.css";
 import '@mdi/font/css/materialdesignicons.min.css';
-import {get_parent_context,
-        subscribe,
-        // unsubscribe,
-        export_one_way_binding_prop,
-        // export_two_way_binding_prop,
-        // import_one_way_binding_prop,
-        import_two_way_binding_prop,
-        // log
-        } from "../karsalib.js"
+import { BECom } from "../karsalib.js"
 
 Vue.use([Buefy]);
 
@@ -421,9 +413,10 @@ var all_reagents = [
     ]
 
 export default {
-    name: "WorkflowTab",
+    name: "StartTab",
     data: function() {
         return {
+            be: null,
             // Modal active variables
             is_modal_new_project_active: false,
             is_modal_new_experiment_active: false,
@@ -451,6 +444,7 @@ export default {
             inlets: inlets,
             mspecs: mspecs,
             reagents: all_reagents,
+            room: null,
             endpoints: [
                 'projects',
                 'experiments',
@@ -512,12 +506,11 @@ export default {
                 this.$store.commit('experiment_selected', value);
             }
         },
-        room: null,
     },
     created() {
         // Initialize project_selected
         this.project_selected = {'id': ""};
-        get_parent_context(this);
+        this.be = new BECom(this);
 
 // //==============================
 //         get_parent_context(this);
@@ -631,19 +624,21 @@ export default {
             this.experiments_ui = new_value.experiments;
         },
         experiment_selected: function(new_value, old_value) {
-            return export_one_way_binding_prop('experiment_selected', new_value, old_value);
+            return this.be.export_one_way_binding_prop('experiment_selected', new_value, old_value);
         },
         project_selected: function(new_value, old_value) {
-            return export_one_way_binding_prop('project_selected', new_value, old_value);
+            return this.be.export_one_way_binding_prop('project_selected', new_value, old_value);
         },
-        socket_connected: function(new_value) {
+        socket_connected: function(new_value, old_value) {
+            if ( new_value === old_value )
+                return false;
             if ( new_value === true )
             {
                 this.room = this.socket.id;
-                this.socket.on("projects", (value) => import_two_way_binding_prop("projects", value.value));
-                this.socket.on('experiments', (value) => import_two_way_binding_prop('experiments', value.value));
+                this.socket.on("projects", (value) => this.be.import_two_way_binding_prop("projects", value.value));
+                this.socket.on('experiments', (value) => this.be.import_two_way_binding_prop('experiments', value.value));
 
-                subscribe();    //TODO: ?? subscribe from within experiment_selected?
+                this.be.subscribe();    //TODO: ?? subscribe from within experiment_selected?
             }
         },
         'instrument.polarity': function(polarity) {

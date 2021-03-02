@@ -116,10 +116,7 @@ import { mapState } from 'vuex'
 import Buefy from "buefy";
 import "buefy/dist/buefy.css";
 import '@mdi/font/css/materialdesignicons.min.css';
-import { get_parent_context,
-         subscribe,
-         import_one_way_binding_prop,
-         export_one_way_binding_prop } from '../karsalib';
+import { BECom } from '../karsalib';
 
 Vue.use([Buefy]);
 
@@ -157,6 +154,7 @@ export default {
     },
     data: function() {
         return {
+            be: null,
             // variables for excel clipboard import
             is_excel_clipboard_modal_active: false,
             excel_clipboard_text: "",
@@ -174,7 +172,7 @@ export default {
         }
     },
     created: function() {
-        get_parent_context(this);
+        this.be = new BECom(this);
 
 // //==============================
 //         get_parent_context(this);
@@ -299,14 +297,14 @@ export default {
             this.target_table_rows = new_data.rows;
         },
         target_to_display: function(new_value, old_value) {
-            return export_one_way_binding_prop('target_to_display', new_value, old_value);
+            return this.be.export_one_way_binding_prop('target_to_display', new_value, old_value);
         },
         socket_connected: function(new_value) {
             if ( new_value === true )
             {
                 // handlers for for external notifications:
-                this.socket.on("targets", (value) => import_one_way_binding_prop("targets", value.value));
-                subscribe();
+                this.socket.on("targets", (value) => this.be.import_one_way_binding_prop("targets", value.value));
+                this.be.subscribe();
             }
         },
     }

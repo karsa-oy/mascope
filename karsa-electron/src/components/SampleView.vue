@@ -71,15 +71,7 @@ import Buefy from "buefy";
 import Multiselect from "vue-multiselect";
 import "buefy/dist/buefy.css";
 import '@mdi/font/css/materialdesignicons.min.css';
-import {get_parent_context,
-        subscribe,
-        // unsubscribe,
-        export_one_way_binding_prop,
-        // export_two_way_binding_prop,
-        import_one_way_binding_prop,
-        // import_two_way_binding_prop,
-        // log
-        } from "../karsalib.js"
+import { BECom } from "../karsalib.js"
 
 Vue.use([Buefy]);
 
@@ -98,7 +90,7 @@ export default {
         Multiselect
     },
     props: {
-        room: String,
+        id: String,
     },
     computed: {
         ...mapState([
@@ -143,7 +135,7 @@ export default {
     },
     data: function() {
         return {
-            // State variables
+            be: null,   //backend communicator
             cache_index_rank: 0, // actual value calculated in "mounted"
             figure_cache: {'t_maxrange': [0, 0], 'mz_maxrange': [0, 0]},
             figure_layouts: {},
@@ -166,6 +158,7 @@ export default {
             zoom_stack: [],
             visualize_range: {},
             stop_visualize_range: {},
+            room: null,
             endpoints: [
                 'figure_ranges',
                 'heatmap_figure_data',
@@ -177,7 +170,7 @@ export default {
     },
 
     created: function(){
-        get_parent_context(this);
+        this.be = new BECom(this);
 
 // //==============================
 //         get_parent_context(this);
@@ -947,8 +940,13 @@ export default {
                 this.reset_view();
             }
         },
-        experiment_selected: function() {
+        experiment_selected: function(new_value) {
             this.reset_view();
+
+            if ( !_.isEmpty(new_value.id) ) {
+                this.room = this.socket.id + '_' + this.id;
+                this.be.subscribe(this.room);
+            }
         },
         figure_ranges: function(new_value, old_value) {
             // // TODO: quick&dirty fix to dismiss acquisition notifications
@@ -957,9 +955,6 @@ export default {
             //     return
             // }
             // //
-            if (new_value.filename !== this.filename) {
-                return false;
-            }
             this.on_figure_ranges(new_value, old_value);
         },
         heatmap_figure_data: function(new_value) {
@@ -1041,28 +1036,26 @@ export default {
             }
         },
         stop_visualize_range: function(new_value, old_value) {
-            return export_one_way_binding_prop('stop_visualize_range', {...new_value, 'uid': Math.random()}, old_value);
+            return this.be.export_one_way_binding_prop('stop_visualize_range', {...new_value, 'uid': Math.random()}, old_value);
         },
         visualize_range: function(new_value, old_value) {
-            return export_one_way_binding_prop('visualize_range', {...new_value, 'uid': Math.random()}, old_value);
+            return this.be.export_one_way_binding_prop('visualize_range', {...new_value, 'uid': Math.random()}, old_value);
         },
         tps_parameters_selected_ui: function(value) {
             this.tps_parameters_selected = {'tps_parameters_selected': value, 'figure_ranges': this.figure_ranges};
         },
         tps_parameters_selected: function(new_value, old_value) {
-            return export_one_way_binding_prop('tps_parameters_selected', new_value, old_value);
+            return this.be.export_one_way_binding_prop('tps_parameters_selected', new_value, old_value);
         },
         socket_connected: function(new_value) {
             if ( new_value === true )
             {
                 // handlers for for external notifications:
-                this.socket.on("figure_ranges", (value) => import_one_way_binding_prop("figure_ranges", {...value.value, 'uid': Math.random()}));
-                this.socket.on("heatmap_figure_data", (value) => import_one_way_binding_prop("heatmap_figure_data", value.value));
-                this.socket.on("spec_stack_figure_data", (value) => import_one_way_binding_prop("spec_stack_figure_data", value.value));
-                this.socket.on("timeseries_figure_data", (value) => import_one_way_binding_prop("timeseries_figure_data", value.value));
-                this.socket.on("tps_parameters", (value) => import_one_way_binding_prop("tps_parameters", value.value));
-
-                subscribe();
+                this.socket.on("figure_ranges", (value) => this.be.import_one_way_binding_prop("figure_ranges", {...value.value, 'uid': Math.random()}));
+                this.socket.on("heatmap_figure_data", (value) => this.be.import_one_way_binding_prop("heatmap_figure_data", value.value));
+                this.socket.on("spec_stack_figure_data", (value) => this.be.import_one_way_binding_prop("spec_stack_figure_data", value.value));
+                this.socket.on("timeseries_figure_data", (value) => this.be.import_one_way_binding_prop("timeseries_figure_data", value.value));
+                this.socket.on("tps_parameters", (value) => this.be.import_one_way_binding_prop("tps_parameters", value.value));
             }
         },
     },
