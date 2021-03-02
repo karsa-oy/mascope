@@ -153,8 +153,6 @@ class MetadataServiceNamespace(BaseClientNamespace):
         global datapool
 
         value = data['value']
-        kwargs = get_client_notification_args(data)
-
         sample = value['id']
         attributes = value.get('attributes')
         project = attributes['project']
@@ -172,7 +170,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
         await self.emit_client_notification(
                             'samples',
                             datapool.get_sample_table(project, experiment),
-                            **{**kwargs, 'notify_twin_clients': True, }
+                            **get_client_notification_args(data),
                             )
     # ---------------------------------
 

@@ -69,9 +69,17 @@ import Vue from "vue";
 import { mapState } from 'vuex'
 import Buefy from "buefy";
 import Multiselect from "vue-multiselect";
-
 import "buefy/dist/buefy.css";
 import '@mdi/font/css/materialdesignicons.min.css';
+import {get_parent_context,
+        subscribe,
+        // unsubscribe,
+        export_one_way_binding_prop,
+        // export_two_way_binding_prop,
+        import_one_way_binding_prop,
+        // import_two_way_binding_prop,
+        // log
+        } from "../karsalib.js"
 
 Vue.use([Buefy]);
 
@@ -90,45 +98,46 @@ export default {
         Multiselect
     },
     props: {
+        room: String,
     },
     computed: {
-        ...mapState(['acquisition_control_active',
-                     'acquisition_started',
-                     'acquisition_status',
+        ...mapState([
+                     'acquisition_control_active',
+                     'acquisition_status',  //no subscription here - use TOFControl sync
                      'experiment_selected',
-                     'figure_ranges',
-                     'heatmap_figure_data',
+                    //  'figure_ranges',
+                    //  'heatmap_figure_data',
                      'sample_to_load',
-                     'spec_stack_figure_data',
+                    //  'spec_stack_figure_data',
                      'target_to_display',
-                     'timeseries_figure_data',
-                     'tps_parameters',
+                    //  'timeseries_figure_data',
+                    //  'tps_parameters',
                      ]),
-        visualize_range: {
-            get() {
-                return this.$store.state.visualize_range;
-            },
-            set(value) {
-                this.$store.commit('visualize_range', value);
-            }
-        },
-        stop_visualize_range: {
-            get() {
-                return this.$store.state.stop_visualize_range;
-            },
-            set(value) {
-                this.$store.commit('stop_visualize_range', value);
-            }
-        },
-        tps_parameters_selected_ui: {
-            get() {
-                return this.$store.state.tps_parameters_selected['tps_parameters_selected'];
-            },
-            set(value) {
-                let new_value = {'tps_parameters_selected': value, 'figure_ranges': this.figure_ranges};
-                this.$store.commit('tps_parameters_selected', new_value);
-            }
-        },
+        // visualize_range: {
+        //     get() {
+        //         return this.$store.state.visualize_range;
+        //     },
+        //     set(value) {
+        //         this.$store.commit('visualize_range', value);
+        //     }
+        // },
+        // stop_visualize_range: {
+        //     get() {
+        //         return this.$store.state.stop_visualize_range;
+        //     },
+        //     set(value) {
+        //         this.$store.commit('stop_visualize_range', value);
+        //     }
+        // },
+        // tps_parameters_selected_ui: {
+        //     get() {
+        //         return this.$store.state.tps_parameters_selected['tps_parameters_selected'];
+        //     },
+        //     set(value) {
+        //         let new_value = {'tps_parameters_selected': value, 'figure_ranges': this.figure_ranges};
+        //         this.$store.commit('tps_parameters_selected', new_value);
+        //     }
+        // },
     },
     data: function() {
         return {
@@ -136,20 +145,53 @@ export default {
             cache_index_rank: 0, // actual value calculated in "mounted"
             figure_cache: {'t_maxrange': [0, 0], 'mz_maxrange': [0, 0]},
             figure_layouts: {},
+            figure_ranges: {},
             filename: '',
             grid_spacing: 0.0049,
             heatmap_data: [],
+            heatmap_figure_data: {},
             heatmap_layout: {},
             heatmap_queue: Promise.resolve(),
             spec_stack_data: [],
             spec_stack_layout: {},
+            spec_stack_figure_data: {},
             timeseries_data: [],
             timeseries_layout: {},
+            timeseries_figure_data: {},
+            tps_parameters: [],
+            tps_parameters_selected_ui: [],
+            tps_parameters_selected: {},
             zoom_stack: [],
+            visualize_range: {},
+            stop_visualize_range: {},
+            endpoints: [
+                'figure_ranges',
+                'heatmap_figure_data',
+                'spec_stack_figure_data',
+                'timeseries_figure_data',
+                'tps_parameters',
+            ],
         }
     },
+
     created: function(){
-    },
+
+//==============================
+        get_parent_context(this);
+        var self = this;
+        self.socket.on("connect", () => {
+            self.socket.on("figure_ranges", (value) => import_one_way_binding_prop("figure_ranges", {...value.value, 'uid': Math.random()}));
+            self.socket.on("heatmap_figure_data", (value) => import_one_way_binding_prop("heatmap_figure_data", value.value));
+            self.socket.on("spec_stack_figure_data", (value) => import_one_way_binding_prop("spec_stack_figure_data", value.value));
+            self.socket.on("timeseries_figure_data", (value) => import_one_way_binding_prop("timeseries_figure_data", value.value));
+            self.socket.on("tps_parameters", (value) => import_one_way_binding_prop("tps_parameters", value.value));
+
+            subscribe();
+        });
+// =============================
+
+
+},
 
     mounted: function() {
         this.init_figures();
@@ -890,10 +932,10 @@ export default {
 
     watch: {
         acquisition_status: function(new_value, old_value) {
-            // TODO: quick&dirty fix to dismiss acquisition notifications
-            if (!this.acquisition_control_active) {
-                return
-            }
+            // // TODO: quick&dirty fix to dismiss acquisition notifications
+            // if (!this.acquisition_control_active) {
+            //     return
+            // }
             //
             if ( _.isEqual(new_value, old_value) ) {
                 return false;
@@ -906,18 +948,21 @@ export default {
             this.reset_view();
         },
         figure_ranges: function(new_value, old_value) {
-            // TODO: quick&dirty fix to dismiss acquisition notifications
-            if (new_value.filename !== this.filename &&
-                !this.acquisition_control_active) {
-                return
+            // // TODO: quick&dirty fix to dismiss acquisition notifications
+            // if (new_value.filename !== this.filename &&
+            //     !this.acquisition_control_active) {
+            //     return
+            // }
+            // //
+            if (new_value.filename !== this.filename) {
+                return false;
             }
-            //
             this.on_figure_ranges(new_value, old_value);
         },
         heatmap_figure_data: function(new_value) {
             // TODO: quick&dirty fix to dismiss acquisition notifications
             if (new_value.filename !== this.filename) {
-                return
+                return false;
             }
             //
             this.on_heatmap_figure_data(new_value);
@@ -991,6 +1036,18 @@ export default {
             if ( _.isEmpty(new_value) || _.isEqual(new_value, old_value) ) {
                 return false;
             }
+        },
+        stop_visualize_range: function(new_value, old_value) {
+            return export_one_way_binding_prop('stop_visualize_range', {...new_value, 'uid': Math.random()}, old_value);
+        },
+        visualize_range: function(new_value, old_value) {
+            return export_one_way_binding_prop('visualize_range', {...new_value, 'uid': Math.random()}, old_value);
+        },
+        tps_parameters_selected_ui: function(value) {
+            this.tps_parameters_selected = {'tps_parameters_selected': value, 'figure_ranges': this.figure_ranges};
+        },
+        tps_parameters_selected: function(new_value, old_value) {
+            return export_one_way_binding_prop('tps_parameters_selected', new_value, old_value);
         },
     },
 };

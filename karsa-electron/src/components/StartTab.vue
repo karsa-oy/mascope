@@ -364,9 +364,17 @@
 import Vue from "vue";
 import { mapState } from 'vuex'
 import Buefy from "buefy";
-
 import "buefy/dist/buefy.css";
 import '@mdi/font/css/materialdesignicons.min.css';
+import {get_parent_context,
+        subscribe,
+        // unsubscribe,
+        export_one_way_binding_prop,
+        // export_two_way_binding_prop,
+        // import_one_way_binding_prop,
+        import_two_way_binding_prop,
+        // log
+        } from "../karsalib.js"
 
 Vue.use([Buefy]);
 
@@ -443,12 +451,16 @@ export default {
             inlets: inlets,
             mspecs: mspecs,
             reagents: all_reagents,
+            endpoints: [
+                'projects',
+                'experiments',
+            ],
         }
     },
     computed: {
         ...mapState([
-                'experiments',
-                'projects',
+                // 'experiments',
+                // 'projects',
                 'socket',
                 ]),
         active_tab: {
@@ -467,6 +479,22 @@ export default {
                 this.$store.commit('data_source_path', value);
             }
         },
+        projects: {
+            get() {
+                return this.$store.state.projects;
+            },
+            set(value) {
+                this.$store.commit('projects', value);
+            }
+        },
+        experiments: {
+            get() {
+                return this.$store.state.experiments;
+            },
+            set(value) {
+                this.$store.commit('experiments', value);
+            }
+        },
         project_selected: {
             get() {
                 return this.$store.state.project_selected;
@@ -483,30 +511,24 @@ export default {
                 this.$store.commit('experiment_selected', value);
             }
         },
-    },
-    watch: {
-        experiments: function(new_value) {
-            if (!_.isEqual(new_value.project, this.project_selected.id)) {
-                return
-            }
-            this.experiments_ui = new_value.experiments;
-        },
-        'instrument.polarity': function(polarity) {
-            this.reagents = all_reagents.filter(function(el){
-                return el.polarity === polarity
-            });
-        },
-        'instrument.reagent': function(reagent) {
-            for(let i in all_reagents){
-                if(all_reagents[i].id === reagent){
-                    this.instrument.polarity = all_reagents[i].polarity;
-                }
-            }
-        },
+        room: null,
     },
     created() {
         // Initialize project_selected
         this.project_selected = {'id': ""};
+
+//==============================
+        get_parent_context(this);
+        var self = this;
+        self.socket.on("connect", () => {
+            self.room = this.socket.id;
+            self.socket.on("projects", (value) => import_two_way_binding_prop("projects", value.value));
+            self.socket.on('experiments', (value) => import_two_way_binding_prop('experiments', value.value));
+
+            subscribe();    //TODO: ?? subscribe from within experiment_selected?
+        });
+// =============================
+
     },
     methods: {
         isValidFilename(str) {
@@ -598,7 +620,33 @@ export default {
             this.is_modal_new_experiment_active = false;
             this.active_tab = 2;
         },
-    }
+    },
+    watch: {
+        experiments: function(new_value) {
+            if (!_.isEqual(new_value.project, this.project_selected.id)) {
+                return false;
+            }
+            this.experiments_ui = new_value.experiments;
+        },
+        experiment_selected: function(new_value, old_value) {
+            return export_one_way_binding_prop('experiment_selected', new_value, old_value);
+        },
+        project_selected: function(new_value, old_value) {
+            return export_one_way_binding_prop('project_selected', new_value, old_value);
+        },
+        'instrument.polarity': function(polarity) {
+            this.reagents = all_reagents.filter(function(el){
+                return el.polarity === polarity
+            });
+        },
+        'instrument.reagent': function(reagent) {
+            for(let i in all_reagents){
+                if(all_reagents[i].id === reagent){
+                    this.instrument.polarity = all_reagents[i].polarity;
+                }
+            }
+        },
+    },
 }
   
 </script>

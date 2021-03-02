@@ -283,9 +283,17 @@
 import Vue from "vue";
 import { mapState } from 'vuex'
 import Buefy from "buefy";
-
 import "buefy/dist/buefy.css";
 import '@mdi/font/css/materialdesignicons.min.css';
+import {get_parent_context,
+        subscribe,
+        unsubscribe,
+        // export_one_way_binding_prop,
+        export_two_way_binding_prop,
+        import_one_way_binding_prop,
+        import_two_way_binding_prop,
+        // log
+        } from "../karsalib.js"
 
 Vue.use([Buefy]);
 
@@ -300,7 +308,8 @@ export default {
     ],
     computed: {
         ...mapState([
-            'instrument_status', 'socket',
+            // 'instrument_status',
+            'socket',
         ]),
         acquisition_control_active: {
             get() {
@@ -318,20 +327,22 @@ export default {
                 this.$store.commit('acquisition_status', value);
             }
         },
-        acquisition_progress() {
-            return this.$store.state.acquisition_progress.progress;
-        },
-        sample_length: {
-            get() {
-                return this.$store.state.sample_length;
-            },
-            set(value) {
-                this.$store.commit('sample_length', value);
-            }
-        },
+        // acquisition_progress() {
+        //     return this.$store.state.acquisition_progress.progress;
+        // },
+        // sample_length: {
+        //     get() {
+        //         return this.$store.state.sample_length;
+        //     },
+        //     set(value) {
+        //         this.$store.commit('sample_length', value);
+        //     }
+        // },
     },
     data: function() {
         return {
+            acquisition_progress: 0,
+            instrument_status: "not_ready",			// not_ready/ready
             is_edit_temperature_ramp_modal_active: false,
             // variable for acquisition button style  and progress bar
             acquisition_button_type: "is-primary",
@@ -356,38 +367,44 @@ export default {
             // flag to separate if data was changed by user or by loading
             // config file in the 
             data_updated_from_loading: true,
-            room: 'TOF',
-            rooms: [
-                'acquisition_started',
+            room: 'TOF',    //TODO: room comes from instrument selection
+            sample_length: 120,
+            endpoints: [
                 'acquisition_status',
                 'acquisition_progress',
                 'instrument_status',
                 'sample_length',
+                // TODO: remove lower 4 endpoints after 
+                // acq. data stream goes to FileService
                 'figure_ranges',
                 'heatmap_figure_data',
                 'spec_stack_figure_data',
                 'timeseries_figure_data',
+                // ============================
             ],
         }
     },
     created: function() {
+
+//==============================
+        get_parent_context(this);
+        var self = this;
+        self.socket.on("connect", () => {
+            // handlers for for external notifications:
+            self.socket.on("acquisition_status", (value) => import_two_way_binding_prop("acquisition_status", value.value));
+            self.socket.on("acquisition_progress", (value) => import_one_way_binding_prop("acquisition_progress", value.value.progress, true));
+            self.socket.on("instrument_status", (value) => import_one_way_binding_prop("instrument_status", value.value));
+            self.socket.on("sample_length", (value) => import_two_way_binding_prop("sample_length", value.value));
+
+            // dynamic subscription thru AcquisitionControl dialog
+        });
+// =============================
+
+
     },
     mounted: function() {
     },
     methods: {
-        subscribe() {
-            this.socket.emit('subscribe',
-                             {'app_name': this.$options.name,
-                              'endpoints': this.rooms,
-                              'room': this.room});
-            this.socket.emit('client_notification', {'name': 'service_state', 'value': {}, 'room': this.room});
-        },
-        unsubscribe() {
-            this.socket.emit('unsubscribe',
-                             {'app_name': this.$options.name,
-                              'endpoints': this.rooms,
-                              'room': this.room});
-        },
         confirmAcquisitionControl() {
             this.$buefy.dialog.confirm({
                 title: 'Instrument control',
@@ -399,7 +416,7 @@ export default {
                 onCancel: () => this.acquisition_control_active = false,
                 onConfirm: () => { this.$buefy.toast.open({message: 'Instrument control granted',
                                                           type: 'is-success'});
-                                   this.subscribe(); }
+                                   subscribe(); }
             })
         },
         delete_row_in_config_desorption_table() {
@@ -524,7 +541,7 @@ export default {
                 this.confirmAcquisitionControl();
             }
             else {
-                this.unsubscribe();
+                unsubscribe();
             }
         },
         acquisition_mode: function(new_value, old_value) {
@@ -560,6 +577,7 @@ export default {
                 this.acquisition_button_type = "is-primary";
                 this.scenthound_status = 'Ready';
             }
+            export_two_way_binding_prop('acquisition_status', new_value, old_value, true);
         },
         instrument_status: function(new_value, old_value) {
             if ( _.isEqual(new_value, old_value) ) {
