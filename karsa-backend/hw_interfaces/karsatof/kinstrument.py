@@ -60,14 +60,7 @@ class KInstrument():
         """
 
         self.desc = descriptor
-
-        # if self.desc.tofPeriod < 1:
-        #     # Convert tofPeriod to nanoseconds if not already
-        #     self.desc.tofPeriod *= 1e9
-        # self.time_res = self.desc.nbrWaveforms * self.desc.tofPeriod * 1e-9  # s
         
-        self.mz_par = self.desc.p
-        self.mz_mode = self.desc.massCalibMode
         self._mz = np.array([self.sno2mz(s) for s in range(self.desc.nbrSamples)],
                             dtype=np.float32
                             )
@@ -300,10 +293,13 @@ class KInstrument():
         if not hasattr(mzs, '__iter__'):
             mzs = [mzs]
         if roundit:
-            snos = [int(round(TwMass2Tof(mz, self.mz_mode, self.mz_par)))
-                    for mz in mzs]
+            snos = [int(round(TwMass2Tof(mz, self.desc.massCalibMode, self.desc.p)))
+                    for mz in mzs
+                    ]
         else:
-            snos = [TwMass2Tof(mz, self.mz_mode, self.mz_par) for mz in mzs]
+            snos = [TwMass2Tof(mz, self.desc.massCalibMode, self.desc.p)
+                    for mz in mzs
+                    ]
         if len(snos) == 1:
             snos = snos[0]
         return snos
@@ -333,10 +329,16 @@ class KInstrument():
                 snos = self.desc.nbrSamples
             snos = [snos]
         if roundit:
-            mzs = [int(round(TwTof2Mass(sno, self.mz_mode, self.mz_par)))
-                   for sno in snos]
+            mzs = [int( round( TwTof2Mass(sno,
+                                          self.desc.massCalibMode,
+                                          self.desc.p
+                                          )))
+                   for sno in snos
+                   ]
         else:
-            mzs = [TwTof2Mass(sno, self.mz_mode, self.mz_par) for sno in snos]
+            mzs = [TwTof2Mass(sno, self.desc.massCalibMode, self.desc.p) 
+                   for sno in snos
+                   ]
         if len(mzs) == 1:
             mzs = mzs[0]
         return mzs

@@ -12,7 +12,7 @@ import os
 import numpy as np
 
 from threading import Thread
-from multiprocessing import (Barrier, Event, Queue)
+from multiprocessing import (Barrier, Event, Process, Queue)
 from queue import Empty
 
 from time import sleep
@@ -47,6 +47,7 @@ from .lib.TwH5 import (
     TwGetBufTimeFromH5,
     TwGetH5Descriptor,
     TwGetRegUserDataFromH5,
+    TwGetSpecXaxisFromH5,
     TwGetTofSpectrumFromH5,
     TwH5Desc,
 )
@@ -706,7 +707,6 @@ class Acquisition(Thread, KInstrument):
             # Feed
             self.tps_queue.put(tps_data)
 
-
     def _get_tps_info(self):
         """Get TPS parameter descriptions from TofDaq Recorder
 
@@ -867,6 +867,7 @@ class Acquisition(Thread, KInstrument):
         """
         TwStopAcquisition()
 
+
 class h5Streamer(Acquisition):
     def __init__(self):
         """Initialize self
@@ -945,14 +946,14 @@ class h5Streamer(Acquisition):
         TwGetRegUserDataFromH5(
                self.desc.currentDataFileName,
                b'/TPS2',
-               -1,
-               -1,
+               0,
+               0,
                nel,
                None,
                None
                )
         # Get TPS data from TW h5
-        data = np.zeros((nel.item(), 1),
+        data = np.zeros((nel.item(), ),
                         dtype=np.double
                         )
         ret = TwGetRegUserDataFromH5(
@@ -964,14 +965,13 @@ class h5Streamer(Acquisition):
                data,
                None # char buffer for info
                )
-        if ret == 9: # Success
+        if ret == 4: # Success
             # Combine data for output
             tps_data = {
                 'filename': self.filename,          # Current file basename
                 'i': self.speci,                    # Current spectrum integer index
                 't': float(ti),                     # Timestamp [s]
                 'data': data.astype(np.float32  # convert to float32
-                                ).reshape(-1    # reshape to (-1,)
                                 ).tobytes(      # serialize
                                 )                   # Serialized TPS data [float32]
                 }
@@ -988,22 +988,20 @@ class h5Streamer(Acquisition):
         """
         info = []
         # Query TPS data size
-        buf_size = np.zeros((1, 1), dtype=int)
+        nel = np.zeros((1,), dtype=int)
         TwGetRegUserDataFromH5(
                     self.desc.currentDataFileName,
                     b'TPS2',
-                    -1,
-                    -1,
-                    buf_size,
+                    0,
+                    0,
+                    nel,
                     None,
                     None
                     )
-        # Calculate numver of TPS parameters
-        nel = int( buf_size.item() / (self.desc.nbrBufs*self.desc.nbrWrites) )
         # Parameter description buffer
-        infobuf = create_string_buffer(b'', 256 * nel)
+        infobuf = create_string_buffer(b'', 256 * nel.item())
         # Get TPS data from TW h5
-        data = np.zeros((1, 1, nel),
+        data = np.zeros((nel.item(),),
                         dtype=np.double
                         )
 
@@ -1012,7 +1010,7 @@ class h5Streamer(Acquisition):
                     b'TPS2',
                     0,
                     0,
-                    buf_size,
+                    nel,
                     data,   # data not used, but needs to be there
                     infobuf
                     )
@@ -1023,7 +1021,7 @@ class h5Streamer(Acquisition):
         info = [ i.decode('unicode_escape') for i in info ] # bytes to str
         return info
 
-    def _wait_for_tick(self):
+    def _wait_for_queues(self):
         """Wait for tick event to be set before continuing streaming
 
         Returns
@@ -1032,8 +1030,11 @@ class h5Streamer(Acquisition):
             True if ticked, False if shutdown
         """
         while not self.shutdown_event.is_set():
-            if self.tick.wait(.1):
-                # Tick
+            if self.spec_queue.qsize() or self.tps_queue.qsize():
+                # Still something in queue
+                sleep(.1)
+            else:
+                # Queues empty
                 return True
         # Shutdown
         return False
@@ -1050,11 +1051,13 @@ class h5Streamer(Acquisition):
         while not self.shutdown_event.is_set():
             try:
                 file_to_stream = self.file_queue.get(timeout=.1)
-
+                # Update TW h5 descriptor
                 ret = TwGetH5Descriptor(file_to_stream.encode(), self.desc)
+                # Add fields to comply with TW shared memory descriptor
                 self.desc.currentDataFileName = file_to_stream.encode()
                 self.desc.iBuf = 0
                 self.desc.iWrite = 0
+                self._update_mz()
             except Empty:
                 continue
             # Start streaming
@@ -1076,10 +1079,9 @@ class h5Streamer(Acquisition):
                     self.desc.iBuf = ibuf
                     # Update self and feed data into queue
                     self._update()
-                    # Wait for client to tick
-                    self.tick.clear()
-                    if self._wait_for_tick():
-                        # Ticked
+                    # Wait for queues to be empty
+                    if self._wait_for_queues():
+                        # Empty
                         continue
                     else:
                         # Shutdown
@@ -1105,10 +1107,17 @@ class h5Streamer(Acquisition):
         """
         raise NotImplementedError
 
-    def tick(self):
-        """Shortcut for setting the 'tick' event
-        """
-        self.tick.set()
+    def _update_mz(self):
+        # Get mz axis from file
+        mz = np.zeros((self.desc.nbrSamples,), dtype=np.double)
+        TwGetSpecXaxisFromH5(self.desc.currentDataFileName,
+                             mz,
+                             1,
+                             None,
+                             0,
+                             0
+                             )
+        self._mz = mz.astype(np.float32)
 
 
 class KStreamer(Thread, KInstrument):

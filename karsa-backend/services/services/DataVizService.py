@@ -411,7 +411,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
         if not visualizer:  # data request was cancelled
             return
         # Extend signal cache
-        tps_data = np.frombuffer( value.get('tps_data'), dtype=np.float32 )
+        tps_data = np.frombuffer( value.get('data'), dtype=np.float32 )
         tps_data = tps_data.reshape(-1, 1)
         ti = value.get('t')
         td = np.array( [timedelta(seconds=ti)] ) # Convert to timedelta

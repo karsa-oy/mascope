@@ -10,13 +10,17 @@ from multiprocessing import Queue
 from queue import Empty
 from datetime import datetime
 
-from karsalib import BaseClientNamespace, parse_cmd_args
+from karsalib import (
+                BaseClientNamespace,
+                parse_cmd_args,
+                get_client_notification_args
+                )
 from tof_service.TOFService import TOFServiceClient
-from karsatof.kgenerator import KStreamer
+from karsatof.kgenerator import h5Streamer
 from karsatof.kdatapool import H5Pool
 
 
-kacq = None
+h5streamer = None
 
 # TODO: make platform-agnostic (move to settings file)
 drive_letter = 'Z:\\'
@@ -43,8 +47,10 @@ class TWh5StreamerNamespace(BaseClientNamespace):
         global h5_path
         global h5_pool
 
-        dt0_json = data.get('dt0', '')
-        dt1_json = data.get('dt1', '')
+        kwargs = get_client_notification_args(data)
+
+        dt0_json = data['value'].get('dt0', '')
+        dt1_json = data['value'].get('dt1', '')
         if dt0_json == '' or dt1_json == '':
             print("Either start or end datetime not given")
             return
@@ -63,32 +69,22 @@ class TWh5StreamerNamespace(BaseClientNamespace):
 
         await self.emit_client_notification('h5_samples',
                                             h5_sample_table,
-                                            no_data_logging=True
+                                            **kwargs
                                             )
 
     async def on_h5_to_import(self, data):
-        print("on_h5_to_import: %s" %str(data))
-        for h5 in data:
+        for h5 in data['value']:
             full_file_path = os.path.join( h5.get('path'), h5.get('filename') )
-            await self.on_h5_stream_request( {'filename': full_file_path} )
+            self.stream_h5(full_file_path)
 
-    async def on_h5_stream_request(self, data):
-        global kacq
-
-        filename = data.get('filename', None)
-        if filename is None:
-            raise ValueError("Received data_request without filename")
-
-        if not os.path.exists(filename):
-            raise ValueError("Received filename does not exist")
-
-        print("Putting to file_queue: %s" %filename)
-        kacq.file_queue.put(filename)
+    def stream_h5(self, h5_filepath):
+        global h5streamer
+        h5streamer.start_stream(h5_filepath)
 
 
 class TWh5StreamerServiceClient(TOFServiceClient):
-    async def  init_service(self):
-        global kacq
+    async def init_service(self):
+        global h5streamer
 
         while True:
             # TODO: TBR python-socketio BadNamespaceError connection bug
@@ -101,7 +97,7 @@ class TWh5StreamerServiceClient(TOFServiceClient):
             except BadNamespaceError:
                 await self.sio.sleep(.1)
                 continue
-        kacq = self.kacq = await self.initialize_kacquisition(KStreamer)
+        h5streamer = self.acquisition = await self.initialize_kgenerator(h5Streamer)
         await h5_pool.scan_dir(h5_path)
         await self.emit_client_notification('h5_streamer_status',
                                     'ready',
@@ -109,13 +105,28 @@ class TWh5StreamerServiceClient(TOFServiceClient):
 
 
 def run():
-    client = TWh5StreamerServiceClient(*parse_cmd_args(), TWh5StreamerNamespace)
+    global INSTRUMENT_NAME
+    global h5streamer
+
+    url, port, namespace = parse_cmd_args()
+
+    # TODO: TWh5Streamer should always be in private namespace with FileIo
+    # if namespace == '/':
+    #     print("TWh5Streamer must be in a private namespace. " +
+    #           "Please restart the service with --ns option."
+    #           )
+    #     return
+    # INSTRUMENT_NAME = namespace.strip('/')
+    INSTRUMENT_NAME = "TOF" # :TODO
+
+    client = TWh5StreamerServiceClient(url, port, (namespace, TWh5StreamerNamespace))
     loop = asyncio.get_event_loop()
     try:
         loop.run_until_complete(client.run())
     except KeyboardInterrupt:
-        kacq.shutdown()
+        h5streamer.shutdown()
 
 
 if __name__=='__main__':
+    INSTRUMENT_NAME = ""
     run()

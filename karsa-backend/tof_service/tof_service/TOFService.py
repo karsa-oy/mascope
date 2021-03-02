@@ -9,7 +9,7 @@ from multiprocessing import Queue
 from queue import Empty
 
 from karsalib import BaseClientNamespace, BaseServiceClient, parse_cmd_args
-from karsatof.kgenerator import Acquisition
+from karsatof.kgenerator import Acquisition, h5Streamer
 
 
 class TOFServiceNamespace(BaseClientNamespace):
@@ -36,7 +36,7 @@ class TOFServiceNamespace(BaseClientNamespace):
 
     
 class TOFServiceClient(BaseServiceClient):
-    async def initialize_kacquisition(self, kgenerator=Acquisition):
+    async def initialize_kgenerator(self, kgenerator=Acquisition):
         """
         Initialize KAcquisition instance.
 
@@ -75,7 +75,7 @@ class TOFServiceClient(BaseServiceClient):
             except BadNamespaceError:
                 await self.sio.sleep(.1)
                 continue
-        self.acquisition = await self.initialize_kacquisition()
+        self.acquisition = await self.initialize_kgenerator()
         await self.emit_client_notification(
                                     'instrument_status',
                                     'ready',
@@ -84,6 +84,7 @@ class TOFServiceClient(BaseServiceClient):
 
     async def service_main(self):
         global INSTRUMENT_NAME
+        INSTRUMENT_NAME = None
 
         # Main loop
         while True:

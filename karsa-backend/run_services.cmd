@@ -21,6 +21,7 @@ pushd .venv || goto :error
 start cmd /k karsa-fileio-service || goto :error
 start cmd /k karsa-sample-service || goto :error
 start cmd /k karsa-dataviz-service || goto :error
+start cmd /k karsa-h5-streamer || goto :error
 ::start cmd /k karsa-signal-service || goto :error
 popd
 
