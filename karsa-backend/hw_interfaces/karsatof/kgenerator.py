@@ -43,7 +43,13 @@ from .lib.TofDaq import (
     TwStartAcquisition,
     TwStopAcquisition
     )
-from .lib.TwH5 import TwH5Desc, TwGetH5Descriptor
+from .lib.TwH5 import (
+    TwGetBufTimeFromH5,
+    TwGetH5Descriptor,
+    TwGetRegUserDataFromH5,
+    TwGetTofSpectrumFromH5,
+    TwH5Desc,
+)
 
 from .kinstrument import KInstrument
 from .kfeeder import KAccumulator
@@ -746,7 +752,7 @@ class Acquisition(Thread, KInstrument):
         return os.path.splitext(os.path.basename(h5_filepath))[0]
 
     def _update(self):
-        """Update per acquisition attributes, if updates are available.
+        """Update per acquisition attributes. If new data is available, feed into queues.
         """
         # Check for updates
         state = self._check()
@@ -758,7 +764,11 @@ class Acquisition(Thread, KInstrument):
             # New file, update attributes
             h5_filepath = self.desc.currentDataFileName.decode() # TW h5 file full path
             self.filename = self._strip_filepath(h5_filepath)
-            self.interval = (self.desc.tofPeriod * 1e-9) * self.desc.nbrWaveforms # [s]
+            tof_period_s = self.desc.tofPeriod
+            if tof_period_s > 1:
+                # Convert [ns]->[s] if needed
+                tof_period_s *= 1e-9 
+            self.interval = tof_period_s * self.desc.nbrWaveforms # [s]
             self.length = (self.desc.nbrWrites * self.desc.nbrBufs) * self.interval # [s]
             print("Acquisition started: %s" %self.filename)
             # Check again for new data
@@ -795,38 +805,40 @@ class Acquisition(Thread, KInstrument):
                     if not TwDaqActive():
                         # No active acquisition
                         # Acquisition has ended
-                        self._finalize()
+                        pass
                     else:
-                        # Acquition active, but got timed out
+                        # Acquition active, but 'TwWaitForNewData' timed out
 
                         # Here we may end up from three scenarios:
                         # 1) Acquisition active, but interval is longer than 'self.timeout'
-                        # 2) TwDaqActive not yet cleared after just finished acquisition
+                        # 2) TwDaqActive not yet cleared after recently finished acquisition
                         # 3) DAQ configured to HW trigger mode, no actual acquisition (legacy feature)
                         
-                        # All three cases should be handled by this block
                         # Wait time so far
                         tot_wait = timeout_counter * self.timeout * 1e-3 # [s]
                         # Calculate acquisition interval
                         acquisition_interval = (self.desc.tofPeriod * 1e-9) * self.desc.nbrWaveforms # [s]
                         # Check if waited long enough already
-                        if tot_wait > (acquisition_interval + 1):
-                            # Acquisition has ended
-                            self._finalize()
-                        else:
+                        wait_seconds = acquisition_interval + 1 # Wait one extra second
+                        if not tot_wait > wait_seconds:
                             # Wait some more
                             continue
+                        else:
+                            # Waited long enough, declare acquisition finished
+                            pass
                     # Clear active flag
                     self.active.clear()
+                    # Reset self
+                    self._finalize()
                     print("Acquisition finished")
             # New data
             elif ret == 4:
                 # Reset timeout counter
                 timeout_counter = 0
-                # Make sure active flag is set
-                self.active.set()
                 # Update self and feed data into queue
                 self._update()
+                # Make sure active flag is set
+                self.active.set()
                 continue
             # Unexpected return value
             else:
@@ -842,6 +854,8 @@ class Acquisition(Thread, KInstrument):
         # Close queues
         self.spec_queue.close()
         self.spec_queue.join_thread()
+        self.tps_queue.close()
+        self.tps_queue.join_thread()
 
     def start_acquisition(self):
         """Start acquisition by calling TW API
@@ -852,6 +866,249 @@ class Acquisition(Thread, KInstrument):
         """Stop acquisition by calling TW API
         """
         TwStopAcquisition()
+
+class h5Streamer(Acquisition):
+    def __init__(self):
+        """Initialize self
+
+        Inherits 'karsatof.kinstrument.KInstrument' which provides some
+        convenience methods for instrument functions.
+
+        Raises
+        ------
+        Exception
+            Exception is raised if fetching 'TwH5Desc' fails for some reason.
+        """
+        print("h5Streamer initializing")
+        Thread.__init__(self)
+
+        # Initialize with empty TW h5 descriptor
+        self.desc = TwH5Desc()
+        KInstrument.__init__(self, self.desc)
+
+        # Synchronization primitives
+        # Streamer specific
+        self.file_queue = Queue()       # Queue for files to stream
+        self.tick = Event()             # Event to control data feed
+        # Common with Acquisition
+        self.shutdown_event = Event()   # Set to break out from main loop
+        self.active = Event()           # Acquisition active event
+        self.spec_queue = Queue()       # Signal output queue
+        self.tps_queue = Queue()        # TPS output queue
+        # Per acquisition attributes
+        self.filename = None            # Filename base from TW h5 file
+        self.interval = None            # Acquisition interval [s]
+        self.length = None              # Acquisition length [s]
+        self.progress = 0               # Acquisition progress [%]
+        self.speci = -1                 # Index of last received spectrum,
+                                        # -1 when there is no active acquisition
+
+    def _get_and_feed_data(self):
+        """Read data from the h5 and put to queues
+        """
+        # Get timestamp from TW h5
+        ti = np.zeros((1,))
+        TwGetBufTimeFromH5(self.desc.currentDataFileName,
+                           ti,
+                           self.desc.iBuf,
+                           self.desc.iWrite
+                           )
+        # == Get and feed mass spectrum data ==
+        # Get most recent spectrum from TW shared memory
+        spec = np.zeros((self.desc.nbrSamples, ), dtype=np.float32)
+        ret = TwGetTofSpectrumFromH5(
+                                self.desc.currentDataFileName,
+                                spec,
+                                0,                  # Segment start index
+                                0,                  # Segment end index
+                                self.desc.iBuf,     # Buf start index
+                                self.desc.iBuf,     # Buf end index
+                                self.desc.iWrite,   # Write start index
+                                self.desc.iWrite,   # Write end index
+                                True,               # BufWrite linked
+                                True                # Normalize to
+                                )                   # [mV/ext]
+        if ret == 4: # Success
+            # Combine data for output
+            spec_data = {
+                    'filename': self.filename, # Current file basename
+                    'i': self.speci, # Current spectrum integer index
+                    't': float(ti), # Timestamp [s]
+                    'spec': spec.tobytes() # Serialized spectrum [float32]
+                    }
+            # Feed
+            self.spec_queue.put(spec_data)
+
+        # == Get and feed TPS data ==
+        # Query data size
+        nel = np.zeros((1,), dtype=int)
+        TwGetRegUserDataFromH5(
+               self.desc.currentDataFileName,
+               b'/TPS2',
+               -1,
+               -1,
+               nel,
+               None,
+               None
+               )
+        # Get TPS data from TW h5
+        data = np.zeros((nel.item(), 1),
+                        dtype=np.double
+                        )
+        ret = TwGetRegUserDataFromH5(
+               self.desc.currentDataFileName,
+               b'/TPS2',
+               self.desc.iBuf,
+               self.desc.iWrite,
+               nel,
+               data,
+               None # char buffer for info
+               )
+        if ret == 9: # Success
+            # Combine data for output
+            tps_data = {
+                'filename': self.filename,          # Current file basename
+                'i': self.speci,                    # Current spectrum integer index
+                't': float(ti),                     # Timestamp [s]
+                'data': data.astype(np.float32  # convert to float32
+                                ).reshape(-1    # reshape to (-1,)
+                                ).tobytes(      # serialize
+                                )                   # Serialized TPS data [float32]
+                }
+            # Feed
+            self.tps_queue.put(tps_data)
+
+    def _get_tps_info(self):
+        """Get TPS parameter descriptions from TW h5
+
+        Returns
+        -------
+        list of str
+            List of TPS parameter names
+        """
+        info = []
+        # Query TPS data size
+        buf_size = np.zeros((1, 1), dtype=int)
+        TwGetRegUserDataFromH5(
+                    self.desc.currentDataFileName,
+                    b'TPS2',
+                    -1,
+                    -1,
+                    buf_size,
+                    None,
+                    None
+                    )
+        # Calculate numver of TPS parameters
+        nel = int( buf_size.item() / (self.desc.nbrBufs*self.desc.nbrWrites) )
+        # Parameter description buffer
+        infobuf = create_string_buffer(b'', 256 * nel)
+        # Get TPS data from TW h5
+        data = np.zeros((1, 1, nel),
+                        dtype=np.double
+                        )
+
+        TwGetRegUserDataFromH5(
+                    self.desc.currentDataFileName,
+                    b'TPS2',
+                    0,
+                    0,
+                    buf_size,
+                    data,   # data not used, but needs to be there
+                    infobuf
+                    )
+        # Parameter descriptions retrieved succesfully
+        # Convert char array to bytes array
+        info = np.asarray(infobuf).view('S256').ravel()
+        info = info.tolist() # Array to list
+        info = [ i.decode('unicode_escape') for i in info ] # bytes to str
+        return info
+
+    def _wait_for_tick(self):
+        """Wait for tick event to be set before continuing streaming
+
+        Returns
+        -------
+        bool
+            True if ticked, False if shutdown
+        """
+        while not self.shutdown_event.is_set():
+            if self.tick.wait(.1):
+                # Tick
+                return True
+        # Shutdown
+        return False
+
+    def run(self):
+        """Main loop
+
+        Poll TW API for new data at interval set by 'self.timeout'. 
+        Loop until 'self.shutdown_event' is set.
+        """
+
+        print("h5Streamer running")
+        # Main loop
+        while not self.shutdown_event.is_set():
+            try:
+                file_to_stream = self.file_queue.get(timeout=.1)
+
+                ret = TwGetH5Descriptor(file_to_stream.encode(), self.desc)
+                self.desc.currentDataFileName = file_to_stream.encode()
+                self.desc.iBuf = 0
+                self.desc.iWrite = 0
+            except Empty:
+                continue
+            # Start streaming
+            # Update self and feed data into queue
+            self._update()
+            # Set active flag 
+            self.active.set()
+            # Loop through the file and feed to queues
+            # Loop through all 'writes'
+            for iwrite in range(self.desc.nbrWrites):
+                # Check for shutdown flag
+                if self.shutdown_event.is_set():
+                    break
+                # Increment write index
+                self.desc.iWrite = iwrite
+                # Loop through all 'bufs' per 'write'
+                for ibuf in range(self.desc.nbrBufs):
+                    # Increment buf index
+                    self.desc.iBuf = ibuf
+                    # Update self and feed data into queue
+                    self._update()
+                    # Wait for client to tick
+                    self.tick.clear()
+                    if self._wait_for_tick():
+                        # Ticked
+                        continue
+                    else:
+                        # Shutdown
+                        break
+            # Out of stream loop
+            self.active.clear()
+            self._finalize()
+            print("h5Stream finished")
+        # Out of main loop
+        print('h5Streamer exiting')
+        self.shutdown()
+
+    def start_stream(self, filename):
+        if os.path.isfile(filename):
+            self.file_queue.put(filename)
+        else:
+            raise ValueError("File does not exist: %s" %filename)
+
+    def stop_stream(self):
+        """Stop stream before complete
+
+        TODO: To be implemented
+        """
+        raise NotImplementedError
+
+    def tick(self):
+        """Shortcut for setting the 'tick' event
+        """
+        self.tick.set()
 
 
 class KStreamer(Thread, KInstrument):

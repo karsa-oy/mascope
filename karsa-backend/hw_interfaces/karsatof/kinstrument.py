@@ -60,11 +60,11 @@ class KInstrument():
         """
 
         self.desc = descriptor
-        if self.desc.tofPeriod < 1:
-            # Convert tofPeriod to nanoseconds if not already
-            self.desc.tofPeriod *= 1e9
 
-        self.time_res = self.desc.nbrWaveforms * self.desc.tofPeriod * 1e-9  # s
+        # if self.desc.tofPeriod < 1:
+        #     # Convert tofPeriod to nanoseconds if not already
+        #     self.desc.tofPeriod *= 1e9
+        # self.time_res = self.desc.nbrWaveforms * self.desc.tofPeriod * 1e-9  # s
         
         self.mz_par = self.desc.p
         self.mz_mode = self.desc.massCalibMode

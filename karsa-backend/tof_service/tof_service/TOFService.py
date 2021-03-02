@@ -110,11 +110,10 @@ class TOFServiceClient(BaseServiceClient):
 
             filename_base = self.acquisition.filename
             filename = filename_base
-            # filename = os.path.join(INSTRUMENT_NAME, filename_base)
 
             await self.emit_client_notification(
                                         'acquisition_started',
-                                        {'filename': filename_base,
+                                        {'filename': filename,
                                          },
                                         room=INSTRUMENT_NAME,
                                         cookies=cookies,
