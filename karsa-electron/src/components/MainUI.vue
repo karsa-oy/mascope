@@ -381,7 +381,7 @@ export default {
         // },
         url: function(new_url) {
             // Connect to new url
-            if (this.socket_is_connected) {
+            if (this.socket && this.socket.connected) {
                 this.socket.disconnect();
             }
             this.connect_socket();
