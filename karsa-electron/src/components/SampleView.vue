@@ -944,6 +944,7 @@ export default {
             this.reset_view();
 
             if ( !_.isEmpty(new_value.id) ) {
+                this.be.unsubscribe();
                 this.room = this.socket.id + '_' + this.id;
                 this.be.subscribe(this.room);
             }

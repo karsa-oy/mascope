@@ -573,6 +573,7 @@ export default {
             this.sample_experiment = new_value.id;
 
             if ( !_.isEmpty(new_value.id) ) {
+                this.be.unsubscribe();
                 this.room = this.id;
                 this.be.subscribe(this.room);
             }
