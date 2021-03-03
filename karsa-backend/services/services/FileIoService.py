@@ -27,7 +27,7 @@ from copy import deepcopy
 from karsalib import BaseClientNamespace, BaseServiceClient, \
                      parse_cmd_args, get_client_notification_args
 from karsatof.kcollector import ExtendableDataArray
-from karsatof.kdatapool import DataPool
+from karsatof.kdatapool import DataPool, parse_datetime_from_filename
 from karsatof.kimage import (convert_base64_to_img, convert_to_base64)
 
 
@@ -595,7 +595,12 @@ class FileIoNamespace(BaseClientNamespace):
 # ========= File I/O functions =========
 def base_to_zarr_filename(base_filename, variable):
     global data_path
-    filepath = os.path.join(data_path, base_filename)
+    file_datetime = parse_datetime_from_filename(base_filename)
+    date_dir = '%.4d.%.2d.%.2d' %(file_datetime.year,
+                                  file_datetime.month,
+                                  file_datetime.day
+                                  )
+    filepath = os.path.join(data_path, data_dir, base_filename)
     zarr_filename = variable + os.extsep + 'zarr'
     return os.path.join(filepath, zarr_filename)
 

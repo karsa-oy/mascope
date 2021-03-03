@@ -16,6 +16,7 @@ import xarray
 import numpy as np
 import pandas as pd
 
+import datetime_glob
 from datetime import datetime, timedelta
 from time import sleep
 from threading import Thread
@@ -25,7 +26,9 @@ from multiprocessing import Lock
 
 from .kevent import KEvent
 
-
+def parse_datetime_from_filename(filename, pattern='*%Y.%m.%d*%Hh%Mm%Ss*'):
+    matcher = datetime_glob.Matcher(pattern=pattern)
+    return matcher.match(filename).as_datetime()
 
 class H5Pool():
     def __init__(self, data_path):
