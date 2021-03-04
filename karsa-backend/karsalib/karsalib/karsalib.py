@@ -7,7 +7,7 @@ import random
 from socketio import AsyncClientNamespace, AsyncNamespace, AsyncClient
 
 NO_LOGGING_DEFAULT = False
-NO_DATA_LOGGING_DEFAULT = True
+NO_DATA_LOGGING_DEFAULT = False
 
 
 def copy_dict(d, ignore_keys=[]):
@@ -107,7 +107,7 @@ class BaseClientNamespace(AsyncClientNamespace):
         elif no_data_logging:
             self.log(f"{name}: ...")
         else:
-            self.log(f"{name}: {value}")
+            self.log(f"{name}: {value} > {kwarg.get('room', name)}")
         await self.emit('client_notification', {'name': name, 'value': value, **kwarg})
         if name in self.service_state:
             self.service_state[name] = value
