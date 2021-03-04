@@ -40,12 +40,12 @@
                                     required
                                     expanded
                                     disabled>
-                                    <option
+                                    <!-- <option
                                         v-for="p in projects"
                                         :value="p.id"
                                         :key="p.id">
                                         {{ p.id }}
-                                    </option>
+                                    </option> -->
                                 </b-select>
                             </b-field>
 
@@ -56,12 +56,12 @@
                                     required
                                     expanded
                                     disabled>
-                                    <option
+                                    <!-- <option
                                         v-for="e in experiments_ui"
                                         :value="e.id"
                                         :key="e.id">
                                         {{ e.id }}
-                                    </option>
+                                    </option> -->
                                 </b-select>
                             </b-field>
 
@@ -327,18 +327,17 @@ export default {
     components: {
     },
     props: {
-        id: String,
     },
     computed: {
         ...mapState([
             'acquisition_control_active',
-            'acquisition_status',
-            'experiments',
+            // 'acquisition_status',
+            // 'experiments',
             'experiment_selected',
             // 'h5_samples',
             // 'h5_streamer_status',
             // 'importable_samples',
-            'projects',
+            // 'projects',
             'project_selected',
             // 'samples',
             'socket',
@@ -427,9 +426,9 @@ export default {
             sample_attributes: {},
             room: null,
             endpoints: [
-                'acquisition_started',
-                'h5_samples',
-                'h5_streamer_status',
+                // 'acquisition_started',
+                // 'h5_samples',
+                // 'h5_streamer_status',
                 'importable_samples',
                 'samples',
                 // 'sample_attributes',
@@ -572,11 +571,9 @@ export default {
             this.sample_project = this.project_selected.id;
             this.sample_experiment = new_value.id;
 
-            if ( !_.isEmpty(new_value.id) ) {
-                this.be.unsubscribe();
-                this.room = this.id;
-                this.be.subscribe(this.room);
-            }
+            this.be.unsubscribe();
+            this.room = this.project_selected.id + '_' + new_value.id;
+            this.be.subscribe(this.room);
         },
         experiments: function(new_value) {
             if (!_.isEqual(new_value.project, this.project_selected.id)) {
@@ -624,6 +621,8 @@ export default {
                 return false;
             }
             this.sample_project = new_value.id;
+            
+            this.be.unsubscribe();
         },
         samples: function(new_data){
             // TODO: quick&dirty fix to close sample attribute popup in acquisition mode
@@ -641,13 +640,6 @@ export default {
                     this.is_sample_attribute_modal_active = false;
                 }
             }
-            // TODO: quick&dirty fix to drop undesired sample update
-            if ( !_.isEqual(new_data.project, this.project_selected.id) ||
-                 !_.isEqual(new_data.experiment, this.experiment_selected.id) ) {
-                     this.be.log("samples update ignored");
-                return
-            }
-            //
             this.sample_table_cols = new_data.cols;
             this.sample_table_rows = new_data.rows;
         },
@@ -697,9 +689,9 @@ export default {
             if ( new_value === true )
             {
                 // handlers for for external notifications:
-                this.socket.on('acquisition_started', (value) => this.be.import_one_way_binding_prop('acquisition_started', value.value));
-                this.socket.on("h5_samples", (value) => this.be.import_one_way_binding_prop("h5_samples", value.value));
-                this.socket.on("h5_streamer_status", (value) => this.be.import_one_way_binding_prop("h5_streamer_status", value.value));
+                // this.socket.on('acquisition_started', (value) => this.be.import_one_way_binding_prop('acquisition_started', value.value));
+                // this.socket.on("h5_samples", (value) => this.be.import_one_way_binding_prop("h5_samples", value.value));
+                // this.socket.on("h5_streamer_status", (value) => this.be.import_one_way_binding_prop("h5_streamer_status", value.value));
                 this.socket.on("importable_samples", (value) => this.be.import_one_way_binding_prop("importable_samples", value.value));
                 this.socket.on("samples", (value) => this.be.import_one_way_binding_prop("samples", value.value));
             }

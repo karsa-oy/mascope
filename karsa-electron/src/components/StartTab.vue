@@ -627,6 +627,10 @@ export default {
             return this.be.export_one_way_binding_prop('experiment_selected', new_value, old_value);
         },
         project_selected: function(new_value, old_value) {
+            this.be.unsubscribe();
+            this.room = new_value.id;
+            this.be.subscribe(this.room);
+
             return this.be.export_one_way_binding_prop('project_selected', new_value, old_value);
         },
         socket_connected: function(new_value, old_value) {

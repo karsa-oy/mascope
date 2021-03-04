@@ -945,8 +945,8 @@ export default {
 
             if ( !_.isEmpty(new_value.id) ) {
                 this.be.unsubscribe();
-                this.room = this.socket.id + '_' + this.id;
-                this.be.subscribe(this.room);
+                // this.room = this.socket.id + '_' + this.id;
+                // this.be.subscribe(this.room);
             }
         },
         figure_ranges: function(new_value, old_value) {

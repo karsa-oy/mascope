@@ -27,14 +27,14 @@
                     <!-- Left column -->
                     <div class="column is-one-quarter" style="padding-left:2rem">
                         <TOFControl></TOFControl>
-                        <SampleBrowser  v-bind:id="this.project_selected.id + '_' + this.experiment_selected.id">
+                        <SampleBrowser>
                         </SampleBrowser>
                         <TargetBrowser></TargetBrowser>
                     </div>
                     <!-- End of left column -->
                     <!-- Right side content -->
                     <div class="column is-three-quarters" style="padding-right:2rem">
-                        <SampleView  v-bind:id="this.project_selected.id + '_' + this.experiment_selected.id">
+                        <SampleView>
                         </SampleView>
                     </div>
                     <!-- End of Right side content -->

@@ -17,7 +17,11 @@ export class BECom {
                           'endpoints': this.ctx.endpoints,
                           'room': the_room});
         this.log(the_room, 'subscribed for', this.ctx.endpoints);
-        this.ctx.socket.emit('client_notification', {'name': 'service_state', 'value': {}, 'room': the_room});
+        this.ctx.socket.emit('client_notification',
+                             {'name': 'service_state',
+                              'value': {},
+                              'room': the_room
+                              });
     }
     
     unsubscribe(room=null) {
