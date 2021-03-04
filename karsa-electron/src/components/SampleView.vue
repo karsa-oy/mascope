@@ -943,11 +943,11 @@ export default {
         experiment_selected: function(new_value) {  // eslint-disable-line no-unused-vars
             this.reset_view();
 
-            // if ( !_.isEmpty(new_value.id) ) {
-            //     this.be.unsubscribe();
-            //     this.room = this.socket.id + '_' + this.id;
-            //     this.be.subscribe(this.room);
-            // }
+            if ( !_.isEmpty(new_value.id) ) {
+                this.be.unsubscribe();
+                this.room = this.socket.id;
+                this.be.subscribe(this.room);
+            }
         },
         figure_ranges: function(new_value, old_value) {
             // // TODO: quick&dirty fix to dismiss acquisition notifications
@@ -1058,8 +1058,8 @@ export default {
                 this.socket.on("timeseries_figure_data", (value) => this.be.import_one_way_binding_prop("timeseries_figure_data", value.value));
                 this.socket.on("tps_parameters", (value) => this.be.import_one_way_binding_prop("tps_parameters", value.value));
 
-                this.room = this.socket.id;
-                this.be.subscribe(this.room);
+                // this.room = this.socket.id;
+                // this.be.subscribe(this.room);
             }
         },
     },

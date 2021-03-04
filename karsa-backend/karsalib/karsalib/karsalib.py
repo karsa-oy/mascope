@@ -7,7 +7,7 @@ import random
 from socketio import AsyncClientNamespace, AsyncNamespace, AsyncClient
 
 NO_LOGGING_DEFAULT = False
-NO_DATA_LOGGING_DEFAULT = False
+NO_DATA_LOGGING_DEFAULT = True
 
 
 def copy_dict(d, ignore_keys=[]):
