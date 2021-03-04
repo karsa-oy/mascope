@@ -136,7 +136,8 @@ class BaseServerNamespace(AsyncNamespace):
         # remove the client rooms from all subscriptions
         for s in list(self.subscriptions):
             for r in self.client_rooms[sid]:
-                self.subscriptions[s].remove(r)
+                if r in self.subscriptions[s]:
+                    self.subscriptions[s].remove(r)
             if not self.subscriptions[s]:
                 del self.subscriptions[s]
         del self.client_rooms[sid]
