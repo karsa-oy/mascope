@@ -596,6 +596,7 @@ export default {
                 this.socket.on("sample_length", (value) => this.be.import_two_way_binding_prop("sample_length", value.value));
 
                 // dynamic subscription thru AcquisitionControl dialog
+                this.be.subscribe(this.socket.id);
             }
         },
     }

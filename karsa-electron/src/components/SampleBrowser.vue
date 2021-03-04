@@ -571,9 +571,12 @@ export default {
             this.sample_project = this.project_selected.id;
             this.sample_experiment = new_value.id;
 
-            this.be.unsubscribe();
-            this.room = this.project_selected.id + '_' + new_value.id;
-            this.be.subscribe(this.room);
+            if ( !_.isEmpty(new_value.id) ) {
+                this.be.unsubscribe();
+                this.room = this.project_selected.id + '_' + new_value.id;
+                this.be.subscribe(this.room);
+                return this.be.export_one_way_binding_prop('experiment_selected', new_value, old_value);
+            }
         },
         experiments: function(new_value) {
             if (!_.isEqual(new_value.project, this.project_selected.id)) {
@@ -694,6 +697,8 @@ export default {
                 // this.socket.on("h5_streamer_status", (value) => this.be.import_one_way_binding_prop("h5_streamer_status", value.value));
                 this.socket.on("importable_samples", (value) => this.be.import_one_way_binding_prop("importable_samples", value.value));
                 this.socket.on("samples", (value) => this.be.import_one_way_binding_prop("samples", value.value));
+
+                this.be.subscribe(this.socket.id);
             }
         },
     }

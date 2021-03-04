@@ -642,7 +642,7 @@ export default {
                 this.socket.on("projects", (value) => this.be.import_two_way_binding_prop("projects", value.value));
                 this.socket.on('experiments', (value) => this.be.import_two_way_binding_prop('experiments', value.value));
 
-                this.be.subscribe();    //TODO: ?? subscribe from within experiment_selected?
+                this.be.subscribe(this.socket.id);
             }
         },
         'instrument.polarity': function(polarity) {

@@ -25,7 +25,7 @@ export class BECom {
     }
     
     unsubscribe(room=null) {
-        let the_room = room || this.ctx.room || this.ctx.socket.id;
+        let the_room = room || this.ctx.room;
         this.ctx.socket.emit('unsubscribe',
                          {'app_name': this.ctx.$options.name,
                           'endpoints':this.ctx.endpoints,

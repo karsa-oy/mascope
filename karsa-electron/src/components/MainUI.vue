@@ -27,15 +27,13 @@
                     <!-- Left column -->
                     <div class="column is-one-quarter" style="padding-left:2rem">
                         <TOFControl></TOFControl>
-                        <SampleBrowser>
-                        </SampleBrowser>
+                        <SampleBrowser></SampleBrowser>
                         <TargetBrowser></TargetBrowser>
                     </div>
                     <!-- End of left column -->
                     <!-- Right side content -->
                     <div class="column is-three-quarters" style="padding-right:2rem">
-                        <SampleView>
-                        </SampleView>
+                        <SampleView></SampleView>
                     </div>
                     <!-- End of Right side content -->
                 </div>

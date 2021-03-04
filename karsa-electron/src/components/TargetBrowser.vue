@@ -304,7 +304,7 @@ export default {
             {
                 // handlers for for external notifications:
                 this.socket.on("targets", (value) => this.be.import_one_way_binding_prop("targets", value.value));
-                this.be.subscribe();
+                this.be.subscribe(this.socket.id);
             }
         },
     }
