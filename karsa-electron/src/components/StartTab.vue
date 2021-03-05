@@ -618,9 +618,6 @@ export default {
     },
     watch: {
         experiments: function(new_value) {
-            if (!_.isEqual(new_value.project, this.project_selected.id)) {
-                return false;
-            }
             this.experiments_ui = new_value.experiments;
         },
         experiment_selected: function(new_value, old_value) {
