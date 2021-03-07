@@ -158,7 +158,7 @@ export default {
             zoom_stack: [],
             visualize_range: {},
             stop_visualize_range: {},
-            room: null,
+            socket_room: null,
             endpoints: [
                 'figure_ranges',
                 'heatmap_figure_data',
@@ -171,22 +171,6 @@ export default {
 
     created: function(){
         this.be = new BECom(this);
-
-// //==============================
-//         get_parent_context(this);
-//         var self = this;
-//         self.socket.on("connect", () => {
-//             self.socket.on("figure_ranges", (value) => import_one_way_binding_prop("figure_ranges", {...value.value, 'uid': Math.random()}));
-//             self.socket.on("heatmap_figure_data", (value) => import_one_way_binding_prop("heatmap_figure_data", value.value));
-//             self.socket.on("spec_stack_figure_data", (value) => import_one_way_binding_prop("spec_stack_figure_data", value.value));
-//             self.socket.on("timeseries_figure_data", (value) => import_one_way_binding_prop("timeseries_figure_data", value.value));
-//             self.socket.on("tps_parameters", (value) => import_one_way_binding_prop("tps_parameters", value.value));
-
-//             subscribe();
-//         });
-// // =============================
-
-
 },
 
     mounted: function() {
@@ -940,14 +924,8 @@ export default {
                 this.reset_view();
             }
         },
-        experiment_selected: function(new_value) {  // eslint-disable-line no-unused-vars
+        experiment_selected: function(new_value, old_value) {  // eslint-disable-line no-unused-vars
             this.reset_view();
-
-            if ( !_.isEmpty(new_value.id) ) {
-                this.be.unsubscribe();
-                this.room = this.socket.id;
-                this.be.subscribe(this.room);
-            }
         },
         figure_ranges: function(new_value, old_value) {
             // // TODO: quick&dirty fix to dismiss acquisition notifications
@@ -1037,16 +1015,22 @@ export default {
             }
         },
         stop_visualize_range: function(new_value, old_value) {
-            return this.be.export_one_way_binding_prop('stop_visualize_range', {...new_value, 'uid': Math.random()}, old_value);
+            return this.be.export_one_way_binding_prop('stop_visualize_range',
+                                                        {...new_value, 'uid': Math.random()}, old_value,
+                                                        this.socket_room);
         },
         visualize_range: function(new_value, old_value) {
-            return this.be.export_one_way_binding_prop('visualize_range', {...new_value, 'uid': Math.random()}, old_value);
+            return this.be.export_one_way_binding_prop('visualize_range',
+                                                        {...new_value, 'uid': Math.random()}, old_value,
+                                                        this.socket_room);
         },
         tps_parameters_selected_ui: function(value) {
             this.tps_parameters_selected = {'tps_parameters_selected': value, 'figure_ranges': this.figure_ranges};
         },
         tps_parameters_selected: function(new_value, old_value) {
-            return this.be.export_one_way_binding_prop('tps_parameters_selected', new_value, old_value);
+            return this.be.export_one_way_binding_prop('tps_parameters_selected',
+                                                        new_value, old_value,
+                                                        this.socket_room);
         },
         socket_connected: function(new_value) {
             if ( new_value === true )
@@ -1058,8 +1042,8 @@ export default {
                 this.socket.on("timeseries_figure_data", (value) => this.be.import_one_way_binding_prop("timeseries_figure_data", value.value));
                 this.socket.on("tps_parameters", (value) => this.be.import_one_way_binding_prop("tps_parameters", value.value));
 
-                // this.room = this.socket.id;
-                // this.be.subscribe(this.room);
+                this.socket_room = this.socket.id;
+                this.be.subscribe(this.socket_room);
             }
         },
     },

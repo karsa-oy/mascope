@@ -71,6 +71,7 @@ export default {
         return {
             dotenv: {},
             be: null,
+            socket_room: null,
             // endpoints - list of notifications the MainUI wants to receive
             endpoints: [
                 // 'acquisition_status',
@@ -283,11 +284,10 @@ export default {
             var self = this;
             self.socket = io.connect(self.url);
             self.socket.on("connect", () => {
-                self.room = self.socket.id;
                 self.socket_connected = true;
                 // handlers for for external notifications (endpoint imports), if any:
-
-                this.be.subscribe();
+                this.socket_room = self.socket.id;
+                this.be.subscribe(this.socket_room);
 
                 // self.socket.emit('subscribe',
                 //                 {'app_name': self.$options.name,

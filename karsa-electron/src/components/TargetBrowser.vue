@@ -166,6 +166,8 @@ export default {
             target_table_rows: [],
             target_table_cols: [],
             target_table_selected_row: {},
+            //
+            socket_room: null,
             endpoints: [
                 'targets',
             ]
@@ -173,18 +175,6 @@ export default {
     },
     created: function() {
         this.be = new BECom(this);
-
-// //==============================
-//         get_parent_context(this);
-//         var self = this;
-//         self.socket.on("connect", () => {
-//             // handlers for for external notifications:
-//             self.socket.on("targets", (value) => import_one_way_binding_prop("targets", value.value));
-
-//             subscribe();
-//         });
-// // =============================
-
     },
     mounted: function() {
         this.ReadTargetsFromFile();
@@ -297,14 +287,17 @@ export default {
             this.target_table_rows = new_data.rows;
         },
         target_to_display: function(new_value, old_value) {
-            return this.be.export_one_way_binding_prop('target_to_display', new_value, old_value);
+            return this.be.export_one_way_binding_prop('target_to_display',
+                                                        new_value, old_value,
+                                                        this.socket_room);
         },
         socket_connected: function(new_value) {
             if ( new_value === true )
             {
                 // handlers for for external notifications:
                 this.socket.on("targets", (value) => this.be.import_one_way_binding_prop("targets", value.value));
-                this.be.subscribe(this.socket.id);
+                this.socket_room = this.socket.id;
+                this.be.subscribe(this.socket_room);
             }
         },
     }

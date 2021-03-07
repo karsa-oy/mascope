@@ -361,7 +361,8 @@ export default {
             // flag to separate if data was changed by user or by loading
             // config file in the 
             data_updated_from_loading: true,
-            room: 'TOF',    //TODO: room comes from instrument selection
+            socket_room: null,
+            instrument_room: 'TOF',    //TODO: room comes from instrument selection
             sample_length: 120,
             endpoints: [
                 'acquisition_status',
@@ -380,22 +381,6 @@ export default {
     },
     created: function() {
         this.be = new BECom(this);
-
-// //==============================
-//         get_parent_context(this);
-//         var self = this;
-//         self.socket.on("connect", () => {
-//             // handlers for for external notifications:
-//             self.socket.on("acquisition_status", (value) => import_two_way_binding_prop("acquisition_status", value.value));
-//             self.socket.on("acquisition_progress", (value) => import_one_way_binding_prop("acquisition_progress", value.value.progress, true));
-//             self.socket.on("instrument_status", (value) => import_one_way_binding_prop("instrument_status", value.value));
-//             self.socket.on("sample_length", (value) => import_two_way_binding_prop("sample_length", value.value));
-
-//             // dynamic subscription thru AcquisitionControl dialog
-//         });
-// // =============================
-
-
     },
     mounted: function() {
     },
@@ -411,7 +396,7 @@ export default {
                 onCancel: () => this.acquisition_control_active = false,
                 onConfirm: () => { this.$buefy.toast.open({message: 'Instrument control granted',
                                                           type: 'is-success'});
-                                   this.be.subscribe(); }
+                                   this.be.subscribe(this.instrument_room); }
             })
         },
         delete_row_in_config_desorption_table() {
@@ -536,7 +521,7 @@ export default {
                 this.confirmAcquisitionControl();
             }
             else {
-                this.be.unsubscribe();
+                this.be.unsubscribe(this.instrument_room);
             }
         },
         acquisition_mode: function(new_value, old_value) {
@@ -572,7 +557,10 @@ export default {
                 this.acquisition_button_type = "is-primary";
                 this.scenthound_status = 'Ready';
             }
-            return this.be.export_two_way_binding_prop('acquisition_status', new_value, old_value, true);
+            return this.be.export_two_way_binding_prop('acquisition_status',
+                                                        new_value, old_value,
+                                                        this.instrument_room,
+                                                        true);
         },
         instrument_status: function(new_value, old_value) {
             if ( _.isEqual(new_value, old_value) ) {
@@ -596,7 +584,8 @@ export default {
                 this.socket.on("sample_length", (value) => this.be.import_two_way_binding_prop("sample_length", value.value));
 
                 // dynamic subscription thru AcquisitionControl dialog
-                this.be.subscribe(this.socket.id);
+                this.socket_room = this.socket.id;
+                this.be.subscribe(this.socket_room);
             }
         },
     }

@@ -331,7 +331,7 @@ export default {
     computed: {
         ...mapState([
             'acquisition_control_active',
-            // 'acquisition_status',
+            'acquisition_status',
             // 'experiments',
             'experiment_selected',
             // 'h5_samples',
@@ -424,7 +424,8 @@ export default {
             sample_table_cols: [],
             sample_table_checked_rows: [],
             sample_attributes: {},
-            room: null,
+            socket_room: null,
+            experiment_room: null,
             endpoints: [
                 // 'acquisition_started',
                 // 'h5_samples',
@@ -572,10 +573,13 @@ export default {
             this.sample_experiment = new_value.id;
 
             if ( !_.isEmpty(new_value.id) ) {
-                this.be.unsubscribe();
-                this.room = this.project_selected.id + '_' + new_value.id;
-                this.be.subscribe(this.room);
-                return this.be.export_one_way_binding_prop('experiment_selected', new_value, old_value);
+                if ( !_.isEmpty(this.experiment_room) )
+                    this.be.unsubscribe(this.experiment_room);
+                this.experiment_room = this.project_selected.id + '_' + new_value.id;
+                this.be.subscribe(this.experiment_room);
+                return this.be.export_one_way_binding_prop('experiment_selected',
+                                                           new_value, old_value,
+                                                           this.experiment_room);
             }
         },
         experiments: function(new_value) {
@@ -624,8 +628,7 @@ export default {
                 return false;
             }
             this.sample_project = new_value.id;
-            
-            this.be.unsubscribe();
+            // this.be.unsubscribe();
         },
         samples: function(new_data){
             // TODO: quick&dirty fix to close sample attribute popup in acquisition mode
@@ -677,16 +680,24 @@ export default {
             }
         },
         h5_to_import: function(new_value, old_value) {
-            return this.be.export_one_way_binding_prop('h5_to_import', new_value, old_value);
+            return this.be.export_one_way_binding_prop('h5_to_import',
+                                                        new_value, old_value,
+                                                        this.experiment_room);
         },
         import_h5_table_datetime_range: function(new_value, old_value) {
-            return this.be.export_one_way_binding_prop('import_h5_table_datetime_range', new_value, old_value);
+            return this.be.export_one_way_binding_prop('import_h5_table_datetime_range',
+                                                        new_value, old_value,
+                                                        this.experiment_room);
         },
         import_sample_table_datetime_range: function(new_value, old_value) {
-            return this.be.export_one_way_binding_prop('import_sample_table_datetime_range', new_value, old_value);
+            return this.be.export_one_way_binding_prop('import_sample_table_datetime_range',
+                                                        new_value, old_value,
+                                                        this.experiment_room);
         },
         sample_attributes: function(new_value, old_value) {
-            return this.be.export_one_way_binding_prop('sample_attributes', new_value, old_value);
+            return this.be.export_one_way_binding_prop('sample_attributes',
+                                                        new_value, old_value,
+                                                        this.experiment_room);
         },
         socket_connected: function(new_value) {
             if ( new_value === true )
@@ -698,7 +709,8 @@ export default {
                 this.socket.on("importable_samples", (value) => this.be.import_one_way_binding_prop("importable_samples", value.value));
                 this.socket.on("samples", (value) => this.be.import_one_way_binding_prop("samples", value.value));
 
-                this.be.subscribe(this.socket.id);
+                this.socket_room = this.socket.id;
+                this.be.subscribe(this.socket_room);
             }
         },
     }

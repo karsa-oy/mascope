@@ -444,7 +444,9 @@ export default {
             inlets: inlets,
             mspecs: mspecs,
             reagents: all_reagents,
-            room: null,
+            socket_room: null,
+            all_projects_room: 'all_projects',
+            project_room: null,
             endpoints: [
                 'projects',
                 'experiments',
@@ -511,19 +513,6 @@ export default {
         // Initialize project_selected
         this.project_selected = {'id': ""};
         this.be = new BECom(this);
-
-// //==============================
-//         get_parent_context(this);
-//         var self = this;
-//         self.socket.on("connect", () => {
-//             self.room = this.socket.id;
-//             self.socket.on("projects", (value) => import_two_way_binding_prop("projects", value.value));
-//             self.socket.on('experiments', (value) => import_two_way_binding_prop('experiments', value.value));
-
-//             subscribe();    //TODO: ?? subscribe from within experiment_selected?
-//         });
-// // =============================
-
     },
     methods: {
         isValidFilename(str) {
@@ -614,6 +603,11 @@ export default {
                                         };
             this.is_modal_new_experiment_active = false;
             this.active_tab = 2;
+
+            // let corresponding project room to be updated for the new experiment
+            this.be.emit_client_notification('project_selected',
+                                             {id: this.project.title},
+                                             this.project_room)
         },
     },
     watch: {
@@ -621,25 +615,36 @@ export default {
             this.experiments_ui = new_value.experiments;
         },
         experiment_selected: function(new_value, old_value) {
-            return this.be.export_one_way_binding_prop('experiment_selected', new_value, old_value);
+            return this.be.export_one_way_binding_prop('experiment_selected',
+                                                        new_value, old_value,
+                                                        this.project_room );
         },
         project_selected: function(new_value, old_value) {
-            this.be.unsubscribe();
-            this.room = new_value.id;
-            this.be.subscribe(this.room);
-
-            return this.be.export_one_way_binding_prop('project_selected', new_value, old_value);
+            if ( !_.isEmpty(new_value.id) ) {
+                if ( !_.isEmpty(this.project_room) )
+                    this.be.unsubscribe(this.project_room);
+                this.project_room = new_value.id;
+                this.be.subscribe(this.project_room);
+                // push new_value of project_selected to corresponding room
+                this.be.export_one_way_binding_prop('project_selected',
+                                                    new_value, old_value,
+                                                    this.project_room);
+                // make all clients in 'all_projects' room see the new project
+                this.be.emit_client_notification('service_state', {},
+                                                 'all_projects');
+            }
         },
         socket_connected: function(new_value, old_value) {
             if ( new_value === old_value )
                 return false;
             if ( new_value === true )
             {
-                this.room = this.socket.id;
                 this.socket.on("projects", (value) => this.be.import_two_way_binding_prop("projects", value.value));
                 this.socket.on('experiments', (value) => this.be.import_two_way_binding_prop('experiments', value.value));
 
-                this.be.subscribe(this.socket.id);
+                this.socket_room = this.socket.id;
+                this.be.subscribe(this.socket_room);
+                this.be.subscribe(this.all_projects_room);
             }
         },
         'instrument.polarity': function(polarity) {
