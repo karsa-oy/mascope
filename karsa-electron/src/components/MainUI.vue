@@ -26,6 +26,24 @@
                 <div class="columns">
                     <!-- Left column -->
                     <div class="column is-one-quarter" style="padding-left:2rem">
+
+                        <!-- Namespace selector -->
+                        <div style="text-align:center;
+                                    margin-top:.4rem;
+                                    margin-bottom:1rem;">
+                            <b-field label="Data source">
+                                <b-select placeholder="Select" expanded>
+                                    <option
+                                        v-for="source in data_sources"
+                                        :value="source"
+                                        :key="source">
+                                        {{ source }}
+                                    </option>
+                                </b-select>
+                            </b-field>
+                        </div>
+                        <!-- End of namespace selector -->
+
                         <TOFControl></TOFControl>
                         <SampleBrowser></SampleBrowser>
                         <TargetBrowser></TargetBrowser>
@@ -93,6 +111,7 @@ export default {
                 // 'timeseries_figure_data',
                 // 'tps_parameters',
             ],
+            data_sources: ["TOF1", "TOF2", "H5", "RAW"], // TODO: Request list of available namespaces
         };
     },
     computed: {
