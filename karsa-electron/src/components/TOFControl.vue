@@ -361,6 +361,7 @@ export default {
             // flag to separate if data was changed by user or by loading
             // config file in the 
             data_updated_from_loading: true,
+            // Communication
             socket_room: null,
             instrument_room: 'TOF',    //TODO: room comes from instrument selection
             sample_length: 120,
@@ -369,13 +370,6 @@ export default {
                 'acquisition_progress',
                 'instrument_status',
                 'sample_length',
-                // TODO: remove lower 4 endpoints after 
-                // acq. data stream goes to FileService
-                'figure_ranges',
-                'heatmap_figure_data',
-                'spec_stack_figure_data',
-                'timeseries_figure_data',
-                // ============================
             ],
         }
     },
