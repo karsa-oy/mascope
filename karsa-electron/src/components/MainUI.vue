@@ -12,17 +12,11 @@
                 label="">
                 <ConfigVue></ConfigVue>
             </b-tab-item>
-            <!-- Start tab -->
-            <b-tab-item
-                icon=""
-                label="Start">
-                <StartTab></StartTab>
-            </b-tab-item>
             <!-- Experiment tab -->
             <b-tab-item
                 icon=""
-                :label="this.project_selected.id + '/' + this.experiment_selected.id"
-                :visible="this.experiment_selected.id !== ''">
+                :label="this.project_selected.id + '/' + this.experiment_selected.id">
+                <!-- :visible="this.experiment_selected.id !== ''"> -->
                 <div class="columns">
                     <!-- Left column -->
                     <div class="column is-one-quarter" style="padding-left:2rem">
@@ -64,7 +58,6 @@
 <script type="text/javascript">
 import { mapState } from 'vuex';
 import ConfigVue from './ConfigVue'; 
-import StartTab from "./StartTab.vue";
 import TargetBrowser from "./TargetBrowser.vue";
 import SampleView from "./SampleView.vue"
 import SampleBrowser from "./SampleBrowser.vue"
@@ -79,7 +72,6 @@ export default {
     store,
     components: {
         ConfigVue,
-        StartTab,
         TargetBrowser,
         SampleBrowser,
         SampleView,
@@ -87,6 +79,7 @@ export default {
     },
     data() {
         return {
+            active_tab: 2,
             dotenv: {},
             be: null,
             socket_room: null,
@@ -128,14 +121,6 @@ export default {
             // 'tps_parameters_selected',
             // 'visualize_range',
             ]),
-        active_tab: {
-            get() {
-                return this.$store.state.active_tab;
-            },
-            set(value) {
-                this.$store.commit('active_tab', value);
-            }
-        },
         // acquisition_status: {
         //     get() {
         //         return this.$store.state.acquisition_status;
@@ -453,38 +438,7 @@ body {
     padding-top: 5px; 
     /* border-top:15px solid #29282e;  */
 }
-/* .tabs>ul>li{
-    -webkit-app-region: no-drag;
-} */
-/* Style the buttons that are used to open the tab content */
-/* .tab button {
-    background-color: inherit;
-    float: left;
-    border: none;
-    outline: none;
-    cursor: pointer;
-    padding: 14px 16px;
-    transition: 0.3s;
-} */
 
-/* Change background color of buttons on hover */
-/* .tab button:hover {
-    background-color: #ddd;
-} */
-
-/* Create an active/current tablink class */
-/* .tab button.active {
-    background-color: #ccc;
-} */
-
-/* Style the tab content */
-/* .tabcontent {
-    display: none;
-    padding: 6px 12px;
-    border: 1px solid #ccc;
-    border-top: none;
-    height: 93vh; 
-} */
 #header-container{
     display:none; 
 }
@@ -518,6 +472,9 @@ body {
 }
 .column{
     padding-bottom: 0px; 
+}
+.detail-container {
+    color: black;
 }
 #logo{
     padding-left:20px;
@@ -585,6 +542,14 @@ a.pagination-link.is-current {
 .main-tab>ul>li>a>span:hover {
     color: #000000;
 }
+
+.menu-label {
+    color: white;
+}
+.menu-list a{
+    color: #ababab;
+}
+
 .tabs li.is-active a {
     border-bottom: 5px solid;
     border-bottom-color: #bfbdc5;
@@ -612,6 +577,7 @@ a.pagination-link.is-current {
 .table {
     background-color:transparent; 
     color: inherit;
+    font-size: 15px;
 }
 .table:focus {
     outline: none;
@@ -641,6 +607,9 @@ th>input{
 }
 .table thead td, .table thead th {
     color: inherit;
+}
+ul {
+    list-style: none;
 }
 
 .b-slider.is-small .b-slider-tick-label {

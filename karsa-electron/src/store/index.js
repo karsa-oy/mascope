@@ -5,7 +5,6 @@ Vue.use(Vuex)
 
 export default new Vuex.Store({
 	state: {
-		active_tab: 1,
 		acquisition_control_active: false,
 		// acquisition_started: {},
 		acquisition_status: "not_running",		// not_running/starting/running/stopping
@@ -43,9 +42,6 @@ export default new Vuex.Store({
 		// stop_visualize_range: {},
 	},
 	mutations: {
-		active_tab(state, payload) {
-			state.active_tab = payload;
-		},
 		acquisition_control_active(state, payload) {
 			state.acquisition_control_active = payload;
 		},

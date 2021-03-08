@@ -1,6 +1,129 @@
 <template>
     <div>
-<!-- Modals -->
+    <!-- Modals -->
+        <!--- New project modal--> 
+        <section class="project-attribute-modal">
+            <b-modal :active.sync="is_modal_new_project_active"
+                has-modal-card
+                trap-focus
+                :can-cancel="true"
+                aria-role="dialog"
+                aria-modal>
+                <div class="modal-card" style="width: 500px">
+                    <!-- Main content -->
+                    <div class="columns">
+                        <!-- Left side -->
+                        <div class="column">
+                            <header class="modal-card-head">
+                                <p class="modal-card-title">
+                                    New project
+                                </p>
+                            </header>
+                            <section class="modal-card-body">
+                                <b-field label="Project title">
+                                    <b-input type="input"
+                                        v-model="project.title"
+                                        :value="project.title"
+                                        maxlength="50"
+                                        required
+                                        validation-message="Only numbers, letters and _ allowed in the title"
+                                        :pattern="valid_pattern.toString().slice(1, -1)">
+                                    </b-input>
+                                </b-field>
+                                <b-field label="Description">
+                                    <b-input
+                                        v-model="project.description"
+                                        :value="project.description"
+                                        maxlength="200"
+                                        type="textarea">
+                                    </b-input>
+                                </b-field>
+                            </section>
+                        </div>
+                    </div>
+                    <!-- Footer -->
+                    <footer class="modal-card-foot">
+                        <button
+                            class="button"
+                            type="button"
+                            @click="SetProject()"
+                            is-dark>
+                            Proceed
+                        </button>
+                        <button
+                            class="button"
+                            type="button"
+                            is-dark
+                            @click="CancelNewProject()">
+                            Cancel
+                        </button>
+                    </footer>
+                </div>
+            </b-modal>
+        </section>
+        <!--- End of new project modal--> 
+
+        <!--- New experiment modal--> 
+        <section class="sample-attribute-modal">
+            <b-modal :active.sync="is_modal_new_experiment_active"
+                has-modal-card
+                trap-focus
+                :can-cancel="true"
+                aria-role="dialog"
+                aria-modal
+            >
+                <div class="modal-card" style="width: 500px">
+                    <div class="columns">
+                        <div class="column">
+                            <header class="modal-card-head">
+                                <p class="modal-card-title">
+                                    New experiment
+                                </p>
+                            </header>
+                            <section class="modal-card-body">
+                                <b-field label="Experiment title">
+                                    <b-input type="input"
+                                        v-model="experiment.title"
+                                        :value="experiment.title"
+                                        maxlength="50"
+                                        required
+                                        validation-message="Only numbers, letters and _ allowed in the title"
+                                        :pattern="valid_pattern.toString().slice(1, -1)">
+                                    </b-input>
+                                </b-field>
+                                <b-field label="Description">
+                                    <b-input 
+                                        v-model="experiment.description" 
+                                        :value="experiment.description"
+                                        maxlength="200" 
+                                        type="textarea">
+                                    </b-input>
+                                </b-field>
+                            </section>
+                        </div>
+                    </div>
+                    <!-- Footer -->
+                    <footer class="modal-card-foot">
+                        <button 
+                            class="button" 
+                            type="button" 
+                            @click="SetExperiment" 
+                            is-dark>
+                            Proceed
+                        </button>
+                        <button 
+                            class="button" 
+                            type="button" 
+                            is-dark 
+                            @click="CancelNewExperiment">
+                            Cancel
+                        </button>
+                    </footer>
+                </div>
+            </b-modal>
+        </section>
+        <!--- End of new experiment modal-->
+
         <!-- Modal for sample attributes -->
         <section class="sample-attribute-modal">
             <b-modal :active.sync="is_sample_attribute_modal_active"
@@ -255,36 +378,108 @@
                     <div class="card-content">
                         <div class="content">
                             <div class="left-panel-collapsable">
-                                <b-button
-                                    type="is-dark"
-                                    @click="is_sample_attribute_modal_active=true"
-                                    outlined
-                                    inverted
-                                    size="is-small"
-                                    :disabled="!sample_file.length">
-                                    Sample attributes
-                                </b-button>
+                                <!-- Sample browser tree -->
+                                <b-menu>
+                                    <!-- Projects -->
+                                    <b-menu-list label="Projects">
+                                        <!-- Project item -->
+                                        <b-menu-item
+                                            v-for="p in projects"
+                                            :key="p.id"
+                                            :label="p.id"
+                                            @click="project.title=p.id; SetProject()">
+                                            <!-- Experiments -->
+                                            <b-menu-list
+                                                label="Experiments"
+                                                v-if="p.id === project_selected.id">
+                                                <!-- Experiment item -->
+                                                <b-menu-item 
+                                                    v-for="e in experiments_ui"
+                                                    :key="e.id"
+                                                    :label="e.id"
+                                                    @click="experiment.title=e.id; SetExperiment()">
+                                                    <p class="menu-label">
+                                                        Samples
+                                                    </p>
+                                                    <!-- Sample table -->
+                                                    <b-table 
+                                                        id="samples-datatable"
+                                                        style="height:100%; width:100%"
+                                                        :data="sample_table_rows"
+                                                        :sticky-header="true"
+                                                        :checkable="(!acquisition_control_active ||
+                                                                    acquisition_status=='not_running') ? true : false"
+                                                        :header-checkable="false"
+                                                        :checked-rows.sync="sample_table_checked_rows"
+                                                        detailed
+                                                        detail-key="title"
+                                                        :show-detail-icon="false"
+                                                        v-if="e.id === experiment_selected.id">
+                                                        <!-- Columns -->
+                                                        <b-table-column field="title" label="" v-slot="props">
+                                                            <a @click="props.toggleDetails(props.row)">
+                                                                {{ props.row.title }}
+                                                            </a>
+                                                        </b-table-column>
+                                                        <!-- End of columns -->
+                                                        <!-- Details view -->
+                                                        <template #detail="props">
+                                                            <div>
+                                                                <p>
+                                                                    <strong>{{ props.row.title }}</strong>
+                                                                    <br>
+                                                                    {{ props.row.description }}
+                                                                    <br>
+                                                                    <small style="color: #ababab;">{{ props.row.id }}</small>
+                                                                </p>
+                                                                <b-button
+                                                                    type="is-dark"
+                                                                    @click="sample_file=props.row.id;
+                                                                            sample_name=props.row.title;
+                                                                            sample_description=props.row.description;
+                                                                            is_sample_attribute_modal_active=true"
+                                                                    outlined
+                                                                    size="is-small">
+                                                                    Edit
+                                                                </b-button>
+                                                            </div>
+                                                        </template>
+                                                        <!-- End of details view -->
+                                                    </b-table>
+                                                    <!-- End of sample table -->
+                                                    <!-- Import sample item -->
+                                                    <b-menu-item
+                                                        icon="plus"
+                                                        :active="is_import_sample_modal_active"
+                                                        @click="LaunchSampleImport()">
+                                                    </b-menu-item>
+                                                    <!-- End of import sample item -->
+                                                </b-menu-item>
+                                                <!-- End of experiment item -->
+                                                <!-- New experiment item -->
+                                                <b-menu-item
+                                                    icon="plus"
+                                                    :active="is_modal_new_experiment_active"
+                                                    @click="LaunchNewExperimentModal()">
+                                                </b-menu-item>
+                                                <!-- End of new experiment item -->
+                                            </b-menu-list>
+                                            <!-- End of experiments -->
+                                        </b-menu-item>
+                                        <!-- End of project item -->
+                                        <!-- New project item -->
+                                        <b-menu-item
+                                            icon="plus"
+                                            :active="is_modal_new_project_active"
+                                            @click="LaunchNewProjectModal()">
+                                        </b-menu-item>
+                                        <!-- End of new project item -->
+                                    </b-menu-list>
+                                    <!-- End of projects -->
+                                </b-menu>
+                                <!-- End of sample browser tree -->
+
                                 <div><br></div>
-                                <b-table 
-                                    id="samples-datatable"
-                                    style="max-height:400px"
-                                    :columns="sample_table_cols"
-                                    :data="sample_table_rows"
-                                    :sticky-header="true"
-                                    :checkable="(!acquisition_control_active ||
-                                                 acquisition_status=='not_running') ? true : false"
-                                    :header-checkable="false"
-                                    :checked-rows.sync="sample_table_checked_rows">
-                                </b-table>
-                                <div><br></div>
-                                <b-button
-                                    type="is-dark"
-                                    @click="LaunchSampleImport()"
-                                    size="is-small"
-                                    outlined
-                                    inverted>
-                                    Import sample
-                                </b-button>
                                 <b-button
                                     type="is-dark"
                                     @click="is_import_h5_modal_active=true"
@@ -332,13 +527,9 @@ export default {
         ...mapState([
             'acquisition_control_active',
             'acquisition_status',
-            'experiments',
-            'experiment_selected',
             // 'h5_samples',
             // 'h5_streamer_status',
             // 'importable_samples',
-            'projects',
-            'project_selected',
             // 'samples',
             'socket',
             'socket_connected',
@@ -375,6 +566,38 @@ export default {
         //         this.$store.commit('sample_attributes', value);
         //     }
         // },
+        experiments: {
+            get() {
+                return this.$store.state.experiments;
+            },
+            set(value) {
+                this.$store.commit('experiments', value);
+            }
+        },
+        experiment_selected: {
+            get() {
+                return this.$store.state.experiment_selected;
+            },
+            set(value) {
+                this.$store.commit('experiment_selected', value);
+            }
+        },
+        projects: {
+            get() {
+                return this.$store.state.projects;
+            },
+            set(value) {
+                this.$store.commit('projects', value);
+            }
+        },
+        project_selected: {
+            get() {
+                return this.$store.state.project_selected;
+            },
+            set(value) {
+                this.$store.commit('project_selected', value);
+            }
+        },
         sample_to_load: {
             get() {
                 return this.$store.state.sample_to_load;
@@ -388,9 +611,15 @@ export default {
         return {
             be: null,
             acquisition_started: false,
+            // Project / experiment title validation
+            valid_pattern: RegExp(/^\w+$/),
+            // h5 streamer
             h5_samples: [],
             h5_streamer_status: "not_ready",		// not_ready/ready
             h5_to_import: [],
+            // Modal active variables
+            is_modal_new_project_active: false,
+            is_modal_new_experiment_active: false,
             is_import_sample_modal_active: false,
             is_import_h5_modal_active: false,
             is_sample_attribute_modal_active: false,
@@ -400,7 +629,6 @@ export default {
             import_min_datetime: null,
             import_max_datetime: new Date(),
             // variables for sample import modal
-            experiments_ui: [],
             importable_samples: {},
             import_sample_table_loading: true,
             import_sample_table_rows: [],
@@ -412,6 +640,17 @@ export default {
             import_h5_table_cols: [],
             import_h5_table_checked_rows: [],
             import_h5_table_datetime_range: {},
+            // Project metadata
+            project: {
+                title: "",
+                description: ""
+                },
+            // Experiment metadata
+            experiments_ui: [],
+            experiment: {
+                title: "",
+                description: ""
+                },
             // Sample metadata for selected sample
             samples: [],
             sample_file: "",
@@ -424,34 +663,28 @@ export default {
             sample_table_cols: [],
             sample_table_checked_rows: [],
             sample_attributes: {},
+
+            // Communication
+            projects_room: 'projects',
+            project_room: null,
             socket_room: null,
             experiment_room: null,
             endpoints: [
                 // 'acquisition_started',
                 // 'h5_samples',
                 // 'h5_streamer_status',
+                'experiments',
                 'importable_samples',
+                'projects',
                 'samples',
                 // 'sample_attributes',
             ],
         }
     },
     created: function() {
+        // Initialize project_selected
+        this.project_selected = {'id': ""};
         this.be = new BECom(this);
-
-// //==============================
-//         get_parent_context(this);
-//         var self = this;
-//         self.socket.on("connect", () => {
-//             self.socket.on('acquisition_started', (value) => import_one_way_binding_prop('acquisition_started', value.value));
-//             self.socket.on("h5_samples", (value) => import_one_way_binding_prop("h5_samples", value.value));
-//             self.socket.on("h5_streamer_status", (value) => import_one_way_binding_prop("h5_streamer_status", value.value));
-//             self.socket.on("importable_samples", (value) => import_one_way_binding_prop("importable_samples", value.value));
-//             self.socket.on("samples", (value) => import_one_way_binding_prop("samples", value.value));
-
-//             subscribe();
-//         });
-// // =============================
 
     },
     mounted: function() {
@@ -546,6 +779,100 @@ export default {
             this.sample_attributes = sample;
             this.is_sample_attribute_modal_active = false;
         },
+                isValidFilename(str) {
+            return this.valid_pattern.test(str);
+        },
+
+        LaunchNewProjectModal() {
+            // Clear fields
+            this.project.title = "";
+            this.project.description = "";
+
+            this.is_modal_new_project_active = true;
+        },
+
+        CancelNewProject() {
+            // Reset project
+            this.project_selected = {'id': ""};
+            this.project.title = "";
+            this.project.description = "";
+            // Reset experiment
+            this.experiment_selected = {'id': ""};
+            this.experiment.title = "";
+            this.experiment.description = "";
+
+            this.is_modal_new_project_active = false;
+        },
+
+        SetProject() {
+            if ( !this.isValidFilename(this.project.title) ) {
+                // Project title contains illegal characters
+                return
+            }
+            // Find project description
+            for (let i in this.projects) {
+                if(this.projects[i].id === this.project.title){
+                    this.project.description = this.projects[i].attributes.description;
+                    break;
+                }
+            }
+            this.project_selected = {'id': this.project.title,
+                                     'attributes': {
+                                        'title': this.project.title,
+                                        'description': this.project.description
+                                        }
+                                     };
+            // Reset experiment
+            this.experiment_selected = {'id': ""};
+            this.experiment.title = "";
+            this.experiment.description = "";
+
+            this.is_modal_new_project_active = false;
+        },
+
+        LaunchNewExperimentModal() {
+            // Clear fields
+            this.experiment.title = "";
+            this.experiment.description = "";
+
+            this.is_modal_new_experiment_active = true;
+        },
+
+        CancelNewExperiment() {
+            // Reset experiment
+            this.experiment_selected = {'id': ""};
+            this.experiment.title = "";
+            this.experiment.description = "";
+
+            this.is_modal_new_experiment_active = false;
+        },
+
+        SetExperiment() {
+            if ( !this.isValidFilename(this.experiment.title) ) {
+                // Experiment title contains illegal characters
+                return
+            }
+            // Find experiment description
+            for (let i in this.experiments_ui) {
+                if(this.experiments_ui[i].id === this.experiment.title){
+                    this.experiment.description = this.experiments_ui[i].attributes.description;
+                }
+            }
+            this.experiment_selected = {'id': this.experiment.title,
+                                        'attributes': {
+                                            'title': this.experiment.title,
+                                            'project': this.project.title,
+                                            'description': this.experiment.description,
+                                            'conductor': this.experiment.conductor
+                                            }
+                                        };
+            this.is_modal_new_experiment_active = false;
+
+            // let corresponding project room to be updated for the new experiment
+            this.be.emit_client_notification('project_selected',
+                                             {id: this.project.title},
+                                             this.project_room)
+        },
     },
     watch: {
         acquisition_started: function(new_value, old_value) {
@@ -577,15 +904,16 @@ export default {
                     this.be.unsubscribe(this.experiment_room);
                 this.experiment_room = this.project_selected.id + '_' + new_value.id;
                 this.be.subscribe(this.experiment_room);
+                // TODO: This triggers 'samples' update to everyone in 'this.experiment_room'
+                // Need to make distinction between new experiment and selected experiment
                 return this.be.export_one_way_binding_prop('experiment_selected',
-                                                           new_value, old_value,
-                                                           this.experiment_room);
+                                                           new_value,
+                                                           old_value,
+                                                           this.experiment_room
+                                                           );
             }
         },
         experiments: function(new_value) {
-            if (!_.isEqual(new_value.project, this.project_selected.id)) {
-                return
-            }
             this.experiments_ui = new_value.experiments;
         },
         h5_table_checked_rows: function(new_value, old_value) {
@@ -604,6 +932,21 @@ export default {
             }
             this.import_h5_table_cols = new_data.cols;
             this.import_h5_table_rows = new_data.rows;
+        },
+        h5_to_import: function(new_value, old_value) {
+            return this.be.export_one_way_binding_prop('h5_to_import',
+                                                        new_value, old_value,
+                                                        this.experiment_room);
+        },
+        import_h5_table_datetime_range: function(new_value, old_value) {
+            return this.be.export_one_way_binding_prop('import_h5_table_datetime_range',
+                                                        new_value, old_value,
+                                                        this.experiment_room);
+        },
+        import_sample_table_datetime_range: function(new_value, old_value) {
+            return this.be.export_one_way_binding_prop('import_sample_table_datetime_range',
+                                                        new_value, old_value,
+                                                        this.experiment_room);
         },
         import_sample_table_checked_rows: function(new_value, old_value) {
             if ( _.isEqual(new_value, old_value) ) {
@@ -624,11 +967,25 @@ export default {
             this.import_sample_table_loading = false;
         },
         project_selected: function(new_value, old_value) {
-            if ( _.isEqual(new_value, old_value) ) {
-                return false;
+            if ( !_.isEmpty(new_value.id) ) {
+                if ( !_.isEmpty(this.project_room) ) {
+                    this.be.unsubscribe(this.project_room);
+                }
+                this.project_room = new_value.id;
+                this.be.subscribe(this.project_room);
+                // push new_value of project_selected to corresponding room
+                this.be.export_one_way_binding_prop('project_selected',
+                                                    new_value,
+                                                    old_value,
+                                                    this.project_room
+                                                    );
+                // make all clients in 'projects' room see the new project
+                this.be.emit_client_notification('service_state',
+                                                 {},
+                                                 'projects'
+                                                 );
             }
             this.sample_project = new_value.id;
-            // this.be.unsubscribe();
         },
         samples: function(new_data){
             // TODO: quick&dirty fix to close sample attribute popup in acquisition mode
@@ -648,6 +1005,11 @@ export default {
             }
             this.sample_table_cols = new_data.cols;
             this.sample_table_rows = new_data.rows;
+        },
+        sample_attributes: function(new_value, old_value) {
+            return this.be.export_one_way_binding_prop('sample_attributes',
+                                                        new_value, old_value,
+                                                        this.experiment_room);
         },
         sample_table_checked_rows: function(new_value, old_value) {
             if ( _.isEqual(new_value, old_value) ) {
@@ -679,26 +1041,6 @@ export default {
                 this.sample_to_load = {'filename': ""};
             }
         },
-        h5_to_import: function(new_value, old_value) {
-            return this.be.export_one_way_binding_prop('h5_to_import',
-                                                        new_value, old_value,
-                                                        this.experiment_room);
-        },
-        import_h5_table_datetime_range: function(new_value, old_value) {
-            return this.be.export_one_way_binding_prop('import_h5_table_datetime_range',
-                                                        new_value, old_value,
-                                                        this.experiment_room);
-        },
-        import_sample_table_datetime_range: function(new_value, old_value) {
-            return this.be.export_one_way_binding_prop('import_sample_table_datetime_range',
-                                                        new_value, old_value,
-                                                        this.experiment_room);
-        },
-        sample_attributes: function(new_value, old_value) {
-            return this.be.export_one_way_binding_prop('sample_attributes',
-                                                        new_value, old_value,
-                                                        this.experiment_room);
-        },
         socket_connected: function(new_value) {
             if ( new_value === true )
             {
@@ -706,7 +1048,9 @@ export default {
                 // this.socket.on('acquisition_started', (value) => this.be.import_one_way_binding_prop('acquisition_started', value.value));
                 // this.socket.on("h5_samples", (value) => this.be.import_one_way_binding_prop("h5_samples", value.value));
                 // this.socket.on("h5_streamer_status", (value) => this.be.import_one_way_binding_prop("h5_streamer_status", value.value));
+                this.socket.on('experiments', (value) => this.be.import_two_way_binding_prop('experiments', value.value));
                 this.socket.on("importable_samples", (value) => this.be.import_one_way_binding_prop("importable_samples", value.value));
+                this.socket.on("projects", (value) => this.be.import_two_way_binding_prop("projects", value.value));
                 this.socket.on("samples", (value) => this.be.import_one_way_binding_prop("samples", value.value));
 
                 this.socket_room = this.socket.id;
@@ -718,5 +1062,3 @@ export default {
 
 
 </script>
-
-<style src = "../assets/css/MeasurementTab.css"> </style>
