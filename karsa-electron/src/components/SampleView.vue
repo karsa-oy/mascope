@@ -69,9 +69,9 @@ import Vue from "vue";
 import { mapState } from 'vuex'
 import Buefy from "buefy";
 import Multiselect from "vue-multiselect";
-
 import "buefy/dist/buefy.css";
 import '@mdi/font/css/materialdesignicons.min.css';
+import { BECom } from "../karsalib.js"
 
 Vue.use([Buefy]);
 
@@ -90,66 +90,88 @@ export default {
         Multiselect
     },
     props: {
+        id: String,
     },
     computed: {
-        ...mapState(['acquisition_control_active',
-                     'acquisition_started',
-                     'acquisition_status',
+        ...mapState([
+                     'acquisition_control_active',
+                     'acquisition_status',  //no subscription here - use TOFControl sync
                      'experiment_selected',
-                     'figure_ranges',
-                     'heatmap_figure_data',
+                    //  'figure_ranges',
+                    //  'heatmap_figure_data',
                      'sample_to_load',
-                     'spec_stack_figure_data',
+                    //  'spec_stack_figure_data',
                      'target_to_display',
-                     'timeseries_figure_data',
-                     'tps_parameters',
+                    //  'timeseries_figure_data',
+                    //  'tps_parameters',
+                     'socket',
+                     'socket_connected'
                      ]),
-        visualize_range: {
-            get() {
-                return this.$store.state.visualize_range;
-            },
-            set(value) {
-                this.$store.commit('visualize_range', value);
-            }
-        },
-        stop_visualize_range: {
-            get() {
-                return this.$store.state.stop_visualize_range;
-            },
-            set(value) {
-                this.$store.commit('stop_visualize_range', value);
-            }
-        },
-        tps_parameters_selected_ui: {
-            get() {
-                return this.$store.state.tps_parameters_selected['tps_parameters_selected'];
-            },
-            set(value) {
-                let new_value = {'tps_parameters_selected': value, 'figure_ranges': this.figure_ranges};
-                this.$store.commit('tps_parameters_selected', new_value);
-            }
-        },
+        // visualize_range: {
+        //     get() {
+        //         return this.$store.state.visualize_range;
+        //     },
+        //     set(value) {
+        //         this.$store.commit('visualize_range', value);
+        //     }
+        // },
+        // stop_visualize_range: {
+        //     get() {
+        //         return this.$store.state.stop_visualize_range;
+        //     },
+        //     set(value) {
+        //         this.$store.commit('stop_visualize_range', value);
+        //     }
+        // },
+        // tps_parameters_selected_ui: {
+        //     get() {
+        //         return this.$store.state.tps_parameters_selected['tps_parameters_selected'];
+        //     },
+        //     set(value) {
+        //         let new_value = {'tps_parameters_selected': value, 'figure_ranges': this.figure_ranges};
+        //         this.$store.commit('tps_parameters_selected', new_value);
+        //     }
+        // },
     },
     data: function() {
         return {
-            // State variables
+            be: null,   //backend communicator
             cache_index_rank: 0, // actual value calculated in "mounted"
             figure_cache: {'t_maxrange': [0, 0], 'mz_maxrange': [0, 0]},
             figure_layouts: {},
+            figure_ranges: {},
             filename: '',
             grid_spacing: 0.0049,
             heatmap_data: [],
+            heatmap_figure_data: {},
             heatmap_layout: {},
             heatmap_queue: Promise.resolve(),
             spec_stack_data: [],
             spec_stack_layout: {},
+            spec_stack_figure_data: {},
             timeseries_data: [],
             timeseries_layout: {},
+            timeseries_figure_data: {},
+            tps_parameters: [],
+            tps_parameters_selected_ui: [],
+            tps_parameters_selected: {},
             zoom_stack: [],
+            visualize_range: {},
+            stop_visualize_range: {},
+            socket_room: null,
+            endpoints: [
+                'figure_ranges',
+                'heatmap_figure_data',
+                'spec_stack_figure_data',
+                'timeseries_figure_data',
+                'tps_parameters',
+            ],
         }
     },
+
     created: function(){
-    },
+        this.be = new BECom(this);
+},
 
     mounted: function() {
         this.init_figures();
@@ -890,10 +912,10 @@ export default {
 
     watch: {
         acquisition_status: function(new_value, old_value) {
-            // TODO: quick&dirty fix to dismiss acquisition notifications
-            if (!this.acquisition_control_active) {
-                return
-            }
+            // // TODO: quick&dirty fix to dismiss acquisition notifications
+            // if (!this.acquisition_control_active) {
+            //     return
+            // }
             //
             if ( _.isEqual(new_value, old_value) ) {
                 return false;
@@ -902,22 +924,22 @@ export default {
                 this.reset_view();
             }
         },
-        experiment_selected: function() {
+        experiment_selected: function(new_value, old_value) {  // eslint-disable-line no-unused-vars
             this.reset_view();
         },
         figure_ranges: function(new_value, old_value) {
-            // TODO: quick&dirty fix to dismiss acquisition notifications
-            if (new_value.filename !== this.filename &&
-                !this.acquisition_control_active) {
-                return
-            }
-            //
+            // // TODO: quick&dirty fix to dismiss acquisition notifications
+            // if (new_value.filename !== this.filename &&
+            //     !this.acquisition_control_active) {
+            //     return
+            // }
+            // //
             this.on_figure_ranges(new_value, old_value);
         },
         heatmap_figure_data: function(new_value) {
             // TODO: quick&dirty fix to dismiss acquisition notifications
             if (new_value.filename !== this.filename) {
-                return
+                return false;
             }
             //
             this.on_heatmap_figure_data(new_value);
@@ -990,6 +1012,38 @@ export default {
         tps_parameters: function(new_value, old_value) {
             if ( _.isEmpty(new_value) || _.isEqual(new_value, old_value) ) {
                 return false;
+            }
+        },
+        stop_visualize_range: function(new_value, old_value) {
+            return this.be.export_one_way_binding_prop('stop_visualize_range',
+                                                        {...new_value, 'uid': Math.random()}, old_value,
+                                                        this.socket_room);
+        },
+        visualize_range: function(new_value, old_value) {
+            return this.be.export_one_way_binding_prop('visualize_range',
+                                                        {...new_value, 'uid': Math.random()}, old_value,
+                                                        this.socket_room);
+        },
+        tps_parameters_selected_ui: function(value) {
+            this.tps_parameters_selected = {'tps_parameters_selected': value, 'figure_ranges': this.figure_ranges};
+        },
+        tps_parameters_selected: function(new_value, old_value) {
+            return this.be.export_one_way_binding_prop('tps_parameters_selected',
+                                                        new_value, old_value,
+                                                        this.socket_room);
+        },
+        socket_connected: function(new_value) {
+            if ( new_value === true )
+            {
+                // handlers for for external notifications:
+                this.socket.on("figure_ranges", (value) => this.be.import_one_way_binding_prop("figure_ranges", {...value.value, 'uid': Math.random()}));
+                this.socket.on("heatmap_figure_data", (value) => this.be.import_one_way_binding_prop("heatmap_figure_data", value.value));
+                this.socket.on("spec_stack_figure_data", (value) => this.be.import_one_way_binding_prop("spec_stack_figure_data", value.value));
+                this.socket.on("timeseries_figure_data", (value) => this.be.import_one_way_binding_prop("timeseries_figure_data", value.value));
+                this.socket.on("tps_parameters", (value) => this.be.import_one_way_binding_prop("tps_parameters", value.value));
+
+                this.socket_room = this.socket.id;
+                this.be.subscribe(this.socket_room);
             }
         },
     },

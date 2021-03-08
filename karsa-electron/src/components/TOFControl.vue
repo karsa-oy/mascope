@@ -283,9 +283,9 @@
 import Vue from "vue";
 import { mapState } from 'vuex'
 import Buefy from "buefy";
-
 import "buefy/dist/buefy.css";
 import '@mdi/font/css/materialdesignicons.min.css';
+import { BECom } from "../karsalib.js"
 
 Vue.use([Buefy]);
 
@@ -300,7 +300,9 @@ export default {
     ],
     computed: {
         ...mapState([
-            'instrument_status', 'socket',
+            // 'instrument_status',
+            'socket',
+            'socket_connected',
         ]),
         acquisition_control_active: {
             get() {
@@ -318,20 +320,23 @@ export default {
                 this.$store.commit('acquisition_status', value);
             }
         },
-        acquisition_progress() {
-            return this.$store.state.acquisition_progress.progress;
-        },
-        sample_length: {
-            get() {
-                return this.$store.state.sample_length;
-            },
-            set(value) {
-                this.$store.commit('sample_length', value);
-            }
-        },
+        // acquisition_progress() {
+        //     return this.$store.state.acquisition_progress.progress;
+        // },
+        // sample_length: {
+        //     get() {
+        //         return this.$store.state.sample_length;
+        //     },
+        //     set(value) {
+        //         this.$store.commit('sample_length', value);
+        //     }
+        // },
     },
     data: function() {
         return {
+            be: null,
+            acquisition_progress: 0,
+            instrument_status: "not_ready",			// not_ready/ready
             is_edit_temperature_ramp_modal_active: false,
             // variable for acquisition button style  and progress bar
             acquisition_button_type: "is-primary",
@@ -356,38 +361,30 @@ export default {
             // flag to separate if data was changed by user or by loading
             // config file in the 
             data_updated_from_loading: true,
-            room: 'TOF',
-            rooms: [
-                'acquisition_started',
+            socket_room: null,
+            instrument_room: 'TOF',    //TODO: room comes from instrument selection
+            sample_length: 120,
+            endpoints: [
                 'acquisition_status',
                 'acquisition_progress',
                 'instrument_status',
                 'sample_length',
+                // TODO: remove lower 4 endpoints after 
+                // acq. data stream goes to FileService
                 'figure_ranges',
                 'heatmap_figure_data',
                 'spec_stack_figure_data',
                 'timeseries_figure_data',
+                // ============================
             ],
         }
     },
     created: function() {
+        this.be = new BECom(this);
     },
     mounted: function() {
     },
     methods: {
-        subscribe() {
-            this.socket.emit('subscribe',
-                             {'app_name': this.$options.name,
-                              'endpoints': this.rooms,
-                              'room': this.room});
-            this.socket.emit('client_notification', {'name': 'service_state', 'value': {}, 'room': this.room});
-        },
-        unsubscribe() {
-            this.socket.emit('unsubscribe',
-                             {'app_name': this.$options.name,
-                              'endpoints': this.rooms,
-                              'room': this.room});
-        },
         confirmAcquisitionControl() {
             this.$buefy.dialog.confirm({
                 title: 'Instrument control',
@@ -399,7 +396,7 @@ export default {
                 onCancel: () => this.acquisition_control_active = false,
                 onConfirm: () => { this.$buefy.toast.open({message: 'Instrument control granted',
                                                           type: 'is-success'});
-                                   this.subscribe(); }
+                                   this.be.subscribe(this.instrument_room); }
             })
         },
         delete_row_in_config_desorption_table() {
@@ -524,7 +521,7 @@ export default {
                 this.confirmAcquisitionControl();
             }
             else {
-                this.unsubscribe();
+                this.be.unsubscribe(this.instrument_room);
             }
         },
         acquisition_mode: function(new_value, old_value) {
@@ -560,6 +557,10 @@ export default {
                 this.acquisition_button_type = "is-primary";
                 this.scenthound_status = 'Ready';
             }
+            return this.be.export_two_way_binding_prop('acquisition_status',
+                                                        new_value, old_value,
+                                                        this.instrument_room,
+                                                        true);
         },
         instrument_status: function(new_value, old_value) {
             if ( _.isEqual(new_value, old_value) ) {
@@ -571,6 +572,20 @@ export default {
             else {
                 this.scenthound_status = 'Offline';
                 this.acquisition_status = 'not_running';
+            }
+        },
+        socket_connected: function(new_value) {
+            if ( new_value === true )
+            {
+                // handlers for for external notifications:
+                this.socket.on("acquisition_status", (value) => this.be.import_two_way_binding_prop("acquisition_status", value.value));
+                this.socket.on("acquisition_progress", (value) => this.be.import_one_way_binding_prop("acquisition_progress", value.value.progress, true));
+                this.socket.on("instrument_status", (value) => this.be.import_one_way_binding_prop("instrument_status", value.value));
+                this.socket.on("sample_length", (value) => this.be.import_two_way_binding_prop("sample_length", value.value));
+
+                // dynamic subscription thru AcquisitionControl dialog
+                this.socket_room = this.socket.id;
+                this.be.subscribe(this.socket_room);
             }
         },
     }

@@ -36,12 +36,11 @@ export default {
     },
     computed: {
         ...mapState([
-                    'acquisition_started',
-                    'acquisition_status',
-                    'figure_ranges',
-                    'instrument_status',
+                    // 'acquisition_started',
+                    // 'acquisition_status',
+                    // 'figure_ranges',
+                    // 'instrument_status',
                     ]),
-
 
    },
 

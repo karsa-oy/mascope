@@ -107,7 +107,7 @@ class BaseClientNamespace(AsyncClientNamespace):
         elif no_data_logging:
             self.log(f"{name}: ...")
         else:
-            self.log(f"{name}: {value}")
+            self.log(f"{name}: {value} > {kwarg.get('room', name)}")
         await self.emit('client_notification', {'name': name, 'value': value, **kwarg})
         if name in self.service_state:
             self.service_state[name] = value
@@ -136,7 +136,8 @@ class BaseServerNamespace(AsyncNamespace):
         # remove the client rooms from all subscriptions
         for s in list(self.subscriptions):
             for r in self.client_rooms[sid]:
-                self.subscriptions[s].remove(r)
+                if r in self.subscriptions[s]:
+                    self.subscriptions[s].remove(r)
             if not self.subscriptions[s]:
                 del self.subscriptions[s]
         del self.client_rooms[sid]
@@ -219,113 +220,12 @@ class BaseServerNamespace(AsyncNamespace):
                             dict(endpoint=endpoint,
                                  cb_name=cb, cb_ctx=cb_ctx,
                                  arg=arg, kwarg=kwarg,
-                                 no_logging=True,
-                                 **get_client_notification_args(data)),
+                                 **{**get_client_notification_args(data), 'no_logging': True}),
                             room=sid)
 
         sent_to = len(src_sids) * '>'
         self.log(f"{endpoint} {sent_to} {target_room}")
         await self.emit(endpoint, data, room=target_room, callback=cb and srv_callback)
-
-
-    # async def on_client_notification(self, sid, data):
-    #     """
-    #     client_notifications are forwarded by Router from providers
-    #     to subscribers via corresponding rooms, where a room is a property name.
-    #     data: dict(name=prop_name, value=prop_value, no_logging=bool, no_data_logging=bool, ...)
-    #           all key-value pairs in data dict are forwarded to subscriber,
-    #           no_logging/no_data_logging - skip logging/data logging in subscriber; default: False,
-    #     """
-    #     no_logging = data.get('no_logging', False)
-    #     no_data_logging = data.get('no_data_logging', True)
-    #     notify_twin_clients = data.get('notify_twin_clients', False)   # overriding rule, if defined
-    #     notify_twin_services = data.get('notify_twin_services', False)   # overriding rule, if defined
-    #     subscription = data['name']
-    #     cb = data.pop('callback', None)
-    #     cb_ctx = data.pop('callback_context', None)
-    #     if no_logging:
-    #         pass
-    #     elif no_data_logging:
-    #         self.log(f"{subscription}: ...")
-    #     else:
-    #         self.log(data)
-
-    #     if 'cookies' not in data:
-    #         data['cookies'] = dict(src_sid=[])
-    #     cookies = data['cookies']
-    #     if subscription not in self.subscriptions:
-    #         self.log(f"{subscription}: no handlers - notification dropped.")
-    #         return
-    #     src_sids = cookies['src_sid']
-    #     # sids are added to the cookies only by this procedure
-    #     src_sids.append(sid)
-    #     # shuffle for naive balance loading in case of twin services
-    #     subscriptions = deepcopy(self.subscriptions[subscription])
-    #     # random.shuffle(subscriptions)
-    #     # # do not forward notification to self and self twins
-    #     # the_twin_app_sids = self.app_name_to_sids[self.sid_to_app[sid]['name']]
-    #     # for s in the_twin_app_sids:
-    #     #     try:
-    #     #         subscriptions.remove(s)
-    #     #     except:
-    #     #         # self may not be subscribed to this notification: ignore
-    #     #         pass
-    #     # by default, namespace client (both app client, and app service)
-    #     # notifies only one of the subscriber twins (if any); when defined, the flags
-    #     # notify_twin_clients/services alter subscriber notification rule for twins
-    #     # subscriptions = self.remove_twin_app_sids(sids=subscriptions,
-    #     #                                             sids_to_stay=src_sids,
-    #     #                                             keep_twin_clients=notify_twin_clients,
-    #     #                                             keep_twin_services=notify_twin_services)
-    #     async def srv_callback(*arg, **kwarg):
-    #         await self.emit('client_notification_callback',
-    #                         dict(subscription=subscription,
-    #                              cb_name=cb, cb_ctx=cb_ctx,
-    #                              arg=arg, kwarg=kwarg,
-    #                              no_logging=True,
-    #                              **get_client_notification_args(data)),
-    #                         room=sid)
-
-    #     for target_sid in subscriptions:
-    #         sent_to = len(src_sids) * '>'
-    #         self.log(f"{subscription}: {self.sid_to_app[sid]['name']} {sent_to} {self.sid_to_app[target_sid]['name']}")
-    #         room = f"{subscription}_{target_sid}"
-    #         await self.emit(subscription, data, room=room, callback=cb and srv_callback)
-
-
-    # def remove_twin_app_sids(self, sids, sids_to_stay,
-    #                          keep_twin_clients=False,
-    #                          keep_twin_services=False):
-    #     """
-    #        Remove socket_ids of twin applications from sids array;
-    #        If sids_to_stay contain the twin app socket_id, then leave
-    #        it in resulting array and remove the twin sid.
-    #     """
-    #     res = []
-    #     # make sure relevant sids_to_stay members get to a result array
-    #     for s in sids_to_stay:
-    #         if s in sids:
-    #             res.append(s)
-    #             if (self.sid_to_app[s]['type'] == 'client' and keep_twin_clients) or \
-    #                (self.sid_to_app[s]['type'] == 'service' and keep_twin_services) :
-    #                 sids.remove(s)
-    #             else:
-    #                 self.remove_sid_with_twins(sids, s)
-    #     # check the rest of sids array
-    #     while sids:
-    #         s = sids[0]
-    #         res.append(s)
-    #         if (self.sid_to_app[s]['type'] == 'client' and keep_twin_clients) or \
-    #            (self.sid_to_app[s]['type'] == 'service' and keep_twin_services) :
-    #             sids.pop(0)
-    #         else:
-    #             self.remove_sid_with_twins(sids, s)
-    #     return res
-
-    # def remove_sid_with_twins(self, sids, sid_to_remove):
-    #     twin_sids_to_remove = self.app_name_to_sids[self.sid_to_app[sid_to_remove]['name']]
-    #     for s in twin_sids_to_remove:
-    #         sids.remove(s)
 
 
 def parse_cmd_args():

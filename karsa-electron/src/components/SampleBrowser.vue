@@ -314,9 +314,9 @@
 import Vue from "vue";
 import { mapState } from 'vuex'
 import Buefy from "buefy";
-
 import "buefy/dist/buefy.css";
 import '@mdi/font/css/materialdesignicons.min.css';
+import { BECom } from "../karsalib.js"
 
 Vue.use([Buefy]);
 
@@ -331,49 +331,50 @@ export default {
     computed: {
         ...mapState([
             'acquisition_control_active',
-            'acquisition_started',
             'acquisition_status',
             'experiments',
             'experiment_selected',
-            'h5_samples',
-            'h5_streamer_status',
-            'importable_samples',
+            // 'h5_samples',
+            // 'h5_streamer_status',
+            // 'importable_samples',
             'projects',
             'project_selected',
-            'samples',
+            // 'samples',
+            'socket',
+            'socket_connected',
         ]),
-        import_h5_table_datetime_range: {
-            get() {
-                return this.$store.state.import_h5_table_datetime_range;
-            },
-            set(value) {
-                this.$store.commit('import_h5_table_datetime_range', value);
-            }
-        },
-        import_sample_table_datetime_range: {
-            get() {
-                return this.$store.state.import_sample_table_datetime_range;
-            },
-            set(value) {
-                this.$store.commit('import_sample_table_datetime_range', value);
-            }
-        },
-        h5_to_import: {
-            get() {
-                return this.$store.state.h5_to_import;
-            },
-            set(value) {
-                this.$store.commit('h5_to_import', value);
-            }
-        },
-        sample_attributes: {
-            get() {
-                return this.$store.state.sample_attributes;
-            },
-            set(value) {
-                this.$store.commit('sample_attributes', value);
-            }
-        },
+        // import_h5_table_datetime_range: {
+        //     get() {
+        //         return this.$store.state.import_h5_table_datetime_range;
+        //     },
+        //     set(value) {
+        //         this.$store.commit('import_h5_table_datetime_range', value);
+        //     }
+        // },
+        // import_sample_table_datetime_range: {
+        //     get() {
+        //         return this.$store.state.import_sample_table_datetime_range;
+        //     },
+        //     set(value) {
+        //         this.$store.commit('import_sample_table_datetime_range', value);
+        //     }
+        // },
+        // h5_to_import: {
+        //     get() {
+        //         return this.$store.state.h5_to_import;
+        //     },
+        //     set(value) {
+        //         this.$store.commit('h5_to_import', value);
+        //     }
+        // },
+        // sample_attributes: {
+        //     get() {
+        //         return this.$store.state.sample_attributes;
+        //     },
+        //     set(value) {
+        //         this.$store.commit('sample_attributes', value);
+        //     }
+        // },
         sample_to_load: {
             get() {
                 return this.$store.state.sample_to_load;
@@ -385,6 +386,11 @@ export default {
     },
     data: function() {
         return {
+            be: null,
+            acquisition_started: false,
+            h5_samples: [],
+            h5_streamer_status: "not_ready",		// not_ready/ready
+            h5_to_import: [],
             is_import_sample_modal_active: false,
             is_import_h5_modal_active: false,
             is_sample_attribute_modal_active: false,
@@ -395,15 +401,19 @@ export default {
             import_max_datetime: new Date(),
             // variables for sample import modal
             experiments_ui: [],
+            importable_samples: {},
             import_sample_table_loading: true,
             import_sample_table_rows: [],
             import_sample_table_cols: [],
             import_sample_table_checked_rows: [],
+            import_sample_table_datetime_range: {},
             // variables for h5 import modal
             import_h5_table_rows: [],
             import_h5_table_cols: [],
             import_h5_table_checked_rows: [],
+            import_h5_table_datetime_range: {},
             // Sample metadata for selected sample
+            samples: [],
             sample_file: "",
             sample_name: "",
             sample_description: "",
@@ -413,9 +423,36 @@ export default {
             sample_table_rows: [],
             sample_table_cols: [],
             sample_table_checked_rows: [],
-            }
+            sample_attributes: {},
+            socket_room: null,
+            experiment_room: null,
+            endpoints: [
+                // 'acquisition_started',
+                // 'h5_samples',
+                // 'h5_streamer_status',
+                'importable_samples',
+                'samples',
+                // 'sample_attributes',
+            ],
+        }
     },
     created: function() {
+        this.be = new BECom(this);
+
+// //==============================
+//         get_parent_context(this);
+//         var self = this;
+//         self.socket.on("connect", () => {
+//             self.socket.on('acquisition_started', (value) => import_one_way_binding_prop('acquisition_started', value.value));
+//             self.socket.on("h5_samples", (value) => import_one_way_binding_prop("h5_samples", value.value));
+//             self.socket.on("h5_streamer_status", (value) => import_one_way_binding_prop("h5_streamer_status", value.value));
+//             self.socket.on("importable_samples", (value) => import_one_way_binding_prop("importable_samples", value.value));
+//             self.socket.on("samples", (value) => import_one_way_binding_prop("samples", value.value));
+
+//             subscribe();
+//         });
+// // =============================
+
     },
     mounted: function() {
     },
@@ -534,6 +571,16 @@ export default {
             this.sample_description = "";
             this.sample_project = this.project_selected.id;
             this.sample_experiment = new_value.id;
+
+            if ( !_.isEmpty(new_value.id) ) {
+                if ( !_.isEmpty(this.experiment_room) )
+                    this.be.unsubscribe(this.experiment_room);
+                this.experiment_room = this.project_selected.id + '_' + new_value.id;
+                this.be.subscribe(this.experiment_room);
+                return this.be.export_one_way_binding_prop('experiment_selected',
+                                                           new_value, old_value,
+                                                           this.experiment_room);
+            }
         },
         experiments: function(new_value) {
             if (!_.isEqual(new_value.project, this.project_selected.id)) {
@@ -581,6 +628,7 @@ export default {
                 return false;
             }
             this.sample_project = new_value.id;
+            // this.be.unsubscribe();
         },
         samples: function(new_data){
             // TODO: quick&dirty fix to close sample attribute popup in acquisition mode
@@ -598,13 +646,6 @@ export default {
                     this.is_sample_attribute_modal_active = false;
                 }
             }
-            // TODO: quick&dirty fix to drop undesired sample update
-            if ( !_.isEqual(new_data.project, this.project_selected.id) ||
-                 !_.isEqual(new_data.experiment, this.experiment_selected.id) ) {
-                     console.log("samples update ignored");
-                return
-            }
-            //
             this.sample_table_cols = new_data.cols;
             this.sample_table_rows = new_data.rows;
         },
@@ -618,13 +659,14 @@ export default {
             if ( this.sample_table_checked_rows.length > 1 ) {
                 this.sample_table_checked_rows = [last_selection,];
             }
-            // TODO: clean up figures
-            // check if the vuex props should be mapped to local props
-            this.$store.commit('heatmap_figure_data', {});
-            this.$store.commit('timeseries_figure_data', {});
-            this.$store.commit('tps_parameters_selected', []);
-            this.$store.commit('tps_parameters', []);
-            this.$store.commit('spec_stack_figure_data', {});
+
+            // // TODO: clean up figures -  NO NEED?
+            // // check if the vuex props should be mapped to local props
+            // this.$store.commit('heatmap_figure_data', {});
+            // this.$store.commit('timeseries_figure_data', {});
+            // this.$store.commit('tps_parameters_selected', []);
+            // this.$store.commit('tps_parameters', []);
+            // this.$store.commit('spec_stack_figure_data', {});
 
             if (last_selection) {
                 this.sample_file = last_selection.id;
@@ -635,6 +677,40 @@ export default {
                 this.sample_to_load = {'filename': this.sample_file};
             } else {
                 this.sample_to_load = {'filename': ""};
+            }
+        },
+        h5_to_import: function(new_value, old_value) {
+            return this.be.export_one_way_binding_prop('h5_to_import',
+                                                        new_value, old_value,
+                                                        this.experiment_room);
+        },
+        import_h5_table_datetime_range: function(new_value, old_value) {
+            return this.be.export_one_way_binding_prop('import_h5_table_datetime_range',
+                                                        new_value, old_value,
+                                                        this.experiment_room);
+        },
+        import_sample_table_datetime_range: function(new_value, old_value) {
+            return this.be.export_one_way_binding_prop('import_sample_table_datetime_range',
+                                                        new_value, old_value,
+                                                        this.experiment_room);
+        },
+        sample_attributes: function(new_value, old_value) {
+            return this.be.export_one_way_binding_prop('sample_attributes',
+                                                        new_value, old_value,
+                                                        this.experiment_room);
+        },
+        socket_connected: function(new_value) {
+            if ( new_value === true )
+            {
+                // handlers for for external notifications:
+                // this.socket.on('acquisition_started', (value) => this.be.import_one_way_binding_prop('acquisition_started', value.value));
+                // this.socket.on("h5_samples", (value) => this.be.import_one_way_binding_prop("h5_samples", value.value));
+                // this.socket.on("h5_streamer_status", (value) => this.be.import_one_way_binding_prop("h5_streamer_status", value.value));
+                this.socket.on("importable_samples", (value) => this.be.import_one_way_binding_prop("importable_samples", value.value));
+                this.socket.on("samples", (value) => this.be.import_one_way_binding_prop("samples", value.value));
+
+                this.socket_room = this.socket.id;
+                this.be.subscribe(this.socket_room);
             }
         },
     }

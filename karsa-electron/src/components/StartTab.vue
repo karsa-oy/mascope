@@ -364,9 +364,9 @@
 import Vue from "vue";
 import { mapState } from 'vuex'
 import Buefy from "buefy";
-
 import "buefy/dist/buefy.css";
 import '@mdi/font/css/materialdesignicons.min.css';
+import { BECom } from "../karsalib.js"
 
 Vue.use([Buefy]);
 
@@ -413,9 +413,10 @@ var all_reagents = [
     ]
 
 export default {
-    name: "WorkflowTab",
+    name: "StartTab",
     data: function() {
         return {
+            be: null,
             // Modal active variables
             is_modal_new_project_active: false,
             is_modal_new_experiment_active: false,
@@ -443,13 +444,21 @@ export default {
             inlets: inlets,
             mspecs: mspecs,
             reagents: all_reagents,
+            socket_room: null,
+            all_projects_room: 'all_projects',
+            project_room: null,
+            endpoints: [
+                'projects',
+                'experiments',
+            ],
         }
     },
     computed: {
         ...mapState([
-                'experiments',
-                'projects',
+                // 'experiments',
+                // 'projects',
                 'socket',
+                'socket_connected',
                 ]),
         active_tab: {
             get() {
@@ -465,6 +474,22 @@ export default {
             },
             set(value) {
                 this.$store.commit('data_source_path', value);
+            }
+        },
+        projects: {
+            get() {
+                return this.$store.state.projects;
+            },
+            set(value) {
+                this.$store.commit('projects', value);
+            }
+        },
+        experiments: {
+            get() {
+                return this.$store.state.experiments;
+            },
+            set(value) {
+                this.$store.commit('experiments', value);
             }
         },
         project_selected: {
@@ -484,29 +509,10 @@ export default {
             }
         },
     },
-    watch: {
-        experiments: function(new_value) {
-            if (!_.isEqual(new_value.project, this.project_selected.id)) {
-                return
-            }
-            this.experiments_ui = new_value.experiments;
-        },
-        'instrument.polarity': function(polarity) {
-            this.reagents = all_reagents.filter(function(el){
-                return el.polarity === polarity
-            });
-        },
-        'instrument.reagent': function(reagent) {
-            for(let i in all_reagents){
-                if(all_reagents[i].id === reagent){
-                    this.instrument.polarity = all_reagents[i].polarity;
-                }
-            }
-        },
-    },
     created() {
         // Initialize project_selected
         this.project_selected = {'id': ""};
+        this.be = new BECom(this);
     },
     methods: {
         isValidFilename(str) {
@@ -597,8 +603,63 @@ export default {
                                         };
             this.is_modal_new_experiment_active = false;
             this.active_tab = 2;
+
+            // let corresponding project room to be updated for the new experiment
+            this.be.emit_client_notification('project_selected',
+                                             {id: this.project.title},
+                                             this.project_room)
         },
-    }
+    },
+    watch: {
+        experiments: function(new_value) {
+            this.experiments_ui = new_value.experiments;
+        },
+        experiment_selected: function(new_value, old_value) {
+            return this.be.export_one_way_binding_prop('experiment_selected',
+                                                        new_value, old_value,
+                                                        this.project_room );
+        },
+        project_selected: function(new_value, old_value) {
+            if ( !_.isEmpty(new_value.id) ) {
+                if ( !_.isEmpty(this.project_room) )
+                    this.be.unsubscribe(this.project_room);
+                this.project_room = new_value.id;
+                this.be.subscribe(this.project_room);
+                // push new_value of project_selected to corresponding room
+                this.be.export_one_way_binding_prop('project_selected',
+                                                    new_value, old_value,
+                                                    this.project_room);
+                // make all clients in 'all_projects' room see the new project
+                this.be.emit_client_notification('service_state', {},
+                                                 'all_projects');
+            }
+        },
+        socket_connected: function(new_value, old_value) {
+            if ( new_value === old_value )
+                return false;
+            if ( new_value === true )
+            {
+                this.socket.on("projects", (value) => this.be.import_two_way_binding_prop("projects", value.value));
+                this.socket.on('experiments', (value) => this.be.import_two_way_binding_prop('experiments', value.value));
+
+                this.socket_room = this.socket.id;
+                this.be.subscribe(this.socket_room);
+                this.be.subscribe(this.all_projects_room);
+            }
+        },
+        'instrument.polarity': function(polarity) {
+            this.reagents = all_reagents.filter(function(el){
+                return el.polarity === polarity
+            });
+        },
+        'instrument.reagent': function(reagent) {
+            for(let i in all_reagents){
+                if(all_reagents[i].id === reagent){
+                    this.instrument.polarity = all_reagents[i].polarity;
+                }
+            }
+        },
+    },
 }
   
 </script>
