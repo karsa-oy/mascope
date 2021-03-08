@@ -40,12 +40,12 @@
                                     required
                                     expanded
                                     disabled>
-                                    <!-- <option
+                                    <option
                                         v-for="p in projects"
                                         :value="p.id"
                                         :key="p.id">
                                         {{ p.id }}
-                                    </option> -->
+                                    </option>
                                 </b-select>
                             </b-field>
 
@@ -56,12 +56,12 @@
                                     required
                                     expanded
                                     disabled>
-                                    <!-- <option
+                                    <option
                                         v-for="e in experiments_ui"
                                         :value="e.id"
                                         :key="e.id">
                                         {{ e.id }}
-                                    </option> -->
+                                    </option>
                                 </b-select>
                             </b-field>
 
@@ -332,12 +332,12 @@ export default {
         ...mapState([
             'acquisition_control_active',
             'acquisition_status',
-            // 'experiments',
+            'experiments',
             'experiment_selected',
             // 'h5_samples',
             // 'h5_streamer_status',
             // 'importable_samples',
-            // 'projects',
+            'projects',
             'project_selected',
             // 'samples',
             'socket',
