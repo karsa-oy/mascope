@@ -105,7 +105,6 @@ class TWh5StreamerServiceClient(TOFServiceClient):
 
 
 def run():
-    global INSTRUMENT_NAME
     global h5streamer
 
     url, port, namespace = parse_cmd_args()
@@ -116,8 +115,6 @@ def run():
     #           "Please restart the service with --ns option."
     #           )
     #     return
-    # INSTRUMENT_NAME = namespace.strip('/')
-    INSTRUMENT_NAME = "TOF" # :TODO
 
     client = TWh5StreamerServiceClient(url, port, (namespace, TWh5StreamerNamespace))
     loop = asyncio.get_event_loop()
@@ -128,5 +125,4 @@ def run():
 
 
 if __name__=='__main__':
-    INSTRUMENT_NAME = ""
     run()

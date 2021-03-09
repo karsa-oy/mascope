@@ -11,6 +11,7 @@ from queue import Empty
 from karsalib import BaseClientNamespace, BaseServiceClient, parse_cmd_args
 from karsatof.kgenerator import Acquisition, h5Streamer
 
+NO_DATA_LOGGING_DEFAULT = True
 
 class TOFServiceNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for
@@ -69,7 +70,7 @@ class TOFServiceClient(BaseServiceClient):
                 await self.emit_client_notification(
                                             'instrument_status',
                                             'not_ready',
-                                            room=INSTRUMENT_NAME,
+                                            no_data_logging=False
                                             )
                 break
             except BadNamespaceError:
@@ -79,13 +80,10 @@ class TOFServiceClient(BaseServiceClient):
         await self.emit_client_notification(
                                     'instrument_status',
                                     'ready',
-                                    room=INSTRUMENT_NAME,
+                                    no_data_logging=False
                                     )
 
     async def service_main(self):
-        global INSTRUMENT_NAME
-        INSTRUMENT_NAME = None
-
         # Main loop
         while True:
             # Catch Ctrl+C
@@ -105,7 +103,6 @@ class TOFServiceClient(BaseServiceClient):
             await self.emit_client_notification(
                                         'acquisition_status',
                                         'running',
-                                        room=INSTRUMENT_NAME,
                                         cookies=cookies,
                                         )
 
@@ -116,7 +113,6 @@ class TOFServiceClient(BaseServiceClient):
                                         'acquisition_started',
                                         {'filename': filename,
                                          },
-                                        room=INSTRUMENT_NAME,
                                         cookies=cookies,
                                         )
             await self.emit_client_notification(
@@ -125,7 +121,6 @@ class TOFServiceClient(BaseServiceClient):
                                          'mz': self.acquisition.mz.tobytes(),
                                          't_range': [0, self.acquisition.length]
                                          },
-                                        room=INSTRUMENT_NAME,
                                         cookies=cookies,
                                         no_data_logging=True
                                         )
@@ -134,7 +129,6 @@ class TOFServiceClient(BaseServiceClient):
                                         {'filename': filename,
                                          'tps_info': self.acquisition.tps_info,
                                          },
-                                        room=INSTRUMENT_NAME,
                                         cookies=cookies,
                                         )
             # Acquisition loop
@@ -154,7 +148,6 @@ class TOFServiceClient(BaseServiceClient):
                     await self.emit_client_notification(
                                             'acquired_spectrum',
                                             spec_data,
-                                            room=INSTRUMENT_NAME,
                                             cookies=cookies,
                                             no_data_logging=True
                                             )
@@ -162,7 +155,6 @@ class TOFServiceClient(BaseServiceClient):
                     await self.emit_client_notification(
                                             'acquired_tps_data',
                                             tps_data,
-                                            room=INSTRUMENT_NAME,
                                             cookies=cookies,
                                             no_data_logging=True
                                             )
@@ -171,7 +163,6 @@ class TOFServiceClient(BaseServiceClient):
                                             'acquisition_progress', 
                                             {'progress': self.acquisition.progress,
                                              },
-                                            room=INSTRUMENT_NAME,
                                             cookies=cookies,
                                             )
                 # Got poison pill
@@ -181,20 +172,17 @@ class TOFServiceClient(BaseServiceClient):
                                             'acquisition_progress', 
                                             {'progress': 100.,
                                              },
-                                            room=INSTRUMENT_NAME,
                                             cookies=cookies,
                                             )
                     await self.emit_client_notification(
                                             'acquisition_finished', 
                                             {'filename': filename
                                              },
-                                            room=INSTRUMENT_NAME,
                                             cookies=cookies,
                                             )
                     await self.emit_client_notification(
                                             'acquisition_status',
                                             'not_running',
-                                            room=INSTRUMENT_NAME,
                                             cookies=cookies,
                                             )
                     self.log("Exiting acquisition loop.")
@@ -205,8 +193,6 @@ class TOFServiceClient(BaseServiceClient):
 
 
 def run():
-    global INSTRUMENT_NAME
-
     url, port, namespace = parse_cmd_args()
 
     # TODO: TOFService should always be in private namespace with FileIo
@@ -215,8 +201,6 @@ def run():
     #           "Please restart the service with --ns option."
     #           )
     #     return
-    # INSTRUMENT_NAME = namespace.strip('/')
-    INSTRUMENT_NAME = "TOF" # :TODO
 
     client = TOFServiceClient(url, port, (namespace, TOFServiceNamespace))
     loop = asyncio.get_event_loop()
@@ -224,5 +208,4 @@ def run():
 
 
 if __name__=='__main__':
-    INSTRUMENT_NAME = ""
     run()

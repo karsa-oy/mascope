@@ -12,13 +12,13 @@ if defined CONDA_EXE (
 powershell Test-NetConnection 127.0.0.1 -p 5010 | find /i "failed" && start cmd /k karsa-router-service
 
 :: Start TOFService
-start cmd /k karsa-tof-service || goto :error
+start cmd /k karsa-tof-service --ns=tof || goto :error
 
 :: Set working directory to virtual environment dir
 pushd .venv || goto :error
 
 :: Start other services
-start cmd /k karsa-fileio-service || goto :error
+start cmd /k karsa-fileio-service --ns=tof || goto :error
 start cmd /k karsa-sample-service || goto :error
 start cmd /k karsa-dataviz-service || goto :error
 start cmd /k karsa-h5-streamer || goto :error

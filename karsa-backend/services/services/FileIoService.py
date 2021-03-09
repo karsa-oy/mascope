@@ -357,7 +357,11 @@ class FileIoNamespace(BaseClientNamespace):
         value = data['value']
         kwargs = get_client_notification_args(data)
 
-        filename = value['filename']
+        try:
+            filename = value['filename']
+        except KeyError:
+            print("KeyError: %s" %value)
+            return
         mz_range = value.get('mz_range', None)
         t_range = value.get('t_range', None)
         
@@ -406,7 +410,7 @@ class FileIoNamespace(BaseClientNamespace):
                              'y_range': y_range
                              },
                             set_figure_ranges=set_figure_ranges,
-                            **kwargs
+                            **{**kwargs, 'namespace': '/'}
                             )
         
         stream_data = True
@@ -421,7 +425,7 @@ class FileIoNamespace(BaseClientNamespace):
                                                      't_range': t_range,
                                                      'img': heatmap_img
                                                      },
-                                                    **kwargs
+                                                    **{**kwargs, 'namespace': '/'}
                                                     )
                 for t0, spec_img in spec_imgs:
                     await self.emit_client_notification('spec_trace_image',
@@ -430,7 +434,7 @@ class FileIoNamespace(BaseClientNamespace):
                                                          't_range': [t0, t0], # t1 does not matter
                                                          'img': spec_img
                                                          },
-                                                        **kwargs
+                                                        **{**kwargs, 'namespace': '/'}
                                                         )
                 # No need to send data to DataViz
                 stream_data = False
@@ -469,7 +473,7 @@ class FileIoNamespace(BaseClientNamespace):
                                              },
                                             callback="speci_callback",
                                             callback_context=cache_get_keys(data),
-                                            **kwargs
+                                            **{**kwargs, 'namespace': '/'}
                                             )
             # wait till last series of notifications (mod 10 in size) is processed by subscriber
             while i > signal_env['speci'] and ttl_count < TASK_TTL:
@@ -480,7 +484,7 @@ class FileIoNamespace(BaseClientNamespace):
                                              'mz_range': mz_range,
                                              't_range': t_range,
                                              },
-                                            **kwargs
+                                            **{**kwargs, 'namespace': '/'}
                                             )
     def speci_callback(self, ctx, n):
         _, signal_env = cache_get(ctx, 'signal')

@@ -131,8 +131,8 @@ export default {
     },
     computed: {
         ...mapState([
-            'socket',
-            'socket_connected',
+            'global_namespace',
+            'global_namespace_connected',
             // 'targets',
         ]),
         // target_list_request: {
@@ -167,7 +167,7 @@ export default {
             target_table_cols: [],
             target_table_selected_row: {},
             //
-            socket_room: null,
+            sid: null,
             endpoints: [
                 'targets',
             ]
@@ -289,15 +289,15 @@ export default {
         target_to_display: function(new_value, old_value) {
             return this.be.export_one_way_binding_prop('target_to_display',
                                                         new_value, old_value,
-                                                        this.socket_room);
+                                                        this.sid);
         },
-        socket_connected: function(new_value) {
+        global_namespace_connected: function(new_value) {
             if ( new_value === true )
             {
                 // handlers for for external notifications:
-                this.socket.on("targets", (value) => this.be.import_one_way_binding_prop("targets", value.value));
-                this.socket_room = this.socket.id;
-                this.be.subscribe(this.socket_room);
+                this.global_namespace.on("targets", (value) => this.be.import_one_way_binding_prop("targets", value.value));
+                this.sid = this.global_namespace.id;
+                this.be.subscribe(this.sid);
             }
         },
     }

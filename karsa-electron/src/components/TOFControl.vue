@@ -300,9 +300,7 @@ export default {
     ],
     computed: {
         ...mapState([
-            // 'instrument_status',
-            'socket',
-            'socket_connected',
+            'url',
         ]),
         acquisition_control_active: {
             get() {
@@ -334,7 +332,18 @@ export default {
     },
     data: function() {
         return {
+            // Communication
             be: null,
+            tof_namespace: null,
+            sid: null,
+            sample_length: 120,
+            endpoints: [
+                'acquisition_status',
+                'acquisition_progress',
+                'instrument_status',
+                'sample_length',
+            ],
+
             acquisition_progress: 0,
             instrument_status: "not_ready",			// not_ready/ready
             is_edit_temperature_ramp_modal_active: false,
@@ -361,22 +370,6 @@ export default {
             // flag to separate if data was changed by user or by loading
             // config file in the 
             data_updated_from_loading: true,
-            socket_room: null,
-            instrument_room: 'TOF',    //TODO: room comes from instrument selection
-            sample_length: 120,
-            endpoints: [
-                'acquisition_status',
-                'acquisition_progress',
-                'instrument_status',
-                'sample_length',
-                // TODO: remove lower 4 endpoints after 
-                // acq. data stream goes to FileService
-                'figure_ranges',
-                'heatmap_figure_data',
-                'spec_stack_figure_data',
-                'timeseries_figure_data',
-                // ============================
-            ],
         }
     },
     created: function() {
@@ -396,7 +389,8 @@ export default {
                 onCancel: () => this.acquisition_control_active = false,
                 onConfirm: () => { this.$buefy.toast.open({message: 'Instrument control granted',
                                                           type: 'is-success'});
-                                   this.be.subscribe(this.instrument_room); }
+                                   this.tof_namespace = this.be.connect(this.url + '/tof');
+                                   this.be.subscribe(null, this.tof_namespace); }
             })
         },
         delete_row_in_config_desorption_table() {
@@ -521,7 +515,7 @@ export default {
                 this.confirmAcquisitionControl();
             }
             else {
-                this.be.unsubscribe(this.instrument_room);
+                this.be.disconnect(this.tof_namespace);
             }
         },
         acquisition_mode: function(new_value, old_value) {
@@ -558,9 +552,11 @@ export default {
                 this.scenthound_status = 'Ready';
             }
             return this.be.export_two_way_binding_prop('acquisition_status',
-                                                        new_value, old_value,
-                                                        this.instrument_room,
-                                                        true);
+                                                        new_value,
+                                                        old_value,
+                                                        'acquisition_status',
+                                                        this.tof_namespace,
+                                                        );
         },
         instrument_status: function(new_value, old_value) {
             if ( _.isEqual(new_value, old_value) ) {
@@ -574,18 +570,18 @@ export default {
                 this.acquisition_status = 'not_running';
             }
         },
-        socket_connected: function(new_value) {
+        'tof_namespace.connected': function(new_value) {
             if ( new_value === true )
             {
                 // handlers for for external notifications:
-                this.socket.on("acquisition_status", (value) => this.be.import_two_way_binding_prop("acquisition_status", value.value));
-                this.socket.on("acquisition_progress", (value) => this.be.import_one_way_binding_prop("acquisition_progress", value.value.progress, true));
-                this.socket.on("instrument_status", (value) => this.be.import_one_way_binding_prop("instrument_status", value.value));
-                this.socket.on("sample_length", (value) => this.be.import_two_way_binding_prop("sample_length", value.value));
+                this.tof_namespace.on("acquisition_status", (value) => this.be.import_two_way_binding_prop("acquisition_status", value.value));
+                this.tof_namespace.on("acquisition_progress", (value) => this.be.import_one_way_binding_prop("acquisition_progress", value.value.progress, true));
+                this.tof_namespace.on("instrument_status", (value) => this.be.import_one_way_binding_prop("instrument_status", value.value));
+                this.tof_namespace.on("sample_length", (value) => this.be.import_two_way_binding_prop("sample_length", value.value));
 
                 // dynamic subscription thru AcquisitionControl dialog
-                this.socket_room = this.socket.id;
-                this.be.subscribe(this.socket_room);
+                // this.sid = this.tof_namespace.id;
+                // this.be.subscribe(this.sid);
             }
         },
     }
