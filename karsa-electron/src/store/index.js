@@ -27,7 +27,8 @@ export default new Vuex.Store({
 		sample_selected: {},
 		sample_to_load: {},
 		// samples: [],
-		socket: null,
+		global_namespace: null,
+		global_namespace_connected: false,
 		// spec_stack_figure_data: {},
 		// target_list_request: {},
 		// target_table_data: [],
@@ -37,7 +38,6 @@ export default new Vuex.Store({
 		// tps_parameters: [],
 		// tps_parameters_selected: [],
 		url: "",
-		socket_connected: false,
 		// visualize_range: {},
 		// stop_visualize_range: {},
 	},
@@ -59,6 +59,9 @@ export default new Vuex.Store({
 		},
 		experiments(state, payload) {
 			state.experiments = payload;
+		},
+		global_namespace_connected(state, payload) {
+			state.global_namespace_connected = payload;
 		},
 		// figure_ranges(state, payload) {
 		// 	state.figure_ranges = payload;
@@ -102,8 +105,8 @@ export default new Vuex.Store({
 		// samples(state, payload) {
 		// 	state.samples = payload;
 		// },
-		socket(state, payload) {
-			state.socket = payload;
+		global_namespace(state, payload) {
+			state.global_namespace = payload;
 		},
 		// spec_stack_figure_data(state, payload) {
 		// 	state.spec_stack_figure_data = payload;
@@ -131,9 +134,6 @@ export default new Vuex.Store({
 		// },
 		url(state, payload) {
 			state.url = payload;
-		},
-		socket_connected(state, payload) {
-			state.socket_connected = payload;
 		},
 		// visualize_range(state, payload) {
 		// 	state.visualize_range = payload;

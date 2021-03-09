@@ -98,14 +98,14 @@ export default {
                      'acquisition_status',  //no subscription here - use TOFControl sync
                      'experiment_selected',
                     //  'figure_ranges',
+                      'global_namespace',
                     //  'heatmap_figure_data',
                      'sample_to_load',
                     //  'spec_stack_figure_data',
                      'target_to_display',
                     //  'timeseries_figure_data',
                     //  'tps_parameters',
-                     'socket',
-                     'socket_connected'
+                     'global_namespace_connected'
                      ]),
         // visualize_range: {
         //     get() {
@@ -158,7 +158,7 @@ export default {
             zoom_stack: [],
             visualize_range: {},
             stop_visualize_range: {},
-            socket_room: null,
+            sid: null,
             endpoints: [
                 'figure_ranges',
                 'heatmap_figure_data',
@@ -1017,12 +1017,12 @@ export default {
         stop_visualize_range: function(new_value, old_value) {
             return this.be.export_one_way_binding_prop('stop_visualize_range',
                                                         {...new_value, 'uid': Math.random()}, old_value,
-                                                        this.socket_room);
+                                                        this.sid);
         },
         visualize_range: function(new_value, old_value) {
             return this.be.export_one_way_binding_prop('visualize_range',
                                                         {...new_value, 'uid': Math.random()}, old_value,
-                                                        this.socket_room);
+                                                        this.sid);
         },
         tps_parameters_selected_ui: function(value) {
             this.tps_parameters_selected = {'tps_parameters_selected': value, 'figure_ranges': this.figure_ranges};
@@ -1030,20 +1030,20 @@ export default {
         tps_parameters_selected: function(new_value, old_value) {
             return this.be.export_one_way_binding_prop('tps_parameters_selected',
                                                         new_value, old_value,
-                                                        this.socket_room);
+                                                        this.sid);
         },
-        socket_connected: function(new_value) {
+        global_namespace_connected: function(new_value) {
             if ( new_value === true )
             {
                 // handlers for for external notifications:
-                this.socket.on("figure_ranges", (value) => this.be.import_one_way_binding_prop("figure_ranges", {...value.value, 'uid': Math.random()}));
-                this.socket.on("heatmap_figure_data", (value) => this.be.import_one_way_binding_prop("heatmap_figure_data", value.value));
-                this.socket.on("spec_stack_figure_data", (value) => this.be.import_one_way_binding_prop("spec_stack_figure_data", value.value));
-                this.socket.on("timeseries_figure_data", (value) => this.be.import_one_way_binding_prop("timeseries_figure_data", value.value));
-                this.socket.on("tps_parameters", (value) => this.be.import_one_way_binding_prop("tps_parameters", value.value));
+                this.global_namespace.on("figure_ranges", (value) => this.be.import_one_way_binding_prop("figure_ranges", {...value.value, 'uid': Math.random()}));
+                this.global_namespace.on("heatmap_figure_data", (value) => this.be.import_one_way_binding_prop("heatmap_figure_data", value.value));
+                this.global_namespace.on("spec_stack_figure_data", (value) => this.be.import_one_way_binding_prop("spec_stack_figure_data", value.value));
+                this.global_namespace.on("timeseries_figure_data", (value) => this.be.import_one_way_binding_prop("timeseries_figure_data", value.value));
+                this.global_namespace.on("tps_parameters", (value) => this.be.import_one_way_binding_prop("tps_parameters", value.value));
 
-                this.socket_room = this.socket.id;
-                this.be.subscribe(this.socket_room);
+                this.sid = this.global_namespace.id;
+                this.be.subscribe(this.sid);
             }
         },
     },

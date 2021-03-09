@@ -224,85 +224,6 @@
         </section>
         <!-- End of Modal for sample edit -->
 
-        <!-- Modal for h5 import -->
-        <section class="h5-import-modal">
-            <b-modal :active.sync="is_import_h5_modal_active"
-                has-modal-card
-                trap-focus
-                :can-cancel="true"
-                aria-role="dialog"
-                aria-modal>
-                <div class="columns">
-                    <div class="modal-card" style="width: 500px; height: 700px">
-                        <header class="modal-card-head">
-                            <p class="modal-card-title">Import h5 files</p>
-                        </header>
-                        <section class="modal-card-body">
-                            <b-field label="Start">
-                                <b-datetimepicker
-                                    v-model="import_start_time"
-                                    placeholder="Start datetime"
-                                    :timepicker="{'hour-format': '24'}"
-                                    :min-datetime="import_min_datetime"
-                                    :max-datetime="import_max_datetime">
-                                </b-datetimepicker>
-                            </b-field>
-                            <b-field label="End">
-                                <b-datetimepicker
-                                    v-model="import_end_time"
-                                    placeholder="End datetime"
-                                    :timepicker="{'hour-format': '24'}"
-                                    :min-datetime="import_start_time"
-                                    :max-datetime="import_max_datetime">
-                                </b-datetimepicker>
-                            </b-field>
-                            <button
-                                class="button"
-                                type="button"
-                                @click="FetchH5s()"
-                                is-dark
-                                :disabled="(h5_streamer_status==='not_ready' ||
-                                            import_start_time === null ||
-                                            import_end_time === null
-                                            ) ? true : false">
-                                Fetch h5 list
-                            </button>
-                            <div><br></div>
-                            <b-table 
-                                id="h5-samples-table"
-                                :columns="import_h5_table_cols"
-                                :data="import_h5_table_rows"
-                                :checkable="true"
-                                :checked-rows.sync="import_h5_table_checked_rows">
-                            </b-table>
-                            <div><br></div>
-                        </section>
-                        <footer class="modal-card-foot">
-                            <button
-                                class="button"
-                                type="button"
-                                @click="ImportH5s()"
-                                is-dark
-                                :disabled="(!import_h5_table_checked_rows.length ||
-                                            import_start_time === null ||
-                                            import_end_time === null
-                                            ) ? true : false">
-                                Import
-                            </button>
-                            <button
-                                class="button"
-                                type="button"
-                                is-dark
-                                @click="is_import_h5_modal_active=false">
-                                Cancel
-                            </button>
-                        </footer>
-                    </div>
-                </div>
-            </b-modal>
-        </section>
-        <!-- End of h5 import modal -->
-
         <!-- Modal for sample import -->
         <section class="sample-import-modal">
             <b-modal :active.sync="is_import_sample_modal_active"
@@ -386,8 +307,10 @@
                                         <b-menu-item
                                             v-for="p in projects"
                                             :key="p.id"
-                                            :label="p.id"
                                             @click="project.title=p.id; SetProject()">
+                                            <template #label>
+                                                {{p.id}}
+                                            </template>
                                             <!-- Experiments -->
                                             <b-menu-list
                                                 label="Experiments"
@@ -396,8 +319,10 @@
                                                 <b-menu-item 
                                                     v-for="e in experiments_ui"
                                                     :key="e.id"
-                                                    :label="e.id"
                                                     @click="experiment.title=e.id; SetExperiment()">
+                                                    <template #label>
+                                                        {{e.id}}
+                                                    </template>
                                                     <p class="menu-label">
                                                         Samples
                                                     </p>
@@ -478,20 +403,6 @@
                                     <!-- End of projects -->
                                 </b-menu>
                                 <!-- End of sample browser tree -->
-
-                                <div><br></div>
-                                <b-button
-                                    type="is-dark"
-                                    @click="is_import_h5_modal_active=true"
-                                    size="is-small"
-                                    outlined
-                                    inverted
-                                    :disabled="(h5_streamer_status=='ready' && 
-                                                (!acquisition_control_active ||
-                                                 acquisition_status=='not_running')
-                                                ) ? false : true">
-                                    Import h5 file
-                                </b-button>
                             </div>
                         </div>
                     </div>
@@ -531,41 +442,10 @@ export default {
             // 'h5_streamer_status',
             // 'importable_samples',
             // 'samples',
-            'socket',
-            'socket_connected',
+            'global_namespace',
+            'global_namespace_connected',
         ]),
-        // import_h5_table_datetime_range: {
-        //     get() {
-        //         return this.$store.state.import_h5_table_datetime_range;
-        //     },
-        //     set(value) {
-        //         this.$store.commit('import_h5_table_datetime_range', value);
-        //     }
-        // },
-        // import_sample_table_datetime_range: {
-        //     get() {
-        //         return this.$store.state.import_sample_table_datetime_range;
-        //     },
-        //     set(value) {
-        //         this.$store.commit('import_sample_table_datetime_range', value);
-        //     }
-        // },
-        // h5_to_import: {
-        //     get() {
-        //         return this.$store.state.h5_to_import;
-        //     },
-        //     set(value) {
-        //         this.$store.commit('h5_to_import', value);
-        //     }
-        // },
-        // sample_attributes: {
-        //     get() {
-        //         return this.$store.state.sample_attributes;
-        //     },
-        //     set(value) {
-        //         this.$store.commit('sample_attributes', value);
-        //     }
-        // },
+
         experiments: {
             get() {
                 return this.$store.state.experiments;
@@ -613,15 +493,10 @@ export default {
             acquisition_started: false,
             // Project / experiment title validation
             valid_pattern: RegExp(/^\w+$/),
-            // h5 streamer
-            h5_samples: [],
-            h5_streamer_status: "not_ready",		// not_ready/ready
-            h5_to_import: [],
             // Modal active variables
             is_modal_new_project_active: false,
             is_modal_new_experiment_active: false,
             is_import_sample_modal_active: false,
-            is_import_h5_modal_active: false,
             is_sample_attribute_modal_active: false,
             // variables for import modals
             import_start_time: null,
@@ -635,11 +510,6 @@ export default {
             import_sample_table_cols: [],
             import_sample_table_checked_rows: [],
             import_sample_table_datetime_range: {},
-            // variables for h5 import modal
-            import_h5_table_rows: [],
-            import_h5_table_cols: [],
-            import_h5_table_checked_rows: [],
-            import_h5_table_datetime_range: {},
             // Project metadata
             project: {
                 title: "",
@@ -667,12 +537,10 @@ export default {
             // Communication
             projects_room: 'projects',
             project_room: null,
-            socket_room: null,
+            sid: null,
             experiment_room: null,
             endpoints: [
                 // 'acquisition_started',
-                // 'h5_samples',
-                // 'h5_streamer_status',
                 'experiments',
                 'importable_samples',
                 'projects',
@@ -690,37 +558,6 @@ export default {
     mounted: function() {
     },
     methods: {
-        FetchH5s() {
-            if (this.import_start_time == null || 
-                this.import_end_time == null) {
-                this.$buefy.toast.open({
-                    duration: 3000,
-                    message: "You must select datetime range first!",
-                    type: 'is-danger',
-                    queue: false,
-                })
-                return
-            }
-            // Revert automatic timezone adjustment
-            let dt0 = new Date(this.import_start_time.getTime()); // copy
-            let start_hours_diff = dt0.getHours() - dt0.getTimezoneOffset() / 60;
-            dt0.setHours(start_hours_diff);
-
-            let dt1 = new Date(this.import_end_time.getTime()); // copy
-            let end_hours_diff = dt1.getHours() - dt1.getTimezoneOffset() / 60;
-            dt1.setHours(end_hours_diff);
-            
-            // Request list of h5 files in given range
-            let fetch_request = {
-                'dt0': dt0.toJSON(),
-                'dt1': dt1.toJSON()
-            }
-            this.import_h5_table_datetime_range = fetch_request;
-        },
-        ImportH5s() {
-            this.h5_to_import = this.import_h5_table_checked_rows;
-            this.is_import_h5_modal_active = false;
-        },
         ImportSamples() {
             let to_import = this.import_sample_table_checked_rows[0];
             // Preserve sample id, title and description
@@ -779,7 +616,7 @@ export default {
             this.sample_attributes = sample;
             this.is_sample_attribute_modal_active = false;
         },
-                isValidFilename(str) {
+        isValidFilename(str) {
             return this.valid_pattern.test(str);
         },
 
@@ -856,6 +693,7 @@ export default {
             for (let i in this.experiments_ui) {
                 if(this.experiments_ui[i].id === this.experiment.title){
                     this.experiment.description = this.experiments_ui[i].attributes.description;
+                    break;
                 }
             }
             this.experiment_selected = {'id': this.experiment.title,
@@ -915,33 +753,6 @@ export default {
         },
         experiments: function(new_value) {
             this.experiments_ui = new_value.experiments;
-        },
-        h5_table_checked_rows: function(new_value, old_value) {
-            if ( _.isEqual(new_value, old_value) ) {
-                return false;
-            }
-            var last_selection = [...new_value].pop();
-            // force single row selection
-            if ( this.h5_table_checked_rows.length > 1 ) {
-                this.h5_table_checked_rows = [last_selection,];
-            }
-        },
-        h5_samples: function(new_data, old_data){
-            if ( _.isEqual(new_data, old_data) ) {
-                return false;
-            }
-            this.import_h5_table_cols = new_data.cols;
-            this.import_h5_table_rows = new_data.rows;
-        },
-        h5_to_import: function(new_value, old_value) {
-            return this.be.export_one_way_binding_prop('h5_to_import',
-                                                        new_value, old_value,
-                                                        this.experiment_room);
-        },
-        import_h5_table_datetime_range: function(new_value, old_value) {
-            return this.be.export_one_way_binding_prop('import_h5_table_datetime_range',
-                                                        new_value, old_value,
-                                                        this.experiment_room);
         },
         import_sample_table_datetime_range: function(new_value, old_value) {
             return this.be.export_one_way_binding_prop('import_sample_table_datetime_range',
@@ -1041,20 +852,20 @@ export default {
                 this.sample_to_load = {'filename': ""};
             }
         },
-        socket_connected: function(new_value) {
+        global_namespace_connected: function(new_value) {
             if ( new_value === true )
             {
                 // handlers for for external notifications:
                 // this.socket.on('acquisition_started', (value) => this.be.import_one_way_binding_prop('acquisition_started', value.value));
                 // this.socket.on("h5_samples", (value) => this.be.import_one_way_binding_prop("h5_samples", value.value));
                 // this.socket.on("h5_streamer_status", (value) => this.be.import_one_way_binding_prop("h5_streamer_status", value.value));
-                this.socket.on('experiments', (value) => this.be.import_two_way_binding_prop('experiments', value.value));
-                this.socket.on("importable_samples", (value) => this.be.import_one_way_binding_prop("importable_samples", value.value));
-                this.socket.on("projects", (value) => this.be.import_two_way_binding_prop("projects", value.value));
-                this.socket.on("samples", (value) => this.be.import_one_way_binding_prop("samples", value.value));
+                this.global_namespace.on('experiments', (value) => this.be.import_two_way_binding_prop('experiments', value.value));
+                this.global_namespace.on("importable_samples", (value) => this.be.import_one_way_binding_prop("importable_samples", value.value));
+                this.global_namespace.on("projects", (value) => this.be.import_two_way_binding_prop("projects", value.value));
+                this.global_namespace.on("samples", (value) => this.be.import_one_way_binding_prop("samples", value.value));
 
-                this.socket_room = this.socket.id;
-                this.be.subscribe(this.socket_room);
+                this.sid = this.global_namespace.id;
+                this.be.subscribe(this.sid);
             }
         },
     }

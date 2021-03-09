@@ -26,7 +26,10 @@
                                     margin-top:.4rem;
                                     margin-bottom:1rem;">
                             <b-field label="Data source">
-                                <b-select placeholder="Select" expanded>
+                                <b-select
+                                    v-model="data_source_selected"
+                                    placeholder="Select data source"
+                                    expanded>
                                     <option
                                         v-for="source in data_sources"
                                         :value="source"
@@ -38,7 +41,12 @@
                         </div>
                         <!-- End of namespace selector -->
 
-                        <TOFControl></TOFControl>
+                        <H5import
+                            v-if="data_source_selected.indexOf('h5') != -1">
+                        </H5import>
+                        <TOFControl
+                            v-if="data_source_selected.indexOf('tof') != -1">
+                        </TOFControl>
                         <SampleBrowser></SampleBrowser>
                         <TargetBrowser></TargetBrowser>
                     </div>
@@ -58,23 +66,25 @@
 <script type="text/javascript">
 import { mapState } from 'vuex';
 import ConfigVue from './ConfigVue'; 
-import TargetBrowser from "./TargetBrowser.vue";
+import H5import from './H5import'
 import SampleView from "./SampleView.vue"
 import SampleBrowser from "./SampleBrowser.vue"
+import TargetBrowser from "./TargetBrowser.vue";
 import TOFControl from "./TOFControl.vue"
 import store from '../store';
 import {BECom, read_dotenv, write_dotenv} from "../karsalib.js"
 
-const io = require("socket.io-client");
+// const io = require("socket.io-client");
 
 export default {
     name: "MainUi", //used as app_name - keep it unique
     store,
     components: {
         ConfigVue,
-        TargetBrowser,
+        H5import,
         SampleBrowser,
         SampleView,
+        TargetBrowser,
         TOFControl,
     },
     data() {
@@ -82,189 +92,28 @@ export default {
             active_tab: 2,
             dotenv: {},
             be: null,
-            socket_room: null,
+            sid: null,
             // endpoints - list of notifications the MainUI wants to receive
             endpoints: [
-                // 'acquisition_status',
-                // 'acquisition_started',
-                // 'acquisition_progress',
-                // 'experiments',
-                // 'figure_ranges',
-                // 'h5_samples',
-                // 'h5_streamer_status',
-                // 'heatmap_figure_data',
-                // 'importable_samples',
-                // 'instrument_status',
-                // 'projects',
-                // 'sample_length',
-                // 'samples',
-                // 'spec_stack_figure_data',
-                // 'target_table_data',
-                // 'targets',
-                // 'timeseries_figure_data',
-                // 'tps_parameters',
+
             ],
-            data_sources: ["TOF1", "TOF2", "H5", "RAW"], // TODO: Request list of available namespaces
+            data_sources: ["tof", "h5", "RAW", ""], // TODO: Request list of available namespaces
+            data_source_selected: "",
         };
     },
     computed: {
         ...mapState([
             'experiment_selected',
-            // 'h5_to_import',
-            // 'import_h5_table_datetime_range',
-            // 'import_sample_table_datetime_range',
             'project_selected',
-            // 'sample_attributes',
-            // 'stop_visualize_range',
-            // 'target_list_request',
-            // 'target_to_display',
-            // 'tps_parameters_selected',
-            // 'visualize_range',
             ]),
-        // acquisition_status: {
-        //     get() {
-        //         return this.$store.state.acquisition_status;
-        //     },
-        //     set(value) {
-        //         this.$store.commit('acquisition_status', value);
-        //     }
-        // },
-        // acquisition_started: {
-        //     get() {
-        //         return this.$store.state.acquisition_started;
-        //     },
-        //     set(value) {
-        //         this.$store.commit('acquisition_started', value);
-        //     }
-        // },
-        // acquisition_progress: {
-        //     get() {
-        //         return this.$store.state.acquisition_progress;
-        //     },
-        //     set(value) {
-        //         this.$store.commit('acquisition_progress', value);
-        //     }
-        // },
-        // experiments: {
-        //     get() {
-        //         return this.$store.state.experiments;
-        //     },
-        //     set(value) {
-        //         this.$store.commit('experiments', value);
-        //     }
-        // },
-        // figure_ranges: {
-        //     get() {
-        //         return this.$store.state.figure_ranges;
-        //     },
-        //     set(value) {
-        //         this.$store.commit('figure_ranges', value);
-        //     }
-        // },
-        // h5_samples: {
-        //     get() {
-        //         return this.$store.state.h5_samples;
-        //     },
-        //     set(value) {
-        //         this.$store.commit('h5_samples', value);
-        //     }
-        // },
-        // h5_streamer_status: {
-        //     get() {
-        //         return this.$store.state.h5_streamer_status;
-        //     },
-        //     set(value) {
-        //         this.$store.commit('h5_streamer_status', value);
-        //     }
-        // },
-        // heatmap_figure_data: {
-        //     get() {
-        //         return this.$store.state.heatmap_figure_data;
-        //     },
-        //     set(value) {
-        //         this.$store.commit('heatmap_figure_data', value);
-        //     }
-        // },
-        // importable_samples: {
-        //     get() {
-        //         return this.$store.state.importable_samples;
-        //     },
-        //     set(value) {
-        //         this.$store.commit('importable_samples', value);
-        //     }
-        // },
-        // instrument_status: {
-        //     get() {
-        //         return this.$store.state.instrument_status;
-        //     },
-        //     set(value) {
-        //         this.$store.commit('instrument_status', value);
-        //     }
-        // },
-        // projects: {
-        //     get() {
-        //         return this.$store.state.projects;
-        //     },
-        //     set(value) {
-        //         this.$store.commit('projects', value);
-        //     }
-        // },
-        // samples: {
-        //     get() {
-        //         return this.$store.state.samples;
-        //     },
-        //     set(value) {
-        //         this.$store.commit('samples', value);
-        //     }
-        // },
-        // sample_length: {
-        //     get() {
-        //         return this.$store.state.sample_length;
-        //     },
-        //     set(value) {
-        //         this.$store.commit('sample_length', value);
-        //     }
-        // },
-        socket: {
+        global_namespace: {
             get() {
-                return this.$store.state.socket;
+                return this.$store.state.global_namespace;
             },
             set(value) {
-                this.$store.commit('socket', value);
+                this.$store.commit('global_namespace', value);
             }
         },
-        // spec_stack_figure_data: {
-        //     get() {
-        //         return this.$store.state.spec_stack_figure_data;
-        //     },
-        //     set(value) {
-        //         this.$store.commit('spec_stack_figure_data', value);
-        //     }
-        // },
-        // targets: {
-        //     get() {
-        //         return this.$store.state.targets;
-        //     },
-        //     set(value) {
-        //         this.$store.commit('targets', value);
-        //     }
-        // },
-        // timeseries_figure_data: {
-        //     get() {
-        //         return this.$store.state.timeseries_figure_data;
-        //     },
-        //     set(value) {
-        //         this.$store.commit('timeseries_figure_data', value);
-        //     }
-        // },
-        // tps_parameters: {
-        //     get() {
-        //         return this.$store.state.tps_parameters;
-        //     },
-        //     set(value) {
-        //         this.$store.commit('tps_parameters', value);
-        //     }
-        // },
         url: {
             get() {
                 return this.$store.state.url;
@@ -273,68 +122,14 @@ export default {
                 this.$store.commit('url', value);
             }
         },
-        socket_connected: {
+        global_namespace_connected: {
             get() {
-                return this.$store.state.socket_connected;
+                return this.$store.state.global_namespace_connected;
             },
             set(value) {
-                this.$store.commit('socket_connected', value);
+                this.$store.commit('global_namespace_connected', value);
             }
         },
-    },
-    methods: {
-        connect_socket() {
-            this.be.log(this.$options.name, "Connecting to url: ", this.url);
-            var self = this;
-            self.socket = io.connect(self.url);
-            self.socket.on("connect", () => {
-                self.socket_connected = true;
-                // handlers for for external notifications (endpoint imports), if any:
-                this.socket_room = self.socket.id;
-                this.be.subscribe(this.socket_room);
-
-                // self.socket.emit('subscribe',
-                //                 {'app_name': self.$options.name,
-                //                  'endpoints': self.endpoints,
-                //                  'room': self.socket.id});
-                // handlers for for external notifications:
-                // input value as object {name, value, cookies, no_data_logging...}
-                // self.socket.on("samples", (value) => import_one_way_binding_prop("samples", value.value));
-                // self.socket.on("h5_samples", (value) => import_one_way_binding_prop("h5_samples", value.value));
-                // self.socket.on("h5_streamer_status", (value) => import_one_way_binding_prop("h5_streamer_status", value.value));
-                // self.socket.on("importable_samples", (value) => import_one_way_binding_prop("importable_samples", value.value));
-                // self.socket.on("target_table_data", (value) => import_one_way_binding_prop("target_table_data", value.value));
-                // self.socket.on("targets", (value) => import_one_way_binding_prop("targets", value.value));
-                // self.socket.on("figure_ranges", (value) => import_one_way_binding_prop("figure_ranges", {...value.value, 'uid': Math.random()}));
-                // self.socket.on("tps_parameters", (value) => import_one_way_binding_prop("tps_parameters", value.value));
-                // self.socket.on("heatmap_figure_data", (value) => import_one_way_binding_prop("heatmap_figure_data", value.value));
-                // self.socket.on("timeseries_figure_data", (value) => import_one_way_binding_prop("timeseries_figure_data", value.value));
-                // self.socket.on("spec_stack_figure_data", (value) => import_one_way_binding_prop("spec_stack_figure_data", value.value));
-                // self.socket.on("projects", (value) => import_two_way_binding_prop("projects", value.value));
-                // self.socket.on("experiments", (value) => import_two_way_binding_prop("experiments", value.value));
-
-
-                // self.socket.on("acquisition_started", (value) => import_one_way_binding_prop("acquisition_started", value.value));
-                // self.socket.on("acquisition_status", (value) => import_two_way_binding_prop("acquisition_status", value.value));
-                // self.socket.on("acquisition_progress", (value) => import_one_way_binding_prop("acquisition_progress", value.value, true));
-                // self.socket.on("instrument_status", (value) => import_one_way_binding_prop("instrument_status", value.value));
-                // self.socket.on("sample_length", (value) => import_two_way_binding_prop("sample_length", value.value));
-
-
-                // // if MainUI was restarted, get latest state variables from other running services
-                // self.socket.emit('client_notification', {'name': 'service_state', 'value': {}, 'room': self.socket.id});
-                self.$buefy.toast.open({
-                    message: 'Socket connected!',
-                    type: 'is-success'
-                })
-            });
-            // no need to unsubscribe on disconnect - client is unsubscribed by framework
-            self.socket.on("disconnect", () => {
-                this.socket_connected = false;
-                this.be.log(this.$options.name, "socket disconnected");
-            });
-        },
-
     },
 
     created() {
@@ -346,48 +141,10 @@ export default {
     // watchers for internal notifications 
     // watchers also see changes from external notifications, if any
     watch: {
-        // acquisition_status: function(new_value, old_value) {
-        //     return export_two_way_binding_prop('acquisition_status', new_value, old_value, true);
-        // },
-        // sample_length: function(new_value, old_value) {
-        //     return export_two_way_binding_prop('sample_length', new_value, old_value);
-        // },
-        // experiment_selected: function(new_value, old_value) {
-        //     return export_one_way_binding_prop('experiment_selected', new_value, old_value);
-        // },
-        // h5_to_import: function(new_value, old_value) {
-        //     return export_one_way_binding_prop('h5_to_import', new_value, old_value);
-        // },
-        // import_h5_table_datetime_range: function(new_value, old_value) {
-        //     return export_one_way_binding_prop('import_h5_table_datetime_range', new_value, old_value);
-        // },
-        // import_sample_table_datetime_range: function(new_value, old_value) {
-        //     return export_one_way_binding_prop('import_sample_table_datetime_range', new_value, old_value);
-        // },
-        // project_selected: function(new_value, old_value) {
-        //     return export_one_way_binding_prop('project_selected', new_value, old_value);
-        // },
-        // sample_attributes: function(new_value, old_value) {
-        //     return export_one_way_binding_prop('sample_attributes', new_value, old_value);
-        // },
-        // stop_visualize_range: function(new_value, old_value) {
-        //     return export_one_way_binding_prop('stop_visualize_range', {...new_value, 'uid': Math.random()}, old_value);
-        // },
-        // target_list_request: function(new_value, old_value) {
-        //     return export_one_way_binding_prop('target_list_request', new_value, old_value);
-        // },
-        // target_to_display: function(new_value, old_value) {
-        //     return export_one_way_binding_prop('target_to_display', new_value, old_value);
-        // },
-        // tps_parameters_selected: function(new_value, old_value) {
-        //     return export_one_way_binding_prop('tps_parameters_selected', new_value, old_value);
-        // },
         url: function(new_url) {
             // Connect to new url
-            if (this.socket && this.socket.connected) {
-                this.socket.disconnect();
-            }
-            this.connect_socket();
+            this.be.disconnect(this.global_namespace);
+            this.global_namespace = this.be.connect();
             // Parse url into dotenv format and write to file
             let url_obj = new URL(new_url);
             this.dotenv.protocol = url_obj.protocol;
@@ -395,9 +152,6 @@ export default {
             this.dotenv.port = url_obj.port;
             write_dotenv(this.dotenv);
         },
-        // visualize_range: function(new_value, old_value) {
-        //     return export_one_way_binding_prop('visualize_range', {...new_value, 'uid': Math.random()}, old_value);
-        // },
     }
 }
 </script>
@@ -542,14 +296,12 @@ a.pagination-link.is-current {
 .main-tab>ul>li>a>span:hover {
     color: #000000;
 }
-
 .menu-label {
     color: white;
 }
 .menu-list a{
     color: #ababab;
 }
-
 .tabs li.is-active a {
     border-bottom: 5px solid;
     border-bottom-color: #bfbdc5;
