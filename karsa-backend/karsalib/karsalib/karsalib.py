@@ -119,7 +119,7 @@ class BaseServerNamespace(AsyncNamespace):
     client_rooms = dict()   # for housekeeping
 
     def log(self, *arg, **kwarg):
-        print(f"[{self.__class__.__name__}.{inspect.stack()[1].function}]", *arg, **kwarg)
+        print(f"[{self.namespace}.{inspect.stack()[1].function}]", *arg, **kwarg)
 
     def on_connect(self, sid, environ):
         self.log("connected to namespace", self.namespace)
@@ -192,6 +192,7 @@ class BaseServerNamespace(AsyncNamespace):
         no_data_logging = data.get('no_data_logging', True)
         endpoint = data['name']
         room = data.get('room')
+        namespace = data.get('namespace', self.namespace)
         cb = data.pop('callback', None)
         cb_ctx = data.pop('callback_context', None)
         if no_logging:
@@ -221,11 +222,12 @@ class BaseServerNamespace(AsyncNamespace):
                                  cb_name=cb, cb_ctx=cb_ctx,
                                  arg=arg, kwarg=kwarg,
                                  **{**get_client_notification_args(data), 'no_logging': True}),
-                            room=sid)
-
+                            room=sid,
+                            namespace=self.namespace
+                            )
         sent_to = len(src_sids) * '>'
-        self.log(f"{endpoint} {sent_to} {target_room}")
-        await self.emit(endpoint, data, room=target_room, callback=cb and srv_callback)
+        self.log(f"{endpoint} {sent_to} {namespace}:{target_room}")
+        await self.emit(endpoint, data, room=target_room, namespace=namespace, callback=cb and srv_callback)
 
 
 def parse_cmd_args():

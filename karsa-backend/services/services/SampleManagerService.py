@@ -44,6 +44,9 @@ class MetadataServiceNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to MainService """
 
     endpoints = [
+        # DataViz
+        'data_request',
+        'stop_data_request',
         # UI
         'experiment_selected',
         'experiments',
@@ -58,6 +61,35 @@ class MetadataServiceNamespace(BaseClientNamespace):
     service_state = dict(
         projects = datapool.get_projects(),
     )
+
+    # ========== DataViz requests ========== 
+    async def on_data_request(self, data):
+        try:
+            namespace = data['value']['filename'].split('_')[0]
+        except KeyError:
+            print("No filename in data: %s" %str(data))
+
+        # TODO: override actual namespace only for prototyping
+        namespace = 'tof'
+
+        await self.emit_client_notification('data_request',
+                                       data,
+                                       namespace=namespace
+                                       )
+
+    async def on_stop_data_request(self, data):
+        try:
+            namespace = data['value']['filename'].split('_')[0]
+        except KeyError:
+            print("No filename in data: %s" %str(data))
+
+        # TODO: override actual namespace only for prototyping
+        namespace = 'tof'
+
+        await self.emit_client_notification('stop_data_request',
+                                       data,
+                                       namespace=namespace
+                                       )
 
     # ========== UI requests ==========
     async def on_experiment_selected(self, data):

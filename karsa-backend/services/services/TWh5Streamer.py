@@ -109,12 +109,11 @@ class TWh5StreamerServiceClient(TOFServiceClient):
 
 
 def run():
-    client = TWh5StreamerServiceClient(*parse_cmd_args(), TWh5StreamerNamespace)
+    url, port, namespace = parse_cmd_args()
+
+    client = TWh5StreamerServiceClient(url, port, (namespace, TWh5StreamerNamespace))
     loop = asyncio.get_event_loop()
-    try:
-        loop.run_until_complete(client.run())
-    except KeyboardInterrupt:
-        kacq.shutdown()
+    loop.run_until_complete(client.run())
 
 
 if __name__=='__main__':
