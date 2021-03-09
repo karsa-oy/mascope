@@ -43,8 +43,8 @@ export class BECom {
         let the_room = room || this.ctx.room;
         let the_namespace = namespace || this.ctx.global_namespace;
         this.log(the_room, 'subscribed for', this.ctx.endpoints);
-        if ( !the_room )
-            throw "Subscribe error: no room.";
+        // if ( !the_room )
+        //     throw "Subscribe error: no room.";
         the_namespace.emit('subscribe',
                          {'app_name': this.ctx.$options.name,
                           'endpoints': this.ctx.endpoints,

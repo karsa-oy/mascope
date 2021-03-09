@@ -389,7 +389,8 @@ export default {
                 onCancel: () => this.acquisition_control_active = false,
                 onConfirm: () => { this.$buefy.toast.open({message: 'Instrument control granted',
                                                           type: 'is-success'});
-                                   this.tof_namespace = this.be.connect(this.url + '/tof'); }
+                                   this.tof_namespace = this.be.connect(this.url + '/tof');
+                                   this.be.subscribe(null, this.tof_namespace); }
             })
         },
         delete_row_in_config_desorption_table() {

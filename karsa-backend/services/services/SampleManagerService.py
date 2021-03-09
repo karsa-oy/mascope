@@ -70,12 +70,17 @@ class MetadataServiceNamespace(BaseClientNamespace):
             print("No filename in data: %s" %str(data))
 
         # TODO: override actual namespace only for prototyping
-        namespace = 'tof'
+        namespace = '/tof'
 
-        await self.emit_client_notification('data_request',
-                                       data,
-                                       namespace=namespace
-                                       )
+        value = data['value']
+        kwargs = get_client_notification_args(data)
+
+        await self.emit_client_notification(
+                                        'data_request',
+                                        value,
+                                        **kwargs,
+                                        namespace=namespace
+                                        )
 
     async def on_stop_data_request(self, data):
         try:
@@ -84,7 +89,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
             print("No filename in data: %s" %str(data))
 
         # TODO: override actual namespace only for prototyping
-        namespace = 'tof'
+        namespace = '/tof'
 
         await self.emit_client_notification('stop_data_request',
                                        data,
