@@ -604,7 +604,7 @@ def base_to_zarr_filename(base_filename, variable):
                                   file_datetime.month,
                                   file_datetime.day
                                   )
-    filepath = os.path.join(data_path, data_dir, base_filename)
+    filepath = os.path.join(data_path, date_dir, base_filename)
     zarr_filename = variable + os.extsep + 'zarr'
     return os.path.join(filepath, zarr_filename)
 

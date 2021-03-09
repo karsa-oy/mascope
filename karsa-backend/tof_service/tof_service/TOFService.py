@@ -11,6 +11,7 @@ from queue import Empty
 from karsalib import BaseClientNamespace, BaseServiceClient, parse_cmd_args
 from karsatof.kgenerator import Acquisition, h5Streamer
 
+acquisition = None
 NO_DATA_LOGGING_DEFAULT = True
 
 class TOFServiceNamespace(BaseClientNamespace):
@@ -29,11 +30,12 @@ class TOFServiceNamespace(BaseClientNamespace):
         )
 
     async def on_acquisition_status(self, data):
+        global acquisition
         self.log(data['value'])
         if data['value'] == "starting":
-            TwStartAcquisition()
+            acquisition.start_acquisition()
         elif data['value'] == "stopping":
-            TwStopAcquisition()
+            acquisition.stop_acquisition()
 
     
 class TOFServiceClient(BaseServiceClient):
@@ -63,6 +65,8 @@ class TOFServiceClient(BaseServiceClient):
 
 
     async def init_service(self):
+        global acquisition
+        
         while True:
             # TODO: TBR python-socketio BadNamespaceError connection bug
             from socketio.exceptions import BadNamespaceError
@@ -76,7 +80,7 @@ class TOFServiceClient(BaseServiceClient):
             except BadNamespaceError:
                 await self.sio.sleep(.1)
                 continue
-        self.acquisition = await self.initialize_kgenerator()
+        acquisition = self.acquisition = await self.initialize_kgenerator()
         await self.emit_client_notification(
                                     'instrument_status',
                                     'ready',

@@ -22,9 +22,12 @@ from karsatof.kdatapool import H5Pool
 
 h5streamer = None
 
+
 # TODO: make platform-agnostic (move to settings file)
 drive_letter = 'Z:\\'
 h5_dir = os.path.join('Data', 'raw_KLTOF2')
+
+
 h5_path = os.path.join(drive_letter, h5_dir)
 h5_pool = H5Pool(h5_path)
 

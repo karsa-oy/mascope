@@ -8,7 +8,7 @@ import os
 import clr
 
 dll_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dlls")
-libnames = ['ThermoFisher.CommonCore.Data']
+libnames = ['ThermoFisher.CommonCore.Data.dll']
 for lib in libnames:
     dll = os.path.join(dll_path, lib)
     clr.AddReference(dll)
