@@ -112,6 +112,19 @@ class BaseClientNamespace(AsyncClientNamespace):
         if name in self.service_state:
             self.service_state[name] = value
 
+    async def emit_service_notification(self, name, value, **kwarg):
+        no_logging = kwarg.get('no_logging', NO_LOGGING_DEFAULT)
+        no_data_logging = kwarg.get('no_data_logging', NO_DATA_LOGGING_DEFAULT)
+        if no_logging:
+            pass
+        elif no_data_logging:
+            self.log(f"{name}: ...")
+        else:
+            self.log(f"{name}: {value} > {kwarg.get('room', name)}")
+        await self.emit('service_notification', {'name': name, 'value': value, **kwarg})
+        if name in self.service_state:
+            self.service_state[name] = value
+
 
 class BaseServerNamespace(AsyncNamespace):
     """ socketio server base namespace class """
@@ -238,7 +251,7 @@ class BaseServerNamespace(AsyncNamespace):
                             room=sid,
                             namespace=self.namespace
                             )
-                            
+
         no_logging = data.get('no_logging', False)
         no_data_logging = data.get('no_data_logging', True)
         endpoint = data['name']
