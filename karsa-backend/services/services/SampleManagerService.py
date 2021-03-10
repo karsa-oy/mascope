@@ -111,10 +111,12 @@ class MetadataServiceNamespace(BaseClientNamespace):
             # Update UI
             project_experiments = datapool.get_experiments(project)
             await self.emit_client_notification(
-                                    'experiments',
-                                    project_experiments,
-                                    **{**kwargs, 'notify_twin_clients': True, }
-                                    )
+                            'experiments',
+                            project_experiments,
+                            **{**kwargs,
+                               'client_room': project
+                               }
+                            )
         # Update sample table data
         await self.emit_client_notification(
                             'samples',
@@ -145,7 +147,10 @@ class MetadataServiceNamespace(BaseClientNamespace):
             await self.emit_client_notification(
                                     'projects',
                                     projects,
-                                    **kwargs)
+                                    **{**kwargs,
+                                       'client_room': None
+                                       }
+                                    )
 
         experiments = datapool.get_experiments(project)
         await self.emit_client_notification(

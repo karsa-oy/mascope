@@ -790,12 +790,6 @@ export default {
                                                     old_value,
                                                     this.room_project
                                                     );
-                // make all clients in 'projects' room see the new project
-                // TODO: This should be handled by SampleManagerService
-                this.be.emit_service_notification('service_state',
-                                                  {},
-                                                  'projects'
-                                                  );
             }
             this.sample_project = new_value.id;
         },
