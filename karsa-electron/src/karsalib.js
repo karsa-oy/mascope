@@ -40,7 +40,7 @@ export class BECom {
     }
 
     subscribe(room=null, namespace=null) {
-        let the_room = room || this.ctx.room;
+        let the_room = room || this.ctx.room_sid;
         let the_namespace = namespace || this.ctx.global_namespace;
         this.log(the_room, 'subscribed for', this.ctx.endpoints);
         // if ( !the_room )
@@ -57,7 +57,7 @@ export class BECom {
     }
     
     unsubscribe(room=null, namespace=null) {
-        let the_room = room || this.ctx.room;
+        let the_room = room || this.ctx.room_sid;
         let the_namespace = namespace || this.ctx.global_namespace;
         this.log(the_room, 'unsubscribed from', this.ctx.endpoints);
         if ( !the_room )

@@ -705,11 +705,6 @@ export default {
                                             }
                                         };
             this.is_modal_new_experiment_active = false;
-
-            // let corresponding project room to be updated for the new experiment
-            this.be.emit_service_notification('project_selected',
-                                              {id: this.project.title},
-                                              this.room_project)
         },
     },
     watch: {
@@ -742,12 +737,10 @@ export default {
                     this.be.unsubscribe(this.room_experiment);
                 this.room_experiment = this.project_selected.id + '_' + new_value.id;
                 this.be.subscribe(this.room_experiment);
-                // TODO: This triggers 'samples' update to everyone in 'this.room_experiment'
-                // Need to make distinction between new experiment and selected experiment
                 return this.be.export_one_way_binding_prop('experiment_selected',
                                                            new_value,
                                                            old_value,
-                                                           this.room_experiment
+                                                           this.room_sid
                                                            );
             }
         },
@@ -788,7 +781,7 @@ export default {
                 this.be.export_one_way_binding_prop('project_selected',
                                                     new_value,
                                                     old_value,
-                                                    this.room_project
+                                                    this.room_sid
                                                     );
             }
             this.sample_project = new_value.id;
