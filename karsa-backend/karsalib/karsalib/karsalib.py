@@ -7,7 +7,7 @@ import random
 from socketio import AsyncClientNamespace, AsyncNamespace, AsyncClient
 
 NO_LOGGING_DEFAULT = False
-NO_DATA_LOGGING_DEFAULT = True
+NO_DATA_LOGGING_DEFAULT = False
 
 
 def copy_dict(d, ignore_keys=[]):
@@ -188,22 +188,21 @@ class BaseServerNamespace(AsyncNamespace):
               other named args are free form, e.g. 
               room, cookies, no_logging, no_data_logging...
         """
+
         no_logging = data.get('no_logging', False)
         no_data_logging = data.get('no_data_logging', True)
         endpoint = data['name']
-        room = data.get('room')
+        client_room = data.get('client_room')
         namespace = data.get('namespace', self.namespace)
         cb = data.pop('callback', None)
         cb_ctx = data.pop('callback_context', None)
+
         if no_logging:
             pass
         elif no_data_logging:
             self.log(f"{endpoint}: ...")
         else:
             self.log(data)
-    #    if endpoint not in self.subscriptions:
-    #        self.log(f"{endpoint}: no providers yet.")
-    #        return
 
         if 'cookies' not in data:
             data['cookies'] = dict(src_sid=[])
@@ -211,11 +210,25 @@ class BaseServerNamespace(AsyncNamespace):
         src_sids = cookies['src_sid']
         # sids are added to the cookies only by this procedure
         src_sids.append(sid)
+        sent_to = len(src_sids) * '>'
 
-        target_room = endpoint
-        if room in self.subscriptions.get(endpoint, []):
-            target_room = room
-
+        if client_room:
+            # Room given explicitly
+            target_rooms = [client_room]
+        else:
+            # Room not given, emit to all endpoint subscribers
+            target_rooms = self.subscriptions.get(endpoint, [])
+            
+        for target_room in target_rooms:
+            await self.emit(endpoint,
+                            data,
+                            room=target_room,
+                            namespace=namespace,
+                            callback=cb and srv_callback
+                            )
+            self.log(f"{endpoint} {sent_to} {namespace}:{target_room}")
+            
+    async def on_service_notification(self, sid, data):
         async def srv_callback(*arg, **kwarg):
             await self.emit('client_notification_callback',
                             dict(endpoint=endpoint,
@@ -225,10 +238,40 @@ class BaseServerNamespace(AsyncNamespace):
                             room=sid,
                             namespace=self.namespace
                             )
+                            
+        no_logging = data.get('no_logging', False)
+        no_data_logging = data.get('no_data_logging', True)
+        endpoint = data['name']
+        # client_room = data.get('client_room')
+        namespace = data.get('namespace', self.namespace)
+        cb = data.pop('callback', None)
+        cb_ctx = data.pop('callback_context', None)
+
+        if no_logging:
+            pass
+        elif no_data_logging:
+            self.log(f"{endpoint}: ...")
+        else:
+            self.log(data)
+        
+        if 'cookies' not in data:
+            data['cookies'] = dict(src_sid=[])
+        cookies = data['cookies']
+        src_sids = cookies['src_sid']
+        # sids are added to the cookies only by this procedure
+        src_sids.append(sid)
+
+        target_room = endpoint
+
         sent_to = len(src_sids) * '>'
         self.log(f"{endpoint} {sent_to} {namespace}:{target_room}")
-        await self.emit(endpoint, data, room=target_room, namespace=namespace, callback=cb and srv_callback)
 
+        await self.emit(endpoint,
+                        data,
+                        room=target_room,
+                        namespace=namespace,
+                        callback=cb and srv_callback
+                        )
 
 def parse_cmd_args():
     """
@@ -277,6 +320,9 @@ class BaseServiceClient:
 
     async def emit_client_notification(self, name, value, **kwarg):
         await self.root_ns.emit_client_notification(name, value, **kwarg)
+
+    async def emit_service_notification(self, name, value, **kwarg):
+        await self.root_ns.emit_service_notification(name, value, **kwarg)
 
     async def register_router_namespaces(self, namespaces):
         self.log("Connecting to '/' to register %s" %namespaces)

@@ -535,10 +535,10 @@ export default {
             sample_attributes: {},
 
             // Communication
-            projects_room: 'projects',
-            project_room: null,
-            sid: null,
-            experiment_room: null,
+            room_projects: 'projects',
+            room_project: null,
+            room_sid: null,
+            room_experiment: null,
             endpoints: [
                 // 'acquisition_started',
                 'experiments',
@@ -707,9 +707,9 @@ export default {
             this.is_modal_new_experiment_active = false;
 
             // let corresponding project room to be updated for the new experiment
-            this.be.emit_client_notification('project_selected',
-                                             {id: this.project.title},
-                                             this.project_room)
+            this.be.emit_service_notification('project_selected',
+                                              {id: this.project.title},
+                                              this.room_project)
         },
     },
     watch: {
@@ -738,16 +738,16 @@ export default {
             this.sample_experiment = new_value.id;
 
             if ( !_.isEmpty(new_value.id) ) {
-                if ( !_.isEmpty(this.experiment_room) )
-                    this.be.unsubscribe(this.experiment_room);
-                this.experiment_room = this.project_selected.id + '_' + new_value.id;
-                this.be.subscribe(this.experiment_room);
-                // TODO: This triggers 'samples' update to everyone in 'this.experiment_room'
+                if ( !_.isEmpty(this.room_experiment) )
+                    this.be.unsubscribe(this.room_experiment);
+                this.room_experiment = this.project_selected.id + '_' + new_value.id;
+                this.be.subscribe(this.room_experiment);
+                // TODO: This triggers 'samples' update to everyone in 'this.room_experiment'
                 // Need to make distinction between new experiment and selected experiment
                 return this.be.export_one_way_binding_prop('experiment_selected',
                                                            new_value,
                                                            old_value,
-                                                           this.experiment_room
+                                                           this.room_experiment
                                                            );
             }
         },
@@ -757,7 +757,7 @@ export default {
         import_sample_table_datetime_range: function(new_value, old_value) {
             return this.be.export_one_way_binding_prop('import_sample_table_datetime_range',
                                                         new_value, old_value,
-                                                        this.experiment_room);
+                                                        this.room_experiment);
         },
         import_sample_table_checked_rows: function(new_value, old_value) {
             if ( _.isEqual(new_value, old_value) ) {
@@ -779,22 +779,23 @@ export default {
         },
         project_selected: function(new_value, old_value) {
             if ( !_.isEmpty(new_value.id) ) {
-                if ( !_.isEmpty(this.project_room) ) {
-                    this.be.unsubscribe(this.project_room);
+                if ( !_.isEmpty(this.room_project) ) {
+                    this.be.unsubscribe(this.room_project);
                 }
-                this.project_room = new_value.id;
-                this.be.subscribe(this.project_room);
+                this.room_project = new_value.id;
+                this.be.subscribe(this.room_project);
                 // push new_value of project_selected to corresponding room
                 this.be.export_one_way_binding_prop('project_selected',
                                                     new_value,
                                                     old_value,
-                                                    this.project_room
+                                                    this.room_project
                                                     );
                 // make all clients in 'projects' room see the new project
-                this.be.emit_client_notification('service_state',
-                                                 {},
-                                                 'projects'
-                                                 );
+                // TODO: This should be handled by SampleManagerService
+                this.be.emit_service_notification('service_state',
+                                                  {},
+                                                  'projects'
+                                                  );
             }
             this.sample_project = new_value.id;
         },
@@ -820,7 +821,7 @@ export default {
         sample_attributes: function(new_value, old_value) {
             return this.be.export_one_way_binding_prop('sample_attributes',
                                                         new_value, old_value,
-                                                        this.experiment_room);
+                                                        this.room_experiment);
         },
         sample_table_checked_rows: function(new_value, old_value) {
             if ( _.isEqual(new_value, old_value) ) {
@@ -864,8 +865,8 @@ export default {
                 this.global_namespace.on("projects", (value) => this.be.import_two_way_binding_prop("projects", value.value));
                 this.global_namespace.on("samples", (value) => this.be.import_one_way_binding_prop("samples", value.value));
 
-                this.sid = this.global_namespace.id;
-                this.be.subscribe(this.sid);
+                this.room_sid = this.global_namespace.id;
+                this.be.subscribe(this.room_sid);
             }
         },
     }

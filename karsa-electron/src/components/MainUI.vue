@@ -92,7 +92,7 @@ export default {
             active_tab: 2,
             dotenv: {},
             be: null,
-            sid: null,
+            room_sid: null,
             // endpoints - list of notifications the MainUI wants to receive
             endpoints: [
 
@@ -114,20 +114,20 @@ export default {
                 this.$store.commit('global_namespace', value);
             }
         },
-        url: {
-            get() {
-                return this.$store.state.url;
-            },
-            set(value) {
-                this.$store.commit('url', value);
-            }
-        },
         global_namespace_connected: {
             get() {
                 return this.$store.state.global_namespace_connected;
             },
             set(value) {
                 this.$store.commit('global_namespace_connected', value);
+            }
+        },
+        url: {
+            get() {
+                return this.$store.state.url;
+            },
+            set(value) {
+                this.$store.commit('url', value);
             }
         },
     },

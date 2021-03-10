@@ -84,7 +84,7 @@ class TOFServiceClient(BaseServiceClient):
         await self.emit_client_notification(
                                     'instrument_status',
                                     'ready',
-                                    no_data_logging=False
+                                    no_data_logging=False,
                                     )
 
     async def service_main(self):
@@ -108,6 +108,8 @@ class TOFServiceClient(BaseServiceClient):
                                         'acquisition_status',
                                         'running',
                                         cookies=cookies,
+                                        client_room=self.instrument_name, # TODO: is this correct?
+                                        namespace='/'
                                         )
 
             filename_base = self.acquisition.filename
@@ -118,8 +120,11 @@ class TOFServiceClient(BaseServiceClient):
                                         {'filename': filename,
                                          },
                                         cookies=cookies,
+                                        client_room=self.instrument_name, # TODO: is this correct?
+                                        namespace='/'
                                         )
-            await self.emit_client_notification(
+
+            await self.emit_service_notification(
                                         'acquisition_coordinates',
                                         {'filename': filename,
                                          'mz': self.acquisition.mz.tobytes(),
@@ -128,7 +133,7 @@ class TOFServiceClient(BaseServiceClient):
                                         cookies=cookies,
                                         no_data_logging=True
                                         )
-            await self.emit_client_notification(
+            await self.emit_service_notification(
                                         'tps_parameter_info',
                                         {'filename': filename,
                                          'tps_info': self.acquisition.tps_info,
@@ -149,14 +154,14 @@ class TOFServiceClient(BaseServiceClient):
                 # Got data
                 if spec_data is not None:
                     # Spectrum data
-                    await self.emit_client_notification(
+                    await self.emit_service_notification(
                                             'acquired_spectrum',
                                             spec_data,
                                             cookies=cookies,
                                             no_data_logging=True
                                             )
                     # TPS data
-                    await self.emit_client_notification(
+                    await self.emit_service_notification(
                                             'acquired_tps_data',
                                             tps_data,
                                             cookies=cookies,
@@ -168,6 +173,8 @@ class TOFServiceClient(BaseServiceClient):
                                             {'progress': self.acquisition.progress,
                                              },
                                             cookies=cookies,
+                                            client_room=self.instrument_name, # TODO: is this correct?
+                                            namespace='/'
                                             )
                 # Got poison pill
                 else:
@@ -177,8 +184,10 @@ class TOFServiceClient(BaseServiceClient):
                                             {'progress': 100.,
                                              },
                                             cookies=cookies,
+                                            client_room=self.instrument_name, # TODO: is this correct?
+                                            namespace='/'
                                             )
-                    await self.emit_client_notification(
+                    await self.emit_service_notification(
                                             'acquisition_finished', 
                                             {'filename': filename
                                              },
@@ -188,6 +197,8 @@ class TOFServiceClient(BaseServiceClient):
                                             'acquisition_status',
                                             'not_running',
                                             cookies=cookies,
+                                            client_room=self.instrument_name, # TODO: is this correct?
+                                            namespace='/'
                                             )
                     self.log("Exiting acquisition loop.")
                     break # Break out of acquisition loop

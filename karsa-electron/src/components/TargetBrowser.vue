@@ -167,7 +167,7 @@ export default {
             target_table_cols: [],
             target_table_selected_row: {},
             //
-            sid: null,
+            room_sid: null,
             endpoints: [
                 'targets',
             ]
@@ -289,15 +289,15 @@ export default {
         target_to_display: function(new_value, old_value) {
             return this.be.export_one_way_binding_prop('target_to_display',
                                                         new_value, old_value,
-                                                        this.sid);
+                                                        this.room_sid);
         },
         global_namespace_connected: function(new_value) {
             if ( new_value === true )
             {
                 // handlers for for external notifications:
                 this.global_namespace.on("targets", (value) => this.be.import_one_way_binding_prop("targets", value.value));
-                this.sid = this.global_namespace.id;
-                this.be.subscribe(this.sid);
+                this.room_sid = this.global_namespace.id;
+                this.be.subscribe(this.room_sid);
             }
         },
     }

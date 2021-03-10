@@ -71,7 +71,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
         value = data['value']
         kwargs = get_client_notification_args(data)
 
-        await self.emit_client_notification(
+        await self.emit_service_notification(
                                         'data_request',
                                         value,
                                         **kwargs,
@@ -87,7 +87,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
         # TODO: override actual namespace only for prototyping
         namespace = '/tof'
 
-        await self.emit_client_notification('stop_data_request',
+        await self.emit_service_notification('stop_data_request',
                                        data,
                                        namespace=namespace
                                        )
@@ -97,15 +97,6 @@ class MetadataServiceNamespace(BaseClientNamespace):
         value = data['value']
         kwargs = get_client_notification_args(data)
         experiment = value.get('id')
-        # if experiment == '':
-        #     await self.emit_client_notification(
-        #                     'samples',
-        #                     {'rows': [],
-        #                      'cols': [],
-        #                      },
-        #                     **kwargs
-        #                     )
-        #     return
         attributes = value.get('attributes')
         project = attributes.get('project')
         global datapool
@@ -145,11 +136,6 @@ class MetadataServiceNamespace(BaseClientNamespace):
         value = data['value']
         kwargs = get_client_notification_args(data)
         project = value.get('id')
-        # if project == '':
-        #     await self.emit_client_notification('experiments',
-        #                                 {'project': project, 'experiments': []},
-        #                                 **kwargs)
-        #     return
 
         if project not in datapool.pool.keys():
             # New project
@@ -200,7 +186,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
             datapool.delete_sample(project, experiment, sample)
 
         # Update sample table data in UIs
-        await self.emit_client_notification(
+        await self.emit_service_notification(
                             'samples',
                             datapool.get_sample_table(project, experiment),
                             **get_client_notification_args(data),

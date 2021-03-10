@@ -171,7 +171,7 @@ export default {
         return {
             be: null,
             h5_namespace: null,
-            sid: null,
+            room_sid: null,
             endpoints: [
                 'acquisition_progress',
                 // 'h5_samples',
@@ -261,7 +261,7 @@ export default {
             return this.be.export_one_way_binding_prop('import_h5_table_datetime_range',
                                                         new_value,
                                                         old_value,
-                                                        this.sid,
+                                                        this.room_sid,
                                                         this.h5_namespace,
                                                         );
         },
@@ -272,8 +272,8 @@ export default {
                 this.h5_namespace.on("h5_streamer_status", (value) => this.be.import_two_way_binding_prop("h5_streamer_status", value.value));
                 this.h5_namespace.on("h5_samples", (value) => this.be.import_one_way_binding_prop("h5_samples", value.value));
                 // TODO: Below needed?
-                // this.sid = this.h5_namespace.id;
-                // this.be.subscribe(this.sid);
+                // this.room_sid = this.h5_namespace.id;
+                // this.be.subscribe(this.room_sid);
             }
         },
     },

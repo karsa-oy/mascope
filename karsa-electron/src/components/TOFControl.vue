@@ -335,7 +335,7 @@ export default {
             // Communication
             be: null,
             tof_namespace: null,
-            sid: null,
+            room_sid: null,
             sample_length: 120,
             endpoints: [
                 'acquisition_status',
@@ -580,8 +580,8 @@ export default {
                 this.tof_namespace.on("sample_length", (value) => this.be.import_two_way_binding_prop("sample_length", value.value));
 
                 // dynamic subscription thru AcquisitionControl dialog
-                // this.sid = this.tof_namespace.id;
-                // this.be.subscribe(this.sid);
+                // this.room_sid = this.tof_namespace.id;
+                // this.be.subscribe(this.room_sid);
             }
         },
     }

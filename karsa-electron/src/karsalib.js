@@ -4,7 +4,7 @@ const envfile = require('envfile');
 const io = require("socket.io-client");
 
 const NO_LOGGING_DEFAULT = false;
-const NO_DATA_LOGGING_DEFAULT = true;
+const NO_DATA_LOGGING_DEFAULT = false;
 
 
 export class BECom {
@@ -71,7 +71,7 @@ export class BECom {
     export_one_way_binding_prop(name,
                                 new_value,
                                 old_value,
-                                room=null,
+                                client_room=null,
                                 namespace=null,
                                 no_logging=NO_LOGGING_DEFAULT,
                                 no_data_logging=NO_DATA_LOGGING_DEFAULT
@@ -79,20 +79,24 @@ export class BECom {
         if ( _.isEqual(new_value, old_value) ) {
                 return false;
             }
-            let the_room = room || this.ctx.room || this.ctx.sid;
+            let the_room = client_room || this.ctx.room_sid;
             let the_namespace = namespace || this.ctx.global_namespace;
             if ( no_logging === false ) {
                 this.log('send', name, 'to', the_room, old_value, new_value);
             }
-            the_namespace.emit('client_notification',
-                            {name: name, value: new_value, room: the_room,
-                             no_logging: no_logging, no_data_logging: no_data_logging});
+            the_namespace.emit('service_notification',
+                                {name: name,
+                                 value: new_value,
+                                 client_room: the_room,
+                                 no_logging: no_logging,
+                                 no_data_logging: no_data_logging
+                                 });
     }
     
     export_two_way_binding_prop(name,
                                 new_value,
                                 old_value,
-                                room=null,
+                                client_room=null,
                                 namespace=null,
                                 no_logging=NO_LOGGING_DEFAULT,
                                 no_data_logging=NO_DATA_LOGGING_DEFAULT
@@ -100,16 +104,20 @@ export class BECom {
             if ( _.isEqual(new_value, old_value) ) {
                 return false;
             }
-            let the_room = room || this.ctx.room || this.ctx.sid;
+            let the_room = client_room || this.ctx.room_sid;
             let the_namespace = namespace || this.ctx.global_namespace;
             let i = this.external_notifications.findIndex(
                         (e) => _.isEqual(e, [name, new_value]))
             if ( i === -1 ) {
                 if ( no_logging === false )
                 this.log('send', name, 'to', the_room, old_value, new_value);
-                the_namespace.emit('client_notification',
-                                {name: name, value: new_value, room: the_room,
-                                 no_logging: no_logging, no_data_logging: no_data_logging});
+                the_namespace.emit('service_notification',
+                                    {name: name,
+                                     value: new_value,
+                                     client_room: the_room,
+                                     no_logging: no_logging,
+                                     no_data_logging: no_data_logging
+                                     });
             } else {
                 this.external_notifications.splice(i, 1);
             }
@@ -140,14 +148,14 @@ export class BECom {
         console.log('[' + this.log_prefix + ']',  ...args);
     }
 
-    emit_client_notification(name,
-                             value,
-                             room=null,
-                             namespace=null,
-                             no_logging=NO_LOGGING_DEFAULT,
-                             no_data_logging=NO_DATA_LOGGING_DEFAULT
-                             ) {
-        let the_room = room || this.ctx.room || this.ctx.socket.id;
+    emit_service_notification(name,
+                              value,
+                              client_room=null,
+                              namespace=null,
+                              no_logging=NO_LOGGING_DEFAULT,
+                              no_data_logging=NO_DATA_LOGGING_DEFAULT
+                              ) {
+        let the_room = client_room || this.ctx.room_sid;
         let the_namespace = namespace || this.ctx.global_namespace;
         if ( no_logging ) {
             // pass;
@@ -158,10 +166,10 @@ export class BECom {
         else {
             this.log(name, ':', value, 'to room', the_room);
         }
-        the_namespace.emit('client_notification',
+        the_namespace.emit('service_notification',
                             {name: name,
                              value: value,
-                             room: the_room,
+                             client_room: the_room,
                              no_logging: no_logging,
                              no_data_logging: no_data_logging
                             });
