@@ -98,14 +98,14 @@ export default {
                      'acquisition_status',  //no subscription here - use TOFControl sync
                      'experiment_selected',
                     //  'figure_ranges',
-                      'global_namespace',
+                      'root_namespace',
                     //  'heatmap_figure_data',
                      'sample_to_load',
                     //  'spec_stack_figure_data',
                      'target_to_display',
                     //  'timeseries_figure_data',
                     //  'tps_parameters',
-                     'global_namespace_connected'
+                     'root_namespace_connected'
                      ]),
         // visualize_range: {
         //     get() {
@@ -136,6 +136,8 @@ export default {
     data: function() {
         return {
             be: null,   //backend communicator
+            namespace: null,
+
             cache_index_rank: 0, // actual value calculated in "mounted"
             figure_cache: {'t_maxrange': [0, 0], 'mz_maxrange': [0, 0]},
             figure_layouts: {},
@@ -1032,17 +1034,18 @@ export default {
                                                         new_value, old_value,
                                                         this.room_sid);
         },
-        global_namespace_connected: function(new_value) {
+        root_namespace_connected: function(new_value) {
             if ( new_value === true )
             {
+                this.namespace = this.root_namespace;
                 // handlers for for external notifications:
-                this.global_namespace.on("figure_ranges", (value) => this.be.import_one_way_binding_prop("figure_ranges", {...value.value, 'uid': Math.random()}));
-                this.global_namespace.on("heatmap_figure_data", (value) => this.be.import_one_way_binding_prop("heatmap_figure_data", value.value));
-                this.global_namespace.on("spec_stack_figure_data", (value) => this.be.import_one_way_binding_prop("spec_stack_figure_data", value.value));
-                this.global_namespace.on("timeseries_figure_data", (value) => this.be.import_one_way_binding_prop("timeseries_figure_data", value.value));
-                this.global_namespace.on("tps_parameters", (value) => this.be.import_one_way_binding_prop("tps_parameters", value.value));
+                this.namespace.on("figure_ranges", (value) => this.be.import_one_way_binding_prop("figure_ranges", {...value.value, 'uid': Math.random()}));
+                this.namespace.on("heatmap_figure_data", (value) => this.be.import_one_way_binding_prop("heatmap_figure_data", value.value));
+                this.namespace.on("spec_stack_figure_data", (value) => this.be.import_one_way_binding_prop("spec_stack_figure_data", value.value));
+                this.namespace.on("timeseries_figure_data", (value) => this.be.import_one_way_binding_prop("timeseries_figure_data", value.value));
+                this.namespace.on("tps_parameters", (value) => this.be.import_one_way_binding_prop("tps_parameters", value.value));
 
-                this.room_sid = this.global_namespace.id;
+                this.room_sid = this.root_namespace.id;
                 this.be.subscribe(this.room_sid);
             }
         },

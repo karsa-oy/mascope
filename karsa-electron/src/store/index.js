@@ -20,6 +20,7 @@ export default new Vuex.Store({
 		// import_sample_table_datetime_range: {},
 		// importable_samples: {},
 		// instrument_status: "not_ready",			// not_ready/ready
+		new_file: "",
 		project_selected: {'id': ""},
 		projects: [],
 		// sample_attributes: {},
@@ -27,8 +28,8 @@ export default new Vuex.Store({
 		sample_selected: {},
 		sample_to_load: {},
 		// samples: [],
-		global_namespace: null,
-		global_namespace_connected: false,
+		root_namespace: null,
+		root_namespace_connected: false,
 		// spec_stack_figure_data: {},
 		// target_list_request: {},
 		// target_table_data: [],
@@ -60,8 +61,8 @@ export default new Vuex.Store({
 		experiments(state, payload) {
 			state.experiments = payload;
 		},
-		global_namespace_connected(state, payload) {
-			state.global_namespace_connected = payload;
+		root_namespace_connected(state, payload) {
+			state.root_namespace_connected = payload;
 		},
 		// figure_ranges(state, payload) {
 		// 	state.figure_ranges = payload;
@@ -90,8 +91,8 @@ export default new Vuex.Store({
 		// instrument_status(state, payload) {
 		// 	state.instrument_status = payload;
 		// },
-		room(state, payload) {
-			state.room = payload;
+		new_file(state, payload) {
+			state.new_file = payload;
 		},
 		// sample_attributes(state, payload) {
 		// 	state.sample_attributes = payload;
@@ -105,8 +106,8 @@ export default new Vuex.Store({
 		// samples(state, payload) {
 		// 	state.samples = payload;
 		// },
-		global_namespace(state, payload) {
-			state.global_namespace = payload;
+		root_namespace(state, payload) {
+			state.root_namespace = payload;
 		},
 		// spec_stack_figure_data(state, payload) {
 		// 	state.spec_stack_figure_data = payload;

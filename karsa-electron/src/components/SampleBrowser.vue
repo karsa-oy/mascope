@@ -441,9 +441,10 @@ export default {
             // 'h5_samples',
             // 'h5_streamer_status',
             // 'importable_samples',
+            'new_file',
             // 'samples',
-            'global_namespace',
-            'global_namespace_connected',
+            'root_namespace',
+            'root_namespace_connected',
         ]),
 
         experiments: {
@@ -490,7 +491,8 @@ export default {
     data: function() {
         return {
             be: null,
-            acquisition_started: false,
+            namespace: null,
+            // acquisition_started: false,
             // Project / experiment title validation
             valid_pattern: RegExp(/^\w+$/),
             // Modal active variables
@@ -708,20 +710,6 @@ export default {
         },
     },
     watch: {
-        acquisition_started: function(new_value, old_value) {
-            if (!this.acquisition_control_active) {
-                return
-            }
-            if (new_value === old_value) {
-                return false;
-            }
-            this.sample_file = new_value.filename;
-            let sample_no = this.sample_table_rows.length + 1;
-            this.sample_name = sample_no.toString().padStart(3, '0') + '_';
-            this.sample_description = "";
-            this.is_sample_attribute_modal_active = true;
-            this.sample_table_checked_rows = [];
-        },
         experiment_selected: function(new_value, old_value) {
             if ( _.isEqual(new_value, old_value) ) {
                 return false;
@@ -770,6 +758,17 @@ export default {
             this.import_sample_table_rows = new_data.rows;
             this.import_sample_table_loading = false;
         },
+        new_file: function(new_value, old_value) {
+            if (new_value === old_value) {
+                return false;
+            }
+            this.sample_file = new_value;
+            let sample_no = this.sample_table_rows.length + 1;
+            this.sample_name = sample_no.toString().padStart(3, '0') + '_';
+            this.sample_description = "";
+            this.is_sample_attribute_modal_active = true;
+            this.sample_table_checked_rows = [];
+        },
         project_selected: function(new_value, old_value) {
             if ( !_.isEmpty(new_value.id) ) {
                 if ( !_.isEmpty(this.room_project) ) {
@@ -807,8 +806,9 @@ export default {
         },
         sample_attributes: function(new_value, old_value) {
             return this.be.export_one_way_binding_prop('sample_attributes',
-                                                        new_value, old_value,
-                                                        this.room_experiment);
+                                                       new_value, old_value,
+                                                       this.room_experiment
+                                                       );
         },
         sample_table_checked_rows: function(new_value, old_value) {
             if ( _.isEqual(new_value, old_value) ) {
@@ -840,19 +840,17 @@ export default {
                 this.sample_to_load = {'filename': ""};
             }
         },
-        global_namespace_connected: function(new_value) {
+        root_namespace_connected: function(new_value) {
             if ( new_value === true )
             {
+                this.namespace = this.root_namespace;
                 // handlers for for external notifications:
-                // this.socket.on('acquisition_started', (value) => this.be.import_one_way_binding_prop('acquisition_started', value.value));
-                // this.socket.on("h5_samples", (value) => this.be.import_one_way_binding_prop("h5_samples", value.value));
-                // this.socket.on("h5_streamer_status", (value) => this.be.import_one_way_binding_prop("h5_streamer_status", value.value));
-                this.global_namespace.on('experiments', (value) => this.be.import_two_way_binding_prop('experiments', value.value));
-                this.global_namespace.on("importable_samples", (value) => this.be.import_one_way_binding_prop("importable_samples", value.value));
-                this.global_namespace.on("projects", (value) => this.be.import_two_way_binding_prop("projects", value.value));
-                this.global_namespace.on("samples", (value) => this.be.import_one_way_binding_prop("samples", value.value));
+                this.namespace.on('experiments', (value) => this.be.import_two_way_binding_prop('experiments', value.value));
+                this.namespace.on("importable_samples", (value) => this.be.import_one_way_binding_prop("importable_samples", value.value));
+                this.namespace.on("projects", (value) => this.be.import_two_way_binding_prop("projects", value.value));
+                this.namespace.on("samples", (value) => this.be.import_one_way_binding_prop("samples", value.value));
 
-                this.room_sid = this.global_namespace.id;
+                this.room_sid = this.root_namespace.id;
                 this.be.subscribe(this.room_sid);
             }
         },

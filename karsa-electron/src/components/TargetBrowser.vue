@@ -131,8 +131,8 @@ export default {
     },
     computed: {
         ...mapState([
-            'global_namespace',
-            'global_namespace_connected',
+            'root_namespace',
+            'root_namespace_connected',
             // 'targets',
         ]),
         // target_list_request: {
@@ -155,6 +155,7 @@ export default {
     data: function() {
         return {
             be: null,
+            namespace: null,
             // variables for excel clipboard import
             is_excel_clipboard_modal_active: false,
             excel_clipboard_text: "",
@@ -291,12 +292,13 @@ export default {
                                                         new_value, old_value,
                                                         this.room_sid);
         },
-        global_namespace_connected: function(new_value) {
+        root_namespace_connected: function(new_value) {
             if ( new_value === true )
             {
+                this.namespace = this.root_namespace;
                 // handlers for for external notifications:
-                this.global_namespace.on("targets", (value) => this.be.import_one_way_binding_prop("targets", value.value));
-                this.room_sid = this.global_namespace.id;
+                this.namespace.on("targets", (value) => this.be.import_one_way_binding_prop("targets", value.value));
+                this.room_sid = this.root_namespace.id;
                 this.be.subscribe(this.room_sid);
             }
         },

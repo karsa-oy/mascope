@@ -19,21 +19,21 @@ export class BECom {
         this.log(this.ctx.$options.name, "Connecting to url: ", the_url);
         let namespace = io.connect(the_url);
         namespace.on("connect", () => {
-            this.ctx['global_namespace_connected'] = true;
+            this.ctx['root_namespace_connected'] = true;
             // handlers for for external notifications (endpoint imports), if any:
             this.ctx['sid'] = namespace.id;
             this.subscribe(this.ctx.sid, namespace);
         });
         // no need to unsubscribe on disconnect - client is unsubscribed by framework
         namespace.on("disconnect", () => {
-            this.ctx['global_namespace_connected'] = false;
+            this.ctx['root_namespace_connected'] = false;
             this.log(this.ctx.$options.name, "socket disconnected");
         });
         return namespace
     }
 
     disconnect(namespace=null) {
-        let the_namespace = namespace || this.ctx.global_namespace;
+        let the_namespace = namespace || this.ctx.namespace;
         if (the_namespace && the_namespace.connected) {
             the_namespace.disconnect();
         }
@@ -41,7 +41,7 @@ export class BECom {
 
     subscribe(room=null, namespace=null) {
         let the_room = room || this.ctx.room_sid;
-        let the_namespace = namespace || this.ctx.global_namespace;
+        let the_namespace = namespace || this.ctx.namespace;
         this.log(the_room, 'subscribed for', this.ctx.endpoints);
         // if ( !the_room )
         //     throw "Subscribe error: no room.";
@@ -58,7 +58,7 @@ export class BECom {
     
     unsubscribe(room=null, namespace=null) {
         let the_room = room || this.ctx.room_sid;
-        let the_namespace = namespace || this.ctx.global_namespace;
+        let the_namespace = namespace || this.ctx.namespace;
         this.log(the_room, 'unsubscribed from', this.ctx.endpoints);
         if ( !the_room )
             throw "Unsubscribe error: no room.";
@@ -80,7 +80,7 @@ export class BECom {
                 return false;
             }
             let the_room = client_room || this.ctx.room_sid;
-            let the_namespace = namespace || this.ctx.global_namespace;
+            let the_namespace = namespace || this.ctx.namespace;
             if ( no_logging === false ) {
                 this.log('send', name, 'to', the_room, old_value, new_value);
             }
@@ -105,7 +105,7 @@ export class BECom {
                 return false;
             }
             let the_room = client_room || this.ctx.room_sid;
-            let the_namespace = namespace || this.ctx.global_namespace;
+            let the_namespace = namespace || this.ctx.namespace;
             let i = this.external_notifications.findIndex(
                         (e) => _.isEqual(e, [name, new_value]))
             if ( i === -1 ) {
@@ -156,7 +156,7 @@ export class BECom {
                               no_data_logging=NO_DATA_LOGGING_DEFAULT
                               ) {
         let the_room = client_room || this.ctx.room_sid;
-        let the_namespace = namespace || this.ctx.global_namespace;
+        let the_namespace = namespace || this.ctx.namespace;
         if ( no_logging ) {
             // pass;
         }

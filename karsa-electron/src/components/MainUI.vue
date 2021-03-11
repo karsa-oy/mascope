@@ -106,20 +106,20 @@ export default {
             'experiment_selected',
             'project_selected',
             ]),
-        global_namespace: {
+        root_namespace: {
             get() {
-                return this.$store.state.global_namespace;
+                return this.$store.state.root_namespace;
             },
             set(value) {
-                this.$store.commit('global_namespace', value);
+                this.$store.commit('root_namespace', value);
             }
         },
-        global_namespace_connected: {
+        root_namespace_connected: {
             get() {
-                return this.$store.state.global_namespace_connected;
+                return this.$store.state.root_namespace_connected;
             },
             set(value) {
-                this.$store.commit('global_namespace_connected', value);
+                this.$store.commit('root_namespace_connected', value);
             }
         },
         url: {
@@ -143,8 +143,8 @@ export default {
     watch: {
         url: function(new_url) {
             // Connect to new url
-            this.be.disconnect(this.global_namespace);
-            this.global_namespace = this.be.connect();
+            this.be.disconnect(this.root_namespace);
+            this.root_namespace = this.be.connect();
             // Parse url into dotenv format and write to file
             let url_obj = new URL(new_url);
             this.dotenv.protocol = url_obj.protocol;

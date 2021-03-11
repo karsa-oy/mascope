@@ -6,7 +6,7 @@
             <div class="column is-on-third">
                 <b-field
                     label="URL"
-                    :type="global_namespace_connected ? 'is-success' : 'is-danger'">
+                    :type="root_namespace_connected ? 'is-success' : 'is-danger'">
                     <b-input
                         v-model="url"
                         lazy>
@@ -38,8 +38,8 @@ export default {
     ],
     computed: {
         ...mapState([
-            'global_namespace',
-            'global_namespace_connected',
+            'root_namespace',
+            'root_namespace_connected',
         ]),
         url: {
             get() {
