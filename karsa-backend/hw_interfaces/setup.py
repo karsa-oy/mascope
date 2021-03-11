@@ -26,6 +26,7 @@ setuptools.setup(
 	'colorcet',
         'dask[complete]',
         'datashader',
+        'datetime_glob',
         'h5py',
         'h5sparse',
         'numpy',
