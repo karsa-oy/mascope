@@ -19,9 +19,13 @@ class TOFServiceNamespace(BaseClientNamespace):
         connecting to Router """
 
     endpoints = [
-            'acquisition_status',
-            'data_write_path',
-            'service_state'
+            # 
+            'service_state',
+            #
+            # TOFControl
+            'start_acquisition',
+            'stop_acquisition',
+            #
             ]
 
     service_state = dict(
@@ -29,13 +33,11 @@ class TOFServiceNamespace(BaseClientNamespace):
         instrument_status = 'not_ready',
         )
 
-    async def on_acquisition_status(self, data):
-        global acquisition
-        self.log(data['value'])
-        if data['value'] == "starting":
-            acquisition.start_acquisition()
-        elif data['value'] == "stopping":
-            acquisition.stop_acquisition()
+    async def on_start_acquisition(self, data):
+        acquisition.start_acquisition()
+
+    async def on_stop_acquisition(self, data):
+        acquisition.stop_acquisition()
 
     
 class TOFServiceClient(BaseServiceClient):
@@ -103,13 +105,10 @@ class TOFServiceClient(BaseServiceClient):
 
             # Initialize acquisition
             self.log("Initializing acquisition.")
-            cookies = dict(src_sid=[])  # make tofservice originator of the requests
             await self.emit_client_notification(
                                         'acquisition_status',
                                         'running',
-                                        cookies=cookies,
-                                        client_room=self.instrument_name, # TODO: is this correct?
-                                        namespace='/'
+                                        # client_room=self.instrument_name, # TODO: is this correct?
                                         )
 
             filename_base = self.acquisition.filename
@@ -119,9 +118,7 @@ class TOFServiceClient(BaseServiceClient):
                                         'acquisition_started',
                                         {'filename': filename,
                                          },
-                                        cookies=cookies,
-                                        client_room=self.instrument_name, # TODO: is this correct?
-                                        namespace='/'
+                                        # client_room=self.instrument_name, # TODO: is this correct?
                                         )
 
             await self.emit_service_notification(
@@ -130,7 +127,6 @@ class TOFServiceClient(BaseServiceClient):
                                          'mz': self.acquisition.mz.tobytes(),
                                          't_range': [0, self.acquisition.length]
                                          },
-                                        cookies=cookies,
                                         no_data_logging=True
                                         )
             await self.emit_service_notification(
@@ -138,7 +134,6 @@ class TOFServiceClient(BaseServiceClient):
                                         {'filename': filename,
                                          'tps_info': self.acquisition.tps_info,
                                          },
-                                        cookies=cookies,
                                         )
             # Acquisition loop
             self.log("Entering acquisition loop.")
@@ -157,14 +152,12 @@ class TOFServiceClient(BaseServiceClient):
                     await self.emit_service_notification(
                                             'acquired_spectrum',
                                             spec_data,
-                                            cookies=cookies,
                                             no_data_logging=True
                                             )
                     # TPS data
                     await self.emit_service_notification(
                                             'acquired_tps_data',
                                             tps_data,
-                                            cookies=cookies,
                                             no_data_logging=True
                                             )
                     # Progress
@@ -172,9 +165,7 @@ class TOFServiceClient(BaseServiceClient):
                                             'acquisition_progress', 
                                             {'progress': self.acquisition.progress,
                                              },
-                                            cookies=cookies,
-                                            client_room=self.instrument_name, # TODO: is this correct?
-                                            namespace='/'
+                                            # client_room=self.instrument_name, # TODO: is this correct?
                                             )
                 # Got poison pill
                 else:
@@ -183,22 +174,17 @@ class TOFServiceClient(BaseServiceClient):
                                             'acquisition_progress', 
                                             {'progress': 100.,
                                              },
-                                            cookies=cookies,
-                                            client_room=self.instrument_name, # TODO: is this correct?
-                                            namespace='/'
+                                            # client_room=self.instrument_name, # TODO: is this correct?
                                             )
                     await self.emit_service_notification(
                                             'acquisition_finished', 
                                             {'filename': filename
                                              },
-                                            cookies=cookies,
                                             )
                     await self.emit_client_notification(
                                             'acquisition_status',
                                             'not_running',
-                                            cookies=cookies,
-                                            client_room=self.instrument_name, # TODO: is this correct?
-                                            namespace='/'
+                                            # client_room=self.instrument_name, # TODO: is this correct?
                                             )
                     self.log("Exiting acquisition loop.")
                     break # Break out of acquisition loop

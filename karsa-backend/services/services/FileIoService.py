@@ -274,6 +274,12 @@ class FileIoNamespace(BaseClientNamespace):
                   value.get('t_range')
                   )
 
+        # Repeat the notification into root ns for DataViz
+        await self.emit_service_notification('acquisition_coordinates',
+                                             value,
+                                             namespace='/'
+                                             )
+
     async def on_acquired_spectrum(self, data):
         """Receive new spectrum, add to cache
 
@@ -300,6 +306,12 @@ class FileIoNamespace(BaseClientNamespace):
                                             )
         else:
             Warning("[on_acquired_spectrum]: signal_array is None")
+        
+        # Repeat the notification into root ns for DataViz
+        await self.emit_service_notification('acquired_spectrum',
+                                             value,
+                                             namespace='/'
+                                             )
 
     async def on_acquired_tps_data(self, data):
         value = data['value']
@@ -332,6 +344,12 @@ class FileIoNamespace(BaseClientNamespace):
             await tps_array.flush()      # TODO: tps_array is None on killing acquisition from MainUI
         else:
             Warning("[on_acquistion_finished]: tps_array is None")
+        
+        # Repeat the notification into root ns for DataViz
+        await self.emit_service_notification('acquisition_finished',
+                                             value,
+                                             namespace='/'
+                                             )
 
     async def on_tps_parameter_info(self, data):
         value = data['value']
@@ -410,7 +428,10 @@ class FileIoNamespace(BaseClientNamespace):
                              'y_range': y_range
                              },
                             set_figure_ranges=set_figure_ranges,
-                            **{**kwargs, 'namespace': '/'}
+                            **{**kwargs,
+                               'namespace': '/',
+                               'no_data_logging': True
+                               }
                             )
         
         stream_data = True
@@ -425,8 +446,11 @@ class FileIoNamespace(BaseClientNamespace):
                                                      't_range': t_range,
                                                      'img': heatmap_img
                                                      },
-                                                    **{**kwargs, 'namespace': '/'}
-                                                    )
+                                                    **{**kwargs,
+                                                           'namespace': '/',
+                                                           'no_data_logging': True
+                                                           }
+                                                        )
                 for t0, spec_img in spec_imgs:
                     await self.emit_service_notification('spec_trace_image',
                                                         {'filename': filename,
@@ -434,7 +458,10 @@ class FileIoNamespace(BaseClientNamespace):
                                                          't_range': [t0, t0], # t1 does not matter
                                                          'img': spec_img
                                                          },
-                                                        **{**kwargs, 'namespace': '/'}
+                                                        **{**kwargs,
+                                                           'namespace': '/',
+                                                           'no_data_logging': True
+                                                           }
                                                         )
                 # No need to send data to DataViz
                 stream_data = False
@@ -473,7 +500,10 @@ class FileIoNamespace(BaseClientNamespace):
                                              },
                                             callback="speci_callback",
                                             callback_context=cache_get_keys(data),
-                                            **{**kwargs, 'namespace': '/'}
+                                            **{**kwargs,
+                                               'namespace': '/',
+                                               'no_data_logging': True
+                                               }
                                             )
             # wait till last series of notifications (mod 10 in size) is processed by subscriber
             while i > signal_env['speci'] and ttl_count < TASK_TTL:
