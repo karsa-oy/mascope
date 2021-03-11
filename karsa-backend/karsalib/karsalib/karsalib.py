@@ -7,7 +7,7 @@ import random
 from socketio import AsyncClientNamespace, AsyncNamespace, AsyncClient
 
 NO_LOGGING_DEFAULT = False
-NO_DATA_LOGGING_DEFAULT = False
+NO_DATA_LOGGING_DEFAULT = True
 
 
 def copy_dict(d, ignore_keys=[]):
@@ -72,7 +72,7 @@ class BaseClientNamespace(AsyncClientNamespace):
             await self.emit('client_notification',
                             {**data, 'name': k, 'value': v})
 
-    def on_client_notification_callback(self, data):
+    def on_service_notification_callback(self, data):
         endpoint = data['endpoint']
         cb_name = data['cb_name']
         cb_ctx = data['cb_ctx']
@@ -243,7 +243,7 @@ class BaseServerNamespace(AsyncNamespace):
             
     async def on_service_notification(self, sid, data):
         async def srv_callback(*arg, **kwarg):
-            await self.emit('client_notification_callback',
+            await self.emit('service_notification_callback',
                             dict(endpoint=endpoint,
                                  cb_name=cb, cb_ctx=cb_ctx,
                                  arg=arg, kwarg=kwarg,
