@@ -49,11 +49,11 @@ export class BECom {
                          {'app_name': this.ctx.$options.name,
                           'endpoints': this.ctx.endpoints,
                           'room': the_room});
-        the_namespace.emit('client_notification',
-                             {'name': 'service_state',
-                              'value': {},
-                              'room': the_room
-                              });
+        the_namespace.emit('service_notification',
+                            {'name': 'service_state',
+                             'value': {},
+                             'client_room': the_room
+                             });
     }
     
     unsubscribe(room=null, namespace=null) {
