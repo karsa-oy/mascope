@@ -132,7 +132,6 @@ export default {
     computed: {
         ...mapState([
             'root_namespace',
-            'root_namespace_connected',
             // 'targets',
         ]),
         // target_list_request: {
@@ -292,7 +291,7 @@ export default {
                                                         new_value, old_value,
                                                         this.room_sid);
         },
-        root_namespace_connected: function(new_value) {
+        'root_namespace.connected': function(new_value) {
             if ( new_value === true )
             {
                 this.namespace = this.root_namespace;

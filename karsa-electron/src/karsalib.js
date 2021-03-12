@@ -18,15 +18,14 @@ export class BECom {
         let the_url = url || this.ctx.url;
         this.log(this.ctx.$options.name, "Connecting to url: ", the_url);
         let namespace = io.connect(the_url);
+        this.ctx['namespace'] = namespace;
         namespace.on("connect", () => {
-            this.ctx['root_namespace_connected'] = true;
             // handlers for for external notifications (endpoint imports), if any:
-            this.ctx['sid'] = namespace.id;
-            this.subscribe(this.ctx.sid, namespace);
+            this.ctx['room_sid'] = namespace.id;
+            this.subscribe(this.ctx.room_sid, namespace);
         });
         // no need to unsubscribe on disconnect - client is unsubscribed by framework
         namespace.on("disconnect", () => {
-            this.ctx['root_namespace_connected'] = false;
             this.log(this.ctx.$options.name, "socket disconnected");
         });
         return namespace

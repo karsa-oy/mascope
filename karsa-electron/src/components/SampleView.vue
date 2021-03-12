@@ -105,7 +105,6 @@ export default {
                      'target_to_display',
                     //  'timeseries_figure_data',
                     //  'tps_parameters',
-                     'root_namespace_connected'
                      ]),
         // visualize_range: {
         //     get() {
@@ -1034,7 +1033,7 @@ export default {
                                                         new_value, old_value,
                                                         this.room_sid);
         },
-        root_namespace_connected: function(new_value) {
+        'root_namespace.connected': function(new_value) {
             if ( new_value === true )
             {
                 this.namespace = this.root_namespace;

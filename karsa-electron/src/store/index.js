@@ -29,7 +29,6 @@ export default new Vuex.Store({
 		sample_to_load: {},
 		// samples: [],
 		root_namespace: null,
-		root_namespace_connected: false,
 		// spec_stack_figure_data: {},
 		// target_list_request: {},
 		// target_table_data: [],
@@ -60,9 +59,6 @@ export default new Vuex.Store({
 		},
 		experiments(state, payload) {
 			state.experiments = payload;
-		},
-		root_namespace_connected(state, payload) {
-			state.root_namespace_connected = payload;
 		},
 		// figure_ranges(state, payload) {
 		// 	state.figure_ranges = payload;

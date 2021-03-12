@@ -114,14 +114,6 @@ export default {
                 this.$store.commit('root_namespace', value);
             }
         },
-        root_namespace_connected: {
-            get() {
-                return this.$store.state.root_namespace_connected;
-            },
-            set(value) {
-                this.$store.commit('root_namespace_connected', value);
-            }
-        },
         url: {
             get() {
                 return this.$store.state.url;

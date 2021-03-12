@@ -6,7 +6,7 @@
             <div class="column is-on-third">
                 <b-field
                     label="URL"
-                    :type="root_namespace_connected ? 'is-success' : 'is-danger'">
+                    :type="url_connected ? 'is-success' : 'is-danger'">
                     <b-input
                         v-model="url"
                         lazy>
@@ -39,7 +39,6 @@ export default {
     computed: {
         ...mapState([
             'root_namespace',
-            'root_namespace_connected',
         ]),
         url: {
             get() {
@@ -52,9 +51,14 @@ export default {
     },
     data: function() {
         return {
-
+            url_connected: false,
         }
     },
+    watch: {
+        'root_namespace.connected': function(new_value) {
+            this.url_connected = new_value;
+        }
+    }
 }
 
 </script>

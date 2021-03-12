@@ -444,7 +444,6 @@ export default {
             'new_file',
             // 'samples',
             'root_namespace',
-            'root_namespace_connected',
         ]),
 
         experiments: {
@@ -840,7 +839,7 @@ export default {
                 this.sample_to_load = {'filename': ""};
             }
         },
-        root_namespace_connected: function(new_value) {
+        'root_namespace.connected': function(new_value) {
             if ( new_value === true )
             {
                 this.namespace = this.root_namespace;

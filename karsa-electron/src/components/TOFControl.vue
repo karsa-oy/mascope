@@ -393,8 +393,7 @@ export default {
                 onCancel: () => this.acquisition_control_active = false,
                 onConfirm: () => { this.$buefy.toast.open({message: 'Instrument control granted',
                                                           type: 'is-success'});
-                                   this.namespace = this.be.connect(this.url + '/tof');
-                                   this.be.subscribe(null, this.namespace); }
+                                   this.be.connect(this.url + '/tof'); } // TODO: hard-coded namespace
             })
         },
         delete_row_in_config_desorption_table() {
@@ -588,7 +587,6 @@ export default {
                 this.namespace.on("sample_length", (value) => this.be.import_two_way_binding_prop("sample_length", value.value));
 
                 // dynamic subscription thru AcquisitionControl dialog
-                // this.room_sid = this.namespace.id;
                 // this.be.subscribe(this.room_sid);
             }
         },
