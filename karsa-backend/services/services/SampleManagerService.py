@@ -71,7 +71,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
         value = data['value']
         kwargs = get_client_notification_args(data)
 
-        await self.emit_service_notification(
+        await self.emit_client_notification(
                                         'data_request',
                                         value,
                                         **kwargs,
@@ -87,7 +87,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
         # TODO: override actual namespace only for prototyping
         namespace = '/tof'
 
-        await self.emit_service_notification('stop_data_request',
+        await self.emit_client_notification('stop_data_request',
                                        data,
                                        namespace=namespace
                                        )
@@ -112,16 +112,15 @@ class MetadataServiceNamespace(BaseClientNamespace):
             project_experiments = datapool.get_experiments(project)
             await self.emit_client_notification(
                             'experiments',
-                            project_experiments,
-                            **{**kwargs,
-                               'client_room': project
-                               }
+                            room='_'.join([project, experiment]),
                             )
         # Update sample table data
         await self.emit_client_notification(
                             'samples',
                             datapool.get_sample_table(project, experiment),
-                            **kwargs
+                            **{**kwargs,
+                               'room': data['client_room']
+                                }
                             )
 
     async def on_import_sample_table_datetime_range(self, data):
@@ -130,7 +129,9 @@ class MetadataServiceNamespace(BaseClientNamespace):
         await self.emit_client_notification(
                             'importable_samples',
                             datapool.get_sample_table(),
-                            **get_client_notification_args(data)
+                            **{**get_client_notification_args(data),
+                               'room': data['client_room']
+                               }
                             )
 
     async def on_project_selected(self, data):
@@ -148,15 +149,18 @@ class MetadataServiceNamespace(BaseClientNamespace):
                                     'projects',
                                     projects,
                                     **{**kwargs,
-                                       'client_room': None
-                                       }
+                                       'room': data['client_room']
+                                        }
                                     )
 
         experiments = datapool.get_experiments(project)
         await self.emit_client_notification(
                                     'experiments',
                                     experiments,
-                                    **kwargs)
+                                    **{**kwargs,
+                                       'room': data['client_room']
+                                        }
+                                    )
 
     async def on_sample_attributes(self, data):
         """Write attributes of a sample to disk. Make a symbolic link from
@@ -191,10 +195,12 @@ class MetadataServiceNamespace(BaseClientNamespace):
             datapool.delete_sample(project, experiment, sample)
 
         # Update sample table data in UIs
-        await self.emit_service_notification(
+        await self.emit_client_notification(
                             'samples',
                             datapool.get_sample_table(project, experiment),
-                            **get_client_notification_args(data),
+                            **{**get_client_notification_args(data),
+                               'room': '_'.join([project, experiment])
+                               }
                             )
     # ---------------------------------
 

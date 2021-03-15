@@ -298,7 +298,7 @@ export default {
                 // handlers for for external notifications:
                 this.namespace.on("targets", (value) => this.be.import_one_way_binding_prop("targets", value.value));
                 this.room_sid = this.root_namespace.id;
-                this.be.subscribe(this.room_sid);
+                this.be.subscribe(this.endpoints, this.room_sid);
             }
         },
     }

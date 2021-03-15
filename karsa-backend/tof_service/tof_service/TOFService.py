@@ -121,7 +121,7 @@ class TOFServiceClient(BaseServiceClient):
                                         # client_room=self.instrument_name, # TODO: is this correct?
                                         )
 
-            await self.emit_service_notification(
+            await self.emit_client_notification(
                                         'acquisition_coordinates',
                                         {'filename': filename,
                                          'mz': self.acquisition.mz.tobytes(),
@@ -129,7 +129,7 @@ class TOFServiceClient(BaseServiceClient):
                                          },
                                         no_data_logging=True
                                         )
-            await self.emit_service_notification(
+            await self.emit_client_notification(
                                         'tps_parameter_info',
                                         {'filename': filename,
                                          'tps_info': self.acquisition.tps_info,
@@ -149,13 +149,13 @@ class TOFServiceClient(BaseServiceClient):
                 # Got data
                 if spec_data is not None:
                     # Spectrum data
-                    await self.emit_service_notification(
+                    await self.emit_client_notification(
                                             'acquired_spectrum',
                                             spec_data,
                                             no_data_logging=True
                                             )
                     # TPS data
-                    await self.emit_service_notification(
+                    await self.emit_client_notification(
                                             'acquired_tps_data',
                                             tps_data,
                                             no_data_logging=True
@@ -176,7 +176,7 @@ class TOFServiceClient(BaseServiceClient):
                                              },
                                             # client_room=self.instrument_name, # TODO: is this correct?
                                             )
-                    await self.emit_service_notification(
+                    await self.emit_client_notification(
                                             'acquisition_finished', 
                                             {'filename': filename
                                              },

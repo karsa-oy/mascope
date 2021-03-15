@@ -275,7 +275,7 @@ class FileIoNamespace(BaseClientNamespace):
                   )
 
         # Repeat the notification into root ns for DataViz
-        await self.emit_service_notification('acquisition_coordinates',
+        await self.emit_client_notification('acquisition_coordinates',
                                              value,
                                              namespace='/'
                                              )
@@ -308,7 +308,7 @@ class FileIoNamespace(BaseClientNamespace):
             Warning("[on_acquired_spectrum]: signal_array is None")
         
         # Repeat the notification into root ns for DataViz
-        await self.emit_service_notification('acquired_spectrum',
+        await self.emit_client_notification('acquired_spectrum',
                                              value,
                                              namespace='/'
                                              )
@@ -346,7 +346,7 @@ class FileIoNamespace(BaseClientNamespace):
             Warning("[on_acquistion_finished]: tps_array is None")
         
         # Repeat the notification into root ns for DataViz
-        await self.emit_service_notification('acquisition_finished',
+        await self.emit_client_notification('acquisition_finished',
                                              value,
                                              namespace='/'
                                              )
@@ -418,7 +418,7 @@ class FileIoNamespace(BaseClientNamespace):
         t = signal.time.values.astype(np.float32)
         y_range = [0, signal.max().compute().item()]
 
-        await self.emit_service_notification(
+        await self.emit_client_notification(
                             'data_stream_coordinates',
                             {'filename': filename,
                              'mz': mz.tobytes(),
@@ -440,7 +440,7 @@ class FileIoNamespace(BaseClientNamespace):
             try:
                 heatmap_img = load_heatmap_image(filename)
                 spec_imgs = load_spec_trace_images(filename)
-                await self.emit_service_notification('heatmap_image',
+                await self.emit_client_notification('heatmap_image',
                                                     {'filename': filename,
                                                      'mz_range': mz_range,
                                                      't_range': t_range,
@@ -452,7 +452,7 @@ class FileIoNamespace(BaseClientNamespace):
                                                            }
                                                         )
                 for t0, spec_img in spec_imgs:
-                    await self.emit_service_notification('spec_trace_image',
+                    await self.emit_client_notification('spec_trace_image',
                                                         {'filename': filename,
                                                          'mz_range': mz_range,
                                                          't_range': [t0, t0], # t1 does not matter
@@ -489,7 +489,7 @@ class FileIoNamespace(BaseClientNamespace):
                     await asyncio.sleep(.1)
                 spec = spec_array.values
                 ti = float( spec_array.time )
-                await self.emit_service_notification(
+                await self.emit_client_notification(
                                             'loaded_spectrum',
                                             {'filename': filename,
                                              'i': i,
@@ -509,7 +509,7 @@ class FileIoNamespace(BaseClientNamespace):
             while i > signal_env['speci'] and ttl_count < TASK_TTL:
                 await asyncio.sleep(.1)
         # cache_release(data, 'signal')     # TODO: is it needed here?
-        await self.emit_service_notification('data_stream_finished',
+        await self.emit_client_notification('data_stream_finished',
                                             {'filename': filename,
                                              'mz_range': mz_range,
                                              't_range': t_range,
@@ -571,7 +571,7 @@ class FileIoNamespace(BaseClientNamespace):
                                     ]
         t = tps_data.time.values.astype(np.float32)
         kwargs = get_client_notification_args(data)
-        await self.emit_service_notification(
+        await self.emit_client_notification(
                             'tps_data_stream_coordinates',
                             {'filename': filename,
                              'parameters': parameters,
@@ -601,7 +601,7 @@ class FileIoNamespace(BaseClientNamespace):
                 await asyncio.sleep(.1)
             param_ys = param_array.values
             ti = float( param_array.time )
-            await self.emit_service_notification('loaded_tps_data',
+            await self.emit_client_notification('loaded_tps_data',
                                            {'filename': filename,
                                             'i': i,
                                             'tps_data': param_ys.tobytes(),
@@ -615,7 +615,7 @@ class FileIoNamespace(BaseClientNamespace):
         while i > tps_env['tps_speci'] and ttl_count < TASK_TTL:
             await asyncio.sleep(.1)
         # cache_release(data, 'tps')     # TODO: is it needed here?
-        await self.emit_service_notification('tps_data_stream_finished',
+        await self.emit_client_notification('tps_data_stream_finished',
                                        {'filename': filename},
                                        **kwargs
                                        )

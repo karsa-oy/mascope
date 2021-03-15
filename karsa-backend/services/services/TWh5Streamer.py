@@ -72,6 +72,7 @@ class TWh5StreamerNamespace(BaseClientNamespace):
 
         await self.emit_client_notification('h5_samples',
                                             h5_sample_table,
+                                            room=data['client_room'],
                                             **kwargs
                                             )
 

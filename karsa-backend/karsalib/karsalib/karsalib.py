@@ -5,6 +5,7 @@ import inspect
 from copy import deepcopy
 import random
 from socketio import AsyncClientNamespace, AsyncNamespace, AsyncClient
+from socketio.exceptions import BadNamespaceError
 
 NO_LOGGING_DEFAULT = False
 NO_DATA_LOGGING_DEFAULT = True
@@ -40,6 +41,9 @@ class BaseClientNamespace(AsyncClientNamespace):
             room = room,
         )
         await self.emit('subscribe', data)
+        await self.on_service_state(dict(value={},
+                                         room=room,
+                                         no_data_logging=NO_DATA_LOGGING_DEFAULT, ))
 
     async def unsubscribe(self, endpoints=None, room=None):
         data = dict(
@@ -53,8 +57,6 @@ class BaseClientNamespace(AsyncClientNamespace):
         self.app_name = self.__class__.__name__
         self.log(f"connected to namespace {self.namespace}")
         await self.subscribe()
-        await self.on_service_state(dict(value={},
-                                         no_data_logging=NO_DATA_LOGGING_DEFAULT, ))
 
     def on_disconnect(self):
         self.log(f"disconnected from namespace {self.namespace}")
@@ -72,7 +74,7 @@ class BaseClientNamespace(AsyncClientNamespace):
             await self.emit('client_notification',
                             {**data, 'name': k, 'value': v})
 
-    def on_service_notification_callback(self, data):
+    def on_client_notification_callback(self, data):
         endpoint = data['endpoint']
         cb_name = data['cb_name']
         cb_ctx = data['cb_ctx']
@@ -112,48 +114,27 @@ class BaseClientNamespace(AsyncClientNamespace):
         if name in self.service_state:
             self.service_state[name] = value
 
-    async def emit_service_notification(self, name, value, **kwarg):
-        no_logging = kwarg.get('no_logging', NO_LOGGING_DEFAULT)
-        no_data_logging = kwarg.get('no_data_logging', NO_DATA_LOGGING_DEFAULT)
-        if no_logging:
-            pass
-        elif no_data_logging:
-            self.log(f"{name}: ...")
-        else:
-            self.log(f"{name}: {value} > {kwarg.get('room', name)}")
-        await self.emit('service_notification', {'name': name, 'value': value, **kwarg})
-        if name in self.service_state:
-            self.service_state[name] = value
-
 
 class BaseServerNamespace(AsyncNamespace):
     """ socketio server base namespace class """
-    subscriptions = dict()  # dict(endpoint:rooms)
-    client_rooms = dict()   # for housekeeping
 
     def log(self, *arg, **kwarg):
         print(f"[{self.namespace}.{inspect.stack()[1].function}]", *arg, **kwarg)
 
     def on_connect(self, sid, environ):
         self.log("connected to namespace", self.namespace)
-        self.client_rooms[sid] = []
-
 
     async def on_disconnect(self, sid):
         self.log(sid, "disconnected from namespace", self.namespace)
         # clear the app caches, if any, in all app services
+        # TODO: move stop_visualize_range to affected services
         await self.on_client_notification(sid,
                         dict(name='stop_visualize_range',
                              value={},
                              no_data_logging=False) )
-        # remove the client rooms from all subscriptions
-        for s in list(self.subscriptions):
-            for r in self.client_rooms[sid]:
-                if r in self.subscriptions[s]:
-                    self.subscriptions[s].remove(r)
-            if not self.subscriptions[s]:
-                del self.subscriptions[s]
-        del self.client_rooms[sid]
+        # refresh state of affected services
+        await self.emit('service_state', {})
+
 
 
     def on_subscribe(self, sid, data):
@@ -165,29 +146,22 @@ class BaseServerNamespace(AsyncNamespace):
         app_name = data['app_name']
         endpoints = data['endpoints']
         room = data.get('room')
-        self.log(f"{app_name}:{room} created endpoints {endpoints}")
+        self.log(f"{app_name}:{room or sid} created endpoints {endpoints}")
         if room:
-            for e in endpoints:
-                if e not in self.subscriptions:
-                    self.subscriptions[e] = []
-                self.subscriptions[e].append(room)
             self.enter_room(sid, room)
-            self.client_rooms[sid].append(room)
         else:
             for e in endpoints:
                 self.enter_room(sid, e)
 
 
-    def on_unsubscribe(self, sid, data):
+    async def on_unsubscribe(self, sid, data):
         app_name = data['app_name']
         endpoints = data['endpoints']
         room = data.get('room')
         self.log(f"{app_name}:{room} destroyed endpoints {endpoints}")
         if room:
             self.leave_room(sid, room)
-            self.client_rooms[sid].remove(room)
-            for e in endpoints:
-                self.subscriptions[e].remove(room)
+            await self.emit('service_state', {}, room=room)
         else:
             for e in endpoints:
                 self.leave_room(sid, e)
@@ -201,11 +175,10 @@ class BaseServerNamespace(AsyncNamespace):
               other named args are free form, e.g. 
               room, cookies, no_logging, no_data_logging...
         """
-
         no_logging = data.get('no_logging', False)
         no_data_logging = data.get('no_data_logging', True)
         endpoint = data['name']
-        client_room = data.get('client_room')
+        room = data.get('room')
         namespace = data.get('namespace', self.namespace)
         cb = data.pop('callback', None)
         cb_ctx = data.pop('callback_context', None)
@@ -223,27 +196,11 @@ class BaseServerNamespace(AsyncNamespace):
         src_sids = cookies['src_sid']
         # sids are added to the cookies only by this procedure
         src_sids.append(sid)
-        sent_to = len(src_sids) * '>'
 
-        if client_room:
-            # Room given explicitly
-            target_rooms = [client_room]
-        else:
-            # Room not given, emit to all endpoint subscribers
-            target_rooms = self.subscriptions.get(endpoint, [])
-            
-        for target_room in target_rooms:
-            await self.emit(endpoint,
-                            data,
-                            room=target_room,
-                            namespace=namespace,
-                            callback=cb and srv_callback
-                            )
-            self.log(f"{endpoint} {sent_to} {namespace}:{target_room}")
-            
-    async def on_service_notification(self, sid, data):
+        target_room = room if room else endpoint
+
         async def srv_callback(*arg, **kwarg):
-            await self.emit('service_notification_callback',
+            await self.emit('client_notification_callback',
                             dict(endpoint=endpoint,
                                  cb_name=cb, cb_ctx=cb_ctx,
                                  arg=arg, kwarg=kwarg,
@@ -251,40 +208,10 @@ class BaseServerNamespace(AsyncNamespace):
                             room=sid,
                             namespace=self.namespace
                             )
-
-        no_logging = data.get('no_logging', False)
-        no_data_logging = data.get('no_data_logging', True)
-        endpoint = data['name']
-        # client_room = data.get('client_room')
-        namespace = data.get('namespace', self.namespace)
-        cb = data.pop('callback', None)
-        cb_ctx = data.pop('callback_context', None)
-
-        if no_logging:
-            pass
-        elif no_data_logging:
-            self.log(f"{endpoint}: ...")
-        else:
-            self.log(data)
-        
-        if 'cookies' not in data:
-            data['cookies'] = dict(src_sid=[])
-        cookies = data['cookies']
-        src_sids = cookies['src_sid']
-        # sids are added to the cookies only by this procedure
-        src_sids.append(sid)
-
-        target_room = endpoint
-
         sent_to = len(src_sids) * '>'
         self.log(f"{endpoint} {sent_to} {namespace}:{target_room}")
+        await self.emit(endpoint, data, room=target_room, namespace=namespace, callback=cb and srv_callback)
 
-        await self.emit(endpoint,
-                        data,
-                        room=target_room,
-                        namespace=namespace,
-                        callback=cb and srv_callback
-                        )
 
 def parse_cmd_args():
     """
@@ -320,41 +247,37 @@ class BaseServiceClient:
         if not NO_LOGGING_DEFAULT:
             print(f"[{self.__class__.__name__}.{inspect.stack()[1].function}]", *arg, **kwarg)
 
-    def __init__(self, url, port, client_namespace):
+    def __init__(self, url, port, client_namespace_data):
         self.addr = f'{url}:{port}'
         if not self.addr.startswith('http'):
             self.addr = 'http://' + self.addr
         self.sio = AsyncClient()
-        namespace, handlers = client_namespace
-        if not namespace.startswith('/'):
-            namespace = '/' + namespace
-        self.sio.register_namespace( handlers(namespace) )
-        self.root_ns = self.sio.namespace_handlers.get(namespace)
+        ns_name, ns_class = client_namespace_data
+        if not ns_name.startswith('/'):
+            ns_name = '/' + ns_name
+        self.sio.register_namespace( ns_class(ns_name) )
+        self.ns_handler = self.sio.namespace_handlers.get(ns_name)
 
     async def emit_client_notification(self, name, value, **kwarg):
-        await self.root_ns.emit_client_notification(name, value, **kwarg)
+        await self.ns_handler.emit_client_notification(name, value, **kwarg)
 
-    async def emit_service_notification(self, name, value, **kwarg):
-        await self.root_ns.emit_service_notification(name, value, **kwarg)
-
-    async def register_router_namespaces(self, namespaces):
-        self.log("Connecting to '/' to register %s" %namespaces)
-        await self.connect(['/'])
+    async def register_private_namespace_on_router(self, ns_handler):
+        self.log(f"Registering {ns_handler.namespace} on Router...")
+        await self.sio.connect(self.addr, namespaces=['/',])
         # TODO: TBR python-socketio BadNamespaceError connection bug
-        from socketio.exceptions import BadNamespaceError
         while True:
             try:
-                for namespace in namespaces:
-                    await self.sio.emit('register_namespace',
-                                        namespace,
-                                        callback=self.disconnect
-                                        )
-                    self.log("Registering %s in Router" %namespace)
+                await self.sio.emit('register_namespace',
+                                    ns_handler.namespace,
+                                    callback=self.disconnect
+                                    )
+                self.log(f"Registered {ns_handler.namespace}")
                 break
-            except BadNamespaceError:
+            except BadNamespaceError as e:
+                self.log(f"Failed: {e}.\nRetrying...")
                 await self.sio.sleep(.1)
 
-    async def connect(self, namespaces):
+    async def connect(self, namespaces=None):
         while True:
             try:
                 self.log('Connecting to Router...')
@@ -369,9 +292,7 @@ class BaseServiceClient:
                 await self.sio.sleep(1)
 
     async def disconnect(self):
-        self.log("Disconnecting from Router...")
         await self.sio.disconnect()
-        self.log("Disconnected")
 
     async def init_service(self):
         """
@@ -387,9 +308,44 @@ class BaseServiceClient:
             await self.sio.sleep(1)
 
     async def run(self):
-        namespaces = list( self.sio.namespace_handlers.keys() )
-        if namespaces[0] != '/':
-            await self.register_router_namespaces(namespaces)
-        await self.connect(namespaces)
+        if self.ns_handler.namespace != '/':
+            await self.register_private_namespace_on_router(self.ns_handler)
+        await self.connect([self.ns_handler.namespace])
+        await self.init_service()
+        await self.service_main()
+
+
+class BridgeServiceClient(BaseServiceClient):
+
+    def __init__(self, url, port, public_namespace_data, private_namespace_data):
+        self.addr = f'{url}:{port}'
+        if not self.addr.startswith('http'):
+            self.addr = 'http://' + self.addr
+        self.sio = AsyncClient()
+        # public namespace
+        ns_name, ns_class = public_namespace_data
+        if ns_name != '/':
+            raise BadNamespaceError(f'Invalid root namespace {ns_name}')
+        self.sio.register_namespace( ns_class(ns_name) )
+        self.public_ns = self.sio.namespace_handlers.get(ns_name)
+        # private namespace
+        ns_name, ns_class = private_namespace_data
+        if not ns_name.startswith('/'):
+            ns_name = '/' + ns_name
+        self.sio.register_namespace( ns_class(ns_name) )
+        self.private_ns = self.sio.namespace_handlers.get(ns_name)
+        # cross-references
+        self.public_ns.parent = self
+        self.private_ns.parent = self
+
+    async def emit_public_notification(self, name, value, **kwarg):
+        await self.public_ns.emit_client_notification(name, value, **kwarg)
+
+    async def emit_private_notification(self, name, value, **kwarg):
+        await self.private_ns.emit_client_notification(name, value, **kwarg)
+
+    async def run(self):
+        await self.register_private_namespace_on_router(self.private_ns)
+        await self.connect()
         await self.init_service()
         await self.service_main()

@@ -1045,7 +1045,7 @@ export default {
                 this.namespace.on("tps_parameters", (value) => this.be.import_one_way_binding_prop("tps_parameters", value.value));
 
                 this.room_sid = this.root_namespace.id;
-                this.be.subscribe(this.room_sid);
+                this.be.subscribe(this.endpoints, this.room_sid);
             }
         },
     },

@@ -543,13 +543,13 @@ export default {
             if(new_value === "starting"){
                 this.acquisition_control_label = "Starting Acquisition";
                 this.acquisition_button_type = "is-danger";
-                this.be.emit_service_notification('start_acquisition', {});
+                this.be.emit_client_notification('start_acquisition', {});
             }
             if(new_value === "stopping"){
                 this.acquisition_control_label = "Stopping Acquisition";
                 this.acquisition_button_type = "is-danger";
                 this.scenthound_status = 'Processing...';
-                this.be.emit_service_notification('stop_acquisition', {});
+                this.be.emit_client_notification('stop_acquisition', {});
             }
             if(new_value === "running"){
                 this.sample_table_checked_rows = [];
@@ -587,7 +587,7 @@ export default {
                 this.namespace.on("sample_length", (value) => this.be.import_two_way_binding_prop("sample_length", value.value));
 
                 // dynamic subscription thru AcquisitionControl dialog
-                // this.be.subscribe(this.room_sid);
+                this.be.subscribe(this.endpoints, null);
             }
         },
     }

@@ -22,7 +22,6 @@ export class BECom {
         namespace.on("connect", () => {
             // handlers for for external notifications (endpoint imports), if any:
             this.ctx['room_sid'] = namespace.id;
-            this.subscribe(this.ctx.room_sid, namespace);
         });
         // no need to unsubscribe on disconnect - client is unsubscribed by framework
         namespace.on("disconnect", () => {
@@ -38,17 +37,17 @@ export class BECom {
         }
     }
 
-    subscribe(room=null, namespace=null) {
-        let the_room = room || this.ctx.room_sid;
+    subscribe(endpoints, room, namespace=null) {
+        let the_endpoints = endpoints;
+        let the_room = room;
         let the_namespace = namespace || this.ctx.namespace;
-        this.log(the_room, 'subscribed for', this.ctx.endpoints);
-        // if ( !the_room )
-        //     throw "Subscribe error: no room.";
+        this.log(the_room, 'subscribed for', the_endpoints);
+
         the_namespace.emit('subscribe',
                          {'app_name': this.ctx.$options.name,
-                          'endpoints': this.ctx.endpoints,
+                          'endpoints': the_endpoints,
                           'room': the_room});
-        the_namespace.emit('service_notification',
+        the_namespace.emit('client_notification',
                             {'name': 'service_state',
                              'value': {},
                              'client_room': the_room
@@ -83,7 +82,7 @@ export class BECom {
             if ( no_logging === false ) {
                 this.log('send', name, 'to', the_room, old_value, new_value);
             }
-            the_namespace.emit('service_notification',
+            the_namespace.emit('client_notification',
                                 {name: name,
                                  value: new_value,
                                  client_room: the_room,
@@ -110,7 +109,7 @@ export class BECom {
             if ( i === -1 ) {
                 if ( no_logging === false )
                 this.log('send', name, 'to', the_room, old_value, new_value);
-                the_namespace.emit('service_notification',
+                the_namespace.emit('client_notification',
                                     {name: name,
                                      value: new_value,
                                      client_room: the_room,
@@ -147,7 +146,7 @@ export class BECom {
         console.log('[' + this.log_prefix + ']',  ...args);
     }
 
-    emit_service_notification(name,
+    emit_client_notification(name,
                               value,
                               client_room=null,
                               namespace=null,
@@ -165,7 +164,7 @@ export class BECom {
         else {
             this.log(name, ':', value, 'to room', the_room);
         }
-        the_namespace.emit('service_notification',
+        the_namespace.emit('client_notification',
                             {name: name,
                              value: value,
                              client_room: the_room,

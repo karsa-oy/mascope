@@ -178,7 +178,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
         data : dict(name, value, cookies, no_logging, no_data_logging...)
                value: JSON data from UI, keys: 'filename', 't_range', 'mz_range'
         """
-        await self.emit_service_notification('data_request',
+        await self.emit_client_notification('data_request',
                                             data['value'],
                                             **get_client_notification_args(data)
                                             )
@@ -196,7 +196,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                       keys: 'filename', 't_range', 'mz_range';  or
                       keys: 'filename', 'ranges';
         """
-        await self.emit_service_notification('stop_data_request',
+        await self.emit_client_notification('stop_data_request',
                                             data['value'],
                                             **get_client_notification_args(data))
         d = deepcopy(data)
@@ -212,7 +212,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
     async def on_tps_parameters_selected(self, data):
         """TPS parameters selected from the dropdown
         """
-        await self.emit_service_notification('tps_data_request',
+        await self.emit_client_notification('tps_data_request',
                                             data['value'],
                                             **get_client_notification_args(data)
                                             )
@@ -225,7 +225,9 @@ class DataVizServiceNamespace(BaseClientNamespace):
         await self.emit_client_notification(
                                 'heatmap_figure_data',
                                 value,
-                                **get_client_notification_args(data)
+                                **{**get_client_notification_args(data),
+                                   'room': data['client_room']
+                                   }
                                 )
     
     async def on_spec_trace_image(self, data):
@@ -233,7 +235,9 @@ class DataVizServiceNamespace(BaseClientNamespace):
         await self.emit_client_notification(
                         'spec_stack_figure_data',
                         value,
-                        **get_client_notification_args(data)
+                        **{**get_client_notification_args(data),
+                           'room': data['client_room']
+                           }
                         )
 
     async def on_data_stream_coordinates(self, data):
@@ -299,7 +303,9 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                  'mz_range': mz_range,
                                  't_range': t_range,
                                  },
-                                 **kwargs
+                                **{**kwargs,
+                                  'room': data['client_room']
+                                  }
                                 )
 
     async def on_acquired_spectrum(self, data):
@@ -346,7 +352,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                 'img_filename': 'heatmap.png',
                                 'img': full_heatmap_str
                                 }
-                    await self.emit_service_notification(
+                    await self.emit_client_notification(
                                         'image_to_save',
                                         image_data,
                                         **kwargs
@@ -360,7 +366,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                             'img_filename': 'spec%.2f.png' %spec_trace.get('t_range')[0],
                             'img': spec_trace['img']
                             })
-                        await self.emit_service_notification(
+                        await self.emit_client_notification(
                                             'image_to_save',
                                             image_data,
                                             **kwargs
@@ -661,7 +667,9 @@ class DataVizServiceClient(BaseServiceClient):
                 await self.emit_client_notification(
                                 'heatmap_figure_data',
                                 heatmap_slice,
-                                **kwargs
+                                **{**kwargs,
+                                   'room': data['client_room']
+                                   }
                                 )
             if spec_trace is not None:
                 i = spec_trace.pop('i')
@@ -675,7 +683,9 @@ class DataVizServiceClient(BaseServiceClient):
                 await self.emit_client_notification(
                                 'spec_stack_figure_data',
                                 spec_trace,
-                                **kwargs
+                                **{**kwargs,
+                                   'room': data['client_room']
+                                   }
                                 )
 
         # Terminate image generators

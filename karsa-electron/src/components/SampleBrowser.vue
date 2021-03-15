@@ -536,17 +536,14 @@ export default {
             sample_attributes: {},
 
             // Communication
-            room_projects: 'projects',
+            room_experiment: null,
             room_project: null,
             room_sid: null,
-            room_experiment: null,
             endpoints: [
-                // 'acquisition_started',
                 'experiments',
                 'importable_samples',
                 'projects',
                 'samples',
-                // 'sample_attributes',
             ],
         }
     },
@@ -723,7 +720,9 @@ export default {
                 if ( !_.isEmpty(this.room_experiment) )
                     this.be.unsubscribe(this.room_experiment);
                 this.room_experiment = this.project_selected.id + '_' + new_value.id;
-                this.be.subscribe(this.room_experiment);
+                this.be.subscribe(['samples'],
+                                  this.room_experiment
+                                  );
                 return this.be.export_one_way_binding_prop('experiment_selected',
                                                            new_value,
                                                            old_value,
@@ -774,7 +773,9 @@ export default {
                     this.be.unsubscribe(this.room_project);
                 }
                 this.room_project = new_value.id;
-                this.be.subscribe(this.room_project);
+                this.be.subscribe(['experiments'],
+                                  this.room_project
+                                  );
                 // push new_value of project_selected to corresponding room
                 this.be.export_one_way_binding_prop('project_selected',
                                                     new_value,
@@ -850,7 +851,8 @@ export default {
                 this.namespace.on("samples", (value) => this.be.import_one_way_binding_prop("samples", value.value));
 
                 this.room_sid = this.root_namespace.id;
-                this.be.subscribe(this.room_sid);
+                this.be.subscribe(this.endpoints, this.room_sid);
+                this.be.subscribe(['projects'], 'projects');
             }
         },
     }
