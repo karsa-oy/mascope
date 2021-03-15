@@ -112,7 +112,8 @@ class MetadataServiceNamespace(BaseClientNamespace):
             project_experiments = datapool.get_experiments(project)
             await self.emit_client_notification(
                             'experiments',
-                            room='_'.join([project, experiment]),
+                            project_experiments,
+                            room=project,
                             )
         # Update sample table data
         await self.emit_client_notification(
