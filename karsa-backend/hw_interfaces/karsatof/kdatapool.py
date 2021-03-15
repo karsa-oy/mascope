@@ -368,8 +368,16 @@ class DataPool():
 
     def new_sample(self, project, experiment, sample, attributes):
         experiment_path = os.path.join(self.projects_root, project, experiment)
+
         instrument = sample.split('_')[0]
-        sample_data_path = os.path.join(instrument, sample)
+
+        file_datetime = parse_datetime_from_filename(sample)
+        date_dir = '%.4d.%.2d.%.2d' %(file_datetime.year,
+                                      file_datetime.month,
+                                      file_datetime.day
+                                      )
+
+        sample_data_path = os.path.join(instrument, date_dir, sample)
         sample_experiment_path = os.path.join(experiment_path, sample)
         # Check if sample exists
         if not os.path.isdir(sample_data_path):
