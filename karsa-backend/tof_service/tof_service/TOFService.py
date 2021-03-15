@@ -8,16 +8,51 @@ import numpy as np
 from multiprocessing import Queue
 from queue import Empty
 
-from karsalib import BaseClientNamespace, BaseServiceClient, parse_cmd_args
+from karsalib import BaseClientNamespace, BridgeServiceClient, \
+                     parse_cmd_args, get_client_notification_args
 from karsatof.kgenerator import Acquisition, h5Streamer
 
 acquisition = None
 NO_DATA_LOGGING_DEFAULT = True
 
-class TOFServiceNamespace(BaseClientNamespace):
-    """ python-socket.io client namespace for
-        connecting to Router """
 
+class TOFServicePublicNamespace(BaseClientNamespace):
+    # TOF service public (root) interfaces
+    parent = None
+    # the public namespace is primarily exposed to the root namespace
+    # via a room_instrument = private_namespace_name.
+    room_instrument = None
+    room_data_sources = 'room_data_sources'
+    endpoints = []
+    endpoints_room_data_sources = [
+            'instrument_data_request',
+            'service_state',
+            ]
+    endpoints_room_instrument = [
+            'instrument_data_request',
+            ]
+    service_state = dict(
+        instrument_data = dict(),
+        )
+
+    async def subscribe(self):
+        if self.endpoints:
+            await super().subscribe(self.endpoints)
+        if self.endpoints_room_data_sources:
+            await super().subscribe(self.endpoints_room_data_sources, self.room_data_sources)
+        if self.endpoints_room_instrument:
+            await super().subscribe(self.endpoints_room_instrument, self.room_instrument)
+
+    async def on_instrument_data_request(self, data):
+        await self.emit_client_notification(
+                                    'instrument_data',
+                                    self.parent.instrument_data,
+                                    **get_client_notification_args(data)
+                                    )
+
+
+class TOFServicePrivateNamespace(BaseClientNamespace):
+    # TOF service private interfaces
     endpoints = [
             # 
             'service_state',
@@ -27,7 +62,6 @@ class TOFServiceNamespace(BaseClientNamespace):
             'stop_acquisition',
             #
             ]
-
     service_state = dict(
         acquisition_status = 'not_running',
         instrument_status = 'not_ready',
@@ -40,7 +74,7 @@ class TOFServiceNamespace(BaseClientNamespace):
         acquisition.stop_acquisition()
 
     
-class TOFServiceClient(BaseServiceClient):
+class TOFServiceClient(BridgeServiceClient):
     async def initialize_kgenerator(self, kgenerator=Acquisition):
         """
         Initialize KAcquisition instance.
@@ -73,7 +107,7 @@ class TOFServiceClient(BaseServiceClient):
             # TODO: TBR python-socketio BadNamespaceError connection bug
             from socketio.exceptions import BadNamespaceError
             try:
-                await self.emit_client_notification(
+                await self.emit_private_notification(
                                             'instrument_status',
                                             'not_ready',
                                             no_data_logging=False
@@ -83,11 +117,18 @@ class TOFServiceClient(BaseServiceClient):
                 await self.sio.sleep(.1)
                 continue
         acquisition = self.acquisition = await self.initialize_kgenerator()
-        await self.emit_client_notification(
+        await self.emit_private_notification(
                                     'instrument_status',
                                     'ready',
                                     no_data_logging=False,
                                     )
+        await self.emit_public_notification(
+                                    'instrument_data',
+                                    self.instrument_data,
+                                    room=self.public_ns.room_data_sources,
+                                    no_data_logging=False
+                                    )
+
 
     async def service_main(self):
         # Main loop
@@ -105,23 +146,21 @@ class TOFServiceClient(BaseServiceClient):
 
             # Initialize acquisition
             self.log("Initializing acquisition.")
-            await self.emit_client_notification(
+            await self.emit_private_notification(
                                         'acquisition_status',
                                         'running',
-                                        # client_room=self.instrument_name, # TODO: is this correct?
                                         )
 
             filename_base = self.acquisition.filename
             filename = filename_base
 
-            await self.emit_client_notification(
+            await self.emit_private_notification(
                                         'acquisition_started',
                                         {'filename': filename,
                                          },
-                                        # client_room=self.instrument_name, # TODO: is this correct?
                                         )
 
-            await self.emit_client_notification(
+            await self.emit_private_notification(
                                         'acquisition_coordinates',
                                         {'filename': filename,
                                          'mz': self.acquisition.mz.tobytes(),
@@ -129,7 +168,7 @@ class TOFServiceClient(BaseServiceClient):
                                          },
                                         no_data_logging=True
                                         )
-            await self.emit_client_notification(
+            await self.emit_private_notification(
                                         'tps_parameter_info',
                                         {'filename': filename,
                                          'tps_info': self.acquisition.tps_info,
@@ -149,42 +188,39 @@ class TOFServiceClient(BaseServiceClient):
                 # Got data
                 if spec_data is not None:
                     # Spectrum data
-                    await self.emit_client_notification(
+                    await self.emit_private_notification(
                                             'acquired_spectrum',
                                             spec_data,
                                             no_data_logging=True
                                             )
                     # TPS data
-                    await self.emit_client_notification(
+                    await self.emit_private_notification(
                                             'acquired_tps_data',
                                             tps_data,
                                             no_data_logging=True
                                             )
                     # Progress
-                    await self.emit_client_notification(
+                    await self.emit_private_notification(
                                             'acquisition_progress', 
                                             {'progress': self.acquisition.progress,
                                              },
-                                            # client_room=self.instrument_name, # TODO: is this correct?
                                             )
                 # Got poison pill
                 else:
                     # Finalize acquisition
-                    await self.emit_client_notification(
+                    await self.emit_private_notification(
                                             'acquisition_progress', 
                                             {'progress': 100.,
                                              },
-                                            # client_room=self.instrument_name, # TODO: is this correct?
                                             )
-                    await self.emit_client_notification(
+                    await self.emit_private_notification(
                                             'acquisition_finished', 
                                             {'filename': filename
                                              },
                                             )
-                    await self.emit_client_notification(
+                    await self.emit_private_notification(
                                             'acquisition_status',
                                             'not_running',
-                                            # client_room=self.instrument_name, # TODO: is this correct?
                                             )
                     self.log("Exiting acquisition loop.")
                     break # Break out of acquisition loop
@@ -195,15 +231,12 @@ class TOFServiceClient(BaseServiceClient):
 
 def run():
     url, port, namespace = parse_cmd_args()
-
-    # TODO: TOFService should always be in private namespace with FileIo
-    # if namespace == '/':
-    #     print("TOFService must be in a private namespace. " +
-    #           "Please restart the service with --ns option."
-    #           )
-    #     return
-
-    client = TOFServiceClient(url, port, (namespace, TOFServiceNamespace))
+    client = TOFServiceClient(url, port,
+                              ('/', TOFServicePublicNamespace),
+                              (namespace, TOFServicePrivateNamespace))
+    # TODO: get instrument_data from corresponding hw_interface
+    client.instrument_data = {'name': namespace, 'model': 'Tofwerk', }
+    client.public_ns.room_instrument = namespace
     loop = asyncio.get_event_loop()
     loop.run_until_complete(client.run())
 

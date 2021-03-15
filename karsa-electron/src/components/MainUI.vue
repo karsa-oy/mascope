@@ -95,10 +95,15 @@ export default {
             room_sid: null,
             // endpoints - list of notifications the MainUI wants to receive
             endpoints: [
-
+                'instrument_data',
+                'service_state',
             ],
-            data_sources: ["tof", "h5", "RAW", ""], // TODO: Request list of available namespaces
+            instrument_data: {},
+            service_state: null,
+            data_sources: [],
             data_source_selected: "",
+            room_data_sources: 'room_data_sources',
+
         };
     },
     computed: {
@@ -143,6 +148,32 @@ export default {
             this.dotenv.host = url_obj.hostname;
             this.dotenv.port = url_obj.port;
             write_dotenv(this.dotenv);
+        },
+        instrument_data: function(new_value) {
+            if ( !new_value.name || this.data_sources.indexOf(new_value.name) != -1 )
+                return false;
+            this.data_sources.push(new_value.name);
+        },
+        service_state: async function() {
+            this.data_sources = [];
+
+            console.log('TODO: Fix ugly workaround to let data_sources update well')
+            await new Promise(r => setTimeout(r, 500));
+
+            await this.be.emit_client_notification('instrument_data_request',
+                                             {},
+                                             this.room_data_sources,
+                                             this.room_data_sources
+                                            );
+        },
+        'root_namespace.connected': function(new_value) {
+            if ( new_value === true )
+            {
+                // handlers for for external notifications:
+                this.root_namespace.on("instrument_data", (value) => this.be.import_one_way_binding_prop("instrument_data", value.value));
+                this.root_namespace.on("service_state", (value) => this.be.import_one_way_binding_prop("service_state", {...value.value, 'uid': Math.random()}));
+                this.be.subscribe(this.endpoints, this.room_data_sources);
+            }
         },
     }
 }

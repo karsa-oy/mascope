@@ -135,8 +135,6 @@ class BaseServerNamespace(AsyncNamespace):
         # refresh state of affected services
         await self.emit('service_state', {})
 
-
-
     def on_subscribe(self, sid, data):
         """
         Initialize client subscriptions. Subscriptions contain notif names
@@ -152,7 +150,6 @@ class BaseServerNamespace(AsyncNamespace):
         else:
             for e in endpoints:
                 self.enter_room(sid, e)
-
 
     async def on_unsubscribe(self, sid, data):
         app_name = data['app_name']

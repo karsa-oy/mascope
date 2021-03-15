@@ -254,6 +254,7 @@ export default {
                                                         new_value,
                                                         old_value,
                                                         null,
+                                                        null,
                                                         this.h5_namespace,
                                                         );
         },
@@ -262,6 +263,7 @@ export default {
                                                         new_value,
                                                         old_value,
                                                         this.room_sid,
+                                                        null,
                                                         this.h5_namespace,
                                                         );
         },

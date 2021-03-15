@@ -44,11 +44,13 @@ export class BECom {
         the_namespace.emit('subscribe',
                          {'app_name': this.ctx.$options.name,
                           'endpoints': endpoints,
+                          'client_room': room,
                           'room': room});
         the_namespace.emit('client_notification',
                             {'name': 'service_state',
                              'value': {},
-                             'client_room': room
+                             'client_room': room,
+                             'room': room,
                              });
     }
     
@@ -64,7 +66,8 @@ export class BECom {
     export_one_way_binding_prop(name,
                                 new_value,
                                 old_value,
-                                client_room=null,
+                                src_room=null,   //client_room
+                                target_room=null,
                                 namespace=null,
                                 no_logging=NO_LOGGING_DEFAULT,
                                 no_data_logging=NO_DATA_LOGGING_DEFAULT
@@ -72,24 +75,30 @@ export class BECom {
         if ( _.isEqual(new_value, old_value) ) {
                 return false;
             }
-            let the_room = client_room || this.ctx.room_sid;
-            let the_namespace = namespace || this.ctx.namespace;
-            if ( no_logging === false ) {
-                this.log('send', name, 'to', the_room, old_value, new_value);
-            }
-            the_namespace.emit('client_notification',
-                                {name: name,
-                                 value: new_value,
-                                 client_room: the_room,
-                                 no_logging: no_logging,
-                                 no_data_logging: no_data_logging
-                                 });
+
+        // let the_room = client_room || this.ctx.room_sid;
+        let from_room = src_room || this.ctx.room_sid;
+        let to_room = target_room;
+
+        let the_namespace = namespace || this.ctx.namespace;
+        if ( no_logging === false ) {
+            this.log('send', name, 'from', from_room, 'to', to_room, old_value, new_value);
+        }
+        the_namespace.emit('client_notification',
+                           {name: name,
+                            value: new_value,
+                            client_room: from_room,
+                            room: to_room,
+                            no_logging: no_logging,
+                            no_data_logging: no_data_logging
+                           });
     }
     
     export_two_way_binding_prop(name,
                                 new_value,
                                 old_value,
-                                client_room=null,
+                                src_room=null,   //client_room
+                                target_room=null,
                                 namespace=null,
                                 no_logging=NO_LOGGING_DEFAULT,
                                 no_data_logging=NO_DATA_LOGGING_DEFAULT
@@ -97,17 +106,19 @@ export class BECom {
             if ( _.isEqual(new_value, old_value) ) {
                 return false;
             }
-            let the_room = client_room || this.ctx.room_sid;
+            let from_room = src_room || this.ctx.room_sid;
+            let to_room = target_room;
             let the_namespace = namespace || this.ctx.namespace;
             let i = this.external_notifications.findIndex(
                         (e) => _.isEqual(e, [name, new_value]))
             if ( i === -1 ) {
                 if ( no_logging === false )
-                this.log('send', name, 'to', the_room, old_value, new_value);
+                    this.log('send', name, 'from', from_room, 'to', to_room, old_value, new_value);
                 the_namespace.emit('client_notification',
                                     {name: name,
                                      value: new_value,
-                                     client_room: the_room,
+                                     client_room: from_room,
+                                     room: to_room,
                                      no_logging: no_logging,
                                      no_data_logging: no_data_logging
                                      });
@@ -142,27 +153,30 @@ export class BECom {
     }
 
     emit_client_notification(name,
-                              value,
-                              client_room=null,
-                              namespace=null,
-                              no_logging=NO_LOGGING_DEFAULT,
-                              no_data_logging=NO_DATA_LOGGING_DEFAULT
-                              ) {
-        let the_room = client_room || this.ctx.room_sid;
+                            value,
+                            client_room=null,     // src (client) room to pass thru notif.chain
+                            room=null,            // target room
+                            namespace=null,
+                            no_logging=NO_LOGGING_DEFAULT,
+                            no_data_logging=NO_DATA_LOGGING_DEFAULT
+                            ) {
+        let from_room = client_room || this.ctx.room_sid;
+        let to_room = room;
         let the_namespace = namespace || this.ctx.namespace;
         if ( no_logging ) {
             // pass;
         }
         else if ( no_data_logging ) {
-            this.log(name, '...', 'to room', the_room);
+            this.log(name, '...', 'from', from_room, 'to', to_room);
         }
         else {
-            this.log(name, ':', value, 'to room', the_room);
+            this.log(name, ':', value, 'from', from_room, 'to', to_room);
         }
         the_namespace.emit('client_notification',
                             {name: name,
                              value: value,
-                             client_room: the_room,
+                             client_room: from_room,
+                             room: to_room,
                              no_logging: no_logging,
                              no_data_logging: no_data_logging
                             });
