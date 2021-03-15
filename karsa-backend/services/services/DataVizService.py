@@ -668,7 +668,7 @@ class DataVizServiceClient(BaseServiceClient):
                                 'heatmap_figure_data',
                                 heatmap_slice,
                                 **{**kwargs,
-                                   'room': data['client_room']
+                                   'room': kwargs['client_room']
                                    }
                                 )
             if spec_trace is not None:
@@ -684,7 +684,7 @@ class DataVizServiceClient(BaseServiceClient):
                                 'spec_stack_figure_data',
                                 spec_trace,
                                 **{**kwargs,
-                                   'room': data['client_room']
+                                   'room': kwargs['client_room']
                                    }
                                 )
 
