@@ -38,32 +38,27 @@ export class BECom {
     }
 
     subscribe(endpoints, room, namespace=null) {
-        let the_endpoints = endpoints;
-        let the_room = room;
         let the_namespace = namespace || this.ctx.namespace;
-        this.log(the_room, 'subscribed for', the_endpoints);
+        this.log(room, 'subscribed for', endpoints);
 
         the_namespace.emit('subscribe',
                          {'app_name': this.ctx.$options.name,
-                          'endpoints': the_endpoints,
-                          'room': the_room});
+                          'endpoints': endpoints,
+                          'room': room});
         the_namespace.emit('client_notification',
                             {'name': 'service_state',
                              'value': {},
-                             'client_room': the_room
+                             'client_room': room
                              });
     }
     
-    unsubscribe(room=null, namespace=null) {
-        let the_room = room || this.ctx.room_sid;
+    unsubscribe(endpoints, room, namespace=null) {
         let the_namespace = namespace || this.ctx.namespace;
-        this.log(the_room, 'unsubscribed from', this.ctx.endpoints);
-        if ( !the_room )
-            throw "Unsubscribe error: no room.";
+        this.log(room, 'unsubscribed from', endpoints);
         the_namespace.emit('unsubscribe',
                          {'app_name': this.ctx.$options.name,
-                          'endpoints':this.ctx.endpoints,
-                          'room': the_room});
+                          'endpoints': endpoints,
+                          'room': room});
     }
     
     export_one_way_binding_prop(name,

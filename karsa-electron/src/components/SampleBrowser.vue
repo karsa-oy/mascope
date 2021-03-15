@@ -332,8 +332,7 @@
                                                         style="height:100%; width:100%"
                                                         :data="sample_table_rows"
                                                         :sticky-header="true"
-                                                        :checkable="(!acquisition_control_active ||
-                                                                    acquisition_status=='not_running') ? true : false"
+                                                        :checkable="true"
                                                         :header-checkable="false"
                                                         :checked-rows.sync="sample_table_checked_rows"
                                                         detailed
@@ -436,8 +435,6 @@ export default {
     },
     computed: {
         ...mapState([
-            'acquisition_control_active',
-            'acquisition_status',
             // 'h5_samples',
             // 'h5_streamer_status',
             // 'importable_samples',
@@ -718,7 +715,9 @@ export default {
 
             if ( !_.isEmpty(new_value.id) ) {
                 if ( !_.isEmpty(this.room_experiment) )
-                    this.be.unsubscribe(this.room_experiment);
+                    this.be.unsubscribe(['samples'],
+                                        this.room_experiment
+                                        );
                 this.room_experiment = this.project_selected.id + '_' + new_value.id;
                 this.be.subscribe(['samples'],
                                   this.room_experiment
@@ -770,7 +769,9 @@ export default {
         project_selected: function(new_value, old_value) {
             if ( !_.isEmpty(new_value.id) ) {
                 if ( !_.isEmpty(this.room_project) ) {
-                    this.be.unsubscribe(this.room_project);
+                    this.be.unsubscribe(['experiments'],
+                                        this.room_project
+                                        );
                 }
                 this.room_project = new_value.id;
                 this.be.subscribe(['experiments'],
@@ -786,21 +787,6 @@ export default {
             this.sample_project = new_value.id;
         },
         samples: function(new_data){
-            // TODO: quick&dirty fix to close sample attribute popup in acquisition mode
-            // if another client saved them first
-            if (this.acquisition_control_active) {
-                let sample_in_new_data = false;
-                for (let i=0; i<new_data.rows.length; i++) {
-                    if (_.isEqual(new_data.rows[i].id, this.sample_file)) {
-                        sample_in_new_data = true;
-                        break;
-                    }
-                }
-                if (sample_in_new_data) {
-                    // Close pop-up
-                    this.is_sample_attribute_modal_active = false;
-                }
-            }
             this.sample_table_cols = new_data.cols;
             this.sample_table_rows = new_data.rows;
         },

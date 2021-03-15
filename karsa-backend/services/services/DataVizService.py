@@ -304,7 +304,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                  't_range': t_range,
                                  },
                                 **{**kwargs,
-                                  'room': data['client_room']
+                                  'room': (data.get('client_room') or filename)
                                   }
                                 )
 
@@ -517,7 +517,9 @@ class SignalVisualizer(ExtendableDataArray):
                            }
         await client.emit_client_notification('timeseries_figure_data',
                                        timeseries_data,
-                                       **kwargs
+                                       **{**kwargs,
+                                          'room': (kwargs.get('client_room') or timeseries_data.get('filename'))
+                                          }
                                        )
         await self.reset_array()
 
@@ -586,7 +588,9 @@ class TPSVisualizer(ExtendableDataArray):
         timeseries_data = {'traces': [ts_trace], }
         await client.emit_client_notification('timeseries_figure_data',
                                        timeseries_data,
-                                       **kwargs
+                                       **{**kwargs,
+                                          'room': (kwargs.get('client_room') or timeseries_data.get('filename'))
+                                          }
                                        )
 
         # Reset signal cache, leave the last column
@@ -668,7 +672,7 @@ class DataVizServiceClient(BaseServiceClient):
                                 'heatmap_figure_data',
                                 heatmap_slice,
                                 **{**kwargs,
-                                   'room': kwargs['client_room']
+                                   'room': (kwargs.get('client_room') or heatmap_slice.get('filename'))
                                    }
                                 )
             if spec_trace is not None:
@@ -684,7 +688,7 @@ class DataVizServiceClient(BaseServiceClient):
                                 'spec_stack_figure_data',
                                 spec_trace,
                                 **{**kwargs,
-                                   'room': kwargs['client_room']
+                                   'room': (kwargs.get('client_room') or spec_trace.get('filename'))
                                    }
                                 )
 

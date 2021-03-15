@@ -949,6 +949,7 @@ export default {
             if ( _.isEqual(new_value, old_value) ) {
                 return false;
             }
+            this.be.unsubscribe(this.endpoints, old_value.filename);
             this.reset_figure_cache();
             this.reset_figures();
             if ( !_.isEmpty(this.filename) )
@@ -964,6 +965,7 @@ export default {
                 't_range': null,
                 'mz_range': null
                 };
+            this.be.subscribe(this.endpoints, this.filename);
         },
         spec_stack_figure_data: function(new_value) {
             // TODO: quick&dirty fix to dismiss acquisition notifications
