@@ -163,21 +163,31 @@ export default {
     },
     computed: {
         ...mapState([
-            'acquisition_progress',
             'url',
-        ])
+        ]),
+        new_file: {
+            get() {
+                return this.$store.state.new_file;
+            },
+            set(value) {
+                this.$store.commit('new_file', value);
+            }
+        },
     },
     data: function() {
         return {
             be: null,
-            h5_namespace: null,
+            namespace: null,
             room_sid: null,
             endpoints: [
                 'acquisition_progress',
-                // 'h5_samples',
+                'acquisition_started',
+                // 'acquisition_status',
                 'h5_streamer_status'
             ],
             // h5 streamer
+            acquisition_progress: 0,
+            acquisition_started: {},
             is_import_h5_modal_active: false,
             h5_samples: [],
             h5_streamer_status: "not_ready",		// not_ready/ready
@@ -232,6 +242,12 @@ export default {
         },
     },
     watch: {
+        acquisition_started: function(new_value, old_value) {
+            if (new_value === old_value) {
+                return false;
+            }
+            this.new_file = new_value.filename;
+        },
         h5_table_checked_rows: function(new_value, old_value) {
             if ( _.isEqual(new_value, old_value) ) {
                 return false;
@@ -267,15 +283,19 @@ export default {
                                                         this.h5_namespace,
                                                         );
         },
-        'h5_namespace.connected': function(new_value) {
+        'namespace.connected': function(new_value) {
             if ( new_value === true )
             {
                 // handlers for for external notifications:
+                this.namespace.on("acquisition_started", (value) => this.be.import_one_way_binding_prop("acquisition_started", value.value));
+                // this.namespace.on("acquisition_status", (value) => this.be.import_one_way_binding_prop("acquisition_status", value.value));
+                this.namespace.on("acquisition_progress", (value) => this.be.import_one_way_binding_prop("acquisition_progress", value.value.progress, true));
                 this.h5_namespace.on("h5_streamer_status", (value) => this.be.import_two_way_binding_prop("h5_streamer_status", value.value));
                 this.h5_namespace.on("h5_samples", (value) => this.be.import_one_way_binding_prop("h5_samples", value.value));
-                // TODO: Below needed?
-                // this.room_sid = this.h5_namespace.id;
-                // this.be.subscribe(this.room_sid);
+
+                this.be.subscribe(this.endpoints,
+                                  null // room set to null to subscribe to endpoints directly
+                                  );
             }
         },
     },
