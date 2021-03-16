@@ -84,7 +84,13 @@ class MetadataServiceNamespace(BaseClientNamespace):
                                             )
 
     async def on_stop_data_request(self, data):
-        namespace = '/' + data['value']['filename'].split('_')[0]
+        try:
+            namespace = '/' + data['value']['filename'].split('_')[0]
+        except KeyError as e:
+            # TODO: Should not end up here
+            self.log(e)
+            # Do not know where to forward it, return
+            return
         value = data['value']
         kwargs = get_client_notification_args(data)
 
