@@ -26,9 +26,37 @@ from multiprocessing import Lock
 
 from .kevent import KEvent
 
-def parse_datetime_from_filename(filename, pattern='*%Y.%m.%d*%Hh%Mm%Ss*'):
-    matcher = datetime_glob.Matcher(pattern=pattern)
-    return matcher.match(filename).as_datetime()
+
+def parse_path_from_sample_name(sample_name):
+    """Return path (relative to wdir) to sample data, based on its name
+
+    Path is
+        wdir/instrument/yyyy.mm.dd/sample_name
+
+    Parameters
+    ----------
+    sample_name : str
+        Sample name (format: instrument_*%Y.%m.%d*%Hh%Mm%Ss*)
+    """
+    def parse_datetime_from_sample_name(filename, pattern='*%Y.%m.%d*%Hh%Mm%Ss*'):
+        matcher = datetime_glob.Matcher(pattern=pattern)
+        return matcher.match(filename).as_datetime()
+
+    def parse_subdir_from_datetime(datetime):
+        date_dir = '%.4d.%.2d.%.2d' %(datetime.year,
+                                    datetime.month,
+                                    datetime.day
+                                    )
+        return date_dir
+
+    # Instrument name
+    instrument = sample_name.split('_')[0]
+    # Parse datetime and convert to date subdirectory name (yyyy.mm.dd)
+    sample_datetime = parse_datetime_from_sample_name(sample_name)
+    date_dir = parse_subdir_from_datetime(sample_datetime)
+    # Join to sample path relative to wdir
+    return os.path.join(instrument, date_dir, sample_name)
+
 
 class H5Pool():
     def __init__(self, data_path):
@@ -367,17 +395,10 @@ class DataPool():
         self.pool[project].update({ experiment: [] })
 
     def new_sample(self, project, experiment, sample, attributes):
+        # Data path
+        sample_data_path = parse_path_from_sample_name(sample)
+        # Meta-data path
         experiment_path = os.path.join(self.projects_root, project, experiment)
-
-        instrument = sample.split('_')[0]
-
-        file_datetime = parse_datetime_from_filename(sample)
-        date_dir = '%.4d.%.2d.%.2d' %(file_datetime.year,
-                                      file_datetime.month,
-                                      file_datetime.day
-                                      )
-
-        sample_data_path = os.path.join(instrument, date_dir, sample)
         sample_experiment_path = os.path.join(experiment_path, sample)
         # Check if sample exists
         if not os.path.isdir(sample_data_path):

@@ -27,7 +27,7 @@ from copy import deepcopy
 from karsalib import BaseClientNamespace, BaseServiceClient, \
                      parse_cmd_args, get_client_notification_args
 from karsatof.kcollector import ExtendableDataArray
-from karsatof.kdatapool import DataPool, parse_datetime_from_filename
+from karsatof.kdatapool import DataPool, parse_path_from_sample_name
 from karsatof.kimage import (convert_base64_to_img, convert_to_base64)
 
 
@@ -45,7 +45,6 @@ NO_DATA_LOGGING_DEFAULT = True
 
 cache = {}
 client = None
-data_path = 'Data'
 
 # ========== Cache methods ==========
 
@@ -522,12 +521,12 @@ class FileIoNamespace(BaseClientNamespace):
             signal_env['speci'] = n
 
     async def on_image_to_save(self, data):
-        global data_path
         value = data['value']
         filename = value['filename']
         img_filename = value['img_filename']
         img_str = value['img']
-        img_path = os.path.join(data_path, filename, img_filename)
+        sample_data_path = parse_path_from_sample_name(filename)
+        img_path = os.path.join(sample_data_path, img_filename)
         img = convert_base64_to_img(img_str)
         img.save(img_path)
 
@@ -628,32 +627,24 @@ class FileIoNamespace(BaseClientNamespace):
 
 # ========= File I/O functions =========
 def base_to_zarr_filename(base_filename, variable):
-    global data_path
-    file_datetime = parse_datetime_from_filename(base_filename)
-    date_dir = '%.4d.%.2d.%.2d' %(file_datetime.year,
-                                  file_datetime.month,
-                                  file_datetime.day
-                                  )
-    filepath = os.path.join(data_path, date_dir, base_filename)
+    sample_data_path = parse_path_from_sample_name(base_filename)
     zarr_filename = variable + os.extsep + 'zarr'
-    return os.path.join(filepath, zarr_filename)
+    return os.path.join(sample_data_path, zarr_filename)
 
 def load_heatmap_image(base_filename):
-    global data_path
-    filepath = os.path.join(data_path, base_filename)
+    sample_data_path = parse_path_from_sample_name(base_filename)
     heatmap_filename = 'heatmap.png'
-    heatmap_file = os.path.join(filepath, heatmap_filename)
+    heatmap_file = os.path.join(sample_data_path, heatmap_filename)
     img = Image.open(heatmap_file)
     img_str = convert_to_base64(img)
     return img_str
 
 def load_spec_trace_images(base_filename):
-    global data_path
-    filepath = os.path.join(data_path, base_filename)
-    all_files = next( os.walk(filepath) )[2]
+    sample_data_path = parse_path_from_sample_name(base_filename)
+    all_files = next( os.walk(sample_data_path) )[2]
     imgs = []
     for spec_filename in fnmatch.filter(all_files, 'spec*.png'):
-        spec_file = os.path.join(filepath, spec_filename)
+        spec_file = os.path.join(sample_data_path, spec_filename)
         img = Image.open(spec_file)
         img_str = convert_to_base64(img)
         t0 = float( spec_file.split('spec')[1].split('.png')[0] )
@@ -691,17 +682,14 @@ class FileIoClient(BaseServiceClient):
 
 def run():
     global client
-    global data_path
 
     url, port, namespace = parse_cmd_args()
-    # TODO: FileIo should always be in private namespace with data producer
-    # if namespace == '/':
-    #     print("FileIoService must be in a private namespace. " +
-    #           "Please restart the service with --ns option."
-    #           )
-    #     return
-
-    # data_path = namespace.strip('/')  # :TODO
+    # FileIo should always be in private namespace with data producer
+    if namespace == '/':
+        print("FileIoService must be in a private namespace. " +
+              "Please restart the service with --ns option."
+              )
+        return
 
     client = FileIoClient(url, port, (namespace, FileIoNamespace))
     loop = asyncio.get_event_loop()
