@@ -42,6 +42,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
     endpoints = [
         # DataViz
         'data_request',
+        'image_to_save',
         'stop_data_request',
         # UI
         'experiment_selected',
@@ -60,37 +61,38 @@ class MetadataServiceNamespace(BaseClientNamespace):
 
     # ========== DataViz requests ========== 
     async def on_data_request(self, data):
-        try:
-            namespace = data['value']['filename'].split('_')[0]
-        except KeyError:
-            print("No filename in data: %s" %str(data))
-
-        # TODO: override actual namespace only for prototyping
-        namespace = '/tof'
-
+        namespace = '/' + data['value']['filename'].split('_')[0]
         value = data['value']
         kwargs = get_client_notification_args(data)
 
-        await self.emit_client_notification(
-                                        'data_request',
-                                        value,
-                                        **kwargs,
-                                        namespace=namespace
-                                        )
+        await self.emit_client_notification('data_request',
+                                            value,
+                                            **kwargs,
+                                            namespace=namespace
+                                            )
+
+    async def on_image_to_save(self, data):
+        namespace = '/' + data['value']['filename'].split('_')[0]
+        value = data['value']
+        kwargs = get_client_notification_args(data)
+
+        await self.emit_client_notification('image_to_save',
+                                            value,
+                                            **{**kwargs,
+                                               'namespace': namespace
+                                               }
+                                            )
 
     async def on_stop_data_request(self, data):
-        try:
-            namespace = data['value']['filename'].split('_')[0]
-        except KeyError:
-            print("No filename in data: %s" %str(data))
-
-        # TODO: override actual namespace only for prototyping
-        namespace = '/tof'
+        namespace = '/' + data['value']['filename'].split('_')[0]
+        value = data['value']
+        kwargs = get_client_notification_args(data)
 
         await self.emit_client_notification('stop_data_request',
-                                       data,
-                                       namespace=namespace
-                                       )
+                                            value,
+                                            **kwargs,
+                                            namespace=namespace
+                                            )
 
     # ========== UI requests ==========
     async def on_experiment_selected(self, data):
