@@ -821,9 +821,15 @@ export default {
                 this.sample_description = last_selection.description || "";
                 this.sample_project = last_selection.project;
                 this.sample_experiment = last_selection.experiment;
-                this.sample_to_load = {'filename': this.sample_file};
+                this.sample_to_load = {'filename': this.sample_file,
+                                       'title': this.sample_name,
+                                       'description': this.sample_description,
+                                       };
             } else {
-                this.sample_to_load = {'filename': ""};
+                this.sample_to_load = {'filename': "",
+                                       'title': "",
+                                       'description': "",
+                                       };
             }
         },
         'root_namespace.connected': function(new_value) {

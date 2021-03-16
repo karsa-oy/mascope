@@ -3,8 +3,15 @@
 
         <!-- Main content  area-->
         <section>
+            <div style="text-align:center;">
+                <h1 style="color:white; font-size:24px;">
+                    {{ sample_to_load.title  }}
+                </h1>
+                <p style="color:#ababab; font-size:16px;">
+                    {{ sample_to_load.description }}
+                </p>
+            </div>
             <div class="columns">
-
                 <!-- Left side -->
                 <div class="column is-half">
                     <!-- Heatmap section -->
@@ -53,7 +60,7 @@
                             <div id="spec-stack-figure"></div>
                         </div>                            
                     </section>
-                    <!-- End of spec stack chart -->
+                    <!-- End of spec stack -->
                 </div>
 
             </div>
@@ -78,9 +85,6 @@ Vue.use([Buefy]);
 var fs = require('fs');
 var Plotly = require('plotly.js-dist');
 var _ = require('underscore');
-
-//var dialog = require("electron").remote.dialog;
-//var remote = require('electron').remote;
 
 
 export default {
