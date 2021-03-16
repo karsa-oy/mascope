@@ -47,7 +47,7 @@ class TOFServicePublicNamespace(BaseClientNamespace):
         await self.emit_client_notification(
                                     'instrument_data',
                                     self.parent.instrument_data,
-                                    **get_client_notification_args(data)
+                                    **get_client_notification_args(data),
                                     )
 
 
@@ -152,7 +152,9 @@ class TOFServiceClient(BridgeServiceClient):
                                         )
 
             filename_base = self.acquisition.filename
-            filename = filename_base
+            filename = '_'.join([self.private_ns.namespace.strip('/'),
+                                 filename_base
+                                 ])
 
             await self.emit_private_notification(
                                         'acquisition_started',
@@ -190,13 +192,17 @@ class TOFServiceClient(BridgeServiceClient):
                     # Spectrum data
                     await self.emit_private_notification(
                                             'acquired_spectrum',
-                                            spec_data,
+                                            {**spec_data,
+                                             'filename': filename
+                                             },
                                             no_data_logging=True
                                             )
                     # TPS data
                     await self.emit_private_notification(
                                             'acquired_tps_data',
-                                            tps_data,
+                                            {**tps_data,
+                                             'filename': filename
+                                             },
                                             no_data_logging=True
                                             )
                     # Progress
@@ -231,9 +237,18 @@ class TOFServiceClient(BridgeServiceClient):
 
 def run():
     url, port, namespace = parse_cmd_args()
-    client = TOFServiceClient(url, port,
+    # TOFService should always be in private namespace with data producer
+    if namespace == '/':
+        print("TOFService must be in a private namespace. " +
+              "Please restart the service with --ns option."
+              )
+        return
+
+    client = TOFServiceClient(url,
+                              port,
                               ('/', TOFServicePublicNamespace),
-                              (namespace, TOFServicePrivateNamespace))
+                              (namespace, TOFServicePrivateNamespace)
+                              )
     # TODO: get instrument_data from corresponding hw_interface
     client.instrument_data = {'name': namespace, 'model': 'Tofwerk', }
     client.public_ns.room_instrument = namespace
