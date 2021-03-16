@@ -47,7 +47,8 @@ class TOFServicePublicNamespace(BaseClientNamespace):
         await self.emit_client_notification(
                                     'instrument_data',
                                     self.parent.instrument_data,
-                                    **get_client_notification_args(data),
+                                    **{**get_client_notification_args(data),
+                                       'room': data['client_room'], }
                                     )
 
 

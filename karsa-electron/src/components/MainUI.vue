@@ -96,10 +96,11 @@ export default {
             // endpoints - list of notifications the MainUI wants to receive
             endpoints: [
                 'instrument_data',
-                'service_state',
+                'room_mate_gone',
             ],
             instrument_data: {},
-            service_state: null,
+            instrument_data_queue: Promise.resolve(),
+            room_mate_gone: null,
             data_sources: [],
             data_source_selected: "",
             room_data_sources: 'room_data_sources',
@@ -128,11 +129,18 @@ export default {
             }
         },
     },
-
     created() {
         this.be = new BECom(this);
         this.dotenv = read_dotenv();
         this.url = this.dotenv.protocol + "//" + this.dotenv.host + ":" + this.dotenv.port;
+    },
+    methods: {
+        on_instrument_data: function(new_value) {
+            if ( !new_value.name || this.data_sources.indexOf(new_value.name) != -1 )
+                return false;
+            this.data_sources.push(new_value.name);
+        },
+
     },
 
     // watchers for internal notifications 
@@ -150,16 +158,13 @@ export default {
             write_dotenv(this.dotenv);
         },
         instrument_data: function(new_value) {
-            if ( !new_value.name || this.data_sources.indexOf(new_value.name) != -1 )
-                return false;
-            this.data_sources.push(new_value.name);
+            var self = this;
+            self.instrument_data_queue = self.instrument_data_queue.then(function() {
+                return self.on_instrument_data(new_value); }
+            );
         },
-        service_state: async function() {
+        room_mate_gone: async function() {
             this.data_sources = [];
-
-            console.log('TODO: Fix ugly workaround to let data_sources update well')
-            await new Promise(r => setTimeout(r, 500));
-
             await this.be.emit_client_notification('instrument_data_request',
                                              {},
                                              this.room_data_sources,
@@ -171,7 +176,7 @@ export default {
             {
                 // handlers for for external notifications:
                 this.root_namespace.on("instrument_data", (value) => this.be.import_one_way_binding_prop("instrument_data", value.value));
-                this.root_namespace.on("service_state", (value) => this.be.import_one_way_binding_prop("service_state", {...value.value, 'uid': Math.random()}));
+                this.root_namespace.on("room_mate_gone", (value) => this.be.import_one_way_binding_prop("room_mate_gone", {...value.value, 'uid': Math.random()}));
                 this.be.subscribe(this.endpoints, this.room_data_sources);
             }
         },

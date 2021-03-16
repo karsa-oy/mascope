@@ -132,8 +132,9 @@ class BaseServerNamespace(AsyncNamespace):
                         dict(name='stop_visualize_range',
                              value={},
                              no_data_logging=False) )
-        # refresh state of affected services
-        await self.emit('service_state', {})
+        # let affected rooms know the client is gone
+        for r in self.rooms(sid):
+            await self.emit('room_mate_gone', {}, room=r)
 
     def on_subscribe(self, sid, data):
         """
