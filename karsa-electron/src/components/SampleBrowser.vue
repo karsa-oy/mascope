@@ -486,8 +486,18 @@ export default {
     },
     data: function() {
         return {
+            // Communication
             be: null,
             namespace: null,
+            room_experiment: null,
+            room_project: null,
+            room_sid: null,
+            endpoints: [
+                'experiments',
+                'importable_samples',
+                'projects',
+                'samples',
+            ],
             // acquisition_started: false,
             // Project / experiment title validation
             valid_pattern: RegExp(/^\w+$/),
@@ -531,17 +541,6 @@ export default {
             sample_table_cols: [],
             sample_table_checked_rows: [],
             sample_attributes: {},
-
-            // Communication
-            room_experiment: null,
-            room_project: null,
-            room_sid: null,
-            endpoints: [
-                'experiments',
-                'importable_samples',
-                'projects',
-                'samples',
-            ],
         }
     },
     created: function() {
@@ -792,7 +791,8 @@ export default {
         },
         sample_attributes: function(new_value, old_value) {
             return this.be.export_one_way_binding_prop('sample_attributes',
-                                                       new_value, old_value,
+                                                       new_value,
+                                                       old_value,
                                                        this.room_experiment
                                                        );
         },

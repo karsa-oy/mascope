@@ -340,9 +340,9 @@ export default {
             namespace: null,
             room_sid: null,
             endpoints: [
+                'acquisition_progress',
                 'acquisition_started',
                 'acquisition_status',
-                'acquisition_progress',
                 'instrument_status',
                 'sample_length',
             ],
@@ -586,8 +586,9 @@ export default {
                 this.namespace.on("new_file", (value) => this.be.import_one_way_binding_prop("new_file", value.value));
                 this.namespace.on("sample_length", (value) => this.be.import_two_way_binding_prop("sample_length", value.value));
 
-                // dynamic subscription thru AcquisitionControl dialog
-                this.be.subscribe(this.endpoints, null);
+                this.be.subscribe(this.endpoints,
+                                  null // room set to null to subscribe to endpoints directly
+                                  );
             }
         },
     }
