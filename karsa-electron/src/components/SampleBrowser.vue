@@ -161,8 +161,7 @@
                                     placeholder="Select a project"
                                     v-model="sample_project"
                                     required
-                                    expanded
-                                    disabled>
+                                    expanded>
                                     <option
                                         v-for="p in projects"
                                         :value="p.id"
@@ -177,8 +176,7 @@
                                     placeholder="Select an experiment"
                                     v-model="sample_experiment"
                                     required
-                                    expanded
-                                    disabled>
+                                    expanded>
                                     <option
                                         v-for="e in experiments_ui"
                                         :value="e.id"
@@ -795,6 +793,14 @@ export default {
                                                        old_value,
                                                        this.room_experiment
                                                        );
+        },
+        sample_experiment: function(new_value) {
+            this.experiment.title = new_value;
+            this.SetExperiment();
+        },
+        sample_project: function(new_value) {
+            this.project.title = new_value;
+            this.SetProject();
         },
         sample_table_checked_rows: function(new_value, old_value) {
             if ( _.isEqual(new_value, old_value) ) {
