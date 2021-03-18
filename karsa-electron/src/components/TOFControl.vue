@@ -301,6 +301,7 @@ export default {
     computed: {
         ...mapState([
             'url',
+            'data_source_selected',
         ]),
         acquisition_control_active: {
             get() {
@@ -393,7 +394,7 @@ export default {
                 onCancel: () => this.acquisition_control_active = false,
                 onConfirm: () => { this.$buefy.toast.open({message: 'Instrument control granted',
                                                           type: 'is-success'});
-                                   this.be.connect(this.url + '/tof'); } // TODO: hard-coded namespace
+                                   this.be.connect(this.url + '/' + this.data_source_selected.name); }
             })
         },
         delete_row_in_config_desorption_table() {

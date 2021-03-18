@@ -159,7 +159,7 @@
                             <b-field label="Project">
                                 <b-select
                                     placeholder="Select a project"
-                                    v-model="sample_project"
+                                    v-model="project_selected.id"
                                     required
                                     expanded>
                                     <option
@@ -174,7 +174,7 @@
                             <b-field label="Experiment">
                                 <b-select
                                     placeholder="Select an experiment"
-                                    v-model="sample_experiment"
+                                    v-model="experiment_selected.id"
                                     required
                                     expanded>
                                     <option

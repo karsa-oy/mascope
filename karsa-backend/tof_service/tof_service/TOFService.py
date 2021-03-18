@@ -251,7 +251,7 @@ def run():
                               (namespace, TOFServicePrivateNamespace)
                               )
     # TODO: get instrument_data from corresponding hw_interface
-    client.instrument_data = {'name': namespace, 'model': 'Tofwerk', }
+    client.instrument_data = {'name': namespace, 'type': 'Tofwerk_streamer', }
     client.public_ns.room_instrument = namespace
     loop = asyncio.get_event_loop()
     loop.run_until_complete(client.run())

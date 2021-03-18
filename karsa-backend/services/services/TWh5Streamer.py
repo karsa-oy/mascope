@@ -178,6 +178,7 @@ def run():
                                        (namespace, TWh5StreamerPrivateNamespace)
                                        )
     client.instrument_data = {'name': namespace,
+                              'type': 'h5_streamer',
                               }
     client.public_ns.room_instrument = namespace
 

@@ -27,14 +27,14 @@
                                     margin-bottom:1rem;">
                             <b-field label="Data source">
                                 <b-select
-                                    v-model="data_source_selected"
+                                    v-model="data_source_name_selected"
                                     placeholder="Select data source"
                                     expanded>
                                     <option
                                         v-for="source in data_sources"
-                                        :value="source"
-                                        :key="source">
-                                        {{ source }}
+                                        :value="source.name"
+                                        :key="source.name">
+                                        {{ source.name }}
                                     </option>
                                 </b-select>
                             </b-field>
@@ -42,10 +42,10 @@
                         <!-- End of namespace selector -->
 
                         <H5import
-                            v-if="data_source_selected.indexOf('h5') != -1">
+                            v-if="data_source_selected.type && data_source_selected.type.indexOf('h5_streamer') != -1">
                         </H5import>
                         <TOFControl
-                            v-if="data_source_selected.indexOf('tof') != -1">
+                            v-if="data_source_selected.type && data_source_selected.type.indexOf('Tofwerk_streamer') != -1">
                         </TOFControl>
                         <SampleBrowser></SampleBrowser>
                         <TargetBrowser></TargetBrowser>
@@ -101,8 +101,8 @@ export default {
             instrument_data: {},
             instrument_data_queue: Promise.resolve(),
             room_mate_gone: null,
+            data_source_name_selected: null,
             data_sources: [],
-            data_source_selected: "",
             room_data_sources: 'room_data_sources',
 
         };
@@ -128,6 +128,14 @@ export default {
                 this.$store.commit('url', value);
             }
         },
+        data_source_selected: {
+            get() {
+                return this.$store.state.data_source_selected;
+            },
+            set(value) {
+                this.$store.commit('data_source_selected', value);
+            }
+        },
     },
     created() {
         this.be = new BECom(this);
@@ -135,10 +143,13 @@ export default {
         this.url = this.dotenv.protocol + "//" + this.dotenv.host + ":" + this.dotenv.port;
     },
     methods: {
+        filter_data_sources_by_prop(name, value) {
+            return this.data_sources.filter(o => {return o[name] === value});
+        },
         on_instrument_data: function(new_value) {
             if ( !new_value.name || this.data_sources.indexOf(new_value.name) != -1 )
                 return false;
-            this.data_sources.push(new_value.name);
+            this.data_sources.push(new_value);
         },
 
     },
@@ -156,6 +167,11 @@ export default {
             this.dotenv.host = url_obj.hostname;
             this.dotenv.port = url_obj.port;
             write_dotenv(this.dotenv);
+        },
+        data_source_name_selected: function(new_value, old_value) {
+            if ( new_value === old_value )
+                return false;
+            this.data_source_selected = this.filter_data_sources_by_prop('name', new_value)[0];
         },
         instrument_data: function(new_value) {
             var self = this;
