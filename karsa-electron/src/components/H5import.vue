@@ -164,6 +164,7 @@ export default {
     computed: {
         ...mapState([
             'url',
+            'data_source_selected',
         ]),
         new_file: {
             get() {
@@ -205,7 +206,7 @@ export default {
     },
     created: function() {
         this.be = new BECom(this);
-        this.h5_namespace = this.be.connect(this.url + '/h5');
+        this.h5_namespace = this.be.connect(this.url + '/' + this.data_source_selected.name);
         // this.be.subscribe(null, this.h5_namespace); // TODO: subscribe or not to
     },
     methods: {

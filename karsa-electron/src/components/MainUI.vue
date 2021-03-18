@@ -74,7 +74,7 @@ import TOFControl from "./TOFControl.vue"
 import store from '../store';
 import {BECom, read_dotenv, write_dotenv} from "../karsalib.js"
 
-// const io = require("socket.io-client");
+const _ = require("underscore")
 
 export default {
     name: "MainUi", //used as app_name - keep it unique
@@ -143,11 +143,12 @@ export default {
         this.url = this.dotenv.protocol + "//" + this.dotenv.host + ":" + this.dotenv.port;
     },
     methods: {
-        filter_data_sources_by_prop(name, value) {
+        filter_data_sources_prop(name, value) {
             return this.data_sources.filter(o => {return o[name] === value});
         },
         on_instrument_data: function(new_value) {
-            if ( !new_value.name || this.data_sources.indexOf(new_value.name) != -1 )
+            if ( !new_value.name ||
+                 !_.isEmpty(this.filter_data_sources_prop('name', new_value.name)) )
                 return false;
             this.data_sources.push(new_value);
         },
@@ -171,7 +172,7 @@ export default {
         data_source_name_selected: function(new_value, old_value) {
             if ( new_value === old_value )
                 return false;
-            this.data_source_selected = this.filter_data_sources_by_prop('name', new_value)[0];
+            this.data_source_selected = this.filter_data_sources_prop('name', new_value)[0];
         },
         instrument_data: function(new_value) {
             var self = this;

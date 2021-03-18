@@ -379,6 +379,9 @@ export default {
     },
     created: function() {
         this.be = new BECom(this);
+        if ( this.acquisition_control_active ) {
+            this.be.connect(this.url + '/' + this.data_source_selected.name);
+        }
     },
     mounted: function() {
     },
