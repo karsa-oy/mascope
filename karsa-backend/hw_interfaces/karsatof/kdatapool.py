@@ -26,6 +26,11 @@ from multiprocessing import Lock
 
 from .kevent import KEvent
 
+FILENAME_DATETIME_PATTERNS = [
+        '*%Y.%m.%d*%Hh%Mm%Ss*',
+        '*%Y%m%d_%H%M_*',
+        '*%Y%m%d_*',
+        ]
 
 def parse_path_from_sample_name(sample_name):
     """Return path (relative to wdir) to sample data, based on its name
@@ -38,15 +43,26 @@ def parse_path_from_sample_name(sample_name):
     sample_name : str
         Sample name (format: instrument_*%Y.%m.%d*%Hh%Mm%Ss*)
     """
-    def parse_datetime_from_sample_name(filename, pattern='*%Y.%m.%d*%Hh%Mm%Ss*'):
-        matcher = datetime_glob.Matcher(pattern=pattern)
-        return matcher.match(filename).as_datetime()
+    def parse_datetime_from_sample_name(filename):
+        global FILENAME_DATETIME_PATTERNS
+        for pattern in FILENAME_DATETIME_PATTERNS:
+            matcher = datetime_glob.Matcher(pattern=pattern)
+            dt = matcher.match(filename)
+            if dt:
+                # Parsed succesfully
+                break
+        if dt is None:
+            raise ValueError("parse_datetime_from_sample_name: " +
+                             "No matching pattern found for filename: %s"
+                             %filename
+                             )
+        return dt.as_datetime()
 
     def parse_subdir_from_datetime(datetime):
         date_dir = '%.4d.%.2d.%.2d' %(datetime.year,
-                                    datetime.month,
-                                    datetime.day
-                                    )
+                                      datetime.month,
+                                      datetime.day
+                                      )
         return date_dir
 
     # Instrument name
@@ -431,258 +447,129 @@ class DataPool():
         self.pool[project].update({ experiment: experiment_samples })
 
 
-
-class KDataPool():
-    """Class to scan a directory for data, and store the data with attributes
-    in a pandas DataFrame.
-    
-    ...
-    
-    Attributes
-    ----------
-    path : str
-        Directory path where the datapool points to
-    timestamps_as_str : bool
-        If True, store timestamps in str format, otherwise datetime
-    pool : DataFrame
-        Pandas DataFrame where the found data files are collected
-    
-    """
-    
-    def __init__(self,
-                 path,
-                 recursive=False,
-                 fname_filter='Data*.h5',
-                 timestamps_as_str=False,
-                 diary=None):
+class RawPool():
+    def __init__(self, data_path):
         """Initialize self
-        
-        ...
 
         Parameters
         ----------
-        path : str
-            Directory path where the datapool points to
-        recursive : bool, optional
-            Scan recursively. The default is False.
-        timestamps_as_str : bool, optional
-            If True, store timestamps in str format, otherwise datetime.
-            The default is False (datetime).
-        diary : str, optional
-            Path to diary text file. The default is None.
+        data_path : str
+            Root data path
         """
-        
-        self.path = path
-        self.timestamps_as_str = timestamps_as_str
-        self.scan_directory(self.path,
-                            recursive=recursive,
-                            fname_filter=fname_filter,
-                            diary=diary
-                            )
 
-    def scan_directory(self,
-                       path,
-                       fname_filter,
-                       recursive=False,
-                       diary=None):
-        """Find raw files (in subfolders) of the given root directory
+        self.data_root = data_path
+        self.pool = pd.DataFrame()
+
+    async def scan_dir(self,
+                       path=None,
+                       fname_filter='*.raw'
+                       ):
+        """Scan directory for raw files
         
         This function walks through the given path, trying to find data files
-        matching the given filter. For each found file, the 'append_pool'
-        method is called.
+        matching the given filter.
         
-        Parameters
-        ----------
         path : str
-            Path to scan
-        fname_filter : str
-            String to match the filename with. The default is 'Data*.h5'.
+            Root path
+        fname_filter : datetime.datetime
+            String to match the filename with. The default is '*.raw'.
         recursive : bool, optional
             Scan recursively. The default is False.
-        diary : str or None, optional
-            Diary file name. The default is None.
+
         """
         
-        self.path = path
+        if path is None:
+            path = self.data_root
+
+        print("Scanning: %s" % str(path))
+
         self.pool = pd.DataFrame(index=[],
                                  data=[],
-                                 columns=['sample id',
-                                          'description',
-                                          'file',
-                                          'start time',
-                                          'end time',
-                                          'length',
-                                          'polarity',
-                                          'note',
-                                          'lock'
+                                 columns=['filename',
+                                          'datetime',
+                                          'filesize',
+                                          'path',
                                           ]
                                  )
-        # Walk path and find files
-        for root, dirnames, filenames in os.walk(path):
-            for filename in fnmatch.filter(filenames, fname_filter):
-                rawfile = os.path.join(root, filename)
-                self.append_pool(rawfile)
 
-            # zarr files are actually directories
-            for filename in fnmatch.filter(dirnames, fname_filter):
-                if '_tps' in filename:
-                    continue #XXX: Hack to skip tps data files
-                rawfile = os.path.join(root, filename)
-                self.append_pool(rawfile)
-            # scan on only root directory
-            if recursive == False:
-                break
-        # Read measurement diary if given
-        if diary is not None:
-            self.read_diary(diary)
-        
-    def append_pool(self, rawfile, lock=Lock()):
-        """Append data file to pool.
-        
-        This function tries to instantate KEvent for the given data file,
-        in order to read attributes from the file. If it is succesful,
-        a row will be added to the pool.
-
-        Parameters
-        ----------
-        rawfile : str
-            Full path of the data file
-        lock : Lock, optional
-            Lock object for the file, to be used for synchronizing
-            file access. The default is to create a new Lock.
-        """
+        # Get list of all files
         try:
-            ke = KEvent(rawfile)
-            if self.timestamps_as_str:
-                dt0 = str(ke.dt0)
-                dt1 = str(ke.dt1)
-            else:
-                dt0 = ke.dt0
-                dt1 = ke.dt1
-            df = pd.DataFrame( index=[os.path.basename(rawfile)],
-                               data=[ np.array([ ke.sampleid,
-                                                 ke.description,
-                                                 ke.filename,
-                                                 dt0,
-                                                 dt1,
-                                                 ke.length,
-                                                 ke.polarity,
-                                                 "",
-                                                 lock]) ],
-                               columns=['sample id',
-                                        'description',
-                                        'file',
-                                        'start time',
-                                        'end time',
-                                        'length',
-                                        'polarity',
-                                        'note',
-                                        'lock'] )
-            self.pool = self.pool.append(df)
-            
-        except:
-            # Maybe it is a zarr file
-            # TODO: Properly
-            try:
-                ds = xarray.open_zarr(rawfile)
-                if self.timestamps_as_str:
-                    dt0 = ''
-                    dt1 = ''
-                else:
-                    raise NotImplementedError
-                df = pd.DataFrame(
-                        index=[os.path.basename(rawfile)],
-                        data=[ np.array([
-                                    ds.attrs.get('sample_name', ''),
-                                    ds.attrs.get('sample_description', ''),
-                                    rawfile,
-                                    dt0,
-                                    dt1,
-                                    0, #float(ds.data_array.time[-1]),
-                                    '',
-                                    "",
-                                    lock
-                                    ])
-                               ],
-                        columns=['sample id',
-                                 'description',
-                                 'file',
-                                 'start time',
-                                 'end time',
-                                 'length',
-                                 'polarity',
-                                 'note',
-                                 'lock'
-                                 ]
-                        )
-                self.pool = self.pool.append(df)
-            
-            except Exception as e:
-                print(e)
-                print('Error: failed to read - %s' %rawfile)
+            files = next( os.walk(path) )[2]
+        except StopIteration:
+            # No files
+            print("Done")
+            return
+        # Loop through files in root, assumed to be named by date
+        for filename in fnmatch.filter(files, fname_filter):
+            await asyncio.sleep(0)
+            # Try to parse time from filename
+            matcher = datetime_glob.Matcher(pattern='%Y%m%d %H%M *')
+            file_datetime_match = matcher.match(filename)
+            if not file_datetime_match:
+                print("Skipped file: %s due to invalid datetime format" %filename)
+                continue
+            file_datetime = file_datetime_match.as_datetime()
 
-            
-    def read_diary(self, logfile):
-        """Read free form text file and try to split it by dates
-        
-        This function finds lines in the diary of the form:
-        '%d.%m.%Y\n' or
-        '%d%m%Y\n'
-        and splits the text accordingly. Finally it adds the nearest
-        slice of diary text to rows in the pool.
+            # Append to pool
+            rawfile = os.path.join(path, filename)
+
+            size_bytes = os.stat(rawfile).st_size
+            size_mb = round(2**-20 * size_bytes, 2)
+
+            df_row = pd.DataFrame(
+                            index=[filename],
+                            data=[[
+                                filename,
+                                file_datetime,
+                                size_mb,
+                                path
+                                ]],
+                            columns=[
+                                'filename',
+                                'datetime',
+                                'filesize',
+                                'path'
+                                ]
+                            )
+            self.pool = self.pool.append(df_row)
+            print(str(rawfile))
+
+        self.pool = self.pool.sort_index()
+        print("Done")
+
+    async def get_datetime_range(self,
+                                 start_datetime=datetime(1970, 1, 1),
+                                 end_datetime=datetime.now()
+                                 ):
+        """[summary]
 
         Parameters
         ----------
-        logfile : str
-            File path of the diary text file
+        start_date : datetime.datetime
+            Start date
+        end_date : datetime.datetime
+            End date
+
+        Returns
+        -------
+        [type]
+            [description]
         """
+
+        sub_pool = self.pool[(self.pool['datetime'] >= start_datetime) &
+                             (self.pool['datetime'] <= end_datetime)
+                             ].copy()
+
+        sub_pool['datetime'] = sub_pool['datetime'].astype(str)
+
+        sample_table = {'rows': list( sub_pool.to_dict('index').values() ),
+                        'cols': [ {'field': col.lower(),
+                                   'label': col.capitalize(),
+                                   }
+                                  for col in sub_pool.columns ]
+                        }
         
-        dates = []
-        notes = []
-        # Split at date
-        with open(logfile, 'r') as f:
-            buf = []
-            date = None
-            for l in f:
-                # Try to parse a date from current line
-                try:
-                    date = datetime.strptime(l, '%d.%m.%Y\n')
-                except:
-                    try:
-                        date = datetime.strptime(l, '%d%m%Y\n')
-                    except:
-                        date = None
-                        
-                if date is not None:
-                    dates.append(date)
-                    if len(dates)==1:
-                        buf = []
-                        continue    
-                    else:
-                        note = "".join(buf)
-                        try:
-                            note = note.decode("utf-8")
-                        except:
-                            print(note)
-                        notes.append(note)
-                        buf = []
-                buf.append(l)
-            note = "".join(buf)
-            note = note.decode("utf-8")
-            notes.append(note)
-        log = pd.DataFrame(index=dates, data=np.asarray(notes), columns=['note'])
-        #self.pool['Note'] = ''
-        for i, date in enumerate(log.index):
-            if i < len(log)-1:
-                next_date = log.index[i+1]
-            else:
-                next_date = date + timedelta(days=1)
-                
-            mask = np.logical_and( self.pool['start time'] >= date, 
-                                   self.pool['start time'] < next_date)
-            ind = mask.nonzero()[0]
-            if len(ind) > 0:
-                self.pool.loc[self.pool.index[ind], 'note'] = log.loc[date, 'note']
+        return sample_table
 
 
 
