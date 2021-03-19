@@ -77,6 +77,7 @@ def strip_filepath(filepath):
     """
     return os.path.splitext(os.path.basename(filepath))[0]
 
+
 class Acquisition(Thread, KInstrument):
     def __init__(self):
         """Initialize self
@@ -500,6 +501,18 @@ class h5Streamer(Acquisition):
         info = [ i.decode('unicode_escape') for i in info ] # bytes to str
         return info
 
+    def _update_mz(self):
+        # Get mz axis from file
+        mz = np.zeros((self.desc.nbrSamples,), dtype=np.double)
+        TwGetSpecXaxisFromH5(self.desc.currentDataFileName,
+                             mz,
+                             1,
+                             None,
+                             0,
+                             0
+                             )
+        self._mz = mz.astype(np.float32)
+
     def _wait_for_queues(self):
         """Wait for tick event to be set before continuing streaming
 
@@ -589,23 +602,13 @@ class h5Streamer(Acquisition):
         """
         raise NotImplementedError
 
-    def _update_mz(self):
-        # Get mz axis from file
-        mz = np.zeros((self.desc.nbrSamples,), dtype=np.double)
-        TwGetSpecXaxisFromH5(self.desc.currentDataFileName,
-                             mz,
-                             1,
-                             None,
-                             0,
-                             0
-                             )
-        self._mz = mz.astype(np.float32)
-
 
 class RawStreamer(Thread):
-    def __init__(self):
+    def __init__(self, mz_precision=4):
         print("RawStreamer initializing")
         Thread.__init__(self)
+        # Parameters
+        self._mz_precision = mz_precision
         # Thermo Fischer RawFileReaderFactory
         self.raw = None
         # Synchronization primitives
@@ -623,19 +626,29 @@ class RawStreamer(Thread):
         self.speci = -1                 # Index of last received spectrum,
                                         # -1 when there is no active acquisition
 
+    @property
+    def mz(self):
+        if self.raw:
+            return np.array([self.raw.RunHeaderEx.LowMass,
+                             self.raw.RunHeaderEx.HighMass],
+                            dtype=np.float32
+                            )
+
     def _get_and_feed_data(self):
         """Read data from the RAW file and put to queues
         """
-        # Get timestamp from TF RAW
-        ti = np.zeros((1,))
         # == Get and feed mass spectrum data ==
         scan_no = self.speci + 1
         # Get the scan statistics from the RAW file for this scan number
         scan_stats = self.raw.GetScanStatsForScanNumber(scan_no)
+        # Get timestamp from scan stats
+        ti = scan_stats.StartTime * 60. # [s]
         scan = self.raw.GetSegmentedScanFromScanNumber(scan_no, scan_stats)
         # Map .NET arrays into numpy arrays
         mz = net2np_array(scan.Positions).astype(np.float32)
         spec = net2np_array(scan.Intensities).astype(np.float32)
+        # Round mz values based on the mz precision
+        mz, spec = self._set_mz_precision(mz, spec)
         # Combine data for output
         spec_data = {
                 'filename': self.filename,  # Current file basename
@@ -662,6 +675,32 @@ class RawStreamer(Thread):
         self.filename = None
         self.progress = 0
         self.speci = -1
+
+    def _set_mz_precision(self, mz, spec):
+        # Round the mz values based on the mz precision
+        mz = np.asarray(np.round(mz, self._mz_precision), dtype=np.float32)
+
+        # Contiguous mz values might now be equivalent. Combine their intensity values by taking the sum.
+        unique_mz = np.unique(mz)
+        unique_mz_intensities = np.zeros(unique_mz.shape, dtype=np.float32)
+
+        # Note: This assumes that mz and unique_mz are sorted
+        if len(mz) != len(unique_mz):
+            acc = 0
+            current_unique_mz_idx = 0
+            current_unique_mz = unique_mz[0]
+            for i, mz in enumerate(mz):
+                if mz != current_unique_mz:
+                    unique_mz_intensities[current_unique_mz_idx] = acc  # Flush the accumulator
+                    acc = 0  # Reset the accumulator
+                    current_unique_mz_idx += 1  # Go to the next unique mz value
+                    current_unique_mz = unique_mz[current_unique_mz_idx]  # Get the unique mz value
+                acc += spec[i]  # Increment the accumulator
+            unique_mz_intensities[current_unique_mz_idx] = acc  # Flush the accumulator
+        else:
+            unique_mz_intensities = spec
+
+        return unique_mz, unique_mz_intensities
 
     def _update(self, scan=None):
         """Update per acquisition attributes. If new data is available, feed into queues.
@@ -744,3 +783,24 @@ class RawStreamer(Thread):
         # Out of main loop
         print('RawStreamer exiting')
         self.shutdown()
+
+    def shutdown(self):
+        """Shutdown procedure
+        """
+        self.shutdown_event.set()
+        # Close queues
+        self.spec_queue.close()
+        self.spec_queue.join_thread()
+
+    def start_stream(self, filename):
+        if os.path.isfile(filename):
+            self.file_queue.put(filename)
+        else:
+            raise ValueError("File does not exist: %s" %filename)
+
+    def stop_stream(self):
+        """Stop stream before complete
+
+        TODO: To be implemented
+        """
+        raise NotImplementedError
