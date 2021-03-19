@@ -206,8 +206,8 @@ export default {
     },
     created: function() {
         this.be = new BECom(this);
-        this.h5_namespace = this.be.connect(this.url + '/' + this.data_source_selected.name);
-        // this.be.subscribe(null, this.h5_namespace); // TODO: subscribe or not to
+        this.namespace = this.be.connect(this.url + '/' + this.data_source_selected.name);
+        // this.be.subscribe(null, this.namespace); // TODO: subscribe or not to
     },
     methods: {
         FetchH5s() {
@@ -272,7 +272,7 @@ export default {
                                                         old_value,
                                                         null,
                                                         null,
-                                                        this.h5_namespace,
+                                                        this.namespace,
                                                         );
         },
         import_h5_table_datetime_range: function(new_value, old_value) {
@@ -281,7 +281,7 @@ export default {
                                                         old_value,
                                                         this.room_sid,
                                                         null,
-                                                        this.h5_namespace,
+                                                        this.namespace,
                                                         );
         },
         'namespace.connected': function(new_value) {
@@ -291,8 +291,8 @@ export default {
                 this.namespace.on("acquisition_started", (value) => this.be.import_one_way_binding_prop("acquisition_started", value.value));
                 // this.namespace.on("acquisition_status", (value) => this.be.import_one_way_binding_prop("acquisition_status", value.value));
                 this.namespace.on("acquisition_progress", (value) => this.be.import_one_way_binding_prop("acquisition_progress", value.value.progress, true));
-                this.h5_namespace.on("h5_streamer_status", (value) => this.be.import_two_way_binding_prop("h5_streamer_status", value.value));
-                this.h5_namespace.on("h5_samples", (value) => this.be.import_one_way_binding_prop("h5_samples", value.value));
+                this.namespace.on("h5_streamer_status", (value) => this.be.import_two_way_binding_prop("h5_streamer_status", value.value));
+                this.namespace.on("h5_samples", (value) => this.be.import_one_way_binding_prop("h5_samples", value.value));
 
                 this.be.subscribe(this.endpoints,
                                   null // room set to null to subscribe to endpoints directly
