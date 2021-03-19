@@ -14,6 +14,7 @@ import h5sparse
 import array
 import xarray
 import sparse
+import time
 
 from collections import defaultdict
 from threading import Thread
@@ -75,7 +76,7 @@ class ExtendableDataArray():
         self.chunk_size = chunk_size
 
         self.data_array = xarray.DataArray()
-        self.delayed_writes = []
+        self.delayed_write = None
 
 
     def init_array(self, dims, data=None, coords=None, name=''):
@@ -139,6 +140,8 @@ class ExtendableDataArray():
             Arguments to the callback function, by default empty tuple.
         """
 
+        # t0 = time.time()
+
         # Dimension check            
         dims = self.data_array.dims
         if dim not in dims:
@@ -167,43 +170,35 @@ class ExtendableDataArray():
         self.data_array = xarray.concat(to_concat,
                                         dim=dim
                                         )
+        # t1 = time.time()
+        # print("Concatenation took: %.2f seconds" %(t1-t0))
+        # t0 = time.time()
 
         # Incremental write to file
         if self.path is not None:
-            if len(self.delayed_writes) == 0:
-                # Initialize new group in the file
-                group = '%04d' % (self.data_array.shape[1]-1)
-                try:
-                    extension.to_dataset().to_zarr(
-                                        self.path,
-                                        group=group,
-                                        mode='a',
-                                        # append_dim='time',
-                                        compute=True
-                                        )
-                except Exception as e:
-                    print('Exception in group initialization: %s' %e)
-                self.delayed_writes.append(None) # insert dummy
+            if self.delayed_write is None:
+                # Start new delayed chunk, to be written later
+                self.delayed_write = extension
             else:
                 # Collect delayed chunk to be written later
-                group_no = self.data_array.shape[1]-1 - len(self.delayed_writes)
+                group_no = (self.data_array.shape[1] - 1) - self.delayed_write.shape[1]
                 group = '%04d' % group_no
-                delayed_write = extension.to_dataset().to_zarr(
-                                    self.path,
-                                    group=group,
-                                    mode='a',
-                                    append_dim='time',
-                                    compute=False
-                                    )
-                self.delayed_writes.append(delayed_write)
-            if len(self.delayed_writes) == self.chunk_size:
-                # Write delayed chunks
-                chunks_to_write = self.delayed_writes[1:] # skip dummy
-                self.delayed_writes = []
-                for delayed_write in chunks_to_write:
-                    delayed_write.compute()
-                    await asyncio.sleep(0)
-                
+                self.delayed_write = xarray.concat([self.delayed_write, extension],
+                                                   dim=dim
+                                                   )
+            if self.delayed_write.shape[1] == self.chunk_size:
+                # Write delayed chunk
+                self.delayed_write.to_dataset().to_zarr(self.path,
+                                                        group=group,
+                                                        mode='a',
+                                                        # append_dim='time',
+                                                        compute=True
+                                                        )
+                self.delayed_write = None
+
+        # t1 = time.time()
+        # print("Write operation took: %.2f seconds" %(t1-t0))
+
         # Optional callback function
         if callback is not None:
             return callback(*cargs, **ckwargs)
@@ -211,13 +206,17 @@ class ExtendableDataArray():
         return extension
 
     async def flush(self):
-        if len(self.delayed_writes) > 1:
-            # Write delayed chunks
-            chunks_to_write = self.delayed_writes[1:] # skip dummy
-            self.delayed_writes = []
-            for delayed_write in chunks_to_write:
-                delayed_write.compute()
-                await asyncio.sleep(0)
+        if self.delayed_write is not None:
+            # Write (last, incomplete) delayed chunk
+            group_no = (self.data_array.shape[1] - 1) - self.delayed_write.shape[1]
+            group = '%04d' % group_no
+            self.delayed_write.to_dataset().to_zarr(self.path,
+                                                    group=group,
+                                                    mode='a',
+                                                    # append_dim='time',
+                                                    compute=True
+                                                    )
+            self.delayed_write = None
 
     def assign_column(self, data, col):
         """Assign data into an existing data array column
