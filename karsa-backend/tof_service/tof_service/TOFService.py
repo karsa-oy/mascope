@@ -153,9 +153,12 @@ class TOFServiceClient(BridgeServiceClient):
                                         )
 
             filename_base = self.acquisition.filename
+            # Prepend with instrument name
             filename = '_'.join([self.private_ns.namespace.strip('/'),
                                  filename_base
                                  ])
+            # Replace spaces with underscore
+            filename = filename.replace(' ', '_')
 
             await self.emit_private_notification(
                                         'acquisition_started',
@@ -171,18 +174,22 @@ class TOFServiceClient(BridgeServiceClient):
                                          },
                                         no_data_logging=True
                                         )
-            await self.emit_private_notification(
-                                        'tps_parameter_info',
-                                        {'filename': filename,
-                                         'tps_info': self.acquisition.tps_info,
-                                         },
-                                        )
+            if hasattr(self.acquisition, 'tps_info'):
+                await self.emit_private_notification(
+                                            'tps_parameter_info',
+                                            {'filename': filename,
+                                             'tps_info': self.acquisition.tps_info,
+                                             },
+                                            )
             # Acquisition loop
             self.log("Entering acquisition loop.")
             while True:
                 try:
                     spec_data = self.acquisition.spec_queue.get_nowait() # Non-blocking
-                    tps_data = self.acquisition.tps_queue.get() # Blocking, since new data expected
+                    if hasattr(self.acquisition, 'tps_queue'):
+                        tps_data = self.acquisition.tps_queue.get() # Blocking, since new data expected
+                    else:
+                        tps_data = None
                 except Empty:
                     # No new data
                     await self.sio.sleep(.1)
@@ -198,20 +205,21 @@ class TOFServiceClient(BridgeServiceClient):
                                              },
                                             no_data_logging=True
                                             )
-                    # TPS data
-                    await self.emit_private_notification(
-                                            'acquired_tps_data',
-                                            {**tps_data,
-                                             'filename': filename
-                                             },
-                                            no_data_logging=True
-                                            )
                     # Progress
                     await self.emit_private_notification(
                                             'acquisition_progress', 
                                             {'progress': self.acquisition.progress,
                                              },
                                             )
+                    if tps_data:
+                        # TPS data
+                        await self.emit_private_notification(
+                                                'acquired_tps_data',
+                                                {**tps_data,
+                                                 'filename': filename
+                                                 },
+                                                no_data_logging=True
+                                                )
                 # Got poison pill
                 else:
                     # Finalize acquisition

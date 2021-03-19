@@ -290,21 +290,26 @@ class FileIoNamespace(BaseClientNamespace):
         # Get package index
         value = data['value']
         i = value.get('i')
+        self.log(i)
         filename_base = value.get('filename')
 
         ti = np.array( [value.get('t')], dtype=np.float32 )
         spec = np.frombuffer(value.get('spec'), dtype=np.float32)
         spec = spec.reshape(-1, 1)
         signal_array, _ = cache_get(data, 'signal')
-        if signal_array:       # TODO: signal_array is None on killing acquisition from MainUI
-            print(i)
-            mz = signal_array.data_array.mz
-            await signal_array.extend_array(spec,
-                                            [mz, ti],
-                                            'time'
-                                            )
+
+        if 'mz' in value:
+            # mz coordinates provided with data
+            mz = np.frombuffer(value['mz'], dtype=np.float32)
+            mz = mz.reshape(-1,)
         else:
-            Warning("[on_acquired_spectrum]: signal_array is None")
+            # Use mz coordinates from signal_array
+            mz = signal_array.data_array.mz
+
+        await signal_array.extend_array(spec,
+                                        [mz, ti],
+                                        'time'
+                                        )
         
         # Repeat the notification into root ns for DataViz
         await self.emit_client_notification('acquired_spectrum',
@@ -623,6 +628,7 @@ class FileIoNamespace(BaseClientNamespace):
         if not tps_env is None:
             tps_env['tps_speci'] = n
     # ----------------------------------------
+
 
 
 # ========= File I/O functions =========

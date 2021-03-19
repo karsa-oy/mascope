@@ -312,13 +312,22 @@ class DataVizServiceNamespace(BaseClientNamespace):
         value = data['value']
         visualizer = viz_cache_get(data, 'signal')
         if not visualizer:  # data request was cancelled
+            self.log("received data for cancelled request")
             return
         # Extend signal cache
         spec = np.frombuffer( value.get('spec'), dtype=np.float32 )
         spec = spec.reshape(-1, 1)
         ti = value.get('t')
         td = np.array( [timedelta(seconds=ti)] ) # Convert to timedelta
-        mz = visualizer.data_array.mz
+
+        if 'mz' in value:
+            # mz coordinates provided with data
+            mz = np.frombuffer(value['mz'], dtype=np.float32)
+            mz = mz.reshape(-1,)
+        else:
+            # Use mz coordinates from signal_array
+            mz = visualizer.data_array.mz
+
         await visualizer.extend_array(spec,
                                       [mz, td],
                                       'time'
