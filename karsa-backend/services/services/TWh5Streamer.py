@@ -120,13 +120,10 @@ class TWh5StreamerPrivateNamespace(BaseClientNamespace):
                                             )
 
     async def on_h5_to_import(self, data):
+        global h5streamer
         for h5 in data['value']:
             full_file_path = os.path.join( h5.get('path'), h5.get('filename') )
-            self.stream_h5(full_file_path)
-
-    def stream_h5(self, h5_filepath):
-        global h5streamer
-        h5streamer.start_stream(h5_filepath)
+            h5streamer.start_stream(full_file_path)        
 
 
 class TWh5StreamerServiceClient(TOFServiceClient):
