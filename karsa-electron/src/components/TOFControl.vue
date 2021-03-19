@@ -517,6 +517,15 @@ export default {
         },
     },
     watch: {
+        data_source_selected: function(new_value, old_value) {
+            if ( _.isEqual(new_value, old_value) )
+                return false;
+            if ( this.acquisition_control_active ) {
+                // this.be.unsubscribe(this.endpoints, null);   //TODO: is it needed?
+                this.be.disconnect(this.namespace);
+                this.be.connect(this.url + '/' + this.data_source_selected.name);
+            }
+        },
         acquisition_control_active: function(new_value) {
             if (new_value) {
                 this.confirmAcquisitionControl();

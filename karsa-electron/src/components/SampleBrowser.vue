@@ -812,15 +812,6 @@ export default {
             if ( this.sample_table_checked_rows.length > 1 ) {
                 this.sample_table_checked_rows = [last_selection,];
             }
-
-            // // TODO: clean up figures -  NO NEED?
-            // // check if the vuex props should be mapped to local props
-            // this.$store.commit('heatmap_figure_data', {});
-            // this.$store.commit('timeseries_figure_data', {});
-            // this.$store.commit('tps_parameters_selected', []);
-            // this.$store.commit('tps_parameters', []);
-            // this.$store.commit('spec_stack_figure_data', {});
-
             if (last_selection) {
                 this.sample_file = last_selection.id;
                 this.sample_name = last_selection.title || "";
