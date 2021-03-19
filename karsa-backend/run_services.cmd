@@ -23,6 +23,8 @@ start cmd /k karsa-sample-service || goto :error
 start cmd /k karsa-dataviz-service || goto :error
 start cmd /k karsa-h5-streamer --ns=h5 || goto :error
 start cmd /k karsa-fileio-service --ns=h5 || goto :error
+start cmd /k karsa-raw-streamer --ns=raw || goto :error
+start cmd /k karsa-fileio-service --ns=raw || goto :error
 ::start cmd /k karsa-signal-service || goto :error
 popd
 
