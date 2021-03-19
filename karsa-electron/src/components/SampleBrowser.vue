@@ -159,7 +159,7 @@
                             <b-field label="Project">
                                 <b-select
                                     placeholder="Select a project"
-                                    v-model="project_selected.id"
+                                    v-model="sample_project"
                                     required
                                     expanded>
                                     <option
@@ -174,7 +174,7 @@
                             <b-field label="Experiment">
                                 <b-select
                                     placeholder="Select an experiment"
-                                    v-model="experiment_selected.id"
+                                    v-model="sample_experiment"
                                     required
                                     expanded>
                                     <option
@@ -704,9 +704,9 @@ export default {
             if ( _.isEqual(new_value, old_value) ) {
                 return false;
             }
-            this.sample_file = "";
-            this.sample_name = "";
-            this.sample_description = "";
+            // this.sample_file = "";
+            // this.sample_name = "";
+            // this.sample_description = "";
             this.sample_project = this.project_selected.id;
             this.sample_experiment = new_value.id;
 

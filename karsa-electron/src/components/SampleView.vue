@@ -696,6 +696,9 @@ export default {
         },
 
         reset_view() {
+            if ( !_.isEmpty(this.filename) ) {
+                this.stop_visualize_range = {'filename': this.filename, };
+            }
             this.reset_figure_cache();
             this.reset_figures();
             this.update_figures();
@@ -930,7 +933,8 @@ export default {
             }
         },
         experiment_selected: function(new_value, old_value) {  // eslint-disable-line no-unused-vars
-            this.reset_view();
+            // this.reset_view();
+            return
         },
         figure_ranges: function(new_value, old_value) {
             // // TODO: quick&dirty fix to dismiss acquisition notifications
@@ -953,14 +957,11 @@ export default {
             if ( _.isEqual(new_value, old_value) ) {
                 return false;
             }
+            this.reset_view();
             this.be.unsubscribe(this.endpoints, old_value.filename);
-            this.reset_figure_cache();
-            this.reset_figures();
-            if ( !_.isEmpty(this.filename) )
-                this.stop_visualize_range = {'filename': this.filename, };
+            
             if ( _.isEmpty(new_value) || _.isEmpty(new_value.filename)) {
                 this.filename = '';
-                this.update_figures();
                 return false;
             }
             this.filename = new_value.filename;
