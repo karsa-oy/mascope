@@ -45,7 +45,7 @@
                             v-if="data_source_selected.type && data_source_selected.type.indexOf('h5_streamer') != -1">
                         </H5import>
                         <RAWimport
-                            v-if="data_source_selected.type && data_source_selected.type.indexOf('raw') != -1">
+                            v-if="data_source_selected.type && data_source_selected.type.indexOf('raw_streamer') != -1">
                         </RAWimport>
                         <TOFControl
                             v-if="data_source_selected.type && data_source_selected.type.indexOf('Tofwerk_streamer') != -1">
