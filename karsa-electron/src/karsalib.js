@@ -128,9 +128,6 @@ export class BECom {
     }
     
     import_one_way_binding_prop(name, value, no_logging=NO_LOGGING_DEFAULT) {
-            if ( _.isEqual(value, this.ctx[name]) ) {
-                return;
-            }
             if ( no_logging === false ) {
                 this.log("receive", name, value);
             }
@@ -138,9 +135,6 @@ export class BECom {
     }
     
     import_two_way_binding_prop(name, value, no_logging=NO_LOGGING_DEFAULT) {
-            if ( _.isEqual(value, this.ctx[name]) ) {
-                return;
-            }
             if ( no_logging === false ) {
                 this.log("receive", name, value);
             }

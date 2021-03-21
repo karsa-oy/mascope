@@ -947,9 +947,9 @@ export default {
         },
         heatmap_figure_data: function(new_value) {
             // TODO: quick&dirty fix to dismiss acquisition notifications
-            if (new_value.filename !== this.filename) {
-                return false;
-            }
+            // if (new_value.filename !== this.filename) {
+            //     return false;
+            // }
             //
             this.on_heatmap_figure_data(new_value);
         },
@@ -958,25 +958,26 @@ export default {
                 return false;
             }
             this.reset_view();
-            this.be.unsubscribe(this.endpoints, old_value.filename);
+            if ( !_.isEmpty(old_value.filename) )
+                this.be.unsubscribe(this.endpoints, old_value.filename);
             
             if ( _.isEmpty(new_value) || _.isEmpty(new_value.filename)) {
                 this.filename = '';
                 return false;
             }
             this.filename = new_value.filename;
+            this.be.subscribe(this.endpoints, this.filename);
             this.visualize_range = {
                 'filename': this.filename,
                 't_range': null,
                 'mz_range': null
                 };
-            this.be.subscribe(this.endpoints, this.filename);
         },
         spec_stack_figure_data: function(new_value) {
             // TODO: quick&dirty fix to dismiss acquisition notifications
-            if (new_value.filename !== this.filename) {
-                return
-            }
+            // if (new_value.filename !== this.filename) {
+            //     return
+            // }
             //
             this.on_spec_stack_figure_data(new_value);
         },
@@ -1011,9 +1012,9 @@ export default {
         },
         timeseries_figure_data: function(new_value) {
             // TODO: quick&dirty fix to dismiss acquisition notifications
-            if (new_value.filename !== this.filename) {
-                return
-            }
+            // if (new_value.filename !== this.filename) {
+            //     return
+            // }
             //
             this.on_timeseries_figure_data(new_value);
         },
