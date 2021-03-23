@@ -456,7 +456,22 @@ export default {
                 return;
             }
             let data = json_data.value;
-            let zoom_stack_item_room = json_data.client_room;
+            let zoom_stack_item_room = json_data.room;
+
+            if ( !Object.keys(this.figure_cache).includes(zoom_stack_item_room) ) {
+                // Key not in cache => figure data pushed by back-end into room filename
+                if (this.filename !== zoom_stack_item_room) {
+                    // Received something wrong
+                    self.beep();
+                    self.log('on_heatmap_figure_data: Something went wrong 1: ',
+                             this.filename,
+                             zoom_stack_item_room
+                             );
+                    return;
+                }
+                // Override cache key (filename) with 'room_sid' (set on 'sample_to_load')
+                zoom_stack_item_room = this.room_sid;
+            }
 
             var x0 = data.t_range[0]; // float
             var x1 = data.t_range[1]; // float
@@ -480,9 +495,9 @@ export default {
             };
 
             let cache_item = self.figure_cache_get(zoom_stack_item_room);
-            if ( _.isUndefined(cache_item) ) {
+            if (!cache_item) {
                 self.beep();
-                self.log('on_heatmap_figure_data: retired frame skipped for mz_range', [y0, y1], this.figure_cache, this.zoom_stack);
+                self.log('on_heatmap_figure_data: Something went wrong 2')
                 return;
             }
 
@@ -503,13 +518,14 @@ export default {
                                     self.heatmap_data,
                                     self.heatmap_layout
                                     );
-            } else if (_.isEqual(cache_item.room, self.zoom_stack[0].room) &&
-                        self.acquisition_status === "running") {
+            } else if ( _.isEqual(zoom_stack_item_room,
+                                  self.zoom_stack[0].room) ) {
                 // on newly acquired spectrum (full mz range, acquisition running),
                 // forward request to latest zoom
                 self.visualize_range = {'mz_range': self.zoom_stack.slice(-1)[0].mz_range,
                                         't_range': [x0, x1],
-                                        'filename': this.filename
+                                        'filename': this.filename,
+                                        'room': self.zoom_stack.slice(-1)[0].room,
                                         };
             }
         },
@@ -531,7 +547,19 @@ export default {
                 return;
             }
             let data = json_data.value;
-            let zoom_stack_item_room = json_data.client_room;
+            let zoom_stack_item_room = json_data.room;
+
+            if ( !Object.keys(this.figure_cache).includes(zoom_stack_item_room) ) {
+                // Key not in cache => figure data pushed by back-end into room filename
+                if (this.filename !== zoom_stack_item_room) {
+                    // Received something wrong
+                    self.beep();
+                    self.log('on_spec_stack_figure_data: Something went wrong 1');
+                    return;
+                }
+                // Override cache key (filename) with 'room_sid' (set on 'sample_to_load')
+                zoom_stack_item_room = this.room_sid;
+            }
 
             var x0 = data.mz_range[0]; // float
             var x1 = data.mz_range[1]; // float
@@ -554,13 +582,13 @@ export default {
                 "layer": "below",
             };
 
-            let mz_range = [x0, x1];
-            var cache_item = self.figure_cache_get(zoom_stack_item_room);
-            if ( _.isUndefined(cache_item) ) {
+            let cache_item = self.figure_cache_get(zoom_stack_item_room);
+            if (!cache_item) {
                 self.beep();
-                self.log('on_spec_stack_figure_data: retired frame skipped for mz_range', mz_range, this.figure_cache, this.zoom_stack);
+                self.log('on_spec_stack_figure_data: Something went wrong 2')
                 return;
             }
+
             cache_item.spec_stack_layout.images.push(chunk);
             cache_item.spec_stack_layout.yaxis.tickvals.push(y0);
             cache_item.spec_stack_layout.yaxis.ticktext.push(y0.toFixed(1).toString());
@@ -598,7 +626,19 @@ export default {
                 return;
             }
             let data = json_data.value;
-            let zoom_stack_item_room = json_data.client_room;
+            let zoom_stack_item_room = json_data.room;
+
+            if ( !Object.keys(this.figure_cache).includes(zoom_stack_item_room) ) {
+                // Key not in cache => figure data pushed by back-end into room filename
+                if (this.filename !== zoom_stack_item_room) {
+                    // Received something wrong
+                    self.beep();
+                    self.log('on_timeseries_figure_data: Something went wrong 1');
+                    return;
+                }
+                // Override cache key (filename) with 'room_sid' (set on 'sample_to_load')
+                zoom_stack_item_room = this.room_sid;
+            }
 
             let x0 = data.xrange && data.xrange[0] 
             x0 = (x0 === undefined) ? self.heatmap_layout.xaxis.range[0] : x0;
@@ -612,12 +652,11 @@ export default {
             }
 
             let trace = traces[0]; // TODO: Need to handle multiple traces?
-            let mz_range = data.mz_range;
 
             let cache_item = self.figure_cache_get(zoom_stack_item_room);
-            if ( _.isUndefined(cache_item) ) {
+            if (!cache_item) {
                 self.beep();
-                self.log('_on_timeseries_figure_data: retired frame skipped for mz_range', mz_range, this.figure_cache, this.zoom_stack);
+                self.log('on_timeseries_figure_data: Something went wrong 2');
                 return;
             }
             if (cache_item.timeseries_data.length) {
