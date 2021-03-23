@@ -24,7 +24,7 @@ from collections import namedtuple
 from PIL import Image
 from copy import deepcopy
 
-from karsalib import BaseClientNamespace, BaseServiceClient, \
+from karsalib import BaseClientNamespace, BaseServiceClient, Logger, \
                      parse_cmd_args, get_client_notification_args
 from karsatof.kcollector import ExtendableDataArray
 from karsatof.kdatapool import DataPool, parse_path_from_sample_name
@@ -45,24 +45,27 @@ NO_DATA_LOGGING_DEFAULT = True
 
 cache = {}
 client = None
+logger = Logger('fileioservice_cache.log')
 
 # ========== Cache methods ==========
 
 def log_cache(func):
     def wrapper(*args, **kwargs):
         global cache
-        print("="*50)
-        print("[%s](fname=%s, sid=%s, ranges=%s, obj_name=%s)"
-              %(func.__name__, *cache_get_keys(args[0]), args[1])
-              )
-        print("cache before: %s" %str(cache))
+        logger.debug("="*50)
+
+        # logger.debug("[%s](fname=%s, sid=%s, ranges=%s, obj_name=%s)"
+        #       %(func.__name__, *cache_get_keys(args[0]), args[1])
+        #       )
+        logger.debug(f"{func.__name__} ( {args},  {kwargs} )")
+        logger.debug("cache before: %s" %str(cache))
         res = func(*args, **kwargs)
-        print("-"*50)
-        print("cache after: %s" %str(cache))
-        print("-"*50)
-        print("return: %s" %str(res))
-        print("="*50)
-        print(" "*50)
+        logger.debug("-"*50)
+        logger.debug("cache after: %s" %str(cache))
+        logger.debug("-"*50)
+        logger.debug("return: %s" %str(res))
+        logger.debug("="*50)
+        logger.debug(" "*50)
         return res
     return wrapper
 
@@ -83,7 +86,7 @@ def cache_contains(data, obj_name):
             ranges in cache[fname][obj_name]['owners'][sid]['ranges']
             )
 
-# @log_cache
+@log_cache
 def cache_get(data, obj_name):
     global cache
     if isinstance(data, list):
@@ -111,7 +114,7 @@ def cache_get(data, obj_name):
         env = cache[fname][obj_name]['owners'][sid]['ranges'][ranges]
     return obj, env
 
-# @log_cache
+@log_cache
 def cache_put(data, obj_name, obj):
     """
     Add a new cache item under 'fname' key, with references to 'sid' and 'ranges'.
@@ -144,7 +147,7 @@ def cache_put(data, obj_name, obj):
                        },
         }
 
-# @log_cache
+@log_cache
 def cache_release(data, obj_name=None):
     """
     Method for releasing references to a cached resource, based on the presence of

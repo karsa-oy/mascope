@@ -4,6 +4,7 @@ import asyncio
 import inspect
 from copy import deepcopy
 import random
+import logging
 from socketio import AsyncClientNamespace, AsyncNamespace, AsyncClient
 from socketio.exceptions import BadNamespaceError
 
@@ -20,6 +21,79 @@ def get_client_notification_args(data):
     ignoring 'name' and 'value' fields.
     """
     return copy_dict(data, ignore_keys=['name', 'value'])
+
+class Logger():
+    # log_levels = [
+    #     logging.DEBUG,
+    #     logging.INFO,
+    #     logging.WARNING,
+    #     logging.ERROR,
+    #     logging.CRITICAL,
+    # ]
+    def __init__(self, fname, c_log_level='INFO', f_log_level='DEBUG', mode='r+'):
+        # notification sender configuration and
+        # methods are borrowed from client class
+        self.target_room = None
+        self.emit_client_notification = None
+        # logger configuration
+        self.logger = logging.getLogger(fname)
+        self.logger.setLevel('DEBUG')
+        # console logger
+        if c_log_level:
+            c_handler = logging.StreamHandler()
+            c_handler.setLevel(level=c_log_level)
+            c_format = logging.Formatter('%(message)s')
+            c_handler.setFormatter(c_format)
+            self.logger.addHandler(c_handler)
+        # file logger
+        if f_log_level:
+            try:
+                f_handler = logging.FileHandler(fname, mode=mode)
+                f_handler.setLevel(level=f_log_level)
+                f_format = logging.Formatter('%(asctime)s %(message)s')
+                f_handler.setFormatter(f_format)
+                self.logger.addHandler(f_handler)
+            except FileNotFoundError:
+                pass
+
+    def configure_notifications(self, sender, target_room):
+        if sender:
+            self.emit_client_notification = sender.__getattribute__('emit_client_notification')
+        if target_room:
+            self.target_room = target_room
+
+    def debug(self, m):
+        self.logger.debug(m)
+
+    def info(self, m):
+        self.logger.info(m)
+
+    def warning(self, m, room=None, namespace='/'):
+        self.logger.warning(m)
+        if self.emit_client_notification:
+            self.emit_client_notification('service_warning', m,
+                                      room=room or self.target_room,
+                                      namespace=namespace,
+                                      no_logging=False,
+                                      no_data_logging=False)
+
+    def error(self, m, room=None, namespace='/'):
+        self.logger.error(m)
+        if self.emit_client_notification:
+            self.emit_client_notification('service_error', m,
+                                      room=room or self.target_room,
+                                      namespace=namespace,
+                                      no_logging=False,
+                                      no_data_logging=False)
+
+    def critical(self, m, room=None, namespace='/'):
+        self.logger.critical(m)
+        if self.emit_client_notification:
+            self.emit_client_notification('service_critical_error', m,
+                                      room=room or self.target_room,
+                                      namespace=namespace,
+                                      no_logging=False,
+                                      no_data_logging=False)
 
 
 class BaseClientNamespace(AsyncClientNamespace):
