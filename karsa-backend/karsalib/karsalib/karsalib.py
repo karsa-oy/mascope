@@ -70,7 +70,7 @@ class Logger():
 
     def warning(self, m, room=None, namespace='/'):
         self.logger.warning(m)
-        if self.emit_client_notification:
+        if self.emit_client_notification and self.logger.isEnabledFor(logging.WARNING):
             self.emit_client_notification('service_warning', m,
                                       room=room or self.target_room,
                                       namespace=namespace,
@@ -79,7 +79,7 @@ class Logger():
 
     def error(self, m, room=None, namespace='/'):
         self.logger.error(m)
-        if self.emit_client_notification:
+        if self.emit_client_notification and self.logger.isEnabledFor(logging.ERROR):
             self.emit_client_notification('service_error', m,
                                       room=room or self.target_room,
                                       namespace=namespace,
@@ -88,7 +88,7 @@ class Logger():
 
     def critical(self, m, room=None, namespace='/'):
         self.logger.critical(m)
-        if self.emit_client_notification:
+        if self.emit_client_notification and self.logger.isEnabledFor(logging.CRITICAL):
             self.emit_client_notification('service_critical_error', m,
                                       room=room or self.target_room,
                                       namespace=namespace,
