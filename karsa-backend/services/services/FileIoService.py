@@ -45,7 +45,7 @@ NO_DATA_LOGGING_DEFAULT = True
 
 cache = {}
 client = None
-logger = Logger('fileioservice_cache.log')
+logger = Logger('fileioservice_cache')
 
 # ========== Cache methods ==========
 

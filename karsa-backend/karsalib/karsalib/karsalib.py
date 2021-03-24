@@ -48,7 +48,7 @@ class Logger():
         # file logger
         if f_log_level:
             try:
-                f_handler = logging.FileHandler(fname, mode=mode)
+                f_handler = logging.FileHandler(fname + '.log', mode=mode)
                 f_handler.setLevel(level=f_log_level)
                 f_format = logging.Formatter('%(asctime)s %(message)s')
                 f_handler.setFormatter(f_format)
