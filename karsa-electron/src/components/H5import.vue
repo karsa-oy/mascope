@@ -38,7 +38,7 @@
                                 type="button"
                                 @click="FetchH5s()"
                                 is-dark
-                                :disabled="(h5_streamer_status==='not_ready' ||
+                                :disabled="(instrument_status==='not_ready' ||
                                             import_start_time === null ||
                                             import_end_time === null
                                             ) ? true : false">
@@ -108,7 +108,7 @@
                         <div class="content">
                             <div style="text-align:center; margin-top:.4rem; margin-bottom:1rem">
                                 <h1 class="acquisition-parameters-h1">
-                                    H5 streamer status: {{ h5_streamer_status }}
+                                    H5 streamer status: {{ instrument_status }}
                                 </h1>
                             </div>
                             <div style="margin-left:1rem; margin-right:1rem; margin-bottom:1rem">
@@ -127,7 +127,7 @@
                                     @click="is_import_h5_modal_active=true"
                                     outlined
                                     inverted
-                                    :disabled="(h5_streamer_status=='ready'
+                                    :disabled="(instrument_status=='ready'
                                                 ) ? false : true">
                                     Import h5 file
                                 </b-button>
@@ -184,14 +184,14 @@ export default {
                 'acquisition_progress',
                 'acquisition_started',
                 // 'acquisition_status',
-                'h5_streamer_status'
+                'instrument_status'
             ],
             // h5 streamer
             acquisition_progress: 0,
             acquisition_started: {},
             is_import_h5_modal_active: false,
             h5_samples: [],
-            h5_streamer_status: "not_ready",		// not_ready/ready
+            instrument_status: "not_ready",		// not_ready/ready
             h5_to_import: [],
             // variables for h5 import modal
             import_start_time: null,
@@ -291,7 +291,7 @@ export default {
                 this.namespace.on("acquisition_started", (value) => this.be.import_one_way_binding_prop("acquisition_started", value.value));
                 // this.namespace.on("acquisition_status", (value) => this.be.import_one_way_binding_prop("acquisition_status", value.value));
                 this.namespace.on("acquisition_progress", (value) => this.be.import_one_way_binding_prop("acquisition_progress", value.value.progress, true));
-                this.namespace.on("h5_streamer_status", (value) => this.be.import_two_way_binding_prop("h5_streamer_status", value.value));
+                this.namespace.on("instrument_status", (value) => this.be.import_two_way_binding_prop("instrument_status", value.value));
                 this.namespace.on("h5_samples", (value) => this.be.import_one_way_binding_prop("h5_samples", value.value));
 
                 this.be.subscribe(this.endpoints,

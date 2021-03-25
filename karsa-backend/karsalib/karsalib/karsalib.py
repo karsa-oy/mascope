@@ -7,6 +7,8 @@ import random
 import logging
 from socketio import AsyncClientNamespace, AsyncNamespace, AsyncClient
 from socketio.exceptions import BadNamespaceError
+from queue import Empty
+
 
 NO_LOGGING_DEFAULT = False
 NO_DATA_LOGGING_DEFAULT = True
@@ -98,6 +100,8 @@ class Logger():
 
 class BaseClientNamespace(AsyncClientNamespace):
     """ python-socket.io client namespace for connecting to Router """
+    # ref to service client
+    parent = None
     # endpoints - list of notifications the client wants to receive from socket server
     endpoints = []
     # service_state - state vars to report to (re)starting subscribers
@@ -329,6 +333,7 @@ class BaseServiceClient:
             ns_name = '/' + ns_name
         self.sio.register_namespace( ns_class(ns_name) )
         self.ns_handler = self.sio.namespace_handlers.get(ns_name)
+        self.ns_handler.parent = self
 
     async def emit_client_notification(self, name, value, **kwarg):
         await self.ns_handler.emit_client_notification(name, value, **kwarg)
@@ -421,3 +426,199 @@ class BridgeServiceClient(BaseServiceClient):
         await self.connect()
         await self.init_service()
         await self.service_main()
+
+
+class BaseStreamerClient(BridgeServiceClient):
+    def __init__(self, StreamerClass, *args, **kwargs):
+        self.streamer_class = StreamerClass
+        self.streamer = None
+        super().__init__(*args, **kwargs)
+
+
+    async def initialize_streamer(self):
+        """
+        Instantuate streamer instance.
+        Should be called from within overridden init_service.
+        """
+        while True:
+            try:
+                self.streamer = self.streamer_class()
+                self.streamer.start()
+                break
+            except Exception as e:
+                self.log(f'{e}\nRetrying...')
+                await self.sio.sleep(2)
+                continue
+
+
+    async def init_service(self):
+        await self.emit_private_notification(
+                                    'instrument_status',
+                                    'not_ready',
+                                    no_data_logging=False
+                                    )
+        # while True:
+        #     # TODO: TBR python-socketio BadNamespaceError connection bug
+        #     from socketio.exceptions import BadNamespaceError
+        #     try:
+        #         await self.emit_private_notification(
+        #                                     'instrument_status',
+        #                                     'not_ready',
+        #                                     no_data_logging=False
+        #                                     )
+        #         break
+        #     except BadNamespaceError:
+        #         await self.sio.sleep(.1)
+        #         continue
+        await self.initialize_streamer()
+        await self.emit_private_notification(
+                                    'instrument_status',
+                                    'ready',
+                                    no_data_logging=False,
+                                    )
+        await self.emit_public_notification(
+                                    'instrument_data',
+                                    self.instrument_data,
+                                    room=self.public_ns.room_data_sources,
+                                    no_data_logging=False
+                                    )
+
+
+    async def service_main(self):
+        # Main loop
+        while True:
+            # Catch Ctrl+C
+            try:
+                # Check for active acquisition
+                if not self.streamer.active.wait(timeout=.1):
+                    await self.sio.sleep(0)
+                    # Not yet
+                    continue
+            except KeyboardInterrupt:
+                # Exit
+                break
+
+            # Initialize acquisition
+            self.log("Initializing acquisition.")
+            await self.emit_private_notification(
+                                        'acquisition_status',
+                                        'running',
+                                        )
+
+            filename_base = self.streamer.filename
+            # Prepend with instrument name
+            filename = '_'.join([self.private_ns.namespace.strip('/'),
+                                 filename_base
+                                 ])
+            # Replace spaces with underscore
+            filename = filename.replace(' ', '_')
+
+            await self.emit_private_notification(
+                                        'acquisition_started',
+                                        {'filename': filename,
+                                         },
+                                        )
+
+            await self.emit_private_notification(
+                                        'acquisition_coordinates',
+                                        {'filename': filename,
+                                         'mz': self.streamer.mz.tobytes(),
+                                         't_range': [0, self.streamer.length]
+                                         },
+                                        no_data_logging=True
+                                        )
+            if hasattr(self.streamer, 'tps_info'):
+                await self.emit_private_notification(
+                                            'tps_parameter_info',
+                                            {'filename': filename,
+                                             'tps_info': self.streamer.tps_info,
+                                             },
+                                            )
+            # Acquisition loop
+            self.log("Entering acquisition loop.")
+            while True:
+                try:
+                    spec_data = self.streamer.spec_queue.get_nowait() # Non-blocking
+                    if hasattr(self.streamer, 'tps_queue'):
+                        tps_data = self.streamer.tps_queue.get() # Blocking, since new data expected
+                    else:
+                        tps_data = None
+                except Empty:
+                    # No new data
+                    await self.sio.sleep(.1)
+                    continue
+                # Got data
+                if spec_data is not None:
+                    # Spectrum data
+                    await self.emit_private_notification(
+                                            'acquired_spectrum',
+                                            {**spec_data,
+                                             'filename': filename
+                                             },
+                                            no_data_logging=True
+                                            )
+                    # Progress
+                    await self.emit_private_notification(
+                                            'acquisition_progress',
+                                            {'progress': self.streamer.progress,
+                                             },
+                                            )
+                    if tps_data:
+                        # TPS data
+                        await self.emit_private_notification(
+                                                'acquired_tps_data',
+                                                {**tps_data,
+                                                 'filename': filename
+                                                 },
+                                                no_data_logging=True
+                                                )
+                # Got poison pill
+                else:
+                    # Finalize acquisition
+                    await self.emit_private_notification(
+                                            'acquisition_progress',
+                                            {'progress': 100.,
+                                             },
+                                            )
+                    await self.emit_private_notification(
+                                            'acquisition_finished',
+                                            {'filename': filename
+                                             },
+                                            )
+                    await self.emit_private_notification(
+                                            'acquisition_status',
+                                            'not_running',
+                                            )
+                    self.log("Exiting acquisition loop.")
+                    break # Break out of acquisition loop
+        # Out of main loop
+        # Kill Acquisition
+        self.streamer.shutdown()
+
+
+def run_streamer_service(streamer_type, StreamerClient, StreamerClass, 
+                         StreamerPublicNamespace, StreamerPrivateNamespace):
+    url, port, namespace = parse_cmd_args()
+    # streamer should always be in private namespace with data producer
+    if namespace == '/':
+        print( "The service must be in a private namespace.",
+               "Please restart the service with --ns option."
+              )
+        return
+
+    client = StreamerClient(StreamerClass,
+                            url,
+                            port,
+                            ('/', StreamerPublicNamespace),
+                            (namespace, StreamerPrivateNamespace)
+                           )
+    client.instrument_data = {'name': namespace,
+                              'type': streamer_type,
+                              }
+    client.public_ns.room_instrument = namespace
+
+    loop = asyncio.get_event_loop()
+    try:
+        loop.run_until_complete(client.run())
+    except KeyboardInterrupt:
+        client.streamer.shutdown()

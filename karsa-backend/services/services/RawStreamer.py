@@ -2,25 +2,12 @@
 RawStreamer Service
 """
 
-import asyncio
 import os
-import numpy as np
 
-from multiprocessing import Queue
-from queue import Empty
-from datetime import datetime
-
-from karsalib import (
-                BaseClientNamespace,
-                parse_cmd_args,
-                get_client_notification_args
-                )
-from tof_service.TOFService import TOFServiceClient
+from karsalib import BaseClientNamespace, get_client_notification_args, \
+                     BaseStreamerClient, run_streamer_service
 from karsatof.kgenerator import RawStreamer
 from karsatof.kdatapool import RawPool
-
-
-raw_streamer = None
 
 
 # TODO: make platform-agnostic (move to settings file)
@@ -37,7 +24,6 @@ raw_pool = RawPool(raw_path)
 
 class RawStreamerPublicNamespace(BaseClientNamespace):
     # raw service public (root) interfaces
-    parent = None
     # the public namespace is primarily exposed to the root namespace
     # via a room_instrument = private_namespace_name.
     room_instrument = None
@@ -88,7 +74,7 @@ class RawStreamerPrivateNamespace(BaseClientNamespace):
             ]
 
     service_state = dict(
-        raw_streamer_status = 'not_ready',
+        instrument_status = 'not_ready',
     )
 
     async def on_import_raw_table_datetime_range(self, data):
@@ -123,72 +109,28 @@ class RawStreamerPrivateNamespace(BaseClientNamespace):
                                             )
 
     async def on_raw_to_import(self, data):
-        global raw_streamer
         for raw_file in data['value']:
             full_file_path = os.path.join( raw_file.get('path'), raw_file.get('filename') )
-            raw_streamer.start_stream(full_file_path)
+            self.parent.streamer.start_stream(full_file_path)
         
 
 
-class RawStreamerServiceClient(TOFServiceClient):
+class RawStreamerServiceClient(BaseStreamerClient):
     async def init_service(self):
-        global raw_streamer
-
-        while True:
-            # TODO: TBR python-socketio BadNamespaceError connection bug
-            from socketio.exceptions import BadNamespaceError
-            try:
-                await self.emit_private_notification('raw_streamer_status', 
-                                                     'not_ready',
-                                                     no_data_logging=False
-                                                     )
-                break
-            except BadNamespaceError:
-                await self.sio.sleep(.1)
-                continue
-        raw_streamer = self.acquisition = await self.initialize_kgenerator(
-                                                                    RawStreamer
-                                                                    )
+        global raw_pool
         await raw_pool.scan_dir(raw_path)
-        await self.emit_private_notification('raw_streamer_status',
-                                             'ready',
-                                             no_data_logging=False
-                                             )
-        await self.emit_public_notification(
-                                'instrument_data',
-                                self.instrument_data,
-                                room=self.public_ns.room_data_sources,
-                                no_data_logging=False
-                                )
+        await super().init_service()
+
 
 
 def run():
-    global raw_streamer
-
-    url, port, namespace = parse_cmd_args()
-    # raw streamer should always be in private namespace with data producer
-    if namespace == '/':
-        print("RawStreamerService must be in a private namespace. " +
-              "Please restart the service with --ns option."
-              )
-        return
-
-    client = RawStreamerServiceClient(url,
-                                      port,
-                                      ('/', RawStreamerPublicNamespace),
-                                      (namespace, RawStreamerPrivateNamespace)
-                                      )
-    client.instrument_data = {'name': namespace,
-                              'type': 'raw_streamer'
-                              }
-    client.public_ns.room_instrument = namespace
-
-    loop = asyncio.get_event_loop()
-    try:
-        loop.run_until_complete(client.run())
-    except KeyboardInterrupt:
-        raw_streamer.shutdown()
+    run_streamer_service('raw_streamer',
+                         RawStreamerServiceClient,
+                         RawStreamer,
+                         RawStreamerPublicNamespace,
+                         RawStreamerPrivateNamespace
+                        )
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
     run()

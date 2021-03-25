@@ -2,25 +2,12 @@
 TWh5Streamer Service
 """
 
-import asyncio
 import os
-import numpy as np
 
-from multiprocessing import Queue
-from queue import Empty
-from datetime import datetime
-
-from karsalib import (
-                BaseClientNamespace,
-                parse_cmd_args,
-                get_client_notification_args
-                )
-from tof_service.TOFService import TOFServiceClient
+from karsalib import BaseClientNamespace, get_client_notification_args, \
+                     BaseStreamerClient, run_streamer_service
 from karsatof.kgenerator import h5Streamer
 from karsatof.kdatapool import H5Pool
-
-
-h5streamer = None
 
 
 # TODO: make platform-agnostic (move to settings file)
@@ -34,7 +21,6 @@ h5_pool = H5Pool(h5_path)
 
 class TWh5StreamerPublicNamespace(BaseClientNamespace):
     # h5 service public (root) interfaces
-    parent = None
     # the public namespace is primarily exposed to the root namespace
     # via a room_instrument = private_namespace_name.
     room_instrument = None
@@ -85,7 +71,7 @@ class TWh5StreamerPrivateNamespace(BaseClientNamespace):
             ]
 
     service_state = dict(
-        h5_streamer_status = 'not_ready',
+        instrument_status = 'not_ready',
     )
 
     async def on_import_h5_table_datetime_range(self, data):
@@ -120,71 +106,27 @@ class TWh5StreamerPrivateNamespace(BaseClientNamespace):
                                             )
 
     async def on_h5_to_import(self, data):
-        global h5streamer
         for h5 in data['value']:
             full_file_path = os.path.join( h5.get('path'), h5.get('filename') )
-            h5streamer.start_stream(full_file_path)        
+            self.parent.streamer.start_stream(full_file_path)
 
 
-class TWh5StreamerServiceClient(TOFServiceClient):
+class TWh5StreamerServiceClient(BaseStreamerClient):
     async def init_service(self):
-        global h5streamer
-
-        while True:
-            # TODO: TBR python-socketio BadNamespaceError connection bug
-            from socketio.exceptions import BadNamespaceError
-            try:
-                await self.emit_private_notification('h5_streamer_status', 
-                                                     'not_ready',
-                                                     no_data_logging=False
-                                                     )
-                break
-            except BadNamespaceError:
-                await self.sio.sleep(.1)
-                continue
-        h5streamer = self.acquisition = await self.initialize_kgenerator(
-                                                                    h5Streamer
-                                                                    )
+        global h5_pool
         await h5_pool.scan_dir(h5_path)
-        await self.emit_private_notification('h5_streamer_status',
-                                             'ready',
-                                             no_data_logging=False
-                                             )
-        await self.emit_public_notification(
-                                'instrument_data',
-                                self.instrument_data,
-                                room=self.public_ns.room_data_sources,
-                                no_data_logging=False
-                                )
+        await super().init_service()
+
 
 
 def run():
-    global h5streamer
-
-    url, port, namespace = parse_cmd_args()
-    # h5 streamer should always be in private namespace with data producer
-    if namespace == '/':
-        print("TWh5StreamerService must be in a private namespace. " +
-              "Please restart the service with --ns option."
-              )
-        return
-
-    client = TWh5StreamerServiceClient(url,
-                                       port,
-                                       ('/', TWh5StreamerPublicNamespace),
-                                       (namespace, TWh5StreamerPrivateNamespace)
-                                       )
-    client.instrument_data = {'name': namespace,
-                              'type': 'h5_streamer',
-                              }
-    client.public_ns.room_instrument = namespace
-
-    loop = asyncio.get_event_loop()
-    try:
-        loop.run_until_complete(client.run())
-    except KeyboardInterrupt:
-        h5streamer.shutdown()
+    run_streamer_service('h5_streamer',
+                         TWh5StreamerServiceClient,
+                         h5Streamer,
+                         TWh5StreamerPublicNamespace,
+                         TWh5StreamerPrivateNamespace
+                        )
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
     run()
