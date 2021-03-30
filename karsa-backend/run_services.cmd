@@ -20,9 +20,9 @@ pushd .venv || goto :error
 :: Start other services
 start cmd /k karsa-fileio-service --ns=TofDaq || goto :error
 start cmd /k karsa-raw-streamer --config=../services/services/raw_streamer_config/h5.yaml || goto :error
-start cmd /k karsa-fileio-service --ns=H5-data || goto :error
+start cmd /k karsa-fileio-service --ns=H5Data || goto :error
 start cmd /k karsa-raw-streamer --config=../services/services/raw_streamer_config/raw.yaml || goto :error
-start cmd /k karsa-fileio-service --ns=Orbitrap-data || goto :error
+start cmd /k karsa-fileio-service --ns=OrbitrapData || goto :error
 start cmd /k karsa-sample-service || goto :error
 start cmd /k karsa-dataviz-service || goto :error
 ::start cmd /k karsa-signal-service || goto :error
