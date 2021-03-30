@@ -3,8 +3,6 @@ from aiohttp import web
 import aiohttp_cors
 from karsalib import BaseServerNamespace, parse_cmd_args
 
-# import nest_asyncio
-# nest_asyncio.apply()
 
 class RouterNamespace(BaseServerNamespace):
     def on_register_namespace(self, sid, namespace):
@@ -22,12 +20,11 @@ class RouterNamespace(BaseServerNamespace):
 def run():
     global sio
 
-    url, port, _ = parse_cmd_args()
+    args = parse_cmd_args()
     sio = socketio.AsyncServer(async_mode='aiohttp',
                                cors_allowed_origins='*',
                                ping_timeout=60)
     sio.register_namespace(RouterNamespace('/'))
-    # sio.register_namespace(RouterNamespace('/tof')) #TODO: Register dynamically
     app = web.Application()
     sio.attach(app)
     cors = aiohttp_cors.setup(app)
@@ -40,7 +37,7 @@ def run():
                                                     allow_headers="*")
                   }
                 )
-    web.run_app(app, host=url, port=port)
+    web.run_app(app, host=args['url'], port=args['port'])
 
 
 if __name__=='__main__':

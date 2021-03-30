@@ -299,22 +299,24 @@ def parse_cmd_args():
         Karsa Router port (default: 5010)
     """
     # Set defaults
-    url = 'localhost'
-    port = 5010
-    namespace = '/'
+    args_cmd = dict()
+    args_file = dict()
+    args_default = dict(url='localhost', port=5010, ns='/')
     # Parse cmd arguments
-    opts, _ = getopt.getopt(sys.argv[1:], 'o:v', ['url=', 'port=', 'ns='])
+    opts, _ = getopt.getopt(sys.argv[1:], 'o:v',
+                ['url=', 'port=', 'ns=', 'streamer_type=', 'raw_pool=', 'config='])
     for opt, arg in opts:
-        if opt=='--url':
-            url = arg
-        if opt=='--ns':
-            namespace = arg
-        if opt=='--port':
-            try:
-                port = int(arg)
-            except:
-                raise SyntaxError(f'Invalid command line argument: {opt}={arg}')
-    return url, port, namespace
+        assert opt[:2]=='--', f"Invalid argument {opt}"
+        key = opt[2:]
+        if key.lower() == 'config':
+            # service config may be defined in yaml file
+            import yaml
+            with open(arg, 'r') as f:
+                args_file = yaml.safe_load(f)
+            continue
+        args_cmd[key] = arg
+    # command line options override the ones from the config file
+    return {**args_default, **args_file, **args_cmd}
 
 
 class BaseServiceClient:
@@ -429,10 +431,27 @@ class BridgeServiceClient(BaseServiceClient):
 
 
 class BaseStreamerClient(BridgeServiceClient):
-    def __init__(self, StreamerClass, *args, **kwargs):
-        self.streamer_class = StreamerClass
-        self.streamer = None
-        super().__init__(*args, **kwargs)
+    def __init__(self, streamer_type, raw_pool,
+                 url, port, public_namespace_data, private_namespace_data):
+        # Caller must have corresponding streamer and pool classes imported
+        try:
+            streamer_class = inspect.stack()[1][0].f_globals[f"{streamer_type}Streamer"]
+        except KeyError:
+            s = f"Invalid streamer_type : {streamer_type}" if streamer_type else \
+                f"Missing streamer_type argument"
+            raise Exception(s)
+        self.streamer = streamer_class()
+        self.raw_pool = None
+        self.raw_pool_path = raw_pool
+        if raw_pool:
+            raw_pool_class = inspect.stack()[1][0].f_globals[f"{streamer_type}Pool"]
+            self.raw_pool = raw_pool_class(raw_pool)
+        super().__init__(url, port, public_namespace_data, private_namespace_data)
+        priv_ns_name, _ = private_namespace_data
+        self.instrument_data = {'name': priv_ns_name,
+                                'type': streamer_type,
+                               }
+        self.public_ns.room_instrument = priv_ns_name
 
 
     async def initialize_streamer(self):
@@ -442,7 +461,6 @@ class BaseStreamerClient(BridgeServiceClient):
         """
         while True:
             try:
-                self.streamer = self.streamer_class()
                 self.streamer.start()
                 break
             except Exception as e:
@@ -452,24 +470,19 @@ class BaseStreamerClient(BridgeServiceClient):
 
 
     async def init_service(self):
-        await self.emit_private_notification(
-                                    'instrument_status',
-                                    'not_ready',
-                                    no_data_logging=False
-                                    )
-        # while True:
-        #     # TODO: TBR python-socketio BadNamespaceError connection bug
-        #     from socketio.exceptions import BadNamespaceError
-        #     try:
-        #         await self.emit_private_notification(
-        #                                     'instrument_status',
-        #                                     'not_ready',
-        #                                     no_data_logging=False
-        #                                     )
-        #         break
-        #     except BadNamespaceError:
-        #         await self.sio.sleep(.1)
-        #         continue
+        while True:
+            # TODO: TBR python-socketio BadNamespaceError connection bug
+            from socketio.exceptions import BadNamespaceError
+            try:
+                await self.emit_private_notification(
+                                            'instrument_status',
+                                            'not_ready',
+                                            no_data_logging=False
+                                            )
+                break
+            except BadNamespaceError:
+                await self.sio.sleep(.1)
+                continue
         await self.initialize_streamer()
         await self.emit_private_notification(
                                     'instrument_status',
@@ -562,6 +575,7 @@ class BaseStreamerClient(BridgeServiceClient):
                                             'acquisition_progress',
                                             {'progress': self.streamer.progress,
                                              },
+                                            no_data_logging=False
                                             )
                     if tps_data:
                         # TPS data
@@ -579,6 +593,7 @@ class BaseStreamerClient(BridgeServiceClient):
                                             'acquisition_progress',
                                             {'progress': 100.,
                                              },
+                                            no_data_logging=False
                                             )
                     await self.emit_private_notification(
                                             'acquisition_finished',
@@ -596,26 +611,25 @@ class BaseStreamerClient(BridgeServiceClient):
         self.streamer.shutdown()
 
 
-def run_streamer_service(streamer_type, StreamerClient, StreamerClass, 
-                         StreamerPublicNamespace, StreamerPrivateNamespace):
-    url, port, namespace = parse_cmd_args()
+def run_streamer_service(StreamerClient,
+                         StreamerPublicNamespace,
+                         StreamerPrivateNamespace):
+    # args: url, port, ns, streamer_type, raw_pool
+    args = parse_cmd_args()
     # streamer should always be in private namespace with data producer
-    if namespace == '/':
+    if args['ns'] == '/':
         print( "The service must be in a private namespace.",
                "Please restart the service with --ns option."
               )
         return
 
-    client = StreamerClient(StreamerClass,
-                            url,
-                            port,
+    client = StreamerClient(args.get('streamer_type', None),
+                            args.get('raw_pool', None),
+                            args['url'],
+                            args['port'],
                             ('/', StreamerPublicNamespace),
-                            (namespace, StreamerPrivateNamespace)
+                            (args['ns'], StreamerPrivateNamespace)
                            )
-    client.instrument_data = {'name': namespace,
-                              'type': streamer_type,
-                              }
-    client.public_ns.room_instrument = namespace
 
     loop = asyncio.get_event_loop()
     try:

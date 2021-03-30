@@ -44,7 +44,6 @@ NO_DATA_LOGGING_DEFAULT = True
 #              )
 
 cache = {}
-client = None
 logger = Logger('fileioservice_cache')
 
 # ========== Cache methods ==========
@@ -292,8 +291,8 @@ class FileIoNamespace(BaseClientNamespace):
         """
         # Get package index
         value = data['value']
-        i = value.get('i')
-        self.log(i)
+        # i = value.get('i')
+        # self.log(i)
         filename_base = value.get('filename')
 
         ti = np.array( [value.get('t')], dtype=np.float32 )
@@ -690,17 +689,17 @@ class FileIoClient(BaseServiceClient):
     pass
 
 def run():
-    global client
-
-    url, port, namespace = parse_cmd_args()
+    args = parse_cmd_args()
     # FileIo should always be in private namespace with data producer
-    if namespace == '/':
+    if args['ns'] == '/':
         print("FileIoService must be in a private namespace. " +
               "Please restart the service with --ns option."
               )
         return
 
-    client = FileIoClient(url, port, (namespace, FileIoNamespace))
+    client = FileIoClient(args['url'],
+                          args['port'],
+                          (args['ns'], FileIoNamespace))
     loop = asyncio.get_event_loop()
     loop.run_until_complete(client.run())
 

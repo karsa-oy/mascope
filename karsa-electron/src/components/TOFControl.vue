@@ -73,7 +73,7 @@
                         role="button"
                         aria-controls="contentIdForA11y3">
                         <p class="card-header-title">
-                            Acquisition
+                            {{ data_source_selected.name }} acquisition
                         </p>
                         <a class="card-header-icon">
                         <b-icon

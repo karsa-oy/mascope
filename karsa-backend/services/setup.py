@@ -37,7 +37,6 @@ setuptools.setup(
             'karsa-sample-service = services.SampleManagerService:run',
             'karsa-dataviz-service = services.DataVizService:run',
             'karsa-signal-service = services.SignalProcessorService:run',
-            'karsa-h5-streamer = services.TWh5Streamer:run',
             'karsa-raw-streamer = services.RawStreamer:run',
         ],
     }

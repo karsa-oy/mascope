@@ -7,20 +7,8 @@ from datetime import datetime
 
 from karsalib import BaseClientNamespace, get_client_notification_args, \
                      BaseStreamerClient, run_streamer_service
-from karsatof.kgenerator import RawStreamer
-from karsatof.kdatapool import RawPool
-
-
-# TODO: make platform-agnostic (move to settings file)
-drive_letter = 'Z:\\'
-raw_dir = os.path.join(drive_letter,
-                       'Data',
-                       'Orbitrap Data and Documents',
-                       'Orbitrap Data 2020'
-                       )
-
-raw_path = os.path.join(drive_letter, raw_dir)
-raw_pool = RawPool(raw_path)
+from karsatof.kgenerator import RawStreamer, H5Streamer
+from karsatof.kdatapool import RawPool, H5Pool
 
 
 class RawStreamerPublicNamespace(BaseClientNamespace):
@@ -65,11 +53,12 @@ class RawStreamerPublicNamespace(BaseClientNamespace):
                                     **get_client_notification_args(data)
                                     )
 
+
 class RawStreamerPrivateNamespace(BaseClientNamespace):
     # raw service private interfaces
     endpoints = [
             'raw_to_import',
-            'raw_stream_request',
+            # 'raw_stream_request',
             'import_raw_table_datetime_range',
             'service_state'
             ]
@@ -79,9 +68,6 @@ class RawStreamerPrivateNamespace(BaseClientNamespace):
     )
 
     async def on_import_raw_table_datetime_range(self, data):
-        global raw_path
-        global raw_pool
-
         kwargs = get_client_notification_args(data)
 
         dt0_json = data['value'].get('dt0', '')
@@ -100,7 +86,7 @@ class RawStreamerPrivateNamespace(BaseClientNamespace):
             print("dt1 not valid JSON datetime")
             return
 
-        raw_sample_table = await raw_pool.get_datetime_range(dt0, dt1)
+        raw_sample_table = await self.parent.raw_pool.get_datetime_range(dt0, dt1)
 
         await self.emit_client_notification('raw_samples',
                                             raw_sample_table,
@@ -113,21 +99,23 @@ class RawStreamerPrivateNamespace(BaseClientNamespace):
         for raw_file in data['value']:
             full_file_path = os.path.join( raw_file.get('path'), raw_file.get('filename') )
             self.parent.streamer.start_stream(full_file_path)
-        
 
 
 class RawStreamerServiceClient(BaseStreamerClient):
+    def __init__(self, *args, **kwargs):
+        # this allows BaseStreamerClient.__init__ to see caller's context,
+        # which is needed for dynamic instantiation of a streamer and a raw_pool
+        super().__init__(*args, **kwargs)
+
     async def init_service(self):
-        global raw_pool
-        await raw_pool.scan_dir(raw_path)
         await super().init_service()
+        assert self.raw_pool, 'Missing raw_pool argument'
+        await self.raw_pool.scan_dir(self.raw_pool_path)
 
 
 
 def run():
-    run_streamer_service('raw_streamer',
-                         RawStreamerServiceClient,
-                         RawStreamer,
+    run_streamer_service(RawStreamerServiceClient,
                          RawStreamerPublicNamespace,
                          RawStreamerPrivateNamespace
                         )

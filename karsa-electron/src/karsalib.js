@@ -4,7 +4,7 @@ const envfile = require('envfile');
 const io = require("socket.io-client");
 
 const NO_LOGGING_DEFAULT = false;
-const NO_DATA_LOGGING_DEFAULT = false;
+const NO_DATA_LOGGING_DEFAULT = true;
 
 
 export class BECom {

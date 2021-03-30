@@ -5,7 +5,7 @@ TOF Service
 
 from karsalib import BaseClientNamespace, get_client_notification_args, \
                      BaseStreamerClient, run_streamer_service
-from karsatof.kgenerator import Acquisition
+from karsatof.kgenerator import TofDaqStreamer
 
 
 NO_DATA_LOGGING_DEFAULT = True
@@ -71,13 +71,21 @@ class TOFServicePrivateNamespace(BaseClientNamespace):
     
 class TOFServiceClient(BaseStreamerClient):
     # TofDaq Recorder must be running.
-    pass
+
+    def __init__(self, streamer_type, raw_pool,
+                 url, port, public_namespace_data, private_namespace_data):
+        # this allows BaseStreamerClient.__init__ to see caller's context,
+        # which is needed for dynamic instantiation of a streamer and a raw_pool
+        super().__init__(streamer_type or 'TofDaq', raw_pool,
+                         url, port, public_namespace_data, private_namespace_data)
+
+    async def init_service(self):
+        await super().init_service()
+        assert self.raw_pool == None, 'TofDaq service does not use raw_pool argument'
 
 
 def run():
-    run_streamer_service('Tofwerk_streamer',
-                         TOFServiceClient,
-                         Acquisition,
+    run_streamer_service(TOFServiceClient,
                          TOFServicePublicNamespace,
                          TOFServicePrivateNamespace
                         )

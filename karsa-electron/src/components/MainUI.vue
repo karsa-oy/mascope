@@ -41,14 +41,14 @@
                         </div>
                         <!-- End of namespace selector -->
 
-                        <H5import
-                            v-if="data_source_selected.type && data_source_selected.type.indexOf('h5_streamer') != -1">
-                        </H5import>
                         <RAWimport
-                            v-if="data_source_selected.type && data_source_selected.type.indexOf('raw_streamer') != -1">
+                            v-if="data_source_selected.type && data_source_selected.type.indexOf('H5') != -1">
+                        </RAWimport>
+                        <RAWimport
+                            v-if="data_source_selected.type && data_source_selected.type.indexOf('Raw') != -1">
                         </RAWimport>
                         <TOFControl
-                            v-if="data_source_selected.type && data_source_selected.type.indexOf('Tofwerk_streamer') != -1">
+                            v-if="data_source_selected.type && data_source_selected.type.indexOf('TofDaq') != -1">
                         </TOFControl>
                         <SampleBrowser></SampleBrowser>
                         <TargetBrowser></TargetBrowser>
@@ -69,7 +69,6 @@
 <script type="text/javascript">
 import { mapState } from 'vuex';
 import ConfigVue from './ConfigVue'; 
-import H5import from './H5import'
 import RAWimport from './RAWimport'
 import SampleView from "./SampleView.vue"
 import SampleBrowser from "./SampleBrowser.vue"
@@ -85,7 +84,6 @@ export default {
     store,
     components: {
         ConfigVue,
-        H5import,
         RAWimport,
         SampleBrowser,
         SampleView,

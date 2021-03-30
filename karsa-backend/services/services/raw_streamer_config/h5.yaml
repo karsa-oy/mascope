@@ -1,0 +1,6 @@
+# H5 streamer configuration; can be overridden from cmd line
+url: localhost
+port: 5010
+ns: H5Data
+streamer_type: H5
+raw_pool: Z:/Data/raw_KLTOF2

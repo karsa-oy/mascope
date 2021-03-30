@@ -220,13 +220,11 @@ class SampleManagerClient(BaseServiceClient):
 def run():
     global projects_path
 
-    url, port, namespace = parse_cmd_args()
-
-    client = SampleManagerClient(url,
-                                 port,
-                                 (namespace, MetadataServiceNamespace)
+    args = parse_cmd_args()
+    client = SampleManagerClient(args['url'],
+                                 args['port'],
+                                 (args['ns'], MetadataServiceNamespace)
                                  )
-
     loop = asyncio.get_event_loop()
     loop.run_until_complete(client.run())
 

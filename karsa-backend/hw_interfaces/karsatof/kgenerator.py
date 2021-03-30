@@ -78,7 +78,7 @@ def strip_filepath(filepath):
     return os.path.splitext(os.path.basename(filepath))[0]
 
 
-class Acquisition(Thread, KInstrument):
+class TofDaqStreamer(Thread, KInstrument):
     def __init__(self):
         """Initialize self
 
@@ -92,7 +92,7 @@ class Acquisition(Thread, KInstrument):
             Exception is raised if TofDaq Recorder is not running, or if
             fetching 'TwSharedMemoryDesc' fails for another reason.
         """
-        print("Acquisition initializing")
+        print("TofDaqStreamer initializing")
         Thread.__init__(self)
 
         # Initialize TW API related structures 'desc' and 'ptr'
@@ -113,14 +113,14 @@ class Acquisition(Thread, KInstrument):
         self.timeout = 500 # [ms], timeout for TwWaitForNewData
         # Synchronization primitives
         self.shutdown_event = Event()   # Set to break out from main loop
-        self.active = Event()           # Acquisition active event
+        self.active = Event()           # TofDaqStreamer active event
         self.spec_queue = Queue()       # Signal output queue
         self.tps_queue = Queue()        # TPS output queue
         # Per acquisition attributes
         self.filename = None            # Filename base from TW h5 file
-        self.interval = None            # Acquisition interval [s]
-        self.length = None              # Acquisition length [s]
-        self.progress = 0               # Acquisition progress [%]
+        self.interval = None            # TofDaqStreamer interval [s]
+        self.length = None              # TofDaqStreamer length [s]
+        self.progress = 0               # TofDaqStreamer progress [%]
         self.speci = -1                 # Index of last received spectrum,
                                         # -1 when there is no active acquisition
 
@@ -251,7 +251,7 @@ class Acquisition(Thread, KInstrument):
                 tof_period_s *= 1e-9 
             self.interval = tof_period_s * self.desc.nbrWaveforms # [s]
             self.length = (self.desc.nbrWrites * self.desc.nbrBufs) * self.interval # [s]
-            print("Acquisition started: %s" %self.filename)
+            print("TofDaqStreamer started: %s" %self.filename)
             # Check again for new data
             state = self._check()
         if state == 1:
@@ -259,7 +259,7 @@ class Acquisition(Thread, KInstrument):
             self.speci = (self.desc.iWrite * self.desc.nbrBufs) + self.desc.iBuf
             print(self.speci)
             self._get_and_feed_data()
-            # Acquisition progress
+            # TofDaqStreamer progress
             n = self.desc.nbrWrites * self.desc.nbrBufs # Total number of spectra
             self.progress = ((self.speci+1) / n) * 100. # [%]
          
@@ -270,7 +270,7 @@ class Acquisition(Thread, KInstrument):
         Loop until 'self.shutdown_event' is set.
         """
 
-        print("Acquisition running")
+        print("TofDaqStreamer running")
         timeout_counter = 0
         # Main loop
         while not self.shutdown_event.is_set():
@@ -285,13 +285,13 @@ class Acquisition(Thread, KInstrument):
                 if self.active.is_set():
                     if not TwDaqActive():
                         # No active acquisition
-                        # Acquisition has ended
+                        # TofDaqStreamer has ended
                         pass
                     else:
                         # Acquition active, but 'TwWaitForNewData' timed out
 
                         # Here we may end up from three scenarios:
-                        # 1) Acquisition active, but interval is longer than 'self.timeout'
+                        # 1) TofDaqStreamer active, but interval is longer than 'self.timeout'
                         # 2) TwDaqActive not yet cleared after recently finished acquisition
                         # 3) DAQ configured to HW trigger mode, no actual acquisition (legacy feature)
                         
@@ -311,7 +311,7 @@ class Acquisition(Thread, KInstrument):
                     self.active.clear()
                     # Reset self
                     self._finalize()
-                    print("Acquisition finished")
+                    print("TofDaqStreamer finished")
             # New data
             elif ret == 4:
                 # Reset timeout counter
@@ -325,7 +325,7 @@ class Acquisition(Thread, KInstrument):
             else:
                 print("Unexpected return value: %s" %TwRetVal(ret).name)
         # Out of main loop
-        print('Acquisition exiting')
+        print('TofDaqStreamer exiting')
         self.shutdown()
         
     def shutdown(self):
@@ -349,7 +349,7 @@ class Acquisition(Thread, KInstrument):
         TwStopAcquisition()
 
 
-class h5Streamer(Acquisition):
+class H5Streamer(TofDaqStreamer):
     def __init__(self):
         """Initialize self
 
@@ -361,7 +361,7 @@ class h5Streamer(Acquisition):
         Exception
             Exception is raised if fetching 'TwH5Desc' fails for some reason.
         """
-        print("h5Streamer initializing")
+        print("H5Streamer initializing")
         Thread.__init__(self)
 
         # Initialize with empty TW h5 descriptor
@@ -371,16 +371,16 @@ class h5Streamer(Acquisition):
         # Synchronization primitives
         # Streamer specific
         self.file_queue = Queue()       # Queue for files to stream
-        # Common with Acquisition
+        # Common with TofDaqStreamer
         self.shutdown_event = Event()   # Set to break out from main loop
-        self.active = Event()           # Acquisition active event
+        self.active = Event()           # TofDaqStreamer active event
         self.spec_queue = Queue()       # Signal output queue
         self.tps_queue = Queue()        # TPS output queue
         # Per acquisition attributes
         self.filename = None            # Filename base from TW h5 file
-        self.interval = None            # Acquisition interval [s]
-        self.length = None              # Acquisition length [s]
-        self.progress = 0               # Acquisition progress [%]
+        self.interval = None            # TofDaqStreamer interval [s]
+        self.length = None              # TofDaqStreamer length [s]
+        self.progress = 0               # TofDaqStreamer progress [%]
         self.speci = -1                 # Index of last received spectrum,
                                         # -1 when there is no active acquisition
 
@@ -538,7 +538,7 @@ class h5Streamer(Acquisition):
         Loop until 'self.shutdown_event' is set.
         """
 
-        print("h5Streamer running")
+        print("H5Streamer running")
         # Main loop
         while not self.shutdown_event.is_set():
             try:
@@ -586,7 +586,7 @@ class h5Streamer(Acquisition):
             self._finalize()
             print("h5Stream finished")
         # Out of main loop
-        print('h5Streamer exiting')
+        print('H5Streamer exiting')
         self.shutdown()
 
     def start_stream(self, filename):
@@ -614,15 +614,15 @@ class RawStreamer(Thread):
         # Synchronization primitives
         # Streamer specific
         self.file_queue = Queue()       # Queue for files to stream
-        # Common with Acquisition
+        # Common with TofDaqStreamer
         self.shutdown_event = Event()   # Set to break out from main loop
-        self.active = Event()           # Acquisition active event
+        self.active = Event()           # RawStreamer active event
         self.spec_queue = Queue()       # Signal output queue
         # Per acquisition attributes
         self.filename = None            # Filename base from TW h5 file
-        self.interval = None            # Acquisition interval [s]
-        self.length = None              # Acquisition length [s]
-        self.progress = 0               # Acquisition progress [%]
+        self.interval = None            # RawStreamer interval [s]
+        self.length = None              # RawStreamer length [s]
+        self.progress = 0               # RawStreamer progress [%]
         self.speci = -1                 # Index of last received spectrum,
                                         # -1 when there is no active acquisition
 
@@ -712,13 +712,13 @@ class RawStreamer(Thread):
             self.filename = strip_filepath(raw_filepath)            
             self.length = self.raw.RunHeaderEx.EndTime * 60. # [s]
             self.interval = self.length / self.raw.RunHeaderEx.LastSpectrum # [s]
-            print("Acquisition started: %s" %self.filename)
+            print("RawStreamer started: %s" %self.filename)
         else:
             # New data
             self.speci = scan - 1
             print(self.speci)
             self._get_and_feed_data()
-            # Acquisition progress
+            # RawStreamer progress
             self.progress = (scan / self.raw.RunHeaderEx.LastSpectrum) * 100. # [%]
 
     def _wait_for_queues(self):
