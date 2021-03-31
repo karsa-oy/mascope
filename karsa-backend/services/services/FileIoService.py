@@ -24,8 +24,12 @@ from collections import namedtuple
 from PIL import Image
 from copy import deepcopy
 
-from karsalib import BaseClientNamespace, BaseServiceClient, Logger, \
-                     parse_cmd_args, get_client_notification_args
+from karsalib import (BaseClientNamespace,
+                      BridgeServiceClient,
+                      Logger,
+                      parse_cmd_args, 
+                      get_client_notification_args
+                      )
 from karsatof.kcollector import ExtendableDataArray
 from karsatof.kdatapool import DataPool, parse_path_from_sample_name
 from karsatof.kimage import (convert_base64_to_img, convert_to_base64)
@@ -211,13 +215,50 @@ async def kill_cache(data):
     tps_array, _ = cache_get(data, 'tps')
     cache_release(data)
     if isinstance(signal_array, ExtendableDataArray):
-        await signal_array.flush()
+        signal_array.flush()
     if isinstance(tps_array, ExtendableDataArray):
-        await tps_array.flush()
+        tps_array.flush()
 
 # -------------------------------------
 
-class FileIoNamespace(BaseClientNamespace):
+class FileIoPublicNamespace(BaseClientNamespace):
+    endpoints = [
+        # DataViz
+        'heatmap_figure_data',
+        'spec_stack_figure_data',
+        # //
+        ]
+
+    async def on_heatmap_figure_data(self, data):
+        self.log(data)
+        value = data['value']
+        filename_base = value['filename']
+        filename = base_to_zarr_filename(filename_base, 'spectrogram')
+        image_array, _ = cache_get(data, 'spectrogram')
+        
+        ti = np.array([ value['t_range'][0] ], dtype=np.float32)
+        img_str = value['img']
+        image_array.extend_array(np.array([img_str]),
+                                 [ti],
+                                 'time'
+                                 )
+
+    async def on_spec_stack_figure_data(self, data):
+        self.log(data)
+        return
+
+    # async def on_image_to_save(self, data):
+    #     value = data['value']
+    #     filename = value['filename']
+    #     img_filename = value['img_filename']
+    #     img_str = value['img']
+    #     sample_data_path = parse_path_from_sample_name(filename)
+    #     img_path = os.path.join(sample_data_path, img_filename)
+    #     img = convert_base64_to_img(img_str)
+    #     img.save(img_path)
+
+
+class FileIoPrivateNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to MainService """
 
     endpoints = [
@@ -227,16 +268,15 @@ class FileIoNamespace(BaseClientNamespace):
         'acquired_tps_data',
         'acquisition_finished',
         'tps_parameter_info',
-        #
-        # DataViz
+        # //
+        # SampleManager
         'data_request',
-        'image_to_save',
         'stop_data_request',
         'tps_data_request',
-        #
+        # //
         # Router
         'service_state',
-        #
+        # //
         ]
 
     service_state = dict()
@@ -259,6 +299,8 @@ class FileIoNamespace(BaseClientNamespace):
         print("Writing signal into: %s" %filename)
 
         mz = np.frombuffer( value.get('mz'), dtype=np.float32 )
+        t_range = value.get('t_range')
+
         signal_array = ExtendableDataArray(path=filename,
                                            array_module=da
                                            )
@@ -272,7 +314,7 @@ class FileIoNamespace(BaseClientNamespace):
                   )
         cache_put(data,
                   'full_t_range',
-                  value.get('t_range')
+                  t_range
                   )
 
         # Repeat the notification into root ns for DataViz
@@ -280,6 +322,21 @@ class FileIoNamespace(BaseClientNamespace):
                                              value,
                                              namespace='/'
                                              )
+        # Initialize visualization arrays
+        filename = base_to_zarr_filename(filename_base, 'spectrogram')
+        spectrogram_array = ExtendableDataArray(path=filename,
+                                                array_module=np,
+                                                dtype=object,
+                                                chunk_size=10,
+                                                )
+        spectrogram_array.init_array(dims=('time',),
+                                     coords=[[]],
+                                     name='spectrogram'
+                                     )
+        cache_put(data,
+                  'spectrogram',
+                  spectrogram_array,
+                  )
 
     async def on_acquired_spectrum(self, data):
         """Receive new spectrum, add to cache
@@ -308,16 +365,39 @@ class FileIoNamespace(BaseClientNamespace):
             # Use mz coordinates from signal_array
             mz = signal_array.data_array.mz
 
-        await signal_array.extend_array(spec,
-                                        [mz, ti],
-                                        'time'
-                                        )
+        signal_array.extend_array(spec,
+                                  [mz, ti],
+                                  'time'
+                                  )
         
         # Repeat the notification into root ns for DataViz
         await self.emit_client_notification('acquired_spectrum',
-                                             value,
-                                             namespace='/'
-                                             )
+                                            value,
+                                            namespace='/'
+                                            )
+
+        # Request visualizations from DataViz
+        t_period = value['period']
+        await self.emit_client_notification('visualize_range',
+                                            {'filename': filename_base,
+                                             'client_room': 'heatmap_figure_data',
+                                             'viz_type': 'spectrogram',
+                                             't_range': [ti.item(), ti.item()+t_period],
+                                             'mz_range': [ float(mz[0]), float(mz[-1]) ],
+                                             't_resolution': t_period,
+                                             },
+                                            namespace='/'
+                                            )
+        # await self.emit_client_notification('visualize_range',
+        #                                     {'filename': filename_base,
+        #                                      'client_room': 'spec_stack_figure_data', # TODO:
+        #                                      'viz_type': 'waterfall',
+        #                                      't_range': t_range,
+        #                                      'mz_range': [ float(mz[0]), float(mz[-1]) ],
+        #                                      't_resolution': 5, # TODO:
+        #                                      },
+        #                                     namespace='/'
+        #                                     )
 
     async def on_acquired_tps_data(self, data):
         value = data['value']
@@ -328,10 +408,10 @@ class FileIoNamespace(BaseClientNamespace):
         tps_array, _ = cache_get(data, 'tps')
         if tps_array:   # TODO: tps_array is None on killing acquisition from MainUI
             tps_info = tps_array.data_array.parameter
-            await tps_array.extend_array(tps_data,
-                                        [tps_info, ti],
-                                        'time'
-                                        )
+            tps_array.extend_array(tps_data,
+                                   [tps_info, ti],
+                                   'time'
+                                   )
 
     async def on_acquisition_finished(self, data):
         global cache
@@ -343,11 +423,11 @@ class FileIoNamespace(BaseClientNamespace):
         tps_array, _ = cache_get(data, 'tps')
         cache_release(data)
         if signal_array:
-            await signal_array.flush()  # TODO: signal_array is None on killing acquisition from MainUI
+            signal_array.flush()  # TODO: signal_array is None on killing acquisition from MainUI
         else:
             Warning("[on_acquistion_finished]: signal_array is None")
         if tps_array:
-            await tps_array.flush()      # TODO: tps_array is None on killing acquisition from MainUI
+            tps_array.flush()      # TODO: tps_array is None on killing acquisition from MainUI
         else:
             Warning("[on_acquistion_finished]: tps_array is None")
         
@@ -527,16 +607,6 @@ class FileIoNamespace(BaseClientNamespace):
         if not signal_env is None:
             signal_env['speci'] = n
 
-    async def on_image_to_save(self, data):
-        value = data['value']
-        filename = value['filename']
-        img_filename = value['img_filename']
-        img_str = value['img']
-        sample_data_path = parse_path_from_sample_name(filename)
-        img_path = os.path.join(sample_data_path, img_filename)
-        img = convert_base64_to_img(img_str)
-        img.save(img_path)
-
     async def on_stop_data_request(self, data):
         ranges = data['value'].pop('ranges', [])
         for r in ranges:
@@ -685,7 +755,7 @@ def write_zarr_attributes(filepath, attributes):
 # ---------------------------------------
 
 
-class FileIoClient(BaseServiceClient):
+class FileIoClient(BridgeServiceClient):
     pass
 
 def run():
@@ -699,7 +769,10 @@ def run():
 
     client = FileIoClient(args['url'],
                           args['port'],
-                          (args['ns'], FileIoNamespace))
+                          ('/', FileIoPublicNamespace),
+                          (args['ns'], FileIoPrivateNamespace)
+                          )
+
     loop = asyncio.get_event_loop()
     loop.run_until_complete(client.run())
 
