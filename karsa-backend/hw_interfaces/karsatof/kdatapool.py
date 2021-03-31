@@ -477,15 +477,15 @@ class SamplePool():
             sample_titles = self.pool.get(project).get(experiment)
         samples = []
         for sample in sample_titles:
-            # Read global sample attributes
-            sample_path = os.path.join(experiment_path, sample)
-            sample_attrs = self._read_attributes(sample_path)
             # Read experiment-specific sample attributes
             experiment_path = os.path.join(self.projects_root,
                                            project,
                                            experiment
                                            )
             sample_exp_attrs = self._read_attributes(experiment_path, prefix=sample)
+            # Read global sample attributes
+            sample_path = os.path.join(experiment_path, sample)
+            sample_attrs = self._read_attributes(sample_path)
             # Concatenate
             sample_attrs.update(sample_exp_attrs)
             
