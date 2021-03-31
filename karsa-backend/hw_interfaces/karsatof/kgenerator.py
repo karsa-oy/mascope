@@ -175,6 +175,7 @@ class TofDaqStreamer(Thread, KInstrument):
                     'filename': self.filename,  # Current file basename
                     'i': self.speci,            # Current spectrum integer index
                     't': float(ti),             # Timestamp [s]
+                    'period': self.interval,    # Collection period [s]
                     'spec': spec.tobytes()      # Serialized spectrum [float32]
                     }
             # Feed
@@ -195,9 +196,10 @@ class TofDaqStreamer(Thread, KInstrument):
                 'filename': self.filename,          # Current file basename
                 'i': self.speci,                    # Current spectrum integer index
                 't': float(ti),                     # Timestamp [s]
-                'data': data.astype(np.float32  # convert to float32
-                                ).reshape(-1    # reshape to (-1,)
-                                ).tobytes(      # serialize
+                'period': self.interval,            # Collection period [s]
+                'data': data.astype(np.float32 # convert to float32
+                                ).reshape(-1   # reshape to (-1,)
+                                ).tobytes(     # serialize
                                 )                   # Serialized TPS data [float32]
                 }
             # Feed
@@ -412,10 +414,11 @@ class H5Streamer(TofDaqStreamer):
         if ret == 4: # Success
             # Combine data for output
             spec_data = {
-                    'filename': self.filename, # Current file basename
-                    'i': self.speci, # Current spectrum integer index
-                    't': float(ti), # Timestamp [s]
-                    'spec': spec.tobytes() # Serialized spectrum [float32]
+                    'filename': self.filename,  # Current file basename
+                    'i': self.speci,            # Current spectrum integer index
+                    't': float(ti),             # Timestamp [s]
+                    'period': self.interval,    # Collection period [s]
+                    'spec': spec.tobytes()      # Serialized spectrum [float32]
                     }
             # Feed
             self.spec_queue.put(spec_data)
@@ -451,6 +454,7 @@ class H5Streamer(TofDaqStreamer):
                 'filename': self.filename,          # Current file basename
                 'i': self.speci,                    # Current spectrum integer index
                 't': float(ti),                     # Timestamp [s]
+                'period': self.interval,            # Collection period [s]
                 'data': data.astype(np.float32  # convert to float32
                                 ).tobytes(      # serialize
                                 )                   # Serialized TPS data [float32]
@@ -654,6 +658,7 @@ class RawStreamer(Thread):
                 'filename': self.filename,  # Current file basename
                 'i': self.speci,            # Current spectrum integer index
                 't': float(ti),             # Timestamp [s]
+                'period': self.interval,    # Collection period [s]
                 'mz': mz.tobytes(),         # Serialized mass axis [float32]
                 'spec': spec.tobytes()      # Serialized spectrum [float32]
                 }
