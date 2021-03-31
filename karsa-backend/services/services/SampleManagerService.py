@@ -27,14 +27,14 @@ from copy import deepcopy
 from karsalib import BaseClientNamespace, BaseServiceClient, \
                      parse_cmd_args, get_client_notification_args
 from karsatof.kcollector import ExtendableDataArray
-from karsatof.kdatapool import DataPool
+from karsatof.kdatapool import SamplePool
 from karsatof.kimage import (convert_base64_to_img, convert_to_base64)
 
 
 NO_DATA_LOGGING_DEFAULT = True
 
 projects_path = 'Projects' # TODO: make configurable
-datapool = DataPool(projects_path)
+datapool = SamplePool(projects_path)
 
 class MetadataServiceNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to MainService """

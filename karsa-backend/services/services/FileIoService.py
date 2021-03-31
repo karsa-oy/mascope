@@ -15,6 +15,7 @@ import os
 import subprocess
 import asyncio
 import fnmatch
+import json
 import xarray
 import zarr
 import numpy as np
@@ -31,7 +32,7 @@ from karsalib import (BaseClientNamespace,
                       get_client_notification_args
                       )
 from karsatof.kcollector import ExtendableDataArray
-from karsatof.kdatapool import DataPool, parse_path_from_sample_name
+from karsatof.kdatapool import parse_path_from_sample_name
 from karsatof.kimage import (convert_base64_to_img, convert_to_base64)
 
 
@@ -308,6 +309,19 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                                 coords=[mz, []],
                                 name='signal'
                                 )
+        # Write attributes
+        attributes = {'id': filename_base,
+                      'length': float(t_range[1]),
+                      'range': [ float(mz[0]), float(mz[-1]) ],
+                      }
+        attr_path = os.path.join(
+                        parse_path_from_sample_name(filename_base),
+                        '.attrs'
+                        )
+        with open(attr_path, 'w') as f:
+            json.dump(attributes, f, indent=4)
+        
+        # Put to cache
         cache_put(data,
                   'signal',
                   signal_array,
@@ -380,12 +394,12 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         t_period = value['period']
         await self.emit_client_notification('visualize_range',
                                             {'filename': filename_base,
-                                             'client_room': 'heatmap_figure_data',
                                              'viz_type': 'spectrogram',
                                              't_range': [ti.item(), ti.item()+t_period],
                                              'mz_range': [ float(mz[0]), float(mz[-1]) ],
                                              't_resolution': t_period,
                                              },
+                                            client_room='heatmap_figure_data',
                                             namespace='/'
                                             )
         # await self.emit_client_notification('visualize_range',
