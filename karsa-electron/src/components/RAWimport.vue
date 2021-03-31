@@ -259,10 +259,10 @@ export default {
         //         this.h5_table_checked_rows = [last_selection,];
         //     }
         // },
-        raw_samples: function(new_data){
-            // if ( _.isEqual(new_data, old_data) ) {
-            //     return false;
-            // }
+        raw_samples: function(new_data, old_data){
+            if ( _.isEqual(new_data, old_data) ) {
+                return false;
+            }
             this.import_raw_table_cols = new_data.cols;
             this.import_raw_table_rows = new_data.rows;
         },
