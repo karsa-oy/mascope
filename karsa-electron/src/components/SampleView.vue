@@ -17,7 +17,7 @@
                     <!-- Heatmap section -->
                     <section class="heatmap-section">
                         <div class="column datashader-heatmap">
-                            <div id="heatmap-figure"></div>
+                            <ViewPort id="spectrogram"></ViewPort>
                         </div>                                    
                     </section>
                     <!-- End of heatmap section-->
@@ -46,7 +46,7 @@
                     <!-- Timeseries section -->
                     <section class="timeseries-section">
                         <div class="column tps-chart"> 
-                            <div id="timeseries-figure"></div>
+                            <ViewPort id="timeseries"></ViewPort>
                         </div>                                    
                     </section>
                     <!-- End of timeseries -->
@@ -57,7 +57,7 @@
                     <!-- Spec stack section -->
                     <section class="spect-stack-section">
                         <div class="column spec-stack-holder">
-                            <div id="spec-stack-figure"></div>
+                            <ViewPort id="waterfall"></ViewPort>
                         </div>                            
                     </section>
                     <!-- End of spec stack -->
@@ -76,20 +76,20 @@ import Vue from "vue";
 import { mapState } from 'vuex'
 import Buefy from "buefy";
 import Multiselect from "vue-multiselect";
+import ViewPort from "./ViewPort.vue"
 import "buefy/dist/buefy.css";
 import '@mdi/font/css/materialdesignicons.min.css';
 import { BECom } from "../karsalib.js"
 
 Vue.use([Buefy]);
 
-var fs = require('fs');
-var Plotly = require('plotly.js-dist');
 var _ = require('underscore');
 
 
 export default {
     name: "SampleView",
     components: {
+        ViewPort,
         // using third party multiselect component
         Multiselect
     },
@@ -98,52 +98,35 @@ export default {
     },
     computed: {
         ...mapState([
-                     'acquisition_control_active',
-                     'acquisition_status',  //no subscription here - use TOFControl sync
-                     'experiment_selected',
-                    //  'figure_ranges',
-                      'root_namespace',
-                    //  'heatmap_figure_data',
-                     'sample_to_load',
-                    //  'spec_stack_figure_data',
-                     'target_to_display',
-                    //  'timeseries_figure_data',
+                    'experiment_selected',
+                    'root_namespace',
+                    'sample_to_load',
+                    'target_to_display',
                     //  'tps_parameters',
-                     ]),
+                    ]),
+        figure_ranges: {
+            get() {
+                return this.$store.state.figure_ranges;
+            },
+            set(value) {
+                this.$store.commit('figure_ranges', value);
+            }
+        },
     },
     data: function() {
         return {
             be: null,   //backend communicator
             namespace: null,
 
-            cache_index_rank: 0, // actual value calculated in "mounted"
-            figure_cache: {'t_maxrange': [0, 0], 'mz_maxrange': [0, 0]},
-            figure_layouts: {},
-            figure_ranges: {},
             filename: '',
-            grid_spacing: 0.0049,
-            heatmap_data: [],
-            heatmap_figure_data: {},
-            heatmap_layout: {},
-            heatmap_queue: Promise.resolve(),
-            spec_stack_data: [],
-            spec_stack_layout: {},
-            spec_stack_figure_data: {},
-            timeseries_data: [],
-            timeseries_layout: {},
-            timeseries_figure_data: {},
+
             tps_parameters: [],
             tps_parameters_selected_ui: [],
             tps_parameters_selected: {},
-            zoom_stack: [],
-            visualize_range: {},
-            stop_visualize_range: {},
+
             room_sid: null,
             endpoints: [
                 'figure_ranges',
-                'heatmap_figure_data',
-                'spec_stack_figure_data',
-                'timeseries_figure_data',
                 // 'tps_parameters',
             ],
         }
@@ -154,8 +137,6 @@ export default {
 },
 
     mounted: function() {
-        this.init_figures();
-        this.cache_index_rank = Math.floor(-Math.log10(this.grid_spacing));
     },
 
     methods: {
@@ -215,499 +196,8 @@ export default {
             snd.play();
         },
 
-        figure_cache_add_ref(zoom_stack_item_room) {
-            if ( Object.keys(this.figure_cache).includes(zoom_stack_item_room) ) {
-                ++this.figure_cache[zoom_stack_item_room].ref_count;
-                return this.figure_cache[zoom_stack_item_room];
-            }
-            this.figure_cache[zoom_stack_item_room] = {
-                    'ref_count': 1,
-                    // 'mz_range': _mz_range,
-                    't_filled_range': [Number.MAX_SAFE_INTEGER, 0],
-                    //    't_filled_range': [0, 0],
-                    'heatmap_layout': this.shallow_copy(this.figure_layouts.heatmap_layout),
-                    'spec_stack_layout': this.shallow_copy(this.figure_layouts.spec_stack_layout),
-                    'timeseries_layout': this.shallow_copy(this.figure_layouts.timeseries_layout),
-                    'timeseries_data': [],
-                    };
-            this.be.subscribe(this.endpoints, zoom_stack_item_room);
-            return this.figure_cache[zoom_stack_item_room];
-        },
-
-        figure_cache_release_ref(zoom_stack_item_room) {
-            let cache_item = this.figure_cache[zoom_stack_item_room];
-            cache_item.ref_count--;
-            if ( cache_item.ref_count <= 0 ) {
-                delete this.figure_cache[zoom_stack_item_room];
-                this.be.unsubscribe(this.endpoints, zoom_stack_item_room);
-            }
-        },
-
-        figure_cache_get(zoom_stack_item_room) {
-            if ( _.isUndefined(zoom_stack_item_room) )
-                return false;
-            return this.figure_cache[zoom_stack_item_room];
-        },
-
-        zoom_stack_search(mz_range) {
-            let min_dmz = 10**(-this.cache_index_rank);
-
-            for (let i=0; i < this.zoom_stack.length; ++i) {
-                let mz_range_item = this.zoom_stack[i].mz_range;
-                if (Math.abs(mz_range_item[0] - mz_range[0]) < min_dmz &&
-                    Math.abs(mz_range_item[1] - mz_range[1]) < min_dmz) {
-                    // Item found from stack
-                    return this.zoom_stack[i];
-                    }
-            }
-            return false;
-        },
-
-        init_figures() {
-            // This function reads figure layouts from config file, creates
-            // the Plotly figures and configures event handlers
-
-            var self = this;
-            // Read layouts from config file
-            if (fs.existsSync('configs/figure_layouts.json')) {
-                self.figure_layouts = JSON.parse(fs.readFileSync('configs/figure_layouts.json', 'utf8'));
-                self.figure_config = self.shallow_copy(self.figure_layouts.figure_config);
-                self.heatmap_layout = self.shallow_copy(self.figure_layouts.heatmap_layout);
-                self.timeseries_layout = self.shallow_copy(self.figure_layouts.timeseries_layout);
-                self.spec_stack_layout = self.shallow_copy(self.figure_layouts.spec_stack_layout);
-            }
-
-            // Common config for all figures
-            var init_data = [{x: [0, 1],
-                              y: [0, 1],
-                              type: "scattergl",
-                              mode: 'markers',
-                              marker: {opacity: 0.0},
-                              hoverinfo: 'skip',
-                              }];
-
-            // ===== Initialize Plotly figures =====
-            // ---- Heatmap -----
-            var heatmap_figure = document.getElementById("heatmap-figure");
-            Plotly.newPlot(heatmap_figure,
-                           init_data,
-                           self.heatmap_layout,
-                           {...self.figure_config, "doubleClick": false}
-                           );
-            // Relayout event
-            heatmap_figure.on("plotly_relayout", function(eventData) {
-                if ( _.isEmpty(eventData) ) {
-                    // Likely a double-click event
-                    return;
-                }
-                if ( _.isEqual(eventData, {'autosize': true}) ) {
-                    // Figure resize event
-                    return;
-                }
-
-                if ( Object.keys(eventData).length ) {
-                    // zoom_in
-
-                    let prev_ranges = self.shallow_copy(self.zoom_stack.slice(-1)[0]);
-                    let x0 = eventData["xaxis.range[0]"];
-                    let x1 = eventData["xaxis.range[1]"];
-                    let y0 = eventData["yaxis.range[0]"];
-                    let y1 = eventData["yaxis.range[1]"];
-                    if( _.isUndefined(prev_ranges) &&
-                        _.isUndefined(x0) && _.isUndefined(x1) &&
-                        _.isUndefined(y0) && _.isUndefined(y1) )
-                        return;
-
-                    x0 = (x0 === undefined) ? prev_ranges.t_range[0] : x0;
-                    x1 = (x1 === undefined) ? prev_ranges.t_range[1] : x1;
-                    y0 = (y0 === undefined) ? prev_ranges.mz_range[0] : y0;
-                    y1 = (y1 === undefined) ? prev_ranges.mz_range[1] : y1;
-                    let ranges = {};
-                    ranges.t_range = [x0, x1];
-                    ranges.mz_range = [y0, y1];
-
-                    self.visualize_range_on_zoom_in(prev_ranges, ranges);
-                }
-            });
-
-            // Double click event
-            heatmap_figure.on('plotly_doubleclick', function(){
-                // Zoom one step out
-                self.visualize_range_on_zoom_out();
-            });
-
-            // Right click event
-            heatmap_figure.addEventListener('contextmenu', function(ev) {
-                ev.preventDefault();
-                this.log("Right click event....");
-                return false;
-            }, false);
-            // ----- End of heatmap -----
-
-
-            // ----- Spec stack -----
-            var spec_stack_figure = document.getElementById("spec-stack-figure");
-            Plotly.newPlot(spec_stack_figure,
-                           init_data,
-                           self.spec_stack_layout,
-                           {...self.figure_config, "doubleClick": false}
-                           );
-            // Relayout event
-            spec_stack_figure.on("plotly_relayout", function(eventData) {
-                if ( _.isEmpty(eventData) ) {
-                    // Likely a double-click event
-                    return;
-                }
-                if ( _.isEqual(eventData, {'autosize': true}) ) {
-                    // Figure resize event
-                    return;
-                }
-                if ( Object.keys(eventData).length ) {
-                    // zoom_in
-                    let prev_ranges = self.shallow_copy(self.zoom_stack.slice(-1)[0]);
-                    let x0 = eventData["xaxis.range[0]"];
-                    let x1 = eventData["xaxis.range[1]"];
-                    let y0 = eventData["yaxis.range[0]"];
-                    let y1 = eventData["yaxis.range[1]"];
-                    if( _.isUndefined(prev_ranges) &&
-                        _.isUndefined(x0) && _.isUndefined(x1) &&
-                        _.isUndefined(y0) && _.isUndefined(y1) )
-                        return;
-
-                    x0 = (x0 === undefined) ? prev_ranges.mz_range[0] : x0;
-                    x1 = (x1 === undefined) ? prev_ranges.mz_range[1] : x1;
-                    y0 = (y0 === undefined) ? prev_ranges.t_range[0] : y0;
-                    y1 = (y1 === undefined) ? prev_ranges.t_range[1] : y1;
-                    let ranges = {};
-                    ranges.mz_range = [x0, x1];
-                    ranges.t_range = [y0, y1];
-
-                    self.visualize_range_on_zoom_in(prev_ranges, ranges);
-                }
-            });
-            // Double click event
-            spec_stack_figure.on('plotly_doubleclick', function(){
-                // On double-click, zoom one step out
-                self.visualize_range_on_zoom_out();
-            });
-            // Right click event
-            spec_stack_figure.addEventListener('contextmenu', function(ev) {
-                ev.preventDefault();
-                this.log("Right click event....");
-                return false;
-            }, false);
-            // ----- End of spec stack -----
-
-            // ----- Timeseries figure -----
-            Plotly.newPlot("timeseries-figure",
-                        self.timeseries_data,
-                        self.timeseries_layout,
-                        self.figure_config
-                        );
-            // ----- End of timeseries figure -----
-        },
-
-        async _on_figure_ranges(new_value, old_value) {
-            if ( _.isEqual(new_value, old_value) ) {
-                self.beep();
-                self.log("skip duplicate figure_ranges");
-                return false;
-            }
-
-            let t0 = new_value.t_range[0];
-            // t0 = (!_.isNull(t0)) ? t0 : old_value.t_range[0];
-            let t1 = new_value.t_range[1];
-            // t1 = (!_.isNull(t1)) ? t1 : old_value.t_range[1];
-            let mz0 = new_value.mz_range[0];
-            // mz0 = (!_.isNull(mz0)) ? mz0 : old_value.mz_range[0];
-            let mz1 = new_value.mz_range[1];
-            // mz1 = (!_.isNull(mz1)) ? mz1 : old_value.mz_range[1];
-
-            this.figure_cache.t_maxrange[0] = Math.min(t0, this.figure_cache.t_maxrange[0]);
-            this.figure_cache.t_maxrange[1] = Math.max(t1, this.figure_cache.t_maxrange[1]);
-            this.figure_cache.mz_maxrange[0] = Math.min(mz0, this.figure_cache.mz_maxrange[0]);
-            this.figure_cache.mz_maxrange[1] = Math.max(mz1, this.figure_cache.mz_maxrange[1]);
-
-            let zoom_stack_item = new this.ZoomStackItem([t0, t1],
-                                                         [mz0, mz1],
-                                                         false,
-                                                         this.room_sid
-                                                         );
-            this.figure_cache_add_ref(zoom_stack_item.room);
-            this.zoom_stack.push(zoom_stack_item);
-            let cur_zoom = this.shallow_copy(zoom_stack_item);
-            this.update_figures(cur_zoom);
-        },
-
-        on_figure_ranges(new_value, old_value) {
-            var self = this;
-            self.heatmap_queue = self.heatmap_queue.then(function() {
-                return self._on_figure_ranges(new_value, old_value); }
-            );
-        },
-
-        async _on_heatmap_figure_data(json_data) {
-            var self = this;
-            if ( _.isEmpty(json_data) ) {
-                // reset the figure
-                self.heatmap_layout = self.shallow_copy(self.figure_layouts.heatmap_layout);
-                self.heatmap_data = [];
-                await Plotly.react("heatmap-figure", self.heatmap_data, self.heatmap_layout);
-                return;
-            }
-            let data = json_data.value;
-            let zoom_stack_item_room = json_data.room;
-
-            if ( !Object.keys(this.figure_cache).includes(zoom_stack_item_room) ) {
-                // Key not in cache => figure data pushed by back-end into room filename
-                if (this.filename !== zoom_stack_item_room) {
-                    // Received something wrong
-                    self.beep();
-                    self.log('on_heatmap_figure_data: Something went wrong 1: ',
-                             this.filename,
-                             zoom_stack_item_room
-                             );
-                    return;
-                }
-                // Override cache key (filename) with 'room_sid' (set on 'sample_to_load')
-                zoom_stack_item_room = this.room_sid;
-            }
-
-            var x0 = data.t_range[0]; // float
-            var x1 = data.t_range[1]; // float
-            var y0 = data.mz_range[0]; // float
-            var y1 = data.mz_range[1]; // float
-            var img = data.img; // base64 png
-            var traces = data.traces; // array
-
-            let chunk = {
-                "source": img,
-                "xref": "x",
-                "yref": "y",
-                "x": x0,
-                "y": y0,
-                "sizex": x1 - x0,
-                "sizey": y1 - y0,
-                "xanchor": "left",
-                "yanchor": "bottom",
-                "sizing": "stretch",
-                "layer": "below"
-            };
-
-            let cache_item = self.figure_cache_get(zoom_stack_item_room);
-            if (!cache_item) {
-                self.beep();
-                self.log('on_heatmap_figure_data: Something went wrong 2')
-                return;
-            }
-
-            cache_item.heatmap_layout.images.push(chunk);
-            cache_item.t_filled_range[0] = Math.min(x0, cache_item.t_filled_range[0]);
-            cache_item.t_filled_range[1] = Math.max(x1, cache_item.t_filled_range[1]);
-
-            // if latest zoom stack item updated, then draw the figure
-            if ( _.isEqual(zoom_stack_item_room,
-                           self.zoom_stack.slice(-1)[0].room) ) {
-                if (traces) {
-                    for (let i=0; i<traces.length; i++) {
-                        self.heatmap_data.push(traces[i]);
-                    }
-                }
-                self.heatmap_layout = cache_item.heatmap_layout;
-                await Plotly.react("heatmap-figure",
-                                    self.heatmap_data,
-                                    self.heatmap_layout
-                                    );
-            } else if ( _.isEqual(zoom_stack_item_room,
-                                  self.zoom_stack[0].room) ) {
-                // on newly acquired spectrum (full mz range, acquisition running),
-                // forward request to latest zoom
-                self.visualize_range = {'mz_range': self.zoom_stack.slice(-1)[0].mz_range,
-                                        't_range': [x0, x1],
-                                        'filename': this.filename,
-                                        'room': self.zoom_stack.slice(-1)[0].room,
-                                        };
-            }
-        },
-
-        on_heatmap_figure_data(json_data) {
-            var self = this;
-            self.heatmap_queue = self.heatmap_queue.then(function() {
-                return self._on_heatmap_figure_data(json_data); }
-            );
-        },
-
-        async _on_spec_stack_figure_data(json_data) {
-            var self = this;
-            if ( _.isEmpty(json_data) ) {
-                // reset the figure
-                self.spec_stack_layout = self.shallow_copy(self.figure_layouts.spec_stack_layout);
-                self.spec_stack_data = [];
-                await Plotly.react("spec-stack-figure", self.spec_stack_data, self.spec_stack_layout);
-                return;
-            }
-            let data = json_data.value;
-            let zoom_stack_item_room = json_data.room;
-
-            if ( !Object.keys(this.figure_cache).includes(zoom_stack_item_room) ) {
-                // Key not in cache => figure data pushed by back-end into room filename
-                if (this.filename !== zoom_stack_item_room) {
-                    // Received something wrong
-                    self.beep();
-                    self.log('on_spec_stack_figure_data: Something went wrong 1');
-                    return;
-                }
-                // Override cache key (filename) with 'room_sid' (set on 'sample_to_load')
-                zoom_stack_item_room = this.room_sid;
-            }
-
-            var x0 = data.mz_range[0]; // float
-            var x1 = data.mz_range[1]; // float
-            var y0 = data.t_range[0]; // float
-            // var y1 = data.t_range[1]; // float
-            var img = data.img; // base64 png
-            // var traces = data.traces; // array
-
-            let chunk = {
-                "source": img,
-                "xref": "x",
-                "yref": "y",
-                "x": x0,
-                "y": y0,
-                "sizex": x1 - x0,
-                "sizey": 1e4,           // number >= actual image height [px]
-                "xanchor": "left",
-                "yanchor": "bottom",
-                "sizing": "contain",    // to display native height
-                "layer": "below",
-            };
-
-            let cache_item = self.figure_cache_get(zoom_stack_item_room);
-            if (!cache_item) {
-                self.beep();
-                self.log('on_spec_stack_figure_data: Something went wrong 2')
-                return;
-            }
-
-            cache_item.spec_stack_layout.images.push(chunk);
-            cache_item.spec_stack_layout.yaxis.tickvals.push(y0);
-            cache_item.spec_stack_layout.yaxis.ticktext.push(y0.toFixed(1).toString());
-
-            // if latest zoom stack item updated, then draw the figure
-            if ( _.isEqual(zoom_stack_item_room,
-                           self.zoom_stack.slice(-1)[0].room) ) {
-                // if (traces) {
-                //     for (let i=0; i<traces.length; i++) {
-                //         self.spec_stack_data.push(traces[i]);
-                //     }
-                // }
-                self.spec_stack_layout = cache_item.spec_stack_layout;
-                await Plotly.update("spec-stack-figure",
-                                    self.spec_stack_data,
-                                    self.spec_stack_layout
-                                    );
-            }
-        },
-
-        on_spec_stack_figure_data(json_data) {
-            var self = this;
-            self.heatmap_queue = self.heatmap_queue.then(function() {
-                return self._on_spec_stack_figure_data(json_data); }
-            );
-        },
-
-        async _on_timeseries_figure_data(json_data) {
-            var self = this;
-            if ( _.isEmpty(json_data) ) {
-                // reset the figure
-                self.timeseries_layout = self.shallow_copy(self.figure_layouts.timeseries_layout);
-                self.timeseries_data = [];
-                await Plotly.react("timeseries-figure", self.timeseries_data, self.timeseries_layout);
-                return;
-            }
-            let data = json_data.value;
-            let zoom_stack_item_room = json_data.room;
-
-            if ( !Object.keys(this.figure_cache).includes(zoom_stack_item_room) ) {
-                // Key not in cache => figure data pushed by back-end into room filename
-                if (this.filename !== zoom_stack_item_room) {
-                    // Received something wrong
-                    self.beep();
-                    self.log('on_timeseries_figure_data: Something went wrong 1');
-                    return;
-                }
-                // Override cache key (filename) with 'room_sid' (set on 'sample_to_load')
-                zoom_stack_item_room = this.room_sid;
-            }
-
-            let x0 = data.xrange && data.xrange[0] 
-            x0 = (x0 === undefined) ? self.heatmap_layout.xaxis.range[0] : x0;
-            let x1 = data.xrange && data.xrange[1] 
-            x1 = (x1 === undefined) ? self.heatmap_layout.xaxis.range[1] : x1;
-            self.timeseries_layout.xaxis.range = [x0, x1];
-            
-            let traces = data.traces || [];
-            if (!traces.length) {
-                return
-            }
-
-            let trace = traces[0]; // TODO: Need to handle multiple traces?
-
-            let cache_item = self.figure_cache_get(zoom_stack_item_room);
-            if (!cache_item) {
-                self.beep();
-                self.log('on_timeseries_figure_data: Something went wrong 2');
-                return;
-            }
-            if (cache_item.timeseries_data.length) {
-                // Append existing trace
-                // TODO: Now pushing always to the first trace
-                cache_item.timeseries_data[0].x.push.apply(cache_item.timeseries_data[0].x, trace.x);
-                cache_item.timeseries_data[0].y.push.apply(cache_item.timeseries_data[0].y, trace.y);
-            } else {
-                // Add new trace
-                cache_item.timeseries_data.push(trace);
-            }
-
-            // if latest zoom stack item updated, then draw the figure
-            if ( _.isEqual(zoom_stack_item_room,
-                           self.zoom_stack.slice(-1)[0].room) ) {
-                self.timeseries_data = cache_item.timeseries_data;
-                await Plotly.update("timeseries-figure", self.timeseries_data, self.timeseries_layout);
-            }
-        },
-
-        on_timeseries_figure_data(json_data) {
-            var self = this;
-            self.heatmap_queue = self.heatmap_queue.then(function() {
-                return self._on_timeseries_figure_data(json_data); }
-            );
-        },
-
-        reset_view() {
-            if ( !_.isEmpty(this.filename) ) {
-                this.stop_visualize_range = {'filename': this.filename, };
-            }
-            this.reset_figure_cache();
-            this.reset_figures();
-            this.update_figures();
-        },
-
-        reset_figures() {
-            this.heatmap_layout = this.shallow_copy(this.figure_layouts.heatmap_layout);
-            this.heatmap_data = [];
-            this.spec_stack_layout = this.shallow_copy(this.figure_layouts.spec_stack_layout);
-            this.spec_stack_data = [];
-            this.timeseries_layout = this.shallow_copy(this.figure_layouts.timeseries_layout);
-            this.timeseries_data = [];
-        },
-
-        reset_figure_cache() {
-            // this.figure_cache = {'t_maxrange': [Number.MAX_SAFE_INTEGER, 0],
-            //                      'mz_maxrange': [Number.MAX_SAFE_INTEGER, 0], };
-            this.figure_cache = {'t_maxrange': [0, 0],
-                                 'mz_maxrange': [0, 0], };
-            this.zoom_stack = [];
+        reset_view: function() {
+            return  
         },
 
         shallow_copy(o) {
@@ -717,213 +207,9 @@ export default {
             return JSON.parse(_o);
         },
 
-        async update_figures(zoom_stack_item=null) {
-            // the function is destructive for zoom_stack_item - don't use refs
-            var self = this;
-            if ( !_.isNull(zoom_stack_item) ) {
-                let cache_item = self.figure_cache_get(zoom_stack_item.room);
-                let mz_range = zoom_stack_item.mz_range;
-                let t_range = zoom_stack_item.t_range;
-                cache_item.heatmap_layout.xaxis.range = t_range;
-                cache_item.heatmap_layout.yaxis.range = mz_range;
-                self.heatmap_layout = cache_item.heatmap_layout;
-                cache_item.spec_stack_layout.xaxis.range = mz_range;
-                cache_item.spec_stack_layout.yaxis.range = [ t_range[0], t_range[1]+5];
-                self.spec_stack_layout = cache_item.spec_stack_layout;
-                cache_item.timeseries_layout.xaxis.range = t_range;
-                self.timeseries_data = cache_item.timeseries_data || [];
-                self.timeseries_layout = cache_item.timeseries_layout;
-            }
-            await Plotly.react("heatmap-figure",
-                                self.heatmap_data,
-                                self.heatmap_layout
-                                );
-            await Plotly.react("spec-stack-figure",
-                                self.spec_stack_data,
-                                self.spec_stack_layout
-                                );
-            await Plotly.react("timeseries-figure",
-                                self.timeseries_data,
-                                self.timeseries_layout
-                                );
-        },
-
-        visualize_range_on_zoom_in(prev_ranges, new_ranges, volatile=false) {
-            let self = this;
-            if ( _.isUndefined(prev_ranges) || _.isUndefined(new_ranges) ) {
-                self.log("visualize_range_on_zoom_in: some of the ranges undefined!");
-                return
-            }
-            // Unpack ranges
-            let [mz0, mz1] = new_ranges.mz_range;
-            let [t0, t1] = new_ranges.t_range;
-            let [pmz0, pmz1] = prev_ranges.mz_range;
-            let [pt0, pt1] = prev_ranges.t_range;
-            // Make sure new ranges are within bounds
-            mz0 = Math.max(mz0, self.figure_cache.mz_maxrange[0]);
-            mz1 = Math.min(mz1, self.figure_cache.mz_maxrange[1]);
-            t0 = Math.max(t0, self.figure_cache.t_maxrange[0]);
-            t1 = Math.min(t1, self.figure_cache.t_maxrange[1]);
-            // Set min significant zoom ranges
-            let min_dmz = 10**(-self.cache_index_rank);
-            // let max_mz_range = self.figure_cache.mz_maxrange[1] - self.figure_cache.mz_maxrange[0]
-            // let min_dmz_factor = 0.2;   //don't zoom-in for more than 80% of orig.size
-            let min_dt = 1;
-            // Check if mz_range has changed
-            let mz_range_updated = true;
-            if ( (Math.abs(mz1-pmz1) < min_dmz && Math.abs(mz0-pmz0) < min_dmz) ) {
-            // if ( Math.abs((Math.abs(mz1-mz0) - Math.abs(pmz1-pmz0))) * max_mz_range /
-            //      (Math.abs(mz1-mz0))**2 < min_dmz_factor ) {
-                // mz_range has not changed significantly, reset to original
-                mz0 = pmz0;
-                mz1 = pmz1;
-                mz_range_updated = false;
-            }
-            // Check if t_range has changed
-            let t_range_updated = true;
-            if ( (Math.abs(t1-pt1) < min_dt &&
-                  Math.abs(t0-pt0) < min_dt) ) {
-                // t_range has not changed significantly, reset to original
-                t0 = pt0;
-                t1 = pt1;
-                t_range_updated = false;
-            }
-            if (!mz_range_updated && !t_range_updated) {
-                // No need to zoom, reset to original ranges
-                self.beep();
-                self.update_figures(prev_ranges);
-                return
-            }
-            // Zoom in
-            // Check if requested stack item exists in stack 
-            let zoom_stack_item = self.zoom_stack_search([mz0, mz1]);
-            if ( zoom_stack_item ) {
-                // m/z range already in cache
-                mz_range_updated = false;
-                // Check if requested time range is already cached
-                let figure_cache_item = self.figure_cache[zoom_stack_item.room];
-                if ( (figure_cache_item.t_filled_range[0] - t0) < min_dt &&
-                     (t1 - figure_cache_item.t_filled_range[1]) < min_dt ) {
-                    // Requested time range is in cache
-                    t_range_updated = false;
-                }
-                // Make a copy of the zoom stack item to add at the top of the stack
-                zoom_stack_item = self.shallow_copy(zoom_stack_item);
-            } else {
-                // Create new zoom_stack_item
-                zoom_stack_item = new self.ZoomStackItem([t0, t1], [mz0, mz1], volatile);
-            }
-            // Add the zoom stack item at the top of the stack
-            self.zoom_stack.push(
-                zoom_stack_item
-                );
-            // Increment figure_cache ref counter
-            self.figure_cache_add_ref(zoom_stack_item.room);
-            // Update figure
-            let cur_ranges = self.shallow_copy(self.zoom_stack.slice(-1)[0]);
-            // Set new ranges
-            self.update_figures(cur_ranges);
-            // Request new visualizations if needed
-            if (mz_range_updated) {
-                // mz_range changed, request full t_range in the new mz_range
-                this.visualize_range = {...cur_ranges, 'filename': this.filename};
-                return
-            }
-            // if (t_range_updated) {
-            //     // TODO: During acquisition, this generates extra visualize_range notifications
-            //     // Fill in t gap (range extended by dragging the axis from corner)
-            //     let t_filled_range = cache_item.t_filled_range;
-            //     let mz_range = cur_ranges.mz_range;
-            //     if (Math.abs(t0 - t_filled_range[0]) > min_dt) {
-            //         let t_range_to_fill = [t0, t_filled_range[0]];
-            //         this.visualize_range = {'mz_range': mz_range,
-            //                                 't_range': t_range_to_fill, 
-            //                                 'filename': this.filename
-            //                                 };
-            //         return
-            //     }
-            //     if (Math.abs(t1 - t_filled_range[1]) > min_dt) {
-            //         let t_range_to_fill = [t_filled_range[1], t1];
-            //         this.visualize_range = {'mz_range': mz_range,
-            //                                 't_range': t_range_to_fill, 
-            //                                 'filename': this.filename
-            //                                 };
-            //         return
-            //     }
-            // }
-        },
-
-        visualize_range_on_zoom_out() {
-            let self = this;
-            if ( self.zoom_stack.length <= 1 ) {
-                self.log("Zoom stack is empty.");
-                self.beep();
-                return
-            }
-            // reset traces
-            self.heatmap_data = [];
-            self.spec_stack_data = [];
-            // remove last zoom and take current zoom into view
-            let zoom_stack_item_to_remove = self.zoom_stack.pop();
-            let zoom_stack_item_to_restore = self.shallow_copy(self.zoom_stack.slice(-1)[0]);
-            // collect ranges for stop_visualize_range call
-            let ranges = [];
-            ranges.push(
-                {'mz_range': self.shallow_copy(zoom_stack_item_to_remove.mz_range),
-                 't_range': self.shallow_copy(zoom_stack_item_to_remove.t_range)
-                 });
-            // Loop until persistent item found from zoom stack
-            while (zoom_stack_item_to_restore.volatile) {
-                ranges.push(
-                    {'mz_range': self.shallow_copy(zoom_stack_item_to_restore.mz_range),
-                     't_range': self.shallow_copy(zoom_stack_item_to_restore.t_range)
-                     });
-                // Release reference of popped item
-                self.figure_cache_release_ref(zoom_stack_item_to_restore.room);
-                // Get next item from stack
-                self.zoom_stack.pop();
-                zoom_stack_item_to_restore = self.shallow_copy(self.zoom_stack.slice(-1)[0]);
-            }
-            self.log("Zoom stack frames left:", self.zoom_stack.length - 1);
-            if ( _.isUndefined(zoom_stack_item_to_remove) || _.isUndefined(zoom_stack_item_to_restore) )
-                return;
-            self.stop_visualize_range = {'filename': self.filename,
-                                         'ranges': ranges};
-            self.update_figures(zoom_stack_item_to_restore);
-            // visualize missing frames and acquisition frames
-            let prev_item_room = zoom_stack_item_to_remove.room;
-            let cur_item_room = zoom_stack_item_to_restore.room;
-            let cur_mz = zoom_stack_item_to_restore.mz_range;
-            let prev_t_filled = self.figure_cache_get(prev_item_room).t_filled_range;
-            let cur_t_filled = self.figure_cache_get(cur_item_room).t_filled_range;
-            // retro-visualization
-            let min_t_gap = 1;
-            if ( prev_t_filled[1] - cur_t_filled[1] > min_t_gap) {
-                self.visualize_range = {'t_range': [cur_t_filled[1], prev_t_filled[1]],
-                                        'mz_range': cur_mz,
-                                        'filename': self.filename};
-            }
-            // remove cache item, if not used anymore
-            self.figure_cache_release_ref(zoom_stack_item_to_remove.room);
-        },
-
-        ZoomStackItem: function(t_range, mz_range, volatile=false, room=null) {
-            this.t_range = t_range;
-            this.mz_range = mz_range;
-            this.volatile = volatile;
-            // Room for zoom stack item
-            this.room = room || Math.random().toString(36).substring(2);
-        },
-
     },
 
     watch: {
-        figure_ranges: function(new_value, old_value) {
-            this.on_figure_ranges(new_value, old_value);
-        },
-        heatmap_figure_data: function(new_value) {
-            this.on_heatmap_figure_data(new_value);
-        },
         sample_to_load: function(new_value, old_value) {
             if ( _.isEqual(new_value, old_value) ) {
                 return false;
@@ -938,86 +224,30 @@ export default {
             }
             this.filename = new_value.filename;
             this.be.subscribe(this.endpoints, this.filename);
-            this.visualize_range = {
-                'filename': this.filename,
-                't_range': null,
-                'mz_range': null,
-                'room': this.room_sid,
-                };
         },
-        spec_stack_figure_data: function(new_value) {
-            this.on_spec_stack_figure_data(new_value);
-        },
-        target_to_display: function(new_value, old_value) {
-            if ( _.isEqual(new_value, old_value) || _.isEmpty(this.filename) ) {
-                return false;
-            }
-            if (new_value == null) {
-                this.visualize_range_on_zoom_out();
-                return
-            }
-            let mz = new_value;
-            let target_mz_range = [mz-.5, mz+.5];
-            let prev_ranges = this.shallow_copy(this.zoom_stack.slice(-1)[0]);
-            let new_ranges = {'mz_range': target_mz_range,
-                              't_range': prev_ranges.t_range};
-            // Add target trace
-            this.heatmap_data = [{
-                            'x': new_ranges.t_range,
-                            'y': [mz, mz],
-                            'mode': 'lines',
-                            'line': {'color': '#8c67ef'}
-                            }];
-            this.spec_stack_data = [{
-                            'x': [mz, mz],
-                            'y': new_ranges.t_range,
-                            'mode': 'lines',
-                            'line': {'color': '#8c67ef'}
-                            }];
-            // Make volatile zoom-in
-            this.visualize_range_on_zoom_in(prev_ranges, new_ranges, true);
-        },
-        timeseries_figure_data: function(new_value) {
-            this.on_timeseries_figure_data(new_value);
-        },
+        
         tps_parameters: function(new_value, old_value) {
             if ( _.isEmpty(new_value) || _.isEqual(new_value, old_value) ) {
                 return false;
             }
         },
-        stop_visualize_range: function(new_value, old_value) {
-            let client_room = new_value.room || this.room_sid;
-            return this.be.export_one_way_binding_prop('stop_visualize_range',
-                                                        {...new_value, 'uid': Math.random()},
-                                                        old_value,
-                                                        client_room
-                                                        );
-        },
-        visualize_range: function(new_value, old_value) {
-            let client_room = new_value.room || this.room_sid;
-            return this.be.export_one_way_binding_prop('visualize_range',
-                                                        {...new_value, 'uid': Math.random()},
-                                                        old_value,
-                                                        client_room
-                                                        );
-        },
+        
         tps_parameters_selected_ui: function(value) {
             this.tps_parameters_selected = {'tps_parameters_selected': value, 'figure_ranges': this.figure_ranges};
         },
+        
         tps_parameters_selected: function(new_value, old_value) {
             return this.be.export_one_way_binding_prop('tps_parameters_selected',
                                                         new_value, old_value,
                                                         this.room_sid);
         },
+
         'root_namespace.connected': function(new_value) {
             if ( new_value === true )
             {
                 this.namespace = this.root_namespace;
                 // handlers for for external notifications:
                 this.namespace.on("figure_ranges", (value) => this.be.import_one_way_binding_prop("figure_ranges", {...value.value, 'uid': Math.random()}));
-                this.namespace.on("heatmap_figure_data", (value) => this.be.import_one_way_binding_prop("heatmap_figure_data", value));
-                this.namespace.on("spec_stack_figure_data", (value) => this.be.import_one_way_binding_prop("spec_stack_figure_data", value));
-                this.namespace.on("timeseries_figure_data", (value) => this.be.import_one_way_binding_prop("timeseries_figure_data", value));
                 // this.namespace.on("tps_parameters", (value) => this.be.import_one_way_binding_prop("tps_parameters", value.value));
 
                 this.room_sid = this.root_namespace.id;
