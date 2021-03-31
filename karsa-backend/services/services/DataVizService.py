@@ -415,8 +415,8 @@ class DataVizServiceNamespace(BaseClientNamespace):
         global generator_output_q # TODO:
 
         value = data['value']
-
-        client_room = value['client_room']
+        client_room = data['client_room']
+        
         filename = value['filename']
         mz_range = value['mz_range']
         t_range = value['t_range']
@@ -809,7 +809,7 @@ class DataVizServiceClient(BaseServiceClient):
             if viz_type == 'waterfall':
                 endpoint = 'spec_stack_figure_data'
             # Emit figure data
-            client_room = img_data['client_room']
+            client_room = img_data.pop('client_room')
             self.log("Emitting to: ", client_room)
             await self.emit_client_notification(
                             endpoint,
