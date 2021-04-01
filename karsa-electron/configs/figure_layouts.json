@@ -19,7 +19,7 @@
 		]
 	},
 
-    "heatmap_layout": {
+    "spectrogram": {
 		"images": [],
 		"height": 440,
 		"title": "",
@@ -57,7 +57,7 @@
 		"paper_bgcolor": "#29282e"
     },
     
-	"timeseries_layout": {
+	"timeseries": {
 		"height": 440,
 		"font": {
 			"color": "#fff"
@@ -101,7 +101,7 @@
 		}
     },
     
-	"spec_stack_layout": {
+	"waterfall": {
 		"images": [],
 		"height": 970,
 		"font": {
