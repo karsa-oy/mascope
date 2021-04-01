@@ -600,7 +600,13 @@ class H5Streamer(TofDaqStreamer):
 
         TODO: To be implemented
         """
-        raise NotImplementedError
+        # raise NotImplementedError
+        # tmp implementation
+        while True:
+            try:
+                self.file_queue.get_nowait()
+            except:
+                break
 
 
 class RawStreamer(Thread):
@@ -803,4 +809,10 @@ class RawStreamer(Thread):
 
         TODO: To be implemented
         """
-        raise NotImplementedError
+        # raise NotImplementedError
+        # tmp implementation
+        while True:
+            try:
+                self.file_queue.get_nowait()
+            except:
+                break

@@ -57,7 +57,8 @@ class RawStreamerPublicNamespace(BaseClientNamespace):
 class RawStreamerPrivateNamespace(BaseClientNamespace):
     # raw service private interfaces
     endpoints = [
-            'raw_to_import',
+            'raw_import',
+            'stop_raw_import',
             # 'raw_stream_request',
             'import_raw_table_datetime_range',
             'service_state'
@@ -95,10 +96,17 @@ class RawStreamerPrivateNamespace(BaseClientNamespace):
                                                }
                                             )
 
-    async def on_raw_to_import(self, data):
+    async def on_raw_import(self, data):
         for raw_file in data['value']:
             full_file_path = os.path.join( raw_file.get('path'), raw_file.get('filename') )
             self.parent.streamer.start_stream(full_file_path)
+
+    async def on_stop_raw_import(self, data):
+        # TODO: do we need to remove only specific files from the queue?
+        # for raw_file in data['value']:
+        #     full_file_path = os.path.join( raw_file.get('path'), raw_file.get('filename') )
+        #     self.parent.streamer.stop_stream(full_file_path)
+        self.parent.streamer.stop_stream()
 
 
 class RawStreamerServiceClient(BaseStreamerClient):
