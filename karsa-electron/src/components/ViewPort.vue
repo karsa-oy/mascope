@@ -195,8 +195,7 @@ export default {
             if (fs.existsSync('configs/figure_layouts.json')) {
                 let figure_layouts = JSON.parse(fs.readFileSync('configs/figure_layouts.json', 'utf8'));
                 self.figure_config = self.shallow_copy(figure_layouts.figure_config);
-// TODO: Make one default figure layout or choose by id
-                self.figure_layout_default = self.shallow_copy(figure_layouts.heatmap_layout);
+                self.figure_layout_default = self.shallow_copy(figure_layouts[self.id]);
             }
 
             // Common config for all figures
@@ -269,7 +268,7 @@ export default {
         },
 
         async _on_figure_ranges(new_value) {
-
+            this.filename = new_value.filename;
             let t0 = new_value.t_range[0];
             let t1 = new_value.t_range[1];
             let mz0 = new_value.mz_range[0];
@@ -283,12 +282,15 @@ export default {
             let zoom_stack_item = new this.ZoomStackItem([t0, t1],
                                                          [mz0, mz1],
                                                          false,
-                                                         this.room_sid
                                                          );
             this.figure_cache_add_ref(zoom_stack_item.room);
             this.zoom_stack.push(zoom_stack_item);
             let cur_zoom = this.shallow_copy(zoom_stack_item);
             this.update_figure(cur_zoom);
+            this.visualize_range = {...cur_zoom,
+                                    'filename': this.filename,
+                                    'viz_type': this.id,
+                                    };
         },
 
         on_figure_ranges(new_value, old_value) {
@@ -617,29 +619,6 @@ export default {
         },
         figure_data: function(new_value) {
             this.on_figure_data(new_value);
-        },
-        sample_to_load: function(new_value, old_value) {
-            if ( _.isEqual(new_value, old_value) ) {
-                return false;
-            }
-            this.reset_view();
-            if (old_value.filename) {
-                // this.be.unsubscribe(this.endpoints, old_value.filename);
-                this.beep();
-            }
-            if ( _.isEmpty(new_value) || _.isEmpty(new_value.filename)) {
-                this.filename = '';
-                return false;
-            }
-            this.filename = new_value.filename;
-            // this.be.subscribe(this.endpoints, this.filename);
-            this.visualize_range = {
-                'filename': this.filename,
-                't_range': null,
-                'mz_range': null,
-                'room': this.room,
-                'viz_type': this.id,
-                };
         },
         target_to_display: function(new_value, old_value) {
             if ( _.isEqual(new_value, old_value) || _.isEmpty(this.filename) ) {

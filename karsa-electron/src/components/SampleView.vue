@@ -126,7 +126,7 @@ export default {
 
             room_sid: null,
             endpoints: [
-                'figure_ranges',
+                // 'figure_ranges',
                 // 'tps_parameters',
             ],
         }
@@ -224,6 +224,10 @@ export default {
             }
             this.filename = new_value.filename;
             this.be.subscribe(this.endpoints, this.filename);
+            this.figure_ranges = {'filename': new_value.filename,
+                                  't_range': [0, new_value.length],
+                                  'mz_range': new_value.range,
+                                  };
         },
         
         tps_parameters: function(new_value, old_value) {
@@ -247,7 +251,7 @@ export default {
             {
                 this.namespace = this.root_namespace;
                 // handlers for for external notifications:
-                this.namespace.on("figure_ranges", (value) => this.be.import_one_way_binding_prop("figure_ranges", {...value.value, 'uid': Math.random()}));
+                // this.namespace.on("figure_ranges", (value) => this.be.import_one_way_binding_prop("figure_ranges", {...value.value, 'uid': Math.random()}));
                 // this.namespace.on("tps_parameters", (value) => this.be.import_one_way_binding_prop("tps_parameters", value.value));
 
                 this.room_sid = this.root_namespace.id;

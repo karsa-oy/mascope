@@ -821,6 +821,8 @@ export default {
                 this.sample_to_load = {'filename': this.sample_file,
                                        'title': this.sample_name,
                                        'description': this.sample_description,
+                                       'length': last_selection.length,
+                                       'range': last_selection.range,
                                        };
             } else {
                 this.sample_to_load = {'filename': "",
