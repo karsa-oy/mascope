@@ -412,6 +412,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         #                                      },
         #                                     namespace='/'
         #                                     )
+        return data['value']['i']
 
     async def on_acquired_tps_data(self, data):
         value = data['value']

@@ -124,12 +124,12 @@
                             <div style="text-align: center">
                                 <b-button
                                     type="is-dark"
-                                    @click="is_raw_import_modal_active=true"
+                                    @click="on_button_acquisition_control()"
                                     outlined
                                     inverted
                                     :disabled="(instrument_status=='ready'
                                                 ) ? false : true">
-                                    Import {{data_source_selected.name}} file
+                                        {{acquisition_control_label}}
                                 </b-button>
                                 <div><br></div>
                             </div>
@@ -183,16 +183,20 @@ export default {
             endpoints: [
                 'acquisition_progress',
                 'acquisition_started',
+                'acquisition_finished',
                 // 'acquisition_status',
                 'instrument_status'
             ],
             // raw streamer
+            acquisition_control_label: null,
             acquisition_progress: 0,
+            acquisition_in_progress: false,
             acquisition_started: {},
+            acquisition_finished: {},
             is_raw_import_modal_active: false,
             raw_samples: [],
             instrument_status: "not_ready",		// not_ready/ready
-            raw_to_import: [],
+            raw_import: [],
             // variables for import modal
             import_start_time: null,
             import_end_time: null,
@@ -238,25 +242,49 @@ export default {
             this.import_raw_table_datetime_range = fetch_request;
         },
         ImportSamples() {
-            this.raw_to_import = this.import_raw_table_checked_rows;
+            this.raw_import = this.import_raw_table_checked_rows;
             this.is_raw_import_modal_active = false;
+        },
+        on_button_acquisition_control() {
+            if ( this.acquisition_in_progress ) {
+                // Interrupt import
+                this.acquisition_control_label = 'Stopping...';
+                this.be.emit_client_notification(
+                    'stop_raw_import',
+                    this.raw_import
+                )
+            }
+            else {
+                // pop up FetchSamples dialog
+                this.is_raw_import_modal_active = true;
+            }
         },
     },
     watch: {
-        acquisition_started: function(new_value, old_value) {
-            if (new_value === old_value) {
-                return false;
-            }
+        acquisition_started: function(new_value) {
+            // if (new_value === old_value) {
+            //     return false;
+            // }
             this.new_file = new_value.filename;
+            this.acquisition_control_label = 'Stop Import';
+            this.acquisition_in_progress = true;
         },
-        // h5_table_checked_rows: function(new_value, old_value) {
+        acquisition_finished: function(new_value) {
+            // if (new_value === old_value) {
+            //     return false;
+            // }
+            this.new_file = new_value.filename;
+            this.acquisition_control_label = 'Import ' +  this.data_source_selected.name +  ' file';
+            this.acquisition_in_progress = false;
+        },
+        // import_raw_table_checked_rows: function(new_value, old_value) {
         //     if ( _.isEqual(new_value, old_value) ) {
         //         return false;
         //     }
         //     var last_selection = [...new_value].pop();
         //     // force single row selection
-        //     if ( this.h5_table_checked_rows.length > 1 ) {
-        //         this.h5_table_checked_rows = [last_selection,];
+        //     if ( this.import_raw_table_checked_rows.length > 1 ) {
+        //         this.import_raw_table_checked_rows = [last_selection,];
         //     }
         // },
         raw_samples: function(new_data, old_data){
@@ -266,8 +294,8 @@ export default {
             this.import_raw_table_cols = new_data.cols;
             this.import_raw_table_rows = new_data.rows;
         },
-        raw_to_import: function(new_value, old_value) {
-            return this.be.export_one_way_binding_prop('raw_to_import',
+        raw_import: function(new_value, old_value) {
+            return this.be.export_one_way_binding_prop('raw_import',
                                                         new_value,
                                                         old_value,
                                                         null,
@@ -301,11 +329,13 @@ export default {
             {
                 // handlers for for external notifications:
                 this.namespace.on("acquisition_started", (value) => this.be.import_one_way_binding_prop("acquisition_started", value.value));
+                this.namespace.on("acquisition_finished", (value) => this.be.import_one_way_binding_prop("acquisition_finished", value.value));
                 // this.namespace.on("acquisition_status", (value) => this.be.import_one_way_binding_prop("acquisition_status", value.value));
                 this.namespace.on("acquisition_progress", (value) => this.be.import_one_way_binding_prop("acquisition_progress", value.value.progress, true));
                 this.namespace.on("instrument_status", (value) => this.be.import_two_way_binding_prop("instrument_status", value.value));
                 this.namespace.on("raw_samples", (value) => this.be.import_one_way_binding_prop("raw_samples", value.value));
 
+                this.acquisition_control_label = 'Import ' +  this.data_source_selected.name +  ' file';
                 this.be.subscribe(this.endpoints,
                                   null // room set to null to subscribe to endpoints directly
                                   );
