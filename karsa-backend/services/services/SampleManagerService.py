@@ -41,8 +41,8 @@ class MetadataServiceNamespace(BaseClientNamespace):
 
     endpoints = [
         # DataViz
-        'data_request',
-        'image_to_save',
+        'mz_coordinate_request',
+        'signal_request',
         'stop_data_request',
         # UI
         'experiment_selected',
@@ -60,12 +60,22 @@ class MetadataServiceNamespace(BaseClientNamespace):
     )
 
     # ========== DataViz requests ========== 
-    async def on_data_request(self, data):
+    async def on_mz_coordinate_request(self, data):
         namespace = '/' + data['value']['filename'].split('_')[0]
         value = data['value']
         kwargs = get_client_notification_args(data)
 
-        await self.emit_client_notification('data_request',
+        await self.emit_client_notification('mz_coordinate_request',
+                                            value,
+                                            **kwargs,
+                                            namespace=namespace
+                                            )
+    async def on_signal_request(self, data):
+        namespace = '/' + data['value']['filename'].split('_')[0]
+        value = data['value']
+        kwargs = get_client_notification_args(data)
+
+        await self.emit_client_notification('signal_request',
                                             value,
                                             **kwargs,
                                             namespace=namespace
