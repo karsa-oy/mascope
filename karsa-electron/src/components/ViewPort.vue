@@ -66,6 +66,7 @@ export default {
             figure: {},
             figure_cache: {'t_maxrange': [0, 0], 'mz_maxrange': [0, 0]},
             figure_config: {},
+            figure_data: {},
             figure_traces: [],
             figure_layout: {},
             figure_layout_default: {},
@@ -247,7 +248,15 @@ export default {
                     let ranges = {};
                     ranges.t_range = [x0, x1];
                     ranges.mz_range = [y0, y1];
-
+                    // Fix for waterfall
+                    if (self.figure_layout_default.xaxis.title.text.indexOf('m/z') != -1) {
+                        x0 = (x0 === undefined) ? prev_ranges.mz_range[0] : x0;
+                        x1 = (x1 === undefined) ? prev_ranges.mz_range[1] : x1;
+                        y0 = (y0 === undefined) ? prev_ranges.t_range[0] : y0;
+                        y1 = (y1 === undefined) ? prev_ranges.t_range[1] : y1;
+                        ranges.t_range = [y0, y1];
+                        ranges.mz_range = [x0, x1];
+                    }
                     self.visualize_range_on_zoom_in(prev_ranges, ranges);
                 }
             });
@@ -305,34 +314,40 @@ export default {
             if ( _.isEmpty(json_data) ) {
                 // reset the figure
                 self.figure_layout = self.shallow_copy(self.figure_layout_default);
-                self.figure_data = [];
-                await Plotly.react(self.id, self.figure_data, self.figure_layout);
+                self.figure_traces = [];
+                await Plotly.react(self.id, self.figure_traces, self.figure_layout);
                 return;
             }
             let data = json_data.value;
             let zoom_stack_item_room = json_data.room;
 
             if ( !Object.keys(this.figure_cache).includes(zoom_stack_item_room) ) {
-                // Key not in cache => figure data pushed by back-end into room filename
-                if (this.filename !== zoom_stack_item_room) {
-                    // Received something wrong
-                    self.beep();
-                    self.log('_on_figure_data: Something went wrong 1: ',
-                             this.filename,
-                             zoom_stack_item_room
-                             );
+                // Received something wrong
+                self.beep();
+                self.log(self.id, ' _on_figure_data: Something went wrong 1: ',
+                         this.figure_cache,
+                         zoom_stack_item_room
+                         );
                     return;
-                }
-                // Override cache key (filename) with 'room_sid' (set on 'sample_to_load')
-                zoom_stack_item_room = this.room_sid;
             }
 
-            var x0 = data.t_range[0]; // float
-            var x1 = data.t_range[1]; // float
-            var y0 = data.mz_range[0]; // float
-            var y1 = data.mz_range[1]; // float
-            var img = data.img; // base64 png
-            var traces = data.traces; // array
+            let x0 = data.t_range[0]; // float
+            let x1 = data.t_range[1]; // float
+            let y0 = data.mz_range[0]; // float
+            let y1 = data.mz_range[1]; // float
+            let sizing = "stretch";
+
+            // Fix for waterfall
+            if (self.figure_layout_default.xaxis.title.text.indexOf('m/z') != -1) {
+                x0 = data.mz_range[0]; // float
+                x1 = data.mz_range[1]; // float
+                y0 = data.t_range[0]; // float
+                y1 = 1e6;
+                sizing = "contain";
+            }
+            
+            let img = data.img; // base64 png
+            let traces = data.traces; // array
 
             let chunk = {
                 "source": img,
@@ -344,18 +359,18 @@ export default {
                 "sizey": y1 - y0,
                 "xanchor": "left",
                 "yanchor": "bottom",
-                "sizing": "stretch",
+                "sizing": sizing,
                 "layer": "below"
             };
 
             let cache_item = self.figure_cache_get(zoom_stack_item_room);
             if (!cache_item) {
                 self.beep();
-                self.log('_on_figure_data: Something went wrong 2')
+                self.log(self.id, ' _on_figure_data: Something went wrong 2')
                 return;
             }
 
-            cache_item.fiure_layout.images.push(chunk);
+            cache_item.figure_layout.images.push(chunk);
             cache_item.t_filled_range[0] = Math.min(x0, cache_item.t_filled_range[0]);
             cache_item.t_filled_range[1] = Math.max(x1, cache_item.t_filled_range[1]);
 
@@ -364,29 +379,33 @@ export default {
                            self.zoom_stack.slice(-1)[0].room) ) {
                 if (traces) {
                     for (let i=0; i<traces.length; i++) {
-                        self.figure_data.push(traces[i]);
+                        self.figure_traces.push(traces[i]);
                     }
                 }
                 self.figure_layout = cache_item.figure_layout;
                 await Plotly.react(self.id,
-                                   self.figure_data,
+                                   self.figure_traces,
                                    self.figure_layout
                                    );
             } else if ( _.isEqual(zoom_stack_item_room,
                                   self.zoom_stack[0].room) ) {
                 // on newly acquired spectrum (full mz range, acquisition running),
                 // forward request to latest zoom
-                self.visualize_range = {'mz_range': self.zoom_stack.slice(-1)[0].mz_range,
-                                        't_range': [x0, x1],
-                                        'filename': this.filename,
-                                        'viz_type': this.id,
-                                        'room': self.zoom_stack.slice(-1)[0].room,
-                                        };
+                // self.visualize_range = {'mz_range': self.zoom_stack.slice(-1)[0].mz_range,
+                //                         't_range': [x0, x1],
+                //                         'filename': this.filename,
+                //                         'viz_type': this.id,
+                //                         'room': self.zoom_stack.slice(-1)[0].room,
+                //                         };
+                return
             }
         },
 
         on_figure_data(json_data) {
             var self = this;
+            if (!_.isEqual(json_data.value.viz_type, self.id)) {
+                return;
+            }
             self.figure_queue = self.figure_queue.then(function() {
                 return self._on_figure_data(json_data); }
             );
@@ -403,7 +422,7 @@ export default {
 
         reset_figure() {
             this.figure_layout = this.shallow_copy(this.figure_layout_default);
-            this.figure_data = [];
+            this.figure_traces = [];
         },
 
         reset_figure_cache() {
@@ -430,15 +449,21 @@ export default {
                 let t_range = zoom_stack_item.t_range;
                 cache_item.figure_layout.xaxis.range = t_range;
                 cache_item.figure_layout.yaxis.range = mz_range;
+                // Fix for waterfall
+                if (self.figure_layout_default.xaxis.title.text.indexOf('m/z') != -1) {
+                    cache_item.figure_layout.xaxis.range = mz_range;
+                    cache_item.figure_layout.yaxis.range = t_range;
+                }
                 self.figure_layout = cache_item.figure_layout;
             }
             await Plotly.react(self.id,
-                              self.figure_data,
+                              self.figure_traces,
                               self.figure_layout
                               );
         },
 
         visualize_range_on_zoom_in(prev_ranges, new_ranges, volatile=false) {
+            this.log(prev_ranges, new_ranges);
             let self = this;
             if ( _.isUndefined(prev_ranges) || _.isUndefined(new_ranges) ) {
                 self.log("visualize_range_on_zoom_in: some of the ranges undefined!");
@@ -556,7 +581,7 @@ export default {
                 return
             }
             // reset traces
-            self.figure_data = [];
+            self.figure_traces = [];
             // remove last zoom and take current zoom into view
             let zoom_stack_item_to_remove = self.zoom_stack.pop();
             let zoom_stack_item_to_restore = self.shallow_copy(self.zoom_stack.slice(-1)[0]);
@@ -634,7 +659,7 @@ export default {
             let new_ranges = {'mz_range': target_mz_range,
                               't_range': prev_ranges.t_range};
             // Add target trace
-            this.figure_data = [{
+            this.figure_traces = [{
                             'x': new_ranges.t_range,
                             'y': [mz, mz],
                             'mode': 'lines',
@@ -665,7 +690,7 @@ export default {
                 this.namespace = this.root_namespace;
                 // handlers for for external notifications:
                 // this.namespace.on("figure_ranges", (value) => this.be.import_one_way_binding_prop("figure_ranges", {...value.value, 'uid': Math.random()}));
-                this.namespace.on("figure_data", (value) => this.be.import_one_way_binding_prop("heatmap_figure_data", value));
+                this.namespace.on("figure_data", (value) => this.be.import_one_way_binding_prop("figure_data", value));
 
                 this.room_sid = this.root_namespace.id;
                 this.room = Math.random().toString(36).substring(2);
