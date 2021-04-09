@@ -196,10 +196,6 @@ export default {
             snd.play();
         },
 
-        reset_view: function() {
-            return  
-        },
-
         shallow_copy(o) {
             let _o = JSON.stringify(o);
             if ( _.isUndefined(_o) )
@@ -214,16 +210,13 @@ export default {
             if ( _.isEqual(new_value, old_value) ) {
                 return false;
             }
-            this.reset_view();
             if (old_value.filename) {
                 this.be.unsubscribe(this.endpoints, old_value.filename);
             }
-            if ( _.isEmpty(new_value) || _.isEmpty(new_value.filename)) {
-                this.filename = '';
-                return false;
+            if (new_value.filename) {
+                this.be.subscribe(this.endpoints, new_value.filename);
             }
             this.filename = new_value.filename;
-            this.be.subscribe(this.endpoints, this.filename);
             this.figure_ranges = {'filename': new_value.filename,
                                   't_range': [0, new_value.length],
                                   'mz_range': new_value.range,

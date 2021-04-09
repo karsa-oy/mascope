@@ -277,6 +277,11 @@ export default {
         },
 
         async _on_figure_ranges(new_value) {
+            if (!new_value.filename) {
+                this.reset_view();
+                this.filename = "";
+                return
+            }
             this.filename = new_value.filename;
             let t0 = new_value.t_range[0];
             let t1 = new_value.t_range[1];
@@ -387,23 +392,13 @@ export default {
                                    self.figure_traces,
                                    self.figure_layout
                                    );
-            } else if ( _.isEqual(zoom_stack_item_room,
-                                  self.zoom_stack[0].room) ) {
-                // on newly acquired spectrum (full mz range, acquisition running),
-                // forward request to latest zoom
-                // self.visualize_range = {'mz_range': self.zoom_stack.slice(-1)[0].mz_range,
-                //                         't_range': [x0, x1],
-                //                         'filename': this.filename,
-                //                         'viz_type': this.id,
-                //                         'room': self.zoom_stack.slice(-1)[0].room,
-                //                         };
-                return
             }
         },
 
         on_figure_data(json_data) {
             var self = this;
             if (!_.isEqual(json_data.value.viz_type, self.id)) {
+                self.log("Received figure_data of wrong type!");
                 return;
             }
             self.figure_queue = self.figure_queue.then(function() {
@@ -694,7 +689,7 @@ export default {
 
                 this.room_sid = this.root_namespace.id;
                 this.room = Math.random().toString(36).substring(2);
-                this.be.subscribe(this.endpoints, this.room);
+                // this.be.subscribe(this.endpoints, this.room);
             }
         },
     },

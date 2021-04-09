@@ -828,6 +828,8 @@ export default {
                 this.sample_to_load = {'filename': "",
                                        'title': "",
                                        'description': "",
+                                       'length': 0,
+                                       'range': [0, 0],
                                        };
             }
         },
