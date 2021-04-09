@@ -210,8 +210,11 @@ class ImageGenerator(Process):
                 # Select function to generate the image
                 viz_type = data['viz_type']
                 global image_generators
-                img_gen_func = image_generators[viz_type]
-
+                try:
+                    img_gen_func = image_generators[viz_type]
+                except KeyError:
+                    print("Requested visualization type '%s' not available!" %viz_type)
+                    continue
                 data_array = data.pop('data')
                 y_range = data.get('y_range', None)
                 img = img_gen_func(data_array,
