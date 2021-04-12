@@ -371,6 +371,7 @@ class H5Streamer(TofDaqStreamer):
         # Synchronization primitives
         # Streamer specific
         self.file_queue = Queue()       # Queue for files to stream
+        self.cancel_event = Event()     # Set to cancel current stream
         # Common with TofDaqStreamer
         self.shutdown_event = Event()   # Set to break out from main loop
         self.active = Event()           # TofDaqStreamer active event
@@ -519,16 +520,16 @@ class H5Streamer(TofDaqStreamer):
         Returns
         -------
         bool
-            True if ticked, False if shutdown
+            True if ticked, False if cancel or shutdown
         """
-        while not self.shutdown_event.is_set():
+        while not (self.cancel_event.is_set() or self.shutdown_event.is_set()):
             if self.spec_queue.qsize() or self.tps_queue.qsize():
                 # Still something in queue
                 sleep(.1)
             else:
                 # Queues empty
                 return True
-        # Shutdown
+        # Cancel or shutdown
         return False
 
     def run(self):
@@ -563,9 +564,6 @@ class H5Streamer(TofDaqStreamer):
             # Loop through the file and feed to queues
             # Loop through all 'writes'
             for iwrite in range(self.desc.nbrWrites):
-                # Check for shutdown flag
-                if self.shutdown_event.is_set():
-                    break
                 # Increment write index
                 self.desc.iWrite = iwrite
                 # Loop through all 'bufs' per 'write'
@@ -581,8 +579,13 @@ class H5Streamer(TofDaqStreamer):
                     else:
                         # Shutdown
                         break
-            # Out of stream loop
+                # Out of buf loop
+                # Check for cancel and shutdown flags
+                if self.cancel_event.is_set() or self.shutdown_event.is_set():
+                    break
+            # Out of write loop
             self.active.clear()
+            self.cancel_event.clear()
             self._finalize()
             print("h5Stream finished")
         # Out of main loop
@@ -597,16 +600,14 @@ class H5Streamer(TofDaqStreamer):
 
     def stop_stream(self):
         """Stop stream before complete
-
-        TODO: To be implemented
         """
-        # raise NotImplementedError
-        # tmp implementation
-        while True:
-            try:
-                self.file_queue.get_nowait()
-            except:
-                break
+        self.cancel_event.set()
+        # Clear all upcoming files from queue
+        # while True:
+        #     try:
+        #         self.file_queue.get_nowait()
+        #     except:
+        #         break
 
 
 class RawStreamer(Thread):
@@ -620,6 +621,7 @@ class RawStreamer(Thread):
         # Synchronization primitives
         # Streamer specific
         self.file_queue = Queue()       # Queue for files to stream
+        self.cancel_event = Event()     # Set to cancel current stream
         # Common with TofDaqStreamer
         self.shutdown_event = Event()   # Set to break out from main loop
         self.active = Event()           # RawStreamer active event
@@ -733,16 +735,16 @@ class RawStreamer(Thread):
         Returns
         -------
         bool
-            True if ticked, False if shutdown
+            True if ticked, False if cancel or shutdown
         """
-        while not self.shutdown_event.is_set():
+        while not (self.cancel_event.is_set() or self.shutdown_event.is_set()):
             if self.spec_queue.qsize():
                 # Still something in queue
                 sleep(.1)
             else:
                 # Queues empty
                 return True
-        # Shutdown
+        # Cancel or shutdown
         return False
 
     def run(self):
@@ -784,6 +786,7 @@ class RawStreamer(Thread):
                     break
             # Out of stream loop
             self.active.clear()
+            self.cancel_event.clear()
             self._finalize()
             print("RawStream finished")
         # Out of main loop
@@ -806,13 +809,11 @@ class RawStreamer(Thread):
 
     def stop_stream(self):
         """Stop stream before complete
-
-        TODO: To be implemented
         """
-        # raise NotImplementedError
-        # tmp implementation
-        while True:
-            try:
-                self.file_queue.get_nowait()
-            except:
-                break
+        self.cancel_event.set()
+        # Clear all upcoming files from queue
+        # while True:
+        #     try:
+        #         self.file_queue.get_nowait()
+        #     except:
+        #         break
