@@ -131,10 +131,19 @@ class BaseClientNamespace(AsyncClientNamespace):
         )
         await self.emit('unsubscribe', data)
 
+
     async def on_connect(self):
         self.app_name = self.__class__.__name__
-        self.log(f"connected to namespace {self.namespace}")
+        self.log(f"connected to {self.namespace}")
         await self.subscribe()
+        # (re)register all private namespaces after root ns is connected
+        if self.namespace == '/':
+            nss = list(self.client.namespace_handlers.keys())
+            nss.remove(self.namespace)
+            for ns in nss:
+                await self.emit('register_namespace', ns)
+                self.log(f"namespace {ns} registered")
+
 
     def on_disconnect(self):
         self.log(f"disconnected from namespace {self.namespace}")
@@ -320,7 +329,6 @@ def parse_cmd_args():
 
 
 class BaseServiceClient:
-
     def log(self, *arg, **kwarg):
         if not NO_LOGGING_DEFAULT:
             print(f"[{self.__class__.__name__}.{inspect.stack()[1].function}]", *arg, **kwarg)
@@ -334,37 +342,25 @@ class BaseServiceClient:
         if not ns_name.startswith('/'):
             ns_name = '/' + ns_name
         self.sio.register_namespace( ns_class(ns_name) )
+        self.log('Register handler for namespace', ns_name)
         self.ns_handler = self.sio.namespace_handlers.get(ns_name)
         self.ns_handler.parent = self
+        # root ns handler is needed to communicate with router at re-connect
+        if '/' not in self.sio.namespace_handlers:
+            self.sio.register_namespace( BaseClientNamespace('/') )
 
     async def emit_client_notification(self, name, value, **kwarg):
         await self.ns_handler.emit_client_notification(name, value, **kwarg)
 
-    async def register_private_namespace_on_router(self, ns_handler):
-        self.log(f"Registering {ns_handler.namespace} on Router...")
-        await self.sio.connect(self.addr, namespaces=['/',])
-        # TODO: TBR python-socketio BadNamespaceError connection bug
-        while True:
-            try:
-                await self.sio.emit('register_namespace',
-                                    ns_handler.namespace,
-                                    callback=self.disconnect
-                                    )
-                self.log(f"Registered {ns_handler.namespace}")
-                break
-            except BadNamespaceError as e:
-                self.log(f"Failed: {e}.\nRetrying...")
-                await self.sio.sleep(.1)
-
     async def connect(self, namespaces=None):
+        self.log('Connecting to Router...')
         while True:
             try:
-                self.log('Connecting to Router...')
                 await self.sio.connect(
                             self.addr,
                             namespaces=namespaces
                             )
-                self.log("Connected!")
+                self.log("Connected to Router")
                 break
             except Exception as e:
                 self.log(f"Failed: {e}\nRetrying...")
@@ -387,15 +383,13 @@ class BaseServiceClient:
             await self.sio.sleep(1)
 
     async def run(self):
-        if self.ns_handler.namespace != '/':
-            await self.register_private_namespace_on_router(self.ns_handler)
-        await self.connect([self.ns_handler.namespace])
+        await self.connect()
         await self.init_service()
         await self.service_main()
 
 
-class BridgeServiceClient(BaseServiceClient):
 
+class BridgeServiceClient(BaseServiceClient):
     def __init__(self, url, port, public_namespace_data, private_namespace_data):
         self.addr = f'{url}:{port}'
         if not self.addr.startswith('http'):
@@ -406,12 +400,14 @@ class BridgeServiceClient(BaseServiceClient):
         if ns_name != '/':
             raise BadNamespaceError(f'Invalid root namespace {ns_name}')
         self.sio.register_namespace( ns_class(ns_name) )
+        self.log('Register handler for namespace', ns_name)
         self.public_ns = self.sio.namespace_handlers.get(ns_name)
         # private namespace
         ns_name, ns_class = private_namespace_data
         if not ns_name.startswith('/'):
             ns_name = '/' + ns_name
         self.sio.register_namespace( ns_class(ns_name) )
+        self.log('Register handler for namespace', ns_name)
         self.private_ns = self.sio.namespace_handlers.get(ns_name)
         # cross-references
         self.public_ns.parent = self
@@ -423,11 +419,6 @@ class BridgeServiceClient(BaseServiceClient):
     async def emit_private_notification(self, name, value, **kwarg):
         await self.private_ns.emit_client_notification(name, value, **kwarg)
 
-    async def run(self):
-        await self.register_private_namespace_on_router(self.private_ns)
-        await self.connect()
-        await self.init_service()
-        await self.service_main()
 
 
 class BaseStreamerClient(BridgeServiceClient):
@@ -557,7 +548,7 @@ class BaseStreamerClient(BridgeServiceClient):
             self.private_ns.acquired_spectrum_callback = acquired_spectrum_callback
 
             stop_task = False
-            TASK_TTL = 1200     # 2 min
+            TASK_TTL = 300     # 30 sec
             while True:
                 try:
                     spec_data = self.streamer.spec_queue.get_nowait() # Non-blocking
@@ -578,6 +569,19 @@ class BaseStreamerClient(BridgeServiceClient):
                         if ttl_count > TASK_TTL:
                             self.log(f"{filename} import was cancelled due to a timeout.")
                             stop_task = True
+
+                            # TODO: timeout due to file_service failure:
+                            # self.streamer is still active here - how to disable?
+                            # ??? self.streamer.stop_stream()
+                            await self.emit_private_notification(
+                                                    'acquisition_finished',
+                                                    {'filename': filename},
+                                                    )
+                            await self.emit_private_notification(
+                                                    'acquisition_status',
+                                                    'not_running',
+                                                    )
+
                             break
                         await asyncio.sleep(.1)
                     if stop_task:

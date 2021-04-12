@@ -324,6 +324,10 @@ export default {
             this.be.disconnect(this.namespace);
             this.namespace = this.be.connect(this.url + '/' + this.data_source_selected.name);
         },
+        import_start_time: function(new_value) {
+            if (!this.import_end_time || Date.parse(new_value) > Date.parse(this.import_end_time))
+                this.import_end_time = new Date(Date.parse(new_value));
+        },
         'namespace.connected': function(new_value) {
             if ( new_value === true )
             {
