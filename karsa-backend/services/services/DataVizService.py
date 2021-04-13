@@ -26,6 +26,7 @@ from multiprocessing import (
                         cpu_count
                         )
 from queue import Empty
+from time import time
 
 from karsalib import BaseClientNamespace, BaseServiceClient, \
                      parse_cmd_args, get_client_notification_args
@@ -131,6 +132,7 @@ def viz_cache_get(table,
 
 
 def viz_cache_process_requests(filename, t_range):
+    # func_t0 = time()
 
     signal_array = cache[filename]['signal']
     period_array = cache[filename]['period']
@@ -156,9 +158,12 @@ def viz_cache_process_requests(filename, t_range):
         period_slice = period_array.data_array.sel(
                                         time=slice(t0_row, t1_row)
                                         )
-        # print("signal_slice shape: %s" %str(signal_slice.shape))
 
-        if signal_slice.shape[1] == 0:
+        BATCH_SIZE = 10
+        no_spectra = signal_slice.shape[1]
+        no_batches = int( np.ceil(no_spectra / BATCH_SIZE) )
+
+        if no_spectra < BATCH_SIZE:
             continue
 
         if t_resolution:
@@ -169,10 +174,16 @@ def viz_cache_process_requests(filename, t_range):
         global generator_input_q # TODO: global q
         y_range = [0, signal_slice.max().compute().item()] # TODO: better scaling
 
-        for i, spec_array in enumerate(signal_slice.transpose()):
-            t0_i = float( spec_array.time )
-            period = float( period_array.data_array[i] )
-            t1_i = t0_i + period
+
+
+        for i in range(no_batches):
+            i0 = i * BATCH_SIZE
+            i1 = min(i0 + BATCH_SIZE, no_spectra - 1)
+
+            spec_array = signal_slice.transpose()[i0:i1]
+
+            t0_i = float( spec_array.time[0] )
+            t1_i = float( spec_array.time[-1] ) + float( period_slice[i1] )
 
             generator_input_q.put({
                             'data': spec_array,
@@ -208,6 +219,8 @@ def viz_cache_process_requests(filename, t_range):
                               [mz0, mz1],
                               t_resolution
                               )
+    # func_t1 = time()
+    # print("[viz_cache_process_requests] duration: %.2f seconds" %(func_t1-func_t0))
 
 
 def viz_cache_put(table,
@@ -784,7 +797,7 @@ class DataVizServiceClient(BaseServiceClient):
             try:
                 img_data = self.generator_output_q.get_nowait()
             except Empty:
-                await self.sio.sleep(.1)
+                await self.sio.sleep(.01)
                 continue
 
             # Got new image
