@@ -300,6 +300,11 @@ export default {
                 this.filename = "";
                 return
             }
+            if (!_.isEqual(new_value.filename, old_value.filename)) {
+                this.log("new sample -> reset_view");
+                this.reset_view();
+                old_value = {};
+            }
             this.filename = new_value.filename;
             let t0 = new_value.t_range[0];
             let t1 = new_value.t_range[1];
@@ -467,13 +472,13 @@ export default {
                 self.figure_layout = cache_item.figure_layout;
             }
             await Plotly.react(self.id,
-                              self.figure_traces,
-                              self.figure_layout
-                              );
+                               self.figure_traces,
+                               self.figure_layout
+                               );
         },
 
         visualize_range_on_zoom_in(prev_ranges, new_ranges, volatile=false) {
-            this.log("prev_ranges: ", prev_ranges, "new_ranges: ", new_ranges);
+            // this.log("prev_ranges: ", prev_ranges, "new_ranges: ", new_ranges);
             let self = this;
             if ( _.isUndefined(prev_ranges) || _.isUndefined(new_ranges) ) {
                 self.log("visualize_range_on_zoom_in: some of the ranges undefined!");
