@@ -20,11 +20,11 @@ import dask.array as da
 import sqlite3
 
 from copy import deepcopy
+from datetime import datetime, timedelta
 from multiprocessing import (
                         Queue,
                         cpu_count
                         )
-from datetime import datetime, timedelta
 from queue import Empty
 
 from karsalib import BaseClientNamespace, BaseServiceClient, \
@@ -109,7 +109,7 @@ def viz_cache_get(table,
         
     if mz_range:
         args.extend(mz_range)
-        query = join_str.join([query, 'mz0 >= ? AND mz1 <= ?'])
+        query = join_str.join([query, 'mz0 = ? AND mz1 = ?'])
         join_str = ' AND '
         
     if t_resolution:
@@ -130,7 +130,7 @@ def viz_cache_get(table,
     return cur
 
 
-async def viz_cache_process_requests(filename, t_range):
+def viz_cache_process_requests(filename, t_range):
 
     signal_array = cache[filename]['signal']
     period_array = cache[filename]['period']
@@ -143,7 +143,7 @@ async def viz_cache_process_requests(filename, t_range):
                             )
 
     for row in request_data_rows:
-        print("[viz_cache_process_requests]: processing row: %s" %str(row))
+        # print("[viz_cache_process_requests]: processing row: %s" %str(row))
         viz_type, t0, t1, mz0, mz1, t_resolution, client_room = row
         
         t0_row = max(t_range[0], t0)
@@ -156,7 +156,7 @@ async def viz_cache_process_requests(filename, t_range):
         period_slice = period_array.data_array.sel(
                                         time=slice(t0_row, t1_row)
                                         )
-        print("signal_slice shape: %s" %str(signal_slice.shape))
+        # print("signal_slice shape: %s" %str(signal_slice.shape))
 
         if signal_slice.shape[1] == 0:
             continue
@@ -183,9 +183,8 @@ async def viz_cache_process_requests(filename, t_range):
                             'y_range': y_range,
                             't_resolution': t_resolution,
                             'client_room': client_room,
+                            'persist_in_cache': True,
                             })
-
-            await asyncio.sleep(0)
 
         if t1_i < t1:
             # Only part of request served, update request time range
@@ -247,8 +246,7 @@ def viz_cache_release(table,
                       t_range=None,
                       mz_range=None,
                       t_resolution=None
-                      ):
-        
+                      ):    
     global con
     cur = con.cursor()
     
@@ -278,7 +276,7 @@ def viz_cache_release(table,
         
     if mz_range:
         args.extend(mz_range)
-        query = join_str.join([query, 'mz0 >= ? AND mz1 <= ?'])
+        query = join_str.join([query, 'mz0 = ? AND mz1 = ?'])
         join_str = ' AND '
         
     if t_resolution:
@@ -396,6 +394,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
         global generator_output_q # TODO:
 
         value = data['value']
+        self.log(value)
         client_room = data.get('client_room') or data['cookies']['src_sid'][0]
         
         filename = value['filename']
@@ -406,7 +405,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
 
         # Get already cached visualizations
         img_data_rows = viz_cache_get('visualizations',
-                                      'viz, t0, t1',
+                                      'viz, t0, t1, mz0, mz1, viz_type',
                                       filename,
                                       viz_type,
                                       t_range,
@@ -414,11 +413,14 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                       t_resolution
                                       )
         # Emit cached visualizations and update request ranges accordingly
-        img_strs = t0_chunk = t1_chunk = None
+        img_strs = []
+        t0_chunk = t1_chunk = None
         for row in img_data_rows:
-            
-            img_str_row, t0_row, t1_row = row
-            
+            img_str_row, t0_row, t1_row, mz0_row, mz1_row, viz_type_row = row
+            print("t0_row: %s, t1_row: %s, mz0_row: %s, mz1_row: %s, viz_type: %s"
+                  %(t0_row, t1_row, mz0_row, mz1_row, viz_type_row)
+                  )
+            self.log("t0_chunk: %.2f, t1_chunk: %.2f" %(t0_chunk or 0, t1_chunk or 0))
             if t0_chunk is None:
                 # Start new continuous chunk of images
                 img_strs = []
@@ -435,25 +437,20 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                   t_resolution,
                                   client_room
                                   )
-            elif t0_row != t1_chunk: # t1 of previous slice != t0 of current one
+            elif abs(t0_row - t1_chunk) > 1e-5: # t1 of previous slice != t0 of current one
                 # Gap in the middle
                 self.log("Gap in the middle: %.2f-%.2f" %(t1_chunk, t0_row))
                 # Make request for the gap
                 viz_cache_put('requests',
                               filename,
                               viz_type,
-                              [t1_chunk, t0_chunk], # From previous t1 until current t0
+                              [t1_chunk, t0_row], # From previous t1 until current t0
                               mz_range,
                               t_resolution,
                               client_room
                               )
-                if img_strs:
-                    # Emit current chunk
-                    if len(img_strs) > 1:
-                        # Merge if many slices
-                        img_str = merge_heatmap_slices(img_strs)
-                    else:
-                        img_str = img_strs[0]
+                # Emit current chunk
+                for img_str in img_strs:
                     # Put to image queue to be emitted from 'service_main'
                     img_data = {'img': img_str,
                                 'filename': filename,
@@ -462,8 +459,9 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                 't_range': [t0_chunk, t1_chunk],
                                 't_resolution': t_resolution,
                                 'client_room': client_room,
+                                'persist_in_cache': False,
                                 }
-                    self.log("Putting cached viz: %s" %str(img_data))
+                    # self.log("Putting cached viz: %s" %str(img_data))
                     generator_output_q.put(img_data)
                 # Start new chunk
                 t0_chunk = t0_row
@@ -472,13 +470,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
             t1_chunk = t1_row
             img_strs.append(img_str_row)
             
-        if img_strs:
-            # Emit chunk
-            if len(img_strs) > 1:
-                # Merge if many slices
-                img_str = merge_heatmap_slices(img_strs)
-            else:
-                img_str = img_strs[0]
+        for img_str in img_strs:
             # Put to image queue to be emitted from 'service_main'
             generator_output_q.put({'img': img_str,
                                     'filename': filename,
@@ -487,10 +479,12 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                     't_range': [t0_chunk, t1_chunk],
                                     't_resolution': t_resolution,
                                     'client_room': client_room,
+                                    'persist_in_cache': False,
                                     })
 
         if (t0_chunk is None) or (t1_chunk < t_range[1]):
             # (All) requested visualizations not available
+            self.log("Gap in the end: %.2f-%.2f" %(t1_chunk or t_range[0], t_range[1]))
             # Make request for the remaining time range
             viz_cache_put('requests',
                           filename,
@@ -509,26 +503,26 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                                  }
                                                 )
             # Add dummy cache item to avoid duplicate data_requests
-            cache[filename] = None
-        else:
+            cache[filename] = {}
+            return
+        elif 'signal' in cache[filename]:
             # Signal array in cache
-            signal_array = cache.get(filename)
-            if signal_array:
-                self.log("Process request on existing signal array")
-                # Check for available time range and process request
-                try:
-                    available_t_range = [signal_array.data_array.time[0].item(),
-                                        signal_array.data_array.time[-1].item()
-                                        ]
-                except AttributeError:
-                    # Nothing in the signal array yet
-                    return
-                process_t_range = [max(t_range[0], available_t_range[0]),
-                                min(t_range[1], available_t_range[1])
-                                ]
-                await viz_cache_process_requests(filename,
-                                                 process_t_range,
-                                                 )
+            signal_array = cache[filename]['signal']
+            self.log("Process request on existing signal array")
+            # Check for available time range and process request
+            try:
+                available_t_range = [signal_array.data_array.time[0].item(),
+                                     signal_array.data_array.time[-1].item()
+                                     ]
+            except AttributeError:
+                # Nothing in the signal array yet
+                return
+            process_t_range = [max(t_range[0], available_t_range[0]),
+                               min(t_range[1], available_t_range[1])
+                               ]
+            viz_cache_process_requests(filename,
+                                       process_t_range,
+                                       )
 
     async def on_stop_visualize_range(self, data):
         """ Stop visualization, if still running; use filename and ranges as input:
@@ -543,18 +537,15 @@ class DataVizServiceNamespace(BaseClientNamespace):
                       keys: 'filename', 't_range', 'mz_range';  or
                       keys: 'filename', 'ranges';
         """
-        await self.emit_client_notification('stop_data_request',
-                                            data['value'],
-                                            **get_client_notification_args(data))
-        d = deepcopy(data)
-        ranges = d['value'].pop('ranges', None)
-        if not ranges:
-            # await kill_cache(data)
-            return
-        for r in ranges:
-            d['value']['mz_range'] = r['mz_range']
-            d['value']['t_range'] = r['t_range']
-            # await kill_cache(d)
+        value = data['value']
+        client_rooms = value['client_rooms']
+        for client_room in client_rooms:
+            viz_cache_release('requests',
+                              client_room=client_room,
+                              )
+        # await self.emit_client_notification('stop_data_request',
+        #                                     data['value'],
+        #                                     **get_client_notification_args(data))
 
     async def on_tps_parameters_selected(self, data):
         """TPS parameters selected from the dropdown
@@ -584,6 +575,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                 't_range': t_range,
                                 't_resolution': t_resolution,
                                 'client_room': client_room,
+                                'persist_in_cache': True,
                                 })
 
     async def on_loaded_spectrum(self, data):
@@ -668,7 +660,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
         available_t_range = [signal_array.data_array.time[0].item(),
                              signal_array.data_array.time[-1].item() + period.item()
                              ]
-        await viz_cache_process_requests(filename_base, available_t_range)
+        viz_cache_process_requests(filename_base, available_t_range)
 
         return data['value'].get('i')
 
@@ -683,7 +675,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
         available_t_range = [signal_array.data_array.time[0].item(),
                              signal_array.data_array.time[-1].item()
                              ]
-        await viz_cache_process_requests(filename,
+        viz_cache_process_requests(filename,
                                          available_t_range,
                                          )
 
@@ -797,15 +789,18 @@ class DataVizServiceClient(BaseServiceClient):
 
             # Got new image
             # self.log("Image ready: ", img_data)
-            # Put viz to cache
-            viz_cache_put('visualizations',
-                          img_data['filename'],
-                          img_data['viz_type'],
-                          img_data['t_range'],
-                          img_data['mz_range'],
-                          img_data['t_resolution'],
-                          img_data['img']
-                          )
+            put_to_cache = img_data.pop('persist_in_cache')
+            if put_to_cache:
+                # Put viz to cache
+                # self.log("Put to cache: %s" %str(img_data))
+                viz_cache_put('visualizations',
+                            img_data['filename'],
+                            img_data['viz_type'],
+                            img_data['t_range'],
+                            img_data['mz_range'],
+                            img_data['t_resolution'],
+                            img_data['img']
+                            )
             # Select endpoint based on viz_type
             # viz_type = img_data.get('viz_type')
             # TODO: Emit all figures into common figure_data endpoint?
@@ -819,7 +814,7 @@ class DataVizServiceClient(BaseServiceClient):
                             'figure_data',
                             img_data,
                             room=client_room,
-                            no_data_logging=False,
+                            no_data_logging=True,
                             )
             # End of main loop
         # Exit
