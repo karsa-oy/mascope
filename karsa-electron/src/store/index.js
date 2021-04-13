@@ -9,6 +9,7 @@ export default new Vuex.Store({
 		acquisition_status: "not_running",		// not_running/starting/running/stopping
 		experiment_selected: {'id': ""},
 		experiments: [],
+		figure_double_click: null,
 		figure_ranges: {},
 		new_file: "",
 		project_selected: {'id': ""},
@@ -32,6 +33,9 @@ export default new Vuex.Store({
 		},
 		experiments(state, payload) {
 			state.experiments = payload;
+		},
+		figure_double_click(state, payload) {
+			state.figure_double_click = payload;
 		},
 		figure_ranges(state, payload) {
 			state.figure_ranges = payload;
