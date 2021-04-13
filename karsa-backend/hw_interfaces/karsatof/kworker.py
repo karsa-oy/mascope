@@ -217,9 +217,13 @@ class ImageGenerator(Process):
                     continue
                 data_array = data.pop('data')
                 y_range = data.get('y_range', None)
-                img = img_gen_func(data_array,
-                                   y_range=y_range
-                                   )
+                try:
+                    img = img_gen_func(data_array,
+                                    y_range=y_range
+                                    )
+                except ZeroDivisionError:
+                    print("Catched ZeroDivisionError in %s" %str(img_gen_func))
+                    continue
                 img_b = convert_to_base64(img)
                 data.update({'img': img_b})
                 self.queue_out.put(data)
