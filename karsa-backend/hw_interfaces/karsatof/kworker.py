@@ -192,6 +192,44 @@ class KEncoder(Process):
         return i0, i1, code, approx
 
 
+image_generators = {
+            'spectrogram': gen_heatmap_image,
+            'waterfall': gen_spec_image,
+            }
+
+class ImageGenerator(Process):
+    def __init__(self, queue_in, queue_out):
+        Process.__init__(self)
+        self.queue_in = queue_in
+        self.queue_out = queue_out
+
+    def run(self):
+        while True:
+            data = self.queue_in.get()
+            if data is not None:
+                # Select function to generate the image
+                viz_type = data['viz_type']
+                global image_generators
+                try:
+                    img_gen_func = image_generators[viz_type]
+                except KeyError:
+                    print("Requested visualization type '%s' not available!" %viz_type)
+                    continue
+                data_array = data.pop('data')
+                y_range = data.get('y_range', None)
+                try:
+                    img = img_gen_func(data_array,
+                                    y_range=y_range
+                                    )
+                except ZeroDivisionError:
+                    print("Catched ZeroDivisionError in %s" %str(img_gen_func))
+                    continue
+                img_b = convert_to_base64(img)
+                data.update({'img': img_b})
+                self.queue_out.put(data)
+            else:
+                break
+
 class SpecTraceGenerator(Process):
 
     def __init__(self, queue_in, queue_out):

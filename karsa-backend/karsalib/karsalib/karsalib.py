@@ -214,11 +214,7 @@ class BaseServerNamespace(AsyncNamespace):
     async def on_disconnect(self, sid):
         self.log(sid, "disconnected from namespace", self.namespace)
         # clear the app caches, if any, in all app services
-        # TODO: move stop_visualize_range to affected services
-        await self.on_client_notification(sid,
-                        dict(name='stop_visualize_range',
-                             value={},
-                             no_data_logging=False) )
+        # TODO:
         # let affected rooms know the client is gone
         for r in self.rooms(sid):
             await self.emit('room_mate_gone', {}, room=r)

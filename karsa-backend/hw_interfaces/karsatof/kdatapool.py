@@ -74,6 +74,8 @@ def parse_path_from_sample_name(sample_name):
     return os.path.join(instrument, date_dir, sample_name)
 
 
+
+
 class H5Pool():
     def __init__(self, data_path):
         """Initialize self
@@ -214,8 +216,133 @@ class H5Pool():
         return sample_table
 
 
-class DataPool():
-    """DataPool structure
+class RawPool():
+    def __init__(self, data_path):
+        """Initialize self
+
+        Parameters
+        ----------
+        data_path : str
+            Root data path
+        """
+
+        self.data_root = data_path
+        self.pool = pd.DataFrame()
+
+    async def scan_dir(self,
+                       path=None,
+                       fname_filter='*.raw'
+                       ):
+        """Scan directory for raw files
+        
+        This function walks through the given path, trying to find data files
+        matching the given filter.
+        
+        path : str
+            Root path
+        fname_filter : datetime.datetime
+            String to match the filename with. The default is '*.raw'.
+        recursive : bool, optional
+            Scan recursively. The default is False.
+
+        """
+        
+        if path is None:
+            path = self.data_root
+
+        print("Scanning: %s" % str(path))
+
+        self.pool = pd.DataFrame(index=[],
+                                 data=[],
+                                 columns=['filename',
+                                          'datetime',
+                                          'filesize',
+                                          'path',
+                                          ]
+                                 )
+
+        # Get list of all files
+        try:
+            files = next( os.walk(path) )[2]
+        except StopIteration:
+            # No files
+            print("Done")
+            return
+        # Loop through files in root, assumed to be named by date
+        for filename in fnmatch.filter(files, fname_filter):
+            await asyncio.sleep(0)
+            # Try to parse time from filename
+            matcher = datetime_glob.Matcher(pattern='%Y%m%d %H%M *')
+            file_datetime_match = matcher.match(filename)
+            if not file_datetime_match:
+                print("Skipped file: %s due to invalid datetime format" %filename)
+                continue
+            file_datetime = file_datetime_match.as_datetime()
+
+            # Append to pool
+            rawfile = os.path.join(path, filename)
+
+            size_bytes = os.stat(rawfile).st_size
+            size_mb = round(2**-20 * size_bytes, 2)
+
+            df_row = pd.DataFrame(
+                            index=[filename],
+                            data=[[
+                                filename,
+                                file_datetime,
+                                size_mb,
+                                path
+                                ]],
+                            columns=[
+                                'filename',
+                                'datetime',
+                                'filesize',
+                                'path'
+                                ]
+                            )
+            self.pool = self.pool.append(df_row)
+            print(str(rawfile))
+
+        self.pool = self.pool.sort_index()
+        print("Done")
+
+    async def get_datetime_range(self,
+                                 start_datetime=datetime(1970, 1, 1),
+                                 end_datetime=datetime.now()
+                                 ):
+        """[summary]
+
+        Parameters
+        ----------
+        start_date : datetime.datetime
+            Start date
+        end_date : datetime.datetime
+            End date
+
+        Returns
+        -------
+        [type]
+            [description]
+        """
+
+        sub_pool = self.pool[(self.pool['datetime'] >= start_datetime) &
+                             (self.pool['datetime'] <= end_datetime)
+                             ].copy()
+
+        sub_pool['datetime'] = sub_pool['datetime'].astype(str)
+
+        sample_table = {'rows': list( sub_pool.to_dict('index').values() ),
+                        'cols': [ {'field': col.lower(),
+                                   'label': col.capitalize(),
+                                   }
+                                  for col in sub_pool.columns ]
+                        }
+        
+        return sample_table
+
+
+class SamplePool():
+    """Sample hierarchy: Projects/Experiments/Samples
 
     Assuming folder structure as follows:
 
@@ -350,18 +477,18 @@ class DataPool():
             sample_titles = self.pool.get(project).get(experiment)
         samples = []
         for sample in sample_titles:
+            # Read experiment-specific sample attributes
             experiment_path = os.path.join(self.projects_root,
                                            project,
                                            experiment
                                            )
-            sample_attrs = self._read_attributes(experiment_path, prefix=sample)
-            if len(sample_attrs) == 0: # For backwards compatibility
-                sample_path = os.path.join(experiment_path, sample)
-                sample_attrs = self._read_attributes(sample_path)
-
-            if 'id' not in sample_attrs.keys():
-                sample_attrs.update( {'id': sample} )
-                
+            sample_exp_attrs = self._read_attributes(experiment_path, prefix=sample)
+            # Read global sample attributes
+            sample_path = os.path.join(experiment_path, sample)
+            sample_attrs = self._read_attributes(sample_path)
+            # Concatenate
+            sample_attrs.update(sample_exp_attrs)
+            
             samples.append({'id': sample,
                             'attributes': sample_attrs
                             })
@@ -445,132 +572,6 @@ class DataPool():
         for sample_dir in sample_dirs:
             experiment_samples.append(sample_dir)
         self.pool[project].update({ experiment: experiment_samples })
-
-
-class RawPool():
-    def __init__(self, data_path):
-        """Initialize self
-
-        Parameters
-        ----------
-        data_path : str
-            Root data path
-        """
-
-        self.data_root = data_path
-        self.pool = pd.DataFrame()
-
-    async def scan_dir(self,
-                       path=None,
-                       fname_filter='*.raw'
-                       ):
-        """Scan directory for raw files
-        
-        This function walks through the given path, trying to find data files
-        matching the given filter.
-        
-        path : str
-            Root path
-        fname_filter : datetime.datetime
-            String to match the filename with. The default is '*.raw'.
-        recursive : bool, optional
-            Scan recursively. The default is False.
-
-        """
-        
-        if path is None:
-            path = self.data_root
-
-        print("Scanning: %s" % str(path))
-
-        self.pool = pd.DataFrame(index=[],
-                                 data=[],
-                                 columns=['filename',
-                                          'datetime',
-                                          'filesize',
-                                          'path',
-                                          ]
-                                 )
-
-        # Get list of all files
-        try:
-            files = next( os.walk(path) )[2]
-        except StopIteration:
-            # No files
-            print("Done")
-            return
-        # Loop through files in root, assumed to be named by date
-        for filename in fnmatch.filter(files, fname_filter):
-            await asyncio.sleep(0)
-            # Try to parse time from filename
-            matcher = datetime_glob.Matcher(pattern='%Y%m%d %H%M *')
-            file_datetime_match = matcher.match(filename)
-            if not file_datetime_match:
-                print("Skipped file: %s due to invalid datetime format" %filename)
-                continue
-            file_datetime = file_datetime_match.as_datetime()
-
-            # Append to pool
-            rawfile = os.path.join(path, filename)
-
-            size_bytes = os.stat(rawfile).st_size
-            size_mb = round(2**-20 * size_bytes, 2)
-
-            df_row = pd.DataFrame(
-                            index=[filename],
-                            data=[[
-                                filename,
-                                file_datetime,
-                                size_mb,
-                                path
-                                ]],
-                            columns=[
-                                'filename',
-                                'datetime',
-                                'filesize',
-                                'path'
-                                ]
-                            )
-            self.pool = self.pool.append(df_row)
-            print(str(rawfile))
-
-        self.pool = self.pool.sort_index()
-        print("Done")
-
-    async def get_datetime_range(self,
-                                 start_datetime=datetime(1970, 1, 1),
-                                 end_datetime=datetime.now()
-                                 ):
-        """[summary]
-
-        Parameters
-        ----------
-        start_date : datetime.datetime
-            Start date
-        end_date : datetime.datetime
-            End date
-
-        Returns
-        -------
-        [type]
-            [description]
-        """
-
-        sub_pool = self.pool[(self.pool['datetime'] >= start_datetime) &
-                             (self.pool['datetime'] <= end_datetime)
-                             ].copy()
-
-        sub_pool['datetime'] = sub_pool['datetime'].astype(str)
-
-        sample_table = {'rows': list( sub_pool.to_dict('index').values() ),
-                        'cols': [ {'field': col.lower(),
-                                   'label': col.capitalize(),
-                                   }
-                                  for col in sub_pool.columns ]
-                        }
-        
-        return sample_table
-
 
 
 

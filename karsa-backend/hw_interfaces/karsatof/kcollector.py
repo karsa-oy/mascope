@@ -76,7 +76,9 @@ class ExtendableDataArray():
         self.chunk_size = chunk_size
 
         self.data_array = xarray.DataArray()
+        
         self.delayed_write = None
+        self.group = '%04d' % 0
 
 
     def init_array(self, dims, data=None, coords=None, name=''):
@@ -115,14 +117,14 @@ class ExtendableDataArray():
 
 
 
-    async def extend_array(self,
-                           data,
-                           coords,
-                           dim,
-                           callback=None,
-                           cargs=(),
-                           ckwargs={}
-                           ):
+    def extend_array(self,
+                     data,
+                     coords,
+                     dim,
+                     callback=None,
+                     cargs=(),
+                     ckwargs={}
+                     ):
         """Extend data array with new data.
         
         Parameters
@@ -144,7 +146,9 @@ class ExtendableDataArray():
 
         # Dimension check            
         dims = self.data_array.dims
-        if dim not in dims:
+        try:
+            dim_index = dims.index(dim)
+        except ValueError:
             raise ValueError("Failed to extend array. Input argument 'dim' " +
                              "must be one of the dimensions of the existing array")
         
@@ -159,7 +163,7 @@ class ExtendableDataArray():
                                      name=self.data_array.name
                                      )
 
-        if self.data_array.shape[1] > 0:
+        if self.data_array.shape[dim_index] > 0:
             # Extend non-empty array
             to_concat = [ self.data_array, extension ]
         else:
@@ -181,17 +185,16 @@ class ExtendableDataArray():
                 self.delayed_write = extension
             else:
                 # Collect delayed chunk to be written later
-                group_no = (self.data_array.shape[1] - 1) - self.delayed_write.shape[1]
-                group = '%04d' % group_no
                 self.delayed_write = xarray.concat([self.delayed_write, extension],
                                                    dim=dim
                                                    )
-            if self.delayed_write.shape[1] == self.chunk_size:
+            if self.delayed_write.shape[dim_index] == self.chunk_size:
                 # Write delayed chunk
+                group_no = (self.data_array.shape[dim_index] / self.chunk_size) - 1
+                self.group = '%04d' % group_no
                 self.delayed_write.to_dataset().to_zarr(self.path,
-                                                        group=group,
+                                                        group=self.group,
                                                         mode='a',
-                                                        # append_dim='time',
                                                         compute=True
                                                         )
                 self.delayed_write = None
@@ -205,15 +208,13 @@ class ExtendableDataArray():
 
         return extension
 
-    async def flush(self):
+    def flush(self):
         if self.delayed_write is not None:
+            self.group = '%04d' % (int(self.group)+1)
             # Write (last, incomplete) delayed chunk
-            group_no = (self.data_array.shape[1] - 1) - self.delayed_write.shape[1]
-            group = '%04d' % group_no
             self.delayed_write.to_dataset().to_zarr(self.path,
-                                                    group=group,
+                                                    group=self.group,
                                                     mode='a',
-                                                    # append_dim='time',
                                                     compute=True
                                                     )
             self.delayed_write = None
@@ -242,31 +243,7 @@ class ExtendableDataArray():
                                       "for array module %s" %str(self.array_module)
                                       )
 
-    def write_to_file(self, path):
-        """Write the data array into file.
 
-        Zarr and netCDF4 formats are supported. The format is inferred
-        from 'path'.
-
-        Parameters
-        ----------
-        path : str
-            File into which to write. The file suffix must be either
-            '.zarr' or '.nc'.
-
-        Raises
-        ------
-        ValueError
-            If file suffix is not any of the supported formats.
-        """
-
-        file_ext = os.path.splitext(path)[1][1:]
-        if file_ext == 'zarr':
-            self.data_array.to_dataset().to_zarr(path)
-        elif file_ext == 'nc':
-            self.data_array.load().to_netcdf(path)
-        else:
-            raise ValueError("Unexpected file extension: %s" %file_ext)
 
 
 

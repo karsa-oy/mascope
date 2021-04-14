@@ -128,33 +128,27 @@ def gen_heatmap_image(data_xarray,
         data_xarray = data_xarray.assign_coords(
                 {'time': [float(t.item()*1e-9) for t in data_xarray.time]}
                 )
+    
+    t0 = t1 = None
+    if not data_xarray.time.shape:
+        # Array has no time dimension, need to expand dimensions
+        t0 = float(data_xarray.time)
+        data_xarray = data_xarray.expand_dims({'time': [t0]}, axis=1)
 
+    if img_width is None:
+        img_width = len(data_xarray.time)
+
+    if data_xarray.time.shape[0] == 1:
+        # Only one spectrum to visualize, need to extend the array
+        t0 = data_xarray.time[0].item()
+        # Concatenate the array with itself
+        data_xarray = xarray.concat([data_xarray, data_xarray], dim='time')
+        t1 = t0 + 1 # Arbitrary t1 to avoid "empty take"
+       
     if t_range is None:
-        if data_xarray.time.shape:
-            if img_width is None:
-                img_width = len(data_xarray.time)
-            t0 = data_xarray.time[0].item()
-            t1 = data_xarray.time[-1].item()
-            if t1 == t0:
-                data_xarray = xarray.concat([data_xarray, data_xarray], dim='time')
-                t1 += 1 # Arbitrary t1
-        else:
-            # Only one spectrum to visualize, need to expand array dimensions
-            t0 = float(data_xarray.time)
-            t1 = t0 + 1 # Arbitrary t1
-            img_width = 1 # px
-            data_xarray = data_xarray.expand_dims({'time': [t0]}, axis=1)
-            # Make a spec of NaNs and concatenate to data_xarray
-            expand_spec = np.empty(data_xarray.shape)
-            expand_spec.fill(np.nan)
-            expand_arr = xarray.DataArray(expand_spec,
-                                          dims=data_xarray.dims,
-                                          coords={'mz': data_xarray.mz,
-                                                  'time': [t1]}
-                                          )
-            data_xarray = xarray.concat([data_xarray, expand_arr], dim='time')
-
-        t_range = (t0, t1)
+        t_range = (t0 or data_xarray.time[0].item(),
+                   t1 or data_xarray.time[-1].item()
+                   )
 
     if mz_range is None:
         mz0 = data_xarray.mz[0].item()
