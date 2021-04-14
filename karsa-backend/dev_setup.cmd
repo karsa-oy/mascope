@@ -33,7 +33,7 @@ echo.
 echo   6. To start the services, run the script:
 echo     run_services.cmd
 echo ========================
-
+  pip install py-spy || goto :error
   exit /b 0
 
 
