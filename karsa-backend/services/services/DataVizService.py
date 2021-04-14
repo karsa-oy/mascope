@@ -41,16 +41,19 @@ from karsatof.kimage import (
 
 NO_DATA_LOGGING_DEAULT = False
 client = None
+
+# Cache for data arrays
 cache = {}
 
 generator_input_q = None # TODO:
 generator_output_q = None # TODO:
 
-in_memory_db = ':memory:'
+# Cache for requests and visualizations
+# in_memory_db = ':memory:'
+# For debugging, write db into a file
 test_db = datetime.now().strftime("DataViz_%Y%m%d_%Hh%Mm%Ss") + '.db'
 con = sqlite3.connect(test_db) 
 cur = con.cursor()
-
 # Create viz table
 cur.execute('''CREATE TABLE visualizations
                (filename text,
@@ -62,7 +65,6 @@ cur.execute('''CREATE TABLE visualizations
                 t_resolution real,
                 viz blob)
             ''')
-            
 # Create requests table            
 cur.execute('''CREATE TABLE requests
                (filename text,
@@ -75,7 +77,7 @@ cur.execute('''CREATE TABLE requests
                 client_room text)
             ''')
 
-
+# ======= Visualization/request cache (db) methods =======
 def viz_cache_get(table,
                   fields,
                   filename=None,
@@ -130,8 +132,9 @@ def viz_cache_get(table,
                 )
     return cur
 
-
 def viz_cache_process_requests(filename, t_range):
+    global cache
+
     # func_t0 = time()
 
     signal_array = cache[filename]['signal']
@@ -143,7 +146,7 @@ def viz_cache_process_requests(filename, t_range):
                             'viz_type, t0, t1, mz0, mz1, t_resolution, client_room',
                             filename,
                             )
-
+    # Loop through db entries
     for row in request_data_rows:
         # print("[viz_cache_process_requests]: processing row: %s" %str(row))
         viz_type, t0, t1, mz0, mz1, t_resolution, client_room = row
@@ -159,7 +162,7 @@ def viz_cache_process_requests(filename, t_range):
                                         time=slice(t0_row, t1_row)
                                         )
 
-        BATCH_SIZE = 10
+        BATCH_SIZE = 10 # Number of spectra to process at once (TODO: make parameter)
         no_spectra = signal_slice.shape[1]
         no_batches = int( np.ceil(no_spectra / BATCH_SIZE) )
 
@@ -170,23 +173,21 @@ def viz_cache_process_requests(filename, t_range):
             # TODO: resample
             raise NotImplementedError
         
-        # Put to queue to be visualized
         global generator_input_q # TODO: global q
         y_range = [0, signal_slice.max().compute().item()] # TODO: better scaling
 
-
-
+        # Loop through signal batches
         for i in range(no_batches):
+            # Batch indices
             i0 = i * BATCH_SIZE
             i1 = min(i0 + BATCH_SIZE, no_spectra - 1)
-
+            # Take a batch
             spec_array = signal_slice.transpose()[i0:i1]
-
             t0_i = float( spec_array.time[0] )
             t1_i = float( spec_array.time[-1] ) + float( period_slice[i1] )
-
+            # Put batch to queue to be visualized
             generator_input_q.put({
-                            'data': spec_array,
+                            'data': spec_array, 
                             'filename': filename,
                             'viz_type': viz_type,
                             'mz_range': [mz0, mz1],
@@ -201,7 +202,7 @@ def viz_cache_process_requests(filename, t_range):
             # Only part of request served, update request time range
             viz_cache_update('requests',
                             ['t0'],
-                            [t1_i],
+                            [t1_i], # New start time
                             filename,
                             viz_type,
                             [t0, t1],
@@ -221,7 +222,6 @@ def viz_cache_process_requests(filename, t_range):
                               )
     # func_t1 = time()
     # print("[viz_cache_process_requests] duration: %.2f seconds" %(func_t1-func_t0))
-
 
 def viz_cache_put(table,
                   filename,
@@ -251,7 +251,6 @@ def viz_cache_put(table,
                 )    
     con.commit()
     
-
 def viz_cache_release(table,
                       filename=None,
                       client_room=None,
@@ -302,7 +301,6 @@ def viz_cache_release(table,
                 args
                 )
     con.commit()
-
 
 def viz_cache_update(table,
                      fields,
@@ -396,12 +394,17 @@ class DataVizServiceNamespace(BaseClientNamespace):
 
     # ========== UI requests ==========
     async def on_visualize_range(self, data):
-        """ Images with new 't_range' and/or 'mz_range' requested
+        """Visualization request
+
+        First check if requested visualizations are in cache already, and emit if there.
+        Secondly, put requests into cache for missing requests.
+        Then check if signal for requested filename is in data cache, request from FileIoService if not.
+        If signal is in cache, process requests.
 
         Parameters
         ----------
         data : dict(name, value, cookies, no_logging, no_data_logging...)
-               value: JSON data from UI, keys: 'filename', 't_range', 'mz_range'
+               value: JSON data from UI, keys: 'filename', 't_range', 'mz_range', 'viz_type'
         """
 
         global generator_output_q # TODO:
@@ -428,11 +431,12 @@ class DataVizServiceNamespace(BaseClientNamespace):
         # Emit cached visualizations and update request ranges accordingly
         img_strs = []
         t0_chunk = t1_chunk = None
+        # Loop through cached visualizations
         for row in img_data_rows:
             img_str_row, t0_row, t1_row, mz0_row, mz1_row, viz_type_row = row
-            print("t0_row: %s, t1_row: %s, mz0_row: %s, mz1_row: %s, viz_type: %s"
-                  %(t0_row, t1_row, mz0_row, mz1_row, viz_type_row)
-                  )
+            # print("t0_row: %s, t1_row: %s, mz0_row: %s, mz1_row: %s, viz_type: %s"
+            #       %(t0_row, t1_row, mz0_row, mz1_row, viz_type_row)
+            #       )
             self.log("t0_chunk: %.2f, t1_chunk: %.2f" %(t0_chunk or 0, t1_chunk or 0))
             if t0_chunk is None:
                 # Start new continuous chunk of images
@@ -483,6 +487,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
             t1_chunk = t1_row
             img_strs.append(img_str_row)
             
+        # Emit images fetched from cache
         for img_str in img_strs:
             # Put to image queue to be emitted from 'service_main'
             generator_output_q.put({'img': img_str,
@@ -496,7 +501,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                     })
 
         if (t0_chunk is None) or (t1_chunk < t_range[1]):
-            # (All) requested visualizations not available
+            # (All) requested visualizations were not available
             self.log("Gap in the end: %.2f-%.2f" %(t1_chunk or t_range[0], t_range[1]))
             # Make request for the remaining time range
             viz_cache_put('requests',
@@ -538,17 +543,13 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                        )
 
     async def on_stop_visualize_range(self, data):
-        """ Stop visualization, if still running; use filename and ranges as input:
-            - if none specified, stop all visualizations for the client;
-            - with file name specified, stop the file visualization;
-            - with ranges specified, stop visualizing current ranges;
+        """Release visualization requests from cache
 
         Parameters
         ----------
         data : dict(name, value, cookies, no_logging, no_data_logging...)
                value: JSON data from UI,
-                      keys: 'filename', 't_range', 'mz_range';  or
-                      keys: 'filename', 'ranges';
+                      keys: 'client_rooms', list of client rooms to release
         """
         value = data['value']
         client_rooms = value['client_rooms']
@@ -592,6 +593,8 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                 })
 
     async def on_loaded_spectrum(self, data):
+        """Spectrum loaded from FileIoService
+        """
         await self.on_acquired_spectrum(data)
         return data['value'].get('i')
 
@@ -609,6 +612,13 @@ class DataVizServiceNamespace(BaseClientNamespace):
         return
 
     async def on_mz_coordinates(self, data):
+        """mz coordinates for a file from FileIoService
+
+        Parameters
+        ----------
+        data : [type]
+            [description]
+        """
         global cache
 
         value = data['value']
@@ -616,7 +626,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
         filename = value['filename']
         self.log(filename)
         
-        # Initialize signal_array
+        # Initialize data arrays
         mz = np.frombuffer( value.get('mz'), dtype=np.float32 )
         signal_array = ExtendableDataArray(array_module=da)
         signal_array.init_array(dims=('mz', 'time'),
@@ -629,18 +639,21 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                 coords=[[]],
                                 name='period'
                                 )
+        # Put to data cache
         cache[filename] = {'signal': signal_array,
                            'period': period_array,
                            }
-        # Request data
+        # Request signal
         await self.emit_client_notification('signal_request',
                                             {'filename': filename,
                                              }
                                             )
 
     async def on_acquired_spectrum(self, data):
+        """TODO: This is duplicate with on_acquired_spectrum in FileIoPrivateNamespace
+        """
         global cache
-        # Get package index
+
         value = data['value']
         # i = value.get('i')
         filename_base = value['filename']
@@ -650,6 +663,8 @@ class DataVizServiceNamespace(BaseClientNamespace):
         self.log(ti.item())
         spec = np.frombuffer(value['spec'], dtype=np.float32)
         spec = spec.reshape(-1, 1)
+
+        # Get data arrays from cache
         signal_array = cache[filename_base]['signal']
         period_array = cache[filename_base]['period']
 
@@ -661,6 +676,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
             # Use mz coordinates from signal_array (TOF)
             mz = signal_array.data_array.mz
 
+        # Extend data arrays (write to file)
         signal_array.extend_array(spec,
                                   [mz, ti],
                                   'time'
@@ -670,6 +686,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                   'time'
                                   )
         
+        # Process pending requests for this file, in updated time range
         available_t_range = [signal_array.data_array.time[0].item(),
                              signal_array.data_array.time[-1].item() + period.item()
                              ]
@@ -814,13 +831,6 @@ class DataVizServiceClient(BaseServiceClient):
                             img_data['t_resolution'],
                             img_data['img']
                             )
-            # Select endpoint based on viz_type
-            # viz_type = img_data.get('viz_type')
-            # TODO: Emit all figures into common figure_data endpoint?
-            # if viz_type == 'spectrogram':
-            #     endpoint = 'heatmap_figure_data'
-            # if viz_type == 'waterfall':
-            #     endpoint = 'spec_stack_figure_data'
             # Emit figure data
             client_room = img_data.pop('client_room')
             await self.emit_client_notification(

@@ -41,15 +41,18 @@ from karsatof.kimage import (convert_base64_to_img, convert_to_base64)
 
 
 client = None
+
+# Cache for data arrays
 cache = {}
 
 signal_q = None # TODO:
 
-in_memory_db = ':memory:'
+# Cache for requests
+# in_memory_db = ':memory:'
+# For debugging, write db into a file
 test_db = datetime.now().strftime("FileIo_%Y%m%d_%Hh%Mm%Ss") + '.db'
 con = sqlite3.connect(test_db) 
 cur = con.cursor()
-            
 # Create requests table            
 cur.execute('''CREATE TABLE requests
                (filename text,
@@ -61,6 +64,7 @@ cur.execute('''CREATE TABLE requests
                 client_room text)
             ''')
 
+# ======= Request cache (db) methods =======
 def cache_get(table,
               fields,
               filename=None,
@@ -89,7 +93,7 @@ def cache_get(table,
         
     if mz_range:
         args.extend(mz_range)
-        query = join_str.join([query, 'mz0 >= ? AND mz1 <= ?'])
+        query = join_str.join([query, 'mz0 = ? AND mz1 = ?'])
         join_str = ' AND '
         
     if t_resolution:
@@ -121,9 +125,9 @@ def cache_process_requests(filename, t_range):
                             't0, t1, mz0, mz1, t_resolution, client_room',
                             filename,
                             )
-
+    # Loop through db entries
     for row in request_data_rows:
-        print("[cache_process_requests]: processing row: %s" %str(row))
+        # print("[cache_process_requests]: processing row: %s" %str(row))
         t0, t1, mz0, mz1, t_resolution, client_room = row
         
         t0_row = max(t_range[0], t0)
@@ -136,7 +140,6 @@ def cache_process_requests(filename, t_range):
         period_slice = period_array.data_array.sel(
                                         time=slice(t0_row, t1_row)
                                         )
-        print("signal_slice shape: %s" %str(signal_slice.shape))
 
         if signal_slice.shape[1] == 0:
             continue
@@ -145,9 +148,8 @@ def cache_process_requests(filename, t_range):
             # TODO: resample
             raise NotImplementedError
         
-        # Put to queue to be visualized
+        # Put to queue to be emitted
         global signal_q # TODO: global q
-        y_range = [0, signal_slice.max().compute().item()] # TODO: better scaling
 
         for i, spec_array in enumerate(signal_slice.transpose()):
             ti = float( spec_array.time.item() )
@@ -307,7 +309,7 @@ def cache_update(table,
                 args
                 )
     con.commit()
-
+# ------------------------------------------
 
 class FileIoPublicNamespace(BaseClientNamespace):
     endpoints = [
@@ -329,16 +331,6 @@ class FileIoPublicNamespace(BaseClientNamespace):
                                  [ti],
                                  'time'
                                  )
-
-    # async def on_image_to_save(self, data):
-    #     value = data['value']
-    #     filename = value['filename']
-    #     img_filename = value['img_filename']
-    #     img_str = value['img']
-    #     sample_data_path = parse_path_from_sample_name(filename)
-    #     img_path = os.path.join(sample_data_path, img_filename)
-    #     img = convert_base64_to_img(img_str)
-    #     img.save(img_path)
 
 
 class FileIoPrivateNamespace(BaseClientNamespace):
@@ -448,10 +440,10 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         Parameters
         ----------
         data : dict
-            keys: 'filename', 'i', 't' and 'spec'
+            keys: 'filename', 'i', 't', 'spec', 'period', ('mz')
         """
         global cache
-        # Get package index
+
         value = data['value']
         # i = value.get('i')
         filename_base = value['filename']
@@ -461,6 +453,8 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         self.log(ti.item())
         spec = np.frombuffer(value['spec'], dtype=np.float32)
         spec = spec.reshape(-1, 1)
+
+        # Get data arrays from cache
         signal_array = cache[filename_base]['signal']
         period_array = cache[filename_base]['period']
 
@@ -472,6 +466,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
             # Use mz coordinates from signal_array (TOF)
             mz = signal_array.data_array.mz
 
+        # Extend data arrays (write to file)
         signal_array.extend_array(spec,
                                   [mz, ti],
                                   'time'
@@ -481,6 +476,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                                   'time'
                                   )
         
+        # Process pending requests for this file, in updated time range
         available_t_range = [signal_array.data_array.time[0].item(),
                              signal_array.data_array.time[-1].item() + period.item()
                              ]
@@ -557,13 +553,14 @@ class FileIoPrivateNamespace(BaseClientNamespace):
             signal_array = open_mfzarr(filename_signal)
             filename_period = base_to_zarr_filename(filename, 'period')
             period_array = open_mfzarr(filename_period)
+            # Load attributes
             attr_path = os.path.join(
                         parse_path_from_sample_name(filename),
                         '.attrs'
                         )
             with open(attr_path, 'w') as f:
                 attributes = json.load(f)
-
+            # Put to data array cache
             cache[filename] = {'signal': signal_array,
                                'period': period_array,
                                'attrs': attributes,
@@ -572,10 +569,12 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         signal_array = cache[filename]['signal']            
 
         if mz_range is None:
+            # Full mz range
             mz0 = float( signal_array.data_array.mz[0] )
             mz1 = float( signal_array.data_array.mz[-1] )
             mz_range = [mz0, mz1]
 
+        # Get mz coordinates (within mz_range)
         mz = signal_array.data_array.mz.sel(mz=slice(*mz_range))
         mz = mz.values.astype(np.float32)
 
@@ -590,8 +589,9 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                             )
 
     async def on_signal_request(self, data):
-        self.log(data)
+        global cache
 
+        self.log(data)
         value = data['value']
 
         filename = value['filename']
@@ -599,179 +599,186 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         mz_range = value.get('mz_range', None)
         t_range = value.get('t_range', None)
         
+        # Get data arrays from cache
         signal_array = cache[filename]['signal']
         period_array = cache[filename]['period']
         attributes = cache[filename]['attrs']
 
         if mz_range is None:
+            # Full mz range
             mz_range = attributes['range']
             
         if t_range is None:
+            # Full time range
             t_range = [0, attributes['length']]
 
+        # print("Making request: filename: %s, t_range: %s, mz_range: %s, client_room: %s"
+        #       %(filename, t_range, mz_range, client_room)
+        #       )
         # Put request to cache
-        print("Making request: filename: %s, t_range: %s, mz_range: %s, client_room: %s"
-              %(filename, t_range, mz_range, client_room)
-              )
         cache_put('requests',
-                      filename,
-                      t_range,
-                      mz_range,
-                      None, # t_resolution,
-                      client_room
-                      )
+                  filename,
+                  t_range,
+                  mz_range,
+                  None, # t_resolution,
+                  client_room
+                  )
+        # Process request(s)
         available_t_range = [signal_array.data_array.time[0],
                              signal_array.data_array.time[-1] + period_array.data_array[-1].item()
                              ]
         cache_process_requests(filename, available_t_range)
 
-    async def on_data_request(self, data):
-        # print("Data request:", data)
-        value = data['value']
-        kwargs = get_client_notification_args(data)
+    # async def on_data_request(self, data):
+    #     # TODO: Deprecated, left for reference
 
-        filename = value['filename']
-        mz_range = value.get('mz_range', None)
-        t_range = value.get('t_range', None)
+    #     # print("Data request:", data)
+    #     value = data['value']
+    #     kwargs = get_client_notification_args(data)
+
+    #     filename = value['filename']
+    #     mz_range = value.get('mz_range', None)
+    #     t_range = value.get('t_range', None)
         
-        signal_array, signal_env = cache_get(data, 'signal')
-        if not signal_array:
-            # File not in cache, load and put
-            filename_zarr = base_to_zarr_filename(filename, 'signal')
-            signal_array = open_mfzarr(filename_zarr)
-            cache_put(data, 'signal', signal_array)
-            signal_array, signal_env = cache_get(data, 'signal')
-        if isinstance(signal_array, ExtendableDataArray):
-            signal_array = signal_array.data_array.to_dataset()
+    #     signal_array, signal_env = cache_get(data, 'signal')
+    #     if not signal_array:
+    #         # File not in cache, load and put
+    #         filename_zarr = base_to_zarr_filename(filename, 'signal')
+    #         signal_array = open_mfzarr(filename_zarr)
+    #         cache_put(data, 'signal', signal_array)
+    #         signal_array, signal_env = cache_get(data, 'signal')
+    #     if isinstance(signal_array, ExtendableDataArray):
+    #         signal_array = signal_array.data_array.to_dataset()
 
-        if mz_range is None:
-            mz0 = float( signal_array.mz[0] )
-            mz1 = float( signal_array.mz[-1] )
-            mz_range = [mz0, mz1]
-            set_figure_ranges = True
-        if t_range is None:
-             # In case of incomplete acquisition, set to full_t_range
-            t_range, _ = cache_get(data, 'full_t_range')
-            if not t_range:
-                t0 = float( signal_array.time[0] )
-                t1 = float( signal_array.time[-1] )
-                t_range = [t0, t1]
+    #     if mz_range is None:
+    #         mz0 = float( signal_array.mz[0] )
+    #         mz1 = float( signal_array.mz[-1] )
+    #         mz_range = [mz0, mz1]
+    #         set_figure_ranges = True
+    #     if t_range is None:
+    #          # In case of incomplete acquisition, set to full_t_range
+    #         t_range, _ = cache_get(data, 'full_t_range')
+    #         if not t_range:
+    #             t0 = float( signal_array.time[0] )
+    #             t1 = float( signal_array.time[-1] )
+    #             t_range = [t0, t1]
 
-        signal = signal_array.signal.sel(
-                    mz=slice(*mz_range),
-                    time=slice(*t_range)
-                    )
-        if signal.shape[1] == 0:
-            print("No data available in the requested time range!")
-            return
-        mz = signal.mz.values.astype(np.float32)
-        t = signal.time.values.astype(np.float32)
-        y_range = [0, signal.max().compute().item()]
+    #     signal = signal_array.signal.sel(
+    #                 mz=slice(*mz_range),
+    #                 time=slice(*t_range)
+    #                 )
+    #     if signal.shape[1] == 0:
+    #         print("No data available in the requested time range!")
+    #         return
+    #     mz = signal.mz.values.astype(np.float32)
+    #     t = signal.time.values.astype(np.float32)
+    #     y_range = [0, signal.max().compute().item()]
 
-        await self.emit_client_notification(
-                            'data_stream_coordinates',
-                            {'filename': filename,
-                             'mz': mz.tobytes(),
-                            #  'time': t.tobytes(),
-                             'mz_range': mz_range,
-                             't_range': t_range,
-                             'y_range': y_range
-                             },
-                            set_figure_ranges=set_figure_ranges,
-                            **{**kwargs,
-                               'namespace': '/',
-                               'no_data_logging': True
-                               }
-                            )
+    #     await self.emit_client_notification(
+    #                         'data_stream_coordinates',
+    #                         {'filename': filename,
+    #                          'mz': mz.tobytes(),
+    #                         #  'time': t.tobytes(),
+    #                          'mz_range': mz_range,
+    #                          't_range': t_range,
+    #                          'y_range': y_range
+    #                          },
+    #                         set_figure_ranges=set_figure_ranges,
+    #                         **{**kwargs,
+    #                            'namespace': '/',
+    #                            'no_data_logging': True
+    #                            }
+    #                         )
         
-        stream_data = True
-        # if set_figure_ranges:
-        #     # Full range request, try to load images from file and send to DataViz
-        #     try:
-        #         heatmap_img = load_heatmap_image(filename)
-        #         spec_imgs = load_spec_trace_images(filename)
-        #         await self.emit_client_notification('heatmap_image',
-        #                                             {'filename': filename,
-        #                                              'mz_range': mz_range,
-        #                                              't_range': t_range,
-        #                                              'img': heatmap_img
-        #                                              },
-        #                                             **{**kwargs,
-        #                                                    'namespace': '/',
-        #                                                    'no_data_logging': True
-        #                                                    }
-        #                                                 )
-        #         for t0, spec_img in spec_imgs:
-        #             await self.emit_client_notification('spec_trace_image',
-        #                                                 {'filename': filename,
-        #                                                  'mz_range': mz_range,
-        #                                                  't_range': [t0, t0], # t1 does not matter
-        #                                                  'img': spec_img
-        #                                                  },
-        #                                                 **{**kwargs,
-        #                                                    'namespace': '/',
-        #                                                    'no_data_logging': True
-        #                                                    }
-        #                                                 )
-        #         # No need to send data to DataViz
-        #         stream_data = False
-        #     except Exception as e:
-        #         print(e)
+    #     stream_data = True
+    #     # if set_figure_ranges:
+    #     #     # Full range request, try to load images from file and send to DataViz
+    #     #     try:
+    #     #         heatmap_img = load_heatmap_image(filename)
+    #     #         spec_imgs = load_spec_trace_images(filename)
+    #     #         await self.emit_client_notification('heatmap_image',
+    #     #                                             {'filename': filename,
+    #     #                                              'mz_range': mz_range,
+    #     #                                              't_range': t_range,
+    #     #                                              'img': heatmap_img
+    #     #                                              },
+    #     #                                             **{**kwargs,
+    #     #                                                    'namespace': '/',
+    #     #                                                    'no_data_logging': True
+    #     #                                                    }
+    #     #                                                 )
+    #     #         for t0, spec_img in spec_imgs:
+    #     #             await self.emit_client_notification('spec_trace_image',
+    #     #                                                 {'filename': filename,
+    #     #                                                  'mz_range': mz_range,
+    #     #                                                  't_range': [t0, t0], # t1 does not matter
+    #     #                                                  'img': spec_img
+    #     #                                                  },
+    #     #                                                 **{**kwargs,
+    #     #                                                    'namespace': '/',
+    #     #                                                    'no_data_logging': True
+    #     #                                                    }
+    #     #                                                 )
+    #     #         # No need to send data to DataViz
+    #     #         stream_data = False
+    #     #     except Exception as e:
+    #     #         print(e)
 
-        def stop_task():
-            cache_release(data, 'signal')
-            self.log(f"{data['name']} was cancelled due to a timeout.")
-        TASK_TTL = 1200     # 2 min
+    #     def stop_task():
+    #         cache_release(data, 'signal')
+    #         self.log(f"{data['name']} was cancelled due to a timeout.")
+    #     TASK_TTL = 1200     # 2 min
 
-        if stream_data:
-            signal_env['speci'] = 0
-            ttl_count = 0
-            for i, spec_array in enumerate(signal.transpose()):
-                if not cache_contains(data, 'signal'):
-                    # Request has been cancelled
-                    break
-                ttl_count = 0
-                while i - signal_env['speci'] > 10: # TODO: sync with spectra bundle size
-                    ttl_count += 1
-                    if ttl_count > TASK_TTL:
-                        stop_task()
-                        break
-                    await asyncio.sleep(.1)
-                spec = spec_array.values
-                ti = float( spec_array.time )
-                await self.emit_client_notification(
-                                            'loaded_spectrum',
-                                            {'filename': filename,
-                                             'i': i,
-                                             'spec': spec.tobytes(),
-                                             'mz_range': mz_range,
-                                             't_range': t_range,
-                                             't': ti,
-                                             },
-                                            callback="speci_callback",
-                                            callback_context=cache_get_keys(data),
-                                            **{**kwargs,
-                                               'namespace': '/',
-                                               'no_data_logging': True
-                                               }
-                                            )
-            # wait till last series of notifications (mod 10 in size) is processed by subscriber
-            while i > signal_env['speci'] and ttl_count < TASK_TTL:
-                await asyncio.sleep(.1)
-        # cache_release(data, 'signal')     # TODO: is it needed here?
-        await self.emit_client_notification('data_stream_finished',
-                                            {'filename': filename,
-                                             'mz_range': mz_range,
-                                             't_range': t_range,
-                                             },
-                                            **{**kwargs, 'namespace': '/'}
-                                            )
-    def speci_callback(self, ctx, n):
-        _, signal_env = cache_get(ctx, 'signal')
-        if not signal_env is None:
-            signal_env['speci'] = n
+    #     if stream_data:
+    #         signal_env['speci'] = 0
+    #         ttl_count = 0
+    #         for i, spec_array in enumerate(signal.transpose()):
+    #             if not cache_contains(data, 'signal'):
+    #                 # Request has been cancelled
+    #                 break
+    #             ttl_count = 0
+    #             while i - signal_env['speci'] > 10: # TODO: sync with spectra bundle size
+    #                 ttl_count += 1
+    #                 if ttl_count > TASK_TTL:
+    #                     stop_task()
+    #                     break
+    #                 await asyncio.sleep(.1)
+    #             spec = spec_array.values
+    #             ti = float( spec_array.time )
+    #             await self.emit_client_notification(
+    #                                         'loaded_spectrum',
+    #                                         {'filename': filename,
+    #                                          'i': i,
+    #                                          'spec': spec.tobytes(),
+    #                                          'mz_range': mz_range,
+    #                                          't_range': t_range,
+    #                                          't': ti,
+    #                                          },
+    #                                         callback="speci_callback",
+    #                                         callback_context=cache_get_keys(data),
+    #                                         **{**kwargs,
+    #                                            'namespace': '/',
+    #                                            'no_data_logging': True
+    #                                            }
+    #                                         )
+    #         # wait till last series of notifications (mod 10 in size) is processed by subscriber
+    #         while i > signal_env['speci'] and ttl_count < TASK_TTL:
+    #             await asyncio.sleep(.1)
+    #     # cache_release(data, 'signal')     # TODO: is it needed here?
+    #     await self.emit_client_notification('data_stream_finished',
+    #                                         {'filename': filename,
+    #                                          'mz_range': mz_range,
+    #                                          't_range': t_range,
+    #                                          },
+    #                                         **{**kwargs, 'namespace': '/'}
+    #                                         )
+    # def speci_callback(self, ctx, n):
+    #     _, signal_env = cache_get(ctx, 'signal')
+    #     if not signal_env is None:
+    #         signal_env['speci'] = n
 
     async def on_stop_data_request(self, data):
+        # TODO: Deprecated, need to update
         ranges = data['value'].pop('ranges', [])
         for r in ranges:
             data['value'].update({'mz_range': r['mz_range']})
@@ -780,7 +787,8 @@ class FileIoPrivateNamespace(BaseClientNamespace):
             return
         await kill_cache(data)
 
-    async def on_tps_data_request(self, data):        
+    async def on_tps_data_request(self, data):     
+        # TODO: Deprecated, need to update   
         value = data['value']
         figure_ranges = value.pop('figure_ranges', {})
         filename = figure_ranges.get('filename', None)
@@ -928,14 +936,15 @@ class FileIoClient(BridgeServiceClient):
 
     async def service_main(self):
         global signal_q
+
         while True:
-            # Check queue for signal to emit
+            # Check queue for signal to emit (put in cache_process_requests)
             try:
                 signal_data = self.signal_q.get_nowait()
             except Empty:
                 await self.sio.sleep(.1)
                 continue
-            # Emit figure data
+            # Emit
             client_room = signal_data.pop('client_room')
             self.log("Emitting t=%s to: " %signal_data['t'], client_room)
             await self.emit_public_notification(
