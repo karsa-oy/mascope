@@ -65,7 +65,7 @@ cur.execute('''CREATE TABLE visualizations
                 t_resolution real,
                 viz blob)
             ''')
-# Create requests table            
+# Create requests table
 cur.execute('''CREATE TABLE requests
                (filename text,
                 viz_type text,
@@ -410,7 +410,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
         global generator_output_q # TODO:
 
         value = data['value']
-        self.log(value)
+        # self.log(value)
         client_room = data.get('client_room') or data['cookies']['src_sid'][0]
         
         filename = value['filename']
@@ -437,14 +437,14 @@ class DataVizServiceNamespace(BaseClientNamespace):
             # print("t0_row: %s, t1_row: %s, mz0_row: %s, mz1_row: %s, viz_type: %s"
             #       %(t0_row, t1_row, mz0_row, mz1_row, viz_type_row)
             #       )
-            self.log("t0_chunk: %.2f, t1_chunk: %.2f" %(t0_chunk or 0, t1_chunk or 0))
+            # self.log("t0_chunk: %.2f, t1_chunk: %.2f" %(t0_chunk or 0, t1_chunk or 0))
             if t0_chunk is None:
                 # Start new continuous chunk of images
                 img_strs = []
                 t0_chunk = t0_row
                 if t0_chunk > t_range[0]:
                     # Gap in the beginning
-                    self.log("Gap in the beginning: %.2f-%.2f" %(t_range[0], t0_chunk))
+                    # self.log("Gap in the beginning: %.2f-%.2f" %(t_range[0], t0_chunk))
                     # Make request for the gap
                     viz_cache_put('requests',
                                   filename,
@@ -456,7 +456,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                   )
             elif abs(t0_row - t1_chunk) > 1e-5: # t1 of previous slice != t0 of current one
                 # Gap in the middle
-                self.log("Gap in the middle: %.2f-%.2f" %(t1_chunk, t0_row))
+                # self.log("Gap in the middle: %.2f-%.2f" %(t1_chunk, t0_row))
                 # Make request for the gap
                 viz_cache_put('requests',
                               filename,
@@ -502,7 +502,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
 
         if (t0_chunk is None) or (t1_chunk < t_range[1]):
             # (All) requested visualizations were not available
-            self.log("Gap in the end: %.2f-%.2f" %(t1_chunk or t_range[0], t_range[1]))
+            # self.log("Gap in the end: %.2f-%.2f" %(t1_chunk or t_range[0], t_range[1]))
             # Make request for the remaining time range
             viz_cache_put('requests',
                           filename,
@@ -515,25 +515,27 @@ class DataVizServiceNamespace(BaseClientNamespace):
         # Check if data_request is needed
         if filename not in cache:
             # Signal not in cache, request shape from FileIoService
-            self.log("Emit data_request to FileIoService")
+            # Add dummy cache item to avoid duplicate data_requests
+            cache[filename] = {}
+            # self.log("Emit data_request to FileIoService")
             await self.emit_client_notification('mz_coordinate_request',
                                                 {'filename': filename
                                                  }
                                                 )
-            # Add dummy cache item to avoid duplicate data_requests
-            cache[filename] = {}
+
             return
         elif 'signal' in cache[filename]:
             # Signal array in cache
             signal_array = cache[filename]['signal']
-            self.log("Process request on existing signal array")
+            # self.log("Process request on existing signal array")
             # Check for available time range and process request
             try:
                 available_t_range = [signal_array.data_array.time[0].item(),
                                      signal_array.data_array.time[-1].item()
                                      ]
-            except AttributeError:
+            except Exception as e:
                 # Nothing in the signal array yet
+                print(e)
                 return
             process_t_range = [max(t_range[0], available_t_range[0]),
                                min(t_range[1], available_t_range[1])
@@ -624,7 +626,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
         value = data['value']
         
         filename = value['filename']
-        self.log(filename)
+        # self.log(filename)
         
         # Initialize data arrays
         mz = np.frombuffer( value.get('mz'), dtype=np.float32 )
@@ -660,7 +662,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
 
         ti = np.array( [value['t']], dtype=np.float32 )
         period = np.array( [value['period']], dtype=np.float32 )
-        self.log(ti.item())
+        # self.log(ti.item())
         spec = np.frombuffer(value['spec'], dtype=np.float32)
         spec = spec.reshape(-1, 1)
 

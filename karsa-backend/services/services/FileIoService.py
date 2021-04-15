@@ -319,7 +319,7 @@ class FileIoPublicNamespace(BaseClientNamespace):
         ]
 
     async def on_figure_data(self, data):
-        self.log(data)
+        # self.log(data)
         value = data['value']
         filename = value['filename']
         viz_type = value['viz_type']
@@ -450,7 +450,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
 
         ti = np.array( [value['t']], dtype=np.float32 )
         period = np.array( [value['period']], dtype=np.float32 )
-        self.log(ti.item())
+        print(ti.item())
         spec = np.frombuffer(value['spec'], dtype=np.float32)
         spec = spec.reshape(-1, 1)
 
@@ -591,7 +591,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
     async def on_signal_request(self, data):
         global cache
 
-        self.log(data)
+        # self.log(data)
         value = data['value']
 
         filename = value['filename']
@@ -946,7 +946,7 @@ class FileIoClient(BridgeServiceClient):
                 continue
             # Emit
             client_room = signal_data.pop('client_room')
-            self.log("Emitting t=%s to: " %signal_data['t'], client_room)
+            # self.log("Emitting t=%s to: " %signal_data['t'], client_room)
             await self.emit_public_notification(
                             'loaded_spectrum',
                             signal_data,
