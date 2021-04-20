@@ -81,18 +81,6 @@ class MetadataServiceNamespace(BaseClientNamespace):
                                             namespace=namespace
                                             )
 
-    async def on_image_to_save(self, data):
-        namespace = '/' + data['value']['filename'].split('_')[0]
-        value = data['value']
-        kwargs = get_client_notification_args(data)
-
-        await self.emit_client_notification('image_to_save',
-                                            value,
-                                            **{**kwargs,
-                                               'namespace': namespace
-                                               }
-                                            )
-
     async def on_stop_data_request(self, data):
         try:
             namespace = '/' + data['value']['filename'].split('_')[0]

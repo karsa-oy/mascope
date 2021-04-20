@@ -312,25 +312,24 @@ def cache_update(table,
 # ------------------------------------------
 
 class FileIoPublicNamespace(BaseClientNamespace):
-    endpoints = [
+    endpoints = []
+    endpoints_room_sid = [
         # DataViz
         'figure_data',
         # //
         ]
+    endpoints_room_instrument = []
+
+    async def subscribe(self):
+        if self.endpoints:
+            await super().subscribe(self.endpoints)
+        if self.endpoints_room_sid:
+            await super().subscribe(self.endpoints_room_sid, self.room_sid)
+        if self.endpoints_room_instrument:
+            await super().subscribe(self.endpoints_room_instrument, self.room_instrument)
 
     async def on_figure_data(self, data):
-        # self.log(data)
-        value = data['value']
-        filename = value['filename']
-        viz_type = value['viz_type']
-        image_array = cache[filename][viz_type]
-        
-        ti = np.array([ value['t_range'][0] ], dtype=np.float32)
-        img_str = value['img']
-        image_array.extend_array(np.array([img_str]),
-                                 [ti],
-                                 'time'
-                                 )
+        await self.parent.private_ns.on_figure_data(data)
 
 
 class FileIoPrivateNamespace(BaseClientNamespace):
@@ -338,6 +337,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
 
     endpoints = [
         # TOFService
+        'acquisition_started',
         'acquisition_coordinates',
         'acquired_spectrum',
         # 'acquired_tps_data',
@@ -353,11 +353,41 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         # Router
         'service_state',
         # //
+        # DataViz
+        # 'figure_data',    # private figure_data is masked by public endpoint
         ]
 
     service_state = dict()
 
+
+    # # ========= DataViz ===============
+    async def on_figure_data(self, data):
+        # self.log(data)
+        value = data['value']
+        filename = value['filename']
+        viz_type = value['viz_type']
+        image_array = cache[filename][viz_type]
+        ti = np.array([ value['t_range'][0] ], dtype=np.float32)
+        img_str = value['img']
+        image_array.extend_array(np.array([img_str]),
+                                 [ti],
+                                 'time'
+                                 )
+
     # ========== TOFService requests ==========
+    async def on_acquisition_started(self, data):
+        # Request full-size visualization from DataViz
+        await self.parent.emit_public_notification(
+                'visualize_range',
+                {'filename': data['value']['filename'],
+                 'mz_range': data['value']['mz_range'],
+                 't_range': data['value']['t_range'],
+                 'viz_type': 'spectrogram',  # TODO: None for all
+                },
+                client_room=self.parent.public_ns.room_sid,
+              )
+
+
     async def on_acquisition_coordinates(self, data):
         """Initialize acquisition cache with received coordinates
 
@@ -422,17 +452,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                       }
         cache[filename_base] = cache_item
         print("cache: %s" %str(cache))
-        # Request visualizations from DataViz
-        await self.emit_client_notification('visualize_range',
-                                            {'filename': filename_base,
-                                             'viz_type': 'spectrogram',
-                                             't_range': [0, t_range[1]],
-                                             'mz_range': [ float(mz[0]), float(mz[-1]) ],
-        #                                      't_resolution': interval,
-                                             },
-                                            client_room='figure_data',
-                                            namespace='/'
-                                            )
+
 
     async def on_acquired_spectrum(self, data):
         """Receive new spectrum, add to cache

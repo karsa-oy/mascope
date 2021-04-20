@@ -337,10 +337,11 @@ class BaseServiceClient:
         ns_name, ns_class = client_namespace_data
         if not ns_name.startswith('/'):
             ns_name = '/' + ns_name
-        self.sio.register_namespace( ns_class(ns_name) )
         self.log('Register handler for namespace', ns_name)
+        self.sio.register_namespace( ns_class(ns_name) )
         self.ns_handler = self.sio.namespace_handlers.get(ns_name)
         self.ns_handler.parent = self
+        self.ns_handler.room_sid = None
         # root ns handler is needed to communicate with router at re-connect
         if '/' not in self.sio.namespace_handlers:
             self.sio.register_namespace( BaseClientNamespace('/') )
@@ -361,6 +362,9 @@ class BaseServiceClient:
             except Exception as e:
                 self.log(f"Failed: {e}\nRetrying...")
                 await self.sio.sleep(1)
+        for ns in self.sio.namespace_handlers:
+            self.sio.namespace_handlers.get(ns).room_sid = self.sio.get_sid(ns)
+
 
     async def disconnect(self):
         await self.sio.disconnect()
@@ -395,19 +399,21 @@ class BridgeServiceClient(BaseServiceClient):
         ns_name, ns_class = public_namespace_data
         if ns_name != '/':
             raise BadNamespaceError(f'Invalid root namespace {ns_name}')
-        self.sio.register_namespace( ns_class(ns_name) )
         self.log('Register handler for namespace', ns_name)
+        self.sio.register_namespace( ns_class(ns_name) )
         self.public_ns = self.sio.namespace_handlers.get(ns_name)
         # private namespace
         ns_name, ns_class = private_namespace_data
         if not ns_name.startswith('/'):
             ns_name = '/' + ns_name
-        self.sio.register_namespace( ns_class(ns_name) )
         self.log('Register handler for namespace', ns_name)
+        self.sio.register_namespace( ns_class(ns_name) )
         self.private_ns = self.sio.namespace_handlers.get(ns_name)
         # cross-references
         self.public_ns.parent = self
+        self.public_ns.room_sid = None
         self.private_ns.parent = self
+        self.private_ns.room_sid = None
 
     async def emit_public_notification(self, name, value, **kwarg):
         await self.public_ns.emit_client_notification(name, value, **kwarg)
@@ -514,12 +520,6 @@ class BaseStreamerClient(BridgeServiceClient):
             filename = filename.replace(' ', '_')
 
             await self.emit_private_notification(
-                                        'acquisition_started',
-                                        {'filename': filename,
-                                         },
-                                        )
-
-            await self.emit_private_notification(
                                         'acquisition_coordinates',
                                         {'filename': filename,
                                          'mz': self.streamer.mz.tobytes(),
@@ -534,6 +534,13 @@ class BaseStreamerClient(BridgeServiceClient):
                                              'tps_info': self.streamer.tps_info,
                                              },
                                             )
+            await self.emit_private_notification(
+                                        'acquisition_started',
+                                        {'filename': filename,
+                                         'mz_range': [float(self.streamer.mz[0]), float(self.streamer.mz[-1])],
+                                         't_range': [0, self.streamer.length],
+                                        },
+                                       )
             # Acquisition loop
             self.log("Entering acquisition loop.")
 
@@ -581,7 +588,7 @@ class BaseStreamerClient(BridgeServiceClient):
                             break
                         await asyncio.sleep(.1)
                     if stop_task:
-                        break
+                        continue
                     # Spectrum data
                     await self.emit_private_notification(
                                             'acquired_spectrum',

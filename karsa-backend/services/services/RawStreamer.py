@@ -19,12 +19,11 @@ class RawStreamerPublicNamespace(BaseClientNamespace):
     room_data_sources = 'room_data_sources'
 
     endpoints = []
-
+    endpoints_room_sid = []
     endpoints_room_data_sources = [
         'instrument_data_request',
         'service_state',
         ]
-    
     endpoints_room_instrument = [
         'instrument_data_request',
         ]
@@ -36,6 +35,10 @@ class RawStreamerPublicNamespace(BaseClientNamespace):
     async def subscribe(self):
         if self.endpoints:
             await super().subscribe(self.endpoints
+                                    )
+        if self.endpoints_room_sid:
+            await super().subscribe(self.endpoints_room_sid,
+                                    self.room_sid
                                     )
         if self.endpoints_room_data_sources:
             await super().subscribe(self.endpoints_room_data_sources,

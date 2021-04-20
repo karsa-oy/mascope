@@ -27,7 +27,7 @@ var _ = require('underscore');
 
 
 export default {
-    name: "ViewPort",
+    // name: "ViewPort",
     components: {
     },
     props: {
@@ -58,6 +58,7 @@ export default {
     },
     data: function() {
         return {
+            name: "ViewPort_" + this.id,
             be: null,   //backend communicator
             namespace: null,
             room: null,
@@ -151,7 +152,7 @@ export default {
         },
 
         log: function(...args) {
-            console.log('[' + this.$options.name + ']',  ...args);
+            console.log('[' + this.name + ']',  ...args);
         },
 
         figure_cache_add_ref(zoom_stack_item_room) {

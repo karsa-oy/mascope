@@ -10,13 +10,13 @@ const NO_DATA_LOGGING_DEFAULT = true;
 export class BECom {
     constructor(ctx) {
         this.ctx = ctx;
-        this.log_prefix = ctx.$options.name;
+        this.app_name = ctx.$options.name || ctx.name;
         this.external_notifications = [];
     }
 
     connect(url=null) {
         let the_url = url || this.ctx.url;
-        this.log(this.ctx.$options.name, "Connecting to url: ", the_url);
+        this.log("Connecting to url: ", the_url);
         let namespace = io.connect(the_url);
         this.ctx['namespace'] = namespace;
         namespace.on("connect", () => {
@@ -25,7 +25,7 @@ export class BECom {
         });
         // no need to unsubscribe on disconnect - client is unsubscribed by framework
         namespace.on("disconnect", () => {
-            this.log(this.ctx.$options.name, "socket disconnected");
+            this.log("socket disconnected");
         });
         return namespace
     }
@@ -42,7 +42,7 @@ export class BECom {
         this.log(room, 'subscribed for', endpoints);
 
         the_namespace.emit('subscribe',
-                         {'app_name': this.ctx.$options.name,
+                         {'app_name': this.app_name,
                           'endpoints': endpoints,
                           'client_room': room,
                           'room': room});
@@ -58,7 +58,7 @@ export class BECom {
         let the_namespace = namespace || this.ctx.namespace;
         this.log(room, 'unsubscribed from', endpoints);
         the_namespace.emit('unsubscribe',
-                         {'app_name': this.ctx.$options.name,
+                         {'app_name': this.app_name,
                           'endpoints': endpoints,
                           'room': room});
     }
@@ -143,7 +143,7 @@ export class BECom {
     }
     
     log(...args) {
-        console.log('[' + this.log_prefix + ']',  ...args);
+        console.log('[' + this.app_name + ']',  ...args);
     }
 
     emit_client_notification(name,

@@ -14,10 +14,11 @@ NO_DATA_LOGGING_DEFAULT = True
 class TOFServicePublicNamespace(BaseClientNamespace):
     # TOF service public (root) interfaces
     # the public namespace is primarily exposed to the root namespace
-    # via a room_instrument = private_namespace_name.
+    # via a room_instrument = private_namespace_name (set by BaseStreamClient init)
     room_instrument = None
     room_data_sources = 'room_data_sources'
     endpoints = []
+    endpoints_room_sid = []
     endpoints_room_data_sources = [
             'instrument_data_request',
             'service_state',
@@ -32,6 +33,8 @@ class TOFServicePublicNamespace(BaseClientNamespace):
     async def subscribe(self):
         if self.endpoints:
             await super().subscribe(self.endpoints)
+        if self.endpoints_room_sid:
+            await super().subscribe(self.endpoints_room_sid, self.room_sid)
         if self.endpoints_room_data_sources:
             await super().subscribe(self.endpoints_room_data_sources, self.room_data_sources)
         if self.endpoints_room_instrument:
