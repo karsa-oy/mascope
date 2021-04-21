@@ -35,8 +35,9 @@ export default {
     },
     computed: {
         ...mapState([
+                    'figure_data',
                     'root_namespace',
-                    'sample_to_load',
+                    // 'sample_to_load',
                     'target_to_display',
                     ]),
         figure_double_click: {
@@ -65,7 +66,7 @@ export default {
             room_sid: null,
             endpoints: [
                 // 'acquisition_progress',
-                'figure_data',
+                // 'figure_data',
                 // 'figure_ranges',
                 ],
 
@@ -75,7 +76,6 @@ export default {
             figure: {},
             figure_cache: {'t_maxrange': [0, 0], 'mz_maxrange': [0, 0]},
             figure_config: {},
-            figure_data: {},
             figure_traces: [],
             figure_layout: {},
             figure_layout_default: {},
@@ -649,6 +649,8 @@ export default {
 
     watch: {
         figure_data: function(new_value) {
+            if ( !_.isEqual(new_value.value.viz_type, this.id) )
+                return;
             this.on_figure_data(new_value);
         },
         figure_double_click: function() {
@@ -702,7 +704,7 @@ export default {
                 this.namespace = this.root_namespace;
                 // handlers for for external notifications:
                 // this.namespace.on("figure_ranges", (value) => this.be.import_one_way_binding_prop("figure_ranges", {...value.value, 'uid': Math.random()}));
-                this.namespace.on("figure_data", (value) => this.be.import_one_way_binding_prop("figure_data", value));
+                // this.namespace.on("figure_data", (value) => this.be.import_one_way_binding_prop("figure_data", value));
 
                 this.room_sid = this.root_namespace.id;
                 this.room = Math.random().toString(36).substring(2);

@@ -104,6 +104,14 @@ export default {
                     'target_to_display',
                     //  'tps_parameters',
                     ]),
+        figure_data: {
+            get() {
+                return this.$store.state.figure_data;
+            },
+            set(value) {
+                this.$store.commit('figure_data', value);
+            }
+        },
         figure_ranges: {
             get() {
                 return this.$store.state.figure_ranges;
@@ -126,6 +134,7 @@ export default {
 
             room_sid: null,
             endpoints: [
+                'figure_data',
                 // 'figure_ranges',
                 // 'tps_parameters',
             ],
@@ -246,6 +255,7 @@ export default {
                 // handlers for for external notifications:
                 // this.namespace.on("figure_ranges", (value) => this.be.import_one_way_binding_prop("figure_ranges", {...value.value, 'uid': Math.random()}));
                 // this.namespace.on("tps_parameters", (value) => this.be.import_one_way_binding_prop("tps_parameters", value.value));
+                this.namespace.on("figure_data", (value) => this.be.import_one_way_binding_prop("figure_data", value));
 
                 this.room_sid = this.root_namespace.id;
                 this.be.subscribe(this.endpoints, this.room_sid);
