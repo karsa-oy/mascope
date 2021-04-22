@@ -1,8 +1,68 @@
 <template>
     <div>
+        <!-- Modals -->
+        <!--- Add annotation modal--> 
+        <section class="add-log-entry-modal">
+            <b-modal :active.sync="is_modal_add_annotation_active"
+                has-modal-card
+                trap-focus
+                :can-cancel="true"
+                aria-role="dialog"
+                aria-modal>
+                <div class="modal-card" style="width: 500px;">
+                    <!-- Main content -->
+                    <div>
+                        <header class="modal-card-head">
+                            <p class="modal-card-title">
+                                Add sample annotation
+                            </p>
+                        </header>
+                        <section class="modal-card-body">
+                            <b-field label="Timestamp">
+                                <b-numberinput
+                                    v-model="annotation_timestamp"
+                                    :value="annotation_timestamp">
+                                </b-numberinput>
+                            </b-field>
+
+                            <b-field label="Annotation text">
+                                <b-input type="input"
+                                    v-model="annotation_text"
+                                    :value="annotation_text"
+                                    maxlength="50">
+                                </b-input>
+                            </b-field>
+
+                            <MetaDataForm></MetaDataForm>
+                            <div><br></div>
+                        </section>
+                    </div>
+                    <!-- Footer -->
+                    <footer class="modal-card-foot">
+                        <button
+                            class="button"
+                            type="button"
+                            @click="is_modal_add_annotation_active=false; add_sample_annotation();"
+                            is-dark>
+                            Save
+                        </button>
+                        <button
+                            class="button"
+                            type="button"
+                            is-dark
+                            @click="is_modal_add_annotation_active=false">
+                            Cancel
+                        </button>
+                    </footer>
+                </div>
+            </b-modal>
+        </section>
+        <!--- End of add annotation modal--> 
+        <!-- End of modals -->
 
         <!-- Main content  area-->
         <section>
+            <!-- Figure div -->
             <div :id="id"></div>
         </section>
 
@@ -18,6 +78,7 @@ import Buefy from "buefy";
 import "buefy/dist/buefy.css";
 import '@mdi/font/css/materialdesignicons.min.css';
 import { BECom } from "../karsalib.js"
+import MetaDataForm from "./MetaDataForm.vue"
 
 Vue.use([Buefy]);
 
@@ -29,6 +90,7 @@ var _ = require('underscore');
 export default {
     // name: "ViewPort",
     components: {
+        MetaDataForm,
     },
     props: {
         id: String,
@@ -70,7 +132,10 @@ export default {
                 // 'figure_ranges',
                 ],
 
-            
+            is_modal_add_annotation_active: false,
+            annotation_text: "",
+            annotation_timestamp: null,
+
             filename: '',
 
             figure: {},
@@ -99,6 +164,23 @@ export default {
     },
 
     methods: {
+        add_sample_annotation() {
+            let annotation = {
+                    'text': this.annotation_text,
+                    'xref': 'x',
+                    'x': this.annotation_timestamp,
+                    'yref': 'paper',
+                    'y': 0,
+                    'ayref': 'paper',
+                    'ay': .9,
+                    'ax': 0,
+            };
+            let annotations = this.figure_layout.annotations || [];
+            annotations.push(annotation);
+            // Update figure
+            Plotly.relayout(this.id, {annotations: annotations})
+        },
+
         beep: function() {
             var snd = new Audio("data:audio/mp3;base64,//uQRAAAAWMSLwUIYAAsYkXgoQwAEaYLWfkWgAI0wWs\
             /ItAAAGDgYtAgAyN+QWaAAihwMWm4G8QQRDiMcCBcH3Cc+CDv/7xA4Tvh9Rz/y8QADBwMWgQAZG/ILNAARQ4GL\
@@ -202,7 +284,7 @@ export default {
             // This function reads figure layouts from config file, creates
             // the Plotly figures and configures event handlers
 
-            let self = this;
+            var self = this;
             // Read layouts from config file
             if (fs.existsSync('configs/figure_layouts.json')) {
                 let figure_layouts = JSON.parse(fs.readFileSync('configs/figure_layouts.json', 'utf8'));
@@ -211,23 +293,26 @@ export default {
             }
 
             // Common config for all figures
-            let init_data = [{x: [0, 1],
-                              y: [0, 1],
+            let init_data = [{x: [0, 1, 2, 3, 4, 5],
+                              y: [0, 1, 2, 0, 1, 2],
                               type: "scattergl",
-                              mode: 'markers',
-                              marker: {opacity: 0.0},
-                              hoverinfo: 'skip',
+                              mode: 'lines+markers',
+                            //   marker: {opacity: 0.0},
+                            //   hoverinfo: 'skip',
                               }];
+            self.figure_layout = self.shallow_copy(self.figure_layout_default);
 
             // ===== Initialize Plotly figure =====
             let figure_div = document.getElementById(self.id);
             Plotly.newPlot(figure_div,
                            init_data,
-                           self.figure_layout_default,
+                           self.figure_layout,
                            {...self.figure_config,
                             "doubleClick": false
                             }
                            );
+            
+            
             // Relayout event
             figure_div.on("plotly_relayout", function(eventData) {
                 if ( _.isEmpty(eventData) ) {
@@ -238,7 +323,10 @@ export default {
                     // Figure resize event
                     return;
                 }
-
+                if ( Object.keys(eventData).length == 1 && eventData.annotations ) {
+                    // Annotations edited
+                    return;
+                }
                 if ( Object.keys(eventData).length ) {
                     // zoom_in
 
@@ -279,17 +367,21 @@ export default {
                     // self.visualize_range_on_zoom_in(prev_ranges, ranges);
                 }
             });
-
+            // Click event
+            figure_div.on('plotly_click', function(eventData){
+                let timestamp = eventData.points[0].x;
+                self.annotation_timestamp = timestamp;
+                self.is_modal_add_annotation_active = true;
+            });
             // Double click event
             figure_div.on('plotly_doubleclick', function(){
                 // Signal double click to all ViewPorts
                 self.figure_double_click = Math.random();
             });
-
             // Right click event
             figure_div.addEventListener('contextmenu', function(ev) {
                 ev.preventDefault();
-                this.log("Right click event....");
+                self.log("Right click event....");
                 return false;
             }, false);
             // ===== Plotly figure initialized =====

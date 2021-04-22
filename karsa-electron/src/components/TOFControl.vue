@@ -1,14 +1,65 @@
 <template>
     <div>
-<!-- Modals -->
+    <!-- Modals -->
+        <!--- Add log entry modal--> 
+        <section class="add-log-entry-modal">
+            <b-modal :active.sync="is_modal_add_log_entry_active"
+                has-modal-card
+                trap-focus
+                :can-cancel="true"
+                aria-role="dialog"
+                aria-modal>
+                <div class="modal-card" style="width: 500px;">
+                    <!-- Main content -->
+                    <div>
+                        <header class="modal-card-head">
+                            <p class="modal-card-title">
+                                Add instrument log entry
+                            </p>
+                        </header>
+                        <section class="modal-card-body">
+                            <b-field label="Datetime">
+                                <b-datetimepicker
+                                    v-model="log_entry_datetimestamp"
+                                    icon="calendar-today"
+                                    :timepicker="{'hour-format': '24'}"
+                                    horizontal-time-picker>
+                                </b-datetimepicker>
+                            </b-field>
+                            <MetaDataForm></MetaDataForm>
+                            <div><br></div>
+                        </section>
+                    </div>
+                    <!-- Footer -->
+                    <footer class="modal-card-foot">
+                        <button
+                            class="button"
+                            type="button"
+                            @click="writeInstrumentLogEntry()"
+                            is-dark>
+                            Save
+                        </button>
+                        <button
+                            class="button"
+                            type="button"
+                            is-dark
+                            @click="cancelInstrumentLogEntry()">
+                            Cancel
+                        </button>
+                    </footer>
+                </div>
+            </b-modal>
+        </section>
+        <!--- End of add log entry modal--> 
         <!-- Modal for edit temperature ramp datatable values -->
         <section class="modal-edit-temperature-ramp-data-table-row">
-            <b-modal :active.sync="is_edit_temperature_ramp_modal_active"
+            <b-modal 
+                :active.sync="is_edit_temperature_ramp_modal_active"
                 has-modal-card
                 trap-focus
                 aria-role="dialog"
-                aria-modal
-            >
+                aria-modal>
+
                 <div class="columns">
                     <div class="modal-card" style="width: auto">
                         <!-- <header class="modal-card-head">
@@ -108,6 +159,13 @@
                                             instrument_status=='not_ready'"
                                     @click="on_button_change_acquisition_status()">
                                     {{ acquisition_control_label }}
+                                </b-button>
+                                <div><br></div>
+                                <b-button
+                                    type="is-dark"
+                                    :disabled="false"
+                                    @click="onButtonInstrumentLogEntry()">
+                                    Add instrument log entry
                                 </b-button>
                                 <div><br></div>
                             </div>
@@ -286,6 +344,8 @@ import Buefy from "buefy";
 import "buefy/dist/buefy.css";
 import '@mdi/font/css/materialdesignicons.min.css';
 import { BECom } from "../karsalib.js"
+import MetaDataForm from "./MetaDataForm.vue"
+
 
 Vue.use([Buefy]);
 
@@ -295,6 +355,7 @@ var _ = require('underscore');
 export default {
     name: "TOFControl",
     components: {
+        MetaDataForm,
     },
     props: [
     ],
@@ -333,8 +394,9 @@ export default {
         return {
             // UI variables
             acquisition_button_type: "is-primary",
-            is_edit_temperature_ramp_modal_active: false,
             acquisition_control_label: "Start Acquisition",
+            is_edit_temperature_ramp_modal_active: false,
+            is_modal_add_log_entry_active: false,
             //
             // Communication
             be: null,
@@ -355,6 +417,11 @@ export default {
             instrument_status: "not_ready",			// not_ready/ready
             scenthound_status: "Offline",       // Offline/Ready/Measuring.../Processing...
             //
+            // Log entry modal variables
+            log_entry_datetimestamp: null,
+            log_entry_fields: [],
+            log_entry_text: "",
+            //
             // variables for desoprtion collapsable
             acquisition_mode: "continuous",
             time: "",
@@ -369,12 +436,6 @@ export default {
             desorption_table_selected_row: null,
             desorption_table_checked_rows: [],
             desorption_data: [],
-            // variables for acquisitions status
-
-            config_file_data: null,
-            // flag to separate if data was changed by user or by loading
-            // config file in the 
-            data_updated_from_loading: true,
         }
     },
     created: function() {
@@ -386,6 +447,9 @@ export default {
     mounted: function() {
     },
     methods: {
+        cancelInstrumentLogEntry() {
+            this.is_modal_add_log_entry_active = false;
+        },
         confirmAcquisitionControl() {
             this.$buefy.dialog.confirm({
                 title: 'Instrument control',
@@ -453,6 +517,10 @@ export default {
             this.is_edit_temperature_ramp_modal_active = false;
             this.save_all_values_to_configuration_file();
         },
+        onButtonInstrumentLogEntry() {
+            this.log_entry_datetimestamp = new Date();
+            this.is_modal_add_log_entry_active = true;
+        },
         on_button_change_acquisition_status() {
             let next_status = {"not_running": "starting",
                                "starting": "stopping",
@@ -515,6 +583,9 @@ export default {
                 this.is_edit_temperature_ramp_modal_active = true;
             }
         },
+        writeInstrumentLogEntry() {
+            this.is_modal_add_log_entry_active = false;
+        },
     },
     watch: {
         data_source_selected: function(new_value, old_value) {
@@ -537,10 +608,6 @@ export default {
         acquisition_mode: function(new_value, old_value) {
             if (new_value === old_value) {
                 return false;
-            }
-            if (this.data_updated_from_loading == false) {
-                // this.save_all_values_to_configuration_file();
-                return // TODO: is there something to do
             }
         },
         acquisition_started: function(new_value, old_value) {

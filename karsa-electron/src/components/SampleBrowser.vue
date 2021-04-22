@@ -137,8 +137,7 @@
                         <header class="modal-card-head">
                             <p class="modal-card-title">{{ sample_file }}</p>
                         </header>
-                        <section class="modal-card-body write_sample_attribute">
-                            
+                        <section class="modal-card-body write_sample_attribute">                            
                             <b-field label="Sample title">
                                 <b-input type="input"
                                     v-model="sample_name"
@@ -155,7 +154,10 @@
                                     type="textarea">
                                 </b-input>
                             </b-field>
+                            
+                            <MetaDataForm></MetaDataForm>
 
+                            <div><br></div>
                             <b-field label="Project">
                                 <b-select
                                     placeholder="Select a project"
@@ -420,6 +422,7 @@ import Buefy from "buefy";
 import "buefy/dist/buefy.css";
 import '@mdi/font/css/materialdesignicons.min.css';
 import { BECom } from "../karsalib.js"
+import MetaDataForm from "./MetaDataForm.vue"
 
 Vue.use([Buefy]);
 
@@ -428,6 +431,7 @@ var _ = require('underscore');
 export default {
     name: "SampleBrowser",
     components: {
+        MetaDataForm,
     },
     props: {
     },

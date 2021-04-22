@@ -1,5 +1,64 @@
 <template>
     <div>
+        <!-- Modals -->
+        <!--- Add log entry modal--> 
+        <section class="add-log-entry-modal">
+            <b-modal :active.sync="is_modal_add_log_entry_active"
+                has-modal-card
+                trap-focus
+                :can-cancel="true"
+                aria-role="dialog"
+                aria-modal>
+                <div class="modal-card" style="width: 500px">
+                    <!-- Main content -->
+                    <div>
+                        <header class="modal-card-head">
+                            <p class="modal-card-title">
+                                Add sample log entry
+                            </p>
+                        </header>
+                        <section class="modal-card-body">
+                            <b-field label="Datetime">
+                                {{ log_entry_datetimestamp }}
+                            </b-field>
+                            <b-field label="DAQ time [s]">
+                                <b-numberinput
+                                    type="is-dark"
+                                    min="0"
+                                    v-model="log_entry_daq_timestamp">
+                                </b-numberinput>
+                            </b-field>
+                            <b-field label="Text">
+                                <b-input
+                                    v-model="log_entry_text"
+                                    maxlength="255"
+                                    type="textarea">
+                                </b-input>
+                            </b-field>
+                        </section>
+                    </div>
+                    <!-- Footer -->
+                    <footer class="modal-card-foot">
+                        <button
+                            class="button"
+                            type="button"
+                            @click="writeSampleLogEntry()"
+                            is-dark>
+                            Save
+                        </button>
+                        <button
+                            class="button"
+                            type="button"
+                            is-dark
+                            @click="cancelSampleLogEntry()">
+                            Cancel
+                        </button>
+                    </footer>
+                </div>
+            </b-modal>
+        </section>
+        <!--- End of add log entry modal--> 
+        <!-- End of modals -->
 
         <!-- Main content  area-->
         <section>
@@ -125,6 +184,16 @@ export default {
         return {
             be: null,   //backend communicator
             namespace: null,
+
+            // UI variables
+            is_modal_add_log_entry_active: false,
+            //
+
+            // Log entry modal variables
+            log_entry_text: "",
+            log_entry_datetimestamp: null,
+            log_entry_daq_timestamp: 0,
+            //
 
             filename: '',
 
