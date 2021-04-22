@@ -430,7 +430,8 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                       )
         # Emit cached visualizations and update request ranges accordingly
         img_strs = []
-        t0_chunk = t1_chunk = None
+        t0_chunk = None
+        t1_chunk = None
         # Loop through cached visualizations
         for row in img_data_rows:
             img_str_row, t0_row, t1_row, mz0_row, mz1_row, viz_type_row = row
