@@ -520,9 +520,10 @@ class DataVizServiceNamespace(BaseClientNamespace):
             cache[filename] = {}
             # self.log("Emit data_request to FileIoService")
             await self.emit_client_notification('mz_coordinate_request',
-                                                {'filename': filename
-                                                 }
-                                                )
+                                                {'filename': filename,
+                                                },
+                                                room=client_room
+                                               )
 
             return
         elif 'signal' in cache[filename]:
@@ -628,6 +629,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
         
         filename = value['filename']
         # self.log(filename)
+        client_room = data.get('client_room') or data['cookies']['src_sid'][0]
         
         # Initialize data arrays
         mz = np.frombuffer( value.get('mz'), dtype=np.float32 )
@@ -649,7 +651,8 @@ class DataVizServiceNamespace(BaseClientNamespace):
         # Request signal
         await self.emit_client_notification('signal_request',
                                             {'filename': filename,
-                                             }
+                                             },
+                                             room=client_room
                                             )
 
     async def on_acquired_spectrum(self, data):

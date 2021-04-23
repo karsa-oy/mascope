@@ -316,6 +316,8 @@ class FileIoPublicNamespace(BaseClientNamespace):
     endpoints_room_sid = [
         # DataViz
         'figure_data',
+        'mz_coordinate_request',
+        'signal_request',
         # //
         ]
     endpoints_room_instrument = []
@@ -331,6 +333,12 @@ class FileIoPublicNamespace(BaseClientNamespace):
     async def on_figure_data(self, data):
         await self.parent.private_ns.on_figure_data(data)
 
+    async def on_mz_coordinate_request(self, data):
+        await self.parent.private_ns.on_mz_coordinate_request(data)
+
+    async def on_signal_request(self, data):
+        await self.parent.private_ns.on_signal_request(data)
+
 
 class FileIoPrivateNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to MainService """
@@ -345,8 +353,6 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         # 'tps_parameter_info',
         # //
         # SampleManager
-        'mz_coordinate_request',
-        'signal_request',
         'stop_data_request',
         'tps_data_request',
         # //
@@ -354,25 +360,13 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         'service_state',
         # //
         # DataViz
-        # 'figure_data',    # private figure_data is masked by public endpoint
+        # 'figure_data',            # masked by public endpoint
+        # 'mz_coordinate_request',  # masked by public endpoint
+        # 'signal_request',         # masked by public endpoint
         ]
 
     service_state = dict()
 
-
-    # # ========= DataViz ===============
-    async def on_figure_data(self, data):
-        # self.log(data)
-        value = data['value']
-        filename = value['filename']
-        viz_type = value['viz_type']
-        image_array = cache[filename][viz_type]
-        ti = np.array([ value['t_range'][0] ], dtype=np.float32)
-        img_str = value['img']
-        image_array.extend_array(np.array([img_str]),
-                                 [ti],
-                                 'time'
-                                 )
 
     # ========== TOFService requests ==========
     async def on_acquisition_started(self, data):
@@ -561,6 +555,19 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         cache_put(data, 'tps', tps_array)
     # -----------------------------------------
     # =========== DataViz requests ===========
+    async def on_figure_data(self, data):
+        # self.log(data)
+        value = data['value']
+        filename = value['filename']
+        viz_type = value['viz_type']
+        image_array = cache[filename][viz_type]
+        ti = np.array([ value['t_range'][0] ], dtype=np.float32)
+        img_str = value['img']
+        image_array.extend_array(np.array([img_str]),
+                                 [ti],
+                                 'time'
+                                 )
+
     async def on_mz_coordinate_request(self, data):
         value = data['value']
 
@@ -598,15 +605,15 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         mz = signal_array.data_array.mz.sel(mz=slice(*mz_range))
         mz = mz.values.astype(np.float32)
 
-        await self.emit_client_notification(
+        await self.parent.emit_public_notification(
                             'mz_coordinates',
                             {'filename': filename,
                              'mz': mz.tobytes(),
                              'mz_range': mz_range,
-                             },
-                            namespace='/',
+                            },
+                            client_room=self.parent.public_ns.room_sid,
                             no_data_logging=True
-                            )
+                        )
 
     async def on_signal_request(self, data):
         global cache
