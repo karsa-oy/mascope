@@ -12,11 +12,6 @@
                 <div class="modal-card" style="width: 500px">
                     <!-- Main content -->
                     <div>
-                        <header class="modal-card-head">
-                            <p class="modal-card-title">
-                                New project
-                            </p>
-                        </header>
                         <section class="modal-card-body">
                             <b-field label="Field to remove">
                                 <b-select
@@ -36,20 +31,15 @@
                     </div>
                     <!-- Footer -->
                     <footer class="modal-card-foot">
-                        <button
-                            class="button"
-                            type="button"
-                            @click="removeField()"
-                            is-dark>
+                        <b-button
+                            type="is-primary"
+                            @click="removeField()">
                             Remove
-                        </button>
-                        <button
-                            class="button"
-                            type="button"
-                            is-dark
+                        </b-button>
+                        <b-button
                             @click="is_modal_remove_field_active=false">
                             Cancel
-                        </button>
+                        </b-button>
                     </footer>
                 </div>
             </b-modal>
@@ -67,19 +57,23 @@
             </template>
         </div>
         <div><br></div>
-        <b-field>
-            <b-button
-                @click="addField()"
-                is-dark>
-                New field
-            </b-button>
-            <b-button
-                @click="is_modal_remove_field_active=true"
-                :disabled="!form_fields.length"
-                is-dark>
-                Remove field
-            </b-button>
-        </b-field>
+        <div class="columns">
+            <div class="column is-half" style="text-align:center">
+                <b-button
+                    @click="addField()"
+                    is-dark>
+                    New field
+                </b-button>
+            </div>
+            <div class="column is-half" style="text-align:center">
+                <b-button
+                    @click="is_modal_remove_field_active=true"
+                    :disabled="!form_fields.length"
+                    is-dark>
+                    Remove field
+                </b-button>
+            </div>
+        </div>
         <!-- End of main content -->
     </div>
 </template>
