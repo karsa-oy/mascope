@@ -361,7 +361,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         # //
         # DataViz
         # 'figure_data',            # masked by public endpoint
-        # 'mz_coordinate_request',  # masked by public endpoint
+        'mz_coordinate_request',
         # 'signal_request',         # masked by public endpoint
         ]
 

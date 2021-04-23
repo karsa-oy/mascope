@@ -372,6 +372,9 @@ def merge_heatmap_slices(img_strs):
     return full_img_str
 
 
+def get_namespace(filename):
+    return '/' + filename.split('_')[0]
+
 class DataVizServiceNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to Router """
 
@@ -522,7 +525,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
             await self.emit_client_notification('mz_coordinate_request',
                                                 {'filename': filename,
                                                 },
-                                                room=client_room
+                                                namespace=get_namespace(filename)
                                                )
 
             return
