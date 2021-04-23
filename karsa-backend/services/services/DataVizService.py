@@ -13,8 +13,8 @@ the images to subscribers
 Created on Fri Apr 17 11:35:57 2020
 """
 
-import inspect
 import asyncio
+import json
 import numpy as np
 import dask.array as da
 import sqlite3
@@ -432,19 +432,19 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                       t_resolution
                                       )
         # Emit cached visualizations and update request ranges accordingly
-        img_strs = []
+        vizs = []
         t0_chunk = None
         t1_chunk = None
         # Loop through cached visualizations
         for row in img_data_rows:
-            img_str_row, t0_row, t1_row, mz0_row, mz1_row, viz_type_row = row
+            viz_row, t0_row, t1_row, mz0_row, mz1_row, viz_type_row = row
             # print("t0_row: %s, t1_row: %s, mz0_row: %s, mz1_row: %s, viz_type: %s"
             #       %(t0_row, t1_row, mz0_row, mz1_row, viz_type_row)
             #       )
             # self.log("t0_chunk: %.2f, t1_chunk: %.2f" %(t0_chunk or 0, t1_chunk or 0))
             if t0_chunk is None:
                 # Start new continuous chunk of images
-                img_strs = []
+                vizs = []
                 t0_chunk = t0_row
                 if t0_chunk > t_range[0]:
                     # Gap in the beginning
@@ -471,10 +471,9 @@ class DataVizServiceNamespace(BaseClientNamespace):
                               client_room
                               )
                 # Emit current chunk
-                for img_str in img_strs:
-                    # Put to image queue to be emitted from 'service_main'
-                    img_data = {'img': img_str,
-                                'filename': filename,
+                for viz in vizs:
+                    # Put to visualization queue to be emitted from 'service_main'
+                    img_data = {'filename': filename,
                                 'viz_type': viz_type,
                                 'mz_range': mz_range,
                                 't_range': [t0_chunk, t1_chunk],
@@ -482,27 +481,39 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                 'client_room': client_room,
                                 'persist_in_cache': False,
                                 }
+                    try:
+                        traces = json.loads(viz)
+                        img_data.update({'traces': traces})
+                    except json.JSONDecodeError:
+                        img_str = viz
+                        img_data.update({'img': img_str})
                     # self.log("Putting cached viz: %s" %str(img_data))
                     generator_output_q.put(img_data)
                 # Start new chunk
                 t0_chunk = t0_row
-                img_strs = []
+                vizs = []
             # Continue collecting the same chunk
             t1_chunk = t1_row
-            img_strs.append(img_str_row)
+            vizs.append(viz_row)
             
         # Emit images fetched from cache
-        for img_str in img_strs:
+        for viz in vizs:
             # Put to image queue to be emitted from 'service_main'
-            generator_output_q.put({'img': img_str,
-                                    'filename': filename,
-                                    'viz_type': viz_type,
-                                    'mz_range': mz_range,
-                                    't_range': [t0_chunk, t1_chunk],
-                                    't_resolution': t_resolution,
-                                    'client_room': client_room,
-                                    'persist_in_cache': False,
-                                    })
+            img_data = {'filename': filename,
+                        'viz_type': viz_type,
+                        'mz_range': mz_range,
+                        't_range': [t0_chunk, t1_chunk],
+                        't_resolution': t_resolution,
+                        'client_room': client_room,
+                        'persist_in_cache': False,
+                        }
+            try:
+                traces = json.loads(viz)
+                img_data.update({'traces': traces})
+            except json.JSONDecodeError:
+                img_str = viz
+                img_data.update({'img': img_str})
+            generator_output_q.put(img_data)
 
         if (t0_chunk is None) or (t1_chunk < t_range[1]):
             # (All) requested visualizations were not available
@@ -838,7 +849,7 @@ class DataVizServiceClient(BaseServiceClient):
                             img_data['t_range'],
                             img_data['mz_range'],
                             img_data['t_resolution'],
-                            img_data['img']
+                            img_data.get('img') or json.dumps(img_data.get('traces')) # TODO: How to cache trace?
                             )
             # Emit figure data
             client_room = img_data.pop('client_room')

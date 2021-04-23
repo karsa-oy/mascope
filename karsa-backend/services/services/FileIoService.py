@@ -585,7 +585,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                         parse_path_from_sample_name(filename),
                         '.attrs'
                         )
-            with open(attr_path, 'w') as f:
+            with open(attr_path, 'r') as f:
                 attributes = json.load(f)
             # Put to data array cache
             cache[filename] = {'signal': signal_array,

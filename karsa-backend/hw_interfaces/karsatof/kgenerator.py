@@ -326,6 +326,7 @@ class TofDaqStreamer(Thread, KInstrument):
             # Unexpected return value
             else:
                 print("Unexpected return value: %s" %TwRetVal(ret).name)
+                sleep(1)
         # Out of main loop
         print('TofDaqStreamer exiting')
         self.shutdown()
