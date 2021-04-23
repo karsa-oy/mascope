@@ -182,7 +182,7 @@ def viz_cache_process_requests(filename, t_range):
             i0 = i * BATCH_SIZE
             i1 = min(i0 + BATCH_SIZE, no_spectra - 1)
             # Take a batch
-            spec_array = signal_slice.transpose()[i0:i1]
+            spec_array = signal_slice.transpose()[i0:i1].load()
             t0_i = float( spec_array.time[0] )
             t1_i = float( spec_array.time[-1] ) + float( period_slice[i1] )
             # Put batch to queue to be visualized
