@@ -38,6 +38,7 @@ from karsatof.kimage import (
                     convert_to_base64,
                     hstack_imgs,
                     )
+from karsatof.kutil import AttrDict
 
 NO_DATA_LOGGING_DEAULT = False
 client = None
@@ -137,8 +138,8 @@ def viz_cache_process_requests(filename, t_range):
 
     # func_t0 = time()
 
-    signal_array = cache[filename]['signal']
-    period_array = cache[filename]['period']
+    signal_array = cache[filename].signal
+    period_array = cache[filename].period
 
     # Get all pending requests for filename
     request_data_rows = viz_cache_get(
@@ -151,15 +152,13 @@ def viz_cache_process_requests(filename, t_range):
         # print("[viz_cache_process_requests]: processing row: %s" %str(row))
         viz_type, t0, t1, mz0, mz1, t_resolution, client_room = row
         
-        t0_row = max(t_range[0], t0)
-        t1_row = min(t_range[1], t1)
+        t0_row = max(t_range[0], t0) # TODO: Ranges may flip, when t_range < [t0, t1]
+        t1_row = min(t_range[1], t1) # TODO: Ranges may flip
 
-        signal_slice = signal_array.data_array.sel(
-                                        time=slice(t0_row, t1_row),
+        signal_slice = signal_array.sel(time=slice(t0_row, t1_row),
                                         mz=slice(mz0, mz1)
                                         )
-        period_slice = period_array.data_array.sel(
-                                        time=slice(t0_row, t1_row)
+        period_slice = period_array.sel(time=slice(t0_row, t1_row)
                                         )
 
         BATCH_SIZE = 10 # Number of spectra to process at once (TODO: make parameter)
@@ -542,12 +541,12 @@ class DataVizServiceNamespace(BaseClientNamespace):
             return
         elif 'signal' in cache[filename]:
             # Signal array in cache
-            signal_array = cache[filename]['signal']
+            signal_array = cache[filename].signal
             # self.log("Process request on existing signal array")
             # Check for available time range and process request
             try:
-                available_t_range = [signal_array.data_array.time[0].item(),
-                                     signal_array.data_array.time[-1].item()
+                available_t_range = [signal_array.time[0].item(),
+                                     signal_array.time[-1].item()
                                      ]
             except Exception as e:
                 # Nothing in the signal array yet
@@ -659,9 +658,11 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                 name='period'
                                 )
         # Put to data cache
-        cache[filename] = {'signal': signal_array,
+        cache_item_dict = {'signal': signal_array,
                            'period': period_array,
                            }
+        cache_item = AttrDict(cache_item_dict)
+        cache[filename] = cache_item
         # Request signal
         await self.emit_client_notification('signal_request',
                                             {'filename': filename,
@@ -694,7 +695,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
             mz = mz.reshape(-1,)
         else:
             # Use mz coordinates from signal_array (TOF)
-            mz = signal_array.data_array.mz
+            mz = signal_array.mz
 
         # Extend data arrays (write to file)
         signal_array.extend_array(spec,
@@ -707,8 +708,8 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                   )
         
         # Process pending requests for this file, in updated time range
-        available_t_range = [signal_array.data_array.time[0].item(),
-                             signal_array.data_array.time[-1].item() + period.item()
+        available_t_range = [signal_array.time[0].item(),
+                             signal_array.time[-1].item() + period.item()
                              ]
         viz_cache_process_requests(filename_base, available_t_range)
 
@@ -720,14 +721,14 @@ class DataVizServiceNamespace(BaseClientNamespace):
         value = data['value']
         filename = value.get('filename')
 
-        signal_array = cache[filename]['signal']
+        signal_array = cache[filename].signal
 
-        available_t_range = [signal_array.data_array.time[0].item(),
-                             signal_array.data_array.time[-1].item()
+        available_t_range = [signal_array.time[0].item(),
+                             signal_array.time[-1].item()
                              ]
         viz_cache_process_requests(filename,
-                                         available_t_range,
-                                         )
+                                   available_t_range,
+                                   )
 
     async def on_tps_parameter_info(self, data):
         value = data['value']
@@ -773,7 +774,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
         tps_data = tps_data.reshape(-1, 1)
         ti = value.get('t')
         td = np.array( [timedelta(seconds=ti)] ) # Convert to timedelta
-        parameter = visualizer.data_array.parameter
+        parameter = visualizer.parameter
 
         return #TODO: TPS visualizations not implemented
 

@@ -80,6 +80,26 @@ class ExtendableDataArray():
         self.delayed_write = None
         self.group = '%04d' % 0
 
+    def __getattr__(self, name):
+        """Override standard getattr behaviour.
+
+        Standard behaviour when getting ExtendableDataArray attributes.
+        If requested attribute not in ExtendableDataArray, try to get it
+        from the encapsulated DataArray object, self.data_array.
+        If not there either, raise AtteibuteError.
+        """
+
+        try:
+            return getattr(self.data_array, name)
+        except AttributeError:
+            raise AttributeError("'ExtendableDataArray' object has no attribute '%s'"
+                                 %name
+                                 )
+    
+    def __getitem__(self, indices):
+        """Make encapsulated DataArray object subscriptable
+        """
+        return self.data_array.__getitem__(indices)
 
     def init_array(self, dims, data=None, coords=None, name=''):
         """Initalize the data array.
@@ -114,8 +134,6 @@ class ExtendableDataArray():
                                             self.path,
                                             mode='w-' # Create
                                             )
-
-
 
     def extend_array(self,
                      data,
