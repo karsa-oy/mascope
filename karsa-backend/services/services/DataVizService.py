@@ -40,6 +40,8 @@ from karsatof.kimage import (
                     )
 from karsatof.kutil import AttrDict
 
+VIZ_TYPES_SUPPORTED = ('spectrogram', 'timeseries', 'waterfall')
+
 NO_DATA_LOGGING_DEAULT = False
 client = None
 
@@ -179,11 +181,15 @@ def viz_cache_process_requests(filename, t_range):
         for i in range(no_batches):
             # Batch indices
             i0 = i * BATCH_SIZE
-            i1 = min(i0 + BATCH_SIZE, no_spectra - 1)
+            i1 = min(i0 + BATCH_SIZE, no_spectra)
+            # print("i0: %s, i1: %s" %(i0, i1))
             # Take a batch
             spec_array = signal_slice.transpose()[i0:i1].load()
+            period_array = period_slice[i0:i1]
+            # print("spec_array shape: %s" %str(spec_array.shape))
+
             t0_i = float( spec_array.time[0] )
-            t1_i = float( spec_array.time[-1] ) + float( period_slice[i1] )
+            t1_i = float( spec_array.time[-1] ) + float( period_array[-1] )
             # Put batch to queue to be visualized
             generator_input_q.put({
                             'data': spec_array, 
@@ -642,7 +648,6 @@ class DataVizServiceNamespace(BaseClientNamespace):
         
         filename = value['filename']
         # self.log(filename)
-        client_room = data.get('client_room') or data['cookies']['src_sid'][0]
         
         # Initialize data arrays
         mz = np.frombuffer( value.get('mz'), dtype=np.float32 )
@@ -667,7 +672,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
         await self.emit_client_notification('signal_request',
                                             {'filename': filename,
                                              },
-                                             room=client_room
+                                            room=data['cookies']['src_sid'][0],
                                             )
 
     async def on_acquired_spectrum(self, data):
@@ -786,27 +791,6 @@ class DataVizServiceNamespace(BaseClientNamespace):
     
     # ----------------------------------------------
 
-
-#         # Timeseries trace
-#         x = list( arr_to_viz.time.values.astype(float) * 1e-9 )
-#         y = list( arr_to_viz.sum('mz').values.astype(float) )
-#         ts_trace = deepcopy(DEFAULT_TRACE)
-#         ts_trace.update({'name': 'TIC [%.2f, %.2f]' %(mz0, mz1),
-#                          'x': x,
-#                          'y': y
-#                          }
-#                         )
-#         timeseries_data = {'filename': self.filename,
-#                            'traces': [ts_trace],
-#                            'mz_range': mz_range,
-#                            }
-#         await client.emit_client_notification('timeseries_figure_data',
-#                                        timeseries_data,
-#                                        **{**kwargs,
-#                                           'room': (kwargs.get('client_room') or timeseries_data.get('filename'))
-#                                           }
-#                                        )
-
 class DataVizServiceClient(BaseServiceClient):
     async def init_service(self):
         global generator_input_q # TODO:
@@ -850,7 +834,7 @@ class DataVizServiceClient(BaseServiceClient):
                             img_data['t_range'],
                             img_data['mz_range'],
                             img_data['t_resolution'],
-                            img_data.get('img') or json.dumps(img_data.get('traces')) # TODO: How to cache trace?
+                            img_data.get('img') or json.dumps(img_data.get('traces'))
                             )
             # Emit figure data
             client_room = img_data.pop('client_room')

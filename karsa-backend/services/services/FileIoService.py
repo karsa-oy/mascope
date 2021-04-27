@@ -39,6 +39,7 @@ from karsatof.kcollector import ExtendableDataArray
 from karsatof.kdatapool import parse_path_from_sample_name
 from karsatof.kimage import (convert_base64_to_img, convert_to_base64)
 from karsatof.kutil import AttrDict
+from services.DataVizService import VIZ_TYPES_SUPPORTED
 
 client = None
 
@@ -368,17 +369,34 @@ class FileIoPrivateNamespace(BaseClientNamespace):
 
     # ========== TOFService requests ==========
     async def on_acquisition_started(self, data):
-        # Request full-size visualization from DataViz
-        await self.parent.emit_public_notification(
-                'visualize_range',
-                {'filename': data['value']['filename'],
-                 'mz_range': data['value']['mz_range'],
-                 't_range': data['value']['t_range'],
-                 'viz_type': 'spectrogram',  # TODO: None for all
-                },
-                client_room=self.parent.public_ns.room_sid,
-              )
+        global cache
 
+        filename = data['value']['filename']
+        # Initialize visualization arrays in file cache and emit request to DataViz
+        for viz_type in VIZ_TYPES_SUPPORTED:
+            # Initialize array
+            filename_viz = base_to_zarr_filename(filename, viz_type)
+            viz_array = ExtendableDataArray(path=filename_viz,
+                                            array_module=np,
+                                            dtype=object,
+                                            chunk_size=1,
+                                            )
+            viz_array.init_array(dims=('time',),
+                                 coords=[[]],
+                                 name=viz_type
+                                 )
+            # Put to file cache
+            cache[filename].update({viz_type: viz_array})
+            # Request full-size visualization from DataViz
+            await self.parent.emit_public_notification(
+                    'visualize_range',
+                    {'filename': filename,
+                     'mz_range': data['value']['mz_range'],
+                     't_range': data['value']['t_range'],
+                     'viz_type': viz_type
+                     },
+                    client_room=self.parent.public_ns.room_sid,
+                    )
 
     async def on_acquisition_coordinates(self, data):
         """Initialize acquisition cache with received coordinates
@@ -425,27 +443,14 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         with open(attr_path, 'w') as f:
             json.dump(attributes, f, indent=4)
 
-        # Initialize visualization arrays
-        filename_spectrogram = base_to_zarr_filename(filename_base, 'spectrogram')
-        spectrogram_array = ExtendableDataArray(path=filename_spectrogram,
-                                                array_module=np,
-                                                dtype=object,
-                                                chunk_size=10,
-                                                )
-        spectrogram_array.init_array(dims=('time',),
-                                     coords=[[]],
-                                     name='spectrogram'
-                                     )
         # Put to cache
         cache_item_dict = {'signal': signal_array,
                            'period': period_array,
-                           'spectrogram': spectrogram_array,
                            'attrs': attributes,
                            }
         cache_item = AttrDict(cache_item_dict)
         cache[filename_base] = cache_item
         print("cache: %s" %str(cache))
-
 
     async def on_acquired_spectrum(self, data):
         """Receive new spectrum, add to cache
@@ -559,13 +564,13 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         value = data['value']
         filename = value['filename']
         viz_type = value['viz_type']
-        image_array = cache[filename][viz_type]
+        viz_array = cache[filename][viz_type]
         ti = np.array([ value['t_range'][0] ], dtype=np.float32)
-        img_str = value['img']
-        image_array.extend_array(np.array([img_str]),
-                                 [ti],
-                                 'time'
-                                 )
+        img_str = value.get('img') or json.dumps(value.get('traces'))
+        viz_array.extend_array(np.array([img_str]),
+                               [ti],
+                               'time'
+                               )
 
     async def on_mz_coordinate_request(self, data):
         value = data['value']
@@ -597,7 +602,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                              'mz': mz.tobytes(),
                              'mz_range': mz_range,
                             },
-                            client_room=self.parent.public_ns.room_sid,
+                            room=data['cookies']['src_sid'][0],
                             no_data_logging=True
                         )
 
