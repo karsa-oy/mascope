@@ -293,13 +293,7 @@ export default {
             }
 
             // Common config for all figures
-            let init_data = [{x: [0, 1, 2, 3, 4, 5],
-                              y: [0, 1, 2, 0, 1, 2],
-                              type: "scattergl",
-                              mode: 'lines+markers',
-                            //   marker: {opacity: 0.0},
-                            //   hoverinfo: 'skip',
-                              }];
+            let init_data = [];
             self.figure_layout = self.shallow_copy(self.figure_layout_default);
 
             // ===== Initialize Plotly figure =====
