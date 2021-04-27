@@ -136,12 +136,7 @@ def viz_cache_get(table,
     return cur
 
 def viz_cache_process_requests(filename, t_range):
-    global cache
-
-    # func_t0 = time()
-
-    signal_array = cache[filename].signal
-    period_array = cache[filename].period
+    global REQUEST_PROCESSORS
 
     # Get all pending requests for filename
     request_data_rows = viz_cache_get(
@@ -153,61 +148,31 @@ def viz_cache_process_requests(filename, t_range):
     for row in request_data_rows:
         # print("[viz_cache_process_requests]: processing row: %s" %str(row))
         viz_type, t0, t1, mz0, mz1, t_resolution, client_room = row
-        
-        t0_row = max(t_range[0], t0) # TODO: Ranges may flip, when t_range < [t0, t1]
-        t1_row = min(t_range[1], t1) # TODO: Ranges may flip
 
-        signal_slice = signal_array.sel(time=slice(t0_row, t1_row),
-                                        mz=slice(mz0, mz1)
-                                        )
-        period_slice = period_array.sel(time=slice(t0_row, t1_row)
-                                        )
+        # Select processing method based on data_type and process request
+        processed_t_range = REQUEST_PROCESSORS[viz_type](
+                                    filename=filename,
+                                    viz_type=viz_type,
+                                    t0=t0,
+                                    t1=t1,
+                                    mz0=mz0,
+                                    mz1=mz1,
+                                    t_resolution=t_resolution,
+                                    client_room=client_room,
+                                    )
 
-        BATCH_SIZE = 10 # Number of spectra to process at once (TODO: make parameter)
-        no_spectra = signal_slice.shape[1]
-        no_batches = int( np.ceil(no_spectra / BATCH_SIZE) )
-
-        if no_spectra < BATCH_SIZE:
+        if not processed_t_range:
+            # Nothing was processed
             continue
 
-        if t_resolution:
-            # TODO: resample
-            raise NotImplementedError
+        # TODO: Handle the case when processed_t_range[0] > t0?
         
-        global generator_input_q # TODO: global q
-        y_range = [0, signal_slice.max().compute().item()] # TODO: better scaling
-
-        # Loop through signal batches
-        for i in range(no_batches):
-            # Batch indices
-            i0 = i * BATCH_SIZE
-            i1 = min(i0 + BATCH_SIZE, no_spectra)
-            # print("i0: %s, i1: %s" %(i0, i1))
-            # Take a batch
-            spec_array = signal_slice.transpose()[i0:i1].load()
-            period_array = period_slice[i0:i1]
-            # print("spec_array shape: %s" %str(spec_array.shape))
-
-            t0_i = float( spec_array.time[0] )
-            t1_i = float( spec_array.time[-1] ) + float( period_array[-1] )
-            # Put batch to queue to be visualized
-            generator_input_q.put({
-                            'data': spec_array, 
-                            'filename': filename,
-                            'viz_type': viz_type,
-                            'mz_range': [mz0, mz1],
-                            't_range': [t0_i, t1_i],
-                            'y_range': y_range,
-                            't_resolution': t_resolution,
-                            'client_room': client_room,
-                            'persist_in_cache': True,
-                            })
-
-        if t1_i < t1:
-            # Only part of request served, update request time range
+        if processed_t_range[1] < t1:
+            # Only part of request served, update request start time
+            t0_new = processed_t_range[1]
             viz_cache_update('requests',
                             ['t0'],
-                            [t1_i], # New start time
+                            [t0_new],
                             filename,
                             viz_type,
                             [t0, t1],
@@ -225,8 +190,6 @@ def viz_cache_process_requests(filename, t_range):
                               [mz0, mz1],
                               t_resolution
                               )
-    # func_t1 = time()
-    # print("[viz_cache_process_requests] duration: %.2f seconds" %(func_t1-func_t0))
 
 def viz_cache_put(table,
                   filename,
@@ -250,8 +213,8 @@ def viz_cache_put(table,
               *args
               )
     
-    cur.execute('''INSERT INTO {} VALUES (?,?,?,?,?,?,?,?)
-                '''.format(table),
+    cur.execute('''INSERT INTO {} VALUES ({})
+                '''.format(table, ','.join( ['?']*len(values) )),
                 values
                 )    
     con.commit()
@@ -366,6 +329,72 @@ def viz_cache_update(table,
                 )
     con.commit()
 
+def process_visualization_request(filename,
+                                  viz_type,
+                                  t0,
+                                  t1,
+                                  mz0,
+                                  mz1,
+                                  t_resolution,
+                                  client_room
+                                  ):
+    global cache
+    global generator_input_q # TODO: global q
+
+    cache_item = cache[filename]
+    
+    signal_slice = cache_item.signal.sel(time=slice(t0, t1),
+                                         mz=slice(mz0, mz1)
+                                         )
+    period_slice = cache_item.period.sel(time=slice(t0, t1)
+                                         )
+    BATCH_SIZE = 10 # Number of spectra to process at once (TODO: make parameter)
+    no_spectra = signal_slice.shape[1]
+    no_batches = int( np.ceil(no_spectra / BATCH_SIZE) )
+
+    if no_spectra < BATCH_SIZE:
+        return False
+
+    if t_resolution:
+        # TODO: resample
+        raise NotImplementedError
+    
+    y_range = [0, signal_slice.max().compute().item()] # TODO: better scaling
+
+    # Loop through signal batches
+    for i in range(no_batches):
+        # Batch indices
+        i0 = i * BATCH_SIZE
+        i1 = min(i0 + BATCH_SIZE, no_spectra)
+        # print("i0: %s, i1: %s" %(i0, i1))
+        # Take a batch
+        spec_array = signal_slice.transpose()[i0:i1].load()
+        period_array = period_slice[i0:i1]
+        # print("spec_array shape: %s" %str(spec_array.shape))
+
+        t0_i = float( spec_array.time[0] )
+        t1_i = float( spec_array.time[-1] ) + float( period_array[-1] )
+        # Put batch to queue to be visualized
+        generator_input_q.put({
+                        'data': spec_array, 
+                        'filename': filename,
+                        'viz_type': viz_type,
+                        'mz_range': [mz0, mz1],
+                        't_range': [t0_i, t1_i],
+                        'y_range': y_range,
+                        't_resolution': t_resolution,
+                        'client_room': client_room,
+                        'persist_in_cache': True,
+                        })
+
+    processed_t_range = (signal_slice.time[0], t1_i)
+    return processed_t_range
+
+
+REQUEST_PROCESSORS = {'spectrogram': process_visualization_request,
+                      'timeseries': process_visualization_request,
+                      'waterfall': process_visualization_request
+                      }
 
 def merge_heatmap_slices(img_strs):
     slice_images = []
@@ -386,8 +415,8 @@ class DataVizServiceNamespace(BaseClientNamespace):
     endpoints = [
             'data_stream_coordinates',
             'data_stream_finished',
+            'loaded_data',
             'loaded_image',
-            'loaded_spectrum',
             'loaded_tps_data',
             'mz_coordinates',
             'service_state',
@@ -615,11 +644,12 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                 'persist_in_cache': True,
                                 })
 
-    async def on_loaded_spectrum(self, data):
+    async def on_loaded_data(self, data):
         """Spectrum loaded from FileIoService
         """
-        await self.on_acquired_spectrum(data)
-        return data['value'].get('i')
+        if data['value']['data_type'] == 'signal':
+            await self.on_acquired_spectrum(data)
+            return data['value'].get('i')
 
     async def on_data_stream_finished(self, data):
         await self.on_acquisition_finished(data)
@@ -669,8 +699,9 @@ class DataVizServiceNamespace(BaseClientNamespace):
         cache_item = AttrDict(cache_item_dict)
         cache[filename] = cache_item
         # Request signal
-        await self.emit_client_notification('signal_request',
-                                            {'filename': filename,
+        await self.emit_client_notification('data_request',
+                                            {'data_type': 'signal',
+                                             'filename': filename,
                                              },
                                             room=data['cookies']['src_sid'][0],
                                             )
