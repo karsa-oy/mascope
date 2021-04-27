@@ -129,8 +129,7 @@ def viz_cache_get(table,
         join_str = ' AND '
 
     cur.execute('''SELECT {} FROM {} WHERE {}
-                   ORDER BY t0 ASC
-                '''.format(fields, table, query),
+                '''.format(fields, table, query), # ORDER BY t0 ASC
                 args
                 )
     return cur
@@ -199,8 +198,8 @@ def viz_cache_put(table,
                   t_resolution,
                   *args
                   ):
-    
     global con
+
     cur = con.cursor()
     
     values = (filename,
@@ -218,7 +217,50 @@ def viz_cache_put(table,
                 values
                 )    
     con.commit()
-    
+
+def viz_cache_put_or_update_request(filename,
+                                    viz_type,
+                                    t_range,
+                                    mz_range,
+                                    t_resolution,
+                                    client_room
+                                    ):
+    global con
+    # Get existing requests
+    cur = viz_cache_get('requests',
+                        'client_room',
+                        filename,
+                        viz_type,
+                        t_range,
+                        mz_range,
+                        t_resolution
+                        )
+    dup_request = cur.fetchone()
+    if dup_request:
+        # Found a duplicate request, append new client room
+        client_rooms = [client_room, *dup_request]
+        client_rooms_str = "'" + ",".join(client_rooms) + "'"
+        viz_cache_update('requests',
+                         ['client_room'],
+                         [client_rooms_str],
+                         filename,
+                         viz_type,
+                         t_range,
+                         mz_range,
+                         t_resolution
+                         )
+        return
+    else:
+        # Make new request
+        viz_cache_put('requests',
+                      filename,
+                      viz_type,
+                      t_range,
+                      mz_range,
+                      t_resolution,
+                      client_room
+                      )
+
 def viz_cache_release(table,
                       filename=None,
                       client_room=None,
@@ -484,26 +526,24 @@ class DataVizServiceNamespace(BaseClientNamespace):
                     # Gap in the beginning
                     # self.log("Gap in the beginning: %.2f-%.2f" %(t_range[0], t0_chunk))
                     # Make request for the gap
-                    viz_cache_put('requests',
-                                  filename,
-                                  viz_type,
-                                  [ t_range[0], t0_chunk ],
-                                  mz_range,
-                                  t_resolution,
-                                  client_room
-                                  )
+                    viz_cache_put_or_update_request(filename,
+                                                    viz_type,
+                                                    [ t_range[0], t0_chunk ],
+                                                    mz_range,
+                                                    t_resolution,
+                                                    client_room
+                                                    )
             elif abs(t0_row - t1_chunk) > 1e-5: # t1 of previous slice != t0 of current one
                 # Gap in the middle
                 # self.log("Gap in the middle: %.2f-%.2f" %(t1_chunk, t0_row))
                 # Make request for the gap
-                viz_cache_put('requests',
-                              filename,
-                              viz_type,
-                              [t1_chunk, t0_row], # From previous t1 until current t0
-                              mz_range,
-                              t_resolution,
-                              client_room
-                              )
+                viz_cache_put_or_update_request(filename,
+                                                viz_type,
+                                                [t1_chunk, t0_row], # From previous t1 until current t0
+                                                mz_range,
+                                                t_resolution,
+                                                client_room
+                                                )
                 # Emit current chunk
                 for viz in vizs:
                     # Put to visualization queue to be emitted from 'service_main'
@@ -553,14 +593,13 @@ class DataVizServiceNamespace(BaseClientNamespace):
             # (All) requested visualizations were not available
             # self.log("Gap in the end: %.2f-%.2f" %(t1_chunk or t_range[0], t_range[1]))
             # Make request for the remaining time range
-            viz_cache_put('requests',
-                          filename,
-                          viz_type,
-                          [ t1_chunk or t_range[0], t_range[1] ],
-                          mz_range,
-                          t_resolution,
-                          client_room
-                          )
+            viz_cache_put_or_update_request(filename,
+                                            viz_type,
+                                            [ t1_chunk or t_range[0], t_range[1] ],
+                                            mz_range,
+                                            t_resolution,
+                                            client_room
+                                            )
         # Check if data_request is needed
         if filename not in cache:
             # Signal not in cache, request shape from FileIoService
@@ -589,7 +628,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                 return
             process_t_range = [max(t_range[0], available_t_range[0]),
                                min(t_range[1], available_t_range[1])
-                               ]
+                               ] # TODO: range might flip
             viz_cache_process_requests(filename,
                                        process_t_range,
                                        )
@@ -869,12 +908,14 @@ class DataVizServiceClient(BaseServiceClient):
                             )
             # Emit figure data
             client_room = img_data.pop('client_room')
-            await self.emit_client_notification(
-                            'figure_data',
-                            img_data,
-                            room=client_room,
-                            no_data_logging=True,
-                            )
+            client_rooms = client_room.split(',')
+            for client_room in client_rooms:
+                await self.emit_client_notification(
+                                'figure_data',
+                                img_data,
+                                room=client_room,
+                                no_data_logging=True,
+                                )
             # End of main loop
         # Exit
         # Terminate image generators
