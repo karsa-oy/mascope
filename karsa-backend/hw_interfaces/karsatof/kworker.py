@@ -7,17 +7,19 @@ Created on Tue Apr 09 17:48:15 2019
 
 import sys
 import os
-
 import numpy as np
+
 from time import sleep
 from multiprocessing import Process, Queue, Event
-from threading import Thread
+from PIL.Image import Image
 from sklearn.decomposition import SparseCoder
 from scipy.sparse import csr_matrix
+from threading import Thread
 
 from .kcode import find_extrema, find_code_peaks
 from .kpeak import fit_peaks
 from .kimage import (gen_spec_image,
+                     gen_timeseries_trace,
                      gen_heatmap_image,
                      convert_to_base64
                      )
@@ -192,8 +194,9 @@ class KEncoder(Process):
         return i0, i1, code, approx
 
 
-image_generators = {
+viz_generators = {
             'spectrogram': gen_heatmap_image,
+            'timeseries': gen_timeseries_trace,
             'waterfall': gen_spec_image,
             }
 
@@ -204,28 +207,31 @@ class ImageGenerator(Process):
         self.queue_out = queue_out
 
     def run(self):
+        global viz_generators
         while True:
             data = self.queue_in.get()
             if data is not None:
                 # Select function to generate the image
                 viz_type = data['viz_type']
-                global image_generators
                 try:
-                    img_gen_func = image_generators[viz_type]
+                    viz_gen_func = viz_generators[viz_type]
                 except KeyError:
                     print("Requested visualization type '%s' not available!" %viz_type)
                     continue
                 data_array = data.pop('data')
                 y_range = data.get('y_range', None)
                 try:
-                    img = img_gen_func(data_array,
-                                    y_range=y_range
-                                    )
+                    viz = viz_gen_func(data_array,
+                                       y_range=y_range
+                                       )
                 except ZeroDivisionError:
-                    print("Catched ZeroDivisionError in %s" %str(img_gen_func))
+                    print("Caught ZeroDivisionError in %s" %str(viz_gen_func))
                     continue
-                img_b = convert_to_base64(img)
-                data.update({'img': img_b})
+                if isinstance(viz, Image):
+                    img_b = convert_to_base64(viz)
+                    data.update({'img': img_b})
+                elif isinstance(viz, dict):
+                    data.update({'traces': [viz]})
                 self.queue_out.put(data)
             else:
                 break

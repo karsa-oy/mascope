@@ -435,14 +435,11 @@ export default {
             let data = json_data.value;
             let zoom_stack_item_room = json_data.room;
 
-            if ( !Object.keys(this.figure_cache).includes(zoom_stack_item_room) ) {
-                // Received something wrong
+            let cache_item = self.figure_cache_get(zoom_stack_item_room);
+            if (!cache_item) {
                 self.beep();
-                self.log(self.id, ' _on_figure_data: Something went wrong 1: ',
-                         this.figure_cache,
-                         zoom_stack_item_room
-                         );
-                    return;
+                self.log('Received figure_data for non-existing zoom stack item!');
+                return;
             }
 
             let x0 = data.t_range[0]; // float
@@ -461,37 +458,34 @@ export default {
             }
             
             let img = data.img; // base64 png
-            let traces = data.traces; // array
-
-            let chunk = {
-                "source": img,
-                "xref": "x",
-                "yref": "y",
-                "x": x0,
-                "y": y0,
-                "sizex": x1 - x0,
-                "sizey": y1 - y0,
-                "xanchor": "left",
-                "yanchor": "bottom",
-                "sizing": sizing,
-                "layer": "below"
-            };
-
-            let cache_item = self.figure_cache_get(zoom_stack_item_room);
-            if (!cache_item) {
-                self.beep();
-                self.log(self.id, ' _on_figure_data: Something went wrong 2')
-                return;
+            if (img) {
+                // Add image to figure layout
+                let chunk = {
+                    "source": img,
+                    "xref": "x",
+                    "yref": "y",
+                    "x": x0,
+                    "y": y0,
+                    "sizex": x1 - x0,
+                    "sizey": y1 - y0,
+                    "xanchor": "left",
+                    "yanchor": "bottom",
+                    "sizing": sizing,
+                    "layer": "below"
+                };
+                cache_item.figure_layout.images.push(chunk);
             }
-
-            cache_item.figure_layout.images.push(chunk);
+            // Keep track of filled ranges
             cache_item.t_filled_range[0] = Math.min(x0, cache_item.t_filled_range[0]);
             cache_item.t_filled_range[1] = Math.max(x1, cache_item.t_filled_range[1]);
+
+            let traces = data.traces; // array
 
             // if latest zoom stack item updated, then draw the figure
             if ( _.isEqual(zoom_stack_item_room,
                            self.zoom_stack.slice(-1)[0].room) ) {
                 if (traces) {
+                    // If traces in json_data, add to figure
                     for (let i=0; i<traces.length; i++) {
                         self.figure_traces.push(traces[i]);
                     }

@@ -518,18 +518,17 @@ def generate_unique_key():
 
 
 class AttrDict(dict):
-    """Dict object that allows accessing items as properties
-    d = AttrDict({'a': 0})
-    d.a
+    """Dict object that allows accessing values like attributes
+    (dot notation).
 
-    NOTE: !!! This is probably not used anywhere anymore !!!
-
+    Example:
+    d = AttrDict({'a': 0})  # initialize AttrDict with a dict
+    d.a                     # returns 0
     """
     
     def __init__(self, *args, **kwargs):
         """Initialize self
         """
-
         super(AttrDict, self).__init__(*args, **kwargs)
         self.__dict__ = self
                 
