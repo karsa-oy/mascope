@@ -340,7 +340,9 @@ export default {
                     }
                     let ranges = {'filename': self.filename};
                     // TODO hacky fix for waterfall
-                    if (self.figure_layout_default.xaxis.title.text.indexOf('m/z') != -1) {
+                    let xaxis_title = self.figure_layout_default.xaxis.title.text ||
+                                      self.figure_layout_default.xaxis.title;
+                    if (xaxis_title.indexOf('m/z') != -1) {
                         x0 = (x0 === undefined) ? prev_ranges.mz_range[0] : x0;
                         x1 = (x1 === undefined) ? prev_ranges.mz_range[1] : x1;
                         y0 = (y0 === undefined) ? prev_ranges.t_range[0] : y0;
@@ -443,7 +445,9 @@ export default {
             let sizing = "stretch";
 
             // TODO: Hacky fix for waterfall
-            if (self.figure_layout_default.xaxis.title.text.indexOf('m/z') != -1) {
+            let xaxis_title = self.figure_layout_default.xaxis.title.text ||
+                              self.figure_layout_default.xaxis.title;
+            if (xaxis_title.indexOf('m/z') != -1) {
                 x0 = data.mz_range[0]; // float
                 x1 = data.mz_range[1]; // float
                 y0 = data.t_range[0]; // float
@@ -546,7 +550,9 @@ export default {
                 cache_item.figure_layout.xaxis.range = t_range;
                 cache_item.figure_layout.yaxis.range = mz_range;
                 // Fix for waterfall
-                if (self.figure_layout_default.xaxis.title.text.indexOf('m/z') != -1) {
+                let xaxis_title = self.figure_layout_default.xaxis.title.text ||
+                                self.figure_layout_default.xaxis.title;
+                if (xaxis_title.indexOf('m/z') != -1) {
                     cache_item.figure_layout.xaxis.range = mz_range;
                     cache_item.figure_layout.yaxis.range = t_range;
                 }
