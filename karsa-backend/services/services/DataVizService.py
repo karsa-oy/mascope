@@ -455,19 +455,9 @@ class DataVizServiceNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to Router """
 
     endpoints = [
-            'data_stream_coordinates',
-            'data_stream_finished',
             'loaded_data',
-            'loaded_image',
-            'loaded_tps_data',
-            'mz_coordinates',
             'service_state',
-            'spec_trace_image',
             'stop_visualize_range',
-            'target_to_load',
-            'tps_data_stream_coordinates',
-            'tps_data_stream_finished',
-            'tps_parameter_info',
             'visualize_range',
             ]
 
@@ -606,8 +596,9 @@ class DataVizServiceNamespace(BaseClientNamespace):
             # Add dummy cache item to avoid duplicate data_requests
             cache[filename] = {}
             # self.log("Emit data_request to FileIoService")
-            await self.emit_client_notification('mz_coordinate_request',
+            await self.emit_client_notification('data_request',
                                                 {'filename': filename,
+                                                 'data_type': 'signal',
                                                 },
                                                 namespace=get_namespace(filename)
                                                )
@@ -651,15 +642,6 @@ class DataVizServiceNamespace(BaseClientNamespace):
         # await self.emit_client_notification('stop_data_request',
         #                                     data['value'],
         #                                     **get_client_notification_args(data))
-
-    async def on_tps_parameters_selected(self, data):
-        """TPS parameters selected from the dropdown
-        """
-        await self.emit_client_notification('tps_data_request',
-                                            data['value'],
-                                            **get_client_notification_args(data)
-                                            )
-
     # ---------------------------------
 
     # ========== FileIoService notifications ==========
@@ -684,24 +666,16 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                 })
 
     async def on_loaded_data(self, data):
-        """Spectrum loaded from FileIoService
+        """Data loaded from FileIoService
         """
-        if data['value']['data_type'] == 'signal':
-            await self.on_acquired_spectrum(data)
+        data_type = data['value']['data_type']
+
+        if data_type == 'mz_coordinates':
+            await self.on_mz_coordinates(data)
+            return
+        if data_type == 'signal':
+            await self.on_loaded_signal(data)
             return data['value'].get('i')
-
-    async def on_data_stream_finished(self, data):
-        await self.on_acquisition_finished(data)
-    
-    async def on_tps_data_stream_coordinates(self, data):
-        await self.on_tps_parameter_info(data)
-
-    async def on_loaded_tps_data(self, data):
-        await self.on_acquired_tps_data(data)
-        return data['value'].get('i')
-
-    async def on_tps_data_stream_finished(self, data):
-        return
 
     async def on_mz_coordinates(self, data):
         """mz coordinates for a file from FileIoService
@@ -719,7 +693,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
         # self.log(filename)
         
         # Initialize data arrays
-        mz = np.frombuffer( value.get('mz'), dtype=np.float32 )
+        mz = np.frombuffer( value['mz'], dtype=np.float32 )
         signal_array = ExtendableDataArray(array_module=da)
         signal_array.init_array(dims=('mz', 'time'),
                                 coords=[mz, []],
@@ -737,15 +711,9 @@ class DataVizServiceNamespace(BaseClientNamespace):
                            }
         cache_item = AttrDict(cache_item_dict)
         cache[filename] = cache_item
-        # Request signal
-        await self.emit_client_notification('data_request',
-                                            {'data_type': 'signal',
-                                             'filename': filename,
-                                             },
-                                            room=data['cookies']['src_sid'][0],
-                                            )
 
-    async def on_acquired_spectrum(self, data):
+
+    async def on_loaded_signal(self, data):
         """TODO: This is duplicate with on_acquired_spectrum in FileIoPrivateNamespace
         """
         global cache
@@ -790,74 +758,59 @@ class DataVizServiceNamespace(BaseClientNamespace):
 
         return data['value'].get('i')
 
-    async def on_acquisition_finished(self, data):
-        global cache
-        
-        value = data['value']
-        filename = value.get('filename')
 
-        signal_array = cache[filename].signal
+    # async def on_tps_parameter_info(self, data):
+    #     value = data['value']
+    #     tps_info = value.get('tps_info')
+    #     set_tps_parameters = value.get('set_tps_parameters', True)
 
-        available_t_range = [signal_array.time[0].item(),
-                             signal_array.time[-1].item()
-                             ]
-        viz_cache_process_requests(filename,
-                                   available_t_range,
-                                   )
+    #     visualizer = TPSVisualizer()
 
-    async def on_tps_parameter_info(self, data):
-        value = data['value']
-        tps_info = value.get('tps_info')
-        set_tps_parameters = value.get('set_tps_parameters', True)
+    #     # Initialize visualizer cache
+    #     visualizer.init_array(dims=('parameter', 'time'),
+    #                           data=None,
+    #                           coords=[tps_info, []],
+    #                           name='tps'
+    #                           )
 
-        visualizer = TPSVisualizer()
+    #     viz_cache_put(data, 'tps', visualizer)
 
-        # Initialize visualizer cache
-        visualizer.init_array(dims=('parameter', 'time'),
-                              data=None,
-                              coords=[tps_info, []],
-                              name='tps'
-                              )
+    #     if set_tps_parameters:
+    #         dropdown_items = [{'label': info,
+    #                            'value': i
+    #                            } for i, info in enumerate(tps_info)
+    #                         ]
+    #         kwargs = get_client_notification_args(data)
+    #         await self.emit_client_notification(
+    #                         'tps_parameters',
+    #                         dropdown_items,
+    #                         **kwargs
+    #                         )
 
-        viz_cache_put(data, 'tps', visualizer)
+    # async def on_acquired_tps_data(self, data):
+    #     value = data['value']
+    #     # speci = value.get('i')
+    #     # self.log(speci)
 
-        if set_tps_parameters:
-            dropdown_items = [{'label': info,
-                               'value': i
-                               } for i, info in enumerate(tps_info)
-                            ]
-            kwargs = get_client_notification_args(data)
-            await self.emit_client_notification(
-                            'tps_parameters',
-                            dropdown_items,
-                            **kwargs
-                            )
+    #     global tps_data
 
-    async def on_acquired_tps_data(self, data):
-        value = data['value']
-        # speci = value.get('i')
-        # self.log(speci)
+    #     global tps_visualizers
+    #     visualizer = viz_cache_get(data, 'tps')
+    #     if not visualizer:  # data request was cancelled
+    #         return
+    #     # Extend signal cache
+    #     tps_data = np.frombuffer( value.get('data'), dtype=np.float32 )
+    #     tps_data = tps_data.reshape(-1, 1)
+    #     ti = value.get('t')
+    #     td = np.array( [timedelta(seconds=ti)] ) # Convert to timedelta
+    #     parameter = visualizer.parameter
 
-        global tps_data
+    #     return #TODO: TPS visualizations not implemented
 
-        global tps_visualizers
-        visualizer = viz_cache_get(data, 'tps')
-        if not visualizer:  # data request was cancelled
-            return
-        # Extend signal cache
-        tps_data = np.frombuffer( value.get('data'), dtype=np.float32 )
-        tps_data = tps_data.reshape(-1, 1)
-        ti = value.get('t')
-        td = np.array( [timedelta(seconds=ti)] ) # Convert to timedelta
-        parameter = visualizer.parameter
-
-        return #TODO: TPS visualizations not implemented
-
-        await visualizer.extend_array(tps_data,
-                                      [parameter, td],
-                                      'time',
-                                      )
-        await visualizer.extend_visualizations(**get_client_notification_args(data))            
+    #     await visualizer.extend_array(tps_data,
+    #                                   [parameter, td],
+    #                                   'time',
+    #                                   )           
     
     # ----------------------------------------------
 

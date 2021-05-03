@@ -336,7 +336,7 @@ def process_signal_request(filename,
                                          mz=slice(mz0, mz1)
                                          )
     period_slice = cache_item.period.sel(time=slice(t0, t1)
-                                    )
+                                         )
 
     if signal_slice.shape[1] == 0:
         return False
@@ -345,7 +345,13 @@ def process_signal_request(filename,
         # TODO: resample
         raise NotImplementedError
     
-    # Put to queue to be emitted from service_main
+    # Put mz coordinates to queue to be emitted from service_main
+    data_q.put({'data_type': 'mz_coordinates',
+                'filename': filename,
+                'mz': signal_slice.mz.values.astype(np.float32).tobytes(),
+                'client_room': client_room,
+                })
+    # Put signal to queue to be emitted from service_main
     for i, spec_array in enumerate(signal_slice.transpose()):
         ti = float( spec_array.time.item() )
         period = float( period_slice[i] )
@@ -359,6 +365,42 @@ def process_signal_request(filename,
     processed_t_range = (signal_slice.time[0], ti+period)
     return processed_t_range
 
+def process_image_request(filename,
+                          viz_type,
+                          t0,
+                          t1,
+                          client_room,
+                          ):
+    global cache
+    global data_q
+
+    cache_item = cache[filename]
+    
+    img_slice = cache_item[viz_type].sel(time=slice(t0, t1))
+
+    if img_slice.shape[1] == 0:
+        return False
+
+    if t_resolution:
+        # TODO: resample
+        raise NotImplementedError
+    
+    # Put to queue to be emitted from service_main
+    for i, img_array in enumerate(img_slice):
+        if not img_array:
+            continue
+        t0_i = float( img_array.time.item() )
+        period = float( period_slice[i] )
+        data_q.put({'filename': filename,
+                    'viz_type': viz_type,
+                    'img': spec_array.values.astype(np.float32).tobytes(),
+                    't_range': [t0_i],
+                    'mz_range': cache_item.attrs['range'],
+                    'client_room': client_room,
+                    })
+    processed_t_range = (img_slice.time[0], ti+period)
+    return processed_t_range
+
 REQUEST_PROCESSORS = {'signal': process_signal_request
                       }
 # ------------------------------------------
@@ -368,8 +410,6 @@ class FileIoPublicNamespace(BaseClientNamespace):
     endpoints_room_sid = [
         # DataViz
         'figure_data',
-        'mz_coordinate_request',
-        'data_request',
         # //
         ]
     endpoints_room_instrument = []
@@ -384,12 +424,6 @@ class FileIoPublicNamespace(BaseClientNamespace):
 
     async def on_figure_data(self, data):
         await self.parent.private_ns.on_figure_data(data)
-
-    async def on_mz_coordinate_request(self, data):
-        await self.parent.private_ns.on_mz_coordinate_request(data)
-
-    async def on_data_request(self, data):
-        await self.parent.private_ns.on_data_request(data)
 
 
 class FileIoPrivateNamespace(BaseClientNamespace):
@@ -413,8 +447,9 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         # //
         # DataViz
         # 'figure_data',            # masked by public endpoint
-        'mz_coordinate_request',
-        # 'signal_request',         # masked by public endpoint
+        # Services
+        'data_request',
+        # //
         ]
 
     service_state = dict()
@@ -625,40 +660,6 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                                'time'
                                )
 
-    async def on_mz_coordinate_request(self, data):
-        value = data['value']
-
-        filename = value['filename']
-        mz_range = value.get('mz_range', None)
-        
-        if filename not in cache:
-            # File not in cache, load and put
-            file_dataset = load_file(filename)
-            # Put to data array cache
-            cache[filename] = file_dataset
-
-        file_cache_item = cache[filename]
-
-        if mz_range is None:
-            # Full mz range
-            mz0 = float( file_cache_item.signal.mz[0] )
-            mz1 = float( file_cache_item.signal.mz[-1] )
-            mz_range = [mz0, mz1]
-
-        # Get mz coordinates (within mz_range)
-        mz = file_cache_item.signal.mz.sel(mz=slice(*mz_range))
-        mz = mz.values.astype(np.float32)
-
-        await self.parent.emit_public_notification(
-                            'mz_coordinates',
-                            {'filename': filename,
-                             'mz': mz.tobytes(),
-                             'mz_range': mz_range,
-                            },
-                            room=data['cookies']['src_sid'][0],
-                            no_data_logging=True
-                        )
-
     async def on_data_request(self, data):
         global cache
 
@@ -671,7 +672,12 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         mz_range = value.get('mz_range', None)
         t_range = value.get('t_range', None)
         
-        # Get file item from cache
+        if filename not in cache:
+            # File not in cache, load and put
+            file_dataset = load_file(filename)
+            # Put to data array cache
+            cache[filename] = file_dataset
+
         file_cache_item = cache[filename]
 
         if mz_range is None:
@@ -682,9 +688,6 @@ class FileIoPrivateNamespace(BaseClientNamespace):
             # Full time range
             t_range = [0, file_cache_item.attrs['length']]
 
-        # print("Making request: filename: %s, t_range: %s, mz_range: %s, client_room: %s"
-        #       %(filename, t_range, mz_range, client_room)
-        #       )
         # Put request to cache
         cache_put('requests',
                   filename,
