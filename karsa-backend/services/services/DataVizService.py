@@ -23,12 +23,13 @@ from copy import deepcopy
 from datetime import datetime, timedelta
 from multiprocessing import (
                         Queue,
+                        Event,
                         cpu_count
                         )
 from queue import Empty
 from time import time
 
-from karsalib import BaseClientNamespace, BaseServiceClient, \
+from karsalib import BaseClientNamespace, BaseServiceClient, CacheQueueConnector, \
                      parse_cmd_args, get_client_notification_args
 from karsatof.kworker import ImageGenerator
 from karsatof.kcollector import ExtendableDataArray
@@ -48,8 +49,10 @@ client = None
 # Cache for data arrays
 cache = {}
 
-generator_input_q = None # TODO:
-generator_output_q = None # TODO:
+generator_request_q = None
+generator_output_q = None
+shutdown_event = None
+generator_input_cache = None
 
 # Cache for requests and visualizations
 # in_memory_db = ':memory:'
@@ -406,9 +409,6 @@ def process_visualization_request(filename,
         or False if no (enough) data was available.
     """
 
-    global cache
-    global generator_input_q # TODO: global q
-
     def feed_cached_visualizations(request_t_range):
         nonlocal cache_item
 
@@ -550,7 +550,7 @@ def process_visualization_request(filename,
             t0_i = float( spec_array.time[0] )
             t1_i = float( spec_array.time[-1] ) + float( period_array[-1] )
             # Put batch to queue to be visualized
-            generator_input_q.put({
+            generator_request_q.put({
                             'data': spec_array, 
                             'filename': filename,
                             'viz_type': viz_type,
@@ -624,8 +624,6 @@ class DataVizServiceNamespace(BaseClientNamespace):
         data : dict(name, value, cookies, no_logging, no_data_logging...)
                value: JSON data from UI, keys: 'filename', 't_range', 'mz_range', 'viz_type'
         """
-
-        global generator_output_q # TODO:
 
         value = data['value']
         # self.log(value)
@@ -854,6 +852,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
             viz_cache_release('requests',
                               client_room=client_room,
                               )
+            generator_input_cache.cache_delete_key(client_room)
         # await self.emit_client_notification('stop_data_request',
         #                                     data['value'],
         #                                     **get_client_notification_args(data))
@@ -901,7 +900,6 @@ class DataVizServiceNamespace(BaseClientNamespace):
         """
         async def on_loaded_image(data):
             # print("on_loaded_image")
-            global generator_output_q
             value = data['value']
             filename = value['filename']
             viz_type = value['data_type']
@@ -1029,20 +1027,30 @@ class DataVizServiceNamespace(BaseClientNamespace):
     
     # ----------------------------------------------
 
+
 class DataVizServiceClient(BaseServiceClient):
     async def init_service(self):
-        global generator_input_q # TODO:
+        global generator_request_q
+        global shutdown_event
+        global generator_input_cache
         global generator_output_q # TODO:
 
-        generator_input_q = self.generator_input_q = Queue() # TODO:
-        generator_output_q = self.generator_output_q = Queue() # TODO:
+        generator_request_q = Queue()
+        generator_input_q =  Queue()
+        shutdown_event = Event()
+        generator_input_cache = CacheQueueConnector('client_room',
+                                                    generator_request_q,
+                                                    generator_input_q,
+                                                    shutdown_event
+                                                    )
+        generator_output_q = Queue()
         self.generator_procs = []
 
         n_jobs = cpu_count()
         for i in range(n_jobs):
             self.log("ImageGenerator %s/%s" %(i+1, n_jobs))
-            gen_proc = ImageGenerator(self.generator_input_q,
-                                      self.generator_output_q
+            gen_proc = ImageGenerator(generator_input_q,
+                                      generator_output_q
                                       )
             gen_proc.start()
             self.generator_procs.append(gen_proc)
@@ -1050,11 +1058,13 @@ class DataVizServiceClient(BaseServiceClient):
             
 
     async def service_main(self):
+        # start input cache thread
+        generator_input_cache.start()
 
         while True:
             # Check queues for new images
             try:
-                img_data = self.generator_output_q.get_nowait()
+                img_data = generator_output_q.get_nowait()
             except Empty:
                 await self.sio.sleep(.1)
                 continue
@@ -1086,6 +1096,8 @@ class DataVizServiceClient(BaseServiceClient):
                                     )
             # End of main loop
         # Exit
+        # TODO: Kill generator_input_cache thread - does not work with Ctrl+C
+        shutdown_event.set()
         # Terminate image generators
         [proc.terminate() for proc in self.generator_procs]
         await self.sio.disconnect()

@@ -7,7 +7,9 @@ import random
 import logging
 from socketio import AsyncClientNamespace, AsyncNamespace, AsyncClient
 from socketio.exceptions import BadNamespaceError
-from queue import Empty
+from queue import Empty, Full
+from threading import Thread
+from multiprocessing import Lock, cpu_count
 
 
 NO_LOGGING_DEFAULT = False
@@ -96,6 +98,95 @@ class Logger():
                                       namespace=namespace,
                                       no_logging=False,
                                       no_data_logging=False)
+
+
+class QConnect(Thread):
+    OUT_Q_LIMIT = 2*cpu_count()
+    CACHE_LIMIT = 1000000   # TODO: number?
+
+    def __init__(self, in_q, out_q, shutdown_event):
+        Thread.__init__(self)
+        self.in_q = in_q
+        self.out_q = out_q
+        self.shutdown_event = shutdown_event
+        self.cache = []
+
+    def cache_put(self, data):
+        if len(self.cache) > self.CACHE_LIMIT:
+            raise Full
+        self.cache.insert(0, data)
+
+    def cache_get(self):
+        data = self.cache.pop()
+        return data
+
+    def run(self):
+        while not self.shutdown_event.is_set():
+            data = None
+            try:
+                data = self.in_q.get(True, .1)
+                # print('in_q.get', data['client_room'])
+            except Empty:
+                data = None
+            if data:
+                try:
+                    self.cache_put(data)
+                except Full as e:
+                    print("Cache overflow -- skipping input!")
+                    continue
+            if self.out_q.qsize() >= self.OUT_Q_LIMIT:
+                continue
+            data = self.cache_get()
+            if data:
+                self.out_q.put(data)
+                # print('out_q.put', data['client_room'])
+        print(f"Exit from {self.__class__.__name__} thread")
+
+
+class CacheQueueConnector(QConnect):
+    def __init__(self, cache_key, *arg, **kwarg):
+        super().__init__(*arg, **kwarg)
+        self.cache = dict()
+        self.cache_key = cache_key
+        self.cache_index = 0
+        self.lock = Lock()
+
+    def cache_put(self, data):
+        key = data.get(self.cache_key)
+        if not key:
+            raise ValueError(f"Invalid input for {self.__class__.__name__} : {data}")
+        with self.lock:
+            if key not in self.cache:
+                self.cache[key] = []
+            self.cache[key].insert(0, data)
+
+    def _get_next_cache_key(self):
+        keys = list(self.cache.keys())
+        if not keys:
+            return None
+        key = keys[self.cache_index]
+        self.cache_index = (self.cache_index + 1) % len(keys)
+        return key
+
+    def cache_get(self):
+        with self.lock:
+            key = self._get_next_cache_key()
+            if not key:
+                return None
+            data = self.cache[key].pop()
+            if not self.cache[key]:
+                del self.cache[key]
+            return data
+
+    def cache_delete_key(self, key):
+        with self.lock:
+            if key in self.cache.keys():
+                del self.cache[key]
+                self.cache_index = min(self.cache_index, len(self.cache.keys()) - 1)
+
+    def cache_size(self):
+        return sum([len(v) for v in self.cache.values()])
+
 
 
 class BaseClientNamespace(AsyncClientNamespace):
