@@ -499,7 +499,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                      't_range': data['value']['t_range'],
                      'viz_type': viz_type
                      },
-                    client_room=self.parent.public_ns.room_sid,
+                    client_room=self.room_sid,
                     )
 
     async def on_acquisition_coordinates(self, data):
@@ -535,17 +535,11 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                                 coords=[[]],
                                 name='signal_period'
                                 )
-        # Write attributes
+        # Store attributes
         attributes = {'id': filename_base,
                       'length': float(t_range[1]),
                       'range': [ float(mz[0]), float(mz[-1]) ],
                       }
-        attr_path = os.path.join(
-                        parse_path_from_sample_name(filename_base),
-                        '.attrs'
-                        )
-        with open(attr_path, 'w') as f:
-            json.dump(attributes, f, indent=4)
 
         # Put to cache
         cache_item_dict = {'signal': signal_array,
@@ -619,12 +613,37 @@ class FileIoPrivateNamespace(BaseClientNamespace):
     async def on_acquisition_finished(self, data):
         global cache
         value = data['value']
-        filename_base = value.get('filename')
+        filename_base = value['filename']
+        cache_item = cache[filename_base]
         print("Finished acquiring file: %s" %filename_base)
-        for key, array in cache[filename_base].items():
+        
+        final_length = float(cache_item.signal.time[-1] +
+                             cache_item.signal_period[-1]
+                             )
+
+        # Update attributes
+        attributes = cache_item['attrs']
+        attributes.update({'length': final_length
+                           })
+        # Write attributes
+        attr_path = os.path.join(
+                        parse_path_from_sample_name(filename_base),
+                        '.attrs'
+                        )
+        with open(attr_path, 'w') as f:
+            json.dump(attributes, f, indent=4)
+
+        for key, array in cache_item.items():
+            # Flush arrays
             if isinstance(array, ExtendableDataArray):
                 print("Flush %s array" %key)
                 array.flush()
+        # Cancel DataViz request
+        await self.parent.emit_public_notification(
+                        'stop_visualize_range',
+                        {'client_rooms': [self.room_sid],
+                         }
+                        )
 
     async def on_tps_parameter_info(self, data):
         value = data['value']
