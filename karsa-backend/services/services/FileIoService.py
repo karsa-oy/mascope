@@ -121,7 +121,7 @@ def cache_get(table,
                 )
     return cur
 
-def cache_process_requests(filename, t_range):
+def cache_process_requests(filename):
     global REQUEST_PROCESSORS
 
     # Get all pending requests for filename
@@ -335,8 +335,8 @@ def process_signal_request(filename,
     signal_slice = cache_item.signal.sel(time=slice(t0, t1),
                                          mz=slice(mz0, mz1)
                                          )
-    period_slice = cache_item.period.sel(time=slice(t0, t1)
-                                         )
+    period_slice = cache_item.signal_period.sel(time=slice(t0, t1)
+                                                )
 
     if signal_slice.shape[1] == 0:
         return False
@@ -345,12 +345,6 @@ def process_signal_request(filename,
         # TODO: resample
         raise NotImplementedError
     
-    # Put mz coordinates to queue to be emitted from service_main
-    data_q.put({'data_type': 'mz_coordinates',
-                'filename': filename,
-                'mz': signal_slice.mz.values.astype(np.float32).tobytes(),
-                'client_room': client_room,
-                })
     # Put signal to queue to be emitted from service_main
     for i, spec_array in enumerate(signal_slice.transpose()):
         ti = float( spec_array.time.item() )
@@ -366,9 +360,12 @@ def process_signal_request(filename,
     return processed_t_range
 
 def process_image_request(filename,
-                          viz_type,
+                          data_type,
                           t0,
                           t1,
+                          mz0,
+                          mz1,
+                          t_resolution,
                           client_room,
                           ):
     global cache
@@ -376,32 +373,50 @@ def process_image_request(filename,
 
     cache_item = cache[filename]
     
-    img_slice = cache_item[viz_type].sel(time=slice(t0, t1))
-
-    if img_slice.shape[1] == 0:
+    try:
+        img_slice = cache_item[data_type].sel(time=slice(t0, t1)).load()
+    except KeyError:
+        print("Requested data_type: %s not cached. What to do!" % data_type)
         return False
+
+    processed_t_range = False
+    if len(img_slice) == 0:
+        return processed_t_range
 
     if t_resolution:
         # TODO: resample
         raise NotImplementedError
     
+    # Filter nans
+    not_nan = np.logical_not( img_slice.isnull() )
+    img_slice = img_slice[not_nan]
+
     # Put to queue to be emitted from service_main
     for i, img_array in enumerate(img_slice):
-        if not img_array:
-            continue
+        img = img_array
+
         t0_i = float( img_array.time.item() )
-        period = float( period_slice[i] )
+        if i < len(img_slice) - 1:
+            t1_i = float( img_slice[i+1].time.item() )
+        else:
+            t1_i = t0_i+1 # TODO:
+
         data_q.put({'filename': filename,
-                    'viz_type': viz_type,
-                    'img': spec_array.values.astype(np.float32).tobytes(),
-                    't_range': [t0_i],
+                    'data_type': data_type,
+                    'img': img.item(),
+                    't_range': [t0_i, t1_i],
                     'mz_range': cache_item.attrs['range'],
                     'client_room': client_room,
                     })
-    processed_t_range = (img_slice.time[0], ti+period)
+
+        processed_t_range = (img_slice.time[0], t1_i)
     return processed_t_range
 
-REQUEST_PROCESSORS = {'signal': process_signal_request
+
+REQUEST_PROCESSORS = {'signal': process_signal_request,
+                      'spectrogram': process_image_request,
+                      'timeseries': process_image_request,
+                      'waterfall': process_image_request,
                       }
 # ------------------------------------------
 
@@ -448,6 +463,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         # DataViz
         # 'figure_data',            # masked by public endpoint
         # Services
+        'coordinate_request',
         'data_request',
         # //
         ]
@@ -511,13 +527,13 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                                 coords=[mz, []],
                                 name='signal'
                                 )
-        filename_period = base_to_zarr_filename(filename_base, 'period')
+        filename_period = base_to_zarr_filename(filename_base, 'signal_period')
         period_array = ExtendableDataArray(path=filename_period,
                                            array_module=np
                                            )
         period_array.init_array(dims=('time'),
                                 coords=[[]],
-                                name='period'
+                                name='signal_period'
                                 )
         # Write attributes
         attributes = {'id': filename_base,
@@ -533,7 +549,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
 
         # Put to cache
         cache_item_dict = {'signal': signal_array,
-                           'period': period_array,
+                           'signal_period': period_array,
                            'attrs': attributes,
                            }
         cache_item = AttrDict(cache_item_dict)
@@ -562,7 +578,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
 
         # Get data arrays from cache
         signal_array = cache[filename_base].signal
-        period_array = cache[filename_base].period
+        period_array = cache[filename_base].signal_period
 
         if 'mz' in value:
             # mz coordinates provided with data (Orbitrap)
@@ -582,11 +598,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                                   'time'
                                   )
         
-        # Process pending requests for this file, in updated time range
-        available_t_range = [signal_array.time[0].item(),
-                             signal_array.time[-1].item() + period.item()
-                             ]
-        cache_process_requests(filename_base, available_t_range)
+        cache_process_requests(filename_base)
 
         return data['value']['i']
 
@@ -647,18 +659,44 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         # cache_put(data, 'tps', tps_array)
     # -----------------------------------------
     # =========== DataViz requests ===========
-    async def on_figure_data(self, data):
-        # self.log(data)
+    
+    async def on_coordinate_request(self, data):
+        global cache
+
         value = data['value']
+        client_room = data.get('client_room') or data['cookies']['src_sid'][0]
+
         filename = value['filename']
-        viz_type = value['viz_type']
-        viz_array = cache[filename][viz_type]
-        ti = np.array([ value['t_range'][0] ], dtype=np.float32)
-        img_str = value.get('img') or json.dumps(value.get('traces'))
-        viz_array.extend_array(np.array([img_str]),
-                               [ti],
-                               'time'
-                               )
+        data_type = value['data_type']
+
+        if filename not in cache:
+            # File not in cache, load and put
+            file_dataset = load_file(filename)
+            # Put to data array cache
+            cache[filename] = file_dataset
+
+        file_cache_item = cache[filename]
+        data_item = file_cache_item[data_type]
+
+        coordinates = {}
+        coordinate_data = {'filename': filename,
+                           'data_type': data_type,
+                           'coordinates': coordinates,
+                           }
+
+        requested_dims = value['dims']
+        all_dims = data_item.dims
+        for dim in all_dims:
+            coord_values_b = []
+            if dim in requested_dims:
+                coord_values = data_item[dim].values
+                coord_values_b = coord_values.astype(np.float32).tobytes()
+            coordinates.update({dim: coord_values_b})
+
+        await self.parent.emit_public_notification('loaded_coordinates',
+                                                   coordinate_data,
+                                                   room=client_room,
+                                                   )
 
     async def on_data_request(self, data):
         global cache
@@ -698,10 +736,20 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                   client_room
                   )
         # Process request(s)
-        available_t_range = [file_cache_item.signal.time[0],
-                             file_cache_item.signal.time[-1] + file_cache_item.period[-1]
-                             ]
-        cache_process_requests(filename, available_t_range)
+        cache_process_requests(filename)
+
+    async def on_figure_data(self, data):
+        # self.log(data)
+        value = data['value']
+        filename = value['filename']
+        viz_type = value['viz_type']
+        viz_array = cache[filename][viz_type]
+        ti = np.array([ value['t_range'][0] ], dtype=np.float32)
+        img_str = value.get('img') or json.dumps(value.get('traces'))
+        viz_array.extend_array(np.array([img_str]),
+                               [ti],
+                               'time'
+                               )
 
 
     async def on_stop_data_request(self, data):
@@ -828,6 +876,7 @@ def load_file(base_filename):
     xarray.Dataset
         Loaded data
     """
+    print("Loading file: %s" %base_filename)
     filepath = parse_path_from_sample_name(base_filename)
     # Get all saved variable names
     zarrs = get_file_data_vars(filepath)
@@ -908,15 +957,25 @@ class FileIoClient(BridgeServiceClient):
     async def init_service(self):
         global data_q # TODO:
 
-        data_q = self.data_q = Queue() # TODO:    
+        data_q = self.data_q = Queue() # TODO:
 
     async def service_main(self):
-        global data_q
+        
+        def data_sent():
+            self.public_ns.ready_for_next = True
+
+        self.public_ns.data_sent = data_sent
+        self.public_ns.ready_for_next = True
+
+
 
         while True:
             # Check queue for signal to emit (put in cache_process_requests)
             try:
+                if not self.public_ns.ready_for_next:
+                    raise Empty
                 data = self.data_q.get_nowait()
+                self.public_ns.ready_for_next = False
             except Empty:
                 await self.sio.sleep(.1)
                 continue
@@ -927,6 +986,7 @@ class FileIoClient(BridgeServiceClient):
                             'loaded_data',
                             data,
                             room=client_room,
+                            callback='data_sent'
                             )
             # End of main loop
         # Exit
