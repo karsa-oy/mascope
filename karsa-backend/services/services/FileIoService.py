@@ -620,25 +620,11 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         global cache
         value = data['value']
         filename_base = value.get('filename')
-        filename = base_to_zarr_filename(filename_base, 'signal')
-        print("Finished acquiring file: %s" %filename)
-        signal_array = cache[filename_base]['signal']
-        # tps_array, _ = cache_get(data, 'tps')
-        # cache_release(data)
-        if signal_array:
-            signal_array.flush()  # TODO: signal_array is None on killing acquisition from MainUI
-        else:
-            Warning("[on_acquistion_finished]: signal_array is None")
-        # if tps_array:
-        #     tps_array.flush()      # TODO: tps_array is None on killing acquisition from MainUI
-        # else:
-        #     Warning("[on_acquistion_finished]: tps_array is None")
-        
-        # Repeat the notification into root ns for DataViz
-        # await self.emit_client_notification('acquisition_finished',
-        #                                      value,
-        #                                      namespace='/'
-        #                                      )
+        print("Finished acquiring file: %s" %filename_base)
+        for key, array in cache[filename_base].items():
+            if isinstance(array, ExtendableDataArray):
+                print("Flush %s array" %key)
+                array.flush()
 
     async def on_tps_parameter_info(self, data):
         value = data['value']

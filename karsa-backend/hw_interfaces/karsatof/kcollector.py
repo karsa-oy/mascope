@@ -78,7 +78,7 @@ class ExtendableDataArray():
         self.data_array = xarray.DataArray()
         
         self.delayed_write = None
-        self.group = '%04d' % 0
+        self.group = -1
 
     def __getattr__(self, name):
         """Override standard getattr behaviour.
@@ -208,10 +208,10 @@ class ExtendableDataArray():
                                                    )
             if self.delayed_write.shape[dim_index] == self.chunk_size:
                 # Write delayed chunk
-                group_no = (self.data_array.shape[dim_index] / self.chunk_size) - 1
-                self.group = '%04d' % group_no
+                self.group = (self.data_array.shape[dim_index] / self.chunk_size) - 1
+                group_name = '%04d' % self.group
                 self.delayed_write.to_dataset().to_zarr(self.path,
-                                                        group=self.group,
+                                                        group=group_name,
                                                         mode='a',
                                                         compute=True
                                                         )
@@ -228,10 +228,10 @@ class ExtendableDataArray():
 
     def flush(self):
         if self.delayed_write is not None:
-            self.group = '%04d' % (int(self.group)+1)
+            group_name = '%04d' % (self.group+1)
             # Write (last, incomplete) delayed chunk
             self.delayed_write.to_dataset().to_zarr(self.path,
-                                                    group=self.group,
+                                                    group=group_name,
                                                     mode='a',
                                                     compute=True
                                                     )
