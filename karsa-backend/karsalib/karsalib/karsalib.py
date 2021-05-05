@@ -131,7 +131,6 @@ class BaseClientNamespace(AsyncClientNamespace):
         )
         await self.emit('unsubscribe', data)
 
-
     async def on_connect(self):
         self.app_name = self.__class__.__name__
         self.log(f"connected to {self.namespace}")
@@ -143,7 +142,6 @@ class BaseClientNamespace(AsyncClientNamespace):
             for ns in nss:
                 await self.emit('register_namespace', ns)
                 self.log(f"namespace {ns} registered")
-
 
     def on_disconnect(self):
         self.log(f"disconnected from namespace {self.namespace}")
@@ -197,10 +195,15 @@ class BaseClientNamespace(AsyncClientNamespace):
             self.log(f"{name}: ...")
         else:
             self.log(f"{name}: {value} > {kwarg.get('room', name)}")
-        await self.emit('client_notification', {'name': name, 'value': value, **kwarg})
+        await self.emit('client_notification',
+                        {'name': name, 'value': value, **kwarg},
+                        )
         if name in self.service_state:
             self.service_state[name] = value
 
+    @property
+    def room_sid(self):
+        return self.parent.sio.get_sid(self.namespace)
 
 class BaseServerNamespace(AsyncNamespace):
     """ socketio server base namespace class """
@@ -341,7 +344,6 @@ class BaseServiceClient:
         self.sio.register_namespace( ns_class(ns_name) )
         self.ns_handler = self.sio.namespace_handlers.get(ns_name)
         self.ns_handler.parent = self
-        self.ns_handler.room_sid = None
         # root ns handler is needed to communicate with router at re-connect
         if '/' not in self.sio.namespace_handlers:
             self.sio.register_namespace( BaseClientNamespace('/') )
@@ -362,9 +364,6 @@ class BaseServiceClient:
             except Exception as e:
                 self.log(f"Failed: {e}\nRetrying...")
                 await self.sio.sleep(1)
-        for ns in self.sio.namespace_handlers:
-            self.sio.namespace_handlers.get(ns).room_sid = self.sio.get_sid(ns)
-
 
     async def disconnect(self):
         await self.sio.disconnect()
@@ -411,17 +410,15 @@ class BridgeServiceClient(BaseServiceClient):
         self.private_ns = self.sio.namespace_handlers.get(ns_name)
         # cross-references
         self.public_ns.parent = self
-        self.public_ns.room_sid = None
         self.private_ns.parent = self
-        self.private_ns.room_sid = None
 
     async def emit_public_notification(self, name, value, **kwarg):
         await self.public_ns.emit_client_notification(name, value, **kwarg)
 
     async def emit_private_notification(self, name, value, **kwarg):
         await self.private_ns.emit_client_notification(name, value, **kwarg)
-
-
+    
+    
 
 class BaseStreamerClient(BridgeServiceClient):
     def __init__(self, streamer_type, raw_pool,
@@ -570,21 +567,10 @@ class BaseStreamerClient(BridgeServiceClient):
                     while spec_data['i'] - self.private_ns.acquired_spectrum_index > 10:
                         ttl_count += 1
                         if ttl_count > TASK_TTL:
+                            # TODO: Should probably call stop_stream for file streamers but not TofDaqStreamer
+                            # self.streamer.stop_stream()
                             self.log(f"{filename} import was cancelled due to a timeout.")
                             stop_task = True
-
-                            # TODO: timeout due to file_service failure:
-                            # self.streamer is still active here - how to disable?
-                            # ??? self.streamer.stop_stream()
-                            await self.emit_private_notification(
-                                                    'acquisition_finished',
-                                                    {'filename': filename},
-                                                    )
-                            await self.emit_private_notification(
-                                                    'acquisition_status',
-                                                    'not_running',
-                                                    )
-
                             break
                         await asyncio.sleep(.1)
                     if stop_task:
