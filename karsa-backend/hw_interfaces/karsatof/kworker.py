@@ -201,15 +201,20 @@ viz_generators = {
             }
 
 class ImageGenerator(Process):
-    def __init__(self, queue_in, queue_out):
+    def __init__(self, queue_in, queue_out, shutdown_event):
         Process.__init__(self)
         self.queue_in = queue_in
         self.queue_out = queue_out
+        self.shutdown_event = shutdown_event
 
     def run(self):
         global viz_generators
-        while True:
-            data = self.queue_in.get()
+        while not self.shutdown_event.is_set():
+            try:
+                data = self.queue_in.get()
+            except KeyboardInterrupt:
+                self.shutdown_event.set()
+                break
             if data is not None:
                 # Select function to generate the image
                 viz_type = data['viz_type']

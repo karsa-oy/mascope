@@ -1050,7 +1050,8 @@ class DataVizServiceClient(BaseServiceClient):
         for i in range(n_jobs):
             self.log("ImageGenerator %s/%s" %(i+1, n_jobs))
             gen_proc = ImageGenerator(generator_input_q,
-                                      generator_output_q
+                                      generator_output_q,
+                                      shutdown_event
                                       )
             gen_proc.start()
             self.generator_procs.append(gen_proc)
