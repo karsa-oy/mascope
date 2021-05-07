@@ -322,10 +322,11 @@ class BaseServerNamespace(AsyncNamespace):
         app_name = data['app_name']
         endpoints = data['endpoints']
         room = data.get('room')
-        self.log(f"{app_name}:{room or sid} created endpoints {endpoints}")
         if room:
+            self.log(f"{app_name}:{sid} joins room {room}")
             self.enter_room(sid, room)
         else:
+            self.log(f"{app_name}:{sid} joins rooms {endpoints}")
             for e in endpoints:
                 self.enter_room(sid, e)
 
@@ -333,11 +334,12 @@ class BaseServerNamespace(AsyncNamespace):
         app_name = data['app_name']
         endpoints = data['endpoints']
         room = data.get('room')
-        self.log(f"{app_name}:{room} destroyed endpoints {endpoints}")
         if room:
+            self.log(f"{app_name}:{sid} leaves room {room}")
             self.leave_room(sid, room)
             await self.emit('service_state', {}, room=room)
         else:
+            self.log(f"{app_name}:{sid} leaves rooms {endpoints}")
             for e in endpoints:
                 self.leave_room(sid, e)
 
