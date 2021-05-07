@@ -329,7 +329,7 @@ class BaseServerNamespace(AsyncNamespace):
             self.log(f"{app_name}:{sid} joins rooms {endpoints}")
             for e in endpoints:
                 self.enter_room(sid, e)
-        self.log(f"{app_name}:{sid} in rooms: {self.rooms(sid)}")
+        self.log(f"{app_name}:{sid} stays in rooms: {self.rooms(sid)}")
 
     async def on_unsubscribe(self, sid, data):
         app_name = data['app_name']
@@ -343,7 +343,7 @@ class BaseServerNamespace(AsyncNamespace):
             self.log(f"{app_name}:{sid} leaves rooms {endpoints}")
             for e in endpoints:
                 self.leave_room(sid, e)
-        self.log(f"{app_name}:{sid} in rooms: {self.rooms(sid)}")
+        self.log(f"{app_name}:{sid} stays in rooms: {self.rooms(sid)}")
 
 
     async def on_client_notification(self, sid, data):

@@ -677,6 +677,10 @@ export default {
             this.visualize_range_on_zoom_in(prev_ranges, new_ranges, true);
         },
         stop_visualize_range: function(new_value, old_value) {
+            let client_rooms = new_value.client_rooms;
+            for (let i in client_rooms) {
+                this.be.unsubscribe(this.endpoints, client_rooms[i]);
+            }
             let client_room = this.room;
             return this.be.export_one_way_binding_prop('stop_visualize_range',
                                                         {...new_value, 'uid': Math.random()},
@@ -696,7 +700,7 @@ export default {
             if ( new_value === true )
             {
                 this.namespace = this.root_namespace;
-                // handlers for for external notifications:
+                // handlers for external notifications:
                 // this.namespace.on("figure_ranges", (value) => this.be.import_one_way_binding_prop("figure_ranges", {...value.value, 'uid': Math.random()}));
                 // this.namespace.on("figure_data", (value) => this.be.import_one_way_binding_prop("figure_data", value));
 

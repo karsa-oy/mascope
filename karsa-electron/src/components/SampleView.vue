@@ -219,12 +219,12 @@ export default {
             if ( _.isEqual(new_value, old_value) ) {
                 return false;
             }
-            if (old_value.filename) {
-                this.be.unsubscribe(this.endpoints, old_value.filename);
-            }
-            if (new_value.filename) {
-                this.be.subscribe(this.endpoints, new_value.filename);
-            }
+            // if (old_value.filename) {
+            //     this.be.unsubscribe(this.endpoints, old_value.filename);
+            // }
+            // if (new_value.filename) {
+            //     this.be.subscribe(this.endpoints, new_value.filename);
+            // }
             this.filename = new_value.filename;
             this.figure_ranges = {'filename': new_value.filename,
                                   't_range': [0, new_value.length],
