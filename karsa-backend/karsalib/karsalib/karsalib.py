@@ -148,7 +148,7 @@ class CacheQueueConnector(QConnect):
         super().__init__(*arg, **kwarg)
         self.cache = dict()
         self.cache_key = cache_key
-        self.cache_index = 0
+        self.cache_index = -1
         self.lock = Lock()
 
     def cache_put(self, data):
@@ -163,9 +163,10 @@ class CacheQueueConnector(QConnect):
     def _get_next_cache_key(self):
         keys = list(self.cache.keys())
         if not keys:
+            self.cache_index = -1
             return None
-        key = keys[self.cache_index]
         self.cache_index = (self.cache_index + 1) % len(keys)
+        key = keys[self.cache_index]
         return key
 
     def cache_get(self):
