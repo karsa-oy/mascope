@@ -135,6 +135,17 @@ class ExtendableDataArray():
                                             mode='w-' # Create
                                             )
 
+    def combine_first(self, data, coords):
+        data = self.array_module.array(data, dtype=self.dtype)
+
+        extension = xarray.DataArray(data,
+                                     dims=self.data_array.dims,
+                                     coords=coords,
+                                     name=self.data_array.name
+                                     )
+
+        self.data_array = self.data_array.combine_first(extension)
+
     def extend_array(self,
                      data,
                      coords,

@@ -66,7 +66,8 @@ export default {
             room_sid: null,
             endpoints: [
                 // 'acquisition_progress',
-                // 'figure_data',
+                'figure_data',
+                'loaded_data',
                 // 'figure_ranges',
                 ],
 
@@ -301,10 +302,11 @@ export default {
                 this.filename = "";
                 return
             }
+            let new_sample = false;
             if (!_.isEqual(new_value.filename, old_value.filename)) {
-                this.log("new sample -> reset_view");
+                // New sample to load, reset
                 this.reset_view();
-                old_value = {};
+                new_sample = true;
             }
             this.filename = new_value.filename;
             let t0 = new_value.t_range[0];
@@ -317,12 +319,16 @@ export default {
             this.figure_cache.mz_maxrange[0] = Math.min(mz0, this.figure_cache.mz_maxrange[0]);
             this.figure_cache.mz_maxrange[1] = Math.max(mz1, this.figure_cache.mz_maxrange[1]);
 
-            this.visualize_range_on_zoom_in(old_value, new_value);
+            if (new_sample) {
+                this.visualize_range_on_sample_to_load(new_value);
+            } else {
+                // Zoom in loaded sample
+                this.visualize_range_on_zoom_in(old_value, new_value);
+            }
         },
 
         on_figure_ranges(new_value, old_value) {
             if (_.isEqual(new_value, old_value)) {
-                this.log("Equal figure ranges");
                 return
             }
             var self = this;
@@ -408,10 +414,6 @@ export default {
 
         on_figure_data(json_data) {
             var self = this;
-            if (!_.isEqual(json_data.value.viz_type, self.id)) {
-                self.log("Received figure_data of wrong type!");
-                return;
-            }
             self.figure_queue = self.figure_queue.then(function() {
                 return self._on_figure_data(json_data); }
             );
@@ -450,7 +452,7 @@ export default {
         },
 
         async update_figure(zoom_stack_item=null) {
-            this.log(zoom_stack_item);
+            // this.log(zoom_stack_item);
             // the function is destructive for zoom_stack_item - don't use refs
             var self = this;
             if ( !_.isNull(zoom_stack_item) ) {
@@ -470,6 +472,29 @@ export default {
                                self.figure_traces,
                                self.figure_layout
                                );
+        },
+        visualize_range_on_sample_to_load(new_ranges) {
+            // this.log(new_ranges);
+            // Unpack ranges
+            let [mz0, mz1] = new_ranges.mz_range;
+            let [t0, t1] = new_ranges.t_range;
+            // Create new zoom_stack_item
+            let zoom_stack_item = new this.ZoomStackItem([t0, t1], [mz0, mz1]);
+            // Add the zoom stack item at the top of the stack
+            this.zoom_stack.push(
+                zoom_stack_item
+                );
+            // Increment figure_cache ref counter
+            this.figure_cache_add_ref(zoom_stack_item.room);
+            // Update figure
+            let cur_ranges = this.shallow_copy(this.zoom_stack.slice(-1)[0]);
+            // Set new ranges
+            this.update_figure(cur_ranges);
+            // Request full range visualization from DataViz (ranges null)
+            this.visualize_range = {'filename': this.filename,
+                                    'viz_type': this.id,
+                                    'room': cur_ranges.room,
+                                    };
         },
 
         visualize_range_on_zoom_in(prev_ranges, new_ranges, volatile=false) {
@@ -613,20 +638,22 @@ export default {
             self.stop_visualize_range = {'client_rooms': cancel_requests};
             self.update_figure(zoom_stack_item_to_restore);
             // visualize missing frames and acquisition frames
-            let prev_item_room = zoom_stack_item_to_remove.room;
-            let cur_item_room = zoom_stack_item_to_restore.room;
-            let cur_mz = zoom_stack_item_to_restore.mz_range;
-            let prev_t_filled = self.figure_cache_get(prev_item_room).t_filled_range;
-            let cur_t_filled = self.figure_cache_get(cur_item_room).t_filled_range;
+// TODO:
+            // let prev_item_room = zoom_stack_item_to_remove.room;
+            // let cur_item_room = zoom_stack_item_to_restore.room;
+            // let cur_mz = zoom_stack_item_to_restore.mz_range;
+            // let prev_t_filled = self.figure_cache_get(prev_item_room).t_filled_range;
+            // let cur_t_filled = self.figure_cache_get(cur_item_room).t_filled_range;
             // retro-visualization
-            let min_t_gap = 1;
-            if ( prev_t_filled[1] - cur_t_filled[1] > min_t_gap) {
-                self.visualize_range = {'t_range': [cur_t_filled[1], prev_t_filled[1]],
-                                        'mz_range': cur_mz,
-                                        'filename': self.filename,
-                                        'viz_type': this.id,
-                                        };
-            }
+            // let min_t_gap = 1;
+            // if ( prev_t_filled[1] - cur_t_filled[1] > min_t_gap) {
+            //     self.visualize_range = {'t_range': [cur_t_filled[1], prev_t_filled[1]],
+            //                             'mz_range': cur_mz,
+            //                             'filename': self.filename,
+            //                             'viz_type': this.id,
+            //                             };
+            // }
+// TODO:
             // remove cache item, if not used anymore
             self.figure_cache_release_ref(zoom_stack_item_to_remove.room);
         },
@@ -643,7 +670,9 @@ export default {
 
     watch: {
         figure_data: function(new_value) {
-            if ( !_.isEqual(new_value.value.viz_type, this.id) )
+            console.log("figure_data");
+            if ( !_.isEqual(new_value.value.viz_type, this.id) &&
+                 !_.isEqual(new_value.value.data_type, this.id))
                 return;
             this.on_figure_data(new_value);
         },

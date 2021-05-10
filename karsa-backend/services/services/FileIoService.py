@@ -349,13 +349,19 @@ def process_signal_request(filename,
     for i, spec_array in enumerate(signal_slice.transpose()):
         ti = float( spec_array.time.item() )
         period = float( period_slice[i] )
-        data_q.put({'data_type': data_type,
-                    'filename': filename,
-                    'spec': spec_array.values.astype(np.float32).tobytes(),
-                    't': ti,
-                    'period': period,
-                    'client_room': client_room,
-                    })
+        data_item = {
+                'data_type': data_type,
+                'filename': filename,
+                'spec': spec_array.values.astype(np.float32).tobytes(),
+                't': ti,
+                'period': period,
+                'client_room': client_room,
+                }
+        if (mz0 is not None) or (mz1 is not None):
+            mz = spec_array.mz.values
+            data_item.update({'mz': mz.astype(np.float32).tobytes()
+                              })
+        data_q.put(data_item)
     processed_t_range = (signal_slice.time[0], ti+period)
     return processed_t_range
 
@@ -393,7 +399,7 @@ def process_image_request(filename,
 
     # Put to queue to be emitted from service_main
     for i, img_array in enumerate(img_slice):
-        img = img_array
+        img_str = img_array.item()
 
         t0_i = float( img_array.time.item() )
         if i < len(img_slice) - 1:
@@ -401,15 +407,26 @@ def process_image_request(filename,
         else:
             t1_i = t0_i+1 # TODO:
 
-        data_q.put({'filename': filename,
-                    'data_type': data_type,
-                    'img': img.item(),
+        img_data = {'filename': filename,
+                    'viz_type': data_type,
+                    'mz_range': [mz0, mz1],
                     't_range': [t0_i, t1_i],
-                    'mz_range': cache_item.attrs['range'],
                     'client_room': client_room,
-                    })
-
+                    }
+        if img_str.startswith('data:image/png;base64'):
+            # base64 png
+            img_data.update({'img': img_str})
+        else:
+            # trace
+            try:
+                traces = json.loads(img_str)
+                img_data.update({'traces': traces})
+            except json.JSONDecodeError:
+                print("Erroneous img_blob: %s" %img_str)
+                continue
+        data_q.put(img_data)
         processed_t_range = (img_slice.time[0], t1_i)
+
     return processed_t_range
 
 
@@ -499,7 +516,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                      't_range': data['value']['t_range'],
                      'viz_type': viz_type
                      },
-                    client_room=self.room_sid,
+                    client_room=self.parent.public_ns.room_sid,
                     )
 
     async def on_acquisition_coordinates(self, data):
@@ -705,13 +722,12 @@ class FileIoPrivateNamespace(BaseClientNamespace):
 
     async def on_data_request(self, data):
         global cache
-
-        # self.log(data)
+        self.log(data)
         value = data['value']
 
         filename = value['filename']
         data_type = value['data_type']
-        client_room = value.get('client_room') or data['cookies']['src_sid'][0]
+        client_room = data.get('client_room') or data['cookies']['src_sid'][0]
         mz_range = value.get('mz_range', None)
         t_range = value.get('t_range', None)
         
@@ -980,7 +996,7 @@ class FileIoClient(BridgeServiceClient):
                 if not self.public_ns.ready_for_next:
                     raise Empty
                 data = self.data_q.get_nowait()
-                self.public_ns.ready_for_next = False
+                # self.public_ns.ready_for_next = False
             except Empty:
                 await self.sio.sleep(.1)
                 continue
@@ -991,7 +1007,7 @@ class FileIoClient(BridgeServiceClient):
                             'loaded_data',
                             data,
                             room=client_room,
-                            callback='data_sent'
+                            # callback='data_sent'
                             )
             # End of main loop
         # Exit

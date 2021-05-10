@@ -134,7 +134,7 @@ export default {
 
             room_sid: null,
             endpoints: [
-                'figure_data',
+                // 'figure_data',
                 // 'figure_ranges',
                 // 'tps_parameters',
             ],
@@ -219,12 +219,6 @@ export default {
             if ( _.isEqual(new_value, old_value) ) {
                 return false;
             }
-            // if (old_value.filename) {
-            //     this.be.unsubscribe(this.endpoints, old_value.filename);
-            // }
-            // if (new_value.filename) {
-            //     this.be.subscribe(this.endpoints, new_value.filename);
-            // }
             this.filename = new_value.filename;
             this.figure_ranges = {'filename': new_value.filename,
                                   't_range': [0, new_value.length],
@@ -256,9 +250,10 @@ export default {
                 // this.namespace.on("figure_ranges", (value) => this.be.import_one_way_binding_prop("figure_ranges", {...value.value, 'uid': Math.random()}));
                 // this.namespace.on("tps_parameters", (value) => this.be.import_one_way_binding_prop("tps_parameters", value.value));
                 this.namespace.on("figure_data", (value) => this.be.import_one_way_binding_prop("figure_data", value));
+                this.namespace.on("loaded_data", (value) => this.be.import_one_way_binding_prop("figure_data", value));
 
                 this.room_sid = this.root_namespace.id;
-                this.be.subscribe(this.endpoints, this.room_sid);
+                // this.be.subscribe(this.endpoints, this.room_sid);
             }
         },
     },
