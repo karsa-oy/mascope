@@ -552,11 +552,18 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                                 coords=[[]],
                                 name='signal_period'
                                 )
-        # Store attributes
+        # Collect attributes
         attributes = {'id': filename_base,
                       'length': float(t_range[1]),
                       'range': [ float(mz[0]), float(mz[-1]) ],
                       }
+        # Write attributes
+        attr_path = os.path.join(
+                        parse_path_from_sample_name(filename_base),
+                        '.attrs'
+                        )
+        with open(attr_path, 'w') as f:
+            json.dump(attributes, f, indent=4)
 
         # Put to cache
         cache_item_dict = {'signal': signal_array,
