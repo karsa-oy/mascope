@@ -22,7 +22,7 @@ import zarr
 import numpy as np
 import dask.array as da
 
-from multiprocessing import Queue
+from multiprocessing import Queue, Event
 from PIL import Image
 from copy import deepcopy
 from datetime import datetime
@@ -31,6 +31,7 @@ from queue import Empty
 
 from karsalib import (BaseClientNamespace,
                       BridgeServiceClient,
+                      CacheQueueConnector,
                       Logger,
                       parse_cmd_args, 
                       get_client_notification_args
@@ -46,7 +47,9 @@ client = None
 # Cache for data arrays
 cache = {}
 
-data_q = None # TODO:
+data_q = None
+shutdown_event = None
+service_input_cache = None
 
 # Cache for requests
 # in_memory_db = ':memory:'
@@ -666,8 +669,10 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         await self.parent.emit_public_notification(
                         'stop_visualize_range',
                         {'client_rooms': [self.room_sid],
+                         'filename': filename_base,
                          }
                         )
+
 
     async def on_tps_parameter_info(self, data):
         value = data['value']
@@ -781,14 +786,20 @@ class FileIoPrivateNamespace(BaseClientNamespace):
 
 
     async def on_stop_data_request(self, data):
-        # TODO: Deprecated, need to update
-        ranges = data['value'].pop('ranges', [])
-        for r in ranges:
-            data['value'].update({'mz_range': r['mz_range']})
-            data['value'].update({'t_range': r['t_range']})
-            await kill_cache(data)
-            return
-        await kill_cache(data)
+        # # TODO: Deprecated, need to update
+        # ranges = data['value'].pop('ranges', [])
+        # for r in ranges:
+        #     data['value'].update({'mz_range': r['mz_range']})
+        #     data['value'].update({'t_range': r['t_range']})
+        #     await kill_cache(data)
+        #     return
+        # await kill_cache(data)
+
+        client_rooms = data['value']['client_rooms']
+        for client_room in client_rooms:
+            cache_release('requests', client_room=client_room)
+            service_input_cache.cache_delete_key(client_room)
+
 
     async def on_tps_data_request(self, data):     
         # TODO: Deprecated, need to update   
@@ -983,19 +994,29 @@ def write_zarr_attributes(filepath, attributes):
 class FileIoClient(BridgeServiceClient):
     
     async def init_service(self):
-        global data_q # TODO:
+        global data_q
+        global shutdown_event
+        global service_input_cache
 
-        data_q = self.data_q = Queue() # TODO:
+        data_q = Queue()
+        self.data_q = Queue()
+        shutdown_event = Event()
+        service_input_cache = CacheQueueConnector('client_room',
+                                                data_q,
+                                                self.data_q,
+                                                shutdown_event
+                                                )
+
 
     async def service_main(self):
-        
+        # start input cache thread
+        service_input_cache.start()
+
         def data_sent():
             self.public_ns.ready_for_next = True
 
         self.public_ns.data_sent = data_sent
         self.public_ns.ready_for_next = True
-
-
 
         while True:
             # Check queue for signal to emit (put in cache_process_requests)
@@ -1018,6 +1039,8 @@ class FileIoClient(BridgeServiceClient):
                             )
             # End of main loop
         # Exit
+        # Kill service_input_cache thread
+        shutdown_event.set()
         await self.sio.disconnect()
 
 def run():
@@ -1034,9 +1057,11 @@ def run():
                           ('/', FileIoPublicNamespace),
                           (args['ns'], FileIoPrivateNamespace)
                           )
-
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(client.run())
+    try:
+        loop.run_until_complete(client.run())
+    except KeyboardInterrupt:
+        shutdown_event.set()
 
 
 if __name__=='__main__':
