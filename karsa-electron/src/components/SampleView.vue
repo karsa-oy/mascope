@@ -17,7 +17,8 @@
                     <!-- Heatmap section -->
                     <section class="heatmap-section">
                         <div class="column datashader-heatmap">
-                            <ViewPort id="spectrogram"></ViewPort>
+                            <ViewPortSpectrogram id="spectrogram">
+                            </ViewPortSpectrogram>
                         </div>                                    
                     </section>
                     <!-- End of heatmap section-->
@@ -46,7 +47,8 @@
                     <!-- Timeseries section -->
                     <section class="timeseries-section">
                         <div class="column tps-chart"> 
-                            <ViewPort id="timeseries"></ViewPort>
+                            <ViewPortTimeseries id="timeseries">
+                            </ViewPortTimeseries>
                         </div>                                    
                     </section>
                     <!-- End of timeseries -->
@@ -57,7 +59,8 @@
                     <!-- Spec stack section -->
                     <section class="spect-stack-section">
                         <div class="column spec-stack-holder">
-                            <ViewPort id="waterfall"></ViewPort>
+                            <ViewPortWaterfall id="waterfall">
+                            </ViewPortWaterfall>
                         </div>                            
                     </section>
                     <!-- End of spec stack -->
@@ -76,7 +79,9 @@ import Vue from "vue";
 import { mapState } from 'vuex'
 import Buefy from "buefy";
 import Multiselect from "vue-multiselect";
-import ViewPort from "./ViewPort.vue"
+import ViewPortSpectrogram from "./ViewPortSpectrogram.vue"
+import ViewPortTimeseries from "./ViewPortTimeseries.vue"
+import ViewPortWaterfall from "./ViewPortWaterfall.vue"
 import "buefy/dist/buefy.css";
 import '@mdi/font/css/materialdesignicons.min.css';
 import { BECom } from "../karsalib.js"
@@ -89,7 +94,9 @@ var _ = require('underscore');
 export default {
     name: "SampleView",
     components: {
-        ViewPort,
+        ViewPortSpectrogram,
+        ViewPortTimeseries,
+        ViewPortWaterfall,
         // using third party multiselect component
         Multiselect
     },

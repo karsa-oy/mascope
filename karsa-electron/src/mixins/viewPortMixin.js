@@ -1,38 +1,11 @@
-<template>
-    <div>
-
-        <!-- Main content  area-->
-        <section>
-            <div :id="id"></div>
-        </section>
-
-    </div>
-</template>
-
-
-<script type = "text/javascript" >
-"use strict";
-import Vue from "vue";
 import { mapState } from 'vuex'
-import Buefy from "buefy";
-import "buefy/dist/buefy.css";
-import '@mdi/font/css/materialdesignicons.min.css';
 import { BECom } from "../karsalib.js"
-
-Vue.use([Buefy]);
 
 var fs = require('fs');
 var Plotly = require('plotly.js-dist');
 var _ = require('underscore');
 
-
-export default {
-    // name: "ViewPort",
-    components: {
-    },
-    props: {
-        id: String,
-    },
+export const viewPortMixin = {
     computed: {
         ...mapState([
                     'figure_data',
@@ -90,15 +63,12 @@ export default {
             stop_visualize_range: {},
         }
     },
-
     created: function(){
         this.be = new BECom(this);
     },
-
     mounted: function() {
         this.init_figure();
     },
-
     methods: {
         beep: function() {
             var snd = new Audio("data:audio/mp3;base64,//uQRAAAAWMSLwUIYAAsYkXgoQwAEaYLWfkWgAI0wWs\
@@ -210,20 +180,10 @@ export default {
                 self.figure_config = self.shallow_copy(figure_layouts.figure_config);
                 self.figure_layout_default = self.shallow_copy(figure_layouts[self.id]);
             }
-
-            // Common config for all figures
-            let init_data = [{x: [0, 1],
-                              y: [0, 1],
-                              type: "scattergl",
-                              mode: 'markers',
-                              marker: {opacity: 0.0},
-                              hoverinfo: 'skip',
-                              }];
-
             // ===== Initialize Plotly figure =====
             let figure_div = document.getElementById(self.id);
             Plotly.newPlot(figure_div,
-                           init_data,
+                           [],
                            self.figure_layout_default,
                            {...self.figure_config,
                             "doubleClick": false
@@ -667,7 +627,6 @@ export default {
         },
 
     },
-
     watch: {
         figure_data: function(new_value) {
             console.log("figure_data");
@@ -739,8 +698,4 @@ export default {
             }
         },
     },
-};
-</script>
-
-<style src = "vue-multiselect/dist/vue-multiselect.min.css"> </style>
-<style src = "../assets/css/MeasurementTab.css"> </style>
+}
