@@ -76,7 +76,8 @@
                     <!-- Heatmap section -->
                     <section class="heatmap-section">
                         <div class="column datashader-heatmap">
-                            <ViewPort id="spectrogram"></ViewPort>
+                            <ViewPortSpectrogram id="spectrogram">
+                            </ViewPortSpectrogram>
                         </div>                                    
                     </section>
                     <!-- End of heatmap section-->
@@ -105,7 +106,8 @@
                     <!-- Timeseries section -->
                     <section class="timeseries-section">
                         <div class="column tps-chart"> 
-                            <ViewPort id="timeseries"></ViewPort>
+                            <ViewPortTimeseries id="timeseries">
+                            </ViewPortTimeseries>
                         </div>                                    
                     </section>
                     <!-- End of timeseries -->
@@ -116,7 +118,8 @@
                     <!-- Spec stack section -->
                     <section class="spect-stack-section">
                         <div class="column spec-stack-holder">
-                            <ViewPort id="waterfall"></ViewPort>
+                            <ViewPortWaterfall id="waterfall">
+                            </ViewPortWaterfall>
                         </div>                            
                     </section>
                     <!-- End of spec stack -->
@@ -135,7 +138,9 @@ import Vue from "vue";
 import { mapState } from 'vuex'
 import Buefy from "buefy";
 import Multiselect from "vue-multiselect";
-import ViewPort from "./ViewPort.vue"
+import ViewPortSpectrogram from "./ViewPortSpectrogram.vue"
+import ViewPortTimeseries from "./ViewPortTimeseries.vue"
+import ViewPortWaterfall from "./ViewPortWaterfall.vue"
 import "buefy/dist/buefy.css";
 import '@mdi/font/css/materialdesignicons.min.css';
 import { BECom } from "../karsalib.js"
@@ -148,7 +153,9 @@ var _ = require('underscore');
 export default {
     name: "SampleView",
     components: {
-        ViewPort,
+        ViewPortSpectrogram,
+        ViewPortTimeseries,
+        ViewPortWaterfall,
         // using third party multiselect component
         Multiselect
     },
@@ -203,7 +210,7 @@ export default {
 
             room_sid: null,
             endpoints: [
-                'figure_data',
+                // 'figure_data',
                 // 'figure_ranges',
                 // 'tps_parameters',
             ],
@@ -288,12 +295,6 @@ export default {
             if ( _.isEqual(new_value, old_value) ) {
                 return false;
             }
-            if (old_value.filename) {
-                this.be.unsubscribe(this.endpoints, old_value.filename);
-            }
-            if (new_value.filename) {
-                this.be.subscribe(this.endpoints, new_value.filename);
-            }
             this.filename = new_value.filename;
             this.figure_ranges = {'filename': new_value.filename,
                                   't_range': [0, new_value.length],
@@ -325,9 +326,10 @@ export default {
                 // this.namespace.on("figure_ranges", (value) => this.be.import_one_way_binding_prop("figure_ranges", {...value.value, 'uid': Math.random()}));
                 // this.namespace.on("tps_parameters", (value) => this.be.import_one_way_binding_prop("tps_parameters", value.value));
                 this.namespace.on("figure_data", (value) => this.be.import_one_way_binding_prop("figure_data", value));
+                this.namespace.on("loaded_data", (value) => this.be.import_one_way_binding_prop("figure_data", value));
 
                 this.room_sid = this.root_namespace.id;
-                this.be.subscribe(this.endpoints, this.room_sid);
+                // this.be.subscribe(this.endpoints, this.room_sid);
             }
         },
     },

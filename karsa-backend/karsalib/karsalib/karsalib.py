@@ -7,7 +7,9 @@ import random
 import logging
 from socketio import AsyncClientNamespace, AsyncNamespace, AsyncClient
 from socketio.exceptions import BadNamespaceError
-from queue import Empty
+from queue import Empty, Full
+from threading import Thread
+from multiprocessing import Lock, cpu_count
 
 
 NO_LOGGING_DEFAULT = False
@@ -98,6 +100,96 @@ class Logger():
                                       no_data_logging=False)
 
 
+class QConnect(Thread):
+    OUT_Q_LIMIT = 2*cpu_count()
+    CACHE_LIMIT = 1000000   # TODO: number?
+
+    def __init__(self, in_q, out_q, shutdown_event):
+        Thread.__init__(self)
+        self.in_q = in_q
+        self.out_q = out_q
+        self.shutdown_event = shutdown_event
+        self.cache = []
+
+    def cache_put(self, data):
+        if len(self.cache) > self.CACHE_LIMIT:
+            raise Full
+        self.cache.insert(0, data)
+
+    def cache_get(self):
+        data = self.cache.pop()
+        return data
+
+    def run(self):
+        while not self.shutdown_event.is_set():
+            data = None
+            try:
+                data = self.in_q.get(True, .1)
+                # print('in_q.get', data['client_room'])
+            except Empty:
+                data = None
+            if data:
+                try:
+                    self.cache_put(data)
+                except Full as e:
+                    print("Cache overflow -- skipping input!")
+                    continue
+            if self.out_q.qsize() >= self.OUT_Q_LIMIT:
+                continue
+            data = self.cache_get()
+            if data:
+                self.out_q.put(data)
+                # print('out_q.put', data['client_room'])
+        print(f"Exit from {self.__class__.__name__} thread")
+
+
+class CacheQueueConnector(QConnect):
+    def __init__(self, cache_key, *arg, **kwarg):
+        super().__init__(*arg, **kwarg)
+        self.cache = dict()
+        self.cache_key = cache_key
+        self.cache_index = -1
+        self.lock = Lock()
+
+    def cache_put(self, data):
+        key = data.get(self.cache_key)
+        if not key:
+            raise ValueError(f"Invalid input for {self.__class__.__name__} : {data}")
+        with self.lock:
+            if key not in self.cache:
+                self.cache[key] = []
+            self.cache[key].insert(0, data)
+
+    def _get_next_cache_key(self):
+        keys = list(self.cache.keys())
+        if not keys:
+            self.cache_index = -1
+            return None
+        self.cache_index = (self.cache_index + 1) % len(keys)
+        key = keys[self.cache_index]
+        return key
+
+    def cache_get(self):
+        with self.lock:
+            key = self._get_next_cache_key()
+            if not key:
+                return None
+            data = self.cache[key].pop()
+            if not self.cache[key]:
+                del self.cache[key]
+            return data
+
+    def cache_delete_key(self, key):
+        with self.lock:
+            if key in self.cache.keys():
+                del self.cache[key]
+                self.cache_index = min(self.cache_index, len(self.cache.keys()) - 1)
+
+    def cache_size(self):
+        return sum([len(v) for v in self.cache.values()])
+
+
+
 class BaseClientNamespace(AsyncClientNamespace):
     """ python-socket.io client namespace for connecting to Router """
     # ref to service client
@@ -131,7 +223,6 @@ class BaseClientNamespace(AsyncClientNamespace):
         )
         await self.emit('unsubscribe', data)
 
-
     async def on_connect(self):
         self.app_name = self.__class__.__name__
         self.log(f"connected to {self.namespace}")
@@ -143,7 +234,6 @@ class BaseClientNamespace(AsyncClientNamespace):
             for ns in nss:
                 await self.emit('register_namespace', ns)
                 self.log(f"namespace {ns} registered")
-
 
     def on_disconnect(self):
         self.log(f"disconnected from namespace {self.namespace}")
@@ -197,10 +287,15 @@ class BaseClientNamespace(AsyncClientNamespace):
             self.log(f"{name}: ...")
         else:
             self.log(f"{name}: {value} > {kwarg.get('room', name)}")
-        await self.emit('client_notification', {'name': name, 'value': value, **kwarg})
+        await self.emit('client_notification',
+                        {'name': name, 'value': value, **kwarg},
+                        )
         if name in self.service_state:
             self.service_state[name] = value
 
+    @property
+    def room_sid(self):
+        return self.parent.sio.get_sid(self.namespace)
 
 class BaseServerNamespace(AsyncNamespace):
     """ socketio server base namespace class """
@@ -228,24 +323,28 @@ class BaseServerNamespace(AsyncNamespace):
         app_name = data['app_name']
         endpoints = data['endpoints']
         room = data.get('room')
-        self.log(f"{app_name}:{room or sid} created endpoints {endpoints}")
         if room:
+            self.log(f"{app_name}:{sid} joins room {room}")
             self.enter_room(sid, room)
         else:
+            self.log(f"{app_name}:{sid} joins rooms {endpoints}")
             for e in endpoints:
                 self.enter_room(sid, e)
+        self.log(f"{app_name}:{sid} stays in rooms: {self.rooms(sid)}")
 
     async def on_unsubscribe(self, sid, data):
         app_name = data['app_name']
         endpoints = data['endpoints']
         room = data.get('room')
-        self.log(f"{app_name}:{room} destroyed endpoints {endpoints}")
         if room:
+            self.log(f"{app_name}:{sid} leaves room {room}")
             self.leave_room(sid, room)
             await self.emit('service_state', {}, room=room)
         else:
+            self.log(f"{app_name}:{sid} leaves rooms {endpoints}")
             for e in endpoints:
                 self.leave_room(sid, e)
+        self.log(f"{app_name}:{sid} stays in rooms: {self.rooms(sid)}")
 
 
     async def on_client_notification(self, sid, data):
@@ -341,7 +440,6 @@ class BaseServiceClient:
         self.sio.register_namespace( ns_class(ns_name) )
         self.ns_handler = self.sio.namespace_handlers.get(ns_name)
         self.ns_handler.parent = self
-        self.ns_handler.room_sid = None
         # root ns handler is needed to communicate with router at re-connect
         if '/' not in self.sio.namespace_handlers:
             self.sio.register_namespace( BaseClientNamespace('/') )
@@ -362,9 +460,6 @@ class BaseServiceClient:
             except Exception as e:
                 self.log(f"Failed: {e}\nRetrying...")
                 await self.sio.sleep(1)
-        for ns in self.sio.namespace_handlers:
-            self.sio.namespace_handlers.get(ns).room_sid = self.sio.get_sid(ns)
-
 
     async def disconnect(self):
         await self.sio.disconnect()
@@ -411,17 +506,15 @@ class BridgeServiceClient(BaseServiceClient):
         self.private_ns = self.sio.namespace_handlers.get(ns_name)
         # cross-references
         self.public_ns.parent = self
-        self.public_ns.room_sid = None
         self.private_ns.parent = self
-        self.private_ns.room_sid = None
 
     async def emit_public_notification(self, name, value, **kwarg):
         await self.public_ns.emit_client_notification(name, value, **kwarg)
 
     async def emit_private_notification(self, name, value, **kwarg):
         await self.private_ns.emit_client_notification(name, value, **kwarg)
-
-
+    
+    
 
 class BaseStreamerClient(BridgeServiceClient):
     def __init__(self, streamer_type, raw_pool,
@@ -570,21 +663,10 @@ class BaseStreamerClient(BridgeServiceClient):
                     while spec_data['i'] - self.private_ns.acquired_spectrum_index > 10:
                         ttl_count += 1
                         if ttl_count > TASK_TTL:
+                            # TODO: Should probably call stop_stream for file streamers but not TofDaqStreamer
+                            # self.streamer.stop_stream()
                             self.log(f"{filename} import was cancelled due to a timeout.")
                             stop_task = True
-
-                            # TODO: timeout due to file_service failure:
-                            # self.streamer is still active here - how to disable?
-                            # ??? self.streamer.stop_stream()
-                            await self.emit_private_notification(
-                                                    'acquisition_finished',
-                                                    {'filename': filename},
-                                                    )
-                            await self.emit_private_notification(
-                                                    'acquisition_status',
-                                                    'not_running',
-                                                    )
-
                             break
                         await asyncio.sleep(.1)
                     if stop_task:

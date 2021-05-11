@@ -1,86 +1,5 @@
-<template>
-    <div>
-        <!-- Modals -->
-        <!--- Add annotation modal--> 
-        <section class="add-log-entry-modal">
-            <b-modal :active.sync="is_modal_add_annotation_active"
-                has-modal-card
-                trap-focus
-                :can-cancel="true"
-                aria-role="dialog"
-                aria-modal>
-                <div class="modal-card" style="width: 500px;">
-                    <!-- Main content -->
-                    <div>
-                        <header class="modal-card-head">
-                            <p class="modal-card-title">
-                                Add sample annotation
-                            </p>
-                        </header>
-                        <section class="modal-card-body">
-                            <b-field label="Timestamp">
-                                <b-numberinput
-                                    v-model="annotation_timestamp"
-                                    :value="annotation_timestamp">
-                                </b-numberinput>
-                            </b-field>
-
-                            <b-field label="Annotation text">
-                                <b-input type="input"
-                                    v-model="annotation_text"
-                                    :value="annotation_text"
-                                    maxlength="50">
-                                </b-input>
-                            </b-field>
-
-                            <MetaDataForm></MetaDataForm>
-                            <div><br></div>
-                        </section>
-                    </div>
-                    <!-- Footer -->
-                    <footer class="modal-card-foot">
-                        <button
-                            class="button"
-                            type="button"
-                            @click="is_modal_add_annotation_active=false; add_sample_annotation();"
-                            is-dark>
-                            Save
-                        </button>
-                        <button
-                            class="button"
-                            type="button"
-                            is-dark
-                            @click="is_modal_add_annotation_active=false">
-                            Cancel
-                        </button>
-                    </footer>
-                </div>
-            </b-modal>
-        </section>
-        <!--- End of add annotation modal--> 
-        <!-- End of modals -->
-
-        <!-- Main content  area-->
-        <section>
-            <!-- Figure div -->
-            <div :id="id"></div>
-        </section>
-
-    </div>
-</template>
-
-
-<script type = "text/javascript" >
-"use strict";
-import Vue from "vue";
 import { mapState } from 'vuex'
-import Buefy from "buefy";
-import "buefy/dist/buefy.css";
-import '@mdi/font/css/materialdesignicons.min.css';
 import { BECom } from "../karsalib.js"
-import MetaDataForm from "./MetaDataForm.vue"
-
-Vue.use([Buefy]);
 
 var fs = require('fs');
 var Plotly = require('plotly.js-dist');
@@ -90,7 +9,6 @@ var _ = require('underscore');
 export default {
     // name: "ViewPort",
     components: {
-        MetaDataForm,
     },
     props: {
         id: String,
@@ -128,7 +46,8 @@ export default {
             room_sid: null,
             endpoints: [
                 // 'acquisition_progress',
-                // 'figure_data',
+                'figure_data',
+                'loaded_data',
                 // 'figure_ranges',
                 ],
 
@@ -154,15 +73,12 @@ export default {
             stop_visualize_range: {},
         }
     },
-
     created: function(){
         this.be = new BECom(this);
     },
-
     mounted: function() {
         this.init_figure();
     },
-
     methods: {
         add_sample_annotation() {
             let annotation = {
@@ -291,16 +207,11 @@ export default {
                 self.figure_config = self.shallow_copy(figure_layouts.figure_config);
                 self.figure_layout_default = self.shallow_copy(figure_layouts[self.id]);
             }
-
-            // Common config for all figures
-            let init_data = [];
-            self.figure_layout = self.shallow_copy(self.figure_layout_default);
-
             // ===== Initialize Plotly figure =====
             let figure_div = document.getElementById(self.id);
             Plotly.newPlot(figure_div,
-                           init_data,
-                           self.figure_layout,
+                           [],
+                           self.figure_layout_default,
                            {...self.figure_config,
                             "doubleClick": false
                             }
@@ -389,10 +300,11 @@ export default {
                 this.filename = "";
                 return
             }
+            let new_sample = false;
             if (!_.isEqual(new_value.filename, old_value.filename)) {
-                this.log("new sample -> reset_view");
+                // New sample to load, reset
                 this.reset_view();
-                old_value = {};
+                new_sample = true;
             }
             this.filename = new_value.filename;
             let t0 = new_value.t_range[0];
@@ -405,12 +317,16 @@ export default {
             this.figure_cache.mz_maxrange[0] = Math.min(mz0, this.figure_cache.mz_maxrange[0]);
             this.figure_cache.mz_maxrange[1] = Math.max(mz1, this.figure_cache.mz_maxrange[1]);
 
-            this.visualize_range_on_zoom_in(old_value, new_value);
+            if (new_sample) {
+                this.visualize_range_on_sample_to_load(new_value);
+            } else {
+                // Zoom in loaded sample
+                this.visualize_range_on_zoom_in(old_value, new_value);
+            }
         },
 
         on_figure_ranges(new_value, old_value) {
             if (_.isEqual(new_value, old_value)) {
-                this.log("Equal figure ranges");
                 return
             }
             var self = this;
@@ -498,10 +414,6 @@ export default {
 
         on_figure_data(json_data) {
             var self = this;
-            if (!_.isEqual(json_data.value.viz_type, self.id)) {
-                self.log("Received figure_data of wrong type!");
-                return;
-            }
             self.figure_queue = self.figure_queue.then(function() {
                 return self._on_figure_data(json_data); }
             );
@@ -540,7 +452,7 @@ export default {
         },
 
         async update_figure(zoom_stack_item=null) {
-            this.log(zoom_stack_item);
+            // this.log(zoom_stack_item);
             // the function is destructive for zoom_stack_item - don't use refs
             var self = this;
             if ( !_.isNull(zoom_stack_item) ) {
@@ -562,6 +474,29 @@ export default {
                                self.figure_traces,
                                self.figure_layout
                                );
+        },
+        visualize_range_on_sample_to_load(new_ranges) {
+            // this.log(new_ranges);
+            // Unpack ranges
+            let [mz0, mz1] = new_ranges.mz_range;
+            let [t0, t1] = new_ranges.t_range;
+            // Create new zoom_stack_item
+            let zoom_stack_item = new this.ZoomStackItem([t0, t1], [mz0, mz1]);
+            // Add the zoom stack item at the top of the stack
+            this.zoom_stack.push(
+                zoom_stack_item
+                );
+            // Increment figure_cache ref counter
+            this.figure_cache_add_ref(zoom_stack_item.room);
+            // Update figure
+            let cur_ranges = this.shallow_copy(this.zoom_stack.slice(-1)[0]);
+            // Set new ranges
+            this.update_figure(cur_ranges);
+            // Request full range visualization from DataViz (ranges null)
+            this.visualize_range = {'filename': this.filename,
+                                    'viz_type': this.id,
+                                    'room': cur_ranges.room,
+                                    };
         },
 
         visualize_range_on_zoom_in(prev_ranges, new_ranges, volatile=false) {
@@ -705,20 +640,22 @@ export default {
             self.stop_visualize_range = {'client_rooms': cancel_requests};
             self.update_figure(zoom_stack_item_to_restore);
             // visualize missing frames and acquisition frames
-            let prev_item_room = zoom_stack_item_to_remove.room;
-            let cur_item_room = zoom_stack_item_to_restore.room;
-            let cur_mz = zoom_stack_item_to_restore.mz_range;
-            let prev_t_filled = self.figure_cache_get(prev_item_room).t_filled_range;
-            let cur_t_filled = self.figure_cache_get(cur_item_room).t_filled_range;
+// TODO:
+            // let prev_item_room = zoom_stack_item_to_remove.room;
+            // let cur_item_room = zoom_stack_item_to_restore.room;
+            // let cur_mz = zoom_stack_item_to_restore.mz_range;
+            // let prev_t_filled = self.figure_cache_get(prev_item_room).t_filled_range;
+            // let cur_t_filled = self.figure_cache_get(cur_item_room).t_filled_range;
             // retro-visualization
-            let min_t_gap = 1;
-            if ( prev_t_filled[1] - cur_t_filled[1] > min_t_gap) {
-                self.visualize_range = {'t_range': [cur_t_filled[1], prev_t_filled[1]],
-                                        'mz_range': cur_mz,
-                                        'filename': self.filename,
-                                        'viz_type': this.id,
-                                        };
-            }
+            // let min_t_gap = 1;
+            // if ( prev_t_filled[1] - cur_t_filled[1] > min_t_gap) {
+            //     self.visualize_range = {'t_range': [cur_t_filled[1], prev_t_filled[1]],
+            //                             'mz_range': cur_mz,
+            //                             'filename': self.filename,
+            //                             'viz_type': this.id,
+            //                             };
+            // }
+// TODO:
             // remove cache item, if not used anymore
             self.figure_cache_release_ref(zoom_stack_item_to_remove.room);
         },
@@ -732,10 +669,11 @@ export default {
         },
 
     },
-
     watch: {
         figure_data: function(new_value) {
-            if ( !_.isEqual(new_value.value.viz_type, this.id) )
+            console.log("figure_data");
+            if ( !_.isEqual(new_value.value.viz_type, this.id) &&
+                 !_.isEqual(new_value.value.data_type, this.id))
                 return;
             this.on_figure_data(new_value);
         },
@@ -769,6 +707,10 @@ export default {
             this.visualize_range_on_zoom_in(prev_ranges, new_ranges, true);
         },
         stop_visualize_range: function(new_value, old_value) {
+            let client_rooms = new_value.client_rooms;
+            for (let i in client_rooms) {
+                this.be.unsubscribe(this.endpoints, client_rooms[i]);
+            }
             let client_room = this.room;
             return this.be.export_one_way_binding_prop('stop_visualize_range',
                                                         {...new_value, 'uid': Math.random()},
@@ -788,7 +730,7 @@ export default {
             if ( new_value === true )
             {
                 this.namespace = this.root_namespace;
-                // handlers for for external notifications:
+                // handlers for external notifications:
                 // this.namespace.on("figure_ranges", (value) => this.be.import_one_way_binding_prop("figure_ranges", {...value.value, 'uid': Math.random()}));
                 // this.namespace.on("figure_data", (value) => this.be.import_one_way_binding_prop("figure_data", value));
 
@@ -798,8 +740,4 @@ export default {
             }
         },
     },
-};
-</script>
-
-<style src = "vue-multiselect/dist/vue-multiselect.min.css"> </style>
-<style src = "../assets/css/MeasurementTab.css"> </style>
+}
