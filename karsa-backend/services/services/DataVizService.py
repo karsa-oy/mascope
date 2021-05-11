@@ -643,15 +643,19 @@ class DataVizServiceNamespace(BaseClientNamespace):
                       keys: 'client_rooms', list of client rooms to release
         """
         value = data['value']
+        filename = value['filename']
         client_rooms = value['client_rooms']
+        if not filename:
+            return
         for client_room in client_rooms:
             viz_cache_release('requests',
                               client_room=client_room,
                               )
             generator_input_cache.cache_delete_key(client_room)
-        # await self.emit_client_notification('stop_data_request',
-        #                                     data['value'],
-        #                                     **get_client_notification_args(data))
+        await self.emit_client_notification('stop_data_request',
+                                            data['value'],
+                                            **{**get_client_notification_args(data),
+                                               'namespace': get_namespace(filename)})
     # ---------------------------------
 
     # ========== FileIoService notifications ==========
@@ -813,7 +817,7 @@ class DataVizServiceClient(BaseServiceClient):
         global generator_request_q
         global shutdown_event
         global generator_input_cache
-        global generator_output_q # TODO:
+        global generator_output_q
 
         generator_request_q = Queue()
         generator_input_q =  Queue()
@@ -878,7 +882,7 @@ class DataVizServiceClient(BaseServiceClient):
                                     )
             # End of main loop
         # Exit
-        # TODO: Kill generator_input_cache thread - does not work with Ctrl+C
+        # Kill generator_input_cache thread
         shutdown_event.set()
         # Terminate image generators
         [proc.terminate() for proc in self.generator_procs]
