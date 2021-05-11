@@ -177,6 +177,13 @@ export class BECom {
     }
 }
 
+export function shallow_copy(o) {
+    let _o = JSON.stringify(o);
+    if ( _.isUndefined(_o) )
+        return _o;
+    return JSON.parse(_o);
+}
+
 export function read_dotenv() {
         let dotenv = {};
         let env_string = fs.readFileSync('.env');

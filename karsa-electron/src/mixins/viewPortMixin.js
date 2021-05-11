@@ -1,5 +1,5 @@
 import { mapState } from 'vuex'
-import { BECom } from "../karsalib.js"
+import { BECom, shallow_copy } from "../karsalib.js"
 
 var fs = require('fs');
 var Plotly = require('plotly.js-dist');
@@ -11,7 +11,7 @@ export const viewPortMixin = {
         ...mapState([
                     'figure_data',
                     'root_namespace',
-                    // 'sample_to_load',
+                    'sample_annotations',
                     'target_to_display',
                     ]),
         figure_double_click: {
@@ -39,22 +39,24 @@ export const viewPortMixin = {
             room: null,
             room_sid: null,
             endpoints: [
-                // 'acquisition_progress',
                 'figure_data',
                 'loaded_data',
-                // 'figure_ranges',
                 ],
-
-            is_modal_add_annotation_active: false,
-            annotation_text: "",
-            annotation_timestamp: null,
-
+            
             filename: '',
 
             figure: {},
-            figure_cache: {'t_maxrange': [0, 0], 'mz_maxrange': [0, 0]},
+            figure_axes: {
+                'mz': 'x',
+                'time': 'y',
+                },
+            figure_cache: {
+                't_maxrange': [0, 0],
+                'mz_maxrange': [0, 0]
+                },
             figure_config: {},
             figure_traces: [],
+            figure_img_config: {},
             figure_layout: {},
             figure_layout_default: {},
             figure_queue: Promise.resolve(),
@@ -74,23 +76,6 @@ export const viewPortMixin = {
         this.init_figure();
     },
     methods: {
-        add_sample_annotation() {
-            let annotation = {
-                    'text': this.annotation_text,
-                    'xref': 'x',
-                    'x': this.annotation_timestamp,
-                    'yref': 'paper',
-                    'y': 0,
-                    'ayref': 'paper',
-                    'ay': .9,
-                    'ax': 0,
-            };
-            let annotations = this.figure_layout.annotations || [];
-            annotations.push(annotation);
-            // Update figure
-            Plotly.relayout(this.id, {annotations: annotations})
-        },
-
         beep: function() {
             var snd = new Audio("data:audio/mp3;base64,//uQRAAAAWMSLwUIYAAsYkXgoQwAEaYLWfkWgAI0wWs\
             /ItAAAGDgYtAgAyN+QWaAAihwMWm4G8QQRDiMcCBcH3Cc+CDv/7xA4Tvh9Rz/y8QADBwMWgQAZG/ILNAARQ4GL\
@@ -155,7 +140,7 @@ export const viewPortMixin = {
             this.figure_cache[zoom_stack_item_room] = {
                     'ref_count': 1,
                     't_filled_range': [Number.MAX_SAFE_INTEGER, 0],
-                    'figure_layout': this.shallow_copy(this.figure_layout_default),
+                    'figure_layout': shallow_copy(this.figure_layout_default),
                     };
             this.be.subscribe(this.endpoints, zoom_stack_item_room);
             return this.figure_cache[zoom_stack_item_room];
@@ -196,10 +181,12 @@ export const viewPortMixin = {
 
             var self = this;
             // Read layouts from config file
-            if (fs.existsSync('configs/figure_layouts.json')) {
-                let figure_layouts = JSON.parse(fs.readFileSync('configs/figure_layouts.json', 'utf8'));
-                self.figure_config = self.shallow_copy(figure_layouts.figure_config);
-                self.figure_layout_default = self.shallow_copy(figure_layouts[self.id]);
+            if (fs.existsSync('configs/figure_config.json')) {
+                let figure_configs = JSON.parse(fs.readFileSync('configs/figure_config.json', 'utf8'));
+                self.figure_config = shallow_copy(figure_configs.common_config);
+                self.figure_layout_default = shallow_copy(figure_configs[self.id].layout);
+                self.figure_img_config = figure_configs[self.id].img;
+                self.figure_axes = figure_configs[self.id].axes;
             }
             // ===== Initialize Plotly figure =====
             let figure_div = document.getElementById(self.id);
@@ -228,52 +215,34 @@ export const viewPortMixin = {
                 }
                 if ( Object.keys(eventData).length ) {
                     // zoom_in
-
-                    let prev_ranges = self.shallow_copy(self.zoom_stack.slice(-1)[0]);
+                    let prev_ranges = shallow_copy(self.zoom_stack.slice(-1)[0]);
                     // console.log("prev_ranges: ", prev_ranges);
-
-                    let x0 = eventData["xaxis.range[0]"];
-                    let x1 = eventData["xaxis.range[1]"];
-                    let y0 = eventData["yaxis.range[0]"];
-                    let y1 = eventData["yaxis.range[1]"];
+                    let mz0 = eventData[self.figure_axes.mz + "axis.range[0]"];
+                    let mz1 = eventData[self.figure_axes.mz + "axis.range[1]"];
+                    let t0 = eventData[self.figure_axes.time + "axis.range[0]"];
+                    let t1 = eventData[self.figure_axes.time + "axis.range[1]"];
                     if (_.isUndefined(prev_ranges) &&
-                        _.isUndefined(x0) && _.isUndefined(x1) &&
-                        _.isUndefined(y0) && _.isUndefined(y1)
+                        _.isUndefined(mz0) && _.isUndefined(mz1) &&
+                        _.isUndefined(t0) && _.isUndefined(t1)
                         ) {
                         self.beep();
                         self.log("Do we ever end up here?");
                     }
                     let ranges = {'filename': self.filename};
-                    // TODO hacky fix for waterfall
-                    let xaxis_title = self.figure_layout_default.xaxis.title.text ||
-                                      self.figure_layout_default.xaxis.title;
-                    if (xaxis_title.indexOf('m/z') != -1) {
-                        x0 = (x0 === undefined) ? prev_ranges.mz_range[0] : x0;
-                        x1 = (x1 === undefined) ? prev_ranges.mz_range[1] : x1;
-                        y0 = (y0 === undefined) ? prev_ranges.t_range[0] : y0;
-                        y1 = (y1 === undefined) ? prev_ranges.t_range[1] : y1;
-                        self.log("x0: ", x0, "x1: ", x1,  "y0: ", y0, "y1: ", y1);
-                        ranges.t_range = [y0, y1];
-                        ranges.mz_range = [x0, x1];
-                    } else {
-                        x0 = (x0 === undefined) ? prev_ranges.t_range[0] : x0;
-                        x1 = (x1 === undefined) ? prev_ranges.t_range[1] : x1;
-                        y0 = (y0 === undefined) ? prev_ranges.mz_range[0] : y0;
-                        y1 = (y1 === undefined) ? prev_ranges.mz_range[1] : y1;
-                        ranges.t_range = [x0, x1];
-                        ranges.mz_range = [y0, y1];
-                    }                    
+                    
+                    mz0 = (mz0 === undefined) ? prev_ranges.mz_range[0] : mz0;
+                    mz1 = (mz1 === undefined) ? prev_ranges.mz_range[1] : mz1;
+                    t0 = (t0 === undefined) ? prev_ranges.t_range[0] : t0;
+                    t1 = (t1 === undefined) ? prev_ranges.t_range[1] : t1;
+                    ranges.t_range = [t0, t1];
+                    ranges.mz_range = [mz0, mz1];
+                    
                     // self.log("ranges: ", ranges);
                     self.figure_ranges = ranges;
-                    // self.visualize_range_on_zoom_in(prev_ranges, ranges);
                 }
             });
             // Click event
-            figure_div.on('plotly_click', function(eventData){
-                let timestamp = eventData.points[0].x;
-                self.annotation_timestamp = timestamp;
-                self.is_modal_add_annotation_active = true;
-            });
+            figure_div.on('plotly_click', (eventData) => this.on_plotly_click(eventData));
             // Double click event
             figure_div.on('plotly_doubleclick', function(){
                 // Signal double click to all ViewPorts
@@ -286,6 +255,11 @@ export const viewPortMixin = {
                 return false;
             }, false);
             // ===== Plotly figure initialized =====
+        },
+
+        on_plotly_click(eventData) {
+            // Plotly click event handler, override in ViewPort component
+            return eventData
         },
 
         async _on_figure_ranges(new_value, old_value) {
@@ -312,7 +286,7 @@ export const viewPortMixin = {
             this.figure_cache.mz_maxrange[1] = Math.max(mz1, this.figure_cache.mz_maxrange[1]);
 
             if (new_sample) {
-                this.visualize_range_on_sample_to_load(new_value);
+                this.visualize_range_on_sample_to_display(new_value);
             } else {
                 // Zoom in loaded sample
                 this.visualize_range_on_zoom_in(old_value, new_value);
@@ -333,7 +307,7 @@ export const viewPortMixin = {
             var self = this;
             if ( _.isEmpty(json_data) ) {
                 // reset the figure
-                self.figure_layout = self.shallow_copy(self.figure_layout_default);
+                self.figure_layout = shallow_copy(self.figure_layout_default);
                 self.figure_traces = [];
                 await Plotly.react(self.id, self.figure_traces, self.figure_layout);
                 return;
@@ -348,22 +322,10 @@ export const viewPortMixin = {
                 return;
             }
 
-            let x0 = data.t_range[0]; // float
-            let x1 = data.t_range[1]; // float
-            let y0 = data.mz_range[0]; // float
-            let y1 = data.mz_range[1]; // float
-            let sizing = "stretch";
-
-            // TODO: Hacky fix for waterfall
-            let xaxis_title = self.figure_layout_default.xaxis.title.text ||
-                              self.figure_layout_default.xaxis.title;
-            if (xaxis_title.indexOf('m/z') != -1) {
-                x0 = data.mz_range[0]; // float
-                x1 = data.mz_range[1]; // float
-                y0 = data.t_range[0]; // float
-                y1 = 1e6;
-                sizing = "contain";
-            }
+            let t0 = data.t_range[0]; // float
+            let t1 = data.t_range[1]; // float
+            let mz0 = data.mz_range[0]; // float
+            let mz1 = data.mz_range[1]; // float
             
             let img = data.img; // base64 png
             if (img) {
@@ -372,20 +334,23 @@ export const viewPortMixin = {
                     "source": img,
                     "xref": "x",
                     "yref": "y",
-                    "x": x0,
-                    "y": y0,
-                    "sizex": x1 - x0,
-                    "sizey": y1 - y0,
+                    [self.figure_axes.mz]: mz0,
+                    [self.figure_axes.time]: t0,
+                    ["size" + self.figure_axes.mz]: mz1 - mz0,
+                    ["size" + self.figure_axes.time]: t1 - t0,
                     "xanchor": "left",
                     "yanchor": "bottom",
-                    "sizing": sizing,
+                    "sizing": "stretch",
                     "layer": "below"
                 };
+                // Override from figure config
+                chunk = Object.assign(chunk, self.figure_img_config);
+                // Push to layout
                 cache_item.figure_layout.images.push(chunk);
             }
             // Keep track of filled ranges
-            cache_item.t_filled_range[0] = Math.min(x0, cache_item.t_filled_range[0]);
-            cache_item.t_filled_range[1] = Math.max(x1, cache_item.t_filled_range[1]);
+            cache_item.t_filled_range[0] = Math.min(t0, cache_item.t_filled_range[0]);
+            cache_item.t_filled_range[1] = Math.max(t1, cache_item.t_filled_range[1]);
 
             let traces = data.traces; // array
 
@@ -420,7 +385,7 @@ export const viewPortMixin = {
         },
 
         reset_figure() {
-            this.figure_layout = this.shallow_copy(this.figure_layout_default);
+            this.figure_layout = shallow_copy(this.figure_layout_default);
             this.figure_traces = [];
         },
 
@@ -429,20 +394,13 @@ export const viewPortMixin = {
             let cancel_requests = [];
             // Collect client_rooms to release
             for (let i=0; i<this.zoom_stack.length; ++i) {
-                cancel_requests.push(this.shallow_copy(this.zoom_stack[i].room));
+                cancel_requests.push(shallow_copy(this.zoom_stack[i].room));
             }
-            this.stop_visualize_range = {'client_rooms': cancel_requests};
+            this.stop_visualize_range = {'client_rooms': cancel_requests, 'filename': this.filename};
             // Reset figure cache and zoom stack
             this.figure_cache = {'t_maxrange': [0, 0],
                                  'mz_maxrange': [0, 0], };
             this.zoom_stack = [];
-        },
-
-        shallow_copy(o) {
-            let _o = JSON.stringify(o);
-            if ( _.isUndefined(_o) )
-                return _o;
-            return JSON.parse(_o);
         },
 
         async update_figure(zoom_stack_item=null) {
@@ -469,7 +427,7 @@ export const viewPortMixin = {
                                self.figure_layout
                                );
         },
-        visualize_range_on_sample_to_load(new_ranges) {
+        visualize_range_on_sample_to_display(new_ranges) {
             // this.log(new_ranges);
             // Unpack ranges
             let [mz0, mz1] = new_ranges.mz_range;
@@ -483,7 +441,7 @@ export const viewPortMixin = {
             // Increment figure_cache ref counter
             this.figure_cache_add_ref(zoom_stack_item.room);
             // Update figure
-            let cur_ranges = this.shallow_copy(this.zoom_stack.slice(-1)[0]);
+            let cur_ranges = shallow_copy(this.zoom_stack.slice(-1)[0]);
             // Set new ranges
             this.update_figure(cur_ranges);
             // Request full range visualization from DataViz (ranges null)
@@ -554,7 +512,7 @@ export const viewPortMixin = {
                     t_range_updated = false;
                 }
                 // Make a copy of the zoom stack item to add at the top of the stack
-                zoom_stack_item = self.shallow_copy(zoom_stack_item);
+                zoom_stack_item = shallow_copy(zoom_stack_item);
             } else {
                 // Create new zoom_stack_item
                 zoom_stack_item = new self.ZoomStackItem([t0, t1], [mz0, mz1], volatile);
@@ -566,7 +524,7 @@ export const viewPortMixin = {
             // Increment figure_cache ref counter
             self.figure_cache_add_ref(zoom_stack_item.room);
             // Update figure
-            let cur_ranges = self.shallow_copy(self.zoom_stack.slice(-1)[0]);
+            let cur_ranges = shallow_copy(self.zoom_stack.slice(-1)[0]);
             // Set new ranges
             self.update_figure(cur_ranges);
             // Request new visualizations if needed
@@ -615,23 +573,23 @@ export const viewPortMixin = {
             self.figure_traces = [];
             // remove last zoom and take current zoom into view
             let zoom_stack_item_to_remove = self.zoom_stack.pop();
-            let zoom_stack_item_to_restore = self.shallow_copy(self.zoom_stack.slice(-1)[0]);
+            let zoom_stack_item_to_restore = shallow_copy(self.zoom_stack.slice(-1)[0]);
             // collect client_rooms to cancel for stop_visualize_range call
             let cancel_requests = [];
-            cancel_requests.push(self.shallow_copy(zoom_stack_item_to_remove.room));
+            cancel_requests.push(shallow_copy(zoom_stack_item_to_remove.room));
             // Loop until persistent item found from zoom stack
             while (zoom_stack_item_to_restore.volatile) {
-                cancel_requests.push(self.shallow_copy(zoom_stack_item_to_restore.room));
+                cancel_requests.push(shallow_copy(zoom_stack_item_to_restore.room));
                 // Release reference of popped item
                 self.figure_cache_release_ref(zoom_stack_item_to_restore.room);
                 // Get next item from stack
                 self.zoom_stack.pop();
-                zoom_stack_item_to_restore = self.shallow_copy(self.zoom_stack.slice(-1)[0]);
+                zoom_stack_item_to_restore = shallow_copy(self.zoom_stack.slice(-1)[0]);
             }
             self.log("Zoom stack frames left:", self.zoom_stack.length - 1);
             if ( _.isUndefined(zoom_stack_item_to_remove) || _.isUndefined(zoom_stack_item_to_restore) )
                 return;
-            self.stop_visualize_range = {'client_rooms': cancel_requests};
+            self.stop_visualize_range = {'client_rooms': cancel_requests, 'filename': this.filename};
             self.update_figure(zoom_stack_item_to_restore);
             // visualize missing frames and acquisition frames
 // TODO:
@@ -677,28 +635,23 @@ export const viewPortMixin = {
         figure_ranges: function(new_value, old_value) {
             this.on_figure_ranges(new_value, old_value);
         },
-        target_to_display: function(new_value, old_value) {
-            if ( _.isEqual(new_value, old_value) || _.isEmpty(this.filename) ) {
-                return false;
+        sample_annotations: function(new_value) {
+            let annotations = [];
+            for (let i in new_value) {
+                let annotation = {
+                    'text': new_value[i].text,
+                    'xref': 'x',
+                    'x': new_value[i].timestamp,
+                    'yref': 'paper',
+                    'y': 0,
+                    'ayref': 'paper',
+                    'ay': .9,
+                    'ax': 0,
+                    };
+                annotations.push(annotation);
             }
-            if (new_value == null) {
-                this.visualize_range_on_zoom_out();
-                return
-            }
-            let mz = new_value;
-            let target_mz_range = [mz-.5, mz+.5];
-            let prev_ranges = this.shallow_copy(this.zoom_stack.slice(-1)[0]);
-            let new_ranges = {'mz_range': target_mz_range,
-                              't_range': prev_ranges.t_range};
-            // Add target trace
-            this.figure_traces = [{
-                            'x': new_ranges.t_range,
-                            'y': [mz, mz],
-                            'mode': 'lines',
-                            'line': {'color': '#8c67ef'}
-                            }];
-            // Make volatile zoom-in
-            this.visualize_range_on_zoom_in(prev_ranges, new_ranges, true);
+            // Update figure
+            Plotly.relayout(this.id, {annotations: annotations})
         },
         stop_visualize_range: function(new_value, old_value) {
             let client_rooms = new_value.client_rooms;
@@ -711,6 +664,29 @@ export const viewPortMixin = {
                                                         old_value,
                                                         client_room
                                                         );
+        },
+        target_to_display: function(new_value, old_value) {
+            if ( _.isEqual(new_value, old_value) || _.isEmpty(this.filename) ) {
+                return false;
+            }
+            if (new_value == null) {
+                this.visualize_range_on_zoom_out();
+                return
+            }
+            let mz = new_value;
+            let target_mz_range = [mz-.5, mz+.5];
+            let prev_ranges = shallow_copy(this.zoom_stack.slice(-1)[0]);
+            let new_ranges = {'mz_range': target_mz_range,
+                              't_range': prev_ranges.t_range};
+            // Add target trace
+            this.figure_traces = [{
+                            'x': new_ranges.t_range,
+                            'y': [mz, mz],
+                            'mode': 'lines',
+                            'line': {'color': '#8c67ef'}
+                            }];
+            // Make volatile zoom-in
+            this.visualize_range_on_zoom_in(prev_ranges, new_ranges, true);
         },
         visualize_range: function(new_value, old_value) {
             let client_room = new_value.room || this.room;

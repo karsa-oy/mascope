@@ -1,65 +1,5 @@
 <template>
     <div>
-        <!-- Modals -->
-        <!--- Add annotation modal--> 
-        <section class="add-log-entry-modal">
-            <b-modal :active.sync="is_modal_add_annotation_active"
-                has-modal-card
-                trap-focus
-                :can-cancel="true"
-                aria-role="dialog"
-                aria-modal>
-                <div class="modal-card" style="width: 500px;">
-                    <!-- Main content -->
-                    <div>
-                        <header class="modal-card-head">
-                            <p class="modal-card-title">
-                                Add sample annotation
-                            </p>
-                        </header>
-                        <section class="modal-card-body">
-                            <b-field label="Timestamp">
-                                <b-numberinput
-                                    v-model="annotation_timestamp"
-                                    :value="annotation_timestamp">
-                                </b-numberinput>
-                            </b-field>
-
-                            <b-field label="Annotation text">
-                                <b-input type="input"
-                                    v-model="annotation_text"
-                                    :value="annotation_text"
-                                    maxlength="50">
-                                </b-input>
-                            </b-field>
-
-                            <MetaDataForm></MetaDataForm>
-                            <div><br></div>
-                        </section>
-                    </div>
-                    <!-- Footer -->
-                    <footer class="modal-card-foot">
-                        <button
-                            class="button"
-                            type="button"
-                            @click="is_modal_add_annotation_active=false; add_sample_annotation();"
-                            is-dark>
-                            Save
-                        </button>
-                        <button
-                            class="button"
-                            type="button"
-                            is-dark
-                            @click="is_modal_add_annotation_active=false">
-                            Cancel
-                        </button>
-                    </footer>
-                </div>
-            </b-modal>
-        </section>
-        <!--- End of add annotation modal--> 
-        <!-- End of modals -->
-
         <!-- Main content  area-->
         <section>
             <div :id="id"></div>
@@ -78,7 +18,6 @@ import "buefy/dist/buefy.css";
 import '@mdi/font/css/materialdesignicons.min.css';
 // import { BECom } from "../karsalib.js"
 import { viewPortMixin } from "../mixins/viewPortMixin"
-import MetaDataForm from "./MetaDataForm.vue"
 
 Vue.use([Buefy]);
 
@@ -90,7 +29,6 @@ Vue.use([Buefy]);
 export default {
     // name: "ViewPort",
     components: {
-        MetaDataForm
     },
     mixins: [
         viewPortMixin
@@ -99,12 +37,17 @@ export default {
         id: String,
     },
     computed: {
+        sample_annotation_timestamp: {
+            get() {
+                return this.$store.state.sample_annotation_timestamp;
+            },
+            set(value) {
+                this.$store.commit('sample_annotation_timestamp', value);
+            },
+        },
     },
     data: function() {
         return {
-            is_modal_add_annotation_active: false,
-            annotation_timestamp: null,
-            annotation_text: "",
         }
     },
 
@@ -115,6 +58,11 @@ export default {
     },
 
     methods: {
+        on_plotly_click(eventData) {
+            // Plotly click event handler
+            let timestamp = eventData.points[0].x;
+            this.sample_annotation_timestamp = timestamp;
+        },
     },
 
     watch: {

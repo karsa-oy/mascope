@@ -86,7 +86,8 @@ def gen_heatmap_image(data_xarray,
                       mz_range=None,
                       y_range=None,
                       img_width=None,
-                      img_height=600
+                      img_height=600,
+                      cmap=fire
                       ):
     """Generate heatmap image to visualize spectra in 2D using datashader
 
@@ -176,7 +177,7 @@ def gen_heatmap_image(data_xarray,
         # Bottom left corner pixel to y_range[1] for scaling
         agg[0, 0] = y_range[1]
 
-    img = tf.shade(agg, cmap=fire)
+    img = tf.shade(agg, cmap=cmap)
     #img = tf.set_background(img, "black")
     return img.to_pil()
 
@@ -289,7 +290,8 @@ def gen_spec_stack_image(data_xarray,
 def gen_spec_image(data_xarray,
                    y_range=None,
                    img_width=600,
-                   img_height=200
+                   img_height=200,
+                   cmap='white'
                    ):
     """Function to generate single spec trace image using datashader.
     Signals in the input array will be flattened time-wise.
@@ -341,7 +343,7 @@ def gen_spec_image(data_xarray,
                     )
     data_df = pd.DataFrame({'mz': mz, 'y': y})
     agg = cvs.line(data_df, 'mz', 'y')
-    img = tf.shade(agg, cmap='white')
+    img = tf.shade(agg, cmap=cmap)
     return img.to_pil()
 
 def gen_timeseries_trace(data_xarray,

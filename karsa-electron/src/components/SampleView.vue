@@ -1,6 +1,63 @@
 <template>
     <div>
         <!-- Modals -->
+        <!--- Add annotation modal--> 
+        <section class="add-log-entry-modal">
+            <b-modal :active.sync="is_modal_add_annotation_active"
+                has-modal-card
+                trap-focus
+                :can-cancel="true"
+                aria-role="dialog"
+                aria-modal>
+                <div class="modal-card" style="width: 500px;">
+                    <!-- Main content -->
+                    <div>
+                        <header class="modal-card-head">
+                            <p class="modal-card-title">
+                                Add sample annotation
+                            </p>
+                        </header>
+                        <section class="modal-card-body">
+                            <b-field label="Timestamp">
+                                <b-numberinput
+                                    v-model="sample_annotation_timestamp"
+                                    :value="sample_annotation_timestamp">
+                                </b-numberinput>
+                            </b-field>
+
+                            <b-field label="Annotation text">
+                                <b-input type="input"
+                                    v-model="sample_annotation_text"
+                                    :value="sample_annotation_text"
+                                    maxlength="50">
+                                </b-input>
+                            </b-field>
+
+                            <MetaDataForm></MetaDataForm>
+                            <div><br></div>
+                        </section>
+                    </div>
+                    <!-- Footer -->
+                    <footer class="modal-card-foot">
+                        <button
+                            class="button"
+                            type="button"
+                            @click="is_modal_add_annotation_active=false; add_sample_annotation();"
+                            is-dark>
+                            Save
+                        </button>
+                        <button
+                            class="button"
+                            type="button"
+                            is-dark
+                            @click="is_modal_add_annotation_active=false">
+                            Cancel
+                        </button>
+                    </footer>
+                </div>
+            </b-modal>
+        </section>
+        <!--- End of add annotation modal--> 
         <!--- Add log entry modal--> 
         <section class="add-log-entry-modal">
             <b-modal :active.sync="is_modal_add_log_entry_active"
@@ -64,10 +121,10 @@
         <section>
             <div style="text-align:center;">
                 <h1 style="color:white; font-size:24px;">
-                    {{ sample_to_load.title  }}
+                    {{ sample_to_display.title  }}
                 </h1>
                 <p style="color:#ababab; font-size:16px;">
-                    {{ sample_to_load.description }}
+                    {{ sample_to_display.description }}
                 </p>
             </div>
             <div class="columns">
@@ -138,6 +195,7 @@ import Vue from "vue";
 import { mapState } from 'vuex'
 import Buefy from "buefy";
 import Multiselect from "vue-multiselect";
+import MetaDataForm from "./MetaDataForm.vue"
 import ViewPortSpectrogram from "./ViewPortSpectrogram.vue"
 import ViewPortTimeseries from "./ViewPortTimeseries.vue"
 import ViewPortWaterfall from "./ViewPortWaterfall.vue"
@@ -153,11 +211,12 @@ var _ = require('underscore');
 export default {
     name: "SampleView",
     components: {
+        MetaDataForm,
+        // using third party multiselect component
+        Multiselect,
         ViewPortSpectrogram,
         ViewPortTimeseries,
         ViewPortWaterfall,
-        // using third party multiselect component
-        Multiselect
     },
     props: {
         id: String,
@@ -166,7 +225,8 @@ export default {
         ...mapState([
                     'experiment_selected',
                     'root_namespace',
-                    'sample_to_load',
+                    'sample_annotation_timestamp',
+                    'sample_to_display',
                     'target_to_display',
                     //  'tps_parameters',
                     ]),
@@ -186,6 +246,14 @@ export default {
                 this.$store.commit('figure_ranges', value);
             }
         },
+        sample_annotations: {
+            get() {
+                return this.$store.state.sample_annotations;
+            },
+            set(value) {
+                this.$store.commit('sample_annotations', value);
+            }
+        },
     },
     data: function() {
         return {
@@ -194,6 +262,11 @@ export default {
 
             // UI variables
             is_modal_add_log_entry_active: false,
+            is_modal_add_annotation_active: false,
+            //
+
+            // Annotation modal variables
+            sample_annotation_text: "",
             //
 
             // Log entry modal variables
@@ -229,69 +302,21 @@ export default {
             console.log('[' + this.$options.name + ']',  ...args);
         },
 
-        beep: function() {
-            var snd = new Audio("data:audio/mp3;base64,//uQRAAAAWMSLwUIYAAsYkXgoQwAEaYLWfkWgAI0wWs\
-            /ItAAAGDgYtAgAyN+QWaAAihwMWm4G8QQRDiMcCBcH3Cc+CDv/7xA4Tvh9Rz/y8QADBwMWgQAZG/ILNAARQ4GL\
-            TcDeIIIhxGOBAuD7hOfBB3/94gcJ3w+o5/5eIAIAAAVwWgQAVQ2ORaIQwEMAJiDg95G4nQL7mQVWI6GwRcfsZA\
-            csKkJvxgxEjzFUgfHoSQ9Qq7KNwqHwuB13MA4a1q/DmBrHgPcmjiGoh//EwC5nGPEmS4RcfkVKOhJf+WOgoxJc\
-            lFz3kgn//dBA+ya1GhurNn8zb//9NNutNuhz31f////9vt///z+IdAEAAAK4LQIAKobHItEIYCGAExBwe8jcTo\
-            F9zIKrEdDYIuP2MgOWFSE34wYiR5iqQPj0JIeoVdlG4VD4XA67mAcNa1fhzA1jwHuTRxDUQ//iYBczjHiTJcIu\
-            PyKlHQkv/LHQUYkuSi57yQT//uggfZNajQ3Vmz+Zt//+mm3Wm3Q576v////+32///5/EOgAAADVghQAAAAA//u\
-            QZAUAB1WI0PZugAAAAAoQwAAAEk3nRd2qAAAAACiDgAAAAAAABCqEEQRLCgwpBGMlJkIz8jKhGvj4k6jzRnqas\
-            NKIeoh5gI7BJaC1A1AoNBjJgbyApVS4IDlZgDU5WUAxEKDNmmALHzZp0Fkz1FMTmGFl1FMEyodIavcCAUHDWrK\
-            AIA4aa2oCgILEBupZgHvAhEBcZ6joQBxS76AgccrFlczBvKLC0QI2cBoCFvfTDAo7eoOQInqDPBtvrDEZBNYN5\
-            xwNwxQRfw8ZQ5wQVLvO8OYU+mHvFLlDh05Mdg7BT6YrRPpCBznMB2r//xKJjyyOh+cImr2/4doscwD6neZjuZR\
-            4AgAABYAAAABy1xcdQtxYBYYZdifkUDgzzXaXn98Z0oi9ILU5mBjFANmRwlVJ3/6jYDAmxaiDG3/6xjQQCCKkR\
-            b/6kg/wW+kSJ5//rLobkLSiKmqP/0ikJuDaSaSf/6JiLYLEYnW/+kXg1WRVJL/9EmQ1YZIsv/6Qzwy5qk7/+tE\
-            U0nkls3/zIUMPKNX/6yZLf+kFgAfgGyLFAUwY//uQZAUABcd5UiNPVXAAAApAAAAAE0VZQKw9ISAAACgAAAAAV\
-            QIygIElVrFkBS+Jhi+EAuu+lKAkYUEIsmEAEoMeDmCETMvfSHTGkF5RWH7kz/ESHWPAq/kcCRhqBtMdokPdM7v\
-            il7RG98A2sc7zO6ZvTdM7pmOUAZTnJW+NXxqmd41dqJ6mLTXxrPpnV8avaIf5SvL7pndPvPpndJR9Kuu8fePvu\
-            iuhorgWjp7Mf/PRjxcFCPDkW31srioCExivv9lcwKEaHsf/7ow2Fl1T/9RkXgEhYElAoCLFtMArxwivDJJ+bR1\
-            HTKJdlEoTELCIqgEwVGSQ+hIm0NbK8WXcTEI0UPoa2NbG4y2K00JEWbZavJXkYaqo9CRHS55FcZTjKEk3NKoCY\
-            UnSQ0rWxrZbFKbKIhOKPZe1cJKzZSaQrIyULHDZmV5K4xySsDRKWOruanGtjLJXFEmwaIbDLX0hIPBUQPVFVkQ\
-            kDoUNfSoDgQGKPekoxeGzA4DUvnn4bxzcZrtJyipKfPNy5w+9lnXwgqsiyHNeSVpemw4bWb9psYeq//uQZBoAB\
-            Qt4yMVxYAIAAAkQoAAAHvYpL5m6AAgAACXDAAAAD59jblTirQe9upFsmZbpMudy7Lz1X1DYsxOOSWpfPqNX2Wq\
-            ktK0DMvuGwlbNj44TleLPQ+Gsfb+GOWOKJoIrWb3cIMeeON6lz2umTqMXV8Mj30yWPpjoSa9ujK8SyeJP5y5mO\
-            W1D6hvLepeveEAEDo0mgCRClOEgANv3B9a6fikgUSu/DmAMATrGx7nng5p5iimPNZsfQLYB2sDLIkzRKZOHGAa\
-            UyDcpFBSLG9MCQALgAIgQs2YunOszLSAyQYPVC2YdGGeHD2dTdJk1pAHGAWDjnkcLKFymS3RQZTInzySoBwMG0\
-            QueC3gMsCEYxUqlrcxK6k1LQQcsmyYeQPdC2YfuGPASCBkcVMQQqpVJshui1tkXQJQV0OXGAZMXSOEEBRirXbV\
-            RQW7ugq7IM7rPWSZyDlM3IuNEkxzCOJ0ny2ThNkyRai1b6ev//3dzNGzNb//4uAvHT5sURcZCFcuKLhOFs8mLA\
-            AEAt4UWAAIABAAAAAB4qbHo0tIjVkUU//uQZAwABfSFz3ZqQAAAAAngwAAAE1HjMp2qAAAAACZDgAAAD5UkTE1\
-            UgZEUExqYynN1qZvqIOREEFmBcJQkwdxiFtw0qEOkGYfRDifBui9MQg4QAHAqWtAWHoCxu1Yf4VfWLPIM2mHDF\
-            sbQEVGwyqQoQcwnfHeIkNt9YnkiaS1oizycqJrx4KOQjahZxWbcZgztj2c49nKmkId44S71j0c8eV9yDK6uPRz\
-            x5X18eDvjvQ6yKo9ZSS6l//8elePK/Lf//IInrOF/FvDoADYAGBMGb7FtErm5MXMlmPAJQVgWta7Zx2go+8xJ0\
-            UiCb8LHHdftWyLJE0QIAIsI+UbXu67dZMjmgDGCGl1H+vpF4NSDckSIkk7Vd+sxEhBQMRU8j/12UIRhzSaUdQ+\
-            rQU5kGeFxm+hb1oh6pWWmv3uvmReDl0UnvtapVaIzo1jZbf/pD6ElLqSX+rUmOQNpJFa/r+sa4e/pBlAABoAAA\
-            AA3CUgShLdGIxsY7AUABPRrgCABdDuQ5GC7DqPQCgbbJUAoRSUj+NIEig0YfyWUho1VBBBA//uQZB4ABZx5zfM\
-            akeAAAAmwAAAAF5F3P0w9GtAAACfAAAAAwLhMDmAYWMgVEG1U0FIGCBgXBXAtfMH10000EEEEEECUBYln03TTT\
-            dNBDZopopYvrTTdNa325mImNg3TTPV9q3pmY0xoO6bv3r00y+IDGid/9aaaZTGMuj9mpu9Mpio1dXrr5HERTZS\
-            mqU36A3CumzN/9Robv/Xx4v9ijkSRSNLQhAWumap82WRSBUqXStV/YcS+XVLnSS+WLDroqArFkMEsAS+eWmrUz\
-            rO0oEmE40RlMZ5+ODIkAyKAGUwZ3mVKmcamcJnMW26MRPgUw6j+LkhyHGVGYjSUUKNpuJUQoOIAyDvEyG8S5yf\
-            K6dhZc0Tx1KI/gviKL6qvvFs1+bWtaz58uUNnryq6kt5RzOCkPWlVqVX2a/EEBUdU1KrXLf40GoiiFXK///qpo\
-            iDXrOgqDR38JB0bw7SoL+ZB9o1RCkQjQ2CBYZKd/+VJxZRRZlqSkKiws0WFxUyCwsKiMy7hUVFhIaCrNQsKkTI\
-            sLivwKKigsj8XYlwt/WKi2N4d//uQRCSAAjURNIHpMZBGYiaQPSYyAAABLAAAAAAAACWAAAAApUF/Mg+0aohSI\
-            RobBAsMlO//Kk4soosy1JSFRYWaLC4qZBYWFRGZdwqKiwkNBVmoWFSJkWFxX4FFRQWR+LsS4W/rFRb////////\
-            //////////////////////////////////////////////////////////////////////////////////////\
-            //////////////////////////////////////////////////////////////////////////////////////\
-            //////////////////////////////////////////////////////////////////////////////////////\
-            //////////////////////////////////////////////////////////////////////////////////////\
-            /////////////////////////////////////////////////////////////////VEFHAAAAAAAAAAAAAAAAA\
-            AAAAAAAAAAAAAAAAAAAAAAAU291bmRib3kuZGUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\
-            AAAAAAAAAAAAAAAAAMjAwNGh0dHA6Ly93d3cuc291bmRib3kuZGUAAAAAAAAAACU=");
-            snd.play();
-        },
-
-        shallow_copy(o) {
-            let _o = JSON.stringify(o);
-            if ( _.isUndefined(_o) )
-                return _o;
-            return JSON.parse(_o);
+        add_sample_annotation() {
+            let annotation = {
+                    'text': this.sample_annotation_text,
+                    'timestamp': this.sample_annotation_timestamp
+                    };
+            this.sample_annotations.push(annotation);
         },
 
     },
 
     watch: {
-        sample_to_load: function(new_value, old_value) {
+        sample_annotation_timestamp: function() {
+            this.is_modal_add_annotation_active = true;
+        },
+        sample_to_display: function(new_value, old_value) {
             if ( _.isEqual(new_value, old_value) ) {
                 return false;
             }

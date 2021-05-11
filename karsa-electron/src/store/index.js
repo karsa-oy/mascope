@@ -15,8 +15,10 @@ export default new Vuex.Store({
 		new_file: "",
 		project_selected: {'id': ""},
 		projects: [],
+		sample_annotations: [],
+		sample_annotation_timestamp: null,
 		sample_selected: {},
-		sample_to_load: {},
+		sample_to_display: {},
 		root_namespace: null,
 		target_to_display: {},
 		url: "",
@@ -47,8 +49,14 @@ export default new Vuex.Store({
 		new_file(state, payload) {
 			state.new_file = payload;
 		},
-		sample_to_load(state, payload) {
-			state.sample_to_load = payload;
+		sample_annotations(state, payload) {
+			state.sample_annotations = payload;
+		},
+		sample_annotation_timestamp(state, payload) {
+			state.sample_annotation_timestamp = payload;
+		},
+		sample_to_display(state, payload) {
+			state.sample_to_display = payload;
 		},
 		root_namespace(state, payload) {
 			state.root_namespace = payload;

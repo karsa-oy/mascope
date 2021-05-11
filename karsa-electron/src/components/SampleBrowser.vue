@@ -477,12 +477,12 @@ export default {
                 this.$store.commit('project_selected', value);
             }
         },
-        sample_to_load: {
+        sample_to_display: {
             get() {
-                return this.$store.state.sample_to_load;
+                return this.$store.state.sample_to_display;
             },
             set(value) {
-                this.$store.commit('sample_to_load', value);
+                this.$store.commit('sample_to_display', value);
             }
         },
     },
@@ -822,19 +822,21 @@ export default {
                 this.sample_description = last_selection.description || "";
                 this.sample_project = last_selection.project;
                 this.sample_experiment = last_selection.experiment;
-                this.sample_to_load = {'filename': this.sample_file,
-                                       'title': this.sample_name,
-                                       'description': this.sample_description,
-                                       'length': last_selection.length,
-                                       'range': last_selection.range,
-                                       };
+                this.sample_to_display = {
+                            'filename': this.sample_file,
+                            'title': this.sample_name,
+                            'description': this.sample_description,
+                            'length': last_selection.length,
+                            'range': last_selection.range,
+                            };
             } else {
-                this.sample_to_load = {'filename': "",
-                                       'title': "",
-                                       'description': "",
-                                       'length': 0,
-                                       'range': [0, 0],
-                                       };
+                this.sample_to_display = {
+                            'filename': "",
+                            'title': "",
+                            'description': "",
+                            'length': 0,
+                            'range': [0, 0],
+                            };
             }
         },
         'root_namespace.connected': function(new_value) {
