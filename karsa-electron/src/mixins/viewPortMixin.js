@@ -6,13 +6,7 @@ var Plotly = require('plotly.js-dist');
 var _ = require('underscore');
 
 
-export default {
-    // name: "ViewPort",
-    components: {
-    },
-    props: {
-        id: String,
-    },
+export const viewPortMixin = {
     computed: {
         ...mapState([
                     'figure_data',
