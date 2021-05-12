@@ -675,15 +675,22 @@ export const viewPortMixin = {
             let prev_ranges = shallow_copy(this.zoom_stack.slice(-1)[0]);
             let new_ranges = {'mz_range': target_mz_range,
                               't_range': prev_ranges.t_range};
-            // Add target trace
-            this.figure_traces = [{
-                            'x': new_ranges.t_range,
-                            'y': [mz, mz],
-                            'mode': 'lines',
-                            'line': {'color': '#8c67ef'}
-                            }];
             // Make volatile zoom-in
             this.visualize_range_on_zoom_in(prev_ranges, new_ranges, true);
+            let mz_axis = this.figure_axes.mz;
+            let time_axis = this.figure_axes.time;
+            if (mz_axis) {
+                // Add target trace
+                let target_traces = [{
+                    [time_axis]: new_ranges.t_range,
+                    [mz_axis]: [mz, mz],
+                    'mode': 'lines',
+                    'line': {'color': '#8c67ef'}
+                    }];
+                let zoom_stack_item = this.zoom_stack.slice(-1)[0]
+                let figure_cache_item = this.figure_cache_get(zoom_stack_item.room);
+                figure_cache_item.figure_traces.push(...target_traces);
+            }
         },
         visualize_range: function(new_value, old_value) {
             let client_room = new_value.room || this.room;
