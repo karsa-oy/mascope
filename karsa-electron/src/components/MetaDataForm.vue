@@ -166,11 +166,28 @@ export default {
 
     data() {
         return {
-            available_templates: [],
+            available_templates: [
+                {
+                    'name': "default",
+                    'template': [{
+                        'label': "Text",
+                        'value': ""
+                        }]
+                },
+                {
+                    'name': "empty",
+                    'template': {}
+                },
+            ],
             field_to_add: "",
             field_to_remove: "",
-            form_fields: [],
-            loaded_template: {},
+            form_fields: [
+                {'label': "Text",
+                 'value': ""
+                 },
+            ],
+            form_title: "MetaDataForm",
+            loaded_template: null,
 
             is_modal_add_field_active: false,
             is_modal_remove_field_active: false,

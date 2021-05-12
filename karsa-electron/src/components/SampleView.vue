@@ -7,53 +7,40 @@
                 has-modal-card
                 trap-focus
                 :can-cancel="true"
+                :destroy-on-hide="false"
                 aria-role="dialog"
                 aria-modal>
                 <div class="modal-card" style="width: 500px;">
-                    <!-- Main content -->
-                    <div>
-                        <header class="modal-card-head">
-                            <p class="modal-card-title">
-                                Add sample annotation
-                            </p>
-                        </header>
-                        <section class="modal-card-body">
-                            <b-field label="Timestamp">
-                                <b-numberinput
-                                    v-model="sample_annotation_timestamp"
-                                    :value="sample_annotation_timestamp">
-                                </b-numberinput>
-                            </b-field>
+                    <header class="modal-card-head">
+                        <p class="modal-card-title">
+                            Add sample annotation
+                        </p>
+                    </header>
+                    <section class="modal-card-body">
 
-                            <b-field label="Annotation text">
-                                <b-input type="input"
-                                    v-model="sample_annotation_text"
-                                    :value="sample_annotation_text"
-                                    maxlength="50">
-                                </b-input>
-                            </b-field>
-
-                            <MetaDataForm :template_path="sample_annotation_template_path">
-                            </MetaDataForm>
-                            <div><br></div>
-                        </section>
-                    </div>
+                        <b-field label="Timestamp">
+                            <b-numberinput
+                                v-model="sample_annotation_timestamp"
+                                :value="sample_annotation_timestamp">
+                            </b-numberinput>
+                        </b-field>
+                        <MetaDataForm
+                            :template_path="sample_annotation_template_path"
+                            @metaDataUpdated="sample_annotation_fields=$event">
+                        </MetaDataForm>
+                        <div><br></div>
+                    </section>
                     <!-- Footer -->
                     <footer class="modal-card-foot">
-                        <button
-                            class="button"
-                            type="button"
-                            @click="is_modal_add_annotation_active=false; add_sample_annotation();"
-                            is-dark>
+                        <b-button
+                            :type="sample_annotation_save_button_type"
+                            @click="is_modal_add_annotation_active=false; add_sample_annotation();">
                             Save
-                        </button>
-                        <button
-                            class="button"
-                            type="button"
-                            is-dark
+                        </b-button>
+                        <b-button
                             @click="is_modal_add_annotation_active=false">
                             Cancel
-                        </button>
+                        </b-button>
                     </footer>
                 </div>
             </b-modal>
@@ -210,14 +197,9 @@ export default {
             //
 
             // Annotation modal variables
+            sample_annotation_fields: {},
+            sample_annotation_save_button_type: "is-success",
             sample_annotation_template_path: "../metadata_templates",
-            sample_annotation_text: "",
-            //
-
-            // Log entry modal variables
-            log_entry_text: "",
-            log_entry_datetimestamp: null,
-            log_entry_daq_timestamp: 0,
             //
 
             filename: '',
@@ -228,9 +210,6 @@ export default {
 
             room_sid: null,
             endpoints: [
-                // 'figure_data',
-                // 'figure_ranges',
-                // 'tps_parameters',
             ],
         }
     },
@@ -248,8 +227,14 @@ export default {
         },
 
         add_sample_annotation() {
+            let annotation_text = "";
+            for (let i in this.sample_annotation_fields) {
+                let label = this.sample_annotation_fields[i].label;
+                let value = this.sample_annotation_fields[i].value;
+                annotation_text += (label + ": " + value + "<br>");
+            }
             let annotation = {
-                    'text': this.sample_annotation_text,
+                    'text': annotation_text,
                     'timestamp': this.sample_annotation_timestamp
                     };
             this.sample_annotations.push(annotation);
@@ -258,6 +243,12 @@ export default {
     },
 
     watch: {
+        sample_annotation_fields: {
+            handler() {
+                this.sample_annotation_save_button_type = "is-danger";
+            },
+            deep: true
+        },
         sample_annotation_timestamp: function() {
             this.is_modal_add_annotation_active = true;
         },
