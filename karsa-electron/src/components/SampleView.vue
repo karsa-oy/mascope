@@ -25,6 +25,7 @@
                             </b-numberinput>
                         </b-field>
                         <MetaDataForm
+                            :default_template="sample_annotation_default_template"
                             :template_path="sample_annotation_template_path"
                             @metaDataUpdated="sample_annotation_fields=$event">
                         </MetaDataForm>
@@ -34,7 +35,7 @@
                     <footer class="modal-card-foot">
                         <b-button
                             :type="sample_annotation_save_button_type"
-                            @click="is_modal_add_annotation_active=false; add_sample_annotation();">
+                            @click="createSampleAnnotation()">
                             Save
                         </b-button>
                         <b-button
@@ -197,6 +198,8 @@ export default {
             //
 
             // Annotation modal variables
+            sample_annotation_default_template: [{'label': "Annotation text",
+                                                  'value': ""}],
             sample_annotation_fields: {},
             sample_annotation_save_button_type: "is-success",
             sample_annotation_template_path: "../metadata_templates",
@@ -226,7 +229,7 @@ export default {
             console.log('[' + this.$options.name + ']',  ...args);
         },
 
-        add_sample_annotation() {
+        createSampleAnnotation() {
             let annotation_text = "";
             for (let i in this.sample_annotation_fields) {
                 let label = this.sample_annotation_fields[i].label;
@@ -238,6 +241,7 @@ export default {
                     'timestamp': this.sample_annotation_timestamp
                     };
             this.sample_annotations.push(annotation);
+            this.is_modal_add_annotation_active=false;
         },
 
     },

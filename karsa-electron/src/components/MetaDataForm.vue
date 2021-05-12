@@ -161,6 +161,7 @@ export default {
     name: "MetaDataForm",
 
     props: {
+        default_template: Array,
         template_path: String,
     },
 
@@ -169,10 +170,7 @@ export default {
             available_templates: [
                 {
                     'name': "default",
-                    'template': [{
-                        'label': "Text",
-                        'value': ""
-                        }]
+                    'template': this.default_template || []
                 },
                 {
                     'name': "empty",
@@ -181,11 +179,7 @@ export default {
             ],
             field_to_add: "",
             field_to_remove: "",
-            form_fields: [
-                {'label': "Text",
-                 'value': ""
-                 },
-            ],
+            form_fields: [],
             form_title: "MetaDataForm",
             loaded_template: null,
 
@@ -197,6 +191,7 @@ export default {
         if (this.template_path) {
             this.findTemplates();
         }
+        this.form_fields = this.default_template;
     },
     methods: {
         addField() {

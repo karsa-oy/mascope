@@ -28,6 +28,7 @@
                                 </b-datetimepicker>
                             </b-field>
                             <MetaDataForm
+                                :default_template="log_entry_default_template"
                                 :template_path="log_entry_template_path"
                                 @metaDataUpdated="log_entry_fields=$event">
                             </MetaDataForm>
@@ -420,6 +421,8 @@ export default {
             //
             // Log entry modal variables
             log_entry_datetimestamp: null,
+            log_entry_default_template: [{'label': "Log text",
+                                          'value': ""}],
             log_entry_fields: [],
             log_entry_save_button_type: "is-success",
             log_entry_template_path: "../metadata_templates",
