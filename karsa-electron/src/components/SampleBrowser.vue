@@ -130,6 +130,7 @@
                 has-modal-card
                 trap-focus
                 :can-cancel="false"
+                :destroy-on-hide="false"
                 aria-role="dialog"
                 aria-modal>
                 <div class="columns">
@@ -475,6 +476,14 @@ export default {
             },
             set(value) {
                 this.$store.commit('project_selected', value);
+            }
+        },
+        sample_annotations: {
+            get() {
+                return this.$store.state.sample_annotations;
+            },
+            set(value) {
+                this.$store.commit('sample_annotations', value);
             }
         },
         sample_to_display: {
@@ -829,6 +838,7 @@ export default {
                             'length': last_selection.length,
                             'range': last_selection.range,
                             };
+                this.sample_annotations = [];
             } else {
                 this.sample_to_display = {
                             'filename': "",
@@ -837,6 +847,7 @@ export default {
                             'length': 0,
                             'range': [0, 0],
                             };
+                this.sample_annotations = [];
             }
         },
         'root_namespace.connected': function(new_value) {

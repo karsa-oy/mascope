@@ -7,6 +7,7 @@
                 has-modal-card
                 trap-focus
                 :can-cancel="true"
+                :destroy-on-hide="false"
                 aria-role="dialog"
                 aria-modal>
                 <div class="modal-card" style="width: 500px;">
@@ -26,26 +27,25 @@
                                     horizontal-time-picker>
                                 </b-datetimepicker>
                             </b-field>
-                            <MetaDataForm></MetaDataForm>
+                            <MetaDataForm
+                                :template_path="log_entry_template_path"
+                                @metaDataUpdated="log_entry_fields=$event">
+                            </MetaDataForm>
                             <div><br></div>
                         </section>
                     </div>
                     <!-- Footer -->
                     <footer class="modal-card-foot">
-                        <button
-                            class="button"
-                            type="button"
+                        <b-button
                             @click="writeInstrumentLogEntry()"
-                            is-dark>
+                            :type="log_entry_save_button_type">
                             Save
-                        </button>
-                        <button
-                            class="button"
-                            type="button"
+                        </b-button>
+                        <b-button
                             is-dark
-                            @click="cancelInstrumentLogEntry()">
+                            @click="is_modal_add_log_entry_active=false;">
                             Cancel
-                        </button>
+                        </b-button>
                     </footer>
                 </div>
             </b-modal>
@@ -349,6 +349,8 @@ import MetaDataForm from "./MetaDataForm.vue"
 
 Vue.use([Buefy]);
 
+var fs = require('fs');
+var path = require('path');
 var Plotly = require('plotly.js-dist');
 var _ = require('underscore');
 
@@ -407,7 +409,6 @@ export default {
                 'acquisition_started',
                 'acquisition_status',
                 'instrument_status',
-                'sample_length',
             ],
             //
             // TOF variables
@@ -420,7 +421,9 @@ export default {
             // Log entry modal variables
             log_entry_datetimestamp: null,
             log_entry_fields: [],
-            log_entry_text: "",
+            log_entry_save_button_type: "is-success",
+            log_entry_template_path: "../metadata_templates",
+            log_path: "../MetaData",
             //
             // variables for desoprtion collapsable
             acquisition_mode: "continuous",
@@ -447,9 +450,6 @@ export default {
     mounted: function() {
     },
     methods: {
-        cancelInstrumentLogEntry() {
-            this.is_modal_add_log_entry_active = false;
-        },
         confirmAcquisitionControl() {
             this.$buefy.dialog.confirm({
                 title: 'Instrument control',
@@ -474,7 +474,6 @@ export default {
             this.desorption_table_data.splice(delete_index, 1);
             this.save_all_values_to_configuration_file();
         },
-        
         draw_desorption_chart() {
             var self = this;
             // format the data and draw the chart
@@ -584,7 +583,44 @@ export default {
             }
         },
         writeInstrumentLogEntry() {
-            this.is_modal_add_log_entry_active = false;
+            var self = this;
+            let file_path = path.join(this.log_path, this.data_source_selected.name + "_log.txt");
+            let log_data = [];
+
+            fs.readFile(file_path, 'utf-8', function (err, file) {
+                if (err) {
+                    if (err.code === 'ENOENT') {
+                        // File not found, create
+                        fs.writeFileSync(file_path, JSON.stringify(log_data, null, 4));
+                    } else {
+                        // Other exception
+                        throw err;
+                    }
+                } else {
+                    // Parse file contents
+                    log_data = JSON.parse(file);
+                }
+                
+                // Parse datetime into string
+                let dt = self.log_entry_datetimestamp;
+                let hours_diff = dt.getHours() - dt.getTimezoneOffset() / 60;
+                dt.setHours(hours_diff);
+                // Combine timestamp with log entry fields and write to file
+                let log_entry_data = {
+                        timestamp: dt.toJSON(),
+                        entry: self.log_entry_fields
+                        }
+                log_data.push(log_entry_data);
+                const log_data_json = JSON.stringify(log_data, null, 4);
+                fs.writeFile(file_path, log_data_json, 'utf8', function(err){
+                        if(err){ 
+                            console.log(err); 
+                        } else {
+                            // Update UI
+                            self.log_entry_save_button_type = "is-success";
+                            self.is_modal_add_log_entry_active = false;
+                        }});
+                });
         },
     },
     watch: {
@@ -655,6 +691,12 @@ export default {
                 this.acquisition_status = 'not_running';
             }
         },
+        log_entry_fields: {
+            handler() {
+                this.log_entry_save_button_type = "is-danger";
+            },
+            deep: true
+        },
         'namespace.connected': function(new_value) {
             if ( new_value === true )
             {
@@ -663,8 +705,6 @@ export default {
                 this.namespace.on("acquisition_status", (value) => this.be.import_one_way_binding_prop("acquisition_status", value.value));
                 this.namespace.on("acquisition_progress", (value) => this.be.import_one_way_binding_prop("acquisition_progress", value.value.progress, true));
                 this.namespace.on("instrument_status", (value) => this.be.import_one_way_binding_prop("instrument_status", value.value));
-                this.namespace.on("new_file", (value) => this.be.import_one_way_binding_prop("new_file", value.value));
-                this.namespace.on("sample_length", (value) => this.be.import_two_way_binding_prop("sample_length", value.value));
 
                 this.be.subscribe(this.endpoints,
                                   null // room set to null to subscribe to endpoints directly

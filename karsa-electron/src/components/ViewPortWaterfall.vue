@@ -23,7 +23,7 @@ import { viewPortMixin } from "../mixins/viewPortMixin"
 Vue.use([Buefy]);
 
 // var fs = require('fs');
-// var Plotly = require('plotly.js-dist');
+var Plotly = require('plotly.js-dist');
 // var _ = require('underscore');
 
 
@@ -54,6 +54,23 @@ export default {
     },
 
     watch: {
+        sample_annotations: function(new_value) {
+            for (let i in new_value) {
+                let annotation = {
+                    'text': new_value[i].text,
+                    'yref': 'y',
+                    'y': new_value[i].timestamp,
+                    'xref': 'paper',
+                    'x': 1,
+                    'axref': 'paper',
+                    'ax': 0,
+                    'ay': 0,
+                    };
+                this.figure_annotations.push(annotation);
+            }
+            // Update figure
+            Plotly.relayout(this.id, {annotations: this.figure_annotations});
+        },
     },
 };
 </script>

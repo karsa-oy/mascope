@@ -1,0 +1,174 @@
+{
+	"common_config": {
+		"responsive": true,
+		"displaylogo": false,
+		"modeBarButtonsToRemove": [
+			"autoScale2d",
+			"hoverClosestGl2d",
+			"hoverClosestCartesian",
+			"hoverCompareCartesian",
+			"lasso2d",
+			"pan2d",
+			"resetScale2d",
+			"select2d",
+			"toggleSpikelines",
+			"toImage",
+			"zoom2d",
+			"zoomIn2d",
+			"zoomOut2d"
+			]
+	},
+
+    "spectrogram": {
+		"axes": {
+			"mz": "y",
+			"time": "x"
+			},
+		"img": {
+			"sizing": "stretch"
+			},
+		"layout": {
+			"images": [],
+			"height": 440,
+			"title": "",
+			"margin": {
+				"l": 40,
+				"r": 10,
+				"b": 25,
+				"t": 20,
+				"pad": 0
+				},
+			"xaxis": {
+				"title": "Time elapsed [s]",
+				"rangemode": "nonnegative",
+				"autorange": false,
+				"showgrid": false,
+				"range": [],
+				"tickmode": "array",
+				"tickvals": [],
+				"ticktext": [],
+				"visible": true
+				},
+			"yaxis": {
+				"title": "m/z [Th]",
+				"visible": true,
+				"rangemode": "nonnegative",
+				"autorange": false,
+				"showgrid": false,
+				"range": []
+				},
+			"font": {
+				"color": "#fff"
+				},
+			"showlegend": false,
+			"dragmode": "zoom",
+			"autosize": true,
+			"hovermode": "closest",
+			"plot_bgcolor": "#29282e",
+			"paper_bgcolor": "#29282e"
+			}
+    },
+    
+	"timeseries": {
+		"axes": {
+			"time": "x"
+			},
+		"layout": {
+			"height": 440,
+			"font": {
+				"color": "#fff"
+				},
+			"xaxis": {
+				"title": "Time elapsed [s]",
+				"autorange": false,
+				"range": [],
+				"showgrid": false,
+				"fixedrange": true,
+				"tickmode": "array",
+				"tickvals": [],
+				"ticktext": [],
+				"visible": true
+				},
+			"yaxis": {
+				"title": "Signal intensity [mV/ext]",
+				"autorange": true,
+				"visible": true,
+				"linecolor": "#999",
+				"showgrid": false,
+				"range": []
+				},
+			"yaxis2": {
+				"autorange": true,
+				"visible": true,
+				"linecolor": "#999",
+				"showgrid": false,
+				"range": [],
+				"overlaying": "y",
+				"side": "right"
+				},
+			"showlegend": false,
+			"dragmode": "zoom",
+			"autosize": true,
+			"hoverinfo": "name+y",
+			"plot_bgcolor": "#29282e",
+			"paper_bgcolor": "#29282e",
+			"margin": {
+				"l": 50,
+				"r": 10,
+				"b": 25,
+				"t": 20,
+				"pad": 0
+				}
+			}
+    },
+    
+	"waterfall": {
+		"axes": {
+			"mz": "x",
+			"time": "y"
+			},
+		"img": {
+			"sizey": 1e5,
+			"sizing": "contain"
+			},
+		"layout": {
+			"images": [],
+			"height": 970,
+			"font": {
+				"color": "#fff"
+				},
+			"xaxis": {
+				"title": "m/z [Th]",
+				"visible": true,
+				"rangemode": "nonnegative",
+				"autorange": false,
+				"showgrid": false
+				},
+			"yaxis": {
+				"autorange": false,
+				"fixedrange": true,
+				"rangemode": "nonnegative",
+				"showgrid": false,
+				"title": "Time elapsed [s]",
+				"tickmode": "array",
+				"tickvals": [],
+				"ticktext": [],
+				"visible": true
+				},
+			"showlegend": false,
+			"dragmode": "zoom",
+			"autosize": true,
+			"hoverinfo": "name+y",
+			"plot_bgcolor": "#29282e",
+			"paper_bgcolor": "#29282e",
+			"margin": {
+				"l": 40,
+				"r": 30,
+				"b": 25,
+				"t": 20,
+				"pad": 0
+				}
+		},
+		"sizing": "contain"
+	}
+}
