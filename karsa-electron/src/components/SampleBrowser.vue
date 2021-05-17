@@ -141,8 +141,8 @@
                         <section class="modal-card-body write_sample_attribute">                            
                             <b-field label="Sample title">
                                 <b-input type="input"
-                                    v-model="sample_name"
-                                    :value="sample_name"
+                                    v-model="sample_title"
+                                    :value="sample_title"
                                     maxlength="50">
                                 </b-input>
                             </b-field>
@@ -156,7 +156,10 @@
                                 </b-input>
                             </b-field>
                             
-                            <MetaDataForm></MetaDataForm>
+                            <MetaDataForm
+                                :default_template="sample_attributes_default_template"
+                                :template_path="sample_attributes_template_path">
+                            </MetaDataForm>
 
                             <div><br></div>
                             <b-field label="Project">
@@ -191,21 +194,17 @@
 
                         </section>
                         <footer class="modal-card-foot">
-                            <button
-                                class="button"
-                                type="button"
+                            <b-button
+                                :type="sample_attributes_save_button_type"
                                 @click="write_sample_attributes"
                                 is-dark
-                                :disabled="!sample_name.length">
+                                :disabled="!sample_title.length">
                                 Save
-                            </button>
-                            <button
-                                class="button"
-                                type="button"
-                                is-dark
+                            </b-button>
+                            <b-button
                                 @click="is_sample_attribute_modal_active=false">
                                 Close
-                            </button>
+                            </b-button>
                             <div style="position:absolute; right:20px">
                                 <b-tooltip
                                     label="Remove sample from this experiment"
@@ -360,7 +359,7 @@
                                                                 <b-button
                                                                     type="is-dark"
                                                                     @click="sample_file=props.row.id;
-                                                                            sample_name=props.row.title;
+                                                                            sample_title=props.row.title;
                                                                             sample_description=props.row.description;
                                                                             is_sample_attribute_modal_active=true"
                                                                     outlined
@@ -543,7 +542,7 @@ export default {
             // Sample metadata for selected sample
             samples: [],
             sample_file: "",
-            sample_name: "",
+            sample_title: "",
             sample_description: "",
             sample_project: "",
             sample_experiment: "",
@@ -552,6 +551,10 @@ export default {
             sample_table_cols: [],
             sample_table_checked_rows: [],
             sample_attributes: {},
+            sample_attributes_default_template: [],
+            sample_attributes_fields: [],
+            sample_attributes_save_button_type: "is-success",
+            sample_attributes_template_path: "../metadata_templates",
         }
     },
     created: function() {
@@ -612,7 +615,7 @@ export default {
             let sample = {
                 'id': this.sample_file,
                 'attributes': {
-                    'title': this.sample_name,
+                    'title': this.sample_title,
                     'description': this.sample_description,
                     'project': this.sample_project,
                     'experiment': this.sample_experiment
@@ -718,7 +721,7 @@ export default {
                 return false;
             }
             // this.sample_file = "";
-            // this.sample_name = "";
+            // this.sample_title = "";
             // this.sample_description = "";
             this.sample_project = this.project_selected.id;
             this.sample_experiment = new_value.id;
@@ -771,7 +774,7 @@ export default {
             }
             this.sample_file = new_value;
             let sample_no = this.sample_table_rows.length + 1;
-            this.sample_name = sample_no.toString().padStart(3, '0') + '_';
+            this.sample_title = sample_no.toString().padStart(3, '0') + '_';
             this.sample_description = "";
             this.is_sample_attribute_modal_active = true;
             this.sample_table_checked_rows = [];
@@ -807,6 +810,15 @@ export default {
                                                        this.room_experiment
                                                        );
         },
+        sample_attributes_fields: {
+            handler() {
+                this.sample_attributes_save_button_type = "is-danger";
+            },
+            deep: true
+        },
+        sample_description: function() {
+            this.sample_attributes_save_button_type = "is-danger";
+        },
         sample_experiment: function(new_value) {
             this.experiment.title = new_value;
             this.SetExperiment();
@@ -827,13 +839,13 @@ export default {
             }
             if (last_selection) {
                 this.sample_file = last_selection.id;
-                this.sample_name = last_selection.title || "";
+                this.sample_title = last_selection.title || "";
                 this.sample_description = last_selection.description || "";
                 this.sample_project = last_selection.project;
                 this.sample_experiment = last_selection.experiment;
                 this.sample_to_display = {
                             'filename': this.sample_file,
-                            'title': this.sample_name,
+                            'title': this.sample_title,
                             'description': this.sample_description,
                             'length': last_selection.length,
                             'range': last_selection.range,
@@ -849,6 +861,9 @@ export default {
                             };
                 this.sample_annotations = [];
             }
+        },
+        sample_title: function() {
+            this.sample_attributes_save_button_type = "is-danger";
         },
         'root_namespace.connected': function(new_value) {
             if ( new_value === true )
