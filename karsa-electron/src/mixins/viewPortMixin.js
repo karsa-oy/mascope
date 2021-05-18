@@ -38,10 +38,6 @@ export const viewPortMixin = {
             namespace: null,
             room: null,
             room_sid: null,
-            endpoints: [
-                'figure_data',
-                'loaded_data',
-                ],
             
             filename: '',
 
@@ -130,34 +126,32 @@ export const viewPortMixin = {
             console.log('[' + this.name + ']',  ...args);
         },
 
-        figure_cache_add_ref(zoom_stack_item_room) {
-            if ( Object.keys(this.figure_cache).includes(zoom_stack_item_room) ) {
-                ++this.figure_cache[zoom_stack_item_room].ref_count;
-                return this.figure_cache[zoom_stack_item_room];
+        figure_cache_add_ref(zoom_stack_item_id) {
+            if ( Object.keys(this.figure_cache).includes(zoom_stack_item_id) ) {
+                ++this.figure_cache[zoom_stack_item_id].ref_count;
+                return this.figure_cache[zoom_stack_item_id];
             }
-            this.figure_cache[zoom_stack_item_room] = {
+            this.figure_cache[zoom_stack_item_id] = {
                     'ref_count': 1,
                     't_filled_range': [Number.MAX_SAFE_INTEGER, 0],
                     'figure_layout': shallow_copy(this.figure_layout_default),
                     'figure_traces': [],
                     };
-            this.be.subscribe(this.endpoints, zoom_stack_item_room);
-            return this.figure_cache[zoom_stack_item_room];
+            return this.figure_cache[zoom_stack_item_id];
         },
 
-        figure_cache_release_ref(zoom_stack_item_room) {
-            let cache_item = this.figure_cache[zoom_stack_item_room];
+        figure_cache_release_ref(zoom_stack_item_id) {
+            let cache_item = this.figure_cache[zoom_stack_item_id];
             cache_item.ref_count--;
             if ( cache_item.ref_count <= 0 ) {
-                delete this.figure_cache[zoom_stack_item_room];
-                this.be.unsubscribe(this.endpoints, zoom_stack_item_room);
+                delete this.figure_cache[zoom_stack_item_id];
             }
         },
 
-        figure_cache_get(zoom_stack_item_room) {
-            if ( _.isUndefined(zoom_stack_item_room) )
+        figure_cache_get(zoom_stack_item_id) {
+            if ( _.isUndefined(zoom_stack_item_id) )
                 return false;
-            return this.figure_cache[zoom_stack_item_room];
+            return this.figure_cache[zoom_stack_item_id];
         },
 
         zoom_stack_search(mz_range) {
@@ -264,6 +258,7 @@ export const viewPortMixin = {
 
         async _on_figure_ranges(new_value, old_value) {
             if (!new_value.filename) {
+                this.log("_on_figure_ranges: !new_value.filename");
                 this.reset_view();
                 this.filename = "";
                 return
@@ -271,6 +266,7 @@ export const viewPortMixin = {
             let new_sample = false;
             if (!_.isEqual(new_value.filename, old_value.filename)) {
                 // New sample to load, reset
+                this.log("_on_figure_ranges: new_sample");
                 this.reset_view();
                 new_sample = true;
             }
@@ -293,16 +289,6 @@ export const viewPortMixin = {
             }
         },
 
-        on_figure_ranges(new_value, old_value) {
-            if (_.isEqual(new_value, old_value)) {
-                return
-            }
-            var self = this;
-            self.figure_queue = self.figure_queue.then(function() {
-                return self._on_figure_ranges(new_value, old_value); }
-            );
-        },
-
         async _on_figure_data(json_data) {
             var self = this;
             if ( _.isEmpty(json_data) ) {
@@ -313,9 +299,9 @@ export const viewPortMixin = {
                 return;
             }
             let data = json_data.value;
-            let zoom_stack_item_room = json_data.room;
+            let zoom_stack_item_id = data.request_id;
 
-            let cache_item = self.figure_cache_get(zoom_stack_item_room);
+            let cache_item = self.figure_cache_get(zoom_stack_item_id);
             if (!cache_item) {
                 self.beep();
                 self.log('Received figure_data for non-existing zoom stack item!');
@@ -359,7 +345,6 @@ export const viewPortMixin = {
             if (_.isEqual(self.figure_layout[time_axis+"axis"].tickmode, "array")) {
                 cache_item.figure_layout[time_axis+"axis"].tickvals.push(t0);
                 cache_item.figure_layout[time_axis+"axis"].ticktext.push(t0.toFixed(2).toString());
-                self.log(cache_item);
             }
 
             let traces = data.traces; // array
@@ -371,11 +356,10 @@ export const viewPortMixin = {
             }
 
             // if latest zoom stack item updated, draw the figure
-            if ( _.isEqual(zoom_stack_item_room,
-                           self.zoom_stack.slice(-1)[0].room) ) {
+            if ( _.isEqual(zoom_stack_item_id,
+                           self.zoom_stack.slice(-1)[0].id) ) {
                 self.figure_layout = cache_item.figure_layout;
                 self.figure_traces = cache_item.figure_traces;
-                self.log(this.figure_annotations);
                 await Plotly.update(self.id,
                                    self.figure_traces,
                                    {...self.figure_layout,
@@ -383,13 +367,6 @@ export const viewPortMixin = {
                                     }
                                    );
             }
-        },
-
-        on_figure_data(json_data) {
-            var self = this;
-            self.figure_queue = self.figure_queue.then(function() {
-                return self._on_figure_data(json_data); }
-            );
         },
 
         reset_view() {
@@ -408,9 +385,12 @@ export const viewPortMixin = {
             let cancel_requests = [];
             // Collect client_rooms to release
             for (let i=0; i<this.zoom_stack.length; ++i) {
-                cancel_requests.push(shallow_copy(this.zoom_stack[i].room));
+                cancel_requests.push(shallow_copy(this.zoom_stack[i].id));
             }
-            this.stop_visualize_range = {'client_rooms': cancel_requests, 'filename': this.filename};
+            this.stop_visualize_range = {
+                                'request_ids': cancel_requests,
+                                'filename': this.filename
+                                };
             // Reset figure cache and zoom stack
             this.figure_cache = {'t_maxrange': [0, 0],
                                  'mz_maxrange': [0, 0], };
@@ -422,7 +402,7 @@ export const viewPortMixin = {
             // the function is destructive for zoom_stack_item - don't use refs
             var self = this;
             if ( !_.isNull(zoom_stack_item) ) {
-                let cache_item = self.figure_cache_get(zoom_stack_item.room);
+                let cache_item = self.figure_cache_get(zoom_stack_item.id);
                 let mz_range = zoom_stack_item.mz_range;
                 let t_range = zoom_stack_item.t_range;
                 let mz_axis = this.figure_axes.mz;
@@ -436,7 +416,7 @@ export const viewPortMixin = {
                 self.figure_layout = cache_item.figure_layout;
                 self.figure_traces = cache_item.figure_traces;
             }
-            self.log(this.figure_annotations);
+            // self.log(this.figure_annotations);
             await Plotly.react(self.id,
                                 self.figure_traces,
                                 self.figure_layout
@@ -448,14 +428,15 @@ export const viewPortMixin = {
             // Unpack ranges
             let [mz0, mz1] = new_ranges.mz_range;
             let [t0, t1] = new_ranges.t_range;
+            let request_id = new_ranges.id;
             // Create new zoom_stack_item
-            let zoom_stack_item = new this.ZoomStackItem([t0, t1], [mz0, mz1]);
+            let zoom_stack_item = new this.ZoomStackItem([t0, t1], [mz0, mz1], request_id);
             // Add the zoom stack item at the top of the stack
             this.zoom_stack.push(
                 zoom_stack_item
                 );
             // Increment figure_cache ref counter
-            this.figure_cache_add_ref(zoom_stack_item.room);
+            this.figure_cache_add_ref(zoom_stack_item.id);
             // Update figure
             let cur_ranges = shallow_copy(this.zoom_stack.slice(-1)[0]);
             // Set new ranges
@@ -463,7 +444,8 @@ export const viewPortMixin = {
             // Request full range visualization from DataViz (ranges null)
             this.visualize_range = {'filename': this.filename,
                                     'viz_type': this.id,
-                                    'room': cur_ranges.room,
+                                    'request_id': cur_ranges.id,
+                                    'room': this.room_sid,
                                     };
         },
 
@@ -521,7 +503,7 @@ export const viewPortMixin = {
                 // m/z range already in cache
                 mz_range_updated = false;
                 // Check if requested time range is already cached
-                let figure_cache_item = self.figure_cache[zoom_stack_item.room];
+                let figure_cache_item = self.figure_cache[zoom_stack_item.id];
                 if ( (figure_cache_item.t_filled_range[0] - t0) < min_dt &&
                      (t1 - figure_cache_item.t_filled_range[1]) < min_dt ) {
                     // Requested time range is in cache
@@ -538,7 +520,7 @@ export const viewPortMixin = {
                 zoom_stack_item
                 );
             // Increment figure_cache ref counter
-            self.figure_cache_add_ref(zoom_stack_item.room);
+            self.figure_cache_add_ref(zoom_stack_item.id);
             // Update figure
             let cur_ranges = shallow_copy(self.zoom_stack.slice(-1)[0]);
             // Set new ranges
@@ -546,9 +528,12 @@ export const viewPortMixin = {
             // Request new visualizations if needed
             if (mz_range_updated) {
                 // mz_range changed, request full t_range in the new mz_range
-                this.visualize_range = {...cur_ranges,
-                                        'filename': this.filename,
+                this.visualize_range = {'filename': this.filename,
                                         'viz_type': this.id,
+                                        'mz_range': cur_ranges.mz_range,
+                                        't_range': cur_ranges.t_range,
+                                        'request_id': cur_ranges.id,
+                                        'room': this.room_sid,
                                         };
                 return
             }
@@ -579,6 +564,7 @@ export const viewPortMixin = {
         },
 
         visualize_range_on_zoom_out() {
+            this.log("visualize_range_on_zoom_out");
             let self = this;
             if ( self.zoom_stack.length <= 1 ) {
                 self.log("Zoom stack is empty.");
@@ -592,12 +578,12 @@ export const viewPortMixin = {
             let zoom_stack_item_to_restore = shallow_copy(self.zoom_stack.slice(-1)[0]);
             // collect client_rooms to cancel for stop_visualize_range call
             let cancel_requests = [];
-            cancel_requests.push(shallow_copy(zoom_stack_item_to_remove.room));
+            cancel_requests.push(shallow_copy(zoom_stack_item_to_remove.id));
             // Loop until persistent item found from zoom stack
             while (zoom_stack_item_to_restore.volatile) {
-                cancel_requests.push(shallow_copy(zoom_stack_item_to_restore.room));
+                cancel_requests.push(shallow_copy(zoom_stack_item_to_restore.id));
                 // Release reference of popped item
-                self.figure_cache_release_ref(zoom_stack_item_to_restore.room);
+                self.figure_cache_release_ref(zoom_stack_item_to_restore.id);
                 // Get next item from stack
                 self.zoom_stack.pop();
                 zoom_stack_item_to_restore = shallow_copy(self.zoom_stack.slice(-1)[0]);
@@ -605,12 +591,15 @@ export const viewPortMixin = {
             self.log("Zoom stack frames left:", self.zoom_stack.length - 1);
             if ( _.isUndefined(zoom_stack_item_to_remove) || _.isUndefined(zoom_stack_item_to_restore) )
                 return;
-            self.stop_visualize_range = {'client_rooms': cancel_requests, 'filename': this.filename};
+            self.stop_visualize_range = {
+                                'request_ids': cancel_requests,
+                                'filename': this.filename
+                                };
             self.update_figure(zoom_stack_item_to_restore);
             // visualize missing frames and acquisition frames
 // TODO:
-            // let prev_item_room = zoom_stack_item_to_remove.room;
-            // let cur_item_room = zoom_stack_item_to_restore.room;
+            // let prev_item_room = zoom_stack_item_to_remove.id;
+            // let cur_item_room = zoom_stack_item_to_restore.id;
             // let cur_mz = zoom_stack_item_to_restore.mz_range;
             // let prev_t_filled = self.figure_cache_get(prev_item_room).t_filled_range;
             // let cur_t_filled = self.figure_cache_get(cur_item_room).t_filled_range;
@@ -625,15 +614,14 @@ export const viewPortMixin = {
             // }
 // TODO:
             // remove cache item, if not used anymore
-            self.figure_cache_release_ref(zoom_stack_item_to_remove.room);
+            self.figure_cache_release_ref(zoom_stack_item_to_remove.id);
         },
 
-        ZoomStackItem: function(t_range, mz_range, volatile=false, room=null) {
+        ZoomStackItem: function(t_range, mz_range, id=null, volatile=false) {
             this.t_range = t_range;
             this.mz_range = mz_range;
             this.volatile = volatile;
-            // Room for zoom stack item
-            this.room = room || Math.random().toString(36).substring(2);
+            this.id = id || Math.random().toString(36).substring(2);
         },
 
     },
@@ -642,20 +630,25 @@ export const viewPortMixin = {
             if ( !_.isEqual(new_value.value.viz_type, this.id) &&
                  !_.isEqual(new_value.value.data_type, this.id))
                 return;
-            this.on_figure_data(new_value);
+            var self = this;
+            self.figure_queue = self.figure_queue.then(function() {
+                return self._on_figure_data(new_value); }
+            );
         },
         figure_double_click: function() {
             this.visualize_range_on_zoom_out();
         },
         figure_ranges: function(new_value, old_value) {
-            this.on_figure_ranges(new_value, old_value);
+            if (_.isEqual(new_value, old_value)) {
+                return
+            }
+            var self = this;
+            self.figure_queue = self.figure_queue.then(function() {
+                return self._on_figure_ranges(new_value, old_value); }
+            );
         },
         stop_visualize_range: function(new_value, old_value) {
-            let client_rooms = new_value.client_rooms;
-            for (let i in client_rooms) {
-                this.be.unsubscribe(this.endpoints, client_rooms[i]);
-            }
-            let client_room = this.room;
+            let client_room = this.room_sid;
             return this.be.export_one_way_binding_prop('stop_visualize_range',
                                                         {...new_value, 'uid': Math.random()},
                                                         old_value,
@@ -688,12 +681,12 @@ export const viewPortMixin = {
                     'line': {'color': '#8c67ef'}
                     }];
                 let zoom_stack_item = this.zoom_stack.slice(-1)[0]
-                let figure_cache_item = this.figure_cache_get(zoom_stack_item.room);
+                let figure_cache_item = this.figure_cache_get(zoom_stack_item.id);
                 figure_cache_item.figure_traces.push(...target_traces);
             }
         },
         visualize_range: function(new_value, old_value) {
-            let client_room = new_value.room || this.room;
+            let client_room = this.room_sid;
             return this.be.export_one_way_binding_prop('visualize_range',
                                                         {...new_value, 'uid': Math.random()},
                                                         old_value,
@@ -709,8 +702,6 @@ export const viewPortMixin = {
                 // this.namespace.on("figure_data", (value) => this.be.import_one_way_binding_prop("figure_data", value));
 
                 this.room_sid = this.root_namespace.id;
-                this.room = Math.random().toString(36).substring(2);
-                // this.be.subscribe(this.endpoints, this.room);
             }
         },
     },

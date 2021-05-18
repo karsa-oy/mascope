@@ -71,7 +71,8 @@ cur.execute('''CREATE TABLE requests
                 mz0 real,
                 mz1 real,
                 t_resolution real,
-                client_room text)
+                client_room text,
+                request_id text)
             ''')
 
 # ======= Visualization/request cache (db) methods =======
@@ -83,6 +84,7 @@ def viz_cache_get(table,
                   mz_range=None,
                   t_resolution=None,
                   client_room=None,
+                  request_id=None,
                   ):
     
     global con
@@ -122,6 +124,11 @@ def viz_cache_get(table,
         query = join_str.join([query, 'client_room = ?'])
         join_str = ' AND '
 
+    if request_id:
+        args.append(request_id)
+        query = join_str.join([query, 'request_id = ?'])
+        join_str = ' AND '
+
     cur.execute('''SELECT {} FROM {} WHERE {}
                 '''.format(fields, table, query), # ORDER BY t0 ASC
                 args
@@ -134,13 +141,20 @@ def viz_cache_process_requests(filename):
     # Get all pending requests for filename
     request_data_rows = viz_cache_get(
                             'requests',
-                            'viz_type, t0, t1, mz0, mz1, t_resolution, client_room',
+                            '''
+                            viz_type,
+                            t0, t1,
+                            mz0, mz1,
+                            t_resolution,
+                            client_room,
+                            request_id
+                            ''',
                             filename,
                             )
     # Loop through db entries
     for row in request_data_rows:
         # print("[viz_cache_process_requests]: processing row: %s" %str(row))
-        viz_type, t0, t1, mz0, mz1, t_resolution, client_room = row
+        viz_type, t0, t1, mz0, mz1, t_resolution, client_room, request_id = row
 
         # Select processing method based on 'data_type' and process request
         processed_until = REQUEST_PROCESSORS[viz_type](
@@ -152,6 +166,7 @@ def viz_cache_process_requests(filename):
                                     mz1=mz1,
                                     t_resolution=t_resolution,
                                     client_room=client_room,
+                                    request_id=request_id,
                                     )
 
         if not processed_until:
@@ -171,17 +186,13 @@ def viz_cache_process_requests(filename):
                             [mz0, mz1],
                             t_resolution,
                             client_room,
+                            request_id,
                             )
         else:
             print("Release request")
             # Request served fully, release from cache
             viz_cache_release('requests',
-                              filename,
-                              client_room,
-                              viz_type,
-                              [t0, t1],
-                              [mz0, mz1],
-                              t_resolution
+                              request_id
                               )
 
 def viz_cache_put(table,
@@ -217,7 +228,8 @@ def viz_cache_put_or_update_request(filename,
                                     t_range,
                                     mz_range,
                                     t_resolution,
-                                    client_room
+                                    client_room,
+                                    request_id,
                                     ):
     global con
     # Get existing requests
@@ -252,16 +264,18 @@ def viz_cache_put_or_update_request(filename,
                       t_range,
                       mz_range,
                       t_resolution,
-                      client_room
+                      client_room,
+                      request_id
                       )
 
 def viz_cache_release(table,
+                      request_id=None,
                       filename=None,
                       client_room=None,
                       viz_type=None,
                       t_range=None,
                       mz_range=None,
-                      t_resolution=None
+                      t_resolution=None,
                       ):    
     global con
     cur = con.cursor()
@@ -269,6 +283,11 @@ def viz_cache_release(table,
     args = []
     query = ''
     join_str = ''
+
+    if request_id:
+        args.append(request_id)
+        query = join_str.join([query, 'request_id = ?'])
+        join_str = ' AND '
     
     if filename:
         args.append(filename)
@@ -315,6 +334,7 @@ def viz_cache_update(table,
                      mz_range=None,
                      t_resolution=None,
                      client_room=None,
+                     request_id=None,
                      *args,
                      ):
 
@@ -359,6 +379,11 @@ def viz_cache_update(table,
         query = join_str.join([query, 'client_room = ?'])
         join_str = ' AND '
 
+    if request_id:
+        args.append(request_id)
+        query = join_str.join([query, 'request_id = ?'])
+        join_str = ' AND '
+
     cur.execute('''UPDATE {} SET {} WHERE {}
                 '''.format(table, set_query, query),
                 args
@@ -372,7 +397,8 @@ def process_visualization_request(filename,
                                   mz0,
                                   mz1,
                                   t_resolution,
-                                  client_room
+                                  client_room,
+                                  request_id,
                                   ):
     """Routine for processing a visualization request
 
@@ -468,6 +494,7 @@ def process_visualization_request(filename,
                             'y_range': y_range,
                             't_resolution': t_resolution,
                             'client_room': client_room,
+                            'request_id': request_id,
                             'persist_in_cache': False,
                             })
 
@@ -540,6 +567,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
         t_range = value.get('t_range')
         t_resolution = value.get('t_resolution')
         viz_type = value['viz_type']
+        request_id = value['request_id']
 
         # Check if data_request is needed
         if filename not in cache:
@@ -553,6 +581,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
             await self.emit_client_notification('data_request',
                                                 {'filename': filename,
                                                  'data_type': viz_type,
+                                                 'request_id': request_id,
                                                  },
                                                 client_room=client_room,
                                                 namespace=get_namespace(filename)
@@ -579,6 +608,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                                 {'filename': filename,
                                                  'data_type': 'signal',
                                                  'mz_range': mz_range,
+                                                 'request_id': request_id,
                                                 },
                                                 namespace=get_namespace(filename)
                                                 )
@@ -617,6 +647,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                                     {'filename': filename,
                                                     'data_type': 'signal',
                                                     'mz_range': mz_range_missing,
+                                                    'request_id': request_id,
                                                     },
                                                     namespace=get_namespace(filename)
                                                     )
@@ -626,7 +657,8 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                         t_range,
                                         mz_range,
                                         t_resolution,
-                                        client_room
+                                        client_room,
+                                        request_id
                                         )
         if not data_request_needed:
             # Process request
@@ -640,18 +672,18 @@ class DataVizServiceNamespace(BaseClientNamespace):
         ----------
         data : dict(name, value, cookies, no_logging, no_data_logging...)
                value: JSON data from UI,
-                      keys: 'client_rooms', list of client rooms to release
+                      keys: 'request_ids', list of request ids to release
         """
         value = data['value']
         filename = value['filename']
-        client_rooms = value['client_rooms']
+        request_ids = value['request_ids']
         if not filename:
             return
-        for client_room in client_rooms:
+        for request_id in request_ids:
             viz_cache_release('requests',
-                              client_room=client_room,
+                              request_id=request_id,
                               )
-            generator_input_cache.cache_delete_key(client_room)
+            generator_input_cache.cache_delete_key(request_id)
         await self.emit_client_notification('stop_data_request',
                                             data['value'],
                                             **{**get_client_notification_args(data),

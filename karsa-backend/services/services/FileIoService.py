@@ -66,7 +66,8 @@ cur.execute('''CREATE TABLE requests
                 mz0 real,
                 mz1 real,
                 t_resolution real,
-                client_room text)
+                client_room text,
+                request_id text)
             ''')
 
 # ======= Request cache (db) methods =======
@@ -78,6 +79,7 @@ def cache_get(table,
               mz_range=None,
               t_resolution=None,
               client_room=None,
+              request_id=None,
               ):
     
     global con
@@ -117,6 +119,11 @@ def cache_get(table,
         query = join_str.join([query, 'client_room = ?'])
         join_str = ' AND '
 
+    if request_id:
+        args.append(request_id)
+        query = join_str.join([query, 'request_id = ?'])
+        join_str = ' AND '
+
     cur.execute('''SELECT {} FROM {} WHERE {}
                    ORDER BY t0 ASC
                 '''.format(fields, table, query),
@@ -130,13 +137,20 @@ def cache_process_requests(filename):
     # Get all pending requests for filename
     request_data_rows = cache_get(
                             'requests',
-                            'data_type, t0, t1, mz0, mz1, t_resolution, client_room',
+                            '''
+                            data_type,
+                            t0, t1,
+                            mz0, mz1,
+                            t_resolution,
+                            client_room,
+                            request_id
+                            ''',
                             filename,
                             )
     # Loop through db entries
     for row in request_data_rows:
         # print("[cache_process_requests]: processing row: %s" %str(row))
-        data_type, t0, t1, mz0, mz1, t_resolution, client_room = row
+        data_type, t0, t1, mz0, mz1, t_resolution, client_room, request_id = row
 
         # Select processing method based on data_type and process request
         processed_t_range = REQUEST_PROCESSORS[data_type](
@@ -148,6 +162,7 @@ def cache_process_requests(filename):
                                     mz1=mz1,
                                     t_resolution=t_resolution,
                                     client_room=client_room,
+                                    request_id=request_id,
                                     )
         if not processed_t_range:
             # Nothing was processed
@@ -167,16 +182,12 @@ def cache_process_requests(filename):
                          [mz0, mz1],
                          t_resolution,
                          client_room,
+                         request_id,
                          )
         else:
-            # Request served fully, release rom cache
+            # Request served fully, release from cache
             cache_release('requests',
-                          filename,
-                          client_room,
-                          data_type,
-                          [t0, t1],
-                          [mz0, mz1],
-                          t_resolution
+                          request_id
                           )
 
 def cache_put(table,
@@ -208,6 +219,7 @@ def cache_put(table,
     con.commit()
 
 def cache_release(table,
+                  request_id=None,
                   filename=None,
                   client_room=None,
                   data_type=None,
@@ -223,6 +235,11 @@ def cache_release(table,
     query = ''
     join_str = ''
     
+    if request_id:
+        args.append(request_id)
+        query = join_str.join([query, 'request_id = ?'])
+        join_str = ' AND '
+
     if filename:
         args.append(filename)
         query = join_str.join([query, 'filename = ?'])
@@ -268,6 +285,7 @@ def cache_update(table,
                  mz_range=None,
                  t_resolution=None,
                  client_room=None,
+                 request_id=None,
                  *args,
                  ):
 
@@ -312,6 +330,12 @@ def cache_update(table,
         query = join_str.join([query, 'client_room = ?'])
         join_str = ' AND '
 
+    if request_id:
+        args.append(request_id)
+        query = join_str.join([query, 'request_id = ?'])
+        join_str = ' AND '
+
+
     cur.execute('''UPDATE {} SET {} WHERE {}
                 '''.format(table, set_query, query),
                 args
@@ -326,6 +350,7 @@ def process_signal_request(filename,
                            mz1,
                            t_resolution,
                            client_room,
+                           request_id,
                            ):
     global cache
     global data_q
@@ -359,6 +384,7 @@ def process_signal_request(filename,
                 't': ti,
                 'period': period,
                 'client_room': client_room,
+                'request_id': request_id,
                 }
         if (mz0 is not None) or (mz1 is not None):
             mz = spec_array.mz.values
@@ -376,6 +402,7 @@ def process_image_request(filename,
                           mz1,
                           t_resolution,
                           client_room,
+                          request_id,
                           ):
     global cache
     global data_q
@@ -415,6 +442,7 @@ def process_image_request(filename,
                     'mz_range': [mz0, mz1],
                     't_range': [t0_i, t1_i],
                     'client_room': client_room,
+                    'request_id': request_id,
                     }
         if img_str.startswith('data:image/png;base64'):
             # base64 png
@@ -740,6 +768,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         filename = value['filename']
         data_type = value['data_type']
         client_room = data.get('client_room') or data['cookies']['src_sid'][0]
+        request_id = value['request_id']
         mz_range = value.get('mz_range', None)
         t_range = value.get('t_range', None)
         
@@ -766,7 +795,8 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                   t_range,
                   mz_range,
                   None, # t_resolution,
-                  client_room
+                  client_room,
+                  request_id,
                   )
         # Process request(s)
         cache_process_requests(filename)
@@ -786,19 +816,12 @@ class FileIoPrivateNamespace(BaseClientNamespace):
 
 
     async def on_stop_data_request(self, data):
-        # # TODO: Deprecated, need to update
-        # ranges = data['value'].pop('ranges', [])
-        # for r in ranges:
-        #     data['value'].update({'mz_range': r['mz_range']})
-        #     data['value'].update({'t_range': r['t_range']})
-        #     await kill_cache(data)
-        #     return
-        # await kill_cache(data)
-
-        client_rooms = data['value']['client_rooms']
-        for client_room in client_rooms:
-            cache_release('requests', client_room=client_room)
-            service_input_cache.cache_delete_key(client_room)
+        self.log(data)
+        value = data['value']
+        request_ids = value['request_ids']
+        for request_id in request_ids:
+            cache_release('requests', request_id=request_id)
+            service_input_cache.cache_delete_key(request_id)
 
 
     async def on_tps_data_request(self, data):     

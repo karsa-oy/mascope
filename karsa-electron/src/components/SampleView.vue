@@ -191,6 +191,7 @@ export default {
         return {
             be: null,   //backend communicator
             namespace: null,
+            room_sid: null,
 
             // UI variables
             is_modal_add_log_entry_active: false,
@@ -210,10 +211,6 @@ export default {
             tps_parameters: [],
             tps_parameters_selected_ui: [],
             tps_parameters_selected: {},
-
-            room_sid: null,
-            endpoints: [
-            ],
         }
     },
 
@@ -264,6 +261,7 @@ export default {
             this.figure_ranges = {'filename': new_value.filename,
                                   't_range': [0, new_value.length],
                                   'mz_range': new_value.range,
+                                  'id': Math.random().toString(36).substring(2)
                                   };
         },
         
@@ -288,13 +286,10 @@ export default {
             {
                 this.namespace = this.root_namespace;
                 // handlers for for external notifications:
-                // this.namespace.on("figure_ranges", (value) => this.be.import_one_way_binding_prop("figure_ranges", {...value.value, 'uid': Math.random()}));
-                // this.namespace.on("tps_parameters", (value) => this.be.import_one_way_binding_prop("tps_parameters", value.value));
                 this.namespace.on("figure_data", (value) => this.be.import_one_way_binding_prop("figure_data", value));
                 this.namespace.on("loaded_data", (value) => this.be.import_one_way_binding_prop("figure_data", value));
 
                 this.room_sid = this.root_namespace.id;
-                // this.be.subscribe(this.endpoints, this.room_sid);
             }
         },
     },
