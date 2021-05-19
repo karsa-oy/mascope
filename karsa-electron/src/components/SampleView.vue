@@ -159,8 +159,10 @@ export default {
                     'root_namespace',
                     'sample_annotation_timestamp',
                     'sample_to_display',
+                    'stop_visualize_range',
                     'target_to_display',
                     //  'tps_parameters',
+                    'visualize_range',
                     ]),
         figure_data: {
             get() {
@@ -211,6 +213,12 @@ export default {
             tps_parameters: [],
             tps_parameters_selected_ui: [],
             tps_parameters_selected: {},
+
+            viz_types: [
+                'spectrogram',
+                'timeseries',
+                'waterfall',
+            ],
         }
     },
 
@@ -264,23 +272,47 @@ export default {
                                   'id': Math.random().toString(36).substring(2)
                                   };
         },
-        
+        stop_visualize_range: function(new_value, old_value) {
+            if (_.isEqual(new_value.request_ids, old_value.request_ids)) {
+                return
+            } else {
+                this.log(new_value, old_value);
+            }
+            return this.be.export_one_way_binding_prop('stop_visualize_range',
+                                                       {...new_value,
+                                                        'uid': Math.random()
+                                                        },
+                                                       old_value,
+                                                       this.room_sid
+                                                       );
+        },
         tps_parameters: function(new_value, old_value) {
             if ( _.isEmpty(new_value) || _.isEqual(new_value, old_value) ) {
                 return false;
             }
         },
-        
         tps_parameters_selected_ui: function(value) {
             this.tps_parameters_selected = {'tps_parameters_selected': value, 'figure_ranges': this.figure_ranges};
         },
-        
         tps_parameters_selected: function(new_value, old_value) {
             return this.be.export_one_way_binding_prop('tps_parameters_selected',
                                                         new_value, old_value,
                                                         this.room_sid);
         },
-
+        visualize_range: function(new_value, old_value) {
+            if (_.isEqual(new_value.request_id, old_value.request_id)) {
+                return
+            }
+            return this.be.export_one_way_binding_prop('visualize_range',
+                                                       {...new_value,
+                                                        'viz_types': this.viz_types,
+                                                        'room': this.room_sid,
+                                                        'uid': Math.random(),
+                                                        },
+                                                       old_value,
+                                                       this.room_sid
+                                                       );
+        },
         'root_namespace.connected': function(new_value) {
             if ( new_value === true )
             {

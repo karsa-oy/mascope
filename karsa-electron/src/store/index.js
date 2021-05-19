@@ -7,6 +7,7 @@ export default new Vuex.Store({
 	state: {
 		acquisition_control_active: false,
 		acquisition_status: "not_running",		// not_running/starting/running/stopping
+		data_source_selected: {},
 		experiment_selected: {'id': ""},
 		experiments: [],
 		figure_data: {},
@@ -15,14 +16,15 @@ export default new Vuex.Store({
 		new_file: "",
 		project_selected: {'id': ""},
 		projects: [],
+		root_namespace: null,
 		sample_annotations: [],
 		sample_annotation_timestamp: null,
 		sample_selected: {},
 		sample_to_display: {},
-		root_namespace: null,
+		stop_visualize_range: {},
 		target_to_display: {},
 		url: "",
-		data_source_selected: {},
+		visualize_range: {},
 	},
 	mutations: {
 		acquisition_control_active(state, payload) {
@@ -30,6 +32,9 @@ export default new Vuex.Store({
 		},
 		acquisition_status(state, payload) {
 			state.acquisition_status = payload;
+		},
+		data_source_selected(state, payload) {
+			state.data_source_selected = payload;
 		},
 		experiment_selected(state, payload) {
 			state.experiment_selected = payload;
@@ -49,6 +54,15 @@ export default new Vuex.Store({
 		new_file(state, payload) {
 			state.new_file = payload;
 		},
+		project_selected(state, payload) {
+			state.project_selected = payload;
+		},
+		projects(state, payload) {
+			state.projects = payload;
+		},
+		root_namespace(state, payload) {
+			state.root_namespace = payload;
+		},
 		sample_annotations(state, payload) {
 			state.sample_annotations = payload;
 		},
@@ -58,8 +72,8 @@ export default new Vuex.Store({
 		sample_to_display(state, payload) {
 			state.sample_to_display = payload;
 		},
-		root_namespace(state, payload) {
-			state.root_namespace = payload;
+		stop_visualize_range(state, payload) {
+			state.stop_visualize_range = payload;
 		},
 		target_to_display(state, payload) {
 			state.target_to_display = payload;
@@ -67,14 +81,8 @@ export default new Vuex.Store({
 		url(state, payload) {
 			state.url = payload;
 		},
-		data_source_selected(state, payload) {
-			state.data_source_selected = payload;
-		},
-		project_selected(state, payload) {
-			state.project_selected = payload;
-		},
-		projects(state, payload) {
-			state.projects = payload;
+		visualize_range(state, payload) {
+			state.visualize_range = payload;
 		},
 	},
 	actions: {

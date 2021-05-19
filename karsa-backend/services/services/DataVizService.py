@@ -192,7 +192,8 @@ def viz_cache_process_requests(filename):
             print("Release request")
             # Request served fully, release from cache
             viz_cache_release('requests',
-                              request_id
+                              request_id=request_id,
+                              viz_type=viz_type
                               )
 
 def viz_cache_put(table,
@@ -566,7 +567,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
         mz_range = value.get('mz_range')
         t_range = value.get('t_range')
         t_resolution = value.get('t_resolution')
-        viz_type = value['viz_type']
+        viz_types = value['viz_types']
         request_id = value['request_id']
 
         # Check if data_request is needed
@@ -576,16 +577,17 @@ class DataVizServiceNamespace(BaseClientNamespace):
 
         cache_item = cache[filename]
 
-        if (not mz_range) and (viz_type not in cache_item):
-            # Request full-range images from FileIo directly to client
-            await self.emit_client_notification('data_request',
-                                                {'filename': filename,
-                                                 'data_type': viz_type,
-                                                 'request_id': request_id,
-                                                 },
-                                                client_room=client_room,
-                                                namespace=get_namespace(filename)
-                                                )
+        if not mz_range:
+            for viz_type in viz_types:
+                # Request full-range images from FileIo directly to client
+                await self.emit_client_notification('data_request',
+                                                    {'filename': filename,
+                                                    'data_type': viz_type,
+                                                    'request_id': request_id,
+                                                    },
+                                                    client_room=client_room,
+                                                    namespace=get_namespace(filename)
+                                                    )
             return
 
         data_request_needed = True
@@ -652,14 +654,15 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                                     namespace=get_namespace(filename)
                                                     )
         # Add a request, or add to existing request
-        viz_cache_put_or_update_request(filename,
-                                        viz_type,
-                                        t_range,
-                                        mz_range,
-                                        t_resolution,
-                                        client_room,
-                                        request_id
-                                        )
+        for viz_type in viz_types:
+            viz_cache_put_or_update_request(filename,
+                                            viz_type,
+                                            t_range,
+                                            mz_range,
+                                            t_resolution,
+                                            client_room,
+                                            request_id
+                                            )
         if not data_request_needed:
             # Process request
             viz_cache_process_requests(filename)

@@ -1,5 +1,5 @@
 import { mapState } from 'vuex'
-import { BECom, shallow_copy } from "../karsalib.js"
+import { shallow_copy } from "../karsalib.js"
 
 var fs = require('fs');
 var Plotly = require('plotly.js-dist');
@@ -10,7 +10,6 @@ export const viewPortMixin = {
     computed: {
         ...mapState([
                     'figure_data',
-                    'root_namespace',
                     'sample_annotations',
                     'target_to_display',
                     ]),
@@ -30,14 +29,26 @@ export const viewPortMixin = {
                 this.$store.commit('figure_ranges', value);
             },
         },
+        stop_visualize_range: {
+            get() {
+                return this.$store.state.stop_visualize_range;
+            },
+            set(value) {
+                this.$store.commit('stop_visualize_range', value);
+            },
+        },
+        visualize_range: {
+            get() {
+                return this.$store.state.visualize_range;
+            },
+            set(value) {
+                this.$store.commit('visualize_range', value);
+            },
+        },
     },
     data: function() {
         return {
             name: "ViewPort_" + this.id,
-            be: null,   //backend communicator
-            namespace: null,
-            room: null,
-            room_sid: null,
             
             filename: '',
 
@@ -58,13 +69,9 @@ export const viewPortMixin = {
             mz_precision: 4,
             
             zoom_stack: [],
-            
-            visualize_range: {},
-            stop_visualize_range: {},
         }
     },
     created: function(){
-        this.be = new BECom(this);
     },
     mounted: function() {
         this.init_figure();
@@ -222,7 +229,9 @@ export const viewPortMixin = {
                         self.beep();
                         self.log("Do we ever end up here?");
                     }
-                    let ranges = {'filename': self.filename};
+                    let ranges = {'filename': self.filename,
+                                  'id': Math.random().toString(36).substring(2),
+                                  };
                     
                     mz0 = (mz0 === undefined) ? prev_ranges.mz_range[0] : mz0;
                     mz1 = (mz1 === undefined) ? prev_ranges.mz_range[1] : mz1;
@@ -304,7 +313,7 @@ export const viewPortMixin = {
             let cache_item = self.figure_cache_get(zoom_stack_item_id);
             if (!cache_item) {
                 self.beep();
-                self.log('Received figure_data for non-existing zoom stack item!');
+                self.log('Received figure_data for non-existing zoom stack item!', self.figure_cache);
                 return;
             }
 
@@ -443,9 +452,7 @@ export const viewPortMixin = {
             this.update_figure(cur_ranges);
             // Request full range visualization from DataViz (ranges null)
             this.visualize_range = {'filename': this.filename,
-                                    'viz_type': this.id,
                                     'request_id': cur_ranges.id,
-                                    'room': this.room_sid,
                                     };
         },
 
@@ -513,7 +520,11 @@ export const viewPortMixin = {
                 zoom_stack_item = shallow_copy(zoom_stack_item);
             } else {
                 // Create new zoom_stack_item
-                zoom_stack_item = new self.ZoomStackItem([t0, t1], [mz0, mz1], volatile);
+                zoom_stack_item = new self.ZoomStackItem([t0, t1],
+                                                         [mz0, mz1],
+                                                         new_ranges.id,
+                                                         volatile
+                                                         );
             }
             // Add the zoom stack item at the top of the stack
             self.zoom_stack.push(
@@ -529,11 +540,9 @@ export const viewPortMixin = {
             if (mz_range_updated) {
                 // mz_range changed, request full t_range in the new mz_range
                 this.visualize_range = {'filename': this.filename,
-                                        'viz_type': this.id,
                                         'mz_range': cur_ranges.mz_range,
                                         't_range': cur_ranges.t_range,
                                         'request_id': cur_ranges.id,
-                                        'room': this.room_sid,
                                         };
                 return
             }
@@ -547,7 +556,6 @@ export const viewPortMixin = {
             //         this.visualize_range = {'mz_range': mz_range,
             //                                 't_range': t_range_to_fill, 
             //                                 'filename': this.filename,
-                                                // 'viz_type': this.id,
             //                                 };
             //         return
             //     }
@@ -556,7 +564,6 @@ export const viewPortMixin = {
             //         this.visualize_range = {'mz_range': mz_range,
             //                                 't_range': t_range_to_fill, 
             //                                 'filename': this.filename,
-                                            // 'viz_type': this.id,
             //                                 };
             //         return
             //     }
@@ -609,7 +616,6 @@ export const viewPortMixin = {
             //     self.visualize_range = {'t_range': [cur_t_filled[1], prev_t_filled[1]],
             //                             'mz_range': cur_mz,
             //                             'filename': self.filename,
-            //                             'viz_type': this.id,
             //                             };
             // }
 // TODO:
@@ -647,14 +653,6 @@ export const viewPortMixin = {
                 return self._on_figure_ranges(new_value, old_value); }
             );
         },
-        stop_visualize_range: function(new_value, old_value) {
-            let client_room = this.room_sid;
-            return this.be.export_one_way_binding_prop('stop_visualize_range',
-                                                        {...new_value, 'uid': Math.random()},
-                                                        old_value,
-                                                        client_room
-                                                        );
-        },
         target_to_display: function(new_value, old_value) {
             if ( _.isEqual(new_value, old_value) || _.isEmpty(this.filename) ) {
                 return false;
@@ -683,25 +681,6 @@ export const viewPortMixin = {
                 let zoom_stack_item = this.zoom_stack.slice(-1)[0]
                 let figure_cache_item = this.figure_cache_get(zoom_stack_item.id);
                 figure_cache_item.figure_traces.push(...target_traces);
-            }
-        },
-        visualize_range: function(new_value, old_value) {
-            let client_room = this.room_sid;
-            return this.be.export_one_way_binding_prop('visualize_range',
-                                                        {...new_value, 'uid': Math.random()},
-                                                        old_value,
-                                                        client_room
-                                                        );
-        },
-        'root_namespace.connected': function(new_value) {
-            if ( new_value === true )
-            {
-                this.namespace = this.root_namespace;
-                // handlers for external notifications:
-                // this.namespace.on("figure_ranges", (value) => this.be.import_one_way_binding_prop("figure_ranges", {...value.value, 'uid': Math.random()}));
-                // this.namespace.on("figure_data", (value) => this.be.import_one_way_binding_prop("figure_data", value));
-
-                this.room_sid = this.root_namespace.id;
             }
         },
     },
