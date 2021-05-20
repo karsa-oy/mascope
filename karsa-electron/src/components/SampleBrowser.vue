@@ -1,6 +1,83 @@
 <template>
     <div>
     <!-- Modals -->
+        <!-- Landing modal -->
+        <section class="landing-modal">
+            <b-modal :active.sync="is_landing_modal_active"
+                has-modal-card
+                trap-focus
+                :can-cancel="true"
+                :destroy-on-hide="false"
+                aria-role="dialog"
+                aria-modal>
+                <div class="columns">
+                    <div class="modal-card" style="width: auto">
+                        <header class="modal-card-head">
+                            <p class="modal-card-title">
+                                Select project and experiment
+                            </p>
+                        </header>
+                        <section class="modal-card-body">
+                            <b-field label="Project">
+                                <b-select
+                                    placeholder="Select a project"
+                                    v-model="sample_project"
+                                    required
+                                    expanded>
+                                    <option
+                                        v-for="p in projects"
+                                        :value="p.id"
+                                        :key="p.id">
+                                        {{ p.id }}
+                                    </option>
+                                </b-select>
+                            </b-field>
+
+                            <b-button
+                                expanded
+                                @click="LaunchNewProjectModal()">
+                                New Project
+                            </b-button>
+
+                            <div><br></div>
+
+                            <b-field label="Experiment">
+                                <b-select
+                                    placeholder="Select an experiment"
+                                    v-model="sample_experiment"
+                                    :disabled="!sample_project"
+                                    required
+                                    expanded>
+                                    <option
+                                        v-for="e in experiments_ui"
+                                        :value="e.id"
+                                        :key="e.id">
+                                        {{ e.id }}
+                                    </option>
+                                </b-select>
+                            </b-field>
+
+                            <b-button
+                                expanded
+                                @click="LaunchNewExperimentModal()"
+                                :disabled="!sample_project">
+                                New Experiment
+                            </b-button>
+
+                        </section>
+                        <footer class="modal-card-foot">
+                            <b-button
+                                @click="is_landing_modal_active=false"
+                                is-dark
+                                :disabled="!(sample_project.length && sample_experiment.length)">
+                                Proceed
+                            </b-button>
+                        </footer>
+                    </div>
+                </div>
+            </b-modal>
+        </section>     
+        <!-- End of landing modal -->
         <!--- New project modal--> 
         <section class="project-attribute-modal">
             <b-modal :active.sync="is_modal_new_project_active"
@@ -48,7 +125,7 @@
                             type="button"
                             @click="SetProject()"
                             is-dark>
-                            Proceed
+                            Create
                         </button>
                         <button
                             class="button"
@@ -64,7 +141,7 @@
         <!--- End of new project modal--> 
 
         <!--- New experiment modal--> 
-        <section class="sample-attribute-modal">
+        <section class="experiment-attribute-modal">
             <b-modal :active.sync="is_modal_new_experiment_active"
                 has-modal-card
                 trap-focus
@@ -81,7 +158,7 @@
                                 </p>
                             </header>
                             <section class="modal-card-body">
-                                <b-field label="Experiment title">
+                                <!-- <b-field label="Experiment title">
                                     <b-input type="input"
                                         v-model="experiment.title"
                                         :value="experiment.title"
@@ -90,15 +167,28 @@
                                         validation-message="Only numbers, letters and _ allowed in the title"
                                         :pattern="valid_pattern.toString().slice(1, -1)">
                                     </b-input>
-                                </b-field>
-                                <b-field label="Description">
+                                </b-field> -->
+                                <!-- <b-field label="Description">
                                     <b-input 
                                         v-model="experiment.description" 
                                         :value="experiment.description"
                                         maxlength="200" 
                                         type="textarea">
                                     </b-input>
-                                </b-field>
+                                </b-field> -->
+                                <MetaDataForm
+                                    form_title="Experiment attributes"
+                                    :default_template="experiment_attributes_default_template"
+                                    :editable="true"
+                                    :template_path="experiment_attributes_template_path">
+                                </MetaDataForm>
+                                <div><br></div>
+                                <MetaDataForm
+                                    form_title="Sample attribute template"
+                                    :default_template="sample_attributes_default_template"
+                                    :editable="true"
+                                    :template_path="sample_attributes_template_path">
+                                </MetaDataForm>
                             </section>
                         </div>
                     </div>
@@ -109,7 +199,7 @@
                             type="button" 
                             @click="SetExperiment" 
                             is-dark>
-                            Proceed
+                            Create
                         </button>
                         <button 
                             class="button" 
@@ -130,7 +220,7 @@
                 has-modal-card
                 trap-focus
                 :can-cancel="false"
-                :destroy-on-hide="false"
+                :destroy-on-hide="true"
                 aria-role="dialog"
                 aria-modal>
                 <div class="columns">
@@ -139,26 +229,13 @@
                             <p class="modal-card-title">{{ sample_file }}</p>
                         </header>
                         <section class="modal-card-body write_sample_attribute">                            
-                            <b-field label="Sample title">
-                                <b-input type="input"
-                                    v-model="sample_title"
-                                    :value="sample_title"
-                                    maxlength="50">
-                                </b-input>
-                            </b-field>
-
-                            <b-field label="Description">
-                                <b-input
-                                    v-model="sample_description"
-                                    :value="sample_description"
-                                    maxlength="200"
-                                    type="textarea">
-                                </b-input>
-                            </b-field>
                             
                             <MetaDataForm
+                                form_title="Sample attributes"
                                 :default_template="sample_attributes_default_template"
-                                :template_path="sample_attributes_template_path">
+                                :initial_template="sample_attributes_template"
+                                :template_path="sample_attributes_template_path"
+                                @metaDataUpdated="sample_attributes_fields=$event">
                             </MetaDataForm>
 
                             <div><br></div>
@@ -307,6 +384,8 @@
                                         <b-menu-item
                                             v-for="p in projects"
                                             :key="p.id"
+                                            :active.sync="p.active"
+                                            :expanded.sync="p.active"
                                             @click="project.title=p.id; SetProject()">
                                             <template #label>
                                                 {{p.id}}
@@ -319,6 +398,8 @@
                                                 <b-menu-item 
                                                     v-for="e in experiments_ui"
                                                     :key="e.id"
+                                                    :active.sync="e.active"
+                                                    :expanded.sync="e.active"
                                                     @click="experiment.title=e.id; SetExperiment()">
                                                     <template #label>
                                                         {{e.id}}
@@ -358,10 +439,7 @@
                                                                 </p>
                                                                 <b-button
                                                                     type="is-dark"
-                                                                    @click="sample_file=props.row.id;
-                                                                            sample_title=props.row.title;
-                                                                            sample_description=props.row.description;
-                                                                            is_sample_attribute_modal_active=true"
+                                                                    @click="LaunchSampleAttributeModal(props.row)"
                                                                     outlined
                                                                     size="is-small">
                                                                     Edit
@@ -512,6 +590,7 @@ export default {
             // Project / experiment title validation
             valid_pattern: RegExp(/^\w+$/),
             // Modal active variables
+            is_landing_modal_active: true,
             is_modal_new_project_active: false,
             is_modal_new_experiment_active: false,
             is_import_sample_modal_active: false,
@@ -534,6 +613,14 @@ export default {
                 description: ""
                 },
             // Experiment metadata
+            experiment_attributes_default_template: [
+                {'label': "Experiment title",
+                 'value': "",
+                 'required': true},
+                {'label': "Experiment description",
+                 'value': ""},
+            ],
+            experiment_attributes_template_path: "../metadata_templates/experiment_templates",
             experiments_ui: [],
             experiment: {
                 title: "",
@@ -551,21 +638,29 @@ export default {
             sample_table_cols: [],
             sample_table_checked_rows: [],
             sample_attributes: {},
-            sample_attributes_default_template: [],
+            sample_attributes_default_template: [
+                {'label': "Sample title",
+                 'value': "",
+                 'required': true},
+                {'label': "Sample description",
+                 'value': ""},
+            ],
+            sample_attributes_template: this.sample_attributes_default_template,
             sample_attributes_fields: [],
             sample_attributes_save_button_type: "is-success",
-            sample_attributes_template_path: "../metadata_templates",
+            sample_attributes_template_path: "../metadata_templates/sample_templates",
         }
     },
     created: function() {
-        // Initialize project_selected
-        this.project_selected = {'id': ""};
         this.be = new BECom(this);
 
     },
     mounted: function() {
     },
     methods: {
+        log: function(...args) {
+            console.log('[' + this.name + ']',  ...args);
+        },
         ImportSamples() {
             let to_import = this.import_sample_table_checked_rows[0];
             // Preserve sample id, title and description
@@ -582,6 +677,18 @@ export default {
             // Export sample attributes to link into current experiment
             this.sample_attributes = sample;
             this.is_import_sample_modal_active = false;
+        },
+        LaunchSampleAttributeModal(sample_table_row) {
+            this.sample_file = sample_table_row.id;
+            this.sample_title = sample_table_row.title;
+            this.sample_description = sample_table_row.description;
+            this.sample_attributes_template = [
+                {'label': "Sample title",
+                 'value': sample_table_row.title},
+                {'label': "Sample description",
+                 'value': sample_table_row.description},
+            ];
+            this.is_sample_attribute_modal_active = true;
         },
         LaunchSampleImport() {
             // Request list of samples from FileService
@@ -658,9 +765,12 @@ export default {
             for (let i in this.projects) {
                 if(this.projects[i].id === this.project.title){
                     this.project.description = this.projects[i].attributes.description;
-                    break;
+                    this.projects[i].active = true;
+                } else {
+                    this.projects[i].active = false;
                 }
             }
+            // Set project_selected
             this.project_selected = {'id': this.project.title,
                                      'attributes': {
                                         'title': this.project.title,
@@ -701,7 +811,9 @@ export default {
             for (let i in this.experiments_ui) {
                 if(this.experiments_ui[i].id === this.experiment.title){
                     this.experiment.description = this.experiments_ui[i].attributes.description;
-                    break;
+                    this.experiments_ui[i].active = true;
+                } else {
+                    this.experiments_ui[i].active = false;
                 }
             }
             this.experiment_selected = {'id': this.experiment.title,
@@ -744,6 +856,7 @@ export default {
         },
         experiments: function(new_value) {
             this.experiments_ui = new_value.experiments;
+            this.SetExperiment();
         },
         import_sample_table_datetime_range: function(new_value, old_value) {
             return this.be.export_one_way_binding_prop('import_sample_table_datetime_range',
@@ -799,6 +912,9 @@ export default {
             }
             this.sample_project = new_value.id;
         },
+        projects: function() {
+            this.SetProject();
+        },
         samples: function(new_data){
             this.sample_table_cols = new_data.cols;
             this.sample_table_rows = new_data.rows;
@@ -811,13 +927,16 @@ export default {
                                                        );
         },
         sample_attributes_fields: {
-            handler() {
+            handler(new_value) {
+                for (let i in new_value) {
+                    if (new_value[i].label == "Sample title") {
+                        this.sample_title = new_value[i].value;
+                        break;
+                    }
+                }
                 this.sample_attributes_save_button_type = "is-danger";
             },
             deep: true
-        },
-        sample_description: function() {
-            this.sample_attributes_save_button_type = "is-danger";
         },
         sample_experiment: function(new_value) {
             this.experiment.title = new_value;

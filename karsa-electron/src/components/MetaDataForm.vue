@@ -1,149 +1,87 @@
 <template>
     <div>
         <!-- Modals -->
-        <!--- Add field modal-->
-        <section class="add-field-modal">
-            <b-modal :active.sync="is_modal_add_field_active"
-                has-modal-card
-                trap-focus
-                :can-cancel="true"
-                aria-role="dialog"
-                aria-modal>
-                <div class="modal-card" style="width: 500px">
-                    <!-- Main content -->
-                    <div>
-                        <section class="modal-card-body">
-                            <b-field label="Field to add">
-                                <b-input
-                                    v-model="field_to_add"
-                                    required
-                                    expanded>
-                                </b-input>
-                            </b-field>
-                        </section>
-                    </div>
-                    <!-- Footer -->
-                    <footer class="modal-card-foot">
-                        <b-button
-                            type="is-primary"
-                            @click="addField()"
-                            :disabled="!field_to_add.length">
-                            Add
-                        </b-button>
-                        <b-button
-                            @click="is_modal_add_field_active=false">
-                            Cancel
-                        </b-button>
-                    </footer>
-                </div>
-            </b-modal>
-        </section>
-        <!--- End of remove field modal-->         <!--- Remove field modal-->
-        <section class="remove-field-modal">
-            <b-modal :active.sync="is_modal_remove_field_active"
-                has-modal-card
-                trap-focus
-                :can-cancel="true"
-                aria-role="dialog"
-                aria-modal>
-                <div class="modal-card" style="width: 500px">
-                    <!-- Main content -->
-                    <div>
-                        <section class="modal-card-body">
-                            <b-field label="Field to remove">
-                                <b-select
-                                    v-model="field_to_remove"
-                                    required
-                                    expanded>
-                                    <option
-                                        v-for="f in form_fields"
-                                        :value="f.label"
-                                        :key="f.label">
-                                        {{ f.label }}
-                                    </option>
-                                </b-select>
-                            </b-field>
-                        </section>
-                    </div>
-                    <!-- Footer -->
-                    <footer class="modal-card-foot">
-                        <b-button
-                            type="is-primary"
-                            @click="removeField()"
-                            :disabled="!field_to_remove.length">
-                            Remove
-                        </b-button>
-                        <b-button
-                            @click="is_modal_remove_field_active=false">
-                            Cancel
-                        </b-button>
-                    </footer>
-                </div>
-            </b-modal>
-        </section>
-        <!--- End of remove field modal--> 
         <!-- End of modals -->
 
         <!-- Main content -->
-        <div v-for="item in form_fields" :key="item.label">
-            <template>
-                <b-field :label="item.label">
-                    <b-input
-                        v-model="item.value"
-                        lazy>
-                    </b-input>
-                </b-field>
-            </template>
-        </div>
-        <div><br></div>
-        <section v-if="Boolean(template_path)">
-            <div class="columns">
-                <div class="column is-half" style="text-align:center">
-                    <div class="rows">
-                        <div class="row">
-                            <b-button
-                                @click="is_modal_add_field_active=true"
-                                is-dark>
-                                New field
-                            </b-button>
-                        </div>
-                        <div class="row">
-                            <b-button
-                                @click="is_modal_remove_field_active=true"
-                                :disabled="!form_fields.length"
-                                is-dark>
-                                Remove field
-                            </b-button>
-                        </div>
-                    </div>
-                </div>
-                <div class="column is-half" style="text-align:center">
-                    <div class="rows">
-                        <div class="row">
-                            <b-select
-                                v-model="loaded_template"
-                                placeholder="Load template"
-                                is-dark>
-                                <option
-                                    v-for="t in available_templates"
-                                    :value="t.template"
-                                    :key="t.name">
-                                    {{ t.name }}
-                                </option>
-                            </b-select>
-                        </div>
-                        <div class="row">
-                            <b-button
-                                @click="saveTemplate()"
-                                :disabled="!form_fields.length"
-                                is-dark>
-                                Save template
-                            </b-button>
-                        </div>
-                    </div>
-                </div>
+        <div class="box">
+            <h1 style="font-size:16px; text-align:center;">
+                <p><b>{{ form_title }}</b></p>
+            </h1>
+            <div><br></div>
+            <div
+                v-for="item in form_fields" :key="item.label">
+                <template>
+                        <b-field :label="item.label">
+                            <b-input
+                                v-model="item.value"
+                                placeholder="default value"
+                                lazy
+                                expanded>
+                            </b-input>
+                            <div v-if="editable">
+                                <b-button
+                                    :id="item.label"
+                                    :disabled="item.required"
+                                    @click="removeField($event)"
+                                    type="is-danger"
+                                    icon-right="delete">
+                                </b-button>
+                            </div>
+                        </b-field>
+                        <!-- <div><br></div> -->
+                </template>
             </div>
-        </section>
+            <div v-if="editable">
+                <b-field label="New field">
+                    <b-button
+                        @click="addField()"
+                        expanded>
+                        <b>+</b>
+                    </b-button>
+                </b-field>
+            </div>
+            <div><br></div>
+            <b-field label="Reuse template" v-if="Boolean(template_path)">
+                <div class="columns">
+                    <div class="column is-half" style="text-align:center">
+                        <b-select
+                            v-model="loaded_template"
+                            placeholder="Load template"
+                            expanded>
+                            <option
+                                v-for="t in available_templates"
+                                :value="t"
+                                :key="t.name">
+                                {{ t.name }}
+                            </option>
+                        </b-select>
+                    </div>
+                    <div
+                        class="column is-one-seventh"
+                        style="text-align:left"
+                        v-if="editable">
+                        <b-button
+                            :disabled="!loaded_template || loaded_template.name=='default template'"
+                            @click="deleteTemplate()"
+                            type="is-danger"
+                            icon-right="delete">
+                        </b-button>
+                    </div>
+                    <div
+                        class="column is-one-third"
+                        style="text-align:center"
+                        v-if="editable">
+                        <b-button
+                            @click="saveTemplate()"
+                            :disabled="!form_fields.length"
+                            expanded>
+                            Save template
+                        </b-button>
+                    </div>
+                </div>
+            </b-field>
+        </div>
         <!-- End of main content -->
     </div>
 </template>
@@ -162,61 +100,76 @@ export default {
 
     props: {
         default_template: Array,
+        editable: Boolean,
+        form_title: String,
+        initial_template: Array,
         template_path: String,
     },
 
     data() {
         return {
-            available_templates: [
+            always_available_templates: [
                 {
-                    'name': "default",
+                    'name': "default template",
                     'template': this.default_template || []
                 },
-                {
-                    'name': "empty",
-                    'template': {}
-                },
             ],
-            field_to_add: "",
-            field_to_remove: "",
+            available_templates: this.always_available_templates,
             form_fields: [],
-            form_title: "MetaDataForm",
             loaded_template: null,
-
-            is_modal_add_field_active: false,
-            is_modal_remove_field_active: false,
         }
     },
     created() {
         if (this.template_path) {
             this.findTemplates();
         }
-        this.form_fields = this.default_template;
+        if (this.initial_template) {
+            this.loaded_template = {'name': null,
+                                    'template': this.initial_template
+                                    };
+        } else {
+            this.loaded_template = {'name': "default template",
+                                    'template': this.default_template
+                                    };
+        }
     },
     methods: {
         addField() {
-            this.form_fields.push({'label': this.field_to_add,
-                                   'value': ""
-                                   });
-            this.is_modal_add_field_active = false;
-            this.field_to_add = "";
-            this.loaded_template = null;
+            this.$buefy.dialog.prompt({
+                message: "Add field to template",
+                confirmText: 'Add',
+                inputAttrs: {
+                    placeholder: 'field label',
+                    maxlength: 100,
+                },
+                trapFocus: true,
+                onConfirm: (field_to_add) => {
+                    this.form_fields.push({'label': field_to_add,
+                                           'value': ""
+                                           });
+                    this.loaded_template = null;
+                }
+            })
+            
         },
         convertToValidFilename(string) {
             return (string.replace(/[/|\\:*?"<>]/g, "_"));
         },
-        removeField() {
-            for (let i=0; i < this.form_fields.length; ++i) {
-                if (_.isEqual(this.field_to_remove, this.form_fields[i].label)) {
-                    this.form_fields.splice(i, 1);
-                    break;
-                }
-            }
-            this.is_modal_remove_field_active = false;
-            this.loaded_template = null;
+        deleteTemplate() {
+            this.$buefy.dialog.confirm({
+                    title: 'Deleting template',
+                    message: 'Are you sure you want to delete template <b>' + this.loaded_template.name + "</b>?",
+                    confirmText: 'Delete',
+                    onConfirm: () => {
+                        fs.unlinkSync(this.loaded_template.path);
+                        this.loaded_template = null;
+                        this.findTemplates();
+                        }
+                })
         },
         findTemplates() {
             var self = this;
+            self.available_templates = shallow_copy(this.always_available_templates);
             // Read templates from disk
             fs.readdir(this.template_path, function (err, files) {
                 if (err) {
@@ -231,34 +184,67 @@ export default {
                         if (_.isEqual(file_ext, '.json')) {
                             // console.log("file: ", file_path, stat);
                             let template = JSON.parse(fs.readFileSync(file_path, 'utf8'));
+                            template.path = file_path;
                             self.available_templates.push(template);
                         }
                     }
                 });
             });
         },
+        removeField(event) {
+            // Field to remove label is in button element id, find it from the event data
+            let field_to_remove = "";
+            for (let i in event.path) {
+                field_to_remove = event.path[i].id;
+                if (field_to_remove)
+                    break;
+            }
+            if (!field_to_remove) {
+                // Failed to find the button id
+                console.log("field_to_remove not found at event.path[1].id: ", event);
+                return
+            }
+            for (let i=0; i < this.form_fields.length; ++i) {
+                if (_.isEqual(field_to_remove, this.form_fields[i].label)) {
+                    this.form_fields.splice(i, 1);
+                    break;
+                }
+            }
+            this.loaded_template = null;
+        },
         saveTemplate() {
             this.$buefy.dialog.prompt({
                 message: "Template name",
+                confirmText: 'Save',
                 inputAttrs: {
                     placeholder: 'template name',
-                    maxlength: 100
+                    maxlength: 100,
                 },
                 trapFocus: true,
                 onConfirm: (template_name) => this.writeTemplate(template_name)
             })
         },
         writeTemplate(template_name) {
+            let filename = this.convertToValidFilename(template_name) + ".json";
+            let template_path = path.join(this.template_path, filename);
+            if (fs.existsSync(template_path)) {
+                this.$buefy.dialog.alert({
+                    title: 'Failed to save template',
+                    message: 'Template with given name exists already. Please choose a different name',
+                    type: 'is-danger',
+                })
+                return
+            }
             let template_data = {
                         name: template_name,
                         template: this.form_fields
                         }
             let template_json = JSON.stringify(template_data, null, 4);
-            let filename = this.convertToValidFilename(template_name) + ".json";
-            let template_path = path.join("templates", filename);
             fs.writeFileSync(template_path, template_json);
             // Add to list of available templates
             this.available_templates.push(template_data);
+            // Set as loaded
+            this.loaded_template = template_data;
         }
     },
     watch: {
@@ -271,7 +257,7 @@ export default {
         loaded_template: function(new_value) {
             if (new_value) {
                 // Make a copy to avoid mutating the loaded template directly
-                this.form_fields = shallow_copy(new_value);
+                this.form_fields = shallow_copy(new_value.template);
             }
         },
     },
