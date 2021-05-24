@@ -539,16 +539,17 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                                  )
             # Put to file cache
             cache[filename].update({viz_type: viz_array})
-            # Request full-size visualization from DataViz
-            await self.parent.emit_public_notification(
-                    'visualize_range',
-                    {'filename': filename,
-                     'mz_range': data['value']['mz_range'],
-                     't_range': data['value']['t_range'],
-                     'viz_type': viz_type
-                     },
-                    client_room=self.parent.public_ns.room_sid,
-                    )
+        # Request full-size visualization from DataViz
+        await self.parent.emit_public_notification(
+                'visualize_range',
+                {'filename': filename,
+                 'mz_range': data['value']['mz_range'],
+                 't_range': data['value']['t_range'],
+                 'viz_types': list(VIZ_TYPES_SUPPORTED),
+                 'request_id': self.parent.public_ns.room_sid,
+                 },
+                client_room=self.parent.public_ns.room_sid,
+                )
 
     async def on_acquisition_coordinates(self, data):
         """Initialize acquisition cache with received coordinates
@@ -696,7 +697,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         # Cancel DataViz request
         await self.parent.emit_public_notification(
                         'stop_visualize_range',
-                        {'client_rooms': [self.room_sid],
+                        {'request_ids': [self.room_sid],
                          'filename': filename_base,
                          }
                         )
