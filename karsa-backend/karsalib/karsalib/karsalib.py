@@ -101,7 +101,7 @@ class Logger():
 
 
 class QConnect(Thread):
-    OUT_Q_LIMIT = 2*cpu_count()
+    OUT_Q_LIMIT = cpu_count()
     CACHE_LIMIT = 1000000   # TODO: number?
 
     def __init__(self, in_q, out_q, shutdown_event):
@@ -147,47 +147,84 @@ class CacheQueueConnector(QConnect):
     def __init__(self, cache_key, *arg, **kwarg):
         super().__init__(*arg, **kwarg)
         self.cache = dict()
-        self.cache_key = cache_key
-        self.cache_index = -1
+        self.cache_key_separator = kwarg.get('cache_key_separator', '/')
+        self.cache_key = cache_key.split(self.cache_key_separator)
+        self.cache_index = len(self.cache_key) * [0]
+        self.cache_index[0] = -1
         self.lock = Lock()
 
     def cache_put(self, data):
-        key = data.get(self.cache_key)
-        if not key:
-            raise ValueError(f"Invalid input for {self.__class__.__name__} : {data}")
+        keys = []
+        for k in self.cache_key:
+            keys.append(data.get(k, 'default'))
+        cache_depth = len(keys) - 1
+        cache_level = self.cache
         with self.lock:
-            if key not in self.cache:
-                self.cache[key] = []
-            self.cache[key].insert(0, data)
+            for i, k in enumerate(keys):
+                if k not in cache_level:
+                    cache_level[k] = [] if i == cache_depth else {}
+                cache_level = cache_level[k]
+            cache_level.insert(0, data)
 
-    def _get_next_cache_key(self):
-        keys = list(self.cache.keys())
-        if not keys:
-            self.cache_index = -1
-            return None
-        self.cache_index = (self.cache_index + 1) % len(keys)
-        key = keys[self.cache_index]
-        return key
+    def _inc_cache_level_index(self, dic, index):
+        step = min(len(dic), index + 1)
+        next_index = step % len(dic)
+        index_shift = step // len(dic)
+        return next_index, index_shift
+
+    def _inc_cache_index(self):
+        cache_level = self.cache
+        for i in range(len(self.cache_index)):
+            self.cache_index[i], shift = self._inc_cache_level_index(cache_level, self.cache_index[i])
+            if not shift:
+                break
+            next_key = list(cache_level.keys())[self.cache_index[i]]
+            cache_level = cache_level[next_key]
 
     def cache_get(self):
-        with self.lock:
-            key = self._get_next_cache_key()
-            if not key:
-                return None
-            data = self.cache[key].pop()
-            if not self.cache[key]:
-                del self.cache[key]
-            return data
+        self.lock.acquire()
+        cache_level_keys = []
+        cache_level_dics = []
+        cache_level = self.cache
+        cache_level_dics.append(cache_level)
+        try:
+            self._inc_cache_index()
+        except:
+            self.lock.release()
+            return None
+        for i in self.cache_index:
+            try:
+                key = list(cache_level.keys())[i]
+            except IndexError:
+                self.lock.release()
+                return self.cache_get()
+            cache_level = cache_level[key]
+            cache_level_dics.append(cache_level)
+            cache_level_keys.append(key)
+        data = cache_level.pop()
+        if not cache_level:             # no more data in this cache element - clean up
+            for d, k in reversed(list(zip(cache_level_dics, cache_level_keys))):
+                if not d[k]:
+                    del d[k]
+        self.lock.release()
+        return data
 
     def cache_delete_key(self, key):
         with self.lock:
-            if key in self.cache.keys():
-                del self.cache[key]
-                self.cache_index = min(self.cache_index, len(self.cache.keys()) - 1)
+            level_keys = key.split(self.cache_key_separator)
+            cache_level = self.cache
+            key_to_delete = level_keys.pop(0)
+            while level_keys:
+                cache_level = cache_level[key_to_delete]
+                key_to_delete = level_keys.pop(0)
+            if key_to_delete in cache_level:
+                del cache_level[key_to_delete]
 
-    def cache_size(self):
-        return sum([len(v) for v in self.cache.values()])
-
+    def cache_size(self, cache_level=None):
+        cache_level = cache_level or self.cache
+        if isinstance(cache_level, list):
+            return len(cache_level)
+        return sum([self.cache_size(v) for v in cache_level.values()])
 
 
 class BaseClientNamespace(AsyncClientNamespace):

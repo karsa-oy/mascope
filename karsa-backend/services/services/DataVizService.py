@@ -50,8 +50,7 @@ client = None
 # Cache for data arrays
 cache = {}
 
-generator_request_q = None
-generator_output_q = None
+generator_input_q = None
 shutdown_event = None
 generator_input_cache = None
 
@@ -135,7 +134,8 @@ def viz_cache_get(table,
                 )
     return cur
 
-def viz_cache_process_requests(filename):
+
+async def viz_cache_process_requests(filename):
     global REQUEST_PROCESSORS
 
     # Get all pending requests for filename
@@ -157,7 +157,7 @@ def viz_cache_process_requests(filename):
         viz_type, t0, t1, mz0, mz1, t_resolution, client_room, request_id = row
 
         # Select processing method based on 'data_type' and process request
-        processed_until = REQUEST_PROCESSORS[viz_type](
+        processed_until = await REQUEST_PROCESSORS[viz_type](
                                     filename=filename,
                                     viz_type=viz_type,
                                     t0=t0,
@@ -169,12 +169,15 @@ def viz_cache_process_requests(filename):
                                     request_id=request_id,
                                     )
 
-        if not processed_until:
-            # Nothing was processed
+        if processed_until is False:
+            # print("Request holds:", client_room, [t0, t1])
             continue
-        
-        if processed_until < t1:
-            print("Update request t0")
+
+        if processed_until == t0:
+            # print("Request holds:", client_room, [t0, t1])
+            continue
+        elif processed_until < t1:
+            print("Update request:", client_room, [processed_until, t1])
             # Only part of request served, update request start time
             t0_new = processed_until
             viz_cache_update('requests',
@@ -189,7 +192,7 @@ def viz_cache_process_requests(filename):
                             request_id,
                             )
         else:
-            print("Release request")
+            print("Release request:", client_room, [t0, t1])
             # Request served fully, release from cache
             viz_cache_release('requests',
                               request_id=request_id,
@@ -391,7 +394,7 @@ def viz_cache_update(table,
                 )
     con.commit()
 
-def process_visualization_request(filename,
+async def process_visualization_request(filename,
                                   viz_type,
                                   t0,
                                   t1,
@@ -429,7 +432,7 @@ def process_visualization_request(filename,
         or False if no (enough) data was available.
     """
 
-    def feed_signal_to_visualize(t_range_to_process):
+    async def feed_signal_to_visualize(t_range_to_process):
         nonlocal cache_item
         try:
             signal_slice = cache_item.signal.sel(time=slice(*t_range_to_process),
@@ -451,7 +454,7 @@ def process_visualization_request(filename,
         no_batches = int( np.ceil(no_spectra / BATCH_SIZE) )
 
         if no_spectra < BATCH_SIZE:
-            return False
+            return processed_until
 
         if t_resolution:
             # TODO: resample
@@ -486,7 +489,7 @@ def process_visualization_request(filename,
             t1_i = float( spec_array.time[-1] ) + float( period_array[-1] )
 
             # Put batch to queue to be visualized
-            generator_request_q.put({
+            generator_input_q.put({
                             'data': spec_array,
                             'filename': filename,
                             'viz_type': viz_type,
@@ -501,17 +504,16 @@ def process_visualization_request(filename,
 
             processed_until = t1_i
             # print("took %.2f sec" %(time()-t0))
-        return processed_until
 
+            await asyncio.sleep(.01)
+
+        return processed_until
 
     cache_item = cache.get(filename)
     if not cache_item:
         print("No such cache item: %s" %filename)
-
-    processed_until = feed_signal_to_visualize([t0, t1])
-
+    processed_until = await feed_signal_to_visualize([t0, t1])
     return processed_until
-    
 
 
 REQUEST_PROCESSORS = {'spectrogram': process_visualization_request,
@@ -665,7 +667,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                             )
         if not data_request_needed:
             # Process request
-            viz_cache_process_requests(filename)
+            await viz_cache_process_requests(filename)
 
 
     async def on_stop_visualize_range(self, data):
@@ -782,7 +784,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                            [mz, ti]
                                            )
             
-            viz_cache_process_requests(filename_base)
+            await viz_cache_process_requests(filename_base)
 
 
         data_type = data['value']['data_type']
@@ -849,27 +851,26 @@ class DataVizServiceNamespace(BaseClientNamespace):
 
 class DataVizServiceClient(BaseServiceClient):
     async def init_service(self):
-        global generator_request_q
+        global generator_input_q
         global shutdown_event
         global generator_input_cache
-        global generator_output_q
 
-        generator_request_q = Queue()
-        generator_input_q =  Queue()
+        generator_input_q = Queue()
+        self.generator_input_q =  Queue()
         shutdown_event = Event()
-        generator_input_cache = CacheQueueConnector('client_room',
-                                                    generator_request_q,
+        generator_input_cache = CacheQueueConnector('request_id/viz_type',
                                                     generator_input_q,
+                                                    self.generator_input_q,
                                                     shutdown_event
                                                     )
-        generator_output_q = Queue()
+        self.generator_output_q = Queue()
         self.generator_procs = []
 
         n_jobs = cpu_count()
         for i in range(n_jobs):
             self.log("ImageGenerator %s/%s" %(i+1, n_jobs))
-            gen_proc = ImageGenerator(generator_input_q,
-                                      generator_output_q,
+            gen_proc = ImageGenerator(self.generator_input_q,
+                                      self.generator_output_q,
                                       shutdown_event
                                       )
             gen_proc.start()
@@ -884,7 +885,7 @@ class DataVizServiceClient(BaseServiceClient):
         while True:
             # Check queues for new images
             try:
-                img_data = generator_output_q.get_nowait()
+                img_data = self.generator_output_q.get_nowait()
             except Empty:
                 await self.sio.sleep(.1)
                 continue

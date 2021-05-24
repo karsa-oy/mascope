@@ -12,6 +12,7 @@ Created on Thu May  7 12:43:13 2020
 """
 
 import os
+import time
 import subprocess
 import asyncio
 import fnmatch
@@ -131,7 +132,8 @@ def cache_get(table,
                 )
     return cur
 
-def cache_process_requests(filename):
+
+async def cache_process_requests(filename):
     global REQUEST_PROCESSORS
 
     # Get all pending requests for filename
@@ -153,7 +155,7 @@ def cache_process_requests(filename):
         data_type, t0, t1, mz0, mz1, t_resolution, client_room, request_id = row
 
         # Select processing method based on data_type and process request
-        processed_t_range = REQUEST_PROCESSORS[data_type](
+        processed_t_range = await REQUEST_PROCESSORS[data_type](
                                     filename=filename,
                                     data_type=data_type,
                                     t0=t0,
@@ -342,7 +344,7 @@ def cache_update(table,
                 )
     con.commit()
 
-def process_signal_request(filename,
+async def process_signal_request(filename,
                            data_type,
                            t0,
                            t1,
@@ -391,10 +393,11 @@ def process_signal_request(filename,
             data_item.update({'mz': mz.astype(np.float32).tobytes()
                               })
         data_q.put(data_item)
+        await asyncio.sleep(.01)
     processed_t_range = (signal_slice.time[0], ti+period)
     return processed_t_range
 
-def process_image_request(filename,
+async def process_image_request(filename,
                           data_type,
                           t0,
                           t1,
@@ -457,7 +460,7 @@ def process_image_request(filename,
                 continue
         data_q.put(img_data)
         processed_t_range = (img_slice.time[0], t1_i)
-
+        await asyncio.sleep(.01)
     return processed_t_range
 
 
@@ -647,9 +650,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                                   [ti],
                                   'time'
                                   )
-        
-        cache_process_requests(filename_base)
-
+        await cache_process_requests(filename_base)
         return data['value']['i']
 
     async def on_acquired_tps_data(self, data):
@@ -800,7 +801,8 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                   request_id,
                   )
         # Process request(s)
-        cache_process_requests(filename)
+        await cache_process_requests(filename)
+
 
     async def on_figure_data(self, data):
         # self.log(data)
@@ -1025,7 +1027,7 @@ class FileIoClient(BridgeServiceClient):
         data_q = Queue()
         self.data_q = Queue()
         shutdown_event = Event()
-        service_input_cache = CacheQueueConnector('client_room',
+        service_input_cache = CacheQueueConnector('request_id/data_type',
                                                 data_q,
                                                 self.data_q,
                                                 shutdown_event
