@@ -509,9 +509,9 @@ async def process_visualization_request(filename,
 
         return processed_until
 
-    cache_item = cache.get(filename)
+    cache_item = cache.get(request_id)
     if not cache_item:
-        print("No such cache item: %s" %filename)
+        print("No such cache item: %s" %request_id)
     processed_until = await feed_signal_to_visualize([t0, t1])
     return processed_until
 
@@ -573,11 +573,11 @@ class DataVizServiceNamespace(BaseClientNamespace):
         request_id = value['request_id']
 
         # Check if data_request is needed
-        if filename not in cache:
+        if request_id not in cache:
             # File not in cache, add
-            cache[filename] = AttrDict({})
+            cache[request_id] = AttrDict({})
 
-        cache_item = cache[filename]
+        cache_item = cache[request_id]
 
         if not mz_range:
             for viz_type in viz_types:
@@ -600,7 +600,8 @@ class DataVizServiceNamespace(BaseClientNamespace):
             # Request signal coordinates
             self.log("Request coordinates")
             await self.emit_client_notification('coordinate_request',
-                                                {'filename': filename,
+                                                {'request_id': request_id,
+                                                 'filename': filename,
                                                  'data_type': 'signal',
                                                  'dims': ['mz'],
                                                  },
@@ -679,6 +680,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                value: JSON data from UI,
                       keys: 'request_ids', list of request ids to release
         """
+        global cache
         value = data['value']
         filename = value['filename']
         request_ids = value['request_ids']
@@ -689,6 +691,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                               request_id=request_id,
                               )
             generator_input_cache.cache_delete_key(request_id)
+            cache.pop(request_id)
         await self.emit_client_notification('stop_data_request',
                                             data['value'],
                                             **{**get_client_notification_args(data),
@@ -705,6 +708,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
 
             value = data['value']
             
+            request_id = value['request_id']
             filename = value['filename']
             data_type = value['data_type']
             coordinates = value['coordinates']
@@ -728,7 +732,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                     name='_'.join([data_type, 'period'])
                                     )
             # Put to data cache
-            cache[filename].update({data_array.name: data_array,
+            cache[request_id].update({data_array.name: data_array,
                                     period_array.name: period_array,
                                     })
 
@@ -744,6 +748,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
 
             value = data['value']
             # i = value.get('i')
+            request_id = value['request_id']
             filename_base = value['filename']
 
             ti = np.array( [value['t']], dtype=np.float32 )
@@ -753,8 +758,8 @@ class DataVizServiceNamespace(BaseClientNamespace):
             spec = spec.reshape(-1, 1)
 
             # Get data arrays from cache
-            signal_array = cache[filename_base]['signal']
-            period_array = cache[filename_base]['signal_period']
+            signal_array = cache[request_id]['signal']
+            period_array = cache[request_id]['signal_period']
 
             if 'mz' in value:
                 # mz coordinates provided with data (Orbitrap)

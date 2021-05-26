@@ -728,6 +728,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         global cache
 
         value = data['value']
+        request_id = value['request_id']
         client_room = data.get('client_room') or data['cookies']['src_sid'][0]
 
         filename = value['filename']
@@ -743,7 +744,8 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         data_item = file_cache_item[data_type]
 
         coordinates = {}
-        coordinate_data = {'filename': filename,
+        coordinate_data = {'request_id': request_id,
+                           'filename': filename,
                            'data_type': data_type,
                            'coordinates': coordinates,
                            }
