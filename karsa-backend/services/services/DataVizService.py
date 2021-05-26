@@ -135,26 +135,27 @@ def viz_cache_get(table,
     return cur
 
 
-async def viz_cache_process_requests(filename):
+async def viz_cache_process_requests(request_id):
     global REQUEST_PROCESSORS
 
     # Get all pending requests for filename
+    # TODO: Pop here instead of get
     request_data_rows = viz_cache_get(
                             'requests',
                             '''
+                            filename,
                             viz_type,
                             t0, t1,
                             mz0, mz1,
                             t_resolution,
-                            client_room,
-                            request_id
+                            client_room
                             ''',
-                            filename,
+                            request_id=request_id,
                             )
     # Loop through db entries
     for row in request_data_rows:
         # print("[viz_cache_process_requests]: processing row: %s" %str(row))
-        viz_type, t0, t1, mz0, mz1, t_resolution, client_room, request_id = row
+        filename, viz_type, t0, t1, mz0, mz1, t_resolution, client_room = row
 
         # Select processing method based on 'data_type' and process request
         processed_until = await REQUEST_PROCESSORS[viz_type](
@@ -170,11 +171,13 @@ async def viz_cache_process_requests(filename):
                                     )
 
         if processed_until is False:
-            # print("Request holds:", client_room, [t0, t1])
+            # Some error
+            # TODO: Put row back to db in here
             continue
 
         if processed_until == t0:
             # print("Request holds:", client_room, [t0, t1])
+            # TODO: Put row back to db in here
             continue
         elif processed_until < t1:
             print("Update request:", client_room, [processed_until, t1])
@@ -444,11 +447,12 @@ async def process_visualization_request(filename,
             print("[feed_signal_to_visualize]: Signal not in cache: %s" %filename)
             return False
 
+        processed_until = t_range_to_process[0]
+
         if 0 in signal_slice.shape:
             print("empty slice")
-            return False
-
-        processed_until = t_range_to_process[0]
+            return processed_until
+            
         BATCH_SIZE = 10 # Number of spectra to process at once (TODO: make parameter)
         no_spectra = signal_slice.shape[1]
         no_batches = int( np.ceil(no_spectra / BATCH_SIZE) )
@@ -668,7 +672,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                             )
         if not data_request_needed:
             # Process request
-            await viz_cache_process_requests(filename)
+            await viz_cache_process_requests(request_id)
 
 
     async def on_stop_visualize_range(self, data):
@@ -691,7 +695,10 @@ class DataVizServiceNamespace(BaseClientNamespace):
                               request_id=request_id,
                               )
             generator_input_cache.cache_delete_key(request_id)
-            cache.pop(request_id)
+            try:
+                cache.pop(request_id)
+            except KeyError:
+                pass
         await self.emit_client_notification('stop_data_request',
                                             data['value'],
                                             **{**get_client_notification_args(data),
@@ -788,8 +795,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                 signal_array.combine_first(spec,
                                            [mz, ti]
                                            )
-            
-            await viz_cache_process_requests(filename_base)
+            await viz_cache_process_requests(request_id)
 
 
         data_type = data['value']['data_type']
