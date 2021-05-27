@@ -1,4 +1,5 @@
 import sys
+import time
 import getopt
 import asyncio
 import inspect
@@ -124,22 +125,25 @@ class QConnect(Thread):
         while not self.shutdown_event.is_set():
             data = None
             try:
-                data = self.in_q.get(True, .1)
+                data = self.in_q.get_nowait()
                 # print('in_q.get', data['client_room'])
             except Empty:
-                data = None
+                pass
+            except KeyboardInterrupt:
+                break
             if data:
                 try:
                     self.cache_put(data)
                 except Full as e:
                     print("Cache overflow -- skipping input!")
-                    continue
             if self.out_q.qsize() >= self.OUT_Q_LIMIT:
+                time.sleep(.1)
                 continue
             data = self.cache_get()
             if data:
                 self.out_q.put(data)
                 # print('out_q.put', data['client_room'])
+        self.cache = None
         print(f"Exit from {self.__class__.__name__} thread")
 
 

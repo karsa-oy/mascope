@@ -826,6 +826,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         request_ids = value['request_ids']
         for request_id in request_ids:
             cache_release('requests', request_id=request_id)
+            print('DDDD cache_delete_key', request_id, request_id in service_input_cache.cache)
             service_input_cache.cache_delete_key(request_id)
 
 
@@ -1029,7 +1030,7 @@ class FileIoClient(BridgeServiceClient):
         data_q = Queue()
         self.data_q = Queue()
         shutdown_event = Event()
-        service_input_cache = CacheQueueConnector('request_id/data_type',
+        service_input_cache = CacheQueueConnector('request_id/data_type/viz_type',
                                                 data_q,
                                                 self.data_q,
                                                 shutdown_event
@@ -1037,37 +1038,44 @@ class FileIoClient(BridgeServiceClient):
 
 
     async def service_main(self):
-        # start input cache thread
-        service_input_cache.start()
+        MAX_RESPONSE_TIME = 15          # seconds to wait for the client response, then drop
+        service_input_cache.start()     # start input cache thread
 
-        def data_sent():
-            self.public_ns.ready_for_next = True
+        def public_ns_data_count(cnt):
+            # the callback is triggered in the notification namespace
+            self.public_ns.cnt = max(cnt, self.public_ns.cnt)
+            self.public_ns.cnt_timestamp = time.time()
 
-        self.public_ns.data_sent = data_sent
-        self.public_ns.ready_for_next = True
+        self.public_ns.public_ns_data_count = public_ns_data_count
+        self.public_ns.cnt = 0
+        self.public_ns.cnt_timestamp = time.time()
+        cnt = 0
 
         while True:
             # Check queue for signal to emit (put in cache_process_requests)
             try:
-                if not self.public_ns.ready_for_next:
-                    raise Empty
                 data = self.data_q.get_nowait()
-                # self.public_ns.ready_for_next = False
+                while cnt - self.public_ns.cnt > 4:
+                    if time.time() - self.public_ns.cnt_timestamp > MAX_RESPONSE_TIME:
+                        # skip frozen packages, if no response in due time
+                        public_ns_data_count(cnt)
+                        raise Empty
+                    await self.sio.sleep(.1)
             except Empty:
                 await self.sio.sleep(.1)
                 continue
-            # Emit
+            except KeyboardInterrupt:
+                break
             client_room = data.pop('client_room')
-            # self.log("Emitting t=%s to: " %signal_data['t'], client_room)
+            cnt += 1
             await self.emit_public_notification(
                             'loaded_data',
                             data,
                             room=client_room,
-                            # callback='data_sent'
+                            callback='public_ns_data_count',
+                            cnt=cnt
                             )
             # End of main loop
-        # Exit
-        # Kill service_input_cache thread
         shutdown_event.set()
         await self.sio.disconnect()
 

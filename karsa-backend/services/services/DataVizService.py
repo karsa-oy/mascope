@@ -135,25 +135,98 @@ def viz_cache_get(table,
     return cur
 
 
+def viz_cache_pop(table,
+                  fields,
+                  filename=None,
+                  viz_type=None,
+                  t_range=None,
+                  mz_range=None,
+                  t_resolution=None,
+                  client_room=None,
+                  request_id=None,
+                  ):
+    global con
+    cur = con.cursor()
+    args = []
+    query = ''
+    join_str = ''
+
+    if filename:
+        args.append(filename)
+        query = join_str.join([query, 'filename = ?'])
+        join_str = ' AND '
+
+    if viz_type:
+        args.append(viz_type)
+        query = join_str.join([query, 'viz_type = ?'])
+        join_str = ' AND '
+
+    # if t_range:
+    #     args.extend(t_range)
+    #     query = join_str.join([query, 't0 >= ? AND t1 <= ?'])
+    #     join_str = ' AND '
+
+    if t_range:
+        # args.extend(t_range)
+        if t_range[0]:
+            args.append(t_range[0])
+            query = join_str.join([query, 't0 >= ?'])
+            join_str = ' AND '
+        if t_range[1]:
+            args.append(t_range[1])
+            query = join_str.join([query, 't1 <= ?'])
+            join_str = ' AND '
+
+    if mz_range:
+        args.extend(mz_range)
+        query = join_str.join([query, 'mz0 = ? AND mz1 = ?'])
+        join_str = ' AND '
+
+    if t_resolution:
+        args.append(t_resolution)
+        query = join_str.join([query, 't_resolution = ?'])
+        join_str = ' AND '
+
+    if client_room:
+        args.append(client_room)
+        query = join_str.join([query, 'client_room = ?'])
+        join_str = ' AND '
+
+    if request_id:
+        args.append(request_id)
+        query = join_str.join([query, 'request_id = ?'])
+        join_str = ' AND '
+
+    cur.execute('''SELECT rowid, {} FROM {} WHERE {}
+                '''.format(fields, table, query),
+                args
+                )
+
+    data = []
+    for id, *d in cur.fetchall():
+        data.append(d)
+        cur.execute('''DELETE FROM {} WHERE rowid={}
+                    '''.format(table, id)
+                    )
+    return data
+
+
 async def viz_cache_process_requests(request_id):
     global REQUEST_PROCESSORS
 
-    # Get all pending requests for filename
-    # TODO: Pop here instead of get
-    request_data_rows = viz_cache_get(
-                            'requests',
-                            '''
-                            filename,
-                            viz_type,
-                            t0, t1,
-                            mz0, mz1,
-                            t_resolution,
-                            client_room
-                            ''',
-                            request_id=request_id,
-                            )
-    # Loop through db entries
-    for row in request_data_rows:
+    rows = viz_cache_pop(
+                    'requests',
+                    '''
+                    filename,
+                    viz_type,
+                    t0, t1,
+                    mz0, mz1,
+                    t_resolution,
+                    client_room
+                    ''',
+                    request_id=request_id,
+                    )
+    for row in rows:
         # print("[viz_cache_process_requests]: processing row: %s" %str(row))
         filename, viz_type, t0, t1, mz0, mz1, t_resolution, client_room = row
 
@@ -170,37 +243,20 @@ async def viz_cache_process_requests(request_id):
                                     request_id=request_id,
                                     )
 
-        if processed_until is False:
-            # Some error
-            # TODO: Put row back to db in here
-            continue
-
-        if processed_until == t0:
-            # print("Request holds:", client_room, [t0, t1])
-            # TODO: Put row back to db in here
-            continue
-        elif processed_until < t1:
-            print("Update request:", client_room, [processed_until, t1])
-            # Only part of request served, update request start time
-            t0_new = processed_until
-            viz_cache_update('requests',
-                            ['t0'],
-                            [t0_new],
+        # some error/no data yet/no full data -- put (updated) request back
+        # if processed_until is False or processed_until<t1:
+        if processed_until != t1:
+            # print("Request holds or updated:", client_room, [t0, t1])
+            viz_cache_put('requests',
                             filename,
                             viz_type,
-                            [t0, t1],
+                            [processed_until, t1],
                             [mz0, mz1],
                             t_resolution,
                             client_room,
-                            request_id,
+                            request_id
                             )
-        else:
-            print("Release request:", client_room, [t0, t1])
-            # Request served fully, release from cache
-            viz_cache_release('requests',
-                              request_id=request_id,
-                              viz_type=viz_type
-                              )
+
 
 def viz_cache_put(table,
                   filename,
@@ -690,6 +746,10 @@ class DataVizServiceNamespace(BaseClientNamespace):
         request_ids = value['request_ids']
         if not filename:
             return
+        await self.emit_client_notification('stop_data_request',
+                                            data['value'],
+                                            **{**get_client_notification_args(data),
+                                               'namespace': get_namespace(filename)})
         for request_id in request_ids:
             viz_cache_release('requests',
                               request_id=request_id,
@@ -699,10 +759,6 @@ class DataVizServiceNamespace(BaseClientNamespace):
                 cache.pop(request_id)
             except KeyError:
                 pass
-        await self.emit_client_notification('stop_data_request',
-                                            data['value'],
-                                            **{**get_client_notification_args(data),
-                                               'namespace': get_namespace(filename)})
     # ---------------------------------
 
     # ========== FileIoService notifications ==========
@@ -765,8 +821,13 @@ class DataVizServiceNamespace(BaseClientNamespace):
             spec = spec.reshape(-1, 1)
 
             # Get data arrays from cache
-            signal_array = cache[request_id]['signal']
-            period_array = cache[request_id]['signal_period']
+            try:
+                signal_array = cache[request_id]['signal']
+                period_array = cache[request_id]['signal_period']
+            except KeyError:
+                # request was cancelled - request_id deleted
+                print(f"Request {request_id} was cancelled")
+                return
 
             if 'mz' in value:
                 # mz coordinates provided with data (Orbitrap)
@@ -797,11 +858,10 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                            )
             await viz_cache_process_requests(request_id)
 
-
         data_type = data['value']['data_type']
-        # print("[on_loaded_data]: %s" %data_type)
         if data_type == 'signal':
             await on_loaded_signal(data)
+        return data['cnt']
 
 
     # async def on_tps_parameter_info(self, data):
@@ -900,6 +960,8 @@ class DataVizServiceClient(BaseServiceClient):
             except Empty:
                 await self.sio.sleep(.1)
                 continue
+            except KeyboardInterrupt:
+                break
 
             # Got new image
             # self.log("Image ready: ", img_data)
