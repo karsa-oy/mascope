@@ -124,6 +124,20 @@ class MetadataServiceNamespace(BaseClientNamespace):
                                     room=data['client_room'],
                                     )
     
+    async def on_delete_experiment(self, data):
+        pass
+
+    async def on_delete_project(self, data):
+        pass
+
+    async def on_delete_sample(self, data):
+        global datapool
+        value = data['value']
+        filename = value['filename']
+        experiment = value['experiment']
+        project = value['project']
+        datapool.delete_sample(project, experiment, filename)
+
     async def on_save_experiment(self, data):
         value = data['value']
         self.log(value)
@@ -192,27 +206,28 @@ class MetadataServiceNamespace(BaseClientNamespace):
         global datapool
 
         value = data['value']
+        self.log(value)
         filename = value['filename']
         experiment = value['experiment']
         project = value['project']
-
         attributes = value.get('attributes')
 
-        if not value.get('remove'):
-            # Update (or create) sample attributes
+        try:
+            samples = datapool.pool.get(project).get(experiment)
+        except KeyError:
+            raise ValueError("Requested project or experiment does not exist!")
+        if filename not in samples:
+            # New sample attributes
             datapool.new_sample(project, experiment, filename, attributes)
         else:
-            # Remove sample (link from experiment)
-            datapool.delete_sample(project, experiment, filename)
+            # TODO: Edit sample attributes
+            raise NotImplementedError("Editing sample not implemented")
 
         # Update sample table data in UIs
         await self.emit_client_notification(
                             'samples',
-                            # datapool.get_sample_table(project, experiment),
                             datapool.get_samples(project, experiment),
-                            **{**get_client_notification_args(data),
-                               'room': '_'.join([project, experiment])
-                               }
+                            room='_'.join([project, experiment])
                             )
     # ---------------------------------
 

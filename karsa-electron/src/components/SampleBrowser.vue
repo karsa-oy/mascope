@@ -79,7 +79,7 @@
         </section>     
         <!-- End of landing modal -->
         
-        <!--- New project modal--> 
+        <!--- Project attributed modal--> 
         <section class="project-attribute-modal">
             <b-modal :active.sync="is_modal_project_attributes_active"
                 has-modal-card
@@ -117,27 +117,21 @@
                             type="is-danger"
                             position="is-right"
                             :delay="0">
-                            <button
-                                class="button"
-                                type="button"
+                            <b-button
                                 :disabled="project_form_props.title && project_form_props.title.startsWith('Edit')"
-                                @click="saveProject()"
-                                is-dark>
+                                @click="saveProject()">
                                 Save
-                            </button>
+                            </b-button>
                         </b-tooltip>
-                        <button
-                            class="button"
-                            type="button"
-                            is-dark
+                        <b-button
                             @click="cancelNewProject()">
                             Cancel
-                        </button>
+                        </b-button>
                     </footer>
                 </div>
             </b-modal>
         </section>
-        <!--- End of new project modal--> 
+        <!--- End of project attributes modal--> 
 
         <!--- New experiment modal--> 
         <section class="experiment-attribute-modal">
@@ -209,7 +203,7 @@
                             <section class="modal-card-body">
                                 <MetaDataForm
                                     form_title="Experiment attributes"
-                                    :initial_template="experiment_selected.attributes"
+                                    :initial_template="experiment_edit_form_props.attributes"
                                     :editable="true"
                                     @metaDataUpdated="experiment_attributes_fields=$event">
                                 </MetaDataForm>
@@ -244,20 +238,20 @@
             <b-modal :active.sync="is_sample_attribute_modal_active"
                 has-modal-card
                 trap-focus
-                :can-cancel="false"
+                :can-cancel="true"
                 :destroy-on-hide="true"
                 aria-role="dialog"
                 aria-modal>
                 <div class="columns">
                     <div class="modal-card" style="width: auto">
                         <header class="modal-card-head">
-                            <p class="modal-card-title">{{ sample_selected.filename }}</p>
+                            <p class="modal-card-title">{{ sample_form_props.filename }}</p>
                         </header>
                         <section class="modal-card-body write_sample_attribute">                            
                             
                             <MetaDataForm
-                                form_title="Sample attributes"
-                                :initial_template="sample_attributes_template"
+                                :form_title="sample_form_props.title"
+                                :initial_template="sample_form_props.attributes"
                                 @metaDataUpdated="sample_attributes_fields=$event">
                             </MetaDataForm>
 
@@ -296,13 +290,19 @@
 
                         </section>
                         <footer class="modal-card-foot">
-                            <b-button
-                                :type="sample_attributes_save_button_type"
-                                @click="saveSample()"
-                                is-dark
-                                :disabled="!(sample_attributes_fields.length && sample_attributes_fields[0].value.length)">
-                                Save
-                            </b-button>
+                            <b-tooltip
+                                label="Editing not implemented"
+                                :triggers="sample_form_props.title && sample_form_props.title.startsWith('Edit') ? ['hover'] : []"
+                                type="is-danger"
+                                position="is-right"
+                                :delay="0">
+                                <b-button
+                                    :type="sample_attributes_save_button_type"
+                                    @click="saveSample()"
+                                    :disabled="(sample_form_props.title && sample_form_props.title.startsWith('Edit'))">
+                                    Save
+                                </b-button>
+                            </b-tooltip>
                             <b-button
                                 @click="is_sample_attribute_modal_active=false">
                                 Close
@@ -420,7 +420,7 @@
                                                     multilined>
                                                     <!-- Menu item content -->
                                                     <div :id="p.title"
-                                                         @contextmenu.prevent="projectRightClick($event)">
+                                                         @contextmenu.prevent="rightClickProject($event)">
                                                         {{p.title}}
                                                     </div>
                                                     <template v-slot:content>
@@ -451,7 +451,7 @@
                                                             multilined>
                                                             <!-- Menu item content -->
                                                             <div :id="e.title"
-                                                                @contextmenu.prevent="experimentRightClick($event)">
+                                                                @contextmenu.prevent="rightClickExperiment($event)">
                                                                 {{e.title}}
                                                             </div>
                                                             <template v-slot:content>
@@ -489,7 +489,7 @@
                                                         <!-- Details view -->
                                                         <template #detail="props">
                                                             <div>
-                                                                <p @contextmenu.prevent="launchSampleAttributeModal(props.row.title)">
+                                                                <p @contextmenu.prevent="rightClickSample(props.row.filename)">
                                                                     <strong>{{ props.row.title }}</strong>
                                                                     <br>
                                                                     {{ props.row.description }}
@@ -681,6 +681,7 @@ export default {
             ],
             experiment_attributes_fields: [],
             experiment_attributes_template_path: "../metadata_templates/experiment_templates",
+            experiment_edit_form_props: {},
             // Sample metadata for selected sample
             samples: [],
             // variables for sample table
@@ -699,6 +700,7 @@ export default {
             sample_attributes_fields: [],
             sample_attributes_save_button_type: "is-success",
             sample_attributes_template_path: "../metadata_templates/sample_templates",
+            sample_form_props: {},
         }
     },
     created: function() {
@@ -717,17 +719,26 @@ export default {
         cancelNewProject() {
             this.is_modal_project_attributes_active = false;
         },
-        experimentRightClick(event) {
-            let title = event.path[0].id;
-            let attributes = [];
+        getExperiment(experiment_title) {
             for (let i in this.experiments) {
-                if (this.experiments[i].title == title) {
-                    attributes = this.experiments[i].attributes;
+                if(this.experiments[i].title === experiment_title){
+                    return shallow_copy(this.experiments[i]);
                 }
             }
-            this.experiment_selected.title = title;
-            this.experiment_selected.attributes = attributes;
-            this.launchExperimentAttributesModal();
+        },
+        getProject(project_title) {
+            for (let i in this.projects) {
+                if(this.projects[i].title === project_title){
+                    return shallow_copy(this.projects[i]);
+                }
+            }
+        },
+        getSample(sample_filename) {
+            for (let i in this.samples) {
+                if(this.samples[i].filename === sample_filename){
+                    return shallow_copy(this.samples[i]);
+                }
+            }
         },
         importSamples() {
             let to_import = this.import_sample_table_checked_rows[0];
@@ -746,18 +757,19 @@ export default {
             this.sample_attributes = sample;
             this.is_import_sample_modal_active = false;
         },
-        launchExperimentAttributesModal() {
+        launchExperimentAttributesModal(initial_template) {
+            this.experiment_edit_form_props.attributes = initial_template;
             this.is_modal_experiment_attributes_active = true;
         },
         launchNewExperimentModal() {
             this.is_modal_new_experiment_active = true;
         },
-        launchProjectAttributesModal(mode) {
+        launchProjectAttributesModal(mode, initial_template=null) {
             switch (mode) {
                 case "new":
                     this.project_form_props = {
                         'title': "New Project",
-                        'initial_template': null,
+                        'initial_template': initial_template,
                         'default_template': this.project_attributes_default_template,
                         'editable': true,
                         'template_path': this.project_attributes_template_path,
@@ -766,7 +778,7 @@ export default {
                 case "edit":
                     this.project_form_props = {
                         'title': "Edit project",
-                        'initial_template': this.project_selected.attributes,
+                        'initial_template': initial_template,
                         'default_template': [],
                         'editable': true,
                         'template_path': null,
@@ -775,9 +787,7 @@ export default {
             }
             this.is_modal_project_attributes_active = true;
         },
-        launchSampleAttributeModal(sample_id) {
-            const sample = this.samples[sample_id];
-            this.sample_attributes_template = shallow_copy(sample.attributes);
+        launchSampleAttributeModal() {
             this.is_sample_attribute_modal_active = true;
         },
         launchSampleImport() {
@@ -797,18 +807,6 @@ export default {
             }
             return pretty_text
         },
-        projectRightClick(event) {
-            let title = event.path[0].id;
-            let attributes = [];
-            for (let i in this.projects) {
-                if (this.projects[i].title == title) {
-                    attributes = this.projects[i].attributes;
-                }
-            }
-            this.project_selected.title = title;
-            this.project_selected.attributes = attributes;
-            this.launchProjectAttributesModal('edit');
-        },
         removeSample() {
             let sample = {
                 'filename': this.sample_selected.filename,
@@ -820,6 +818,24 @@ export default {
             };
             this.sample_attributes = sample;
             this.is_sample_attribute_modal_active = false;
+        },
+        rightClickExperiment(event) {
+            const title = event.path[0].id;
+            const experiment = this.getExperiment(title);
+            // this.experiment_selected.title = title;
+            // this.experiment_selected.attributes = attributes;
+            this.launchExperimentAttributesModal(experiment.attributes);
+        },
+        rightClickProject(event) {
+            const title = event.path[0].id;
+            const project = this.getProject(title);
+            this.launchProjectAttributesModal('edit', project.attributes);
+        },
+        rightClickSample(sample_filename) {
+            const sample = this.getSample(sample_filename);
+            this.sample_form_props = sample;
+            this.sample_form_props.title = "Edit sample attributes";
+            this.launchSampleAttributeModal();
         },
         saveExperiment() {
             let title = this.experiment_attributes_fields[0].value;
@@ -873,9 +889,9 @@ export default {
                 return
             }
             let sample_to_save = {
-                'filename': this.sample_selected.filename,
-                'experiment': this.experiment_selected.title,
-                'project': this.project_selected.title,
+                'filename': this.sample_form_props.filename,
+                'experiment': this.sample_form_props.experiment,
+                'project': this.sample_form_props.project,
                 'attributes': this.sample_attributes_fields,
             };
             // this.sample_attributes = sample;
@@ -889,11 +905,11 @@ export default {
             for (let i in this.experiments) {
                 if(this.experiments[i].title === experiment_title){
                     this.experiments[i].active = true;
-                    this.experiment_selected = shallow_copy(this.experiments[i]);
                 } else {
                     this.experiments[i].active = false;
                 }
             }
+            this.experiment_selected = this.getExperiment(experiment_title);
             this.is_modal_new_experiment_active = false;
             this.is_modal_experiment_attributes_active = false;
         },
@@ -902,11 +918,11 @@ export default {
             for (let i in this.projects) {
                 if(this.projects[i].title === project_title){
                     this.projects[i].active = true;
-                    this.project_selected = shallow_copy(this.projects[i]);
                 } else {
                     this.projects[i].active = false;
                 }
             }
+            this.project_selected = shallow_copy(this.getProject(project_title));
             // Reset experiment
             this.experiment_selected = {
                 'title': "",
@@ -914,15 +930,7 @@ export default {
                 'attributes': [],
                 'sample_attributes_template': [],
                 };
-
             this.is_modal_project_attributes_active = false;
-        },
-        selectSample(sample_filename) {
-            for (let i in this.samples) {
-                if(this.samples[i].filename === sample_filename){
-                    this.sample_selected = shallow_copy(this.samples[i]);
-                }
-            }
         },
     },
     watch: {
@@ -930,8 +938,6 @@ export default {
             if ( _.isEqual(new_value, old_value) ) {
                 return false;
             }
-            this.experiment_selected.title = new_value.title;
-
             if ( !_.isEmpty(new_value.title) ) {
                 if ( !_.isEmpty(this.room_experiment) )
                     this.be.unsubscribe(['samples'],
@@ -975,12 +981,19 @@ export default {
             if (new_value === old_value) {
                 return false;
             }
-            this.sample_attributes_template = shallow_copy(this.sample_attributes_default_template);
-            this.sample_selected.filename = new_value;
+            // this.sample_attributes_template = shallow_copy(this.sample_attributes_default_template);
+            // this.sample_selected.filename = new_value;
+
             // let sample_no = this.sample_table_rows.length + 1;
             // this.sample_selected.title = sample_no.toString().padStart(3, '0') + '_';
-            this.is_sample_attribute_modal_active = true;
-            this.sample_table_checked_rows = [];
+            this.sample_form_props = {};
+            this.sample_form_props.filename = new_value;
+            this.sample_form_props.project = this.project_selected.title;
+            this.sample_form_props.experiment = this.experiment_selected.title;
+            this.sample_form_props.attributes = shallow_copy(this.sample_attributes_default_template);
+            this.sample_form_props.title = "New sample attributes";
+            this.launchSampleAttributeModal();
+            // this.sample_table_checked_rows = [];
         },
         project_selected: function(new_value, old_value) {
             if ( !_.isEmpty(new_value.title) ) {
@@ -1063,7 +1076,7 @@ export default {
             }
             if (last_selection) {
                 let filename = last_selection.filename;
-                this.selectSample(filename);
+                this.sample_selected = this.getSample(filename);
             }
         },
         'root_namespace.connected': function(new_value) {
