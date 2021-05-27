@@ -184,6 +184,16 @@ export function shallow_copy(o) {
     return JSON.parse(_o);
 }
 
+export function isValidFilename(string) {
+    const valid_pattern = RegExp(/^\w+$/);
+    return valid_pattern.test(string);
+}
+
+export function makeValidFilename(string) {
+    // Replace special characters with underscore
+    return (string.replace(/[/|\\:*?"<>]/g, "_"));
+}
+
 export function read_dotenv() {
         let dotenv = {};
         let env_string = fs.readFileSync('.env');

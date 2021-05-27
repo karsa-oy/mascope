@@ -262,6 +262,17 @@ export const viewPortMixin = {
 
         on_plotly_click(eventData) {
             // Plotly click event handler, override in ViewPort component
+            switch (eventData.button){
+                case 0:
+                    this.log('left click')
+                    break
+                case 1:
+                    this.log('wheel click')
+                    break
+                case 2:
+                    this.log('right click')
+                    break
+            }
             return eventData
         },
 
@@ -291,7 +302,7 @@ export const viewPortMixin = {
             this.figure_cache.mz_maxrange[1] = Math.max(mz1, this.figure_cache.mz_maxrange[1]);
 
             if (new_sample) {
-                this.visualize_range_on_sample_to_display(new_value);
+                this.visualize_range_on_sample_selected(new_value);
             } else {
                 // Zoom in loaded sample
                 this.visualize_range_on_zoom_in(old_value, new_value);
@@ -432,7 +443,7 @@ export const viewPortMixin = {
                                 );
         },
 
-        visualize_range_on_sample_to_display(new_ranges) {
+        visualize_range_on_sample_selected(new_ranges) {
             // this.log(new_ranges);
             // Unpack ranges
             let [mz0, mz1] = new_ranges.mz_range;

@@ -44,11 +44,12 @@ class MetadataServiceNamespace(BaseClientNamespace):
         'stop_data_request',
         # UI
         'experiment_selected',
-        'experiments',
         'import_sample_table_datetime_range', # TODO: Should be routed to FileIoService
         'project_selected',
         'projects',
-        'sample_attributes',
+        'save_experiment',
+        'save_project',
+        'save_sample',
         # Router
         'service_state',
         ]
@@ -78,33 +79,22 @@ class MetadataServiceNamespace(BaseClientNamespace):
     # ========== UI requests ==========
     async def on_experiment_selected(self, data):
         value = data['value']
+        self.log(value)
         kwargs = get_client_notification_args(data)
-        experiment = value.get('id')
-        attributes = value.get('attributes')
-        project = attributes.get('project')
+        experiment = value.get('title')
+        project = value.get('project')
+
         global datapool
         if project not in datapool.pool.keys():
             raise ValueError("Requested project does not exist!")
-
         project_experiments = datapool.pool.get(project).keys()
-        # If experiment does not exist, create it
         if experiment not in project_experiments:
-            # Create new experiment directory
-            datapool.new_experiment(project, experiment, attributes)
-            # Update UI
-            project_experiments = datapool.get_experiments(project)
-            await self.emit_client_notification(
-                            'experiments',
-                            project_experiments,
-                            room=project,
-                            )
+            raise ValueError("Requested experiment does not exist!")
         # Update sample table data
         await self.emit_client_notification(
                             'samples',
-                            datapool.get_sample_table(project, experiment),
-                            **{**kwargs,
-                               'room': data['client_room']
-                                }
+                            datapool.get_samples(project, experiment),
+                            room=data['client_room']
                             )
 
     async def on_import_sample_table_datetime_range(self, data):
@@ -112,7 +102,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
         # Update sample table data
         await self.emit_client_notification(
                             'importable_samples',
-                            datapool.get_sample_table(),
+                            datapool.get_samples(),
                             **{**get_client_notification_args(data),
                                'room': data['client_room']
                                }
@@ -122,31 +112,68 @@ class MetadataServiceNamespace(BaseClientNamespace):
         global datapool
         value = data['value']
         kwargs = get_client_notification_args(data)
-        project = value.get('id')
+        project = value.get('title')
 
         if project not in datapool.pool.keys():
-            # New project
-            attributes = value.get('attributes')
-            datapool.new_project(project, attributes)
-            projects = datapool.get_projects()
-            await self.emit_client_notification(
-                                    'projects',
-                                    projects,
-                                    **{**kwargs,
-                                       'room': data['client_room']
-                                        }
-                                    )
+            raise ValueError("Requested project does not exist!")
 
         experiments = datapool.get_experiments(project)
         await self.emit_client_notification(
                                     'experiments',
                                     experiments,
-                                    **{**kwargs,
-                                       'room': data['client_room']
-                                        }
+                                    room=data['client_room'],
+                                    )
+    
+    async def on_save_experiment(self, data):
+        value = data['value']
+        self.log(value)
+        experiment = value.get('title')
+        project = value.get('project')
+        attributes = value.get('attributes')
+        sample_attributes_template = value.get('sample_attributes_template')
+        # Create new experiment directory
+
+        if project not in datapool.pool.keys():
+            raise ValueError("Requested project does not exist!")
+        project_experiments = datapool.pool.get(project).keys()
+        if experiment not in project_experiments:
+            # New experiment
+            datapool.new_experiment(project,
+                                    experiment,
+                                    attributes,
+                                    sample_attributes_template
+                                    )
+        else:
+            # TODO: Edit existing experiment
+            raise NotImplementedError("Editing experiment not implemented")
+
+        project_experiments = datapool.get_experiments(project)
+        await self.emit_client_notification(
+                        'experiments',
+                        project_experiments,
+                        room=project,
+                        )
+
+    async def on_save_project(self, data):
+        value = data['value']
+        self.log(value)
+        project = value.get('title')
+        attributes = value.get('attributes')
+
+        if project not in datapool.pool.keys():
+            # New project
+            datapool.new_project(project, attributes)
+        else:
+            # TODO: Edit existing project
+            raise NotImplementedError("Editing project not implemented")
+        
+        projects = datapool.get_projects()
+        await self.emit_client_notification(
+                                    'projects',
+                                    projects,
                                     )
 
-    async def on_sample_attributes(self, data):
+    async def on_save_sample(self, data):
         """Write attributes of a sample to disk. Make a symbolic link from
         the sample directory in 'data_path' to 'project_path'/experiment 
 
@@ -165,23 +192,24 @@ class MetadataServiceNamespace(BaseClientNamespace):
         global datapool
 
         value = data['value']
-        sample = value['id']
-        attributes = value.get('attributes')
-        project = attributes['project']
-        experiment = attributes['experiment']
+        filename = value['filename']
+        experiment = value['experiment']
+        project = value['project']
 
-        if not attributes.get('remove'):
+        attributes = value.get('attributes')
+
+        if not value.get('remove'):
             # Update (or create) sample attributes
-            attributes.update({'id': sample})
-            datapool.new_sample(project, experiment, sample, attributes)
+            datapool.new_sample(project, experiment, filename, attributes)
         else:
             # Remove sample (link from experiment)
-            datapool.delete_sample(project, experiment, sample)
+            datapool.delete_sample(project, experiment, filename)
 
         # Update sample table data in UIs
         await self.emit_client_notification(
                             'samples',
-                            datapool.get_sample_table(project, experiment),
+                            # datapool.get_sample_table(project, experiment),
+                            datapool.get_samples(project, experiment),
                             **{**get_client_notification_args(data),
                                'room': '_'.join([project, experiment])
                                }

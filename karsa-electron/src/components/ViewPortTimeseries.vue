@@ -60,8 +60,19 @@ export default {
     methods: {
         on_plotly_click(eventData) {
             // Plotly click event handler
-            let timestamp = eventData.points[0].x;
-            this.sample_annotation_timestamp = timestamp;
+            switch (eventData.event.button){
+                case 0:
+                    // Left click
+                    break
+                case 1:
+                    // Wheel click
+                    break
+                case 2:
+                    // Right click
+                    var timestamp = eventData.points[0].x;
+                    this.sample_annotation_timestamp = timestamp;
+                    return
+            }
         },
     },
 

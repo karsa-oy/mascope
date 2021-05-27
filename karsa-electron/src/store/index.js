@@ -8,19 +8,23 @@ export default new Vuex.Store({
 		acquisition_control_active: false,
 		acquisition_status: "not_running",		// not_running/starting/running/stopping
 		data_source_selected: {},
-		experiment_selected: {'id': ""},
+		experiment_selected: {'title': "", 'attributes': []},
 		experiments: [],
 		figure_data: {},
 		figure_double_click: null,
 		figure_ranges: {},
 		new_file: "",
-		project_selected: {'id': ""},
+		project_selected: {'title': "", 'attributes': []},
 		projects: [],
 		root_namespace: null,
 		sample_annotations: [],
 		sample_annotation_timestamp: null,
-		sample_selected: {},
-		sample_to_display: {},
+		sample_selected: {
+				'filename': "",
+				'title': "",
+				'attributes': [],
+				'properties': {},
+				},
 		stop_visualize_range: {},
 		target_to_display: {},
 		url: "",
@@ -69,8 +73,8 @@ export default new Vuex.Store({
 		sample_annotation_timestamp(state, payload) {
 			state.sample_annotation_timestamp = payload;
 		},
-		sample_to_display(state, payload) {
-			state.sample_to_display = payload;
+		sample_selected(state, payload) {
+			state.sample_selected = payload;
 		},
 		stop_visualize_range(state, payload) {
 			state.stop_visualize_range = payload;

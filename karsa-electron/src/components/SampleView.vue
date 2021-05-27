@@ -26,6 +26,7 @@
                         </b-field>
                         <MetaDataForm
                             :default_template="sample_annotation_default_template"
+                            :editable="true"
                             :template_path="sample_annotation_template_path"
                             @metaDataUpdated="sample_annotation_fields=$event">
                         </MetaDataForm>
@@ -53,11 +54,11 @@
         <section>
             <div style="text-align:center;">
                 <h1 style="color:white; font-size:24px;">
-                    {{ sample_to_display.title  }}
+                    {{ sample_selected.title  }}
                 </h1>
-                <p style="color:#ababab; font-size:16px;">
-                    {{ sample_to_display.description }}
-                </p>
+                <!-- <p style="color:#ababab; font-size:16px;">
+                    {{ sample_selected.description }}
+                </p> -->
             </div>
             <div class="columns">
                 <!-- Left side -->
@@ -158,7 +159,7 @@ export default {
                     'experiment_selected',
                     'root_namespace',
                     'sample_annotation_timestamp',
-                    'sample_to_display',
+                    'sample_selected',
                     'stop_visualize_range',
                     'target_to_display',
                     //  'tps_parameters',
@@ -261,14 +262,14 @@ export default {
         sample_annotation_timestamp: function() {
             this.is_modal_add_annotation_active = true;
         },
-        sample_to_display: function(new_value, old_value) {
+        sample_selected: function(new_value, old_value) {
             if ( _.isEqual(new_value, old_value) ) {
                 return false;
             }
             this.filename = new_value.filename;
             this.figure_ranges = {'filename': new_value.filename,
-                                  't_range': [0, new_value.length],
-                                  'mz_range': new_value.range,
+                                  't_range': [0, new_value.properties.length],
+                                  'mz_range': new_value.properties.range,
                                   'id': Math.random().toString(36).substring(2)
                                   };
         },

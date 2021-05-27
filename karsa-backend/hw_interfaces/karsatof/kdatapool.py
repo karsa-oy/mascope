@@ -417,16 +417,16 @@ class SamplePool():
         except Exception as e:
             print(e)
 
-    def _read_attributes(self, path, prefix=''):
-        attr_path = os.path.join(path, prefix+'.attrs')
+    def _read_attributes(self, path, prefix='', ext='.attrs'):
+        attr_path = os.path.join(path, prefix + ext)
         if not os.path.exists(attr_path):
             return {}
         with open(attr_path, 'r') as f:
             attributes = json.load(f)
         return attributes
 
-    def _write_attributes(self, path, attributes, prefix='', overwrite=True):
-        attr_path = os.path.join(path, prefix+'.attrs')
+    def _write_attributes(self, path, attributes, prefix='', ext='.attrs', overwrite=True):
+        attr_path = os.path.join(path, prefix + ext)
         if os.path.exists(attr_path) and not overwrite:
             raise ValueError("Attribute file %s exists already!" % attr_path)
         # Write attributes
@@ -451,10 +451,17 @@ class SamplePool():
         for experiment in experiment_titles:
             experiment_path = os.path.join(project_path, experiment)
             experiment_attrs = self._read_attributes(experiment_path)
-            experiments.append({'id': experiment,
-                                'attributes': experiment_attrs
-                                })
-        return {'project': project, 'experiments': experiments}
+            experiment_sample_attrs_template = self._read_attributes(
+                                                            experiment_path,
+                                                            ext='.template'
+                                                            )
+            experiments.append({
+                    'title': experiment,
+                    'project': project,
+                    'attributes': experiment_attrs,
+                    'sample_attributes_template': experiment_sample_attrs_template
+                    })
+        return experiments
 
     def get_projects(self):
         project_titles = self.pool.keys()
@@ -462,7 +469,7 @@ class SamplePool():
         for project in project_titles:
             project_path = os.path.join(self.projects_root, project)
             project_attrs = self._read_attributes(project_path)
-            projects.append({'id': project,
+            projects.append({'title': project,
                              'attributes': project_attrs
                              })
         return projects
@@ -483,39 +490,17 @@ class SamplePool():
                                            experiment
                                            )
             sample_exp_attrs = self._read_attributes(experiment_path, prefix=sample)
-            # Read global sample attributes
+            # Read sample properties
             sample_path = os.path.join(experiment_path, sample)
-            sample_attrs = self._read_attributes(sample_path)
-            # Concatenate
-            sample_attrs.update(sample_exp_attrs)
+            sample_props = self._read_attributes(sample_path)
             
-            samples.append({'id': sample,
-                            'attributes': sample_attrs
+            samples.append({'filename': sample,
+                            'project': project,
+                            'experiment': experiment,
+                            'properties': sample_props,
+                            'attributes': sample_exp_attrs,
                             })
         return samples
-
-    def get_sample_table(self, project=None, experiment=None):
-        samples = self.get_samples(project, experiment)
-        sample_table_rows = [sample.get('attributes')
-                             for sample in samples
-                             ]
-        sample_table_cols = []
-        if len(sample_table_rows) > 0:
-            attrs = sample_table_rows[0].keys() # TODO: Need to check for all unique keys?
-            sample_table_cols = [
-                        {'field': attr.lower(),
-                         'label': attr.capitalize(),
-                         }
-                        for attr in attrs
-                        ]
-        sample_table_data = {'rows': sample_table_rows,
-                             'cols': sample_table_cols
-                             }
-        if project is not None:
-            sample_table_data.update({'project': project})
-        if experiment is not None:
-            sample_table_data.update({'experiment': experiment})
-        return sample_table_data
 
     def new_project(self, project, attributes):
         project_path = os.path.join(self.projects_root, project)
@@ -527,13 +512,18 @@ class SamplePool():
         # Update self.pool
         self.pool.update({ project: {} })
 
-    def new_experiment(self, project, experiment, attributes):
+    def new_experiment(self, project, experiment, attributes, sample_attributes_template):
         experiment_path = os.path.join(self.projects_root, project, experiment)
         # Make experiment directory
         if not os.path.isdir(experiment_path):
             os.mkdir(experiment_path)
         # Write attributes
         self._write_attributes(experiment_path, attributes)
+        # Write sample attributes tempalte
+        self._write_attributes(experiment_path, 
+                               sample_attributes_template,
+                               ext='.template'
+                               )
         # Update self.pool
         self.pool[project].update({ experiment: [] })
 

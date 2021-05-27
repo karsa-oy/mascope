@@ -29,8 +29,10 @@
                             </b-field>
                             <MetaDataForm
                                 :default_template="log_entry_default_template"
+                                :editable="true"
                                 :template_path="log_entry_template_path"
-                                @metaDataUpdated="log_entry_fields=$event">
+                                @metaDataUpdated="log_entry_fields=$event"
+                                >
                             </MetaDataForm>
                             <div><br></div>
                         </section>
@@ -128,9 +130,9 @@
                             {{ data_source_selected.name }} acquisition
                         </p>
                         <a class="card-header-icon">
-                        <b-icon
-                            :icon="props.open ? 'menu-down' : 'menu-up'">
-                        </b-icon>
+                            <b-icon
+                                :icon="props.open ? 'menu-down' : 'menu-up'">
+                            </b-icon>
                         </a>
                     </div>
                     <div class="card-content">
@@ -420,6 +422,7 @@ export default {
             scenthound_status: "Offline",       // Offline/Ready/Measuring.../Processing...
             //
             // Log entry modal variables
+            log_entry: null,
             log_entry_datetimestamp: null,
             log_entry_default_template: [{'label': "Log text",
                                           'value': ""}],
@@ -609,7 +612,7 @@ export default {
                 let hours_diff = dt.getHours() - dt.getTimezoneOffset() / 60;
                 dt.setHours(hours_diff);
                 // Combine timestamp with log entry fields and write to file
-                let log_entry_data = {
+                var log_entry_data = {
                         timestamp: dt.toJSON(),
                         entry: self.log_entry_fields
                         }
@@ -623,6 +626,12 @@ export default {
                             self.log_entry_save_button_type = "is-success";
                             self.is_modal_add_log_entry_active = false;
                         }});
+                self.be.export_one_way_binding_prop(
+                                    'instrument_log_entry',
+                                    log_entry_data,
+                                    self.log_entry,
+                                    );
+                self.log_entry = log_entry_data;
                 });
         },
     },

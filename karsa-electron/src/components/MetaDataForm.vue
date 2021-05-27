@@ -5,8 +5,18 @@
 
         <!-- Main content -->
         <div class="box">
+            <div style="text-align:right;"
+                 v-if="editable">
+                <b-button
+                    icon-right="settings"
+                    type="is-primary"
+                    size="is-small"
+                    @click="show_edit_functions = !show_edit_functions">
+                </b-button>
+            </div>
             <h1 style="font-size:16px; text-align:center;">
-                <p><b>{{ form_title }}</b></p>
+                <p><b>{{ form_title }}</b>
+                </p>
             </h1>
             <div><br></div>
             <div
@@ -15,11 +25,13 @@
                         <b-field :label="item.label">
                             <b-input
                                 v-model="item.value"
-                                placeholder="default value"
+                                :placeholder="show_edit_functions ? 'default value' : ''"
+                                :required="fillable && item.required"
+                                :disabled="!fillable"
                                 lazy
                                 expanded>
                             </b-input>
-                            <div v-if="editable">
+                            <div v-if="show_edit_functions">
                                 <b-button
                                     :id="item.label"
                                     :disabled="item.required"
@@ -32,7 +44,7 @@
                         <!-- <div><br></div> -->
                 </template>
             </div>
-            <div v-if="editable">
+            <div v-if="show_edit_functions">
                 <b-field label="New field">
                     <b-button
                         @click="addField()"
@@ -60,7 +72,7 @@
                     <div
                         class="column is-one-seventh"
                         style="text-align:left"
-                        v-if="editable">
+                        v-if="show_edit_functions">
                         <b-button
                             :disabled="!loaded_template || loaded_template.name=='default template'"
                             @click="deleteTemplate()"
@@ -71,7 +83,7 @@
                     <div
                         class="column is-one-third"
                         style="text-align:center"
-                        v-if="editable">
+                        v-if="show_edit_functions">
                         <b-button
                             @click="saveTemplate()"
                             :disabled="!form_fields.length"
@@ -88,7 +100,7 @@
     
 <script type="text/javascript">
 
-import { shallow_copy } from "../karsalib.js"
+import { makeValidFilename, shallow_copy } from "../karsalib.js"
 
 var fs = require('fs');
 var path = require('path');
@@ -99,11 +111,36 @@ export default {
     name: "MetaDataForm",
 
     props: {
-        default_template: Array,
-        editable: Boolean,
-        form_title: String,
-        initial_template: Array,
-        template_path: String,
+        default_template: {
+            type: Array,
+            required: false,
+            default: function () { return [] },
+            },
+        editable: {
+            type: Boolean,
+            required: false,
+            default: false,
+            },
+        fillable: {
+            type: Boolean,
+            required: false,
+            default: true,
+            },
+        form_title: {
+            type: String,
+            required: false,
+            default: "",
+            },
+        initial_template: {
+            type: Array,
+            required: false,
+            default: null,
+            },
+        template_path: {
+            type: String,
+            required: false,
+            default: null,
+            },
     },
 
     data() {
@@ -111,12 +148,13 @@ export default {
             always_available_templates: [
                 {
                     'name': "default template",
-                    'template': this.default_template || []
+                    'template': this.default_template
                 },
             ],
             available_templates: this.always_available_templates,
             form_fields: [],
             loaded_template: null,
+            show_edit_functions: true,
         }
     },
     created() {
@@ -132,6 +170,13 @@ export default {
                                     'template': this.default_template
                                     };
         }
+    },
+    mounted() {
+        this.$nextTick(() => {
+            // When creating the form, show_edit_functions is true to render space
+            // for the buttons etc, now set it to false by default
+            this.show_edit_functions = false;
+        });        
     },
     methods: {
         addField() {
@@ -151,9 +196,6 @@ export default {
                 }
             })
             
-        },
-        convertToValidFilename(string) {
-            return (string.replace(/[/|\\:*?"<>]/g, "_"));
         },
         deleteTemplate() {
             this.$buefy.dialog.confirm({
@@ -225,7 +267,7 @@ export default {
             })
         },
         writeTemplate(template_name) {
-            let filename = this.convertToValidFilename(template_name) + ".json";
+            let filename = makeValidFilename(template_name) + ".json";
             let template_path = path.join(this.template_path, filename);
             if (fs.existsSync(template_path)) {
                 this.$buefy.dialog.alert({
