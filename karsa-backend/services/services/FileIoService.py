@@ -32,7 +32,7 @@ from queue import Empty
 
 from karsalib import (BaseClientNamespace,
                       BridgeServiceClient,
-                      CacheQueueConnector,
+                      CacheQ,
                       Logger,
                       parse_cmd_args, 
                       get_client_notification_args
@@ -48,9 +48,7 @@ client = None
 # Cache for data arrays
 cache = {}
 
-data_q = None
-shutdown_event = None
-service_input_cache = None
+service_q = None
 
 # Cache for requests
 # in_memory_db = ':memory:'
@@ -133,7 +131,7 @@ def cache_get(table,
     return cur
 
 
-async def cache_process_requests(filename):
+def cache_process_requests(filename):
     global REQUEST_PROCESSORS
 
     # Get all pending requests for filename
@@ -155,7 +153,7 @@ async def cache_process_requests(filename):
         data_type, t0, t1, mz0, mz1, t_resolution, client_room, request_id = row
 
         # Select processing method based on data_type and process request
-        processed_t_range = await REQUEST_PROCESSORS[data_type](
+        processed_t_range = REQUEST_PROCESSORS[data_type](
                                     filename=filename,
                                     data_type=data_type,
                                     t0=t0,
@@ -344,7 +342,7 @@ def cache_update(table,
                 )
     con.commit()
 
-async def process_signal_request(filename,
+def process_signal_request(filename,
                            data_type,
                            t0,
                            t1,
@@ -355,7 +353,6 @@ async def process_signal_request(filename,
                            request_id,
                            ):
     global cache
-    global data_q
 
     if data_type != 'signal':
         raise ValueError("Wrong request processor selected!")
@@ -392,12 +389,11 @@ async def process_signal_request(filename,
             mz = spec_array.mz.values
             data_item.update({'mz': mz.astype(np.float32).tobytes()
                               })
-        data_q.put(data_item)
-        await asyncio.sleep(.01)
+        service_q.cache_put(data_item)
     processed_t_range = (signal_slice.time[0], ti+period)
     return processed_t_range
 
-async def process_image_request(filename,
+def process_image_request(filename,
                           data_type,
                           t0,
                           t1,
@@ -408,7 +404,6 @@ async def process_image_request(filename,
                           request_id,
                           ):
     global cache
-    global data_q
 
     cache_item = cache[filename]
     
@@ -458,9 +453,8 @@ async def process_image_request(filename,
             except json.JSONDecodeError:
                 print("Erroneous img_blob: %s" %img_str)
                 continue
-        data_q.put(img_data)
+        service_q.cache_put(img_data)
         processed_t_range = (img_slice.time[0], t1_i)
-        await asyncio.sleep(.01)
     return processed_t_range
 
 
@@ -650,7 +644,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                                   [ti],
                                   'time'
                                   )
-        await cache_process_requests(filename_base)
+        cache_process_requests(filename_base)
         return data['value']['i']
 
     async def on_acquired_tps_data(self, data):
@@ -803,7 +797,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                   request_id,
                   )
         # Process request(s)
-        await cache_process_requests(filename)
+        cache_process_requests(filename)
 
 
     async def on_figure_data(self, data):
@@ -826,8 +820,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         request_ids = value['request_ids']
         for request_id in request_ids:
             cache_release('requests', request_id=request_id)
-            print('DDDD cache_delete_key', request_id, request_id in service_input_cache.cache)
-            service_input_cache.cache_delete_key(request_id)
+            service_q.cache_delete_key(request_id)
 
 
     async def on_tps_data_request(self, data):     
@@ -1023,23 +1016,12 @@ def write_zarr_attributes(filepath, attributes):
 class FileIoClient(BridgeServiceClient):
     
     async def init_service(self):
-        global data_q
-        global shutdown_event
-        global service_input_cache
-
-        data_q = Queue()
-        self.data_q = Queue()
-        shutdown_event = Event()
-        service_input_cache = CacheQueueConnector('request_id/data_type/viz_type',
-                                                data_q,
-                                                self.data_q,
-                                                shutdown_event
-                                                )
+        global service_q
+        service_q = CacheQ('request_id/data_type/viz_type')
 
 
     async def service_main(self):
         MAX_RESPONSE_TIME = 15          # seconds to wait for the client response, then drop
-        service_input_cache.start()     # start input cache thread
 
         def public_ns_data_count(cnt):
             # the callback is triggered in the notification namespace
@@ -1054,7 +1036,10 @@ class FileIoClient(BridgeServiceClient):
         while True:
             # Check queue for signal to emit (put in cache_process_requests)
             try:
-                data = self.data_q.get_nowait()
+                data = service_q.cache_get()
+                if not data:
+                    await self.sio.sleep(.1)
+                    continue
                 while cnt - self.public_ns.cnt > 4:
                     if time.time() - self.public_ns.cnt_timestamp > MAX_RESPONSE_TIME:
                         # skip frozen packages, if no response in due time
@@ -1066,6 +1051,9 @@ class FileIoClient(BridgeServiceClient):
                 continue
             except KeyboardInterrupt:
                 break
+
+
+
             client_room = data.pop('client_room')
             cnt += 1
             await self.emit_public_notification(
@@ -1076,7 +1064,6 @@ class FileIoClient(BridgeServiceClient):
                             cnt=cnt
                             )
             # End of main loop
-        shutdown_event.set()
         await self.sio.disconnect()
 
 def run():
@@ -1097,7 +1084,7 @@ def run():
     try:
         loop.run_until_complete(client.run())
     except KeyboardInterrupt:
-        shutdown_event.set()
+        pass
 
 
 if __name__=='__main__':
