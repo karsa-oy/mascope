@@ -79,7 +79,7 @@
         </section>     
         <!-- End of landing modal -->
         
-        <!--- Project attributed modal--> 
+        <!--- Project attributes modal--> 
         <section class="project-attribute-modal">
             <b-modal :active.sync="is_modal_project_attributes_active"
                 has-modal-card
@@ -111,22 +111,30 @@
                     </div>
                     <!-- Footer -->
                     <footer class="modal-card-foot">
-                        <b-tooltip
-                            label="Editing not implemented"
-                            :triggers="project_form_props.title && project_form_props.title.startsWith('Edit') ? ['hover'] : []"
-                            type="is-danger"
-                            position="is-right"
-                            :delay="0">
-                            <b-button
-                                :disabled="project_form_props.title && project_form_props.title.startsWith('Edit')"
-                                @click="saveProject()">
-                                Save
-                            </b-button>
-                        </b-tooltip>
+                        <b-button
+                            :disabled="false"
+                            @click="saveProject()">
+                            Save
+                        </b-button>
                         <b-button
                             @click="cancelNewProject()">
                             Cancel
                         </b-button>
+                        <div
+                            v-if="project_form_props.initial_template"
+                            style="position:absolute; right:20px">
+                            <b-tooltip
+                                label="Delete project"
+                                position="is-left"
+                                :delay="1000">
+                                <b-button
+                                    disabled
+                                    type="is-danger"
+                                    icon-left="delete"
+                                    @click="deleteProject(project_form_props.initial_template[0].value)">
+                                </b-button>
+                            </b-tooltip>
+                        </div>
                     </footer>
                 </div>
             </b-modal>
@@ -135,12 +143,11 @@
 
         <!--- New experiment modal--> 
         <section class="experiment-attribute-modal">
-            <b-modal :active.sync="is_modal_new_experiment_active"
+            <b-modal
+                :active.sync="is_modal_new_experiment_active"
                 has-modal-card
                 trap-focus
-                :can-cancel="true"
-                aria-role="dialog"
-                aria-modal>
+                :can-cancel="true">
                 <div class="modal-card" style="width: 500px">
                     <div class="columns">
                         <div class="column">
@@ -220,21 +227,28 @@
                     </div>
                     <!-- Footer -->
                     <footer class="modal-card-foot">
-                        <b-tooltip
-                            label="Editing not implemented"
-                            type="is-danger"
-                            position="is-right"
-                            :delay="0">
-                            <b-button 
-                                :disabled="true"
-                                @click="saveExperiment()">
-                                Save
-                            </b-button>
-                        </b-tooltip>
+                        <b-button 
+                            :disabled="false"
+                            @click="saveExperiment()">
+                            Save
+                        </b-button>
                         <b-button 
                             @click="is_modal_experiment_attributes_active=false">
                             Cancel
                         </b-button>
+                        <div style="position:absolute; right:20px">
+                            <b-tooltip
+                                label="Delete experiment"
+                                position="is-left"
+                                :delay="1000">
+                                <b-button
+                                    disabled
+                                    type="is-danger"
+                                    icon-left="delete"
+                                    @click="deleteExperiment(experiment_edit_form_props.attributes[0].value)">
+                                </b-button>
+                            </b-tooltip>
+                        </div>
                     </footer>
                 </div>
             </b-modal>
@@ -269,6 +283,7 @@
                                     placeholder="Select a project"
                                     v-model="project_selected.title"
                                     @input="selectProject($event)"
+                                    disabled
                                     required
                                     expanded>
                                     <option
@@ -285,6 +300,7 @@
                                     placeholder="Select an experiment"
                                     v-model="experiment_selected.title"
                                     @input="selectExperiment($event)"
+                                    disabled
                                     required
                                     expanded>
                                     <option
@@ -298,19 +314,12 @@
 
                         </section>
                         <footer class="modal-card-foot">
-                            <b-tooltip
-                                label="Editing not implemented"
-                                :triggers="sample_form_props.title && sample_form_props.title.startsWith('Edit') ? ['hover'] : []"
-                                type="is-danger"
-                                position="is-right"
-                                :delay="0">
-                                <b-button
-                                    :type="sample_attributes_save_button_type"
-                                    @click="saveSample()"
-                                    :disabled="(sample_form_props.title && sample_form_props.title.startsWith('Edit'))">
-                                    Save
-                                </b-button>
-                            </b-tooltip>
+                            <b-button
+                                :type="sample_attributes_save_button_type"
+                                @click="saveSample()"
+                                :disabled="false">
+                                Save
+                            </b-button>
                             <b-button
                                 @click="is_sample_attribute_modal_active=false">
                                 Close
@@ -323,7 +332,7 @@
                                     <b-button
                                         type="is-danger"
                                         icon-left="delete"
-                                        @click="removeSample()">
+                                        @click="removeSample(sample_form_props.filename)">
                                     </b-button>
                                 </b-tooltip>
                             </div>
@@ -384,9 +393,9 @@
             </b-modal>
         </section>
         <!-- End of sample import modal -->
-<!-- End of modals -->
+    <!-- End of modals -->
 
-<!-- Main content area -->
+    <!-- Main content area -->
         <section>
             <!-- Samples datatable collapsable -->
             <section>
@@ -425,7 +434,8 @@
                                                     :delay=500
                                                     position="is-right"
                                                     type="is-light"
-                                                    multilined>
+                                                    multilined
+                                                    append-to-body>
                                                     <!-- Menu item content -->
                                                     <div :id="p.title"
                                                          @contextmenu.prevent="rightClickProject($event)">
@@ -456,7 +466,8 @@
                                                             :delay=500
                                                             position="is-right"
                                                             type="is-light"
-                                                            multilined>
+                                                            multilined
+                                                            append-to-body>
                                                             <!-- Menu item content -->
                                                             <div :id="e.title"
                                                                 @contextmenu.prevent="rightClickExperiment($event)">
@@ -727,6 +738,22 @@ export default {
         cancelNewProject() {
             this.is_modal_project_attributes_active = false;
         },
+        deleteExperiment(title) {
+            this.is_modal_experiment_attributes_active = false;
+            const experiment_to_delete = this.getExperiment(title);
+            return this.be.export_one_way_binding_prop(
+                                            'delete_experiment',
+                                            {'project': experiment_to_delete.project,
+                                             'experiment': experiment_to_delete.title},
+                                            );
+        },
+        deleteProject(title) {
+            this.is_modal_project_attributes_active = false;
+            return this.be.export_one_way_binding_prop(
+                                            'delete_project',
+                                            {'project': title},
+                                            );
+        },
         getExperiment(experiment_title) {
             for (let i in this.experiments) {
                 if(this.experiments[i].title === experiment_title){
@@ -817,28 +844,26 @@ export default {
             }
             return pretty_text
         },
-        removeSample() {
-            let sample = {
-                'filename': this.sample_selected.filename,
-                'experiment': this.experiment_selected.title,
-                'project': this.project_selected.title,
-                'attributes': {
-                    'remove': true,
-                    }
-            };
-            this.sample_attributes = sample;
+        removeSample(filename) {
             this.is_sample_attribute_modal_active = false;
+            const sample_to_remove = this.getSample(filename);
+            return this.be.export_one_way_binding_prop(
+                                            'delete_sample',
+                                            sample_to_remove,
+                                            );
         },
         rightClickExperiment(event) {
             const title = event.path[0].id;
-            const experiment = this.getExperiment(title);
-            // this.experiment_selected.title = title;
-            // this.experiment_selected.attributes = attributes;
+            let experiment = this.getExperiment(title);
+            // Disabled title editing
+            experiment.attributes[0].disabled = true;
             this.launchExperimentAttributesModal(experiment);
         },
         rightClickProject(event) {
             const title = event.path[0].id;
-            const project = this.getProject(title);
+            let project = this.getProject(title);
+            // Disabled title editing
+            project.attributes[0].disabled = true;
             this.launchProjectAttributesModal('edit', project.attributes);
         },
         rightClickSample(sample_filename) {
@@ -1089,7 +1114,10 @@ export default {
             }
             if (last_selection) {
                 let filename = last_selection.filename;
-                this.sample_selected = this.getSample(filename);
+                const sample = this.getSample(filename);
+                this.sample_selected = {'title': last_selection.title,
+                                        ...sample
+                                        };
             }
         },
         'root_namespace.connected': function(new_value) {

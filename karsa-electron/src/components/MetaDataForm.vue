@@ -27,7 +27,7 @@
                                 v-model="item.value"
                                 :placeholder="show_edit_functions ? 'default value' : ''"
                                 :required="fillable && item.required"
-                                :disabled="!fillable"
+                                :disabled="!fillable || item.disabled"
                                 lazy
                                 expanded>
                             </b-input>

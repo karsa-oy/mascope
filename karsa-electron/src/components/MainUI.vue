@@ -307,6 +307,10 @@ body {
 .modal-card .label {
     color: #666;
 }
+.modal-card-body {
+    max-height: 800px;
+    overflow: auto !important;
+}
 
 .pagination-previous[disabled], .pagination-next[disabled], .pagination-link[disabled] {
     background-color: #545454;

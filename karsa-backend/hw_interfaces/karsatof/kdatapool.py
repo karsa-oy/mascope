@@ -425,7 +425,7 @@ class SamplePool():
             attributes = json.load(f)
         return attributes
 
-    def _write_attributes(self, path, attributes, prefix='', ext='.attrs', overwrite=True):
+    def _write_attributes(self, path, attributes, prefix='', ext='.attrs', overwrite=False):
         attr_path = os.path.join(path, prefix + ext)
         if os.path.exists(attr_path) and not overwrite:
             raise ValueError("Attribute file %s exists already!" % attr_path)
@@ -433,6 +433,14 @@ class SamplePool():
         with open(attr_path, 'w') as f:
             json.dump(attributes, f, indent=4)
     
+    def delete_experiment(self, project, experiment):
+        # TODO: TBD
+        raise NotImplementedError("Deleting experiment not implemented")
+
+    def delete_project(self, project):
+        # TODO: TBD
+        raise NotImplementedError("Deleting project not implemented")
+
     def delete_sample(self, project, experiment, sample):
         sample_link_path = os.path.join(
                                 self.projects_root,
@@ -443,6 +451,24 @@ class SamplePool():
         self._remove_link(sample_link_path)
         # Update self.pool
         self.update_experiment_samples(project, experiment)
+
+    def edit_experiment(self, project, experiment, attributes):
+        '''Edit experiment attributes'''
+        experiment_path = os.path.join(self.projects_root, project, experiment)
+        # Write new attributes
+        self._write_attributes(experiment_path, attributes, overwrite=True)
+
+    def edit_project(self, project, attributes):
+        '''Edit experiment attributes'''
+        project_path = os.path.join(self.projects_root, project)
+        # Write new attributes
+        self._write_attributes(project_path, attributes, overwrite=True)
+
+    def edit_sample(self, project, experiment, sample, attributes):
+        '''Edit sample attributes'''
+        experiment_path = os.path.join(self.projects_root, project, experiment)
+        # Write attributes
+        self._write_attributes(experiment_path, attributes, prefix=sample, overwrite=True)
 
     def get_experiments(self, project):
         project_path = os.path.join(self.projects_root, project)
@@ -478,7 +504,7 @@ class SamplePool():
         if project is None and experiment is None:
             # All samples
             # sample_titles = next( os.walk(self.data_root) )[1] # TODO: How to get importable samples
-            sample_titles = [] # :TODO
+            sample_titles = []
         else:
             # Samples in given project and experiment
             sample_titles = self.pool.get(project).get(experiment)
@@ -519,7 +545,7 @@ class SamplePool():
             os.mkdir(experiment_path)
         # Write attributes
         self._write_attributes(experiment_path, attributes)
-        # Write sample attributes tempalte
+        # Write sample attributes template
         self._write_attributes(experiment_path, 
                                sample_attributes_template,
                                ext='.template'

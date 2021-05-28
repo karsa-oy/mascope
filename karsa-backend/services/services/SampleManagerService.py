@@ -44,6 +44,9 @@ class MetadataServiceNamespace(BaseClientNamespace):
         'stop_data_request',
         # UI
         'experiment_selected',
+        'delete_experiment',
+        'delete_project',
+        'delete_sample',
         'import_sample_table_datetime_range', # TODO: Should be routed to FileIoService
         'project_selected',
         'projects',
@@ -125,18 +128,49 @@ class MetadataServiceNamespace(BaseClientNamespace):
                                     )
     
     async def on_delete_experiment(self, data):
-        pass
+        global datapool
+        self.log(data)
+        value = data['value']
+        experiment = value['experiment']
+        project = value['project']
+
+        datapool.delete_experiment(project, experiment)
+        
+        project_experiments = datapool.get_experiments(project)
+        await self.emit_client_notification(
+                        'experiments',
+                        project_experiments,
+                        room=project,
+                        )
 
     async def on_delete_project(self, data):
-        pass
+        global datapool
+        self.log(data)
+        value = data['value']
+        project = value['project']
+
+        datapool.delete_project(project)
+
+        projects = datapool.get_projects()
+        await self.emit_client_notification(
+                                    'projects',
+                                    projects,
+                                    )
 
     async def on_delete_sample(self, data):
+        ''' Remove sample from an experiment '''
         global datapool
         value = data['value']
         filename = value['filename']
         experiment = value['experiment']
         project = value['project']
         datapool.delete_sample(project, experiment, filename)
+        # Update sample table data in UIs
+        await self.emit_client_notification(
+                            'samples',
+                            datapool.get_samples(project, experiment),
+                            room='_'.join([project, experiment])
+                            )
 
     async def on_save_experiment(self, data):
         value = data['value']
@@ -158,8 +192,11 @@ class MetadataServiceNamespace(BaseClientNamespace):
                                     sample_attributes_template
                                     )
         else:
-            # TODO: Edit existing experiment
-            raise NotImplementedError("Editing experiment not implemented")
+            # Edit existing experiment
+            datapool.edit_experiment(project,
+                                     experiment,
+                                     attributes,
+                                     )
 
         project_experiments = datapool.get_experiments(project)
         await self.emit_client_notification(
@@ -178,8 +215,8 @@ class MetadataServiceNamespace(BaseClientNamespace):
             # New project
             datapool.new_project(project, attributes)
         else:
-            # TODO: Edit existing project
-            raise NotImplementedError("Editing project not implemented")
+            # Edit existing project
+            datapool.edit_project(project, attributes)
         
         projects = datapool.get_projects()
         await self.emit_client_notification(
@@ -220,8 +257,8 @@ class MetadataServiceNamespace(BaseClientNamespace):
             # New sample attributes
             datapool.new_sample(project, experiment, filename, attributes)
         else:
-            # TODO: Edit sample attributes
-            raise NotImplementedError("Editing sample not implemented")
+            # Edit sample attributes
+            datapool.edit_sample(project, experiment, filename, attributes)
 
         # Update sample table data in UIs
         await self.emit_client_notification(
