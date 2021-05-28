@@ -163,7 +163,8 @@
                                     :default_template="sample_attributes_default_template"
                                     :editable="true"
                                     :fillable="false"
-                                    :template_path="sample_attributes_template_path">
+                                    :template_path="sample_attributes_template_path"
+                                    @metaDataUpdated="sample_attributes_fields=$event">
                                 </MetaDataForm>
                             </section>
                         </div>
@@ -206,6 +207,13 @@
                                     :initial_template="experiment_edit_form_props.attributes"
                                     :editable="true"
                                     @metaDataUpdated="experiment_attributes_fields=$event">
+                                </MetaDataForm>
+                                <div><br></div>
+                                <MetaDataForm
+                                    form_title="Sample attribute template"
+                                    :initial_template="experiment_edit_form_props.sample_attributes_template"
+                                    :editable="false"
+                                    :fillable="false">
                                 </MetaDataForm>
                             </section>
                         </div>
@@ -757,8 +765,10 @@ export default {
             this.sample_attributes = sample;
             this.is_import_sample_modal_active = false;
         },
-        launchExperimentAttributesModal(initial_template) {
-            this.experiment_edit_form_props.attributes = initial_template;
+        launchExperimentAttributesModal(experiment) {
+            this.experiment_edit_form_props = {};
+            this.experiment_edit_form_props.attributes = experiment.attributes;
+            this.experiment_edit_form_props.sample_attributes_template = experiment.sample_attributes_template;
             this.is_modal_experiment_attributes_active = true;
         },
         launchNewExperimentModal() {
@@ -824,7 +834,7 @@ export default {
             const experiment = this.getExperiment(title);
             // this.experiment_selected.title = title;
             // this.experiment_selected.attributes = attributes;
-            this.launchExperimentAttributesModal(experiment.attributes);
+            this.launchExperimentAttributesModal(experiment);
         },
         rightClickProject(event) {
             const title = event.path[0].id;
@@ -852,7 +862,7 @@ export default {
                     'title': title,
                     'project': this.project_selected.title,
                     'attributes': this.experiment_attributes_fields,
-                    'sample_attributes_template': this.sample_attributes_template,
+                    'sample_attributes_template': this.sample_attributes_fields,
                     };
             this.is_modal_new_experiment_active = false;
             return this.be.export_one_way_binding_prop('save_experiment',
@@ -990,12 +1000,15 @@ export default {
             this.sample_form_props.filename = new_value;
             this.sample_form_props.project = this.project_selected.title;
             this.sample_form_props.experiment = this.experiment_selected.title;
-            this.sample_form_props.attributes = shallow_copy(this.sample_attributes_default_template);
+            this.sample_form_props.attributes = shallow_copy(this.experiment_selected.sample_attributes_template);
             this.sample_form_props.title = "New sample attributes";
             this.launchSampleAttributeModal();
             // this.sample_table_checked_rows = [];
         },
         project_selected: function(new_value, old_value) {
+            if ( _.isEqual(new_value, old_value) ) {
+                return false;
+            }
             if ( !_.isEmpty(new_value.title) ) {
                 if ( !_.isEmpty(this.room_project) ) {
                     this.be.unsubscribe(['experiments'],
