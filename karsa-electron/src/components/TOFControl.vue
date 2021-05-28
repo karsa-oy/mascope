@@ -352,8 +352,8 @@ import MetaDataForm from "./MetaDataForm.vue"
 
 Vue.use([Buefy]);
 
-var fs = require('fs');
-var path = require('path');
+// var fs = require('fs');
+// var path = require('path');
 var Plotly = require('plotly.js-dist');
 var _ = require('underscore');
 
@@ -590,22 +590,22 @@ export default {
         },
         writeInstrumentLogEntry() {
             var self = this;
-            let file_path = path.join(this.log_path, this.data_source_selected.name + "_log.txt");
-            let log_data = [];
+            // let file_path = path.join(this.log_path, this.data_source_selected.name + "_log.txt");
+            // let log_data = [];
 
-            fs.readFile(file_path, 'utf-8', function (err, file) {
-                if (err) {
-                    if (err.code === 'ENOENT') {
-                        // File not found, create
-                        fs.writeFileSync(file_path, JSON.stringify(log_data, null, 4));
-                    } else {
-                        // Other exception
-                        throw err;
-                    }
-                } else {
-                    // Parse file contents
-                    log_data = JSON.parse(file);
-                }
+            // fs.readFile(file_path, 'utf-8', function (err, file) {
+            //     if (err) {
+            //         if (err.code === 'ENOENT') {
+            //             // File not found, create
+            //             fs.writeFileSync(file_path, JSON.stringify(log_data, null, 4));
+            //         } else {
+            //             // Other exception
+            //             throw err;
+            //         }
+            //     } else {
+            //         // Parse file contents
+            //         log_data = JSON.parse(file);
+            //     }
                 
                 // Parse datetime into string
                 let dt = self.log_entry_datetimestamp;
@@ -616,23 +616,22 @@ export default {
                         timestamp: dt.toJSON(),
                         entry: self.log_entry_fields
                         }
-                log_data.push(log_entry_data);
-                const log_data_json = JSON.stringify(log_data, null, 4);
-                fs.writeFile(file_path, log_data_json, 'utf8', function(err){
-                        if(err){ 
-                            console.log(err); 
-                        } else {
-                            // Update UI
-                            self.log_entry_save_button_type = "is-success";
-                            self.is_modal_add_log_entry_active = false;
-                        }});
+            //     log_data.push(log_entry_data);
+            //     const log_data_json = JSON.stringify(log_data, null, 4);
+            //     fs.writeFile(file_path, log_data_json, 'utf8', function(err){
+            //             if(err){ 
+            //                 console.log(err); 
+            //             } else {
+            //             }});
                 self.be.export_one_way_binding_prop(
                                     'instrument_log_entry',
                                     log_entry_data,
                                     self.log_entry,
                                     );
                 self.log_entry = log_entry_data;
-                });
+                // });
+            self.log_entry_save_button_type = "is-success";
+            self.is_modal_add_log_entry_active = false;
         },
     },
     watch: {

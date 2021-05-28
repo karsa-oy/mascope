@@ -496,6 +496,9 @@ class FileIoPrivateNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to MainService """
 
     endpoints = [
+        # TOFControl
+        'instrument_log_entry',
+        # //
         # TOFService
         'acquisition_started',
         'acquisition_coordinates',
@@ -521,6 +524,12 @@ class FileIoPrivateNamespace(BaseClientNamespace):
 
     service_state = dict()
 
+    # ========== TOFControl requests ==========
+    async def on_instrument_log_entry(self, data):
+        value = data['value']
+        entry = value
+        append_instrument_log(self.namespace.strip('/'), entry)
+    # -----------------------------------------
 
     # ========== TOFService requests ==========
     async def on_acquisition_started(self, data):
@@ -703,7 +712,6 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                          }
                         )
 
-
     async def on_tps_parameter_info(self, data):
         value = data['value']
         filename_base = value.get('filename')
@@ -722,8 +730,8 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         #                      )
         # cache_put(data, 'tps', tps_array)
     # -----------------------------------------
+
     # =========== DataViz requests ===========
-    
     async def on_coordinate_request(self, data):
         global cache
 
@@ -805,7 +813,6 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         # Process request(s)
         await cache_process_requests(filename)
 
-
     async def on_figure_data(self, data):
         # self.log(data)
         value = data['value']
@@ -819,7 +826,6 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                                'time'
                                )
 
-
     async def on_stop_data_request(self, data):
         self.log(data)
         value = data['value']
@@ -828,7 +834,6 @@ class FileIoPrivateNamespace(BaseClientNamespace):
             cache_release('requests', request_id=request_id)
             print('DDDD cache_delete_key', request_id, request_id in service_input_cache.cache)
             service_input_cache.cache_delete_key(request_id)
-
 
     async def on_tps_data_request(self, data):     
         # TODO: Deprecated, need to update   
@@ -919,6 +924,20 @@ class FileIoPrivateNamespace(BaseClientNamespace):
 
 
 # ========= File I/O functions =========
+def append_instrument_log(log_path, new_entry):
+    log_file = os.path.join(log_path, '.log')
+    if not os.path.exists(log_file):
+        # Log file does not yet exist, create
+        with open(log_file, 'w') as f:
+            json.dump([new_entry], f, indent=4)
+    else:
+        # Append log
+        with open(log_file, 'r+') as f:
+            instrument_log = json.load(f)
+            instrument_log.append(new_entry)
+            f.seek(0)
+            json.dump(instrument_log, f, indent=4)
+
 def base_to_zarr_filename(base_filename, variable):
     sample_data_path = parse_path_from_sample_name(base_filename)
     zarr_filename = variable + os.extsep + 'zarr'
@@ -1004,7 +1023,6 @@ def open_mfzarr(path, mode='r', concat_dim='time'):
     x.attrs = z.attrs.asdict()
     return x
     
-
 def read_zarr_attributes(filepath):
     if not os.path.exists(filepath):
         raise ValueError("Zarr file %s does not exist" %filepath)
