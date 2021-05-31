@@ -368,6 +368,7 @@ export default {
         ...mapState([
             'url',
             'data_source_selected',
+            'tofdaq_log_entry',
         ]),
         acquisition_control_active: {
             get() {
@@ -707,6 +708,19 @@ export default {
                 this.log_entry_save_button_type = "is-danger";
             },
             deep: true
+        },
+        tofdaq_log_entry: function(new_value, old_value) {
+            let texts = new_value.text.split("<br>").slice(0, -1);
+            for (let i in texts){
+                texts[i] = texts[i].replace(': ', '=');
+            }
+            const joint_text = texts.join(', ');
+            new_value.text = joint_text.slice(0, 255);
+
+            this.be.export_one_way_binding_prop('tofdaq_log_entry',
+                                                new_value,
+                                                old_value,
+                                                this.room_sid);
         },
         'namespace.connected': function(new_value) {
             if ( new_value === true )

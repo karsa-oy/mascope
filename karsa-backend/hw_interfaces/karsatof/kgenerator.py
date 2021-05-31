@@ -23,23 +23,16 @@ from .lib.TofDaq import (
     TwRetVal,
     TSharedMemoryDesc,
     TSharedMemoryPointer,
+    TwAddLogEntry,
     TwGetDescriptor,
     TwTofDaqRunning,
     TwDaqActive,
     TwWaitForNewData,
     TwGetBufTimeFromShMem,
     TwGetTofSpectrumFromShMem,
-    TwGetStickSpectrumFromShMem,
-    TwGetSumSpectrumFromShMem,
     TwQueryRegUserDataSize,
     TwReadRegUserData,
     TwGetRegUserDataDesc,
-    TwSetDaqParameter,
-    TwGetDaqParameter,
-    TwGetDaqParameterInt,
-    TwAddAttributeInt,
-    TwAddAttributeDouble,
-    TwAddAttributeString,
     TwStartAcquisition,
     TwStopAcquisition
     )
@@ -57,9 +50,6 @@ from karsaorbi.koutil import net2np_array
 
 
 from .kinstrument import KInstrument
-from .kfeeder import KAccumulator
-from .kevent import KEvent
-from .kutil import SubscriptableQueue
 
 
 def strip_filepath(filepath):
@@ -265,6 +255,16 @@ class TofDaqStreamer(Thread, KInstrument):
             n = self.desc.nbrWrites * self.desc.nbrBufs # Total number of spectra
             self.progress = ((self.speci+1) / n) * 100. # [%]
          
+    def add_log_entry(self, text, timestamp=0):
+        if timestamp:
+            # Convert seconds to filetime
+            acquisition_time_zero = self.desc.timeZero
+            timestamp = int( acquisition_time_zero + (timestamp*1e7) )
+        if not isinstance(text, bytes):
+            # Convert string to bytes
+            text = text.encode()
+        TwAddLogEntry(text, timestamp)
+
     def run(self):
         """Main loop
 

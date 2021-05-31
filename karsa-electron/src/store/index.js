@@ -27,6 +27,7 @@ export default new Vuex.Store({
 				},
 		stop_visualize_range: {},
 		target_to_display: {},
+		tofdaq_log_entry: {},
 		url: "",
 		visualize_range: {},
 	},
@@ -82,6 +83,9 @@ export default new Vuex.Store({
 		target_to_display(state, payload) {
 			state.target_to_display = payload;
 		},
+		tofdaq_log_entry(state, payload) {
+			state.tofdaq_log_entry = payload;
+		},		
 		url(state, payload) {
 			state.url = payload;
 		},

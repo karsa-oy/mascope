@@ -189,6 +189,14 @@ export default {
                 this.$store.commit('sample_annotations', value);
             }
         },
+        tofdaq_log_entry: {
+            get() {
+                return this.$store.state.tofdaq_log_entry;
+            },
+            set(value) {
+                this.$store.commit('tofdaq_log_entry', value);
+            }
+        },
     },
     data: function() {
         return {
@@ -236,6 +244,7 @@ export default {
         },
 
         createSampleAnnotation() {
+            // Format annotation for display
             let annotation_text = "";
             for (let i in this.sample_annotation_fields) {
                 let label = this.sample_annotation_fields[i].label;
@@ -247,7 +256,27 @@ export default {
                     'timestamp': this.sample_annotation_timestamp
                     };
             this.sample_annotations.push(annotation);
-            this.is_modal_add_annotation_active=false;
+            this.is_modal_add_annotation_active = false;
+
+            // For backwards compatibility, let TOFControl know about annotation
+            this.tofdaq_log_entry = annotation;
+
+            // Format annotation for SampleManagerService
+            const annotation_data = {
+                'filename': this.filename,
+                'project': this.sample_selected.project,
+                'experiment': this.sample_selected.experiment,
+                'annotation': {'timestamp': this.sample_annotation_timestamp,
+                               'entry': this.sample_annotation_fields
+                               }
+            };
+
+            return this.be.export_one_way_binding_prop(
+                                    'save_sample_annotation',
+                                    annotation_data,
+                                    null,
+                                    this.room_sid
+                                    )
         },
 
     },

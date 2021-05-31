@@ -425,6 +425,20 @@ class SamplePool():
             attributes = json.load(f)
         return attributes
 
+    def _write_sample_annotation(self, path, prefix, annotation, ext='.annts'):
+        file_path = os.path.join(path, prefix + ext)
+        if not os.path.exists(file_path):
+            # Annotations file does not yet exist, create
+            with open(file_path, 'w') as f:
+                json.dump([annotation], f, indent=4)
+        else:
+            # Append annotations file
+            with open(file_path, 'r+') as f:
+                annotations = json.load(f)
+                annotations.append(annotation)
+                f.seek(0)
+                json.dump(annotations, f, indent=4)
+
     def _write_attributes(self, path, attributes, prefix='', ext='.attrs', overwrite=False):
         attr_path = os.path.join(path, prefix + ext)
         if os.path.exists(attr_path) and not overwrite:
@@ -433,6 +447,10 @@ class SamplePool():
         with open(attr_path, 'w') as f:
             json.dump(attributes, f, indent=4)
     
+    def annotate_sample(self, project, experiment, sample, annotation):
+        sample_path = os.path.join(self.projects_root, project, experiment)
+        self._write_sample_annotation(sample_path, sample, annotation)
+
     def delete_experiment(self, project, experiment):
         # TODO: TBD
         raise NotImplementedError("Deleting experiment not implemented")

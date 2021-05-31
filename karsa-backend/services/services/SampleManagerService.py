@@ -53,6 +53,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
         'save_experiment',
         'save_project',
         'save_sample',
+        'save_sample_annotation',
         # Router
         'service_state',
         ]
@@ -266,7 +267,19 @@ class MetadataServiceNamespace(BaseClientNamespace):
                             datapool.get_samples(project, experiment),
                             room='_'.join([project, experiment])
                             )
+    
+    async def on_save_sample_annotation(self, data):
+        global datapool
+
+        value = data['value']
+        filename = value['filename']
+        project = value['project']
+        experiment = value['experiment']
+        annotation = value['annotation']
+
+        datapool.annotate_sample(project, experiment, filename, annotation)
     # ---------------------------------
+
 
 class SampleManagerClient(BaseServiceClient):
     pass

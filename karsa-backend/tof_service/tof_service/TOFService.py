@@ -56,6 +56,7 @@ class TOFServicePrivateNamespace(BaseClientNamespace):
             'service_state',
             #
             # TOFControl
+            'tofdaq_log_entry',
             'start_acquisition',
             'stop_acquisition',
             #
@@ -64,6 +65,13 @@ class TOFServicePrivateNamespace(BaseClientNamespace):
         acquisition_status = 'not_running',
         instrument_status = 'not_ready',
         )
+
+    async def on_tofdaq_log_entry(self, data):
+        value = data['value']
+        text = value['text']
+        timestamp = value['timestamp']
+        self.parent.streamer.add_log_entry(text, timestamp)
+
 
     async def on_start_acquisition(self, data):
         self.parent.streamer.start_acquisition()
