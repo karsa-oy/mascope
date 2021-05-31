@@ -202,6 +202,10 @@ export const viewPortMixin = {
             
             // Relayout event
             figure_div.on("plotly_relayout", function(eventData) {
+                if (!self.figure_ranges.filename) {
+                    // No sample loaded
+                    return
+                }
                 if ( _.isEmpty(eventData) ) {
                     // Likely a double-click event
                     return;
