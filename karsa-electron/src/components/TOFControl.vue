@@ -429,8 +429,7 @@ export default {
                                           'value': ""}],
             log_entry_fields: [],
             log_entry_save_button_type: "is-success",
-            log_entry_template_path: "../metadata_templates",
-            log_path: "../MetaData",
+            log_entry_template_path: "../metadata_templates/instrument_templates",
             //
             // variables for desoprtion collapsable
             acquisition_mode: "continuous",

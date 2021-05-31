@@ -3,7 +3,7 @@
     <!-- Modals -->
         <!-- Landing modal -->
         <section class="landing-modal">
-            <b-modal :active.sync="is_landing_modal_active"
+            <b-modal :active.sync="is_modal_landing_active"
                 has-modal-card
                 trap-focus
                 :can-cancel="true"
@@ -67,7 +67,7 @@
                         </section>
                         <footer class="modal-card-foot">
                             <b-button
-                                @click="is_landing_modal_active=false"
+                                @click="is_modal_landing_active=false"
                                 is-dark
                                 :disabled="!(project_selected.title.length && experiment_selected.title.length)">
                                 Proceed
@@ -237,6 +237,10 @@
                             Cancel
                         </b-button>
                         <div style="position:absolute; right:20px">
+                            <b-button
+                                @click="launchPrefillSampleAttributesModal()">
+                                Prefill
+                            </b-button>
                             <b-tooltip
                                 label="Delete experiment"
                                 position="is-left"
@@ -257,7 +261,7 @@
 
         <!-- Modal for sample attributes -->
         <section class="sample-attribute-modal">
-            <b-modal :active.sync="is_sample_attribute_modal_active"
+            <b-modal :active.sync="is_modal_sample_attributes_active"
                 has-modal-card
                 trap-focus
                 :can-cancel="true"
@@ -273,7 +277,9 @@
                             
                             <MetaDataForm
                                 :form_title="sample_form_props.title"
+                                :default_template="sample_form_props.attributes"
                                 :initial_template="sample_form_props.attributes"
+                                :load_template_path="sample_form_props.load_template_path"
                                 @metaDataUpdated="sample_attributes_fields=$event">
                             </MetaDataForm>
 
@@ -321,7 +327,7 @@
                                 Save
                             </b-button>
                             <b-button
-                                @click="is_sample_attribute_modal_active=false">
+                                @click="is_modal_sample_attributes_active=false">
                                 Close
                             </b-button>
                             <div style="position:absolute; right:20px">
@@ -343,9 +349,77 @@
         </section>
         <!-- End of Modal for sample edit -->
 
+        <!-- Modal for prefilling sample attributes -->
+        <section class="sample-attribute-modal">
+            <b-modal :active.sync="is_modal_prefill_sample_attributes_active"
+                has-modal-card
+                trap-focus
+                :can-cancel="true"
+                :destroy-on-hide="true">
+                <div class="columns">
+                    <div class="modal-card" style="width: auto">
+                        <header class="modal-card-head">
+                            <p class="modal-card-title">Prefill sample information</p>
+                        </header>
+                        <section class="modal-card-body write_sample_attribute">                            
+                            
+                            <MetaDataForm
+                                form_title="Prefill sample attributes"
+                                :initial_template="experiment_edit_form_props.sample_attributes_template"
+                                :template_path="experiment_edit_form_props.prefilled_templates_path">
+                            </MetaDataForm>
+
+                            <div><br></div>
+                            <b-field label="Project">
+                                <b-select
+                                    placeholder="Select a project"
+                                    v-model="project_selected.title"
+                                    @input="selectProject($event)"
+                                    disabled
+                                    required
+                                    expanded>
+                                    <option
+                                        v-for="p in projects"
+                                        :value="p.title"
+                                        :key="p.title">
+                                        {{ p.title }}
+                                    </option>
+                                </b-select>
+                            </b-field>
+
+                            <b-field label="Experiment">
+                                <b-select
+                                    placeholder="Select an experiment"
+                                    v-model="experiment_selected.title"
+                                    @input="selectExperiment($event)"
+                                    disabled
+                                    required
+                                    expanded>
+                                    <option
+                                        v-for="e in experiments"
+                                        :value="e.title"
+                                        :key="e.title">
+                                        {{ e.title }}
+                                    </option>
+                                </b-select>
+                            </b-field>
+
+                        </section>
+                        <footer class="modal-card-foot">
+                            <b-button
+                                @click="is_modal_prefill_sample_attributes_active=false">
+                                Close
+                            </b-button>
+                        </footer>
+                    </div>
+                </div>
+            </b-modal>
+        </section>
+        <!-- End of modal for prefilling sample edit -->
+
         <!-- Modal for sample import -->
         <section class="sample-import-modal">
-            <b-modal :active.sync="is_import_sample_modal_active"
+            <b-modal :active.sync="is_modal_sample_import_active"
                 has-modal-card
                 trap-focus
                 :can-cancel="true"
@@ -380,7 +454,7 @@
                                 class="button"
                                 type="button"
                                 is-dark
-                                @click="is_import_sample_modal_active=false">
+                                @click="is_modal_sample_import_active=false">
                                 Cancel
                             </button>
                         </footer>
@@ -523,7 +597,7 @@
                                                     <!-- Import sample item -->
                                                     <b-menu-item
                                                         icon="plus"
-                                                        :active="is_import_sample_modal_active"
+                                                        :active="is_modal_sample_import_active"
                                                         @click="launchSampleImport()">
                                                     </b-menu-item>
                                                     <!-- End of import sample item -->
@@ -576,6 +650,8 @@ import MetaDataForm from "./MetaDataForm.vue"
 Vue.use([Buefy]);
 
 var _ = require('underscore');
+var fs = require('fs');
+
 
 export default {
     name: "SampleBrowser",
@@ -660,12 +736,13 @@ export default {
             // acquisition_started: false,
             // Project / experiment title validation
             // Modal active variables
-            is_landing_modal_active: true,
+            is_modal_landing_active: true,
             is_modal_experiment_attributes_active: false,
+            is_modal_prefill_sample_attributes_active: false,
             is_modal_project_attributes_active: false,
             is_modal_new_experiment_active: false,
-            is_import_sample_modal_active: false,
-            is_sample_attribute_modal_active: false,
+            is_modal_sample_import_active: false,
+            is_modal_sample_attributes_active: false,
             // variables for import modals
             import_start_time: null,
             import_end_time: null,
@@ -715,7 +792,6 @@ export default {
                 {'label': "Description",
                  'value': ""},
             ],
-            sample_attributes_template: [],
             sample_attributes_fields: [],
             sample_attributes_save_button_type: "is-success",
             sample_attributes_template_path: "../metadata_templates/sample_templates",
@@ -724,7 +800,6 @@ export default {
     },
     created: function() {
         this.be = new BECom(this);
-        this.sample_attributes_template = shallow_copy(this.sample_attributes_default_template);
     },
     mounted: function() {
     },
@@ -761,6 +836,17 @@ export default {
                 }
             }
         },
+        getPrefilledTemplatePath(experiment_title, make_if_missing=false) {
+            const template_path = "../metadata_templates/prefilled_templates/" + experiment_title;
+            if (!fs.existsSync(template_path)) {
+                if (make_if_missing) {
+                    fs.mkdirSync(template_path);
+                } else {
+                    return null
+                }
+            }
+            return template_path
+        },
         getProject(project_title) {
             for (let i in this.projects) {
                 if(this.projects[i].title === project_title){
@@ -776,6 +862,8 @@ export default {
             }
         },
         importSamples() {
+            // TODO: Needs an update
+
             let to_import = this.import_sample_table_checked_rows[0];
             // Preserve sample id, title and description
             // Set project and experiment to the selected ones
@@ -790,7 +878,7 @@ export default {
                 };
             // Export sample attributes to link into current experiment
             this.sample_attributes = sample;
-            this.is_import_sample_modal_active = false;
+            this.is_modal_sample_import_active = false;
         },
         launchExperimentAttributesModal(experiment) {
             this.experiment_edit_form_props = {};
@@ -800,6 +888,11 @@ export default {
         },
         launchNewExperimentModal() {
             this.is_modal_new_experiment_active = true;
+        },
+        launchPrefillSampleAttributesModal() {
+            const experiment_title = this.experiment_edit_form_props.attributes[0].value;
+            this.experiment_edit_form_props.prefilled_templates_path = this.getPrefilledTemplatePath(experiment_title, true);
+            this.is_modal_prefill_sample_attributes_active = true;
         },
         launchProjectAttributesModal(mode, initial_template=null) {
             switch (mode) {
@@ -825,7 +918,7 @@ export default {
             this.is_modal_project_attributes_active = true;
         },
         launchSampleAttributeModal() {
-            this.is_sample_attribute_modal_active = true;
+            this.is_modal_sample_attributes_active = true;
         },
         launchSampleImport() {
             // Request list of samples from FileService
@@ -833,7 +926,7 @@ export default {
             // Set loading state
             this.import_sample_table_loading = true;
             // Launch modal
-            this.is_import_sample_modal_active = true;
+            this.is_modal_sample_import_active = true;
         },
         prettyPrintAttributes(form_fields) {
             let pretty_text = "";
@@ -845,7 +938,7 @@ export default {
             return pretty_text
         },
         removeSample(filename) {
-            this.is_sample_attribute_modal_active = false;
+            this.is_modal_sample_attributes_active = false;
             const sample_to_remove = this.getSample(filename);
             return this.be.export_one_way_binding_prop(
                                             'delete_sample',
@@ -930,7 +1023,7 @@ export default {
                 'attributes': this.sample_attributes_fields,
             };
             // this.sample_attributes = sample;
-            this.is_sample_attribute_modal_active = false;
+            this.is_modal_sample_attributes_active = false;
             return this.be.export_one_way_binding_prop('save_sample',
                                                        sample_to_save,
                                                        );
@@ -947,6 +1040,7 @@ export default {
             this.experiment_selected = this.getExperiment(experiment_title);
             this.is_modal_new_experiment_active = false;
             this.is_modal_experiment_attributes_active = false;
+            this.is_modal_landing_active = false;
         },
         selectProject(project_title) {
             // Set project active in the sample tree
@@ -1016,9 +1110,6 @@ export default {
             if (new_value === old_value) {
                 return false;
             }
-            // this.sample_attributes_template = shallow_copy(this.sample_attributes_default_template);
-            // this.sample_selected.filename = new_value;
-
             // let sample_no = this.sample_table_rows.length + 1;
             // this.sample_selected.title = sample_no.toString().padStart(3, '0') + '_';
             this.sample_form_props = {};
@@ -1027,6 +1118,7 @@ export default {
             this.sample_form_props.experiment = this.experiment_selected.title;
             this.sample_form_props.attributes = shallow_copy(this.experiment_selected.sample_attributes_template);
             this.sample_form_props.title = "New sample attributes";
+            this.sample_form_props.load_template_path = this.getPrefilledTemplatePath(this.experiment_selected.title);
             this.launchSampleAttributeModal();
             // this.sample_table_checked_rows = [];
         },

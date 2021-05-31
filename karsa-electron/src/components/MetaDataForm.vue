@@ -54,9 +54,12 @@
                 </b-field>
             </div>
             <div><br></div>
-            <b-field label="Reuse template" v-if="Boolean(template_path)">
+            <b-field label="Reuse template" v-if="Boolean(load_template_path) || Boolean(save_template_path)">
                 <div class="columns">
-                    <div class="column is-half" style="text-align:center">
+                    <div
+                        class="column is-half"
+                        style="text-align:center"
+                        v-if="Boolean(load_template_path)">
                         <b-select
                             v-model="loaded_template"
                             placeholder="Load template"
@@ -83,7 +86,7 @@
                     <div
                         class="column is-one-third"
                         style="text-align:center"
-                        v-if="show_edit_functions">
+                        v-if="Boolean(save_template_path)">
                         <b-button
                             @click="saveTemplate()"
                             :disabled="!form_fields.length"
@@ -140,6 +143,16 @@ export default {
             type: String,
             required: false,
             default: null,
+        },
+        load_template_path: {
+            type: String,
+            required: false,
+            default: function () { return this.template_path },
+            },
+        save_template_path: {
+            type: String,
+            required: false,
+            default: function () { return this.template_path },
             },
     },
 
@@ -151,14 +164,14 @@ export default {
                     'template': this.default_template
                 },
             ],
-            available_templates: this.always_available_templates,
+            available_templates: [],
             form_fields: [],
             loaded_template: null,
             show_edit_functions: true,
         }
     },
     created() {
-        if (this.template_path) {
+        if (this.load_template_path) {
             this.findTemplates();
         }
         if (this.initial_template) {
@@ -213,18 +226,17 @@ export default {
             var self = this;
             self.available_templates = shallow_copy(this.always_available_templates);
             // Read templates from disk
-            fs.readdir(this.template_path, function (err, files) {
+            fs.readdir(this.load_template_path, function (err, files) {
                 if (err) {
                     throw new Error(err);
                 }
                 files.forEach(function (file) {
-                    var file_path = path.join(self.template_path, file);
+                    var file_path = path.join(self.load_template_path, file);
                     var stat = fs.statSync(file_path);
                     if (stat.isFile()) {
                         // Found a file
                         let file_ext = path.parse(file).ext;
                         if (_.isEqual(file_ext, '.json')) {
-                            // console.log("file: ", file_path, stat);
                             let template = JSON.parse(fs.readFileSync(file_path, 'utf8'));
                             template.path = file_path;
                             self.available_templates.push(template);
@@ -267,8 +279,8 @@ export default {
             })
         },
         writeTemplate(template_name) {
-            let filename = makeValidFilename(template_name) + ".json";
-            let template_path = path.join(this.template_path, filename);
+            const filename = makeValidFilename(template_name) + ".json";
+            const template_path = path.join(this.save_template_path, filename);
             if (fs.existsSync(template_path)) {
                 this.$buefy.dialog.alert({
                     title: 'Failed to save template',
@@ -277,11 +289,11 @@ export default {
                 })
                 return
             }
-            let template_data = {
+            const template_data = {
                         name: template_name,
                         template: this.form_fields
                         }
-            let template_json = JSON.stringify(template_data, null, 4);
+            const template_json = JSON.stringify(template_data, null, 4);
             fs.writeFileSync(template_path, template_json);
             // Add to list of available templates
             this.available_templates.push(template_data);
