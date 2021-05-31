@@ -30,7 +30,7 @@ from multiprocessing import (
 from queue import Empty
 from time import time
 
-from karsalib import BaseClientNamespace, BaseServiceClient, CacheQueueConnector, \
+from karsalib import BaseClientNamespace, BaseServiceClient, CacheQ, \
                      parse_cmd_args, get_client_notification_args
 from karsatof.kworker import ImageGenerator
 from karsatof.kcollector import ExtendableDataArray
@@ -211,7 +211,7 @@ def viz_cache_pop(table,
     return data
 
 
-async def viz_cache_process_requests(request_id):
+def viz_cache_process_requests(request_id):
     global REQUEST_PROCESSORS
 
     rows = viz_cache_pop(
@@ -231,7 +231,7 @@ async def viz_cache_process_requests(request_id):
         filename, viz_type, t0, t1, mz0, mz1, t_resolution, client_room = row
 
         # Select processing method based on 'data_type' and process request
-        processed_until = await REQUEST_PROCESSORS[viz_type](
+        processed_until = REQUEST_PROCESSORS[viz_type](
                                     filename=filename,
                                     viz_type=viz_type,
                                     t0=t0,
@@ -453,7 +453,7 @@ def viz_cache_update(table,
                 )
     con.commit()
 
-async def process_visualization_request(filename,
+def process_visualization_request(filename,
                                   viz_type,
                                   t0,
                                   t1,
@@ -491,7 +491,7 @@ async def process_visualization_request(filename,
         or False if no (enough) data was available.
     """
 
-    async def feed_signal_to_visualize(t_range_to_process):
+    def feed_signal_to_visualize(t_range_to_process):
         nonlocal cache_item
         try:
             signal_slice = cache_item.signal.sel(time=slice(*t_range_to_process),
@@ -563,16 +563,12 @@ async def process_visualization_request(filename,
                             })
 
             processed_until = t1_i
-            # print("took %.2f sec" %(time()-t0))
-
-            await asyncio.sleep(.01)
-
         return processed_until
 
     cache_item = cache.get(request_id)
     if not cache_item:
         print("No such cache item: %s" %request_id)
-    processed_until = await feed_signal_to_visualize([t0, t1])
+    processed_until = feed_signal_to_visualize([t0, t1])
     return processed_until
 
 
@@ -728,7 +724,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                             )
         if not data_request_needed:
             # Process request
-            await viz_cache_process_requests(request_id)
+            viz_cache_process_requests(request_id)
 
 
     async def on_stop_visualize_range(self, data):
@@ -856,7 +852,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                 signal_array.combine_first(spec,
                                            [mz, ti]
                                            )
-            await viz_cache_process_requests(request_id)
+            viz_cache_process_requests(request_id)
 
         data_type = data['value']['data_type']
         if data_type == 'signal':
@@ -929,11 +925,11 @@ class DataVizServiceClient(BaseServiceClient):
         generator_input_q = Queue()
         self.generator_input_q =  Queue()
         shutdown_event = Event()
-        generator_input_cache = CacheQueueConnector('request_id/viz_type',
-                                                    generator_input_q,
-                                                    self.generator_input_q,
-                                                    shutdown_event
-                                                    )
+        generator_input_cache = CacheQ('request_id/viz_type',
+                                    generator_input_q,
+                                    self.generator_input_q,
+                                    shutdown_event
+                                    )
         self.generator_output_q = Queue()
         self.generator_procs = []
 

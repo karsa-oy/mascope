@@ -105,7 +105,7 @@ class QConnect(Thread):
     OUT_Q_LIMIT = cpu_count()
     CACHE_LIMIT = 1000000   # TODO: number?
 
-    def __init__(self, in_q, out_q, shutdown_event):
+    def __init__(self, in_q=None, out_q=None, shutdown_event=None):
         Thread.__init__(self)
         self.in_q = in_q
         self.out_q = out_q
@@ -126,7 +126,7 @@ class QConnect(Thread):
             data = None
             try:
                 data = self.in_q.get_nowait()
-                # print('in_q.get', data['client_room'])
+                # print('in_q.get', data['request_id'])
             except Empty:
                 pass
             except KeyboardInterrupt:
@@ -142,12 +142,12 @@ class QConnect(Thread):
             data = self.cache_get()
             if data:
                 self.out_q.put(data)
-                # print('out_q.put', data['client_room'])
+                # print('out_q.put', data['request_id'])
         self.cache = None
         print(f"Exit from {self.__class__.__name__} thread")
 
 
-class CacheQueueConnector(QConnect):
+class CacheQ(QConnect):
     def __init__(self, cache_key, *arg, **kwarg):
         super().__init__(*arg, **kwarg)
         self.cache = dict()
@@ -229,7 +229,6 @@ class CacheQueueConnector(QConnect):
         if isinstance(cache_level, list):
             return len(cache_level)
         return sum([self.cache_size(v) for v in cache_level.values()])
-
 
 class BaseClientNamespace(AsyncClientNamespace):
     """ python-socket.io client namespace for connecting to Router """
