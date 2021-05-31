@@ -701,7 +701,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         # Cancel DataViz request
         await self.parent.emit_public_notification(
                         'stop_visualize_range',
-                        {'request_ids': [self.room_sid],
+                        {'request_ids': [self.parent.public_ns.room_sid],
                          'filename': filename_base,
                          }
                         )
