@@ -60,7 +60,11 @@
         <section>
             <!-- Targetlist datatable collapable -->
             <section>
-                <b-collapse class="card" animation="slide" aria-id="contentIdForA11y3">
+                <b-collapse
+                    :open="false"
+                    class="card"
+                    animation="slide"
+                    aria-id="contentIdForA11y3">
                     <div
                         slot="trigger" 
                         slot-scope="props"
