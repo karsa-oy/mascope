@@ -121,17 +121,22 @@ class QConnect(Thread):
         data = self.cache.pop()
         return data
 
+    def fits_filter(self, data):
+        return False
+
     def run(self):
         while not self.shutdown_event.is_set():
             data = None
             try:
                 data = self.in_q.get_nowait()
-                # print('in_q.get', data['request_id'])
+                # print('in_q.get', data.get('request_id', ':'.join([data.get('name','?'), data.get('key','?')])))
             except Empty:
                 pass
             except KeyboardInterrupt:
                 break
             if data:
+                if self.fits_filter(data):
+                    continue
                 try:
                     self.cache_put(data)
                 except Full as e:
@@ -142,7 +147,7 @@ class QConnect(Thread):
             data = self.cache_get()
             if data:
                 self.out_q.put(data)
-                # print('out_q.put', data['request_id'])
+                # print('out_q.put', data.get('request_id', ':'.join([data.get('name','?'), data.get('key','?')])))
         self.cache = None
         print(f"Exit from {self.__class__.__name__} thread")
 
@@ -156,6 +161,7 @@ class CacheQ(QConnect):
         self.cache_index = len(self.cache_key) * [0]
         self.cache_index[0] = -1
         self.lock = Lock()
+        self.in_q_filters = []
 
     def cache_put(self, data):
         keys = []
@@ -215,6 +221,11 @@ class CacheQ(QConnect):
 
     def cache_delete_key(self, key):
         with self.lock:
+            if self.in_q:
+                # set ignore-marker for data, which is pending in in_q
+                self.in_q_filters.append(key)
+                self.in_q.put({'name': '__stop_fits_filter', 'key': key})
+            # delete cache hierarchy for the key
             level_keys = key.split(self.cache_key_separator)
             cache_level = self.cache
             key_to_delete = level_keys.pop(0)
@@ -223,6 +234,25 @@ class CacheQ(QConnect):
                 key_to_delete = level_keys.pop(0)
             if key_to_delete in cache_level:
                 del cache_level[key_to_delete]
+
+    def fits_filter(self, data):
+        with self.lock:
+            # filter out ignore-marker package
+            if data.get('name') == '__stop_fits_filter':
+                # print('__stop_fits_filter', data['key'])
+                self.in_q_filters.remove(data['key'])
+                return True
+            # check if input data fits any filter element
+            for filter in self.in_q_filters:
+                fit = True
+                for k, v in zip(self.cache_key, filter.split(self.cache_key_separator)):
+                    if data.get(k) != v:
+                        fit = False
+                        break
+                if fit:
+                    # print('fits_filter', filter)
+                    return True
+            return False
 
     def cache_size(self, cache_level=None):
         cache_level = cache_level or self.cache

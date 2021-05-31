@@ -1070,8 +1070,6 @@ class FileIoClient(BridgeServiceClient):
             except KeyboardInterrupt:
                 break
 
-
-
             client_room = data.pop('client_room')
             cnt += 1
             await self.emit_public_notification(
