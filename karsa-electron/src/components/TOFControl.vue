@@ -747,6 +747,8 @@ export default {
         },
         instrument_log: function(new_value) {
             if (!new_value.length) {
+                this.instrument_log_rows = [];
+                this.instrument_log_cols = [];
                 return
             }
             let col_fields = [];

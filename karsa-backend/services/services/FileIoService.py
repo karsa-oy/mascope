@@ -942,8 +942,11 @@ def append_instrument_log(log_path, new_entry):
 
 def read_instrument_log(log_path):
     log_file = os.path.join(log_path, '.log')
-    with open(log_file, 'r+') as f:
-        instrument_log = json.load(f)
+    try:
+        with open(log_file, 'r+') as f:
+            instrument_log = json.load(f)
+    except FileNotFoundError:
+        instrument_log = []
     return instrument_log
 
 def base_to_zarr_filename(base_filename, variable):
