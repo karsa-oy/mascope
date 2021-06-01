@@ -305,8 +305,6 @@ export default {
         stop_visualize_range: function(new_value, old_value) {
             if (_.isEqual(new_value.request_ids, old_value.request_ids)) {
                 return
-            } else {
-                this.log(new_value, old_value);
             }
             return this.be.export_one_way_binding_prop('stop_visualize_range',
                                                        {...new_value,

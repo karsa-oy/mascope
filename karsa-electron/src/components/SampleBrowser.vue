@@ -1205,12 +1205,24 @@ export default {
                 this.sample_table_checked_rows = [last_selection,];
             }
             if (last_selection) {
+                // Sample selected
                 let filename = last_selection.filename;
                 const sample = this.getSample(filename);
                 this.sample_selected = {'title': last_selection.title,
                                         ...sample
                                         };
+            } else {
+                // Sample deselected
+                this.sample_selected = {
+                            'filename': "",
+                            'title': "",
+                            'properties': {
+                                'length': 0,
+                                'range': [0, 0],
+                                },
+                            };
             }
+            this.sample_annotations = [];
         },
         'root_namespace.connected': function(new_value) {
             if ( new_value === true )

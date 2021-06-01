@@ -282,7 +282,7 @@ export const viewPortMixin = {
 
         async _on_figure_ranges(new_value, old_value) {
             if (!new_value.filename) {
-                this.log("_on_figure_ranges: !new_value.filename");
+                // this.log("_on_figure_ranges: !new_value.filename");
                 this.reset_view();
                 this.filename = "";
                 return
@@ -290,7 +290,7 @@ export const viewPortMixin = {
             let new_sample = false;
             if (!_.isEqual(new_value.filename, old_value.filename)) {
                 // New sample to load, reset
-                this.log("_on_figure_ranges: new_sample");
+                // this.log("_on_figure_ranges: new_sample");
                 this.reset_view();
                 new_sample = true;
             }
@@ -586,10 +586,9 @@ export const viewPortMixin = {
         },
 
         visualize_range_on_zoom_out() {
-            this.log("visualize_range_on_zoom_out");
             let self = this;
             if ( self.zoom_stack.length <= 1 ) {
-                self.log("Zoom stack is empty.");
+                // self.log("Zoom stack is empty.");
                 self.beep();
                 return
             }
@@ -610,7 +609,7 @@ export const viewPortMixin = {
                 self.zoom_stack.pop();
                 zoom_stack_item_to_restore = shallow_copy(self.zoom_stack.slice(-1)[0]);
             }
-            self.log("Zoom stack frames left:", self.zoom_stack.length - 1);
+            // self.log("Zoom stack frames left:", self.zoom_stack.length - 1);
             if ( _.isUndefined(zoom_stack_item_to_remove) || _.isUndefined(zoom_stack_item_to_restore) )
                 return;
             self.stop_visualize_range = {
