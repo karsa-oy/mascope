@@ -492,6 +492,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
     endpoints = [
         # TOFControl
         'instrument_log_entry',
+        'instrument_log_request',
         # //
         # TOFService
         'acquisition_started',
@@ -523,6 +524,15 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         value = data['value']
         entry = value
         append_instrument_log(self.namespace.strip('/'), entry)
+    
+    async def on_instrument_log_request(self, data):
+        value = data['value']
+        client_room = data['cookies']['src_sid'][0]
+        log = read_instrument_log(self.namespace.strip('/'))
+        await self.emit_client_notification('instrument_log',
+                                            log,
+                                            room=client_room
+                                            )
     # -----------------------------------------
 
     # ========== TOFService requests ==========
@@ -915,7 +925,6 @@ class FileIoPrivateNamespace(BaseClientNamespace):
     # ----------------------------------------
 
 
-
 # ========= File I/O functions =========
 def append_instrument_log(log_path, new_entry):
     log_file = os.path.join(log_path, '.log')
@@ -930,6 +939,12 @@ def append_instrument_log(log_path, new_entry):
             instrument_log.append(new_entry)
             f.seek(0)
             json.dump(instrument_log, f, indent=4)
+
+def read_instrument_log(log_path):
+    log_file = os.path.join(log_path, '.log')
+    with open(log_file, 'r+') as f:
+        instrument_log = json.load(f)
+    return instrument_log
 
 def base_to_zarr_filename(base_filename, variable):
     sample_data_path = parse_path_from_sample_name(base_filename)

@@ -7,7 +7,7 @@
                 has-modal-card
                 trap-focus
                 :can-cancel="true"
-                :destroy-on-hide="false"
+                :destroy-on-hide="true"
                 aria-role="dialog"
                 aria-modal>
                 <div class="modal-card" style="width: 500px;">
@@ -46,14 +46,59 @@
                         </b-button>
                         <b-button
                             is-dark
-                            @click="is_modal_add_log_entry_active=false;">
+                            @click="is_modal_add_log_entry_active=false;
+                                    is_modal_instrument_log_active=true">
                             Cancel
                         </b-button>
                     </footer>
                 </div>
             </b-modal>
         </section>
-        <!--- End of add log entry modal--> 
+        <!--- End of add log entry modal-->
+
+        <!--- Show log modal--> 
+        <section class="instrument-log-modal">
+            <b-modal :active.sync="is_modal_instrument_log_active"
+                has-modal-card
+                trap-focus
+                :can-cancel="true"
+                :destroy-on-hide="false"
+                aria-role="dialog"
+                aria-modal>
+                <div class="modal-card" style="width: 500px;">
+                    <!-- Main content -->
+                    <div>
+                        <header class="modal-card-head">
+                            <p class="modal-card-title">
+                                Instrument log
+                            </p>
+                        </header>
+                        <section class="modal-card-body">
+                            <b-table
+                                :data="instrument_log_rows"
+                                :columns="instrument_log_cols">
+
+                            </b-table>
+                        </section>
+                    </div>
+                    <!-- Footer -->
+                    <footer class="modal-card-foot">
+                        <b-button
+                            type="is-success"
+                            @click="onButtonInstrumentLogEntry()">
+                            New entry
+                        </b-button>
+                        <b-button
+                            is-dark
+                            @click="is_modal_instrument_log_active=false;">
+                            Close
+                        </b-button>
+                    </footer>
+                </div>
+            </b-modal>
+        </section>
+        <!--- End of show log modal--> 
+
         <!-- Modal for edit temperature ramp datatable values -->
         <section class="modal-edit-temperature-ramp-data-table-row">
             <b-modal 
@@ -167,8 +212,8 @@
                                 <b-button
                                     type="is-dark"
                                     :disabled="false"
-                                    @click="onButtonInstrumentLogEntry()">
-                                    Add instrument log entry
+                                    @click="onButtonShowInstrumentLog()">
+                                    Instrument log
                                 </b-button>
                                 <div><br></div>
                             </div>
@@ -403,6 +448,7 @@ export default {
             acquisition_control_label: "Start Acquisition",
             is_edit_temperature_ramp_modal_active: false,
             is_modal_add_log_entry_active: false,
+            is_modal_instrument_log_active: false,
             //
             // Communication
             be: null,
@@ -419,6 +465,9 @@ export default {
             sample_length: 120,
             acquisition_progress: 0,
             acquisition_started: {},
+            instrument_log: [],
+            instrument_log_rows: [],
+            instrument_log_cols: [],
             instrument_status: "not_ready",			// not_ready/ready
             scenthound_status: "Offline",       // Offline/Ready/Measuring.../Processing...
             //
@@ -524,7 +573,12 @@ export default {
         },
         onButtonInstrumentLogEntry() {
             this.log_entry_datetimestamp = new Date();
+            this.is_modal_instrument_log_active = false;
             this.is_modal_add_log_entry_active = true;
+        },
+        onButtonShowInstrumentLog() {
+            this.be.emit_client_notification('instrument_log_request', {});
+            this.is_modal_instrument_log_active = true;
         },
         on_button_change_acquisition_status() {
             let next_status = {"not_running": "starting",
@@ -632,6 +686,7 @@ export default {
                 // });
             self.log_entry_save_button_type = "is-success";
             self.is_modal_add_log_entry_active = false;
+            self.onButtonShowInstrumentLog();
         },
     },
     watch: {
@@ -690,6 +745,54 @@ export default {
                 this.scenthound_status = 'Ready';
             }
         },
+        instrument_log: function(new_value) {
+            if (!new_value.length) {
+                return
+            }
+            let col_fields = [];
+            let cols = [
+                {'field': "timestamp",
+                 'label': "Timestamp",
+                 'searchable': true,
+                 }
+            ];
+            let rows = [];
+            for (let i in new_value) {
+                var row = {};
+                const entry_data = new_value[i];
+                const timestamp = entry_data.timestamp;
+                row.timestamp = timestamp;
+                const entry = entry_data.entry;
+                for (let j in entry) {
+                    const label = entry[j].label;
+                    const field = label.toLowerCase();
+                    if (col_fields.indexOf(field) == -1) {
+                        // Add field
+                        col_fields.push(field);
+                        cols.push({'field': field,
+                                   'label': label,
+                                   'searchable': true
+                                   });
+                    }
+                    const value = entry[j].value;
+                    row[field] = value;
+                }
+                rows.push(row);
+            }
+            this.instrument_log_rows = rows;
+            this.instrument_log_cols = cols;
+
+            // Update log entry default template with all existing fields
+            let instrument_log_all_fields = [];
+            for (let i=1; i<cols.length; ++i) { // Ignore timestamp
+                const field = 
+                    {'label': cols[i].label,
+                     'value': row[cols[i].field] || "" // Value from last entry
+                     };
+                instrument_log_all_fields.push(field);
+            }
+            this.log_entry_default_template = instrument_log_all_fields;
+        },
         instrument_status: function(new_value, old_value) {
             if ( _.isEqual(new_value, old_value) ) {
                 return false;
@@ -728,6 +831,7 @@ export default {
                 this.namespace.on("acquisition_started", (value) => this.be.import_one_way_binding_prop("acquisition_started", value.value));
                 this.namespace.on("acquisition_status", (value) => this.be.import_one_way_binding_prop("acquisition_status", value.value));
                 this.namespace.on("acquisition_progress", (value) => this.be.import_one_way_binding_prop("acquisition_progress", value.value.progress, true));
+                this.namespace.on("instrument_log", (value) => this.be.import_one_way_binding_prop("instrument_log", value.value));
                 this.namespace.on("instrument_status", (value) => this.be.import_one_way_binding_prop("instrument_status", value.value));
 
                 this.be.subscribe(this.endpoints,

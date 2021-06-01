@@ -836,8 +836,8 @@ export default {
                 }
             }
         },
-        getPrefilledTemplatePath(experiment_title, make_if_missing=false) {
-            const template_path = "../metadata_templates/prefilled_templates/" + experiment_title;
+        getPrefilledTemplatePath(project_title, experiment_title, make_if_missing=false) {
+            const template_path = "../metadata_templates/prefilled_templates/" + ([project_title, experiment_title].join("_"));
             if (!fs.existsSync(template_path)) {
                 if (make_if_missing) {
                     fs.mkdirSync(template_path);
@@ -882,6 +882,8 @@ export default {
         },
         launchExperimentAttributesModal(experiment) {
             this.experiment_edit_form_props = {};
+            this.experiment_edit_form_props.project = experiment.project;
+            this.experiment_edit_form_props.experiment = experiment.title;
             this.experiment_edit_form_props.attributes = experiment.attributes;
             this.experiment_edit_form_props.sample_attributes_template = experiment.sample_attributes_template;
             this.is_modal_experiment_attributes_active = true;
@@ -890,8 +892,9 @@ export default {
             this.is_modal_new_experiment_active = true;
         },
         launchPrefillSampleAttributesModal() {
-            const experiment_title = this.experiment_edit_form_props.attributes[0].value;
-            this.experiment_edit_form_props.prefilled_templates_path = this.getPrefilledTemplatePath(experiment_title, true);
+            const experiment_title = this.experiment_edit_form_props.experiment;
+            const project = this.experiment_edit_form_props.project;
+            this.experiment_edit_form_props.prefilled_templates_path = this.getPrefilledTemplatePath(project, experiment_title, true);
             this.is_modal_prefill_sample_attributes_active = true;
         },
         launchProjectAttributesModal(mode, initial_template=null) {
@@ -1118,7 +1121,7 @@ export default {
             this.sample_form_props.experiment = this.experiment_selected.title;
             this.sample_form_props.attributes = shallow_copy(this.experiment_selected.sample_attributes_template);
             this.sample_form_props.title = "New sample attributes";
-            this.sample_form_props.load_template_path = this.getPrefilledTemplatePath(this.experiment_selected.title);
+            this.sample_form_props.load_template_path = this.getPrefilledTemplatePath(this.project_selected.title, this.experiment_selected.title);
             this.launchSampleAttributeModal();
             // this.sample_table_checked_rows = [];
         },
