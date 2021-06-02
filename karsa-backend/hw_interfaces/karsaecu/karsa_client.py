@@ -10,7 +10,7 @@ STX = 0x02
 ETX = 0x03
 
 class TCPClient():
-    def __init__(self,port,timeout=10):
+    def __init__(self, port, timeout=10):
         self._connected = False
 
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -22,11 +22,10 @@ class TCPClient():
             self.socket.connect((KRS_HOST, port))
             print("Connected")
             self._connected = True
-        except socket.error as err:
-            print("Cannot connect to the Karsa Socker Server. IP = {0}, Port = {1}".format(KRS_HOST,port))
-            raise
+        except Exception as e:
+            print("Cannot connect to the Karsa Socket Server due to exception: {}".format(e))
 
-    def sendCmd(self,command,payload):
+    def sendCmd(self, command, payload):
         l = len(payload)
         c = bytearray(APP_CMD_MIN_LEN + l)
         c[0] = STX
@@ -36,40 +35,43 @@ class TCPClient():
             c[3+i] = payload[i]
         c[3+l] = ETX
         try:
+            # print("sendCmd: %s" %c)
             self.socket.sendall(c)
             return False
         except Exception:
             pass
         return True
         
-    def getResp(self,command):
+    def getResp(self, command):
         try:
             nBytes = self.socket.recv_into(self._resp)
-            if ( (nBytes >= APP_RSP_MIN_LEN) and \
-                 (self._resp[0] == STX) and \
-                 (self._resp[1] == command) and \
-                 (nBytes-4 == self._resp[2]) and \
+            # print("getResp: %s" %self._resp[:nBytes])
+            if ( (nBytes >= APP_RSP_MIN_LEN) and
+                 (self._resp[0] == STX) and
+                 (self._resp[1] == command) and
+                 (nBytes-4 == self._resp[2]) and
                  (self._resp[self._resp[2]+3] == ETX) ):
-                return nBytes-4,self._resp[3:nBytes-1]
+                return nBytes-4, self._resp[3:nBytes-1]
         except Exception:
             pass
         return 0, None
         
-    def sendCmdWaitResp(self,command,payload):
-        err = self.sendCmd(command,payload)
+    def sendCmdWaitResp(self, command, payload):
+        err = self.sendCmd(command, payload)
         if (not err):
             nBytes, resp = self.getResp(command)
             if (resp[0] == 0x00):
                 if (nBytes == 1):
-                    return 0,resp[0:1]
+                    return 0, resp[0:1]
                 else:
-                    return nBytes-1,resp[1:nBytes]
+                    return nBytes-1, resp[1:nBytes]
             else:
-                print("Cmd 0x{0:02X} failed, status = 0x{1:02X}".format(command,resp[0]))
+                print("Cmd 0x{0:02X} failed, status = 0x{1:02X}".format(command, resp[0]))
                 return 0, resp[0:1]
         else:
             return 0, None # internal error
 
+    @property
     def connected(self):
         return self._connected
 
