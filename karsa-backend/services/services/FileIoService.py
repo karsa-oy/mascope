@@ -35,7 +35,8 @@ from karsalib import (BaseClientNamespace,
                       CacheQ,
                       Logger,
                       parse_cmd_args, 
-                      get_client_notification_args
+                      get_client_notification_args,
+                      t_mark
                       )
 from karsatof.kcollector import ExtendableDataArray
 from karsatof.kdatapool import parse_path_from_sample_name
@@ -740,25 +741,23 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         global cache
 
         value = data['value']
-        request_id = value['request_id']
-        client_room = data.get('client_room') or data['cookies']['src_sid'][0]
+        t_mark(value)
 
+        client_room = data.get('client_room') or data['cookies']['src_sid'][0]
         filename = value['filename']
         data_type = value['data_type']
 
         if filename not in cache:
             # File not in cache, load and put
             file_dataset = load_file(filename)
-            # Put to data array cache
             cache[filename] = file_dataset
+            t_mark(value)
 
         file_cache_item = cache[filename]
         data_item = file_cache_item[data_type]
 
         coordinates = {}
-        coordinate_data = {'request_id': request_id,
-                           'filename': filename,
-                           'data_type': data_type,
+        coordinate_data = {**value,
                            'coordinates': coordinates,
                            }
 
@@ -771,6 +770,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                 coord_values_b = coord_values.astype(np.float32).tobytes()
             coordinates.update({dim: coord_values_b})
 
+        t_mark(coordinate_data)
         await self.parent.emit_public_notification('loaded_coordinates',
                                                    coordinate_data,
                                                    room=client_room,
@@ -780,6 +780,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         global cache
         self.log(data)
         value = data['value']
+        t_mark(value)
 
         filename = value['filename']
         data_type = value['data_type']
@@ -791,8 +792,8 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         if filename not in cache:
             # File not in cache, load and put
             file_dataset = load_file(filename)
-            # Put to data array cache
             cache[filename] = file_dataset
+            t_mark(value)
 
         file_cache_item = cache[filename]
 
@@ -816,10 +817,13 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                   )
         # Process request(s)
         cache_process_requests(filename)
+        t_mark(value)
 
     async def on_figure_data(self, data):
         # self.log(data)
         value = data['value']
+        t_mark(value)
+
         filename = value['filename']
         viz_type = value['viz_type']
         viz_array = cache[filename][viz_type]
@@ -829,6 +833,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                                [ti],
                                'time'
                                )
+        t_mark(value)
 
     async def on_stop_data_request(self, data):
         self.log(data)
@@ -837,6 +842,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         for request_id in request_ids:
             cache_release('requests', request_id=request_id)
             service_q.cache_delete_key(request_id)
+        t_mark(value)
 
     async def on_tps_data_request(self, data):     
         # TODO: Deprecated, need to update   

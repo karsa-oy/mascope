@@ -31,7 +31,7 @@ from queue import Empty
 from time import time
 
 from karsalib import BaseClientNamespace, BaseServiceClient, CacheQ, \
-                     parse_cmd_args, get_client_notification_args
+                     parse_cmd_args, get_client_notification_args, t_mark
 from karsatof.kworker import ImageGenerator
 from karsatof.kcollector import ExtendableDataArray
 from karsatof.kimage import (
@@ -548,6 +548,8 @@ def process_visualization_request(filename,
             t0_i = float( spec_array.time[0] )
             t1_i = float( spec_array.time[-1] ) + float( period_array[-1] )
 
+            t_data = {'request_id': request_id,}
+            t_mark(t_data)
             # Put batch to queue to be visualized
             generator_input_q.put({
                             'data': spec_array,
@@ -560,6 +562,7 @@ def process_visualization_request(filename,
                             'client_room': client_room,
                             'request_id': request_id,
                             'persist_in_cache': False,
+                            **t_data
                             })
 
             processed_until = t1_i
@@ -635,6 +638,9 @@ class DataVizServiceNamespace(BaseClientNamespace):
 
         cache_item = cache[request_id]
 
+        t_data = {'request_id': request_id,}
+        t_mark(t_data)
+
         if not mz_range:
             for viz_type in viz_types:
                 # Request full-range images from FileIo directly to client
@@ -642,6 +648,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                                     {'filename': filename,
                                                     'data_type': viz_type,
                                                     'request_id': request_id,
+                                                    **t_data,
                                                     },
                                                     client_room=client_room,
                                                     namespace=get_namespace(filename)
@@ -660,6 +667,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                                  'filename': filename,
                                                  'data_type': 'signal',
                                                  'dims': ['mz'],
+                                                 **t_data,
                                                  },
                                                 namespace=get_namespace(filename)
                                                 )
@@ -670,6 +678,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                                  'data_type': 'signal',
                                                  'mz_range': mz_range,
                                                  'request_id': request_id,
+                                                 **t_data,
                                                 },
                                                 namespace=get_namespace(filename)
                                                 )
@@ -709,6 +718,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                                     'data_type': 'signal',
                                                     'mz_range': mz_range_missing,
                                                     'request_id': request_id,
+                                                    **t_data,
                                                     },
                                                     namespace=get_namespace(filename)
                                                     )
@@ -725,6 +735,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
         if not data_request_needed:
             # Process request
             viz_cache_process_requests(request_id)
+        t_mark(t_data)
 
 
     async def on_stop_visualize_range(self, data):
@@ -742,6 +753,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
         request_ids = value['request_ids']
         if not filename:
             return
+        t_mark(value)
         await self.emit_client_notification('stop_data_request',
                                             data['value'],
                                             **{**get_client_notification_args(data),
@@ -766,6 +778,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
             global cache
 
             value = data['value']
+            t_mark(value)
             
             request_id = value['request_id']
             filename = value['filename']
@@ -794,6 +807,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
             cache[request_id].update({data_array.name: data_array,
                                     period_array.name: period_array,
                                     })
+            t_mark(value)
 
     async def on_loaded_data(self, data):
         """Data loaded from FileIoService
@@ -958,6 +972,8 @@ class DataVizServiceClient(BaseServiceClient):
                 continue
             except KeyboardInterrupt:
                 break
+
+            t_mark(img_data)
 
             # Got new image
             # self.log("Image ready: ", img_data)

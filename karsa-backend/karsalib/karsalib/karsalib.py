@@ -1,4 +1,5 @@
 import sys
+import os
 import time
 import getopt
 import asyncio
@@ -26,6 +27,24 @@ def get_client_notification_args(data):
     ignoring 'name' and 'value' fields.
     """
     return copy_dict(data, ignore_keys=['name', 'value'])
+
+def this_func_name():
+    return inspect.stack()[1][3]
+
+def parent_func_name():
+    return inspect.stack()[2][3]
+
+def t_mark(data, note=None):
+    if 't_mark' not in os.environ:
+        return
+    if 't_mark' not in data:
+        data['t_mark'] = [[note or parent_func_name(), time.time()],]
+        return
+    t = time.time()
+    data['t_mark'][-1][-1] = round(t - data['t_mark'][-1][-1], 3)
+    data['t_mark'].append([note or parent_func_name(), t])
+    print('t_mark :', data['t_mark'], data.get('request_id', ''))
+
 
 class Logger():
     # log_levels = [
