@@ -1193,6 +1193,10 @@ export default {
                     row[attr.label.toLowerCase()] = attr.value.toString(); // TODO: prettify
                 }
                 rows.push(row);
+
+                if (row['filename'] == this.sample_selected.filename) {
+                    this.sample_table_checked_rows = [row,];
+                }
             }
             this.sample_table_cols = cols;
             this.sample_table_rows = rows;
