@@ -38,8 +38,10 @@ class AsyncTCPClient():
 
     async def sendCmd(self, command, payload=[]):
         c = chr(STX)
-        cmd_str = hex(command)
-        for i in range(2, 4):
+        cmd_str = hex(command)[2:] # strip 0x
+        if len(cmd_str) == 1:
+            cmd_str = '0' + cmd_str
+        for i in range(2):
             c += cmd_str[i].upper()
         for i in range(3, 11):
             c += '0'
@@ -61,12 +63,14 @@ class AsyncTCPClient():
         
     async def getResp(self):
         r = await self._reader.readuntil(chr(ETX).encode())
+        print("getResp: %s" %r)
         stx = r[0]
         cmd = r[1:3]
-        error = r[3:7]
-        status = r[7:11]
-        length = r[11:15]
-        payload = r[15:-1]
+        error = r[3:7]      # TODO: handle
+        status = r[7:11]    # TODO: handle
+        length = r[11:15]   # TODO: handle
+        payload = r[15:-3]
+        cs = r[-3:-1]       # TODO: handle
         etx = r[-1]
 
         if ( (stx == STX) and
@@ -77,8 +81,8 @@ class AsyncTCPClient():
         
     async def sendCmdWaitResp(self, command, payload=[]):
         await self.sendCmd(command, payload)
-        resp_cmd, resp = await self.getResp(command)
-        if resp_cmd == command:
+        resp_cmd, resp = await self.getResp()
+        if int(resp_cmd, 16) == command:
             return resp
         else:
             raise ValueError("Received response for wrong command")

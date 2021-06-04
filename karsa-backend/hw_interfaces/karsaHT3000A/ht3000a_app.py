@@ -13,6 +13,7 @@ async def main():
     await tcp.connect()
 
     resp = await tcp.sendCmdWaitResp(CMD_READ_SAMPLER_STATUS)
+    print(resp)
 
     if (tcp.connected):
         tcp.close()
