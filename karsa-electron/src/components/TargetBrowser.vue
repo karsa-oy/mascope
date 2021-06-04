@@ -135,6 +135,7 @@ export default {
     },
     computed: {
         ...mapState([
+            'figure_double_click',
             'root_namespace',
             // 'targets',
         ]),
@@ -265,6 +266,9 @@ export default {
                 this.excel_clipboard_table_rows = this.excel_clipboard_table_rows.slice(1);
             }
         },
+        figure_double_click: function() {
+            this.target_table_selected_row = null;
+        },
         target_table_selected_row:function(new_value, old_value) {
             if ( _.isEqual(new_value, old_value) ) {
                 return false;
@@ -289,11 +293,6 @@ export default {
             }
             this.target_table_cols = new_data.cols;
             this.target_table_rows = new_data.rows;
-        },
-        target_to_display: function(new_value, old_value) {
-            return this.be.export_one_way_binding_prop('target_to_display',
-                                                        new_value, old_value,
-                                                        this.room_sid);
         },
         'root_namespace.connected': function(new_value) {
             if ( new_value === true )

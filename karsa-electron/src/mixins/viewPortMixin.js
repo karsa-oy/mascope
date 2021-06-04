@@ -311,6 +311,24 @@ export const viewPortMixin = {
                 // Zoom in loaded sample
                 this.visualize_range_on_zoom_in(old_value, new_value);
             }
+            // Add target trace if target selected
+            if (this.target_to_display) {
+                let mz = this.target_to_display;
+                let mz_axis = this.figure_axes.mz;
+                let time_axis = this.figure_axes.time;
+                if (mz_axis) {
+                    // Add target trace
+                    let target_traces = [{
+                        [time_axis]: new_value.t_range,
+                        [mz_axis]: [mz, mz],
+                        'mode': 'lines',
+                        'line': {'color': '#8c67ef'}
+                        }];
+                    let zoom_stack_item = this.zoom_stack.slice(-1)[0]
+                    let figure_cache_item = this.figure_cache_get(zoom_stack_item.id);
+                    figure_cache_item.figure_traces.push(...target_traces);
+                }
+            }
         },
 
         async _on_figure_data(json_data) {
@@ -471,7 +489,7 @@ export const viewPortMixin = {
                                     };
         },
 
-        visualize_range_on_zoom_in(prev_ranges, new_ranges, volatile=false) {
+        visualize_range_on_zoom_in(prev_ranges, new_ranges) {
             // this.log("prev_ranges: ", prev_ranges, "new_ranges: ", new_ranges);
             let self = this;
             if ( _.isUndefined(prev_ranges) || _.isUndefined(new_ranges) ) {
@@ -538,7 +556,7 @@ export const viewPortMixin = {
                 zoom_stack_item = new self.ZoomStackItem([t0, t1],
                                                          [mz0, mz1],
                                                          new_ranges.id,
-                                                         volatile
+                                                         new_ranges.volatile
                                                          );
             }
             // Add the zoom stack item at the top of the stack
@@ -667,35 +685,35 @@ export const viewPortMixin = {
                 return self._on_figure_ranges(new_value, old_value); }
             );
         },
-        target_to_display: function(new_value, old_value) {
-            if ( _.isEqual(new_value, old_value) || _.isEmpty(this.filename) ) {
-                return false;
-            }
-            if (new_value == null) {
-                this.visualize_range_on_zoom_out();
-                return
-            }
-            let mz = new_value;
-            let target_mz_range = [mz-.5, mz+.5];
-            let prev_ranges = shallow_copy(this.zoom_stack.slice(-1)[0]);
-            let new_ranges = {'mz_range': target_mz_range,
-                              't_range': prev_ranges.t_range};
-            // Make volatile zoom-in
-            this.visualize_range_on_zoom_in(prev_ranges, new_ranges, true);
-            let mz_axis = this.figure_axes.mz;
-            let time_axis = this.figure_axes.time;
-            if (mz_axis) {
-                // Add target trace
-                let target_traces = [{
-                    [time_axis]: new_ranges.t_range,
-                    [mz_axis]: [mz, mz],
-                    'mode': 'lines',
-                    'line': {'color': '#8c67ef'}
-                    }];
-                let zoom_stack_item = this.zoom_stack.slice(-1)[0]
-                let figure_cache_item = this.figure_cache_get(zoom_stack_item.id);
-                figure_cache_item.figure_traces.push(...target_traces);
-            }
-        },
+        // target_to_display: function(new_value, old_value) {
+        //     if ( _.isEqual(new_value, old_value) || _.isEmpty(this.filename) ) {
+        //         return false;
+        //     }
+        //     if (new_value == null) {
+        //         this.visualize_range_on_zoom_out();
+        //         return
+        //     }
+        //     let mz = new_value;
+        //     let target_mz_range = [mz-.5, mz+.5];
+        //     let prev_ranges = shallow_copy(this.zoom_stack.slice(-1)[0]);
+        //     let new_ranges = {'mz_range': target_mz_range,
+        //                       't_range': prev_ranges.t_range};
+        //     // Make volatile zoom-in
+        //     this.visualize_range_on_zoom_in(prev_ranges, new_ranges, true);
+        //     let mz_axis = this.figure_axes.mz;
+        //     let time_axis = this.figure_axes.time;
+        //     if (mz_axis) {
+        //         // Add target trace
+        //         let target_traces = [{
+        //             [time_axis]: new_ranges.t_range,
+        //             [mz_axis]: [mz, mz],
+        //             'mode': 'lines',
+        //             'line': {'color': '#8c67ef'}
+        //             }];
+        //         let zoom_stack_item = this.zoom_stack.slice(-1)[0]
+        //         let figure_cache_item = this.figure_cache_get(zoom_stack_item.id);
+        //         figure_cache_item.figure_traces.push(...target_traces);
+        //     }
+        // },
     },
 }

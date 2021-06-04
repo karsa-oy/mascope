@@ -157,6 +157,7 @@ export default {
     computed: {
         ...mapState([
                     'experiment_selected',
+                    'figure_double_click',
                     'root_namespace',
                     'sample_annotation_timestamp',
                     'sample_selected',
@@ -282,6 +283,9 @@ export default {
     },
 
     watch: {
+        figure_double_click: function() {
+            return
+        },
         sample_annotation_fields: {
             handler() {
                 this.sample_annotation_save_button_type = "is-danger";
@@ -313,6 +317,21 @@ export default {
                                                        old_value,
                                                        this.room_sid
                                                        );
+        },
+        target_to_display: function(new_value, old_value) {
+            this.log("target_to_display: ", new_value);
+            if ( !new_value || _.isEqual(new_value, old_value) || _.isEmpty(this.filename) ) {
+                return false;
+            }
+            let mz = new_value;
+            let target_mz_range = [mz-.5, mz+.5];
+            let new_figure_ranges = {'filename': this.filename,
+                                     'id': Math.random().toString(36).substring(2),
+                                     't_range': this.figure_ranges.t_range,
+                                     'mz_range': target_mz_range,
+                                     'volatile': true,
+                                     };
+            this.figure_ranges = new_figure_ranges;
         },
         tps_parameters: function(new_value, old_value) {
             if ( _.isEmpty(new_value) || _.isEqual(new_value, old_value) ) {
