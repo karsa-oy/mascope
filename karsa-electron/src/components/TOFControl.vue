@@ -75,9 +75,22 @@
                         </header>
                         <section class="modal-card-body">
                             <b-table
-                                :data="instrument_log_rows"
-                                :columns="instrument_log_cols">
-
+                                :data="instrument_log_rows">
+                                <template v-for="column in instrument_log_cols">
+                                    <b-table-column :key="column.id" v-bind="column">
+                                        <template
+                                            #searchable="props">
+                                            <b-input
+                                                v-model="props.filters[props.column.field]"
+                                                placeholder="Search..."
+                                                icon="magnify"
+                                                size="is-small" />
+                                        </template>
+                                        <template v-slot="props">
+                                            {{ props.row[column.field] }}
+                                        </template>
+                                    </b-table-column>
+                                </template>
                             </b-table>
                         </section>
                     </div>
