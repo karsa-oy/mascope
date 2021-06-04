@@ -8,10 +8,7 @@ import asyncio
 import os
 import fnmatch
 import json
-import shutil
 import subprocess
-import warnings
-import xarray
 
 import numpy as np
 import pandas as pd
@@ -19,12 +16,16 @@ import pandas as pd
 import datetime_glob
 from datetime import datetime, timedelta
 from time import sleep
-from threading import Thread
 from multiprocessing import Lock
+
 # from watchdog.observers import Observer
 # from watchdog.events import FileSystemEventHandler
 
 from .kevent import KEvent
+
+
+METADATA_VERSION_NUMBER = '0.01'
+
 
 FILENAME_DATETIME_PATTERNS = [
         '*%Y.%m.%d*%Hh%Mm%Ss*',
@@ -423,9 +424,16 @@ class SamplePool():
             return {}
         with open(attr_path, 'r') as f:
             attributes = json.load(f)
+
+        if isinstance(attributes, list):
+            if 'metadata_version_number' in attributes[-1]:
+                metadata_version_number = attributes.pop()
+
         return attributes
 
     def _write_sample_annotation(self, path, prefix, annotation, ext='.annts'):
+        annotation.update({'metadata_version_number': METADATA_VERSION_NUMBER})
+
         file_path = os.path.join(path, prefix + ext)
         if not os.path.exists(file_path):
             # Annotations file does not yet exist, create
@@ -440,6 +448,8 @@ class SamplePool():
                 json.dump(annotations, f, indent=4)
 
     def _write_attributes(self, path, attributes, prefix='', ext='.attrs', overwrite=False):
+        attributes.append({'metadata_version_number': METADATA_VERSION_NUMBER})
+
         attr_path = os.path.join(path, prefix + ext)
         if os.path.exists(attr_path) and not overwrite:
             raise ValueError("Attribute file %s exists already!" % attr_path)

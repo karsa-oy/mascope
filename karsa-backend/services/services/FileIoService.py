@@ -44,6 +44,12 @@ from karsatof.kimage import (convert_base64_to_img, convert_to_base64)
 from karsatof.kutil import AttrDict
 from services.DataVizService import VIZ_TYPES_SUPPORTED
 
+
+
+DATA_VERSION_NUMBER = '0.01'
+
+
+
 client = None
 
 # Cache for data arrays
@@ -605,6 +611,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         attributes = {'id': filename_base,
                       'length': float(t_range[1]),
                       'range': [ float(mz[0]), float(mz[-1]) ],
+                      'data_version': DATA_VERSION_NUMBER
                       }
         # Write attributes
         attr_path = os.path.join(
