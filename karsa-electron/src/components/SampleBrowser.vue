@@ -417,6 +417,73 @@
         </section>
         <!-- End of modal for prefilling sample edit -->
 
+        <!-- Sample table modal -->
+        <section class="sample-table-modal">
+            <b-modal :active.sync="is_modal_sample_table_active"
+                has-modal-card
+                trap-focus
+                :can-cancel="true"
+                :destroy-on-hide="false"
+                aria-role="dialog"
+                aria-modal>
+                <div class="modal-card" style="width: auto">
+                    <header class="modal-card-head">
+                        <p class="modal-card-title">
+                            Project experiment samples
+                        </p>
+                    </header>
+                    <section class="modal-card-body">
+                        
+                        <!-- Sample table -->
+                        <b-table 
+                            id="samples-datatable"
+                            style="height:100%; width:100%"
+                            :data="sample_table_rows"
+                            :sticky-header="true"
+                            detailed
+                            detail-key="title"
+                            :show-detail-icon="false">
+                            <!-- Columns -->
+                            <b-table-column
+                                v-for="(col, i) in sample_table_cols"
+                                :key="i"
+                                :field="col.field"
+                                :label="col.label"
+                                v-slot="props">
+                                <a @click="props.toggleDetails(props.row)">
+                                    {{ props.row[col.field] }}
+                                </a>
+                            </b-table-column>
+                            <!-- End of columns -->
+                            <!-- Details view -->
+                            <template #detail="props">
+                                <div>
+                                    <p @contextmenu.prevent="rightClickSample(props.row.filename)">
+                                        <strong>{{ props.row.title }}</strong>
+                                        <br>
+                                        {{ props.row.description }}
+                                        <br>
+                                        <small style="color: #ababab;">{{ props.row.filename }}</small>
+                                    </p>
+                                </div>
+                            </template>
+                            <!-- End of details view -->
+                        </b-table>
+                        <!-- End of sample table -->
+
+                    </section>
+                    <footer class="modal-card-foot">
+                        <b-button
+                            @click="is_modal_sample_table_active=false"
+                            is-dark>
+                            Close
+                        </b-button>
+                    </footer>
+                </div>
+            </b-modal>
+        </section>     
+        <!-- End of sample table modal -->
+
         <!-- Modal for sample import -->
         <section class="sample-import-modal">
             <b-modal :active.sync="is_modal_sample_import_active"
@@ -560,6 +627,37 @@
                                                         Samples
                                                     </p>
                                                     <!-- Sample table -->
+                                                    <div style="text-align:right;">
+                                                        <b-button
+                                                            icon-left="magnify"
+                                                            class="tag is-dark"
+                                                            outlined
+                                                            @click="is_modal_sample_table_active=true">
+                                                        </b-button>
+                                                        <b-dropdown
+                                                            aria-role="menu"
+                                                            type="is-dark"
+                                                            position="is-top-right"
+                                                            trap-focus
+                                                            multiple
+                                                            append-to-body>
+                                                            <b-button
+                                                                icon-left="menu"
+                                                                class="tag is-dark"
+                                                                slot="trigger"
+                                                                outlined>
+                                                            </b-button>
+                                                            <b-field grouped group-multiline>
+                                                                <div v-for="(col, i) in sample_table_cols"
+                                                                    :key="i"
+                                                                    class="control">
+                                                                    <b-checkbox v-model="col.visible">
+                                                                        {{ col.label }}
+                                                                    </b-checkbox>
+                                                                </div>
+                                                            </b-field>
+                                                        </b-dropdown>
+                                                    </div>
                                                     <b-table 
                                                         id="samples-datatable"
                                                         style="height:100%; width:100%"
@@ -573,9 +671,15 @@
                                                         :show-detail-icon="false"
                                                         v-if="e.title === experiment_selected.title">
                                                         <!-- Columns -->
-                                                        <b-table-column field="title" label="" v-slot="props">
+                                                        <b-table-column
+                                                            v-for="(col, i) in sample_table_cols"
+                                                            :key="i"
+                                                            :field="col.field"
+                                                            :label="col.label"
+                                                            :visible="col.visible || false"
+                                                            v-slot="props">
                                                             <a @click="props.toggleDetails(props.row)">
-                                                                {{ props.row.title }}
+                                                                {{ props.row[col.field] }}
                                                             </a>
                                                         </b-table-column>
                                                         <!-- End of columns -->
@@ -743,6 +847,7 @@ export default {
             is_modal_new_experiment_active: false,
             is_modal_sample_import_active: false,
             is_modal_sample_attributes_active: false,
+            is_modal_sample_table_active: false,
             // variables for import modals
             import_start_time: null,
             import_end_time: null,
@@ -1150,27 +1255,25 @@ export default {
         samples: function(new_value){
             // Format data to sample table
             let rows = [];
-            let cols = [
-                    {
-                    'field': "filename",
-                    'label': "Filename",
-                    },
-                    {
-                    'field': "project",
-                    'label': "Project",
-                    },
-                    {
-                    'field': "experiment",
-                    'label': "Experiment",
-                    },
-            ];
+            let cols = [];
             for (const i in new_value) {
                 let sample = new_value[i];
                 let row = {};
-                row['filename'] = sample.filename;
-                row['project'] = sample.project;
-                row['experiment'] = sample.experiment;
-
+                // Unpack attributes
+                for (let i in sample.attributes) {
+                    let attr = sample.attributes[i];
+                    if (rows.length == 0) {
+                        let col = {
+                            'field': attr.label.toLowerCase(),
+                            'label': attr.label,
+                            };
+                        if (col.field == 'title') {
+                            col.visible = true;
+                        }
+                        cols.push(col);
+                    }
+                    row[attr.label.toLowerCase()] = attr.value.toString(); // TODO: prettify
+                }
                 // Unpack properties
                 for (const prop in sample.properties) {
                     if (rows.length == 0) {
@@ -1181,19 +1284,30 @@ export default {
                     }
                     row[prop.toLowerCase()] = sample.properties[prop];
                 }
-                // Unpack attributes
-                for (let i in sample.attributes) {
-                    let attr = sample.attributes[i];
-                    if (rows.length == 0) {
-                        cols.push({
-                            'field': attr.label.toLowerCase(),
-                            'label': attr.label,
-                        });
-                    }
-                    row[attr.label.toLowerCase()] = attr.value.toString(); // TODO: prettify
+                // Hard-coded attributes
+                row['filename'] = sample.filename;
+                row['project'] = sample.project;
+                row['experiment'] = sample.experiment;
+                
+                if (rows.length == 0) {
+                    cols.concat([
+                        {
+                        'field': "filename",
+                        'label': "Filename",
+                        },
+                        {
+                        'field': "project",
+                        'label': "Project",
+                        },
+                        {
+                        'field': "experiment",
+                        'label': "Experiment",
+                        }
+                    ]);
                 }
-                rows.push(row);
 
+                rows.push(row);
+                
                 if (row['filename'] == this.sample_selected.filename) {
                     this.sample_table_checked_rows = [row,];
                 }
