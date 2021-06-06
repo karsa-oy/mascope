@@ -294,7 +294,10 @@ def run():
                                  (args['ns'], MetadataServiceNamespace)
                                  )
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(client.run())
+    try:
+        loop.run_until_complete(client.run())
+    except KeyboardInterrupt:
+        client.log('Quit')
 
 
 if __name__=='__main__':

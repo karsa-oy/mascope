@@ -1171,6 +1171,19 @@ export default {
         },
     },
     watch: {
+        experiments: function() {
+            if (this.experiment_selected.title) {
+                this.selectExperiment(this.experiment_selected.title);
+            }
+        },
+        projects: function() {
+            if (this.project_selected.title) {
+                let experiment_selected_title = this.experiment_selected.title;
+                this.selectProject(this.project_selected.title);
+                if (experiment_selected_title)
+                    this.selectExperiment(experiment_selected_title);
+            }
+        },
         experiment_selected: function(new_value, old_value) {
             if ( _.isEqual(new_value, old_value) ) {
                 return false;
@@ -1252,12 +1265,18 @@ export default {
                                                     );
             }
         },
-        samples: function(new_value){
+        samples: function(new_value, old_value){
             // Format data to sample table
+            let samples = new_value;
+            if ( _.isEmpty(new_value) && !_.isEmpty(old_value) ) {
+                // refresh current sample table
+                samples = old_value;
+                this.selectExperiment(samples[0].experiment)
+            }
             let rows = [];
             let cols = [];
-            for (const i in new_value) {
-                let sample = new_value[i];
+            for (const i in samples) {
+                let sample = samples[i];
                 let row = {};
                 // Unpack attributes
                 for (let i in sample.attributes) {
