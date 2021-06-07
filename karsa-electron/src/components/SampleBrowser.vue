@@ -538,6 +538,15 @@
 
     <!-- Main content area -->
         <section>
+            <b-notification
+                :active="!experiment_selected.title.length"
+                :closable="false"
+                type="is-danger"
+                role="alert">
+                <p style="font-size:20px">
+                    Please select project and experiment.
+                </p>
+            </b-notification>
             <!-- Samples datatable collapsable -->
             <section>
                 <b-collapse class="card" animation="slide" aria-id="contentIdForA11y3">
@@ -699,11 +708,11 @@
                                                     </b-table>
                                                     <!-- End of sample table -->
                                                     <!-- Import sample item -->
-                                                    <b-menu-item
+                                                    <!-- <b-menu-item
                                                         icon="plus"
                                                         :active="is_modal_sample_import_active"
                                                         @click="launchSampleImport()">
-                                                    </b-menu-item>
+                                                    </b-menu-item> -->
                                                     <!-- End of import sample item -->
                                                 </b-menu-item>
                                                 <!-- End of experiment item -->
@@ -838,6 +847,7 @@ export default {
                 'samples',
             ],
             // acquisition_started: false,
+            auto_save_new_sample: true,
             // Project / experiment title validation
             // Modal active variables
             is_modal_landing_active: true,
@@ -1231,8 +1241,10 @@ export default {
             if (new_value === old_value) {
                 return false;
             }
-            // let sample_no = this.sample_table_rows.length + 1;
-            // this.sample_selected.title = sample_no.toString().padStart(3, '0') + '_';
+            if ( !(this.project_selected.title.length &&
+                   this.experiment_selected.title.length) ) {
+                return false;
+            }
             this.sample_form_props = {};
             this.sample_form_props.filename = new_value;
             this.sample_form_props.project = this.project_selected.title;
@@ -1240,8 +1252,14 @@ export default {
             this.sample_form_props.attributes = shallow_copy(this.experiment_selected.sample_attributes_template);
             this.sample_form_props.title = "New sample attributes";
             this.sample_form_props.load_template_path = this.getPrefilledTemplatePath(this.project_selected.title, this.experiment_selected.title);
+            // Set title prefix
+            let sample_no = this.samples.length + 1;
+            const sample_title_prefix = sample_no.toString().padStart(3, '0') + '_';
+            this.sample_form_props.attributes[0].value = sample_title_prefix;
+            if (this.auto_save_new_sample) {
+                this.saveSample();
+            }
             this.launchSampleAttributeModal();
-            // this.sample_table_checked_rows = [];
         },
         project_selected: function(new_value, old_value) {
             if ( _.isEqual(new_value, old_value) ) {
