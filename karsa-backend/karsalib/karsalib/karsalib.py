@@ -167,6 +167,8 @@ class QConnect(Thread):
             if data:
                 self.out_q.put(data)
                 # print('out_q.put', data.get('request_id', ':'.join([data.get('name','?'), data.get('key','?')])))
+            else:
+                time.sleep(.1)
         self.cache = None
         print(f"Exit from {self.__class__.__name__} thread")
 
