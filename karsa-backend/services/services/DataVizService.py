@@ -520,6 +520,9 @@ def process_visualization_request(filename,
             # TODO: resample
             raise NotImplementedError
         
+        signal_slice.load()
+        period_slice.load()
+
         # Feed signal batches to generators
         for i in range(no_batches):
             # print("feeding batch %s/%s" %((i+1), no_batches))
@@ -543,7 +546,7 @@ def process_visualization_request(filename,
                 break
 
             # y_range = [0, spec_array.max().compute().item()] # TODO: better scaling
-            y_range = None
+            y_range = [0, signal_slice.attrs['y_max']]
 
             t0_i = float( spec_array.time[0] )
             t1_i = float( spec_array.time[-1] ) + float( period_array[-1] )
@@ -826,6 +829,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
 
             ti = np.array( [value['t']], dtype=np.float32 )
             period = np.array( [value['period']], dtype=np.float32 )
+            y_max = value['y_max']
             # self.log(ti.item())
             spec = np.frombuffer(value['spec'], dtype=np.float32)
             spec = spec.reshape(-1, 1)
@@ -856,6 +860,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                         [mz, ti],
                                         'time'
                                         )
+                signal_array.attrs.update({'y_max': y_max})
                 period_array.extend_array(period,
                                         [ti],
                                         'time'
@@ -863,9 +868,10 @@ class DataVizServiceNamespace(BaseClientNamespace):
             elif ti.item() in signal_array.time:
                 # self.log("extending mz-wise")
                 # Extend data arrays mz-wise
-                signal_array.combine_first(spec,
-                                           [mz, ti]
-                                           )
+                # signal_array.combine_first(spec,
+                #                            [mz, ti]
+                #                            )
+                pass
             viz_cache_process_requests(request_id)
 
         data_type = data['value']['data_type']

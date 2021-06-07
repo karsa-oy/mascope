@@ -378,6 +378,8 @@ def process_signal_request(filename,
     if t_resolution:
         # TODO: resample
         raise NotImplementedError
+
+    y_max = signal_slice.max().compute().item()
     
     # Put signal to queue to be emitted from service_main
     for i, spec_array in enumerate(signal_slice.transpose()):
@@ -389,6 +391,7 @@ def process_signal_request(filename,
                 'spec': spec_array.values.astype(np.float32).tobytes(),
                 't': ti,
                 'period': period,
+                'y_max': y_max,
                 'client_room': client_room,
                 'request_id': request_id,
                 }
@@ -416,6 +419,7 @@ def process_image_request(filename,
     
     try:
         img_slice = cache_item[data_type].sel(time=slice(t0, t1)).load()
+        period_slice = cache_item[data_type+'_period'].sel(time=slice(t0, t1)).load()
     except KeyError:
         print("Requested data_type: %s not cached. What to do!" % data_type)
         return False
@@ -431,16 +435,14 @@ def process_image_request(filename,
     # Filter nans
     not_nan = np.logical_not( img_slice.isnull() )
     img_slice = img_slice[not_nan]
+    period_slice = period_slice[not_nan]
 
     # Put to queue to be emitted from service_main
     for i, img_array in enumerate(img_slice):
         img_str = img_array.item()
 
         t0_i = float( img_array.time.item() )
-        if i < len(img_slice) - 1:
-            t1_i = float( img_slice[i+1].time.item() )
-        else:
-            t1_i = t0_i+1 # TODO:
+        t1_i = t0_i + float( period_slice[i].item() )
 
         img_data = {'filename': filename,
                     'viz_type': data_type,
@@ -560,8 +562,21 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                                  coords=[[]],
                                  name=viz_type
                                  )
+            viz_period = viz_type + '_period'
+            filename_viz_period = base_to_zarr_filename(filename, viz_period)
+            viz_period_array = ExtendableDataArray(path=filename_viz_period,
+                                                   array_module=np,
+                                                   dtype=object,
+                                                   chunk_size=1,
+                                                   )
+            viz_period_array.init_array(dims=('time',),
+                                        coords=[[]],
+                                        name=viz_period
+                                        )
             # Put to file cache
-            cache[filename].update({viz_type: viz_array})
+            cache[filename].update({viz_type: viz_array,
+                                    viz_period: viz_period_array
+                                    })
         # Request full-size visualization from DataViz
         await self.parent.emit_public_notification(
                 'visualize_range',
@@ -833,13 +848,21 @@ class FileIoPrivateNamespace(BaseClientNamespace):
 
         filename = value['filename']
         viz_type = value['viz_type']
-        viz_array = cache[filename][viz_type]
+        
         ti = np.array([ value['t_range'][0] ], dtype=np.float32)
         img_str = value.get('img') or json.dumps(value.get('traces'))
+        img_period = value['t_range'][1] - value['t_range'][0]
+
+        viz_array = cache[filename][viz_type]
+        period_array = cache[filename][ (viz_type + '_period') ]
         viz_array.extend_array(np.array([img_str]),
                                [ti],
                                'time'
                                )
+        period_array.extend_array(np.array( [img_period], dtype=np.float32 ),
+                                  [ti],
+                                  'time'
+                                  )
         t_mark(value)
 
     async def on_stop_data_request(self, data):
