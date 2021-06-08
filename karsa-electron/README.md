@@ -6,7 +6,7 @@ Front-end/back-end sources can be found here:
 2. Karsa Router and backend services - https://gitlab.com/karsa_dev/karsa_msview/karsa-backend/
 
 Front-end builds are found here:
-https://github.com/aleu/karsa/releases
+https://github.com/karsa-dev/karsa-electron/releases
 
 
 ### Setup Requirements 
