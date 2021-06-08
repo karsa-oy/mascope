@@ -24,10 +24,11 @@ class KarsaMeasClient(AsyncTCPClient):
 
     async def getData(self):
         # Read start header
-        r1 = await self._reader.read(3)
+        r1 = await self._reader.readexactly(3)
+        print(r1)
         stx, cmd, length = r1
         # Read rest of the msg
-        r2 = await self._reader.read(length + 1)
+        r2 = await self._reader.readexactly(length + 1)
         payload = r2[:-1]
         etx = r2[-1]
         nBytes = len(r1) + len(r2)
@@ -42,16 +43,12 @@ class KarsaMeasClient(AsyncTCPClient):
 
 async def main():
     '''Main program'''
-    measTime = 10
-    if (len(sys.argv) > 1):
-        measTime = int(sys.argv[1])
     
     try:
         tcp = KarsaMeasClient()
         await tcp.connect()
 
-        end_time = timer() + measTime
-        while (timer() < end_time):
+        while True:
             nbytes, data = await tcp.getData()
             if (nbytes > 0):
                 print("RX :", end='')
@@ -59,12 +56,11 @@ async def main():
                     print(" {0:02X}".format(data[i]), end='')
                 print("")    
 
-        if (tcp.connected() == True):
-            tcp.close()
-
-    except Exception:
-        print("Connection to Karsa Measurement port failed")
+    except Exception as e:
+        print("Connection to Karsa Measurement port failed: %s" %e)
     finally:
+        if tcp.connected:
+            tcp.close()
         print("exiting")
 
 # Run main.

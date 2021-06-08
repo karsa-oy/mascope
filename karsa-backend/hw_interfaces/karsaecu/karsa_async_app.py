@@ -194,32 +194,36 @@ async def main():
     time.sleep(1)
     await tcp.getVersion()
     await tcp.getNodeList()
+    await tcp.getNodeInfo()
 
-    # if (tcp._nodeCnt > 0):
-    #     for n in range(tcp._nodeCnt):
-    #         time.sleep(1)
-    #         if (tcp._nodeTypes[n] == KRS_NODE_TYPE_MFC):
-    #             await tcp.startMfcMeas(tcp._nodeList[n], 0x2004, 0x03, 10)
-    #             await tcp.startMfcMeas(tcp._nodeList[n], 0x2503, 0x01, 10)
-    #             await tcp.startMfcMeas(0x00, 0x2C00, 0x01, 30)
-    #             await tcp.startMfcMeas(0x00, 0x2540, 0x01, 30)
-    #         if (tcp._nodeTypes[n] == KRS_NODE_TYPE_DIO):
-    #             await tcp.startDioMeas(tcp._nodeList[n], 50)
-    #         if (tcp._nodeTypes[n] == KRS_NODE_TYPE_AI):
-    #             await tcp.startAiMeas(tcp._nodeList[n], 0x03, 30)
+    # print(tcp._nodeList)
+    # print(tcp._nodeTypes)
 
-    #     time.sleep(30)
+    if (tcp._nodeCnt > 0):
+        for n in range(tcp._nodeCnt):
+            time.sleep(1)
+            if (tcp._nodeTypes[n] == KRS_NODE_TYPE_MFC):
+                await tcp.startMfcMeas(tcp._nodeList[n], 0x2004, 0x03, 10)
+                await tcp.startMfcMeas(tcp._nodeList[n], 0x2503, 0x01, 10)
+                await tcp.startMfcMeas(0x00, 0x2C00, 0x01, 30)
+                await tcp.startMfcMeas(0x00, 0x2540, 0x01, 30)
+            if (tcp._nodeTypes[n] == KRS_NODE_TYPE_DIO):
+                await tcp.startDioMeas(tcp._nodeList[n], 50)
+            if (tcp._nodeTypes[n] == KRS_NODE_TYPE_AI):
+                await tcp.startAiMeas(tcp._nodeList[n], 0x03, 30)
 
-    #     # tcp.stopMfcMeas(0x00,0x0000,0x00) # stop all measurements from all MFC nodes
-    #     for n in range(tcp._nodeCnt):
-    #         time.sleep(2)
-    #         if (tcp._nodeTypes[n] == KRS_NODE_TYPE_MFC):
-    #             # tcp.stopMfcMeas(tcp._nodeList[n],0x2004,0x03)
-    #             await tcp.stopMfcMeas(tcp._nodeList[n], 0x0000, 0x00) # stop all measurements from the node
-    #         if (tcp._nodeTypes[n] == KRS_NODE_TYPE_DIO):
-    #             await tcp.stopDioMeas(tcp._nodeList[n])
-    #         if (tcp._nodeTypes[n] == KRS_NODE_TYPE_AI):
-    #             await tcp.stopAiMeas(tcp._nodeList[n], 0x03)
+        time.sleep(30)
+
+        # tcp.stopMfcMeas(0x00,0x0000,0x00) # stop all measurements from all MFC nodes
+        for n in range(tcp._nodeCnt):
+            time.sleep(2)
+            if (tcp._nodeTypes[n] == KRS_NODE_TYPE_MFC):
+                # tcp.stopMfcMeas(tcp._nodeList[n],0x2004,0x03)
+                await tcp.stopMfcMeas(tcp._nodeList[n], 0x0000, 0x00) # stop all measurements from the node
+            if (tcp._nodeTypes[n] == KRS_NODE_TYPE_DIO):
+                await tcp.stopDioMeas(tcp._nodeList[n])
+            if (tcp._nodeTypes[n] == KRS_NODE_TYPE_AI):
+                await tcp.stopAiMeas(tcp._nodeList[n], 0x03)
 
     # time.sleep(3)
 
