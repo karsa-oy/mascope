@@ -128,7 +128,6 @@
                                 position="is-left"
                                 :delay="1000">
                                 <b-button
-                                    disabled
                                     type="is-danger"
                                     icon-left="delete"
                                     @click="deleteProject(project_form_props.initial_template[0].value)">
@@ -246,7 +245,6 @@
                                 position="is-left"
                                 :delay="1000">
                                 <b-button
-                                    disabled
                                     type="is-danger"
                                     icon-left="delete"
                                     @click="deleteExperiment(experiment_edit_form_props.attributes[0].value)">
@@ -420,13 +418,14 @@
         <!-- Sample table modal -->
         <section class="sample-table-modal">
             <b-modal :active.sync="is_modal_sample_table_active"
+                full-screen
                 has-modal-card
                 trap-focus
                 :can-cancel="true"
                 :destroy-on-hide="false"
                 aria-role="dialog"
                 aria-modal>
-                <div class="modal-card" style="width: auto">
+                <div class="modal-card">
                     <header class="modal-card-head">
                         <p class="modal-card-title">
                             Project experiment samples
@@ -437,37 +436,20 @@
                         <!-- Sample table -->
                         <b-table 
                             id="samples-datatable"
-                            style="height:100%; width:100%"
+                            :height="760"
                             :data="sample_table_rows"
-                            :sticky-header="true"
-                            detailed
-                            detail-key="title"
-                            :show-detail-icon="false">
+                            :sticky-header="true">
                             <!-- Columns -->
                             <b-table-column
                                 v-for="(col, i) in sample_table_cols"
                                 :key="i"
                                 :field="col.field"
                                 :label="col.label"
+                                searchable
                                 v-slot="props">
-                                <a @click="props.toggleDetails(props.row)">
-                                    {{ props.row[col.field] }}
-                                </a>
+                                {{ props.row[col.field] }}
                             </b-table-column>
                             <!-- End of columns -->
-                            <!-- Details view -->
-                            <template #detail="props">
-                                <div>
-                                    <p @contextmenu.prevent="rightClickSample(props.row.filename)">
-                                        <strong>{{ props.row.title }}</strong>
-                                        <br>
-                                        {{ props.row.description }}
-                                        <br>
-                                        <small style="color: #ababab;">{{ props.row.filename }}</small>
-                                    </p>
-                                </div>
-                            </template>
-                            <!-- End of details view -->
                         </b-table>
                         <!-- End of sample table -->
 
@@ -588,7 +570,7 @@
                                                     append-to-body>
                                                     <!-- Menu item content -->
                                                     <div :id="p.title"
-                                                         @contextmenu.prevent="rightClickProject($event)">
+                                                        @contextmenu.prevent="rightClickProject($event)">
                                                         {{p.title}}
                                                     </div>
                                                     <template v-slot:content>
@@ -622,6 +604,11 @@
                                                             <div :id="e.title"
                                                                 @contextmenu.prevent="rightClickExperiment($event)">
                                                                 {{e.title}}
+                                                                <!-- <b-icon
+                                                                    class="is-pulled-right"
+                                                                    icon="fullscreen"
+                                                                    @click.native="is_modal_sample_table_active=true">
+                                                                </b-icon> -->
                                                             </div>
                                                             <template v-slot:content>
                                                                 <!-- Tooltip html content -->
@@ -636,37 +623,50 @@
                                                         Samples
                                                     </p>
                                                     <!-- Sample table -->
-                                                    <div style="text-align:right;">
-                                                        <b-button
-                                                            icon-left="magnify"
-                                                            class="tag is-dark"
-                                                            outlined
-                                                            @click="is_modal_sample_table_active=true">
-                                                        </b-button>
-                                                        <b-dropdown
-                                                            aria-role="menu"
-                                                            type="is-dark"
-                                                            position="is-top-right"
-                                                            trap-focus
-                                                            multiple
-                                                            append-to-body>
+                                                    <!-- Buttons above table -->
+                                                    <div class="columns">
+                                                        <div class="column" style="text-align:left;">
                                                             <b-button
-                                                                icon-left="menu"
+                                                                icon-left="plus"
                                                                 class="tag is-dark"
-                                                                slot="trigger"
-                                                                outlined>
+                                                                outlined
+                                                                @click="launchSampleImport()">
                                                             </b-button>
-                                                            <b-field grouped group-multiline>
-                                                                <div v-for="(col, i) in sample_table_cols"
-                                                                    :key="i"
-                                                                    class="control">
-                                                                    <b-checkbox v-model="col.visible">
-                                                                        {{ col.label }}
-                                                                    </b-checkbox>
-                                                                </div>
-                                                            </b-field>
-                                                        </b-dropdown>
+                                                        </div>
+                                                        <div class="column" style="text-align:right;">
+                                                            <b-button
+                                                                icon-left="fullscreen"
+                                                                class="tag is-dark"
+                                                                outlined
+                                                                @click="is_modal_sample_table_active=true">
+                                                            </b-button>
+                                                            <b-dropdown
+                                                                aria-role="menu"
+                                                                type="is-dark"
+                                                                position="is-top-right"
+                                                                trap-focus
+                                                                multiple
+                                                                append-to-body>
+                                                                <b-button
+                                                                    icon-left="menu"
+                                                                    class="tag is-dark"
+                                                                    slot="trigger"
+                                                                    outlined>
+                                                                </b-button>
+                                                                <b-field grouped group-multiline>
+                                                                    <div v-for="(col, i) in sample_table_cols"
+                                                                        :key="i"
+                                                                        class="control">
+                                                                        <b-checkbox v-model="col.visible">
+                                                                            {{ col.label }}
+                                                                        </b-checkbox>
+                                                                    </div>
+                                                                </b-field>
+                                                            </b-dropdown>
+                                                        </div>
                                                     </div>
+                                                    <!-- End of buttons above table -->
+                                                    <!-- Sample table -->
                                                     <b-table 
                                                         id="samples-datatable"
                                                         style="height:100%; width:100%"
@@ -675,9 +675,6 @@
                                                         :checkable="true"
                                                         :header-checkable="false"
                                                         :checked-rows.sync="sample_table_checked_rows"
-                                                        detailed
-                                                        detail-key="title"
-                                                        :show-detail-icon="false"
                                                         v-if="e.title === experiment_selected.title">
                                                         <!-- Columns -->
                                                         <b-table-column
@@ -687,32 +684,27 @@
                                                             :label="col.label"
                                                             :visible="col.visible || false"
                                                             v-slot="props">
-                                                            <a @click="props.toggleDetails(props.row)">
+                                                            <a @click="rightClickSample(props.row.filename)">
+                                                                <b-tooltip
+                                                                    :delay=500
+                                                                    position="is-right"
+                                                                    type="is-light"
+                                                                    multilined
+                                                                    append-to-body>
                                                                 {{ props.row[col.field] }}
+                                                                <template v-slot:content>
+                                                                    <!-- Tooltip html content -->
+                                                                    <div
+                                                                        v-html="prettyPrintAttributes(getSample(props.row.filename).attributes)"
+                                                                        style="text-align:center;">
+                                                                    </div>
+                                                                </template>
+                                                                </b-tooltip>
                                                             </a>
                                                         </b-table-column>
                                                         <!-- End of columns -->
-                                                        <!-- Details view -->
-                                                        <template #detail="props">
-                                                            <div>
-                                                                <p @contextmenu.prevent="rightClickSample(props.row.filename)">
-                                                                    <strong>{{ props.row.title }}</strong>
-                                                                    <br>
-                                                                    {{ props.row.description }}
-                                                                    <br>
-                                                                    <small style="color: #ababab;">{{ props.row.filename }}</small>
-                                                                </p>
-                                                            </div>
-                                                        </template>
-                                                        <!-- End of details view -->
                                                     </b-table>
                                                     <!-- End of sample table -->
-                                                    <!-- Import sample item -->
-                                                    <!-- <b-menu-item
-                                                        icon="plus"
-                                                        :active="is_modal_sample_import_active"
-                                                        @click="launchSampleImport()">
-                                                    </b-menu-item> -->
                                                     <!-- End of import sample item -->
                                                 </b-menu-item>
                                                 <!-- End of experiment item -->
@@ -950,6 +942,9 @@ export default {
                     return shallow_copy(this.experiments[i]);
                 }
             }
+            return {'title': "",
+                    'attributes': [],
+                    };
         },
         getPrefilledTemplatePath(project_title, experiment_title, make_if_missing=false) {
             const template_path = "../metadata_templates/prefilled_templates/" + ([project_title, experiment_title].join("_"));
@@ -968,6 +963,9 @@ export default {
                     return shallow_copy(this.projects[i]);
                 }
             }
+            return {'title': "",
+                    'attributes': [],
+                    };
         },
         getSample(sample_filename) {
             for (let i in this.samples) {
@@ -1246,16 +1244,19 @@ export default {
                 return false;
             }
             this.sample_form_props = {};
+            this.sample_form_props.title = "New sample attributes";
+            this.sample_form_props.load_template_path = this.getPrefilledTemplatePath(this.project_selected.title, this.experiment_selected.title);
             this.sample_form_props.filename = new_value;
             this.sample_form_props.project = this.project_selected.title;
             this.sample_form_props.experiment = this.experiment_selected.title;
-            this.sample_form_props.attributes = shallow_copy(this.experiment_selected.sample_attributes_template);
-            this.sample_form_props.title = "New sample attributes";
-            this.sample_form_props.load_template_path = this.getPrefilledTemplatePath(this.project_selected.title, this.experiment_selected.title);
+            let sample_attributes = shallow_copy(this.experiment_selected.sample_attributes_template);
             // Set title prefix
             let sample_no = this.samples.length + 1;
             const sample_title_prefix = sample_no.toString().padStart(3, '0') + '_';
-            this.sample_form_props.attributes[0].value = sample_title_prefix;
+            sample_attributes[0].value = sample_title_prefix;
+            this.sample_form_props.attributes = sample_attributes;
+            this.sample_attributes_fields = sample_attributes;
+            
             if (this.auto_save_new_sample) {
                 this.saveSample();
             }
