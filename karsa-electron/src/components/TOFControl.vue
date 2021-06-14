@@ -231,7 +231,12 @@
                                     Instrument log
                                 </b-button>
                                 <div><br></div>
-                            </div>
+                                <b-field>
+                                    <b-switch v-model="autosave_on">
+                                        Auto-save
+                                    </b-switch>
+                                </b-field>
+                        </div>
 <div hidden>
                             <h1 class="acquisition-parameters-h1">
                                 Measurement Mode
@@ -446,6 +451,14 @@ export default {
                 this.$store.commit('acquisition_status', value);
             }
         },
+        autosave_on: {
+            get() {
+                return this.$store.state.autosave_on;
+            },
+            set(value) {
+                this.$store.commit('autosave_on', value);
+            }
+        },
         new_file: {
             get() {
                 return this.$store.state.new_file;
@@ -475,7 +488,6 @@ export default {
                 'acquisition_status',
                 'instrument_status',
             ],
-            //
             // TOF variables
             sample_length: 120,
             acquisition_progress: 0,

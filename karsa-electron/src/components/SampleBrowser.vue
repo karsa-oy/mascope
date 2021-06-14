@@ -161,7 +161,9 @@
                                     :default_template="experiment_attributes_default_template"
                                     :editable="true"
                                     :template_path="experiment_attributes_template_path"
-                                    @metaDataUpdated="experiment_attributes_fields=$event">
+                                    :uploadable="true"
+                                    @metaDataUpdated="experiment_attributes_fields=$event"
+                                    @templateUploaded="experiment_template_to_parse=$event">
                                 </MetaDataForm>
                                 <div><br></div>
                                 <MetaDataForm
@@ -657,7 +659,9 @@
                                                                     <div v-for="(col, i) in sample_table_cols"
                                                                         :key="i"
                                                                         class="control">
-                                                                        <b-checkbox v-model="col.visible">
+                                                                        <b-checkbox
+                                                                            v-model="col.visible"
+                                                                            size="is-small">
                                                                             {{ col.label }}
                                                                         </b-checkbox>
                                                                     </div>
@@ -673,6 +677,7 @@
                                                         :data="sample_table_rows"
                                                         :sticky-header="true"
                                                         :checkable="true"
+                                                        :is-row-checkable="(row) => row.filename.indexOf('placeholder')==-1"
                                                         :header-checkable="false"
                                                         :checked-rows.sync="sample_table_checked_rows"
                                                         v-if="e.title === experiment_selected.title">
@@ -767,6 +772,7 @@ export default {
     },
     computed: {
         ...mapState([
+            'autosave_on',
             // 'h5_samples',
             // 'h5_streamer_status',
             // 'importable_samples',
@@ -839,7 +845,6 @@ export default {
                 'samples',
             ],
             // acquisition_started: false,
-            auto_save_new_sample: true,
             // Project / experiment title validation
             // Modal active variables
             is_modal_landing_active: true,
@@ -885,6 +890,7 @@ export default {
             experiment_attributes_fields: [],
             experiment_attributes_template_path: "../metadata_templates/experiment_templates",
             experiment_edit_form_props: {},
+            experiment_template_to_parse: "",
             // Sample metadata for selected sample
             samples: [],
             // variables for sample table
@@ -1179,19 +1185,6 @@ export default {
         },
     },
     watch: {
-        experiments: function() {
-            if (this.experiment_selected.title) {
-                this.selectExperiment(this.experiment_selected.title);
-            }
-        },
-        projects: function() {
-            if (this.project_selected.title) {
-                let experiment_selected_title = this.experiment_selected.title;
-                this.selectProject(this.project_selected.title);
-                if (experiment_selected_title)
-                    this.selectExperiment(experiment_selected_title);
-            }
-        },
         experiment_selected: function(new_value, old_value) {
             if ( _.isEqual(new_value, old_value) ) {
                 return false;
@@ -1212,7 +1205,24 @@ export default {
                                                            );
             }
         },
-        import_sample_table_datetime_range: function(new_value, old_value) {
+        experiment_template_to_parse: function(new_value) {
+            const experiment_data = {
+                'title': this.experiment_attributes_fields[0].value,
+                'attributes': this.experiment_attributes_fields,
+                'project': this.project_selected.title,
+                'template_to_parse': new_value,
+            };
+            return this.be.export_one_way_binding_prop('experiment_from_template_file',
+                                                       experiment_data,
+                                                       null,
+                                                       this.room_sid
+                                                       );
+        },
+        experiments: function() {
+            if (this.experiment_selected.title) {
+                this.selectExperiment(this.experiment_selected.title);
+            }
+        },        import_sample_table_datetime_range: function(new_value, old_value) {
             return this.be.export_one_way_binding_prop('import_sample_table_datetime_range',
                                                         new_value, old_value,
                                                         this.room_experiment);
@@ -1249,18 +1259,28 @@ export default {
             this.sample_form_props.filename = new_value;
             this.sample_form_props.project = this.project_selected.title;
             this.sample_form_props.experiment = this.experiment_selected.title;
-            let sample_attributes = shallow_copy(this.experiment_selected.sample_attributes_template);
-            // Set title prefix
-            let sample_no = this.samples.length + 1;
-            const sample_title_prefix = sample_no.toString().padStart(3, '0') + '_';
-            sample_attributes[0].value = sample_title_prefix;
-            this.sample_form_props.attributes = sample_attributes;
-            this.sample_attributes_fields = sample_attributes;
             
-            if (this.auto_save_new_sample) {
+            if (this.autosave_on) {
+                // Auto-save sample
+                for (let i in this.samples) {
+                    // Find first placeholder sample
+                    if (this.samples[i].filename.indexOf('placeholder') != -1) {
+                        this.sample_attributes_fields = shallow_copy(this.samples[i].attributes);
+                        this.removeSample(this.samples[i].filename)
+                        break;
+                    }
+                }
                 this.saveSample();
-            }
-            this.launchSampleAttributeModal();
+            } else {
+                let sample_attributes = shallow_copy(this.experiment_selected.sample_attributes_template);
+                // Set title prefix
+                let sample_no = this.samples.length + 1;
+                const sample_title_prefix = sample_no.toString().padStart(3, '0') + '_';
+                sample_attributes[0].value = sample_title_prefix;
+                this.sample_form_props.attributes = sample_attributes;
+                this.sample_attributes_fields = sample_attributes;
+                this.launchSampleAttributeModal();
+            }   
         },
         project_selected: function(new_value, old_value) {
             if ( _.isEqual(new_value, old_value) ) {
@@ -1284,6 +1304,14 @@ export default {
                                                     );
             }
         },
+        projects: function() {
+            if (this.project_selected.title) {
+                let experiment_selected_title = this.experiment_selected.title;
+                this.selectProject(this.project_selected.title);
+                if (experiment_selected_title)
+                    this.selectExperiment(experiment_selected_title);
+            }
+        },
         samples: function(new_value){
             // Format data to sample table
             let samples = new_value;
@@ -1300,7 +1328,7 @@ export default {
                             'field': attr.label.toLowerCase(),
                             'label': attr.label,
                             };
-                        if (col.field == 'title') {
+                        if (col.field == 'title' || col.field == 'sample name') {
                             col.visible = true;
                         }
                         cols.push(col);
@@ -1323,7 +1351,7 @@ export default {
                 row['experiment'] = sample.experiment;
                 
                 if (rows.length == 0) {
-                    cols.concat([
+                    cols = cols.concat([
                         {
                         'field': "filename",
                         'label': "Filename",

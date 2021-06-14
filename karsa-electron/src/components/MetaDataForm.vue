@@ -55,46 +55,71 @@
             </div>
             <div><br></div>
             <b-field label="Reuse template" v-if="Boolean(load_template_path) || Boolean(save_template_path)">
-                <div class="columns">
-                    <div
-                        class="column is-half"
-                        style="text-align:center"
-                        v-if="Boolean(load_template_path)">
-                        <b-select
-                            v-model="loaded_template"
-                            placeholder="Load template"
-                            expanded>
-                            <option
-                                v-for="t in available_templates"
-                                :value="t"
-                                :key="t.name">
-                                {{ t.name }}
-                            </option>
-                        </b-select>
+                <div class="container">
+                    <div class="row">
+                        <div class="columns">
+                            <div
+                                class="column is-half"
+                                style="text-align:center"
+                                v-if="Boolean(load_template_path)">
+                                <b-select
+                                    v-model="loaded_template"
+                                    placeholder="Load template"
+                                    expanded>
+                                    <option
+                                        v-for="t in available_templates"
+                                        :value="t"
+                                        :key="t.name">
+                                        {{ t.name }}
+                                    </option>
+                                </b-select>
+                            </div>
+                            <div
+                                class="column is-one-seventh"
+                                style="text-align:left"
+                                v-if="show_edit_functions">
+                                <b-button
+                                    :disabled="!loaded_template || loaded_template.name=='default template'"
+                                    @click="deleteTemplate()"
+                                    type="is-danger"
+                                    icon-right="delete">
+                                </b-button>
+                            </div>
+                            <div
+                                class="column is-one-third"
+                                style="text-align:center"
+                                v-if="Boolean(save_template_path)">
+                                <b-button
+                                    @click="saveTemplate()"
+                                    :disabled="!form_fields.length"
+                                    expanded>
+                                    Save template
+                                </b-button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <br>
                     </div>
                     <div
-                        class="column is-one-seventh"
-                        style="text-align:left"
-                        v-if="show_edit_functions">
-                        <b-button
-                            :disabled="!loaded_template || loaded_template.name=='default template'"
-                            @click="deleteTemplate()"
-                            type="is-danger"
-                            icon-right="delete">
-                        </b-button>
-                    </div>
-                    <div
-                        class="column is-one-third"
-                        style="text-align:center"
-                        v-if="Boolean(save_template_path)">
-                        <b-button
-                            @click="saveTemplate()"
-                            :disabled="!form_fields.length"
-                            expanded>
-                            Save template
-                        </b-button>
+                        class="row"
+                        v-if="uploadable">
+                        <b-field label="Upload template">
+                            <b-field class="file is-primary"  :class="{'has-name': !!uploaded_file}">
+                                <b-upload v-model="uploaded_file" class="file-label" rounded>
+                                    <span class="file-cta">
+                                        <b-icon class="file-icon" icon="upload"></b-icon>
+                                        <span class="file-label">Click to upload</span>
+                                    </span>
+                                    <span class="file-name" v-if="uploaded_file">
+                                        {{ uploaded_file.name }}
+                                    </span>
+                                </b-upload>
+                            </b-field>
+                        </b-field>
                     </div>
                 </div>
+
             </b-field>
         </div>
         <!-- End of main content -->
@@ -144,6 +169,11 @@ export default {
             required: false,
             default: null,
         },
+        uploadable: {
+            type: Boolean,
+            required: false,
+            default: false,
+        },
         load_template_path: {
             type: String,
             required: false,
@@ -168,6 +198,7 @@ export default {
             form_fields: [],
             loaded_template: null,
             show_edit_functions: true,
+            uploaded_file: {},
         }
     },
     created() {
@@ -313,6 +344,10 @@ export default {
                 // Make a copy to avoid mutating the loaded template directly
                 this.form_fields = shallow_copy(new_value.template);
             }
+        },
+        uploaded_file: async function(new_value) {
+            let file_content = await new_value.text();
+            this.$emit("templateUploaded", file_content);
         },
     },
 }

@@ -11,24 +11,13 @@ of the currently selected data path.
 Created on Thu May  7 12:43:13 2020
 """
 
-import os
-import subprocess
 import asyncio
-import fnmatch
-import xarray
-import zarr
-import numpy as np
-import dask.array as da
-from multiprocessing import Lock
-from collections import namedtuple
-from PIL import Image
-from copy import deepcopy
+import os
 
 from karsalib import BaseClientNamespace, BaseServiceClient, \
                      parse_cmd_args, get_client_notification_args
-from karsatof.kcollector import ExtendableDataArray
 from karsatof.kdatapool import SamplePool
-from karsatof.kimage import (convert_base64_to_img, convert_to_base64)
+from karsaHT3000A.ht3000a import parse_csv_report
 
 
 NO_DATA_LOGGING_DEFAULT = True
@@ -44,6 +33,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
         'stop_data_request',
         # UI
         'experiment_selected',
+        'experiment_from_template_file',
         'delete_experiment',
         'delete_project',
         'delete_sample',
@@ -100,6 +90,59 @@ class MetadataServiceNamespace(BaseClientNamespace):
                             datapool.get_samples(project, experiment),
                             room=data['client_room']
                             )
+
+    async def on_experiment_from_template_file(self, data):
+        global datapool
+
+        value = data['value']
+        experiment = value['title']
+        attributes = value['attributes']
+        project = value['project']
+        template_raw_text = value['template_to_parse']
+        # TODO: Currently assumes autosampler report
+        import tempfile
+        fd, report_temp_path = tempfile.mkstemp()
+        try:
+            with os.fdopen(fd, 'w') as tmp:
+                tmp.write(template_raw_text)
+            sequence_steps = parse_csv_report(report_temp_path)
+        finally:
+            os.remove(report_temp_path)
+
+        # Create experiment
+        project_experiments = datapool.pool.get(project).keys()
+        if experiment in project_experiments:
+            raise ValueError("Experiment with given name already exists under project: %s" %project)
+        sample_attributes_template = []
+        for key in sequence_steps[0].keys():
+            sample_attr = {
+                'label': key,
+                'value': "",
+            }
+            sample_attributes_template.append(sample_attr)
+        datapool.new_experiment(project,
+                                experiment,
+                                attributes,
+                                sample_attributes_template
+                                )
+
+        # Create placeholders for each sample
+        for i, step in enumerate(sequence_steps):
+            sample_attributes = []
+            for key, value in step.items():
+                sample_attr = {
+                    'label': key,
+                    'value': value,
+                }
+                sample_attributes.append(sample_attr)
+
+            filename = '%03d_placeholder' %(i+1)
+            datapool.new_sample_placeholder(project,
+                                            experiment,
+                                            filename,
+                                            sample_attributes
+                                            )
+        
 
     async def on_import_sample_table_datetime_range(self, data):
         global datapool
@@ -239,8 +282,6 @@ class MetadataServiceNamespace(BaseClientNamespace):
         ValueError
             [description]
         """
-        global data_path
-        global projects_path
         global datapool
 
         value = data['value']
@@ -279,6 +320,8 @@ class MetadataServiceNamespace(BaseClientNamespace):
 
         datapool.annotate_sample(project, experiment, filename, annotation)
     # ---------------------------------
+
+
 
 
 class SampleManagerClient(BaseServiceClient):

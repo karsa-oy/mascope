@@ -7,6 +7,7 @@ export default new Vuex.Store({
 	state: {
 		acquisition_control_active: false,
 		acquisition_status: "not_running",		// not_running/starting/running/stopping
+		autosave_on: false,
 		data_source_selected: {},
 		experiment_selected: {'title': "", 'attributes': []},
 		experiments: [],
@@ -37,6 +38,9 @@ export default new Vuex.Store({
 		},
 		acquisition_status(state, payload) {
 			state.acquisition_status = payload;
+		},
+		autosave_on(state, payload) {
+			state.autosave_on = payload;
 		},
 		data_source_selected(state, payload) {
 			state.data_source_selected = payload;

@@ -15,6 +15,7 @@ import pandas as pd
 
 import datetime_glob
 from datetime import datetime, timedelta
+from shutil import rmtree
 from time import sleep
 from multiprocessing import Lock
 
@@ -53,10 +54,7 @@ def parse_path_from_sample_name(sample_name):
                 # Parsed succesfully
                 break
         if dt is None:
-            raise ValueError("parse_datetime_from_sample_name: " +
-                             "No matching pattern found for filename: %s"
-                             %filename
-                             )
+            return datetime.now()
         return dt.as_datetime()
 
     def parse_subdir_from_datetime(datetime):
@@ -462,12 +460,14 @@ class SamplePool():
         self._write_sample_annotation(sample_path, sample, annotation)
 
     def delete_experiment(self, project, experiment):
-        # TODO: TBD
-        raise NotImplementedError("Deleting experiment not implemented")
+        experiment_path = os.path.join(self.projects_root, project, experiment)
+        rmtree(experiment_path, ignore_errors=False, onerror=None)
+        self.pool.get(project).pop(experiment)
 
     def delete_project(self, project):
-        # TODO: TBD
-        raise NotImplementedError("Deleting project not implemented")
+        project_path = os.path.join(self.projects_root, project)
+        rmtree(project_path, ignore_errors=False, onerror=None)
+        self.pool.pop(project)
 
     def delete_sample(self, project, experiment, sample):
         sample_link_path = os.path.join(
@@ -529,31 +529,39 @@ class SamplePool():
         return projects
 
     def get_samples(self, project, experiment):
-        if project is None and experiment is None:
-            # All samples
-            # sample_titles = next( os.walk(self.data_root) )[1] # TODO: How to get importable samples
-            sample_titles = []
+        if project is None:
+            # Should return all samples
+            # TODO: Need to get samples from FileIO
+            raise NotImplementedError
+        elif experiment is None:
+            # Samples in given project
+            experiments = self.pool.get(project)
         else:
             # Samples in given project and experiment
-            sample_titles = self.pool.get(project).get(experiment)
-        samples = []
-        for sample in sample_titles:
-            # Read experiment-specific sample attributes
-            experiment_path = os.path.join(self.projects_root,
-                                           project,
-                                           experiment
-                                           )
-            sample_exp_attrs = self._read_attributes(experiment_path, prefix=sample)
-            # Read sample properties
-            sample_path = os.path.join(experiment_path, sample)
-            sample_props = self._read_attributes(sample_path)
+            experiments = [experiment]
             
-            samples.append({'filename': sample,
-                            'project': project,
-                            'experiment': experiment,
-                            'properties': sample_props,
-                            'attributes': sample_exp_attrs,
-                            })
+        samples = []
+        for experiment in experiments:
+            sample_ids = self.pool.get(project).get(experiment)
+            for sample_id in sample_ids:
+                # Read experiment-specific sample attributes
+                experiment_path = os.path.join(self.projects_root,
+                                            project,
+                                            experiment
+                                            )
+                sample_exp_attrs = self._read_attributes(experiment_path,
+                                                        prefix=sample_id
+                                                        )
+                # Read sample properties
+                sample_path = os.path.join(experiment_path, sample_id)
+                sample_props = self._read_attributes(sample_path)
+                
+                samples.append({'filename': sample_id,
+                                'project': project,
+                                'experiment': experiment,
+                                'properties': sample_props,
+                                'attributes': sample_exp_attrs,
+                                })
         return samples
 
     def new_project(self, project, attributes):
@@ -597,6 +605,18 @@ class SamplePool():
         self._write_attributes(experiment_path, attributes, prefix=sample)
         # Update self.pool
         self.update_experiment_samples(project, experiment)
+
+    def new_sample_placeholder(self, project, experiment, sample, attributes):
+        # Meta-data path
+        experiment_path = os.path.join(self.projects_root, project, experiment)
+        sample_experiment_path = os.path.join(experiment_path, sample)
+        dummy_link_target = sample_experiment_path
+        self._make_link(dummy_link_target, sample_experiment_path)
+        # Write attributes
+        self._write_attributes(experiment_path, attributes, prefix=sample)
+        # Update self.pool
+        self.update_experiment_samples(project, experiment)
+
 
     def update_experiment_samples(self, project, experiment):
         """Update samples under given experiment directory
