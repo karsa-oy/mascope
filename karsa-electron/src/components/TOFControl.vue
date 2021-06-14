@@ -211,17 +211,19 @@
                                 </b-progress>
                             </div>
                             <div style="text-align: center">
-                                <b-button
-                                    v-bind:icon-left="acquisition_status=='starting' || 
-                                                    acquisition_status=='stopping' ||
-                                                    instrument_status=='not_ready' ? 'flattr' : ''"
-                                    :type="acquisition_button_type"
-                                    :disabled="acquisition_mode=='triggered' ||
-                                            instrument_status=='not_ready'"
-                                    @click="on_button_change_acquisition_status()">
-                                    {{ acquisition_control_label }}
-                                </b-button>
-                                <div><br></div>
+                                <div style="display:none">
+                                    <b-button
+                                        v-bind:icon-left="acquisition_status=='starting' || 
+                                                        acquisition_status=='stopping' ||
+                                                        instrument_status=='not_ready' ? 'flattr' : ''"
+                                        :type="acquisition_button_type"
+                                        :disabled="acquisition_mode=='triggered' ||
+                                                instrument_status=='not_ready'"
+                                        @click="on_button_change_acquisition_status()">
+                                        {{ acquisition_control_label }}
+                                    </b-button>
+                                    <div><br></div>
+                                </div>
                                 <b-button
                                     type="is-dark"
                                     :disabled="false"
