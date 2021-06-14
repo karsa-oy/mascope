@@ -12,12 +12,16 @@
                 label="">
                 <ConfigVue></ConfigVue>
             </b-tab-item>
-            <!-- Experiment tab -->
+            <!-- Main tab -->
             <b-tab-item
                 icon=""
                 :label="this.project_selected.title + '/' + this.experiment_selected.title">
-                <!-- :visible="this.experiment_selected.id !== ''"> -->
                 <div class="columns">
+                    <b-loading
+                        v-model="is_disconnected"
+                        :can-cancel="false"
+                        :is-full-page="false">
+                    </b-loading>
                     <!-- Left column -->
                     <div class="column is-one-quarter" style="padding-left:2rem">
 
@@ -40,7 +44,6 @@
                             </b-field>
                         </div>
                         <!-- End of namespace selector -->
-
                         <RAWimport
                             v-if="data_source_selected.type && data_source_selected.type.indexOf('H5') != -1">
                         </RAWimport>
@@ -103,6 +106,7 @@ export default {
             ],
             instrument_data: {},
             instrument_data_queue: Promise.resolve(),
+            is_disconnected: true,
             room_mate_gone: null,
             data_source_name_selected: null,
             data_sources: [],
@@ -192,6 +196,7 @@ export default {
                                             );
         },
         'root_namespace.connected': function(new_value) {
+            this.is_disconnected = !new_value;
             if ( new_value === true )
             {
                 // handlers for for external notifications:
@@ -239,6 +244,10 @@ body {
 .tabs{
     padding-top: 5px; 
     /* border-top:15px solid #29282e;  */
+}
+
+.loading-overlay .loading-background {
+    background-color: rgba(0,0,0,.7);
 }
 
 #header-container{
@@ -399,6 +408,9 @@ a.pagination-link.is-current {
 /* tr>th{
     background-color:rgb(51, 50, 50); 
 } */
+.table thead {
+    background-color: inherit;
+}
 .table thead td:hover, .table thead th:hover {
     color: #666;
 }
@@ -411,6 +423,9 @@ th>input{
 }
 .table thead td, .table thead th {
     color: inherit;
+}
+.b-table .table-wrapper.has-sticky-header tr:first-child th {
+    background-color:inherit;
 }
 ul {
     list-style: none;
