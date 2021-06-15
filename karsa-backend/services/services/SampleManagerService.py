@@ -33,11 +33,12 @@ class MetadataServiceNamespace(BaseClientNamespace):
         'stop_data_request',
         # UI
         'experiment_selected',
-        'experiment_from_template_file',
+        'experiment_from_plan',
         'delete_experiment',
         'delete_project',
         'delete_sample',
         'import_sample_table_datetime_range', # TODO: Should be routed to FileIoService
+        'parse_experiment_plan_blob',
         'project_selected',
         'projects',
         'save_experiment',
@@ -91,7 +92,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
                             room=data['client_room']
                             )
 
-    async def on_experiment_from_template_file(self, data):
+    async def on_experiment_from_plan(self, data):
         global datapool
 
         value = data['value']
@@ -143,7 +144,6 @@ class MetadataServiceNamespace(BaseClientNamespace):
                                             sample_attributes
                                             )
         
-
     async def on_import_sample_table_datetime_range(self, data):
         global datapool
         # Update sample table data
@@ -154,6 +154,46 @@ class MetadataServiceNamespace(BaseClientNamespace):
                                'room': data['client_room']
                                }
                             )
+
+    async def on_parse_experiment_plan_blob(self, data):
+        value = data['value']
+        # TODO: Currently assumes autosampler report
+        import tempfile
+        fd, report_temp_path = tempfile.mkstemp()
+        try:
+            with os.fdopen(fd, 'w') as tmp:
+                tmp.write(value)
+            sequence_steps = parse_csv_report(report_temp_path)
+        finally:
+            os.remove(report_temp_path)
+
+        # Parse sequence steps into template
+        sample_attributes_template = []
+        samples = []
+        for i, step in enumerate(sequence_steps):
+            sample = {'title': '%03d_' %(i+1)}
+            sample_attributes = []
+            for key, value in step.items():
+                sample_attr = {
+                    'label': key,
+                    'value': value,
+                }
+                sample_attributes.append(sample_attr)
+                if i==0:
+                    sample_attributes_template.append({'label': key,
+                                                       'value': "",
+                                                       })
+            sample.update({'attributes': sample_attributes})
+            samples.append(sample)
+
+        experiment_plan = {
+            'sample_attributes_template': sample_attributes_template,
+            'samples': samples,
+            }
+        await self.emit_client_notification('experiment_plan',
+                                            experiment_plan,
+                                            room=data['client_room'],
+                                            )
 
     async def on_project_selected(self, data):
         global datapool
@@ -223,6 +263,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
         project = value.get('project')
         attributes = value.get('attributes')
         sample_attributes_template = value.get('sample_attributes_template')
+        sample_placeholders = value.get('sample_placeholders', [])
         # Create new experiment directory
 
         if project not in datapool.pool.keys():
@@ -241,6 +282,15 @@ class MetadataServiceNamespace(BaseClientNamespace):
                                      experiment,
                                      attributes,
                                      )
+
+        # Create placeholders for each sample
+        for i, sample_placeholder in enumerate(sample_placeholders):
+            filename = '%03d_placeholder' %(i+1)
+            datapool.new_sample_placeholder(project,
+                                            experiment,
+                                            filename,
+                                            sample_placeholder.get('attributes'),
+                                            )
 
         project_experiments = datapool.get_experiments(project)
         await self.emit_client_notification(

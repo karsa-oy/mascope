@@ -232,7 +232,9 @@
                                 </b-button>
                                 <div><br></div>
                                 <b-field>
-                                    <b-switch v-model="autosave_on">
+                                    <b-switch
+                                        v-model="autosave_on"
+                                        :disabled="!experiment_selected.title.length">
                                         Auto-save
                                     </b-switch>
                                 </b-field>
@@ -433,6 +435,7 @@ export default {
         ...mapState([
             'url',
             'data_source_selected',
+            'experiment_selected',
             'tofdaq_log_entry',
         ]),
         acquisition_control_active: {
@@ -854,8 +857,8 @@ export default {
                                                 this.room_sid);
         },
         'namespace.connected': function(new_value) {
-            if ( new_value === true )
-            {
+            if (new_value) {
+                // on connect 
                 // handlers for for external notifications:
                 this.namespace.on("acquisition_started", (value) => this.be.import_one_way_binding_prop("acquisition_started", value.value));
                 this.namespace.on("acquisition_status", (value) => this.be.import_one_way_binding_prop("acquisition_status", value.value));
@@ -866,6 +869,9 @@ export default {
                 this.be.subscribe(this.endpoints,
                                   null // room set to null to subscribe to endpoints directly
                                   );
+            } else {
+                // on disconnect
+                this.autosave_on = false;
             }
         },
     }

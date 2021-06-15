@@ -101,23 +101,6 @@
                     <div class="row">
                         <br>
                     </div>
-                    <div
-                        class="row"
-                        v-if="uploadable">
-                        <b-field label="Upload template">
-                            <b-field class="file is-primary"  :class="{'has-name': !!uploaded_file}">
-                                <b-upload v-model="uploaded_file" class="file-label" rounded>
-                                    <span class="file-cta">
-                                        <b-icon class="file-icon" icon="upload"></b-icon>
-                                        <span class="file-label">Click to upload</span>
-                                    </span>
-                                    <span class="file-name" v-if="uploaded_file">
-                                        {{ uploaded_file.name }}
-                                    </span>
-                                </b-upload>
-                            </b-field>
-                        </b-field>
-                    </div>
                 </div>
 
             </b-field>
@@ -344,10 +327,6 @@ export default {
                 // Make a copy to avoid mutating the loaded template directly
                 this.form_fields = shallow_copy(new_value.template);
             }
-        },
-        uploaded_file: async function(new_value) {
-            let file_content = await new_value.text();
-            this.$emit("templateUploaded", file_content);
         },
     },
 }

@@ -156,6 +156,7 @@
                                 </p>
                             </header>
                             <section class="modal-card-body">
+                                <!-- Experiment attributes form -->
                                 <MetaDataForm
                                     form_title="Experiment attributes"
                                     :default_template="experiment_attributes_default_template"
@@ -163,17 +164,53 @@
                                     :template_path="experiment_attributes_template_path"
                                     :uploadable="true"
                                     @metaDataUpdated="experiment_attributes_fields=$event"
-                                    @templateUploaded="experiment_template_to_parse=$event">
+                                    @templateUploaded="experiment_plan_blob=$event">
                                 </MetaDataForm>
+                                <!-- End of experiment attributes form -->
                                 <div><br></div>
+                                <!-- Upload experiment plan -->
+                                <b-field label="Upload experiment plan">
+                                    <b-field class="file is-primary"  :class="{'has-name': !!experiment_plan_file}">
+                                        <b-upload v-model="experiment_plan_file" class="file-label" rounded>
+                                            <span class="file-cta">
+                                                <b-icon class="file-icon" icon="upload"></b-icon>
+                                                <span class="file-label">Click to upload</span>
+                                            </span>
+                                            <span class="file-name" v-if="experiment_plan_file">
+                                                {{ experiment_plan_file.name }}
+                                            </span>
+                                        </b-upload>
+                                    </b-field>
+                                </b-field>
+                                <b-field
+                                    label="Planned experiment"
+                                    v-if="experiment_plan">
+                                    <b-field>
+                                        # samples: {{experiment_plan.samples.length.toString()}}
+                                    </b-field>
+                                    <b-field>
+                                        <b-button
+                                            type="is-primary"
+                                            @click="is_modal_sample_table_active=true;">
+                                            <b-icon icon="fullscreen">
+                                            </b-icon>
+                                        </b-button>
+                                    </b-field>
+                                </b-field>
+                                <!-- End of upload experiment plan -->
+                                <div><br></div>
+                                <!-- Sample attributes form -->
                                 <MetaDataForm
+                                    :key="sample_attributes_key"
                                     form_title="Sample attribute template"
                                     :default_template="sample_attributes_default_template"
+                                    :initial_template="sample_attributes_template.length ? sample_attributes_template : null"
                                     :editable="true"
                                     :fillable="false"
                                     :template_path="sample_attributes_template_path"
                                     @metaDataUpdated="sample_attributes_fields=$event">
                                 </MetaDataForm>
+                                <!-- End of sample attributes form -->
                             </section>
                         </div>
                     </div>
@@ -276,6 +313,7 @@
                         <section class="modal-card-body write_sample_attribute">                            
                             
                             <MetaDataForm
+                                :key="sample_form_key"
                                 :form_title="sample_form_props.title"
                                 :default_template="sample_form_props.attributes"
                                 :initial_template="sample_form_props.attributes"
@@ -289,7 +327,7 @@
                                     placeholder="Select a project"
                                     v-model="project_selected.title"
                                     @input="selectProject($event)"
-                                    disabled
+                                    :disabled="autosave_on"
                                     required
                                     expanded>
                                     <option
@@ -306,7 +344,7 @@
                                     placeholder="Select an experiment"
                                     v-model="experiment_selected.title"
                                     @input="selectExperiment($event)"
-                                    disabled
+                                    :disabled="autosave_on"
                                     required
                                     expanded>
                                     <option
@@ -432,9 +470,13 @@
                         <p class="modal-card-title">
                             Project experiment samples
                         </p>
+                        <b-button
+                            @click="is_modal_sample_table_active=false"
+                            is-dark>
+                            x
+                        </b-button>
                     </header>
                     <section class="modal-card-body">
-                        
                         <!-- Sample table -->
                         <b-table 
                             id="samples-datatable"
@@ -454,15 +496,7 @@
                             <!-- End of columns -->
                         </b-table>
                         <!-- End of sample table -->
-
                     </section>
-                    <footer class="modal-card-foot">
-                        <b-button
-                            @click="is_modal_sample_table_active=false"
-                            is-dark>
-                            Close
-                        </b-button>
-                    </footer>
                 </div>
             </b-modal>
         </section>     
@@ -523,12 +557,12 @@
     <!-- Main content area -->
         <section>
             <b-notification
-                :active="!experiment_selected.title.length"
+                :active="autosave_on"
                 :closable="false"
                 type="is-danger"
                 role="alert">
-                <p style="font-size:20px">
-                    Please select project and experiment.
+                <p style="font-size:16px">
+                    Auto-save into {{project_selected.title}} / {{experiment_selected.title}}
                 </p>
             </b-notification>
             <!-- Samples datatable collapsable -->
@@ -562,7 +596,8 @@
                                             :key="p.title"
                                             :active.sync="p.active"
                                             :expanded.sync="p.active"
-                                            @click="selectProject(p.title)">
+                                            @click="selectProject(p.title)"
+                                            :disabled="autosave_on">
                                             <template #label>
                                                  <b-tooltip
                                                     :delay=500
@@ -594,7 +629,8 @@
                                                     :key="e.title"
                                                     :active.sync="e.active"
                                                     :expanded.sync="e.active"
-                                                    @click="selectExperiment(e.title)">
+                                                    @click="selectExperiment(e.title)"
+                                                    :disabled="autosave_on">
                                                     <template #label>
                                                         <b-tooltip
                                                             :delay=500
@@ -629,6 +665,7 @@
                                                     <div class="columns">
                                                         <div class="column" style="text-align:left;">
                                                             <b-button
+                                                                disabled
                                                                 icon-left="plus"
                                                                 class="tag is-dark"
                                                                 outlined
@@ -677,7 +714,7 @@
                                                         :data="sample_table_rows"
                                                         :sticky-header="true"
                                                         :checkable="true"
-                                                        :is-row-checkable="(row) => row.filename.indexOf('placeholder')==-1"
+                                                        :is-row-checkable="(row) => (row.filename && row.filename.indexOf('placeholder')==-1)"
                                                         :header-checkable="false"
                                                         :checked-rows.sync="sample_table_checked_rows"
                                                         v-if="e.title === experiment_selected.title">
@@ -717,7 +754,8 @@
                                                 <b-menu-item
                                                     icon="plus"
                                                     :active="is_modal_new_experiment_active"
-                                                    @click="launchNewExperimentModal()">
+                                                    @click="launchNewExperimentModal()"
+                                                    :disabled="autosave_on">
                                                 </b-menu-item>
                                                 <!-- End of new experiment item -->
                                             </b-menu-list>
@@ -728,7 +766,8 @@
                                         <b-menu-item
                                             icon="plus"
                                             :active="is_modal_project_attributes_active"
-                                            @click="launchProjectAttributesModal('new')">
+                                            @click="launchProjectAttributesModal('new')"
+                                            :disabled="autosave_on">
                                         </b-menu-item>
                                         <!-- End of new project item -->
                                     </b-menu-list>
@@ -773,11 +812,7 @@ export default {
     computed: {
         ...mapState([
             'autosave_on',
-            // 'h5_samples',
-            // 'h5_streamer_status',
-            // 'importable_samples',
             'new_file',
-            // 'samples',
             'root_namespace',
         ]),
 
@@ -890,7 +925,9 @@ export default {
             experiment_attributes_fields: [],
             experiment_attributes_template_path: "../metadata_templates/experiment_templates",
             experiment_edit_form_props: {},
-            experiment_template_to_parse: "",
+            experiment_plan: null,
+            experiment_plan_blob: "",
+            experiment_plan_file: {},
             // Sample metadata for selected sample
             samples: [],
             // variables for sample table
@@ -906,8 +943,11 @@ export default {
                  'value': ""},
             ],
             sample_attributes_fields: [],
+            sample_attributes_key: Math.random(),
             sample_attributes_save_button_type: "is-success",
+            sample_attributes_template: [],
             sample_attributes_template_path: "../metadata_templates/sample_templates",
+            sample_form_key: Math.random(),
             sample_form_props: {},
         }
     },
@@ -921,6 +961,7 @@ export default {
             console.log('[' + this.name + ']',  ...args);
         },
         cancelNewExperiment() {
+            this.resetExperimentPlan();
             this.is_modal_new_experiment_active = false;
         },
         cancelNewProject() {
@@ -1067,9 +1108,18 @@ export default {
                                             sample_to_remove,
                                             );
         },
+        resetExperimentPlan() {
+            this.experiment_plan = null;
+            this.experiment_plan_blob = "";
+            this.experiment_plan_file = {};
+            this.samples = [];
+            this.sample_attributes_template = shallow_copy(this.sample_attributes_default_template);
+        },
         rightClickExperiment(event) {
             const title = event.path[0].id;
+            this.log(title);
             let experiment = this.getExperiment(title);
+            this.log(experiment);
             // Disabled title editing
             experiment.attributes[0].disabled = true;
             this.launchExperimentAttributesModal(experiment);
@@ -1103,11 +1153,18 @@ export default {
                     'project': this.project_selected.title,
                     'attributes': this.experiment_attributes_fields,
                     'sample_attributes_template': this.sample_attributes_fields,
+                    'sample_placeholders': this.experiment_plan ? this.experiment_plan.samples : [],
                     };
+            
+            this.be.export_one_way_binding_prop('save_experiment',
+                                                new_experiment,
+                                                );
+            this.experiment_selected = {'title': title,
+                                        'project': this.project_selected.title,
+                                        'attributes': []
+                                        };
+            this.resetExperimentPlan();
             this.is_modal_new_experiment_active = false;
-            return this.be.export_one_way_binding_prop('save_experiment',
-                                                        new_experiment,
-                                                        );
         },
         saveProject() {
             let title = this.project_attributes_fields[0].value;
@@ -1124,6 +1181,7 @@ export default {
                     'title': title,
                     'attributes': this.project_attributes_fields
                     };
+            this.project_selected = {'title': title, 'attributes': []};
             this.is_modal_project_attributes_active = false;
             return this.be.export_one_way_binding_prop('save_project',
                                                         new_project,
@@ -1151,6 +1209,9 @@ export default {
                                                        );
         },
         selectExperiment(experiment_title) {
+            // if (experiment_title === this.experiment_selected.title) {
+            //     return
+            // }
             // Set experiment active in sample tree
             for (let i in this.experiments) {
                 if(this.experiments[i].title === experiment_title){
@@ -1165,6 +1226,9 @@ export default {
             this.is_modal_landing_active = false;
         },
         selectProject(project_title) {
+            // if (project_title === this.project_selected.title) {
+            //     return
+            // }
             // Set project active in the sample tree
             for (let i in this.projects) {
                 if(this.projects[i].title === project_title){
@@ -1174,19 +1238,21 @@ export default {
                 }
             }
             this.project_selected = shallow_copy(this.getProject(project_title));
-            // Reset experiment
-            this.experiment_selected = {
-                'title': "",
-                'project': "",
-                'attributes': [],
-                'sample_attributes_template': [],
-                };
+            if (this.project_selected.title !== this.experiment_selected.project) {
+                // Reset experiment
+                this.experiment_selected = {
+                    'title': "",
+                    'project': "",
+                    'attributes': [],
+                    'sample_attributes_template': [],
+                    };
+            }
             this.is_modal_project_attributes_active = false;
         },
     },
     watch: {
         experiment_selected: function(new_value, old_value) {
-            if ( _.isEqual(new_value, old_value) ) {
+            if ( _.isEqual(new_value.title, old_value.title) ) {
                 return false;
             }
             if ( !_.isEmpty(new_value.title) ) {
@@ -1198,31 +1264,59 @@ export default {
                 this.be.subscribe(['samples'],
                                   this.room_experiment
                                   );
-                return this.be.export_one_way_binding_prop('experiment_selected',
-                                                           new_value,
-                                                           old_value,
-                                                           this.room_sid
-                                                           );
+                this.be.export_one_way_binding_prop('experiment_selected',
+                                                    new_value,
+                                                    old_value,
+                                                    this.room_sid
+                                                    );
+                if (this.is_modal_sample_attributes_active) {
+                    // Update sample form props
+                    this.sample_form_props = shallow_copy(this.sample_form_props);
+                    this.sample_form_props.load_template_path = this.getPrefilledTemplatePath(this.project_selected.title, this.experiment_selected.title);
+                    this.sample_form_props.project = this.project_selected.title;
+                    this.sample_form_props.experiment = this.experiment_selected.title;
+                    let sample_attributes = shallow_copy(this.experiment_selected.sample_attributes_template);
+                    // Set title prefix
+                    let sample_no = this.samples.length + 1;
+                    const sample_title_prefix = sample_no.toString().padStart(3, '0') + '_';
+                    sample_attributes[0].value = sample_title_prefix;
+                    this.sample_form_props.attributes = sample_attributes;
+                    this.sample_attributes_fields = sample_attributes;
+                    this.sample_form_key = Math.random();
+                }
             }
         },
-        experiment_template_to_parse: function(new_value) {
-            const experiment_data = {
-                'title': this.experiment_attributes_fields[0].value,
-                'attributes': this.experiment_attributes_fields,
-                'project': this.project_selected.title,
-                'template_to_parse': new_value,
-            };
-            return this.be.export_one_way_binding_prop('experiment_from_template_file',
-                                                       experiment_data,
-                                                       null,
-                                                       this.room_sid
-                                                       );
+        experiment_plan: function(new_value) {
+            if (new_value) {
+                this.sample_attributes_template = new_value.sample_attributes_template;
+                this.sample_attributes_key = Math.random();
+                this.samples = new_value.samples;
+            }
+        },
+        experiment_plan_blob: function(new_value) {
+            if (new_value) {
+                return this.be.export_one_way_binding_prop('parse_experiment_plan_blob',
+                                                        new_value,
+                                                        );
+            }
+            // const experiment_data = {
+            //     'title': this.experiment_attributes_fields[0].value,
+            //     'attributes': this.experiment_attributes_fields,
+            //     'project': this.project_selected.title,
+            //     'template_to_parse': new_value,
+            // };
+            // return this.be.export_one_way_binding_prop('experiment_from_template_file',
+            //                                            experiment_data,
+            //                                            null,
+            //                                            this.room_sid
+            //                                            );
         },
         experiments: function() {
             if (this.experiment_selected.title) {
                 this.selectExperiment(this.experiment_selected.title);
             }
-        },        import_sample_table_datetime_range: function(new_value, old_value) {
+        },
+        import_sample_table_datetime_range: function(new_value, old_value) {
             return this.be.export_one_way_binding_prop('import_sample_table_datetime_range',
                                                         new_value, old_value,
                                                         this.room_experiment);
@@ -1245,14 +1339,12 @@ export default {
             this.import_sample_table_rows = new_data.rows;
             this.import_sample_table_loading = false;
         },
-        new_file: function(new_value, old_value) {
-            if (new_value === old_value) {
-                return false;
-            }
-            if ( !(this.project_selected.title.length &&
-                   this.experiment_selected.title.length) ) {
-                return false;
-            }
+        new_file: function(new_value) {
+            this.$buefy.toast.open({
+                duration: 5000,
+                message: 'Acquisition started: ' + new_value,
+                type: 'is-success'
+            })
             this.sample_form_props = {};
             this.sample_form_props.title = "New sample attributes";
             this.sample_form_props.load_template_path = this.getPrefilledTemplatePath(this.project_selected.title, this.experiment_selected.title);
@@ -1265,25 +1357,33 @@ export default {
                 for (let i in this.samples) {
                     // Find first placeholder sample
                     if (this.samples[i].filename.indexOf('placeholder') != -1) {
+                        // Copy attributes from placeholder
                         this.sample_attributes_fields = shallow_copy(this.samples[i].attributes);
+                        // Delete placeholder
                         this.removeSample(this.samples[i].filename)
-                        break;
+                        return
                     }
                 }
+                // No placeholder sample found, save with blank attributes
+                this.sample_attributes_fields = shallow_copy(this.experiment_selected.sample_attributes_template);
+                // Save sample
                 this.saveSample();
             } else {
-                let sample_attributes = shallow_copy(this.experiment_selected.sample_attributes_template);
-                // Set title prefix
-                let sample_no = this.samples.length + 1;
-                const sample_title_prefix = sample_no.toString().padStart(3, '0') + '_';
-                sample_attributes[0].value = sample_title_prefix;
-                this.sample_form_props.attributes = sample_attributes;
-                this.sample_attributes_fields = sample_attributes;
+                // Manual sample info input
+                if (this.experiment_selected.title.length) {
+                    // Set title prefix
+                    let sample_attributes = shallow_copy(this.experiment_selected.sample_attributes_template);
+                    let sample_no = this.samples.length + 1;
+                    const sample_title_prefix = sample_no.toString().padStart(3, '0') + '_';
+                    sample_attributes[0].value = sample_title_prefix;
+                    this.sample_form_props.attributes = sample_attributes;
+                    this.sample_attributes_fields = sample_attributes;
+                }
                 this.launchSampleAttributeModal();
             }   
         },
         project_selected: function(new_value, old_value) {
-            if ( _.isEqual(new_value, old_value) ) {
+            if ( _.isEqual(new_value.title, old_value.title) ) {
                 return false;
             }
             if ( !_.isEmpty(new_value.title) ) {
@@ -1406,11 +1506,16 @@ export default {
             }
             this.sample_annotations = [];
         },
+        experiment_plan_file: async function(new_value) {
+            let file_content = await new_value.text();
+            this.experiment_plan_blob = file_content;
+        },
         'root_namespace.connected': function(new_value) {
             if ( new_value === true )
             {
                 this.namespace = this.root_namespace;
                 // handlers for for external notifications:
+                this.namespace.on('experiment_plan', (value) => this.be.import_one_way_binding_prop('experiment_plan', value.value));
                 this.namespace.on('experiments', (value) => this.be.import_two_way_binding_prop('experiments', value.value));
                 this.namespace.on("importable_samples", (value) => this.be.import_one_way_binding_prop("importable_samples", value.value));
                 this.namespace.on("projects", (value) => this.be.import_two_way_binding_prop("projects", value.value));

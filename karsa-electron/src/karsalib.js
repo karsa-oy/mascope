@@ -65,7 +65,7 @@ export class BECom {
     
     export_one_way_binding_prop(name,
                                 new_value,
-                                old_value,
+                                old_value=null,
                                 src_room=null,   //client_room
                                 target_room=null,
                                 namespace=null,
@@ -75,7 +75,6 @@ export class BECom {
         if ( _.isEqual(new_value, old_value) ) {
                 return false;
             }
-
         // let the_room = client_room || this.ctx.room_sid;
         let from_room = src_room || this.ctx.room_sid;
         let to_room = target_room;

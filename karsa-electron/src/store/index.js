@@ -9,7 +9,7 @@ export default new Vuex.Store({
 		acquisition_status: "not_running",		// not_running/starting/running/stopping
 		autosave_on: false,
 		data_source_selected: {},
-		experiment_selected: {'title': "", 'attributes': []},
+		experiment_selected: {'title': "", 'project': "", 'attributes': []},
 		experiments: [],
 		figure_data: {},
 		figure_double_click: null,
@@ -25,6 +25,8 @@ export default new Vuex.Store({
 				'title': "",
 				'attributes': [],
 				'properties': {},
+				'project': "",
+				'experiment': "",
 				},
 		stop_visualize_range: {},
 		target_to_display: {},
