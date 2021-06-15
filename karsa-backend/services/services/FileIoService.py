@@ -664,7 +664,6 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         global cache
 
         value = data['value']
-        # i = value.get('i')
         filename_base = value['filename']
 
         ti = np.array( [value['t']], dtype=np.float32 )
@@ -695,7 +694,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                                   'time'
                                   )
         cache_process_requests(filename_base)
-        return data['value']['i']
+        return data['cnt']
 
     async def on_acquired_tps_data(self, data):
         value = data['value']

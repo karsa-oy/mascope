@@ -89,6 +89,7 @@ class TOFServiceClient(BaseStreamerClient):
         # which is needed for dynamic instantiation of a streamer and a raw_pool
         super().__init__(streamer_type or 'TofDaq', raw_pool,
                          url, port, public_namespace_data, private_namespace_data)
+        self.acknowledge_acquisition = False    # do not sync acq.speed with FileIO capacity
 
     async def init_service(self):
         await super().init_service()

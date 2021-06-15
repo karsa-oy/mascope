@@ -593,7 +593,9 @@ def release_request(request_id):
             cache.pop(request_id)
         except KeyError:
             pass
-        # print(this_func_name(), request_id, generator_input_cache.cache.keys(), cache.keys())
+        print(this_func_name(), request_id,
+              'cache_q', generator_input_cache.cache.keys(),
+              'file_cache', cache.keys())
 
 
 REQUEST_PROCESSORS = {'spectrogram': process_visualization_request,
