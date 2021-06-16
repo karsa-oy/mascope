@@ -186,7 +186,7 @@
                                     label="Planned experiment"
                                     v-if="experiment_plan">
                                     <b-field>
-                                        # samples: {{experiment_plan.samples.length.toString()}}
+                                        # samples: {{experiment_plan.sample_placeholders.length.toString()}}
                                     </b-field>
                                     <b-field>
                                         <b-button
@@ -1117,9 +1117,7 @@ export default {
         },
         rightClickExperiment(event) {
             const title = event.path[0].id;
-            this.log(title);
             let experiment = this.getExperiment(title);
-            this.log(experiment);
             // Disabled title editing
             experiment.attributes[0].disabled = true;
             this.launchExperimentAttributesModal(experiment);
@@ -1153,16 +1151,13 @@ export default {
                     'project': this.project_selected.title,
                     'attributes': this.experiment_attributes_fields,
                     'sample_attributes_template': this.sample_attributes_fields,
-                    'sample_placeholders': this.experiment_plan ? this.experiment_plan.samples : [],
+                    'sample_placeholders': this.experiment_plan ? this.experiment_plan.sample_placeholders : [],
                     };
             
             this.be.export_one_way_binding_prop('save_experiment',
                                                 new_experiment,
                                                 );
-            this.experiment_selected = {'title': title,
-                                        'project': this.project_selected.title,
-                                        'attributes': []
-                                        };
+            this.experiment_selected = new_experiment;
             this.resetExperimentPlan();
             this.is_modal_new_experiment_active = false;
         },
@@ -1181,7 +1176,7 @@ export default {
                     'title': title,
                     'attributes': this.project_attributes_fields
                     };
-            this.project_selected = {'title': title, 'attributes': []};
+            this.project_selected = new_project;
             this.is_modal_project_attributes_active = false;
             return this.be.export_one_way_binding_prop('save_project',
                                                         new_project,
@@ -1220,7 +1215,9 @@ export default {
                     this.experiments[i].active = false;
                 }
             }
-            this.experiment_selected = this.getExperiment(experiment_title);
+            if (this.experiment_selected.title != experiment_title) {
+                this.experiment_selected = this.getExperiment(experiment_title);
+            }
             this.is_modal_new_experiment_active = false;
             this.is_modal_experiment_attributes_active = false;
             this.is_modal_landing_active = false;
@@ -1252,7 +1249,7 @@ export default {
     },
     watch: {
         experiment_selected: function(new_value, old_value) {
-            if ( _.isEqual(new_value.title, old_value.title) ) {
+            if ( _.isEqual(new_value, old_value) ) {
                 return false;
             }
             if ( !_.isEmpty(new_value.title) ) {
@@ -1290,7 +1287,7 @@ export default {
             if (new_value) {
                 this.sample_attributes_template = new_value.sample_attributes_template;
                 this.sample_attributes_key = Math.random();
-                this.samples = new_value.samples;
+                this.samples = new_value.sample_placeholders;
             }
         },
         experiment_plan_blob: function(new_value) {
@@ -1299,17 +1296,13 @@ export default {
                                                         new_value,
                                                         );
             }
-            // const experiment_data = {
-            //     'title': this.experiment_attributes_fields[0].value,
-            //     'attributes': this.experiment_attributes_fields,
-            //     'project': this.project_selected.title,
-            //     'template_to_parse': new_value,
-            // };
-            // return this.be.export_one_way_binding_prop('experiment_from_template_file',
-            //                                            experiment_data,
-            //                                            null,
-            //                                            this.room_sid
-            //                                            );
+        },
+        experiment_plan_file: async function(new_value) {
+            if (!new_value.text) {
+                return
+            }
+            let file_content = await new_value.text();
+            this.experiment_plan_blob = file_content;
         },
         experiments: function() {
             if (this.experiment_selected.title) {
@@ -1352,6 +1345,9 @@ export default {
             this.sample_form_props.project = this.project_selected.title;
             this.sample_form_props.experiment = this.experiment_selected.title;
             
+            // Initialize sample attribute fields
+            this.sample_attributes_fields = shallow_copy(this.experiment_selected.sample_attributes_template);
+
             if (this.autosave_on) {
                 // Auto-save sample
                 for (let i in this.samples) {
@@ -1360,25 +1356,21 @@ export default {
                         // Copy attributes from placeholder
                         this.sample_attributes_fields = shallow_copy(this.samples[i].attributes);
                         // Delete placeholder
-                        this.removeSample(this.samples[i].filename)
-                        return
+                        this.removeSample(this.samples[i].filename);
+                        break
                     }
                 }
-                // No placeholder sample found, save with blank attributes
-                this.sample_attributes_fields = shallow_copy(this.experiment_selected.sample_attributes_template);
                 // Save sample
                 this.saveSample();
             } else {
                 // Manual sample info input
-                if (this.experiment_selected.title.length) {
-                    // Set title prefix
-                    let sample_attributes = shallow_copy(this.experiment_selected.sample_attributes_template);
-                    let sample_no = this.samples.length + 1;
-                    const sample_title_prefix = sample_no.toString().padStart(3, '0') + '_';
-                    sample_attributes[0].value = sample_title_prefix;
-                    this.sample_form_props.attributes = sample_attributes;
-                    this.sample_attributes_fields = sample_attributes;
-                }
+                // Set title prefix
+                let sample_attributes = this.sample_attributes_fields;
+                let sample_no = this.samples.length + 1;
+                const sample_title_prefix = sample_no.toString().padStart(3, '0') + '_';
+                sample_attributes[0].value = sample_title_prefix;
+                this.sample_form_props.attributes = sample_attributes;
+                this.sample_attributes_fields = sample_attributes;
                 this.launchSampleAttributeModal();
             }   
         },
@@ -1505,10 +1497,6 @@ export default {
                             };
             }
             this.sample_annotations = [];
-        },
-        experiment_plan_file: async function(new_value) {
-            let file_content = await new_value.text();
-            this.experiment_plan_blob = file_content;
         },
         'root_namespace.connected': function(new_value) {
             if ( new_value === true )

@@ -188,7 +188,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
 
         experiment_plan = {
             'sample_attributes_template': sample_attributes_template,
-            'samples': samples,
+            'sample_placeholders': samples,
             }
         await self.emit_client_notification('experiment_plan',
                                             experiment_plan,
