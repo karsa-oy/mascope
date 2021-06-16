@@ -388,6 +388,12 @@ class H5Streamer(TofDaqStreamer):
         self.speci = -1                 # Index of last received spectrum,
                                         # -1 when there is no active acquisition
 
+    def _finalize(self):
+        # Reset self
+        self._reset()
+        # Feed poison pill
+        self.spec_queue.put(None)
+
     def _get_and_feed_data(self):
         """Read data from the h5 and put to queues
         """
@@ -607,12 +613,14 @@ class H5Streamer(TofDaqStreamer):
         """Stop stream before complete
         """
         self.cancel_event.set()
-        # Clear all upcoming files from queue
-        # while True:
-        #     try:
-        #         self.file_queue.get_nowait()
-        #     except:
-        #         break
+        # Clear all upcoming data from queue
+        while True:
+            try:
+                self.spec_queue.get_nowait()
+                self.tps_queue.get_nowait()
+            except Empty:
+                break
+            sleep(.1)
 
 
 class RawStreamer(Thread):
@@ -817,9 +825,10 @@ class RawStreamer(Thread):
         """Stop stream before complete
         """
         self.cancel_event.set()
-        # Clear all upcoming files from queue
-        # while True:
-        #     try:
-        #         self.file_queue.get_nowait()
-        #     except:
-        #         break
+        # Clear all upcoming data from queue
+        while True:
+            try:
+                self.spec_queue.get_nowait()
+            except Empty:
+                break
+            sleep(.1)
