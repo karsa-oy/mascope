@@ -46,6 +46,31 @@ def t_mark(data, note=None):
     print('t_mark :', data['t_mark'], data.get('request_id', ''))
 
 
+class LRUDict(dict):
+    def __init__(self, capacity: int, *args, **kwargs):
+        self.capacity = capacity
+        self.lru_keys = []
+        self.lock = Lock()
+        super().__init__(*args, **kwargs)
+
+    def __getitem__(self, key):
+        with self.lock:
+            data = super().__getitem__(key)
+            self.lru_keys.remove(key)
+            self.lru_keys.append(key)
+            return data
+
+    def __setitem__(self, key, value):
+        with self.lock:
+            super().__setitem__(key, value)
+            if key in self.lru_keys:
+                self.lru_keys.remove(key)
+            self.lru_keys.append(key)
+            if len(self.lru_keys) > self.capacity:
+                k = self.lru_keys.pop(0)
+                super().__delitem__(k)
+
+
 class Logger():
     # log_levels = [
     #     logging.DEBUG,

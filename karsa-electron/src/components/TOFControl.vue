@@ -924,4 +924,4 @@ var desorption_chart_layout = {
 
 </script>
 
-<style src = "../assets/css/MeasurementTab.css"> </style>
+<style src = "../assets/css/MascopeStyle.css"> </style>

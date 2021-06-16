@@ -32,6 +32,7 @@ from queue import Empty
 
 from karsalib import (BaseClientNamespace,
                       BridgeServiceClient,
+                      LRUDict,
                       CacheQ,
                       Logger,
                       parse_cmd_args, 
@@ -53,7 +54,7 @@ DATA_VERSION_NUMBER = '0.01'
 client = None
 
 # Cache for data arrays
-cache = {}
+cache = LRUDict(10)
 
 service_q = None
 
