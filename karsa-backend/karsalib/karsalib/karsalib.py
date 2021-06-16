@@ -728,7 +728,7 @@ class BaseStreamerClient(BridgeServiceClient):
                                        )
             # Acquisition loop
             self.log("Entering acquisition loop.")
-            MAX_RESPONSE_TIME = 10      # secs to wait for client acknowledgement, then ignore it.
+            MAX_RESPONSE_TIME = 15      # secs to wait for client acknowledgement, then ignore it.
 
             # inject callback handler to private_ns to handle emit result in the notification namespace
             def private_ns_data_count(cnt):
@@ -743,17 +743,13 @@ class BaseStreamerClient(BridgeServiceClient):
             while True:
                 try:
                     spec_data = self.streamer.spec_queue.get_nowait() # Non-blocking
-
                     # acquisition ACK: sync acquisition velocity with FileIo capacity
                     while cnt - self.private_ns.cnt > 4:
                         if time.time() - self.private_ns.cnt_timestamp > MAX_RESPONSE_TIME:
-                            # ignore frozen packets, if no response in due time
-                            self.log(f"Warning: acquisition of packets {self.private_ns.cnt}-{cnt} of {filename} was not acknowledged.")
+                            self.log(f"Warning: no acknowledgement for packets {self.private_ns.cnt}-{cnt} of {filename}")
                             private_ns_data_count(cnt)
-                            raise Empty
+                            raise ConnectionError
                         await self.sio.sleep(.1)
-
-                    # TODO: is it a right place for tps_queue?
                     if hasattr(self.streamer, 'tps_queue'):
                         tps_data = self.streamer.tps_queue.get() # Blocking, since new data expected
                     else:
@@ -761,6 +757,10 @@ class BaseStreamerClient(BridgeServiceClient):
                 except Empty:
                     # No new data
                     await self.sio.sleep(.1)
+                    continue
+                except ConnectionError:
+                    self.streamer.stop_stream()
+                    self.log(f"Acquisition of {filename} was cancelled.")
                     continue
                 except KeyboardInterrupt:
                     spec_data = None
