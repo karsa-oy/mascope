@@ -629,6 +629,7 @@ class BaseStreamerClient(BridgeServiceClient):
                                 'type': streamer_type,
                                }
         self.public_ns.room_instrument = priv_ns_name
+        self.acknowledge_acquisition = True
 
 
     async def initialize_streamer(self):
@@ -727,18 +728,28 @@ class BaseStreamerClient(BridgeServiceClient):
                                        )
             # Acquisition loop
             self.log("Entering acquisition loop.")
+            MAX_RESPONSE_TIME = 15      # secs to wait for client acknowledgement, then ignore it.
 
-            # inject callback handler to private_ns to handle a result of emit_private_notification
-            def acquired_spectrum_callback(i):
-                self.private_ns.acquired_spectrum_index = i
-            self.private_ns.acquired_spectrum_index = 0
-            self.private_ns.acquired_spectrum_callback = acquired_spectrum_callback
+            # inject callback handler to private_ns to handle emit result in the notification namespace
+            def private_ns_data_count(cnt):
+                self.private_ns.cnt = max(cnt, self.private_ns.cnt)
+                self.private_ns.cnt_timestamp = time.time()
 
-            stop_task = False
-            TASK_TTL = 300     # 30 sec
+            self.private_ns.private_ns_data_count = private_ns_data_count
+            self.private_ns.cnt = 0
+            self.private_ns.cnt_timestamp = time.time()
+            cnt = 0
+
             while True:
                 try:
                     spec_data = self.streamer.spec_queue.get_nowait() # Non-blocking
+                    # acquisition ACK: sync acquisition velocity with FileIo capacity
+                    while cnt - self.private_ns.cnt > 4:
+                        if time.time() - self.private_ns.cnt_timestamp > MAX_RESPONSE_TIME:
+                            self.log(f"Warning: no acknowledgement for packets {self.private_ns.cnt}-{cnt} of {filename}")
+                            private_ns_data_count(cnt)
+                            raise ConnectionError
+                        await self.sio.sleep(.1)
                     if hasattr(self.streamer, 'tps_queue'):
                         tps_data = self.streamer.tps_queue.get() # Blocking, since new data expected
                     else:
@@ -747,28 +758,27 @@ class BaseStreamerClient(BridgeServiceClient):
                     # No new data
                     await self.sio.sleep(.1)
                     continue
+                except ConnectionError:
+                    self.streamer.stop_stream()
+                    self.log(f"Acquisition of {filename} was cancelled.")
+                    continue
+                except KeyboardInterrupt:
+                    spec_data = None
+                    self.log(f"Acquisition of {filename} was cancelled.")
+                    pass
+
                 # Got data
                 if spec_data is not None:
-                    # align acquisition velocity with FileIoService capacity
-                    ttl_count = 0
-                    while spec_data['i'] - self.private_ns.acquired_spectrum_index > 10:
-                        ttl_count += 1
-                        if ttl_count > TASK_TTL:
-                            # TODO: Should probably call stop_stream for file streamers but not TofDaqStreamer
-                            # self.streamer.stop_stream()
-                            self.log(f"{filename} import was cancelled due to a timeout.")
-                            stop_task = True
-                            break
-                        await asyncio.sleep(.1)
-                    if stop_task:
-                        continue
                     # Spectrum data
+                    if self.acknowledge_acquisition:
+                        cnt += 1
                     await self.emit_private_notification(
                                             'acquired_spectrum',
                                             {**spec_data,
                                              'filename': filename
                                              },
-                                            callback="acquired_spectrum_callback",
+                                            callback="private_ns_data_count",
+                                            cnt=cnt,
                                             no_data_logging=True
                                             )
                     # Progress

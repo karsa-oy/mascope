@@ -31,7 +31,8 @@ from queue import Empty
 from time import time
 
 from karsalib import BaseClientNamespace, BaseServiceClient, CacheQ, \
-                     parse_cmd_args, get_client_notification_args, t_mark
+                     parse_cmd_args, get_client_notification_args, \
+                     this_func_name, t_mark
 from karsatof.kworker import ImageGenerator
 from karsatof.kcollector import ExtendableDataArray
 from karsatof.kimage import (
@@ -201,7 +202,6 @@ def viz_cache_pop(table,
                 '''.format(fields, table, query),
                 args
                 )
-
     data = []
     for id, *d in cur.fetchall():
         data.append(d)
@@ -214,6 +214,7 @@ def viz_cache_pop(table,
 def viz_cache_process_requests(request_id):
     global REQUEST_PROCESSORS
 
+    check_to_release_request = False
     rows = viz_cache_pop(
                     'requests',
                     '''
@@ -256,6 +257,12 @@ def viz_cache_process_requests(request_id):
                             client_room,
                             request_id
                             )
+        else:
+            check_to_release_request = True
+    if check_to_release_request:
+        cur = viz_cache_get('requests', 'request_id', request_id=request_id)
+        if not cur.fetchone():
+            release_request(request_id)
 
 
 def viz_cache_put(table,
@@ -577,6 +584,19 @@ def process_visualization_request(filename,
     processed_until = feed_signal_to_visualize([t0, t1])
     return processed_until
 
+def release_request(request_id):
+        viz_cache_release('requests',
+                           request_id=request_id,
+                         )
+        generator_input_cache.cache_delete_key(request_id)
+        try:
+            cache.pop(request_id)
+        except KeyError:
+            pass
+        print(this_func_name(), request_id,
+              'cache_q', generator_input_cache.cache.keys(),
+              'file_cache', cache.keys())
+
 
 REQUEST_PROCESSORS = {'spectrogram': process_visualization_request,
                       'timeseries': process_visualization_request,
@@ -762,14 +782,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                             **{**get_client_notification_args(data),
                                                'namespace': get_namespace(filename)})
         for request_id in request_ids:
-            viz_cache_release('requests',
-                              request_id=request_id,
-                              )
-            generator_input_cache.cache_delete_key(request_id)
-            try:
-                cache.pop(request_id)
-            except KeyError:
-                pass
+            release_request(request_id)
     # ---------------------------------
 
     # ========== FileIoService notifications ==========

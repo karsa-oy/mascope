@@ -142,6 +142,8 @@ def cache_process_requests(filename):
     global REQUEST_PROCESSORS
 
     # Get all pending requests for filename
+    t_data = {}
+    t_mark(t_data, 'cache_process_requests:cache_get')
     request_data_rows = cache_get(
                             'requests',
                             '''
@@ -160,6 +162,7 @@ def cache_process_requests(filename):
         data_type, t0, t1, mz0, mz1, t_resolution, client_room, request_id = row
 
         # Select processing method based on data_type and process request
+        t_mark(t_data, f"cache_process_requests:{REQUEST_PROCESSORS[data_type].__name__}")
         processed_t_range = REQUEST_PROCESSORS[data_type](
                                     filename=filename,
                                     data_type=data_type,
@@ -173,12 +176,14 @@ def cache_process_requests(filename):
                                     )
         if not processed_t_range:
             # Nothing was processed
+            t_mark(t_data, f"cache_process_requests:cache_row_skipped")
             continue
 
         # TODO: Handle the case when processed_t_range[0] > t0?
         
         if processed_t_range[1] < t1:
             # Only part of request served, update request start time
+            t_mark(t_data, "cache_process_requests:cache_row_update")
             t0_new = processed_t_range[1]
             cache_update('requests',
                          ['t0'],
@@ -193,9 +198,12 @@ def cache_process_requests(filename):
                          )
         else:
             # Request served fully, release from cache
+            t_mark(t_data, "cache_process_requests:cache_row_release")
             cache_release('requests',
                           request_id
                           )
+        t_mark(t_data, "cache_process_requests:cache_row_done")
+
 
 def cache_put(table,
               filename,
@@ -656,7 +664,6 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         global cache
 
         value = data['value']
-        # i = value.get('i')
         filename_base = value['filename']
 
         ti = np.array( [value['t']], dtype=np.float32 )
@@ -687,7 +694,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                                   'time'
                                   )
         cache_process_requests(filename_base)
-        return data['value']['i']
+        return data['cnt']
 
     async def on_acquired_tps_data(self, data):
         value = data['value']
@@ -731,13 +738,6 @@ class FileIoPrivateNamespace(BaseClientNamespace):
             if isinstance(array, ExtendableDataArray):
                 print("Flush %s array" %key)
                 array.flush()
-        # Cancel DataViz request
-        await self.parent.emit_public_notification(
-                        'stop_visualize_range',
-                        {'request_ids': [self.parent.public_ns.room_sid],
-                         'filename': filename_base,
-                         }
-                        )
 
     async def on_tps_parameter_info(self, data):
         value = data['value']
@@ -813,9 +813,9 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         
         if filename not in cache:
             # File not in cache, load and put
+            t_mark(value, 'on_data_request:load_file')
             file_dataset = load_file(filename)
             cache[filename] = file_dataset
-            t_mark(value)
 
         file_cache_item = cache[filename]
 
@@ -828,6 +828,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
             t_range = [0, file_cache_item.attrs['length']]
 
         # Put request to cache
+        t_mark(value, 'on_data_request:cache_put')
         cache_put('requests',
                   filename,
                   data_type,
@@ -838,8 +839,9 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                   request_id,
                   )
         # Process request(s)
+        t_mark(value, 'on_data_request:cache_process_requests')
         cache_process_requests(filename)
-        t_mark(value)
+        t_mark(value, 'on_data_request:out')
 
     async def on_figure_data(self, data):
         # self.log(data)
