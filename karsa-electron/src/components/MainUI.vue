@@ -274,6 +274,18 @@ body {
 .columns:not(:last-child){
     margin-bottom: 0px; 
 }
+.b-checkbox.checkbox input[type=checkbox] + .check {
+    /* border-color: #7957d5; */
+    box-shadow: 0 0 0.5em rgba(122, 122, 122, 0.8);
+}
+.b-checkbox.checkbox input[type=checkbox]:checked {
+    background: #7957d5;
+    border-color: #7957d5;
+}
+.b-checkbox.checkbox[disabled] input[type=checkbox] + .check {
+    background: #7a7a7a;
+    box-shadow: none;
+}
 .b-tabs .tab-content {
     padding-bottom: 5px;
     padding-left: 5px; 
