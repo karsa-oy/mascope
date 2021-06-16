@@ -295,6 +295,10 @@ export const viewPortMixin = {
                 new_sample = true;
             }
             this.filename = new_value.filename;
+            if (!new_value.mz_range) {
+                this.log("Error: mz_range not defined!")
+                return
+            }
             let t0 = new_value.t_range[0];
             let t1 = new_value.t_range[1];
             let mz0 = new_value.mz_range[0];
