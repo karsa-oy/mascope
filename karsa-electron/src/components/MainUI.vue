@@ -215,6 +215,9 @@ export default {
     }
 </style>
 
+<style src = "vue-multiselect/dist/vue-multiselect.min.css"> </style>
+<style src = "../assets/css/MascopeStyle.css"> </style>
+
 <style>
 html{
     background-color:  #29282e!important;

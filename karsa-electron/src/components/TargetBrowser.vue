@@ -309,5 +309,3 @@ export default {
 
 
 </script>
-
-<style src = "../assets/css/MeasurementTab.css"> </style>
