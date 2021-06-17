@@ -340,6 +340,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
         experiment = value['experiment']
         project = value['project']
         attributes = value.get('attributes')
+        method = value.get('method')
 
         try:
             samples = datapool.pool.get(project).get(experiment)
@@ -347,10 +348,10 @@ class MetadataServiceNamespace(BaseClientNamespace):
             raise ValueError("Requested project or experiment does not exist!")
         if filename not in samples:
             # New sample attributes
-            datapool.new_sample(project, experiment, filename, attributes)
+            datapool.new_sample(project, experiment, filename, attributes, method)
         else:
             # Edit sample attributes
-            datapool.edit_sample(project, experiment, filename, attributes)
+            datapool.edit_sample(project, experiment, filename, attributes, method)
 
         # Update sample table data in UIs
         await self.emit_client_notification(

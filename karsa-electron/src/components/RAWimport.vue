@@ -265,15 +265,14 @@ export default {
             // if (new_value === old_value) {
             //     return false;
             // }
-            this.new_file = new_value.filename;
+            this.new_file = new_value;
             this.acquisition_control_label = 'Stop Import';
             this.acquisition_in_progress = true;
         },
-        acquisition_finished: function(new_value) {
+        acquisition_finished: function() {
             // if (new_value === old_value) {
             //     return false;
             // }
-            this.new_file = new_value.filename;
             this.acquisition_control_label = 'Import ' +  this.data_source_selected.name +  ' file';
             this.acquisition_in_progress = false;
         },

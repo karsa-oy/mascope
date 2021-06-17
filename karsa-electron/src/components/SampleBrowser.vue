@@ -1196,6 +1196,7 @@ export default {
                 'experiment': this.sample_form_props.experiment,
                 'project': this.sample_form_props.project,
                 'attributes': this.sample_attributes_fields,
+                'method': this.sample_form_props.method,
             };
             // this.sample_attributes = sample;
             this.is_modal_sample_attributes_active = false;
@@ -1335,13 +1336,14 @@ export default {
         new_file: function(new_value) {
             this.$buefy.toast.open({
                 duration: 5000,
-                message: 'Acquisition started: ' + new_value,
+                message: 'Acquisition started: ' + new_value.filename,
                 type: 'is-success'
             })
             this.sample_form_props = {};
             this.sample_form_props.title = "New sample attributes";
             this.sample_form_props.load_template_path = this.getPrefilledTemplatePath(this.project_selected.title, this.experiment_selected.title);
-            this.sample_form_props.filename = new_value;
+            this.sample_form_props.filename = new_value.filename;
+            this.sample_form_props.method = new_value.method;
             this.sample_form_props.project = this.project_selected.title;
             this.sample_form_props.experiment = this.experiment_selected.title;
             
@@ -1361,7 +1363,8 @@ export default {
                     }
                 }
                 // Save sample
-                this.saveSample();
+                // Delay to give FileIo some time to save sample properties
+                setTimeout(this.saveSample(), 2000);
             } else {
                 // Manual sample info input
                 // Set title prefix

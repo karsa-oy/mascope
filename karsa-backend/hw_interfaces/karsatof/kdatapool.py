@@ -419,6 +419,7 @@ class SamplePool():
     def _read_attributes(self, path, prefix='', ext='.attrs'):
         attr_path = os.path.join(path, prefix + ext)
         if not os.path.exists(attr_path):
+            print("SamplePool._read_attributes: File not found: %s" %attr_path)
             return {}
         with open(attr_path, 'r') as f:
             attributes = json.load(f)
@@ -446,7 +447,10 @@ class SamplePool():
                 json.dump(annotations, f, indent=4)
 
     def _write_attributes(self, path, attributes, prefix='', ext='.attrs', overwrite=False):
-        attributes.append({'metadata_version_number': METADATA_VERSION_NUMBER})
+        if isinstance(attributes, list):
+            attributes.append({'metadata_version_number': METADATA_VERSION_NUMBER})
+        elif isinstance(attributes, dict):
+            attributes.update({'metadata_version_number': METADATA_VERSION_NUMBER})
 
         attr_path = os.path.join(path, prefix + ext)
         if os.path.exists(attr_path) and not overwrite:
@@ -492,11 +496,13 @@ class SamplePool():
         # Write new attributes
         self._write_attributes(project_path, attributes, overwrite=True)
 
-    def edit_sample(self, project, experiment, sample, attributes):
+    def edit_sample(self, project, experiment, sample, attributes, method):
         '''Edit sample attributes'''
         experiment_path = os.path.join(self.projects_root, project, experiment)
         # Write attributes
         self._write_attributes(experiment_path, attributes, prefix=sample, overwrite=True)
+        # Write method
+        self._write_attributes(experiment_path, method, prefix=sample, ext='.meth', overwrite=True)
 
     def get_experiments(self, project):
         project_path = os.path.join(self.projects_root, project)
@@ -546,12 +552,12 @@ class SamplePool():
             for sample_id in sample_ids:
                 # Read experiment-specific sample attributes
                 experiment_path = os.path.join(self.projects_root,
-                                            project,
-                                            experiment
-                                            )
+                                               project,
+                                               experiment
+                                               )
                 sample_exp_attrs = self._read_attributes(experiment_path,
-                                                        prefix=sample_id
-                                                        )
+                                                         prefix=sample_id
+                                                         )
                 # Read sample properties
                 sample_path = os.path.join(experiment_path, sample_id)
                 sample_props = self._read_attributes(sample_path)
@@ -589,7 +595,7 @@ class SamplePool():
         # Update self.pool
         self.pool[project].update({ experiment: [] })
 
-    def new_sample(self, project, experiment, sample, attributes):
+    def new_sample(self, project, experiment, sample, attributes, method):
         # Data path
         sample_data_path = parse_path_from_sample_name(sample)
         # Meta-data path
@@ -603,6 +609,8 @@ class SamplePool():
             self._make_link(sample_data_path, sample_experiment_path)
         # Write attributes
         self._write_attributes(experiment_path, attributes, prefix=sample)
+        # Write method
+        self._write_attributes(experiment_path, method, prefix=sample, ext='.meth')
         # Update self.pool
         self.update_experiment_samples(project, experiment)
 

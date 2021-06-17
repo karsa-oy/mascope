@@ -5,7 +5,6 @@ Vue.use(Vuex)
 
 export default new Vuex.Store({
 	state: {
-		acquisition_control_active: false,
 		acquisition_status: "not_running",		// not_running/starting/running/stopping
 		autosave_on: false,
 		data_source_selected: {},
@@ -35,9 +34,6 @@ export default new Vuex.Store({
 		visualize_range: {},
 	},
 	mutations: {
-		acquisition_control_active(state, payload) {
-			state.acquisition_control_active = payload;
-		},
 		acquisition_status(state, payload) {
 			state.acquisition_status = payload;
 		},

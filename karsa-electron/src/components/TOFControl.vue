@@ -115,52 +115,48 @@
         <!-- Modal for edit temperature ramp datatable values -->
         <section class="modal-edit-temperature-ramp-data-table-row">
             <b-modal 
-                :active.sync="is_edit_temperature_ramp_modal_active"
+                :active.sync="is_modal_desorption_step_active"
                 has-modal-card
                 trap-focus
                 aria-role="dialog"
                 aria-modal>
-
                 <div class="columns">
                     <div class="modal-card" style="width: auto">
                         <!-- <header class="modal-card-head">
                             <p class="modal-card-title">Scenthound parameters</p>
                         </header> -->
                         <section class="modal-card-body idparams-edit-body">
-                            <b-field label="t(s)">
+                            <b-field label="time [s]">
                                 <b-input
-                                    v-model="edit_dialog_time"
-                                    :value="edit_dialog_time"
-                                    placeholder="seconds"
-                                >
+                                    v-model="desorption_step_modal_time"
+                                    placeholder="seconds">
                                 </b-input>
                             </b-field>
 
-                            <b-field label="Temperature">
+                            <b-field label="Temperature [C]">
                                 <b-input
-                                    v-model="edit_dialog_temperature"
-                                    :value="edit_dialog_temperature"
-                                    placeholder="Temperature"
-                                >
+                                    v-model="desorption_step_modal_temperature"
+                                    placeholder="Temperature">
                                 </b-input>
+                            </b-field>
+
+                            <b-field label="Cassette in">
+                                <b-switch
+                                    v-model="desorption_step_modal_filter_in">
+                                </b-switch>
                             </b-field>
 
                         </section>
                         <footer class="modal-card-foot">
-                            <button
-                                class="button"
-                                type="button"
-                                is-dark
-                                @click="edit_row_in_config_desorption_table()">
+                            <b-button
+                                @click="editDesorptionCycle()"
+                                :disabled="!(desorption_step_modal_temperature && desorption_step_modal_time)">
                                 Save
-                            </button>
-                            <button
-                                class="button"
-                                type="button"
-                                is-dark
-                                @click="is_edit_temperature_ramp_modal_active=false">
+                            </b-button>
+                            <b-button
+                                @click="is_modal_desorption_step_active=false">
                                 Close
-                            </button>
+                            </b-button>
                         </footer>
                     </div>
                 </div>
@@ -173,11 +169,11 @@
         <section>
             <!-- Acquisiton parameters collapsable -->
             <section>
+                <!-- Instrument control collapsable -->
                 <b-collapse
                     class="card"
                     animation="slide"
-                    aria-id="contentIdForA11y3"
-                    :open.sync="acquisition_control_active">
+                    aria-id="contentIdForA11y3">
                     <div
                         slot="trigger" 
                         slot-scope="props"
@@ -185,7 +181,7 @@
                         role="button"
                         aria-controls="contentIdForA11y3">
                         <p class="card-header-title">
-                            {{ data_source_selected.name }} acquisition
+                            {{ data_source_selected.name }}
                         </p>
                         <a class="card-header-icon">
                             <b-icon
@@ -195,11 +191,14 @@
                     </div>
                     <div class="card-content">
                         <div class="content">
+                            <!-- Instrument status display -->
                             <div style="text-align:center; margin-top:.4rem; margin-bottom:1rem">
                                 <h1 class="acquisition-parameters-h1">
                                     Instrument status: {{ scenthound_status }}
                                 </h1>
                             </div>
+                            <!-- End of instrument status display -->
+                            <!-- Acquisition progress bar -->
                             <div style="margin-left:1rem; margin-right:1rem; margin-bottom:1rem">
                                 <b-progress
                                     v-bind:value="acquisition_progress"
@@ -210,14 +209,16 @@
                                     size="is-large">
                                 </b-progress>
                             </div>
+                            <!-- End of acquisition progress bar -->
+                            <!-- Controls -->
                             <div style="text-align: center">
-                                <div style="display:none">
+                                <div v-if="method.tofdaq.acquisition_mode==='manual'">
                                     <b-button
                                         v-bind:icon-left="acquisition_status=='starting' || 
                                                         acquisition_status=='stopping' ||
                                                         instrument_status=='not_ready' ? 'flattr' : ''"
                                         :type="acquisition_button_type"
-                                        :disabled="acquisition_mode=='triggered' ||
+                                        :disabled="method.tofdaq.acquisition_mode=='triggered' ||
                                                 instrument_status=='not_ready'"
                                         @click="on_button_change_acquisition_status()">
                                         {{ acquisition_control_label }}
@@ -225,8 +226,8 @@
                                     <div><br></div>
                                 </div>
                                 <b-button
-                                    type="is-dark"
-                                    :disabled="false"
+                                    type="is-primary"
+                                    :disabled="!control_mode_active"
                                     @click="onButtonShowInstrumentLog()">
                                     Instrument log
                                 </b-button>
@@ -234,171 +235,229 @@
                                 <b-field>
                                     <b-switch
                                         v-model="autosave_on"
-                                        :disabled="!experiment_selected.title.length">
+                                        :disabled="!(control_mode_active && experiment_selected.title.length)">
                                         Auto-save
                                     </b-switch>
                                 </b-field>
-                        </div>
-<div hidden>
-                            <h1 class="acquisition-parameters-h1">
-                                Measurement Mode
-                            </h1>
-                            <div class="acquisition-parameters-form">
-                                <b-field grouped>
-                                    <b-radio
-                                        type="is-white"
-                                        v-model="acquisition_mode"
-                                        native-value="triggered">
-                                        Triggered
-                                    </b-radio>
-                                    <b-radio
-                                        type="is-white"
-                                        v-model="acquisition_mode"
-                                        native-value="continuous">
-                                        Continuous
-                                    </b-radio> 
-
-                                    <label class="sample-length-label">
-                                        Sample length(s)
-                                    </label>
-                                    <b-input
-                                        class="sample-length"
-                                        size="is-small"
-                                        placeholder="90"
-                                        v-model="sample_length"
-                                        :value="sample_length"
-                                        type="number"
-                                        min="0"
-                                        max="20000">
-                                    </b-input>
-                                </b-field>
                             </div>
-                            <!-- Desorption collapsable -->
-                            <section style="width:100%;padding:0.5rem;">
-                                <b-collapse
-                                    class="inner-collapsable card"
-                                    @open="draw_desorption_chart()"
-                                    :open="false"
-                                    animation="slide"
-                                    aria-id="contentIdForA11y3">
-                                    <div
-                                        slot="trigger" 
-                                        slot-scope="props"
-                                        class="inner-collapsable card-header"
-                                        role="button"
-                                        aria-controls="contentIdForA11y3">
-                                        <p class="card-header-title">
-                                            Desorption Temperature ramp
-                                        </p>
-                                        <a class="card-header-icon">
+                            <!-- End of controls -->
+                        </div>
+                        <section style="width:100%; padding:0.5rem;">
+                            <!-- Method collapsable -->
+                            <b-collapse
+                                class="card"
+                                animation="slide"
+                                aria-id="contentIdForA11y3">
+                                <div
+                                    slot="trigger" 
+                                    slot-scope="props"
+                                    class="card-header"
+                                    style="background-color:transparent"
+                                    role="button"
+                                    aria-controls="contentIdForA11y3">
+                                    <p class="card-header-title">
+                                        Method
+                                    </p>
+                                    <a class="card-header-icon">
                                         <b-icon
                                             :icon="props.open ? 'menu-down' : 'menu-up'">
                                         </b-icon>
-                                        </a>
+                                    </a>
+                                </div>
+                                <div
+                                    class="card-content"
+                                    style="background-color:#3f3f48">
+                                    <div class="content">
+                                        <!-- TofDaq section -->
+                                        <section style="width:100%;padding:0.5rem;">
+                                            <div
+                                                class="card-content"
+                                                style="background-color:#50505a">
+                                                <div
+                                                    class="box"
+                                                    style="background-color:inherit">
+                                                    <h1 style="font-size:16px; text-align:center;">
+                                                        <p><b>TofDaq</b>
+                                                        </p>
+                                                    </h1>
+                                                    <b-field label="Acquisition mode">
+                                                        <div style="text-align:center; color:white">
+                                                            <b-radio
+                                                                type="is-white"
+                                                                v-model="method.tofdaq.acquisition_mode"
+                                                                native-value="triggered">
+                                                                Triggered
+                                                            </b-radio>
+                                                            <b-radio
+                                                                type="is-white"
+                                                                v-model="method.tofdaq.acquisition_mode"
+                                                                native-value="manual">
+                                                                Manual
+                                                            </b-radio>
+                                                        </div>
+                                                    </b-field>
+                                                    <b-field label="Sample length [s]">
+                                                        <b-input
+                                                            size="is-small"
+                                                            placeholder="seconds"
+                                                            v-model="method.tofdaq.sample_length"
+                                                            type="number"
+                                                            min="0"
+                                                            max="20000"
+                                                            lazy>
+                                                        </b-input>
+                                                    </b-field>
+                                                </div>
+                                            </div>
+                                        </section>
+                                        <!-- End of TofDaq section -->
+                                        <!-- TPS section -->
+                                        <section style="width:100%;padding:0.5rem;">
+                                            <div
+                                                class="card-content"
+                                                style="background-color:#50505a">
+                                                <div
+                                                    class="box"
+                                                    style="background-color:inherit">
+                                                    <h1 style="font-size:16px; text-align:center;">
+                                                        <p><b>TPS</b>
+                                                        </p>
+                                                    </h1>
+                                                    <div class="">
+                                                        <b-field label="TPS settings file">
+                                                            <b-input
+                                                                size="is-small"
+                                                                v-model="method.tps.settings_file"
+                                                                lazy>
+                                                            </b-input>
+                                                        </b-field>
+                                                        <b-field label="TPS settings file directory">
+                                                            <b-input
+                                                                size="is-small"
+                                                                v-model="method.tps.settings_file_directory"
+                                                                lazy>
+                                                            </b-input>
+                                                        </b-field>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </section>
+                                        <!-- End of TPS section -->
+                                        <!-- CI section -->
+                                        <section style="width:100%;padding:0.5rem;">
+                                            <div
+                                                class="card-content"
+                                                style="background-color:#50505a">
+                                                <MetaDataForm
+                                                    form_title="CI configuration"
+                                                    :editable="true"
+                                                    :default_template="[{'label': 'Reagent flow',
+                                                                            'value': ''
+                                                                            },
+                                                                        {'label': 'Sample flow',
+                                                                            'value': ''
+                                                                            },
+                                                                        {'label': 'Sheath flow',
+                                                                            'value': ''
+                                                                            }]"
+                                                    :template_path="ci_template_path"
+                                                    @metaDataUpdated="method.ci=$event">
+                                                </MetaDataForm>
+                                            </div>
+                                        </section>
+                                        <!-- End of CI section -->
+                                        <!-- Desorption section -->
+                                        <section style="width:100%;padding:0.5rem;">
+                                            <div
+                                                class="card-content"
+                                                style="background-color:#50505a">
+                                                <div
+                                                    class="box"
+                                                    style="background-color:inherit">
+                                                    <h1 style="font-size:16px; text-align:center;">
+                                                        <p><b>Desorption cycle</b>
+                                                        </p>
+                                                    </h1>
+                                                    <!-- Desorption cycle edot buttons -->
+                                                    <div class="desorption-temperature-ramp-controls">
+                                                        <b-tooltip
+                                                            label="Add step"
+                                                            position="is-left"
+                                                            :delay="500">
+                                                            <b-button
+                                                                icon-left="file-document-box-plus-outline"
+                                                                size="is-small"
+                                                                type="is-dark"
+                                                                @click="desorption_table_selected_row=null; launchDesorptionStepModal()"
+                                                                outlined
+                                                                inverted> 
+                                                            </b-button>
+                                                        </b-tooltip>
+                                                        <b-tooltip
+                                                            label="Edit step"
+                                                            position="is-left"
+                                                            :delay="500">
+                                                            <b-button
+                                                                icon-left="file-document-edit-outline"
+                                                                size="is-small"
+                                                                type="is-dark"
+                                                                @click="launchDesorptionStepModal()"
+                                                                v-if="desorption_table_selected_row !=null"
+                                                                outlined
+                                                                inverted>
+                                                            </b-button>
+                                                        </b-tooltip>
+                                                        <b-tooltip
+                                                            label="Remove step"
+                                                            position="is-left"
+                                                            :delay="500">
+                                                            <b-button
+                                                                icon-left="trash-can-outline"
+                                                                size="is-small"
+                                                                type="is-dark"
+                                                                @click="deleteDesorptionCycleStep()"
+                                                                v-if="desorption_table_selected_row !=null"
+                                                                outlined
+                                                                inverted>
+                                                            </b-button>
+                                                        </b-tooltip>
+                                                    </div>
+                                                    <!-- End of desorption cycle edot buttons -->
+                                                    <div class="">
+                                                        <b-table
+                                                            class="desorption-temperature-ramp-table desorption-data-table"
+                                                            :data="desorption_table_data"
+                                                            :columns="desorption_table_columns"
+                                                            :selected.sync="desorption_table_selected_row">
+                                                        </b-table>
+                                                    </div>
+                                                    <div id="desorption-chart-holder">
+                                                        <div
+                                                            class="columns"
+                                                            style="margin-left:2px;"
+                                                            id="desorption-chart">
+                                                        </div>
+                                                    </div>
+                                                    <br>
+                                                </div>
+                                            </div>
+                                        </section>
+                                        <!-- End of Desorption section -->
                                     </div>
-                                    <div class="card-content">
-                                        <div class="desorption-temperature-ramp-controls">
-                                            <b-button
-                                                icon-left="file-document-box-plus-outline"
-                                                size="is-small"
-                                                type="is-dark"
-                                                @click="show_add_new_row=true"
-                                                outlined
-                                                inverted> 
-                                            </b-button>
-                                            <b-button
-                                                icon-left="file-document-edit-outline"
-                                                size="is-small"
-                                                type="is-dark"
-                                                @click="show_desorption_edit_modal()"
-                                                v-if="desorption_table_selected_row !=null"
-                                                outlined
-                                                inverted>
-                                            </b-button>
-                                            <b-button
-                                                icon-left="trash-can-outline"
-                                                size="is-small"
-                                                type="is-dark"
-                                                @click="delete_row_in_config_desorption_table()"
-                                                v-if="desorption_table_selected_row !=null"
-                                                outlined
-                                                inverted>
-                                            </b-button>
-                                        </div>
-                                        <div
-                                            class="columns add-new-desorption-row"
-                                            v-if="show_add_new_row==true">
-                                            <div class="column" style="width:30%"> 
-                                                <b-input
-                                                    size="is-small"
-                                                    v-model="time"
-                                                    type="number"
-                                                    placeholder="time">
-                                                </b-input>
-                                            </div>
-                                            <div class="column" style="width:30%">
-                                                <b-input
-                                                    size="is-small"
-                                                    v-model="temperature"
-                                                    type="number"
-                                                    placeholder="temperature">
-                                                </b-input>
-                                            </div>
-                                            <div class="" style="width:40%; padding-top:15px;">
-                                                <b-button 
-                                                    type="is-dark" 
-                                                    size="is-small" 
-                                                    @click="save_new_row_in_config_desorption_table()" 
-                                                    outlined 
-                                                    inverted>
-                                                    Save
-                                                </b-button>
-                                                &nbsp; 
-                                                <b-button 
-                                                    type="is-dark" 
-                                                    size="is-small" 
-                                                    @click="show_add_new_row=false;
-                                                            time=''; 
-                                                            temperature='';"
-                                                    outlined 
-                                                    inverted>
-                                                    Cancel
-                                                </b-button>
-                                            </div>
-                                        </div>
-                                        <div class="">
-                                            <b-table
-                                                class="desorption-temperature-ramp-table desorption-data-table"
-                                                :data="desorption_table_data"
-                                                :columns="desorption_table_columns"
-                                                per-page="5"
-                                                current-page.sync="0"
-                                                :paginated="true" 
-                                                :pagination-simple="false"
-                                                :checked-rows.sync="desorption_table_checked_rows"
-                                                :selected.sync="desorption_table_selected_row"
-                                                checkable
-                                                sortable
-                                                default-sort-direction="asc"
-                                                :default-sort="['time', 'asc']"
-                                                checkbox-position="right"
-                                                :header-checkable="false"
-                                                focusable>
-                                            </b-table>
-                                        </div>
-                                        <div id="desorption-chart-holder">
-                                            <div class="columns" style="margin-left:2px;" id="desorption-chart"></div>
-                                        </div>
-                                        <br>
+                                    <div style="text-align:center; padding:10px">
+                                        <b-button
+                                            :type="button_save_method_type"
+                                            @click="saveMethod();">
+                                            Save method
+                                        </b-button>
                                     </div>
-                                </b-collapse>
-                            </section>
-                            <!-- End of Desorption collapsable -->
-</div>
-                        </div>
+                                </div>
+                            </b-collapse>
+                            <!-- End of method collapsable -->
+                        </section>
                     </div>
                 </b-collapse>
-                <!-- End of  Acquisition parameters collapsable -->
+                <!-- End of instrument control collapsable -->
             </section>
         </section>
 <!-- End of main content area -->
@@ -413,13 +472,13 @@ import { mapState } from 'vuex'
 import Buefy from "buefy";
 import "buefy/dist/buefy.css";
 import '@mdi/font/css/materialdesignicons.min.css';
-import { BECom } from "../karsalib.js"
+import { BECom, shallow_copy } from "../karsalib.js"
 import MetaDataForm from "./MetaDataForm.vue"
 
 
 Vue.use([Buefy]);
 
-// var fs = require('fs');
+var fs = require('fs');
 // var path = require('path');
 var Plotly = require('plotly.js-dist');
 var _ = require('underscore');
@@ -438,14 +497,6 @@ export default {
             'experiment_selected',
             'tofdaq_log_entry',
         ]),
-        acquisition_control_active: {
-            get() {
-                return this.$store.state.acquisition_control_active;
-            },
-            set(value) {
-                this.$store.commit('acquisition_control_active', value);
-            }
-        },
         acquisition_status: {
             get() {
                 return this.$store.state.acquisition_status;
@@ -477,8 +528,10 @@ export default {
             // UI variables
             acquisition_button_type: "is-primary",
             acquisition_control_label: "Start Acquisition",
-            is_edit_temperature_ramp_modal_active: false,
+            button_save_method_type: "is-success",
+            control_mode_active: false,
             is_modal_add_log_entry_active: false,
+            is_modal_desorption_step_active: false,
             is_modal_instrument_log_active: false,
             //
             // Communication
@@ -492,7 +545,6 @@ export default {
                 'instrument_status',
             ],
             // TOF variables
-            sample_length: 120,
             acquisition_progress: 0,
             acquisition_started: {},
             instrument_log: [],
@@ -501,6 +553,22 @@ export default {
             instrument_status: "not_ready",			// not_ready/ready
             scenthound_status: "Offline",       // Offline/Ready/Measuring.../Processing...
             //
+            // Method variables
+            ci_template_path: "../metadata_templates/ci_templates",
+            method: {
+                tofdaq: {
+                    acquisition_mode: null,
+                    sample_length: null,
+                },
+                ci: [],
+                desorption_cycle: [],
+                tps: {
+                    settings_file: null,
+                    settings_file_directory: null,
+                },
+            },
+            method_json: null,
+            // 
             // Log entry modal variables
             log_entry: null,
             log_entry_datetimestamp: null,
@@ -510,31 +578,50 @@ export default {
             log_entry_save_button_type: "is-success",
             log_entry_template_path: "../metadata_templates/instrument_templates",
             //
-            // variables for desoprtion collapsable
-            acquisition_mode: "continuous",
-            time: "",
-            temperature: "",
-            edit_dialog_time: "",
-            edit_dialog_temperature: "",
-            show_add_new_row: false,
-            // variables for desorption table
+            // variables for desorption config
+            desorption_step_modal_filter_in: true,
+            desorption_step_modal_time: null,
+            desorption_step_modal_temperature: null,
+
+            desorption_chart_data: [],
+
             desorption_table_data: [],
-            desorption_table_columns: [],
-            desorption_table_selected_rows: [],
+            desorption_table_columns: [
+                {
+                    "field": "time",
+                    "label": "time [s]"
+                },
+                {
+                    "field": "temperature",
+                    "label": "Temp. [C]"
+                },
+                {
+                    "field": "filter_in",
+                    "label": "Cassette in"
+                },
+            ],
             desorption_table_selected_row: null,
-            desorption_table_checked_rows: [],
-            desorption_data: [],
+            // 
         }
     },
     created: function() {
         this.be = new BECom(this);
-        if ( this.acquisition_control_active ) {
-            this.be.connect(this.url + '/' + this.data_source_selected.name);
-        }
+        this.confirmAcquisitionControl();        
     },
     mounted: function() {
+        this.initializeMethod();
     },
     methods: {
+        addDesorptionCycleStep() {
+            this.method.desorption_cycle.push({
+                "filter_in": this.desorption_step_modal_filter_in,
+                "time": this.desorption_step_modal_time,
+                "temperature": this.desorption_step_modal_temperature
+            });
+            this.method.desorption_cycle = this.method.desorption_cycle.sort(function(a, b) {
+                return a.time - b.time;
+            });
+        },
         confirmAcquisitionControl() {
             this.$buefy.dialog.confirm({
                 title: 'Instrument control',
@@ -543,63 +630,72 @@ export default {
                 cancelText: 'Cancel',
                 confirmText: 'Proceed',
                 type: 'is-danger',
-                onCancel: () => this.acquisition_control_active = false,
+                onCancel: () => this.control_mode_active = false,
                 onConfirm: () => { this.$buefy.toast.open({message: 'Instrument control granted',
                                                           type: 'is-success'});
                                    this.be.connect(this.url + '/' + this.data_source_selected.name); }
             })
         },
-        delete_row_in_config_desorption_table() {
-            var delete_index = 0;
-            for (var i = 0; i < this.desorption_table_data.length; i++) {
-                if (this.desorption_table_data[i].time == this.desorption_table_selected_row.time && this.desorption_table_data[i].temperature == this.desorption_table_selected_row.temperature) {
+        deleteDesorptionCycleStep() {
+            var delete_index = null;
+            for (let i in this.desorption_table_data) {
+                if (_.isEqual(this.desorption_table_data[i],
+                              this.desorption_table_selected_row
+                              )) {
                     delete_index = i;
                 }
             }
-            this.desorption_table_data.splice(delete_index, 1);
-            this.save_all_values_to_configuration_file();
+            if (delete_index) {
+                this.method.desorption_cycle.splice(delete_index, 1);
+            }
         },
-        draw_desorption_chart() {
-            var self = this;
+        drawDesorptionTable() {
+            this.desorption_table_data = [];
+            for (let i in this.method.desorption_cycle) {
+                let step = this.method.desorption_cycle[i];
+                this.desorption_table_data.push(step);
+            }
+        },
+        drawDesorptionChart() {
             // format the data and draw the chart
-            var x = [];
-            var y = [];
-            var max_time_length = 0;
-            var max_time_temp_value = 0;
-            for (var xx = 0; xx < this.desorption_table_data.length; xx++) {
-                if (this.desorption_table_data[xx].time > max_time_length) {
-                    max_time_length = this.desorption_table_data[xx].time;
-                    max_time_temp_value = this.desorption_table_data[xx].temperature;
+            this.desorption_chart_data = [ shallow_copy(desorption_chart_trace) ];
+            let filter_in = true;
+            for (let i in this.method.desorption_cycle) {
+                var step = this.method.desorption_cycle[i];
+                if (step.filter_in != filter_in) {
+                    filter_in = step.filter_in;
+                    let prev_trace = this.desorption_chart_data[this.desorption_chart_data.length-1];
+                    prev_trace.x.push(step.time);
+                    prev_trace.y.push(step.temperature);
+                    let new_trace = shallow_copy(desorption_chart_trace);
+                    this.desorption_chart_data.push(new_trace);
                 }
-                x.push(this.desorption_table_data[xx].time);
-                y.push(this.desorption_table_data[xx].temperature);
+                this.desorption_chart_data[this.desorption_chart_data.length-1].x.push(step.time);
+                this.desorption_chart_data[this.desorption_chart_data.length-1].y.push(step.temperature);
+                if (filter_in) {
+                    this.desorption_chart_data[this.desorption_chart_data.length-1].fill = "tozeroy";
+                }
+                desorption_chart_layout["xaxis"].tickvals.push(step.time);
+                desorption_chart_layout["xaxis"].ticktext.push(step.time.toString());
+                desorption_chart_layout["yaxis"].tickvals.push(step.temperature);
+                desorption_chart_layout["yaxis"].ticktext.push(step.temperature.toString());
             }
-            if (max_time_length < this.sample_length) {
-                x.push(this.sample_length);
-                y.push(max_time_temp_value);
+            if (step.time < this.sample_length) {
+                this.desorption_chart_data[this.desorption_chart_data.length-1].x.push(this.sample_length);
+                this.desorption_chart_data[this.desorption_chart_data.length-1].y.push(step.temperature);
             }
-            this.desorption_data[0].x = x;
-            this.desorption_data[0].y = y;
-            var layout = desorption_chart_layout;
-            layout.width = 0.23 * screen.width;
-            var config = {
-                responsive: false
-            }
-            Plotly.react("desorption-chart", self.desorption_data, layout, config);
+            Plotly.react("desorption-chart",
+                         this.desorption_chart_data,
+                         desorption_chart_layout,
+                         desorption_chart_config
+                         );
         },
-        edit_row_in_config_desorption_table() {
-            var selected_time_for_edit = this.desorption_table_selected_row.time;
-            var selected_temperature_for_edit = this.desorption_table_selected_row.temperature;
-
-            for (var i = 0; i < this.desorption_table_data.length; i++) {
-                if (parseInt(this.desorption_table_data[i].time) == parseInt(selected_time_for_edit) && parseInt(this.desorption_table_data[i].temperature) == parseInt(selected_temperature_for_edit)) {
-                    this.desorption_table_data[i].time = this.edit_dialog_time;
-                    this.desorption_table_data[i].temperature = this.edit_dialog_temperature;
-                    break;
-                }
+        editDesorptionCycle() {
+            if (this.desorption_table_selected_row) {
+                this.deleteDesorptionCycleStep();
             }
-            this.is_edit_temperature_ramp_modal_active = false;
-            this.save_all_values_to_configuration_file();
+            this.addDesorptionCycleStep();
+            this.is_modal_desorption_step_active = false;
         },
         onButtonInstrumentLogEntry() {
             this.log_entry_datetimestamp = new Date();
@@ -617,103 +713,53 @@ export default {
                                "stopping": "stopping"};
             this.acquisition_status = next_status[this.acquisition_status];
         },
-        save_all_values_to_configuration_file() {
-            // Before saving the desorption table data sort i
-            var self = this;
-            self.desorption_table_data = self.desorption_table_data.sort(function(a, b) {
-                return a.time - b.time;
-            });
-            var checked_indexes = [];
-            for (var i = 0; i < self.desorption_table_data.length; i++) {
-                for (var j = 0; j < self.desorption_table_checked_rows.length; j++) {
-                    if (self.desorption_table_checked_rows[j].time === self.desorption_table_data[i].time &&
-                        self.desorption_table_checked_rows[j].temperature === self.desorption_table_data[i].temperature) {
-                        checked_indexes.push(i);
-                    }
+        initializeMethod() {
+            try {
+                if (fs.existsSync('configs/tofcontrol_config.json')) {
+                    let tofcontrol_config = JSON.parse(fs.readFileSync('configs/tofcontrol_config.json', 'utf8'));
+                    this.method = tofcontrol_config;
                 }
+            } catch (err) {
+                console.error(err)
             }
-            var new_configurations = {
-                "AcquisitonParameters": {
-                    "acquisition_mode": self.acquisition_mode,
-                    "sample_length": parseInt(self.sample_length),
-                },
-                "DesorptionTemperatureRamp": {
-                    "data": self.desorption_table_data,
-                    "checked_rows": checked_indexes
-                },
-                "desorption_table_columns": self.desorption_table_columns,
-                "desorption_data": self.desorption_data,
-            };
-            self.write_to_config_file(JSON.stringify(new_configurations, null, 3));
+            // ===== Initialize Plotly figure =====
+            Plotly.newPlot("desorption-chart",
+                           [],
+                           desorption_chart_layout,
+                           desorption_chart_config
+                           );
         },
-        save_new_row_in_config_desorption_table() {
-            // validate data first
-            if (this.time == "" || this.temperature == "") {
-                this.display_notification("The values entered are invalid.", "is-black");
-                return false;
-            }
-            if (parseInt(this.time) > parseInt(this.sample_length)) {
-                this.display_notification("Entered time cannot be greater than sample length, Either lower time value or Increase the sample length", "is-black");
-                return false;
-            }
-            this.desorption_table_data.push({
-                "time": this.time,
-                "temperature": this.temperature
-            });
-            this.save_all_values_to_configuration_file();
-            this.time = "";
-            this.temperature = "";
-            this.show_add_new_row = false;
+        saveMethod() {
+            fs.writeFileSync('configs/tofcontrol_config.json',
+                             this.method_json
+                             );
+            this.button_save_method_type = "is-success";
         },
-        show_desorption_edit_modal() {
-            if (this.desorption_table_selected_row != null) {
-                this.edit_dialog_time = this.desorption_table_selected_row.time;
-                this.edit_dialog_temperature = this.desorption_table_selected_row.temperature;
-                this.is_edit_temperature_ramp_modal_active = true;
-            }
+        launchDesorptionStepModal() {
+            this.desorption_step_modal_filter_in = this.desorption_table_selected_row ? this.desorption_table_selected_row.filter_in : true;
+            this.desorption_step_modal_time = this.desorption_table_selected_row ? this.desorption_table_selected_row.time : null;
+            this.desorption_step_modal_temperature = this.desorption_table_selected_row ? this.desorption_table_selected_row.temperature : null;
+            this.is_modal_desorption_step_active = true;
         },
         writeInstrumentLogEntry() {
             var self = this;
-            // let file_path = path.join(this.log_path, this.data_source_selected.name + "_log.txt");
-            // let log_data = [];
-
-            // fs.readFile(file_path, 'utf-8', function (err, file) {
-            //     if (err) {
-            //         if (err.code === 'ENOENT') {
-            //             // File not found, create
-            //             fs.writeFileSync(file_path, JSON.stringify(log_data, null, 4));
-            //         } else {
-            //             // Other exception
-            //             throw err;
-            //         }
-            //     } else {
-            //         // Parse file contents
-            //         log_data = JSON.parse(file);
-            //     }
                 
-                // Parse datetime into string
-                let dt = self.log_entry_datetimestamp;
-                let hours_diff = dt.getHours() - dt.getTimezoneOffset() / 60;
-                dt.setHours(hours_diff);
-                // Combine timestamp with log entry fields and write to file
-                var log_entry_data = {
-                        timestamp: dt.toJSON(),
-                        entry: self.log_entry_fields
-                        }
-            //     log_data.push(log_entry_data);
-            //     const log_data_json = JSON.stringify(log_data, null, 4);
-            //     fs.writeFile(file_path, log_data_json, 'utf8', function(err){
-            //             if(err){ 
-            //                 console.log(err); 
-            //             } else {
-            //             }});
-                self.be.export_one_way_binding_prop(
-                                    'instrument_log_entry',
-                                    log_entry_data,
-                                    self.log_entry,
-                                    );
-                self.log_entry = log_entry_data;
-                // });
+            // Parse datetime into string
+            let dt = self.log_entry_datetimestamp;
+            let hours_diff = dt.getHours() - dt.getTimezoneOffset() / 60;
+            dt.setHours(hours_diff);
+            // Combine timestamp with log entry fields and write to file
+            var log_entry_data = {
+                    timestamp: dt.toJSON(),
+                    entry: self.log_entry_fields
+                    }
+
+            self.be.export_one_way_binding_prop(
+                                'instrument_log_entry',
+                                log_entry_data,
+                                self.log_entry,
+                                );
+            self.log_entry = log_entry_data;
             self.log_entry_save_button_type = "is-success";
             self.is_modal_add_log_entry_active = false;
             self.onButtonShowInstrumentLog();
@@ -723,30 +769,17 @@ export default {
         data_source_selected: function(new_value, old_value) {
             if ( _.isEqual(new_value, old_value) )
                 return false;
-            if ( this.acquisition_control_active ) {
-                // this.be.unsubscribe(this.endpoints, null);   //TODO: is it needed?
-                this.be.disconnect(this.namespace);
-                this.be.connect(this.url + '/' + this.data_source_selected.name);
-            }
-        },
-        acquisition_control_active: function(new_value) {
-            if (new_value) {
-                this.confirmAcquisitionControl();
-            }
-            else {
-                this.be.disconnect(this.namespace);
-            }
-        },
-        acquisition_mode: function(new_value, old_value) {
-            if (new_value === old_value) {
-                return false;
-            }
+            // this.be.unsubscribe(this.endpoints, null);   //TODO: is it needed?
+            this.be.disconnect(this.namespace);
+            this.be.connect(this.url + '/' + this.data_source_selected.name);
         },
         acquisition_started: function(new_value, old_value) {
             if (new_value === old_value) {
                 return false;
             }
-            this.new_file = new_value.filename;
+            this.new_file = {...new_value,
+                             "method": this.method,
+                             };
         },
         acquisition_status: function(new_value, old_value) {
             if (new_value === old_value) {
@@ -843,6 +876,17 @@ export default {
             },
             deep: true
         },
+        method: {
+            handler() {
+                this.method_json = JSON.stringify(this.method, null, 4);
+                this.button_save_method_type = "is-danger";
+            },
+            deep: true
+        },
+        'method.desorption_cycle': function() {
+            this.drawDesorptionTable();
+            this.drawDesorptionChart();
+        },
         tofdaq_log_entry: function(new_value, old_value) {
             let texts = new_value.text.split("<br>").slice(0, -1);
             for (let i in texts){
@@ -859,6 +903,7 @@ export default {
         'namespace.connected': function(new_value) {
             if (new_value) {
                 // on connect 
+                this.control_mode_active = true;
                 // handlers for for external notifications:
                 this.namespace.on("acquisition_started", (value) => this.be.import_one_way_binding_prop("acquisition_started", value.value));
                 this.namespace.on("acquisition_status", (value) => this.be.import_one_way_binding_prop("acquisition_status", value.value));
@@ -871,48 +916,61 @@ export default {
                                   );
             } else {
                 // on disconnect
+                this.control_mode_active = false;
                 this.autosave_on = false;
             }
         },
     }
 };
 
+var desorption_chart_trace = {
+        "name": "",
+        "line": {
+            "shape": "hv"
+        },
+        "mode": "lines",
+        "type": "scatter",
+        "x": [],
+        "y": [],
+        "hoverinfo": "x,y",
+};
+
 var desorption_chart_layout = {
     "width": 280,
     "height": 280,
-    "legend": {
-        "y": 0.5,
-        "font": {
-            "size": 10
-        },
-        "traceorder": "reversed",
-        "color": "#fff"
-    },
+
     "font": {
         "color": "#fff"
     },
+
     "xaxis": {
+        "title": "time [s]",
+        "tickmode": "array",
+        "tickvals": [],
+        "ticktext": [],
         "visible": true,
         "linecolor": "#999",
-        "tickmode": "linear",
-        "tick0": 0,
-        "dtick": 20
-    },
+        "rangemode": "tozero",
+        "showgrid": false,
+        },
+
     "yaxis": {
+        "title": "Temperature [C]",
+        "tickmode": "array",
+        "tickvals": [],
+        "ticktext": [],
         "visible": true,
         "linecolor": "#999",
-        "tickmode": "linear",
-        "tick0": 0,
-        "dtick": 10,
-        "gridcolor": "#676565"
-    },
+        "rangemode": "tozero",
+        "showgrid": false,
+        },
+
     "showlegend": false,
-    "commented_out__dragmode": "select",
-    "commented_out__autosize": false,
-    "commented_out__autoscale": false,
-    "hovermode": "closest",
-    "plot_bgcolor": "#29282e",
-    "paper_bgcolor": "#29282e",
+    "dragmode": false,
+    
+    "plot_bgcolor": "transparent",
+    "paper_bgcolor": "transparent",
+
     "margin": {
         "l": 30,
         "r": 20,
@@ -922,6 +980,24 @@ var desorption_chart_layout = {
     }
 };
 
-</script>
+var	desorption_chart_config = {
+    "responsive": true,
+    "displaylogo": false,
+    "modeBarButtonsToRemove": [
+        "autoScale2d",
+        "hoverClosestGl2d",
+        "hoverClosestCartesian",
+        "hoverCompareCartesian",
+        "lasso2d",
+        "pan2d",
+        "resetScale2d",
+        "select2d",
+        "toggleSpikelines",
+        "toImage",
+        "zoom2d",
+        "zoomIn2d",
+        "zoomOut2d"
+        ]
+};
 
-<style src = "../assets/css/MascopeStyle.css"> </style>
+</script>

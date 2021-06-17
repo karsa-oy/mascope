@@ -220,7 +220,7 @@ export default {
 
 <style>
 html{
-    background-color:  #29282e!important;
+    background-color:  #1f1f22!important;
     color: #dfdfdf;  
 }
 #app {

@@ -4,7 +4,9 @@
         <!-- End of modals -->
 
         <!-- Main content -->
-        <div class="box">
+        <div
+            class="box"
+            style="background-color:inherit">
             <div style="text-align:right;"
                  v-if="editable">
                 <b-button
@@ -93,7 +95,7 @@
                                     @click="saveTemplate()"
                                     :disabled="!form_fields.length"
                                     expanded>
-                                    Save template
+                                    Save
                                 </b-button>
                             </div>
                         </div>
