@@ -64,8 +64,8 @@
 			"dragmode": "zoom",
 			"autosize": true,
 			"hovermode": "closest",
-			"plot_bgcolor": "#29282e",
-			"paper_bgcolor": "#29282e"
+			"plot_bgcolor": "transparent",
+			"paper_bgcolor": "transparent"
 			}
     },
     
@@ -110,8 +110,8 @@
 			"dragmode": "zoom",
 			"autosize": true,
 			"hoverinfo": "name+y",
-			"plot_bgcolor": "#29282e",
-			"paper_bgcolor": "#29282e",
+			"plot_bgcolor": "transparent",
+			"paper_bgcolor": "transparent",
 			"margin": {
 				"l": 50,
 				"r": 10,
@@ -159,8 +159,8 @@
 			"dragmode": "zoom",
 			"autosize": true,
 			"hoverinfo": "name+y",
-			"plot_bgcolor": "#29282e",
-			"paper_bgcolor": "#29282e",
+			"plot_bgcolor": "transparent",
+			"paper_bgcolor": "transparent",
 			"margin": {
 				"l": 40,
 				"r": 30,

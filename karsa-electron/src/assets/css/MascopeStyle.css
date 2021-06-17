@@ -186,6 +186,7 @@ a.dropdown-item.is-active, .dropdown .dropdown-menu .has-link a.is-active, butto
     border-radius: 3px; 
 }
 .desorption-data-table{
+    color: #a7a7a7;
     margin: 3px 10px 20px 10px;
 }
 .desorption-temprature-ramp{
