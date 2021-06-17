@@ -393,6 +393,7 @@ class H5Streamer(TofDaqStreamer):
         self._reset()
         # Feed poison pill
         self.spec_queue.put(None)
+        self.tps_queue.put(None)
 
     def _get_and_feed_data(self):
         """Read data from the h5 and put to queues
