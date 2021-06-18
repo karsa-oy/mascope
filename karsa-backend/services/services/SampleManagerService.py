@@ -180,6 +180,13 @@ class MetadataServiceNamespace(BaseClientNamespace):
             sample = {'title': '%03d_' %(i+1)}
             sample_attributes = []
             for key, value in step.items():
+                try:
+                    value = int(value)
+                except ValueError:
+                    try:
+                        value = float(value)
+                    except ValueError:
+                        pass
                 sample_attr = {
                     'label': key,
                     'value': value,

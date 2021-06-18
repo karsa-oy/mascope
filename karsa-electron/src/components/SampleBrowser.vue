@@ -480,7 +480,8 @@
                             id="samples-datatable"
                             :height="760"
                             :data="sample_table_rows"
-                            :sticky-header="true">
+                            :sticky-header="true"
+                            striped>
                             <!-- Columns -->
                             <b-table-column
                                 v-for="(col, i) in sample_table_cols"
@@ -488,6 +489,7 @@
                                 :field="col.field"
                                 :label="col.label"
                                 searchable
+                                sortable
                                 v-slot="props">
                                 {{ props.row[col.field] }}
                             </b-table-column>
@@ -495,6 +497,12 @@
                         </b-table>
                         <!-- End of sample table -->
                     </section>
+                    <footer class="modal-card-foot">
+                        <b-button
+                            @click="exportSampleTable()">
+                            Export CSV
+                        </b-button>
+                    </footer>
                 </div>
             </b-modal>
         </section>     
@@ -797,9 +805,9 @@ import MetaDataForm from "./MetaDataForm.vue"
 
 Vue.use([Buefy]);
 
-var _ = require('underscore');
-var fs = require('fs');
-
+const _ = require('underscore');
+const fs = require('fs');
+const { Parser } = require('json2csv');
 
 export default {
     name: "SampleBrowser",
@@ -981,6 +989,34 @@ export default {
                                             'delete_project',
                                             {'project': title},
                                             );
+        },
+        exportSampleTable() {
+            const fields = this.sample_table_cols.map(a => { return {'label': a.label, 'value': a.field } });
+            const opts = {
+                "fields": fields,
+            };
+
+            try {
+                // Parse CSV
+                const parser = new Parser(opts);
+                const csv = parser.parse(this.sample_table_rows);
+                const csv_filename = this.project_selected.title + '_' + this.experiment_selected.title + '.csv';
+                // Make blob
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                // Create a temporary download link for the blob and "click" it
+                var link = document.createElement('a');
+                var url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', csv_filename);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                // Remove the link
+                document.body.removeChild(link);
+            } catch (err) {
+                console.error(err);
+            }
+
         },
         getExperiment(experiment_title) {
             for (let i in this.experiments) {
@@ -1422,12 +1458,12 @@ export default {
                             'field': attr.label.toLowerCase(),
                             'label': attr.label,
                             };
-                        if (col.field == 'title' || col.field == 'sample name') {
+                        if (i == 0) {
                             col.visible = true;
                         }
                         cols.push(col);
                     }
-                    row[attr.label.toLowerCase()] = attr.value.toString(); // TODO: prettify
+                    row[attr.label.toLowerCase()] = attr.value;
                 }
                 // Unpack properties
                 for (const prop in sample.properties) {
