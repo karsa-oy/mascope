@@ -12,7 +12,9 @@ Created on Thu May  7 12:43:13 2020
 """
 
 import asyncio
+import csv
 import os
+import tempfile
 
 from karsalib import BaseClientNamespace, BaseServiceClient, \
                      parse_cmd_args, get_client_notification_args
@@ -157,16 +159,20 @@ class MetadataServiceNamespace(BaseClientNamespace):
 
     async def on_parse_experiment_plan_blob(self, data):
         value = data['value']
-        # TODO: Currently assumes autosampler report
-        import tempfile
+        # Differentiate autosampler report from generic csv
+        autosampler_report = value.startswith("HT3000A Autorun Report")
+        # Make temp file for csv reader
         fd, report_temp_path = tempfile.mkstemp()
         try:
-            with os.fdopen(fd, 'w') as tmp:
+            with os.fdopen(fd, 'r+') as tmp:
                 tmp.write(value)
-            sequence_steps = parse_csv_report(report_temp_path)
+                tmp.seek(0)
+                if autosampler_report:
+                    sequence_steps = parse_csv_report(tmp)
+                else:
+                    sequence_steps = [row for row in csv.DictReader(tmp)]
         finally:
             os.remove(report_temp_path)
-
         # Parse sequence steps into template
         sample_attributes_template = []
         samples = []

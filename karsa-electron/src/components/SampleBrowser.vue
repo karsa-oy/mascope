@@ -162,9 +162,7 @@
                                     :default_template="experiment_attributes_default_template"
                                     :editable="true"
                                     :template_path="experiment_attributes_template_path"
-                                    :uploadable="true"
-                                    @metaDataUpdated="experiment_attributes_fields=$event"
-                                    @templateUploaded="experiment_plan_blob=$event">
+                                    @metaDataUpdated="experiment_attributes_fields=$event">
                                 </MetaDataForm>
                                 <!-- End of experiment attributes form -->
                                 <div><br></div>
@@ -682,7 +680,8 @@
                                                             <b-dropdown
                                                                 aria-role="menu"
                                                                 type="is-dark"
-                                                                position="is-top-right"
+                                                                position="is-bottom-right"
+                                                                style="top:0px;"
                                                                 trap-focus
                                                                 multiple
                                                                 append-to-body>
@@ -692,7 +691,7 @@
                                                                     slot="trigger"
                                                                     outlined>
                                                                 </b-button>
-                                                                <b-field grouped group-multiline>
+                                                                <div>
                                                                     <div v-for="(col, i) in sample_table_cols"
                                                                         :key="i"
                                                                         class="control">
@@ -702,7 +701,7 @@
                                                                             {{ col.label }}
                                                                         </b-checkbox>
                                                                     </div>
-                                                                </b-field>
+                                                                </div>
                                                             </b-dropdown>
                                                         </div>
                                                     </div>

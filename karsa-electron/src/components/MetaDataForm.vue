@@ -154,11 +154,6 @@ export default {
             required: false,
             default: null,
         },
-        uploadable: {
-            type: Boolean,
-            required: false,
-            default: false,
-        },
         load_template_path: {
             type: String,
             required: false,
@@ -183,7 +178,6 @@ export default {
             form_fields: [],
             loaded_template: null,
             show_edit_functions: true,
-            uploaded_file: {},
         }
     },
     created() {
