@@ -788,9 +788,9 @@ class BaseStreamerClient(BridgeServiceClient):
                     self.log(f"Acquisition of {filename} was cancelled.")
                     continue
                 except KeyboardInterrupt:
-                    spec_data = None
+                    self.streamer.stop_stream()
                     self.log(f"Acquisition of {filename} was cancelled.")
-                    pass
+                    continue
 
                 # Got data
                 if spec_data is not None:

@@ -1117,9 +1117,9 @@ class FileIoClient(BridgeServiceClient):
                     continue
                 while cnt - self.public_ns.cnt > 4:
                     if time.time() - self.public_ns.cnt_timestamp > MAX_RESPONSE_TIME:
-                        # skip frozen packages, if no response in due time
+                        # stop waiting frozen packages, if no response in due time
                         public_ns_data_count(cnt)
-                        raise Empty
+                        break
                     await self.sio.sleep(.1)
             except Empty:
                 await self.sio.sleep(.1)
