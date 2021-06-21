@@ -244,6 +244,7 @@ export default {
         ImportSamples() {
             this.raw_import = this.import_raw_table_checked_rows;
             this.is_raw_import_modal_active = false;
+            this.import_raw_table_checked_rows = [];
         },
         on_button_acquisition_control() {
             if ( this.acquisition_in_progress ) {
