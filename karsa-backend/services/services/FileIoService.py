@@ -139,9 +139,8 @@ def cache_get(table,
     return cur
 
 
-def cache_process_requests(filename):
+def cache_process_requests(filename, flush=False, **kwargs):
     global REQUEST_PROCESSORS
-
     # Get all pending requests for filename
     t_data = {}
     t_mark(t_data, 'cache_process_requests:cache_get')
@@ -156,6 +155,7 @@ def cache_process_requests(filename):
                             request_id
                             ''',
                             filename,
+                            **kwargs
                             )
     # Loop through db entries
     for row in request_data_rows:
@@ -174,15 +174,14 @@ def cache_process_requests(filename):
                                     t_resolution=t_resolution,
                                     client_room=client_room,
                                     request_id=request_id,
+                                    flush=flush
                                     )
-        if not processed_t_range:
+        if not flush and not processed_t_range:
             # Nothing was processed
             t_mark(t_data, f"cache_process_requests:cache_row_skipped")
             continue
-
-        # TODO: Handle the case when processed_t_range[0] > t0?
         
-        if processed_t_range[1] < t1:
+        if not flush and processed_t_range[1] < t1:
             # Only part of request served, update request start time
             t_mark(t_data, "cache_process_requests:cache_row_update")
             t0_new = processed_t_range[1]
@@ -203,6 +202,7 @@ def cache_process_requests(filename):
             cache_release('requests',
                           request_id
                           )
+
         t_mark(t_data, "cache_process_requests:cache_row_done")
 
 
@@ -367,6 +367,7 @@ def process_signal_request(filename,
                            t_resolution,
                            client_room,
                            request_id,
+                           flush=False
                            ):
     global cache
 
@@ -410,6 +411,15 @@ def process_signal_request(filename,
                               })
         service_q.cache_put(data_item)
     processed_t_range = (signal_slice.time[0], ti+period)
+    if flush:
+        termination_package = {
+            'data_type': 'etx',
+            'client_room': client_room,
+            'request_id': request_id,
+            }
+        print("Put termination package to queue")
+        service_q.cache_put(termination_package)
+
     return processed_t_range
 
 def process_image_request(filename,
@@ -616,6 +626,13 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         t_range = value['t_range']
 
         filename_signal = base_to_zarr_filename(filename_base, 'signal')
+
+        if os.path.exists(filename_signal):
+            # Should hit here only when trying to import a file which has already been imported/acquired
+            print("File %s exists already! Canceling import" %filename_base)
+            await self.emit_client_notification('stop_raw_import', {})
+            return
+
         signal_array = ExtendableDataArray(path=filename_signal,
                                            array_module=da
                                            )
@@ -740,7 +757,8 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                 print("Flush %s array" %key)
                 array.flush()
 
-        cache_release('requests', filename=filename_base, data_type='signal')
+        cache_process_requests(filename_base, data_type='signal', flush=True)
+        # cache_release('requests', filename=filename_base, data_type='signal')
 
     async def on_tps_parameter_info(self, data):
         value = data['value']
@@ -803,7 +821,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
 
     async def on_data_request(self, data):
         global cache
-        self.log(data)
+        # self.log(data)
         value = data['value']
         t_mark(value)
 

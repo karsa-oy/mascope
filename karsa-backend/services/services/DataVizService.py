@@ -211,7 +211,7 @@ def viz_cache_pop(table,
     return data
 
 
-def viz_cache_process_requests(request_id):
+def viz_cache_process_requests(request_id, flush=False):
     global REQUEST_PROCESSORS
 
     check_to_release_request = False
@@ -242,11 +242,12 @@ def viz_cache_process_requests(request_id):
                                     t_resolution=t_resolution,
                                     client_room=client_room,
                                     request_id=request_id,
+                                    flush=flush
                                     )
 
         # some error/no data yet/no full data -- put (updated) request back
         # if processed_until is False or processed_until<t1:
-        if processed_until != t1:
+        if processed_until != t1 and not flush:
             # print("Request holds or updated:", client_room, [t0, t1])
             viz_cache_put('requests',
                             filename,
@@ -258,11 +259,14 @@ def viz_cache_process_requests(request_id):
                             request_id
                             )
         else:
-            check_to_release_request = True
-    if check_to_release_request:
-        cur = viz_cache_get('requests', 'request_id', request_id=request_id)
-        if not cur.fetchone():
-            release_request(request_id)
+            viz_cache_release('requests',
+                              request_id=request_id,
+                              )
+    #         check_to_release_request = True
+    # if check_to_release_request:
+    #     cur = viz_cache_get('requests', 'request_id', request_id=request_id)
+    #     if not cur.fetchone():
+    #         cancel_request(request_id)
 
 
 def viz_cache_put(table,
@@ -469,6 +473,7 @@ def process_visualization_request(filename,
                                   t_resolution,
                                   client_room,
                                   request_id,
+                                  flush
                                   ):
     """Routine for processing a visualization request
 
@@ -518,9 +523,11 @@ def process_visualization_request(filename,
             
         BATCH_SIZE = 10 # Number of spectra to process at once (TODO: make parameter)
         no_spectra = signal_slice.shape[1]
-        no_batches = int( np.ceil(no_spectra / BATCH_SIZE) )
+        no_batches = int( np.floor(no_spectra / BATCH_SIZE) )
+        if flush:
+            no_batches = int( np.ceil(no_spectra / BATCH_SIZE) )
 
-        if no_spectra < BATCH_SIZE:
+        if not no_batches:
             return processed_until
 
         if t_resolution:
@@ -544,19 +551,21 @@ def process_visualization_request(filename,
             # print(spec_array)
 
             # is_nanrow = spec_array.isnull().all(axis=0).any()
-            is_nanrow = np.isnan( np.sum(spec_array.values, axis=1) ).any()
-            if is_nanrow:
+            # is_nanrow = np.isnan( np.sum(spec_array.values, axis=1) ).any()
+            # if is_nanrow:
                 # Some mz-channel full of nan => spectra not yet loaded
                 # print("spec_array.isnull.all(axis=1).any()")
                 # print("is nan row")
                 # print("took %.2f sec" %(time()-t0))
-                break
+                # break
 
             # y_range = [0, spec_array.max().compute().item()] # TODO: better scaling
             y_range = [0, signal_slice.attrs['y_max']]
 
             t0_i = float( spec_array.time[0] )
             t1_i = float( spec_array.time[-1] ) + float( period_array[-1] )
+
+            print("Processing range: %s" %str((t0_i, t1_i)))
 
             t_data = {'request_id': request_id,}
             t_mark(t_data)
@@ -584,7 +593,7 @@ def process_visualization_request(filename,
     processed_until = feed_signal_to_visualize([t0, t1])
     return processed_until
 
-def release_request(request_id):
+def cancel_request(request_id):
         viz_cache_release('requests',
                            request_id=request_id,
                          )
@@ -760,7 +769,6 @@ class DataVizServiceNamespace(BaseClientNamespace):
             viz_cache_process_requests(request_id)
         t_mark(t_data)
 
-
     async def on_stop_visualize_range(self, data):
         """Release visualization requests from cache
 
@@ -782,11 +790,10 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                             **{**get_client_notification_args(data),
                                                'namespace': get_namespace(filename)})
         for request_id in request_ids:
-            release_request(request_id)
+            cancel_request(request_id)
     # ---------------------------------
 
     # ========== FileIoService notifications ==========
-
     async def on_loaded_coordinates(self, data):
             """
             """
@@ -838,7 +845,10 @@ class DataVizServiceNamespace(BaseClientNamespace):
             value = data['value']
             # i = value.get('i')
             request_id = value['request_id']
-            filename_base = value['filename']
+            # filename_base = value['filename']
+            if not value.get('spec'):
+                viz_cache_process_requests(request_id, flush=True)
+                return
 
             ti = np.array( [value['t']], dtype=np.float32 )
             period = np.array( [value['period']], dtype=np.float32 )
@@ -890,62 +900,11 @@ class DataVizServiceNamespace(BaseClientNamespace):
         data_type = data['value']['data_type']
         if data_type == 'signal':
             await on_loaded_signal(data)
+        elif data_type == 'etx':
+            print("Processing termination package")
+            request_id = data['value']['request_id']
+            viz_cache_process_requests(request_id, flush=True)
         return data['cnt']
-
-
-    # async def on_tps_parameter_info(self, data):
-    #     value = data['value']
-    #     tps_info = value.get('tps_info')
-    #     set_tps_parameters = value.get('set_tps_parameters', True)
-
-    #     visualizer = TPSVisualizer()
-
-    #     # Initialize visualizer cache
-    #     visualizer.init_array(dims=('parameter', 'time'),
-    #                           data=None,
-    #                           coords=[tps_info, []],
-    #                           name='tps'
-    #                           )
-
-    #     viz_cache_put(data, 'tps', visualizer)
-
-    #     if set_tps_parameters:
-    #         dropdown_items = [{'label': info,
-    #                            'value': i
-    #                            } for i, info in enumerate(tps_info)
-    #                         ]
-    #         kwargs = get_client_notification_args(data)
-    #         await self.emit_client_notification(
-    #                         'tps_parameters',
-    #                         dropdown_items,
-    #                         **kwargs
-    #                         )
-
-    # async def on_acquired_tps_data(self, data):
-    #     value = data['value']
-    #     # speci = value.get('i')
-    #     # self.log(speci)
-
-    #     global tps_data
-
-    #     global tps_visualizers
-    #     visualizer = viz_cache_get(data, 'tps')
-    #     if not visualizer:  # data request was cancelled
-    #         return
-    #     # Extend signal cache
-    #     tps_data = np.frombuffer( value.get('data'), dtype=np.float32 )
-    #     tps_data = tps_data.reshape(-1, 1)
-    #     ti = value.get('t')
-    #     td = np.array( [timedelta(seconds=ti)] ) # Convert to timedelta
-    #     parameter = visualizer.parameter
-
-    #     return #TODO: TPS visualizations not implemented
-
-    #     await visualizer.extend_array(tps_data,
-    #                                   [parameter, td],
-    #                                   'time',
-    #                                   )           
-    
     # ----------------------------------------------
 
 
