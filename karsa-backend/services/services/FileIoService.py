@@ -42,7 +42,7 @@ from karsalib import (BaseClientNamespace,
 from karsatof.kcollector import ExtendableDataArray
 from karsatof.kdatapool import parse_path_from_sample_name
 from karsatof.kimage import (convert_base64_to_img, convert_to_base64)
-from karsatof.kutil import AttrDict
+from karsatof.kutil import AttrDict, generate_unique_key
 from services.DataVizService import VIZ_TYPES_SUPPORTED
 
 
@@ -430,7 +430,7 @@ def process_image_request(filename,
         img_slice = cache_item[data_type].sel(time=slice(t0, t1)).load()
         period_slice = cache_item[data_type+'_period'].sel(time=slice(t0, t1)).load()
     except KeyError:
-        print("Requested data_type: %s not cached. What to do!" % data_type)
+        print("Requested data_type: %s not cached. cache_item.keys: %s" % (data_type, list(cache_item.keys())) )
         return False
 
     processed_t_range = False
@@ -593,7 +593,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                  'mz_range': data['value']['mz_range'],
                  't_range': data['value']['t_range'],
                  'viz_types': list(VIZ_TYPES_SUPPORTED),
-                 'request_id': self.parent.public_ns.room_sid,
+                 'request_id': generate_unique_key(),
                  },
                 client_room=self.parent.public_ns.room_sid,
                 )
@@ -632,7 +632,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                                 name='signal_period'
                                 )
         # Collect attributes
-        attributes = {'id': filename_base,
+        attributes = {'filename': filename_base,
                       'length': float(t_range[1]),
                       'range': [ float(mz[0]), float(mz[-1]) ],
                       'data_version': DATA_VERSION_NUMBER
@@ -739,6 +739,8 @@ class FileIoPrivateNamespace(BaseClientNamespace):
             if isinstance(array, ExtendableDataArray):
                 print("Flush %s array" %key)
                 array.flush()
+
+        cache_release('requests', filename=filename_base, data_type='signal')
 
     async def on_tps_parameter_info(self, data):
         value = data['value']
