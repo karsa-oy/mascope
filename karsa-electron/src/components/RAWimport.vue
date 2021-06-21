@@ -70,7 +70,7 @@
                                 class="button"
                                 type="button"
                                 is-dark
-                                @click="is_raw_import_modal_active=false">
+                                @click="import_raw_table_checked_rows=[]; is_raw_import_modal_active=false;">
                                 Cancel
                             </button>
                         </footer>
