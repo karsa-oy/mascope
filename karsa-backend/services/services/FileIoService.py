@@ -414,6 +414,7 @@ def process_signal_request(filename,
     if flush:
         termination_package = {
             'data_type': 'etx',
+            'filename': filename,
             'client_room': client_room,
             'request_id': request_id,
             }
@@ -431,6 +432,7 @@ def process_image_request(filename,
                           t_resolution,
                           client_room,
                           request_id,
+                          flush=False
                           ):
     global cache
 
