@@ -21,7 +21,6 @@
                             <b-field label="Project">
                                 <b-select
                                     placeholder="Select a project"
-                                    v-model="project_selected.title"
                                     @input="selectProject($event)"
                                     required
                                     expanded>
