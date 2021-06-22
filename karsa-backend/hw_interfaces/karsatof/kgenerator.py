@@ -248,7 +248,10 @@ class TofDaqStreamer(Thread, KInstrument):
             state = self._check()
         if state == 1:
             # New data
-            self.speci = (self.desc.iWrite * self.desc.nbrBufs) + self.desc.iBuf
+            new_speci = (self.desc.iWrite * self.desc.nbrBufs) + self.desc.iBuf
+            if new_speci - self.speci > 1:
+                print("Warning: Skipped a spec!")
+            self.speci = new_speci
             print(self.speci)
             self._get_and_feed_data()
             # TofDaqStreamer progress
