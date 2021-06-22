@@ -437,10 +437,10 @@ def process_image_request(filename,
     global cache
 
     cache_item = cache[filename]
-    
+    data_type_period = data_type + '_period'
     try:
         img_slice = cache_item[data_type].sel(time=slice(t0, t1)).load()
-        period_slice = cache_item[data_type+'_period'].sel(time=slice(t0, t1)).load()
+        period_slice = cache_item[data_type_period].sel(time=slice(t0, t1)).load()
     except KeyError:
         print("Requested data_type: %s not cached. cache_item.keys: %s" % (data_type, list(cache_item.keys())) )
         return False
@@ -573,7 +573,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         # Initialize visualization arrays in file cache and emit request to DataViz
         for viz_type in VIZ_TYPES_SUPPORTED:
             # Initialize array
-            filename_viz = base_to_zarr_filename(filename, viz_type)
+            filename_viz = filename_to_zarr_path(filename, viz_type)
             viz_array = ExtendableDataArray(path=filename_viz,
                                             array_module=np,
                                             dtype=object,
@@ -584,7 +584,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                                  name=viz_type
                                  )
             viz_period = viz_type + '_period'
-            filename_viz_period = base_to_zarr_filename(filename, viz_period)
+            filename_viz_period = filename_to_zarr_path(filename, viz_period)
             viz_period_array = ExtendableDataArray(path=filename_viz_period,
                                                    array_module=np,
                                                    dtype=object,
@@ -627,7 +627,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         mz = np.frombuffer( value['mz'], dtype=np.float32 )
         t_range = value['t_range']
 
-        filename_signal = base_to_zarr_filename(filename_base, 'signal')
+        filename_signal = filename_to_zarr_path(filename_base, 'signal')
 
         if os.path.exists(filename_signal):
             # Should hit here only when trying to import a file which has already been imported/acquired
@@ -642,7 +642,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                                 coords=[mz, []],
                                 name='signal'
                                 )
-        filename_period = base_to_zarr_filename(filename_base, 'signal_period')
+        filename_period = filename_to_zarr_path(filename_base, 'signal_period')
         period_array = ExtendableDataArray(path=filename_period,
                                            array_module=np
                                            )
@@ -671,7 +671,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                            }
         cache_item = AttrDict(cache_item_dict)
         cache[filename_base] = cache_item
-        print("cache: %s" %str(cache))
+        # print("cache: %s" %str(cache))
 
     async def on_acquired_spectrum(self, data):
         """Receive new spectrum, add to cache
@@ -767,7 +767,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
     async def on_tps_parameter_info(self, data):
         value = data['value']
         filename_base = value.get('filename')
-        filename = base_to_zarr_filename(filename_base, 'tps')
+        filename = filename_to_zarr_path(filename_base, 'tps')
 
         print("Writing TPS data into: %s" %filename)
 
@@ -796,7 +796,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
 
         if filename not in cache:
             # File not in cache, load and put
-            file_dataset = load_file(filename)
+            file_dataset = load_file(filename, vars=[data_type])
             cache[filename] = file_dataset
             t_mark(value)
 
@@ -831,6 +831,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
 
         filename = value['filename']
         data_type = value['data_type']
+        data_type_period = data_type + '_period'
         client_room = data.get('client_room') or data['cookies']['src_sid'][0]
         request_id = value['request_id']
         mz_range = value.get('mz_range', None)
@@ -839,18 +840,26 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         if filename not in cache:
             # File not in cache, load and put
             t_mark(value, 'on_data_request:load_file')
-            file_dataset = load_file(filename)
+            file_dataset = load_file(filename, vars=[data_type, data_type_period])
             cache[filename] = file_dataset
+        
+        cache_item = cache[filename]
 
-        file_cache_item = cache[filename]
+        if data_type not in cache_item:
+            data_array = load_array(filename, data_type)
+            period_array = load_array(filename, data_type_period)
+            new_cache_item = xarray.merge([cache_item, data_array, period_array])
+            new_cache_item.attrs = cache_item.attrs
+            cache[filename] = new_cache_item
+
 
         if mz_range is None:
             # Full mz range
-            mz_range = file_cache_item.attrs['range']
+            mz_range = cache_item.attrs['range']
             
         if t_range is None:
             # Full time range
-            t_range = [0, file_cache_item.attrs['length']]
+            t_range = [0, cache_item.attrs['length']]
 
         # Put request to cache
         t_mark(value, 'on_data_request:cache_put')
@@ -916,7 +925,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
 
         sample_array, tps_env = cache_get(data, 'tps')
         if not sample_array:
-            filename = base_to_zarr_filename(filename, '_tps')
+            filename = filename_to_zarr_path(filename, '_tps')
             sample_array = open_mfzarr(filename)
             cache_put(data, 'tps', sample_array)
             sample_array, tps_env = cache_get(data, 'tps')
@@ -1012,7 +1021,7 @@ def read_instrument_log(log_path):
         instrument_log = []
     return instrument_log
 
-def base_to_zarr_filename(base_filename, variable):
+def filename_to_zarr_path(base_filename, variable):
     sample_data_path = parse_path_from_sample_name(base_filename)
     zarr_filename = variable + os.extsep + 'zarr'
     return os.path.join(sample_data_path, zarr_filename)
@@ -1021,35 +1030,63 @@ def get_file_data_vars(filepath):
     file_dirs = next(os.walk(filepath))[1]
     zarrs = []
     for var in fnmatch.filter(file_dirs, '*.zarr'):
-        zarrs.append(var)
+        zarrs.append(var.strip('.zarr'))
     return zarrs
 
-def load_file(base_filename):
-    """Load all stored variables in a file into a xarray.Dataset object
+def load_array(base_filename, var):
+    """Load a stored variable in a file into a xarray.Dataset object
 
     Parameters
     ----------
     base_filename : str
         Base filename
+    var : str
+        Variable (zarr array) name
 
     Returns
     -------
     xarray.Dataset
         Loaded data
     """
-    print("Loading file: %s" %base_filename)
+    print("Loading array: %s from file: %s" %(base_filename, var))
+    var_path = filename_to_zarr_path(base_filename, var)
+    # Load data from file
+    try:
+        dataset = open_mfzarr(var_path)
+    except FileNotFoundError as e:
+        print("FileNotFoundError: Error reading %s, %s" %(var_path, e))
+    return dataset
+
+def load_file(base_filename, vars=None):
+    """Load all stored variables in a file into a xarray.Dataset object
+
+    Parameters
+    ----------
+    base_filename : str
+        Base filename
+    vars : list, optional
+        List of variable (zarr array) names to load. By default None,
+        all variables are loaded.
+
+    Returns
+    -------
+    xarray.Dataset
+        Loaded data
+    """
     filepath = parse_path_from_sample_name(base_filename)
-    # Get all saved variable names
-    zarrs = get_file_data_vars(filepath)
+    if vars is None:
+        # Get all saved variable names
+        zarrs = get_file_data_vars(filepath)
+        vars = [ zarr.strip('.zarr') for zarr in zarrs ]
+    print("Loading variables: %s file: %s" %(str(vars), base_filename))
     # Load data from file
     dss = []
-    for var in zarrs:
-        var_path = os.path.join(filepath, var)
+    for var in vars:
         try:
-            var_ds = open_mfzarr(var_path)
+            var_ds = load_array(base_filename, var)
             dss.append(var_ds)
-        except ValueError as e:
-            print("ValueError: Error reading %s, %s" %(var_path, e))
+        except Exception as e:
+            print("Failed to load data: %s" %e)
             continue
     # Merge into xarray.Dataset
     dataset = xarray.merge(dss)
@@ -1088,7 +1125,7 @@ def open_mfzarr(path, mode='r', concat_dim='time'):
     """
 
     if not os.path.exists(path):
-        raise ValueError("Zarr file %s does not exist" %path)
+        raise FileNotFoundError("Zarr file %s does not exist" %path)
     z = zarr.open(path, mode=mode)
     groups = [ g[0] for g in z.groups() ]
     x = xarray.concat([ xarray.open_zarr(path, g) for g in groups ],
