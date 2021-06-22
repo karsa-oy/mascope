@@ -232,13 +232,7 @@
                                     Instrument log
                                 </b-button>
                                 <div><br></div>
-                                <b-field>
-                                    <b-switch
-                                        v-model="autosave_on"
-                                        :disabled="!(control_mode_active && experiment_selected.title.length)">
-                                        Auto-save
-                                    </b-switch>
-                                </b-field>
+
                             </div>
                             <!-- End of controls -->
                         </div>
@@ -505,14 +499,6 @@ export default {
                 this.$store.commit('acquisition_status', value);
             }
         },
-        autosave_on: {
-            get() {
-                return this.$store.state.autosave_on;
-            },
-            set(value) {
-                this.$store.commit('autosave_on', value);
-            }
-        },
         new_file: {
             get() {
                 return this.$store.state.new_file;
@@ -526,7 +512,7 @@ export default {
     data: function() {
         return {
             // UI variables
-            acquisition_button_type: "is-primary",
+            acquisition_button_type: "is-success",
             acquisition_control_label: "Start Acquisition",
             button_save_method_type: "is-success",
             control_mode_active: false,
@@ -804,7 +790,7 @@ export default {
             }
             if(new_value === "not_running"){
                 this.acquisition_control_label = "Start Acquisition";
-                this.acquisition_button_type = "is-primary";
+                this.acquisition_button_type = "is-success";
                 this.scenthound_status = 'Ready';
             }
         },
@@ -917,7 +903,6 @@ export default {
             } else {
                 // on disconnect
                 this.control_mode_active = false;
-                this.autosave_on = false;
             }
         },
     }

@@ -25,11 +25,11 @@
                     <!-- Left column -->
                     <div class="column is-one-quarter" style="padding-left:2rem">
 
-                        <!-- Namespace selector -->
+                        <!-- Data source selector -->
                         <div style="text-align:center;
                                     margin-top:.4rem;
                                     margin-bottom:1rem;">
-                            <b-field label="Data source">
+                            <b-field label="Data source" grouped>
                                 <b-select
                                     v-model="data_source_name_selected"
                                     placeholder="Select data source"
@@ -41,9 +41,16 @@
                                         {{ source.name }}
                                     </option>
                                 </b-select>
+
+                                <b-switch
+                                    style="color:white"
+                                    v-model="autosave_on"
+                                    :disabled="!(experiment_selected.title.length)">
+                                    Auto-save
+                                </b-switch>
                             </b-field>
                         </div>
-                        <!-- End of namespace selector -->
+                        <!-- End of data source selector -->
                         <RAWimport
                             v-if="data_source_selected.type && data_source_selected.type.indexOf('H5') != -1">
                         </RAWimport>
@@ -119,6 +126,22 @@ export default {
             'experiment_selected',
             'project_selected',
             ]),
+        autosave_on: {
+            get() {
+                return this.$store.state.autosave_on;
+            },
+            set(value) {
+                this.$store.commit('autosave_on', value);
+            }
+        },
+        data_source_selected: {
+            get() {
+                return this.$store.state.data_source_selected;
+            },
+            set(value) {
+                this.$store.commit('data_source_selected', value);
+            }
+        },
         root_namespace: {
             get() {
                 return this.$store.state.root_namespace;
@@ -133,14 +156,6 @@ export default {
             },
             set(value) {
                 this.$store.commit('url', value);
-            }
-        },
-        data_source_selected: {
-            get() {
-                return this.$store.state.data_source_selected;
-            },
-            set(value) {
-                this.$store.commit('data_source_selected', value);
             }
         },
     },
