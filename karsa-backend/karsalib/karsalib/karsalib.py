@@ -656,6 +656,9 @@ class BaseStreamerClient(BridgeServiceClient):
         self.public_ns.room_instrument = priv_ns_name
         self.acknowledge_acquisition = True
 
+    @property
+    def instrument_name(self):
+        return self.instrument_data.get('name')
 
     async def initialize_streamer(self):
         """
@@ -723,13 +726,21 @@ class BaseStreamerClient(BridgeServiceClient):
 
             filename_base = self.streamer.filename
             # Prepend with instrument name
-            filename = '_'.join([self.private_ns.namespace.strip('/'),
+            filename = '_'.join([self.instrument_name,
                                  filename_base
                                  ])
             # Replace spaces with underscore
             filename = filename.replace(' ', '_')
 
             await self.emit_private_notification(
+                                        'acquisition_coordinates',
+                                        {'filename': filename,
+                                         'mz': self.streamer.mz.tobytes(),
+                                         't_range': [0, self.streamer.length]
+                                         },
+                                        no_data_logging=True
+                                        )
+            await self.emit_public_notification(
                                         'acquisition_coordinates',
                                         {'filename': filename,
                                          'mz': self.streamer.mz.tobytes(),
@@ -806,6 +817,13 @@ class BaseStreamerClient(BridgeServiceClient):
                                             cnt=cnt,
                                             no_data_logging=True
                                             )
+                    await self.emit_public_notification(
+                                            'acquired_spectrum',
+                                            {**spec_data,
+                                             'filename': filename
+                                             },
+                                            no_data_logging=True
+                                            )
                     # Progress
                     await self.emit_private_notification(
                                             'acquisition_progress',
@@ -832,6 +850,11 @@ class BaseStreamerClient(BridgeServiceClient):
                                             no_data_logging=False
                                             )
                     await self.emit_private_notification(
+                                            'acquisition_finished',
+                                            {'filename': filename
+                                             },
+                                            )
+                    await self.emit_public_notification(
                                             'acquisition_finished',
                                             {'filename': filename
                                              },

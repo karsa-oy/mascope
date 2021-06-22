@@ -753,8 +753,10 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         with open(attr_path, 'w') as f:
             json.dump(attributes, f, indent=4)
 
-        for key, array in cache_item.items():
+        arrays_to_flush = ['signal', 'signal_period']
+        for key in arrays_to_flush:
             # Flush arrays
+            array = cache_item.get(key)
             if isinstance(array, ExtendableDataArray):
                 print("Flush %s array" %key)
                 array.flush()

@@ -30,9 +30,15 @@ from multiprocessing import (
 from queue import Empty
 from time import time
 
-from karsalib import BaseClientNamespace, BaseServiceClient, CacheQ, \
-                     parse_cmd_args, get_client_notification_args, \
-                     this_func_name, t_mark
+from karsalib import (
+                BaseClientNamespace,
+                BaseServiceClient,
+                CacheQ,
+                parse_cmd_args,
+                get_client_notification_args,
+                this_func_name,
+                t_mark
+                )
 from karsatof.kworker import ImageGenerator
 from karsatof.kcollector import ExtendableDataArray
 from karsatof.kimage import (
@@ -211,13 +217,14 @@ def viz_cache_pop(table,
     return data
 
 
-def viz_cache_process_requests(request_id, flush=False):
+def viz_cache_process_requests(filename, flush=False, **kwargs):
     global REQUEST_PROCESSORS
 
     check_to_release_request = False
     rows = viz_cache_pop(
                     'requests',
                     '''
+                    request_id,
                     filename,
                     viz_type,
                     t0, t1,
@@ -225,11 +232,12 @@ def viz_cache_process_requests(request_id, flush=False):
                     t_resolution,
                     client_room
                     ''',
-                    request_id=request_id,
+                    filename=filename,
+                    **kwargs
                     )
     for row in rows:
         # print("[viz_cache_process_requests]: processing row: %s" %str(row))
-        filename, viz_type, t0, t1, mz0, mz1, t_resolution, client_room = row
+        request_id, filename, viz_type, t0, t1, mz0, mz1, t_resolution, client_room = row
 
         # Select processing method based on 'data_type' and process request
         processed_until = REQUEST_PROCESSORS[viz_type](
@@ -560,7 +568,7 @@ def process_visualization_request(filename,
                 # break
 
             # y_range = [0, spec_array.max().compute().item()] # TODO: better scaling
-            y_range = [0, signal_slice.attrs['y_max']]
+            y_range = [0, signal_slice.attrs.get('y_max', spec_array.max().compute().item())]
 
             t0_i = float( spec_array.time[0] )
             t1_i = float( spec_array.time[-1] ) + float( period_array[-1] )
@@ -587,7 +595,7 @@ def process_visualization_request(filename,
             processed_until = t1_i
         return processed_until
 
-    cache_item = cache.get(request_id)
+    cache_item = cache.get(filename) or cache.get(request_id)
     if not cache_item:
         print("No such cache item: %s" %request_id)
     processed_until = feed_signal_to_visualize([t0, t1])
@@ -631,8 +639,10 @@ class DataVizServiceNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to Router """
 
     endpoints = [
-            'loaded_coordinates',
-            'loaded_data',
+            'acquisition_coordinates',
+            'acquired_spectrum',
+            # 'loaded_coordinates',
+            # 'loaded_data',
             'service_state',
             'stop_visualize_range',
             'visualize_range',
@@ -663,13 +673,6 @@ class DataVizServiceNamespace(BaseClientNamespace):
         viz_types = value['viz_types']
         request_id = value['request_id']
 
-        # Check if data_request is needed
-        if request_id not in cache:
-            # File not in cache, add
-            cache[request_id] = AttrDict({})
-
-        cache_item = cache[request_id]
-
         t_data = {'request_id': request_id,}
         t_mark(t_data)
 
@@ -686,6 +689,13 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                                     namespace=get_namespace(filename)
                                                     )
             return
+
+        # Check if data_request is needed
+        cache_item = cache.get(filename, None) or cache.get(request_id, None)
+        if not cache_item:
+            # File not in cache, add
+            cache[request_id] = AttrDict({})
+            cache_item = cache[request_id]
 
         data_request_needed = True
         if 'signal' not in cache_item:
@@ -766,7 +776,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                             )
         if not data_request_needed:
             # Process request
-            viz_cache_process_requests(request_id)
+            viz_cache_process_requests(filename, request_id=request_id)
         t_mark(t_data)
 
     async def on_stop_visualize_range(self, data):
@@ -845,9 +855,9 @@ class DataVizServiceNamespace(BaseClientNamespace):
             value = data['value']
             # i = value.get('i')
             request_id = value['request_id']
-            # filename_base = value['filename']
+            filename = value['filename']
             if not value.get('spec'):
-                viz_cache_process_requests(request_id, flush=True)
+                viz_cache_process_requests(filename, request_id=request_id, flush=True)
                 return
 
             ti = np.array( [value['t']], dtype=np.float32 )
@@ -895,17 +905,106 @@ class DataVizServiceNamespace(BaseClientNamespace):
                 #                            [mz, ti]
                 #                            )
                 pass
-            viz_cache_process_requests(request_id)
+            viz_cache_process_requests(filename, request_id=request_id)
 
         data_type = data['value']['data_type']
         if data_type == 'signal':
             await on_loaded_signal(data)
         elif data_type == 'etx':
             print("Processing termination package")
+            filename = data['value']['filename']
             request_id = data['value']['request_id']
-            viz_cache_process_requests(request_id, flush=True)
+            viz_cache_process_requests(filename, request_id=request_id, flush=True)
         return data['cnt']
     # ----------------------------------------------
+
+    async def on_acquisition_coordinates(self, data):
+        """Initialize acquisition cache with received coordinates
+
+        Parameters
+        ----------
+        data : dict
+            keys: 'mz' and 'time'
+        """
+        global cache
+
+        value = data['value']
+        filename_base = value.get('filename')
+        print("Start acquiring sample: %s" %filename_base)
+        
+        mz = np.frombuffer( value['mz'], dtype=np.float32 )
+        t_range = value['t_range']
+
+        signal_array = ExtendableDataArray(array_module=np
+                                           )
+        signal_array.init_array(dims=('mz', 'time'),
+                                coords=[mz, []],
+                                name='signal'
+                                )
+        period_array = ExtendableDataArray(array_module=np
+                                           )
+        period_array.init_array(dims=('time'),
+                                coords=[[]],
+                                name='signal_period'
+                                )
+        # Put to cache
+        cache_item_dict = {'signal': signal_array,
+                           'signal_period': period_array,
+                           'attrs': {},
+                           }
+        cache_item = AttrDict(cache_item_dict)
+        cache[filename_base] = cache_item
+
+    async def on_acquired_spectrum(self, data):
+        """Receive new spectrum, add to cache
+
+        Parameters
+        ----------
+        data : dict
+            keys: 'filename', 'i', 't', 'spec', 'period', ('mz')
+        """
+        global cache
+
+        value = data['value']
+        filename_base = value['filename']
+
+        ti = np.array( [value['t']], dtype=np.float32 )
+        period = np.array( [value['period']], dtype=np.float32 )
+        print(ti.item())
+        spec = np.frombuffer(value['spec'], dtype=np.float32)
+        spec = spec.reshape(-1, 1)
+
+        # Get data arrays from cache
+        signal_array = cache[filename_base].signal
+        period_array = cache[filename_base].signal_period
+
+        if 'mz' in value:
+            # mz coordinates provided with data (Orbitrap)
+            mz = np.frombuffer(value['mz'], dtype=np.float32)
+            mz = mz.reshape(-1,)
+        else:
+            # Use mz coordinates from signal_array (TOF)
+            mz = signal_array.mz
+
+        # Extend data arrays (write to file)
+        signal_array.extend_array(spec,
+                                  [mz, ti],
+                                  'time'
+                                  )
+        period_array.extend_array(period,
+                                  [ti],
+                                  'time'
+                                  )
+        viz_cache_process_requests(filename_base)
+
+    async def on_acquisition_finished(self, data):
+        global cache
+        value = data['value']
+        filename_base = value['filename']
+        cache_item = cache[filename_base]
+        print("Finished acquiring file: %s" %filename_base)
+        viz_cache_process_requests(filename_base, flush=True)
+
 
 
 class DataVizServiceClient(BaseServiceClient):
