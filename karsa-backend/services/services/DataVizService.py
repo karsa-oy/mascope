@@ -641,6 +641,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
     endpoints = [
             'acquisition_coordinates',
             'acquired_spectrum',
+            'acquisition_finished',
             # 'loaded_coordinates',
             # 'loaded_data',
             'service_state',
