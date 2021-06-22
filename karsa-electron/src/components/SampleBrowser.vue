@@ -45,7 +45,6 @@
                             <b-field label="Experiment">
                                 <b-select
                                     placeholder="Select an experiment"
-                                    v-model="experiment_selected.title"
                                     @input="selectExperiment($event)"
                                     :disabled="!project_selected.title"
                                     required
