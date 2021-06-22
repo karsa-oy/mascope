@@ -87,7 +87,7 @@ class TofDaqStreamer(Thread, KInstrument):
 
         # Initialize TW API related structures 'desc' and 'ptr'
         if not TwTofDaqRunning():
-            raise Exception("TofDaq Recorder not running.")
+            raise ModuleNotFoundError("TofDaq Recorder not running.")
         self.desc = TSharedMemoryDesc() # TW shared memory descriptor
         ret = TwGetDescriptor(self.desc)
         if ret == 4:
@@ -330,7 +330,12 @@ class TofDaqStreamer(Thread, KInstrument):
         # Out of main loop
         print('TofDaqStreamer exiting')
         self.shutdown()
-        
+
+    def stop_stream(self):
+        """Stop stream before complete
+        """
+        self.shutdown()
+
     def shutdown(self):
         """Shutdown procedure
         """

@@ -860,13 +860,26 @@ def run_streamer_service(StreamerClient,
               )
         return
 
-    client = StreamerClient(args.get('streamer_type', None),
-                            args.get('raw_pool', None),
-                            args['url'],
-                            args['port'],
-                            ('/', StreamerPublicNamespace),
-                            (args['ns'], StreamerPrivateNamespace)
-                           )
+    client = None
+    while True:
+        try:
+            client = StreamerClient(args.get('streamer_type', None),
+                                    args.get('raw_pool', None),
+                                    args['url'],
+                                    args['port'],
+                                    ('/', StreamerPublicNamespace),
+                                    (args['ns'], StreamerPrivateNamespace)
+                                )
+            break
+        except ModuleNotFoundError as e:
+            print(str(e))
+            try:
+                time.sleep(5)
+            except KeyboardInterrupt:
+                print('Cancelled')
+                return
+        except:
+            raise
 
     loop = asyncio.get_event_loop()
     try:
