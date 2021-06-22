@@ -159,7 +159,7 @@ def cache_process_requests(filename, flush=False, **kwargs):
                             )
     # Loop through db entries
     for row in request_data_rows:
-        # print("[cache_process_requests]: processing row: %s" %str(row))
+        # print("[cache_process_requests]: processing row: %s, flush=%s" %(str(row), flush))
         data_type, t0, t1, mz0, mz1, t_resolution, client_room, request_id = row
 
         # Select processing method based on data_type and process request
@@ -441,7 +441,8 @@ def process_image_request(filename,
     try:
         img_slice = cache_item[data_type].sel(time=slice(t0, t1)).load()
         period_slice = cache_item[data_type_period].sel(time=slice(t0, t1)).load()
-    except KeyError:
+    except KeyError as e:
+        print("Error in process_image_request: %s" %e)
         print("Requested data_type: %s not cached. cache_item.keys: %s" % (data_type, list(cache_item.keys())) )
         return False
 
@@ -528,9 +529,9 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         'acquisition_started',
         'acquisition_coordinates',
         'acquired_spectrum',
-        # 'acquired_tps_data',
+        'acquired_tps_data',
         'acquisition_finished',
-        # 'tps_parameter_info',
+        'tps_parameter_info',
         # //
         # SampleManager
         'stop_data_request',
@@ -713,22 +714,23 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                                   [ti],
                                   'time'
                                   )
-        cache_process_requests(filename_base)
+        cache_process_requests(filename_base, data_type='signal')
         return data['cnt']
 
     async def on_acquired_tps_data(self, data):
+        global cache
+
         value = data['value']
         filename_base = value.get('filename')
-        # ti = np.array( [value.get('t')], dtype=np.float32 )
-        # tps_data = np.frombuffer( value.get('data'), dtype=np.float32)
-        # tps_data = tps_data.reshape(-1, 1)
-        # tps_array, _ = cache_get(data, 'tps')
-        # if tps_array:   # TODO: tps_array is None on killing acquisition from MainUI
-        #     tps_info = tps_array.parameter
-        #     tps_array.extend_array(tps_data,
-        #                            [tps_info, ti],
-        #                            'time'
-        #                            )
+        ti = np.array( [value.get('t')], dtype=np.float32 )
+        tps_data = np.frombuffer( value.get('data'), dtype=np.float32)
+        tps_data = tps_data.reshape(-1, 1)
+        tps_array = cache[filename_base].tps
+        tps_info = tps_array.parameter
+        tps_array.extend_array(tps_data,
+                               [tps_info, ti],
+                               'time'
+                               )
 
     async def on_acquisition_finished(self, data):
         global cache
@@ -765,6 +767,8 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         # cache_release('requests', filename=filename_base, data_type='signal')
 
     async def on_tps_parameter_info(self, data):
+        global cache
+
         value = data['value']
         filename_base = value.get('filename')
         filename = filename_to_zarr_path(filename_base, 'tps')
@@ -773,14 +777,16 @@ class FileIoPrivateNamespace(BaseClientNamespace):
 
         tps_info = value.get('tps_info')
         
-        # tps_array = ExtendableDataArray(path=filename,
-        #                                 array_module=da
-        #                                 )
-        # tps_array.init_array(dims=('parameter', 'time'),
-        #                      coords=[tps_info, []],
-        #                      name='tps'
-        #                      )
-        # cache_put(data, 'tps', tps_array)
+        tps_array = ExtendableDataArray(path=filename,
+                                        array_module=da
+                                        )
+        tps_array.init_array(dims=('parameter', 'time'),
+                             coords=[tps_info, []],
+                             name='tps'
+                             )
+        cache_item = cache[filename_base]
+        cache_item.update({'tps': tps_array})
+        cache[filename_base] = cache_item
     # -----------------------------------------
 
     # =========== DataViz requests ===========
@@ -874,7 +880,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                   )
         # Process request(s)
         t_mark(value, 'on_data_request:cache_process_requests')
-        cache_process_requests(filename)
+        cache_process_requests(filename, data_type=data_type)
         t_mark(value, 'on_data_request:out')
 
     async def on_figure_data(self, data):
@@ -900,6 +906,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                                   'time'
                                   )
         t_mark(value)
+        cache_process_requests(filename, data_type=viz_type)
 
     async def on_stop_data_request(self, data):
         self.log(data)
