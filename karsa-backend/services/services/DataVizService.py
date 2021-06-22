@@ -1009,6 +1009,10 @@ class DataVizServiceNamespace(BaseClientNamespace):
 
 
 class DataVizServiceClient(BaseServiceClient):
+    def __init__(self, url, port, client_namespace_data, n_jobs):
+        super().__init__(url, port, client_namespace_data)
+        self.n_jobs = n_jobs
+
     async def init_service(self):
         global generator_input_q
         global shutdown_event
@@ -1025,9 +1029,8 @@ class DataVizServiceClient(BaseServiceClient):
         self.generator_output_q = Queue()
         self.generator_procs = []
 
-        n_jobs = cpu_count()
-        for i in range(n_jobs):
-            self.log("ImageGenerator %s/%s" %(i+1, n_jobs))
+        for i in range(self.n_jobs):
+            self.log("ImageGenerator %s/%s" %(i+1, self.n_jobs))
             gen_proc = ImageGenerator(self.generator_input_q,
                                       self.generator_output_q,
                                       shutdown_event
@@ -1097,7 +1100,8 @@ def run():
     args = parse_cmd_args()
     client = DataVizServiceClient(args['url'],
                                   args['port'],
-                                  (args['ns'], DataVizServiceNamespace)
+                                  (args['ns'], DataVizServiceNamespace),
+                                  int( args.get('n_jobs', cpu_count()) )
                                   )
     loop = asyncio.get_event_loop()
     try:

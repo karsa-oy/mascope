@@ -524,7 +524,14 @@ def parse_cmd_args():
     args_default = dict(url='localhost', port=5010, ns='/')
     # Parse cmd arguments
     opts, _ = getopt.getopt(sys.argv[1:], 'o:v',
-                ['url=', 'port=', 'ns=', 'streamer_type=', 'raw_pool=', 'config='])
+                ['config=',
+                 'n_jobs=',
+                 'ns=',
+                 'port=',
+                 'raw_pool=',
+                 'streamer_type=',
+                 'url=',
+                 ])
     for opt, arg in opts:
         assert opt[:2]=='--', f"Invalid argument {opt}"
         key = opt[2:]
