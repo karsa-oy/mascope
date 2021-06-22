@@ -61,9 +61,7 @@ class KInstrument():
 
         self.desc = descriptor
         
-        self._mz = np.array([self.sno2mz(s) for s in range(self.desc.nbrSamples)],
-                            dtype=np.float32
-                            )
+        self._mz = self.calculate_mz()
 
         self.ps = None
         self.peakshapes = None
@@ -342,3 +340,8 @@ class KInstrument():
         if len(mzs) == 1:
             mzs = mzs[0]
         return mzs
+
+    def calculate_mz(self):
+        return np.array([self.sno2mz(s) for s in range(self.desc.nbrSamples)],
+                         dtype=np.float32
+                         )
