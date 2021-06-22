@@ -612,6 +612,16 @@ class H5Streamer(TofDaqStreamer):
         print('H5Streamer exiting')
         self.shutdown()
 
+    def shutdown(self):
+        """Shutdown procedure
+        """
+        self.shutdown_event.set()
+        # Close queues
+        self.spec_queue.close()
+        self.spec_queue.join_thread()
+        self.tps_queue.close()
+        self.tps_queue.join_thread()
+
     def start_stream(self, filename):
         if os.path.isfile(filename):
             self.file_queue.put(filename)
