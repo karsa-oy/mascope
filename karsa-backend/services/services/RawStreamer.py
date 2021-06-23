@@ -118,6 +118,10 @@ class RawStreamerServiceClient(BaseStreamerClient):
         # which is needed for dynamic instantiation of a streamer and a raw_pool
         super().__init__(*args, **kwargs)
 
+    # @property
+    # def instrument_name(self):
+    #     return os.path.basename(os.path.normpath(self.raw_pool.data_root))
+
     async def init_service(self):
         await super().init_service()
         assert self.raw_pool, 'Missing raw_pool argument'
