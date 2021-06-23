@@ -334,12 +334,11 @@ class TofDaqStreamer(Thread, KInstrument):
         print('TofDaqStreamer exiting')
         self.shutdown()
 
-    def stop_stream(self):
-        """Stop stream before complete
+    def shutdown(self):
+        """Shutdown procedure
         """
-        # self.stop_acquisition()
         self.shutdown_event.set()
-        # Clear all upcoming data from queue
+        # Clear left-over data from queues
         while True:
             try:
                 self.spec_queue.get_nowait()
@@ -347,11 +346,6 @@ class TofDaqStreamer(Thread, KInstrument):
             except Empty:
                 break
             sleep(.1)
-
-    def shutdown(self):
-        """Shutdown procedure
-        """
-        self.shutdown_event.set()
         # Close queues
         self.spec_queue.close()
         self.spec_queue.join_thread()
@@ -367,6 +361,11 @@ class TofDaqStreamer(Thread, KInstrument):
         """Stop acquisition by calling TW API
         """
         TwStopAcquisition()
+
+    def stop_stream(self):
+        """Stop stream before complete
+        """
+        self.stop_acquisition()
 
 
 class H5Streamer(TofDaqStreamer):
@@ -625,6 +624,14 @@ class H5Streamer(TofDaqStreamer):
         """Shutdown procedure
         """
         self.shutdown_event.set()
+        # Clear all left-over data from queue
+        while True:
+            try:
+                self.spec_queue.get_nowait()
+                self.tps_queue.get_nowait()
+            except Empty:
+                break
+            sleep(.1)
         # Close queues
         self.spec_queue.close()
         self.spec_queue.join_thread()
@@ -641,14 +648,6 @@ class H5Streamer(TofDaqStreamer):
         """Stop stream before complete
         """
         self.cancel_event.set()
-        # Clear all upcoming data from queue
-        while True:
-            try:
-                self.spec_queue.get_nowait()
-                self.tps_queue.get_nowait()
-            except Empty:
-                break
-            sleep(.1)
 
 
 class RawStreamer(Thread):
@@ -839,6 +838,13 @@ class RawStreamer(Thread):
         """Shutdown procedure
         """
         self.shutdown_event.set()
+        # Clear all left-over data from queue
+        while True:
+            try:
+                self.spec_queue.get_nowait()
+            except Empty:
+                break
+            sleep(.1)
         # Close queues
         self.spec_queue.close()
         self.spec_queue.join_thread()
@@ -853,10 +859,3 @@ class RawStreamer(Thread):
         """Stop stream before complete
         """
         self.cancel_event.set()
-        # Clear all upcoming data from queue
-        while True:
-            try:
-                self.spec_queue.get_nowait()
-            except Empty:
-                break
-            sleep(.1)
