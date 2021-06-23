@@ -270,11 +270,11 @@ def viz_cache_process_requests(filename, flush=False, **kwargs):
             viz_cache_release('requests',
                               request_id=request_id,
                               )
-    #         check_to_release_request = True
-    # if check_to_release_request:
-    #     cur = viz_cache_get('requests', 'request_id', request_id=request_id)
-    #     if not cur.fetchone():
-    #         cancel_request(request_id)
+            check_to_release_request = True
+    if check_to_release_request:
+        cur = viz_cache_get('requests', 'request_id', request_id=request_id)
+        if not cur.fetchone():
+            release_request(request_id)
 
 
 def viz_cache_put(table,
@@ -601,7 +601,7 @@ def process_visualization_request(filename,
     processed_until = feed_signal_to_visualize([t0, t1])
     return processed_until
 
-def cancel_request(request_id):
+def release_request(request_id):
         viz_cache_release('requests',
                            request_id=request_id,
                          )
@@ -801,7 +801,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                             **{**get_client_notification_args(data),
                                                'namespace': get_namespace(filename)})
         for request_id in request_ids:
-            cancel_request(request_id)
+            release_request(request_id)
     # ---------------------------------
 
     # ========== FileIoService notifications ==========
