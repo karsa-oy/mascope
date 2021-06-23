@@ -603,7 +603,8 @@ class SamplePool():
         sample_experiment_path = os.path.join(experiment_path, sample)
         # Check if sample exists
         if not os.path.isdir(sample_data_path):
-            raise ValueError("Sample %s does not exist!" % sample_data_path)
+            # raise ValueError("Sample %s does not exist!" % sample_data_path)
+            print("Sample file %s does not exist! Creating link anyway." % sample_data_path)
         # If sample not yet part of the experiment, link it
         if not os.path.isdir(sample_experiment_path):
             self._make_link(sample_data_path, sample_experiment_path)

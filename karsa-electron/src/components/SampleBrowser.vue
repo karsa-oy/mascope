@@ -1398,8 +1398,7 @@ export default {
                     }
                 }
                 // Save sample
-                // Delay to give FileIo some time to save sample properties
-                setTimeout(this.saveSample(), 2000);
+                this.saveSample();
             } else {
                 // Manual sample info input
                 // Set title prefix
