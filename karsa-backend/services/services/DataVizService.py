@@ -217,7 +217,7 @@ def viz_cache_pop(table,
     return data
 
 
-def viz_cache_process_requests(filename, flush=False, **kwargs):
+async def viz_cache_process_requests(filename, flush=False, **kwargs):
     global REQUEST_PROCESSORS
 
     check_to_release_request = False
@@ -240,7 +240,7 @@ def viz_cache_process_requests(filename, flush=False, **kwargs):
         request_id, filename, viz_type, t0, t1, mz0, mz1, t_resolution, client_room = row
 
         # Select processing method based on 'data_type' and process request
-        processed_until = REQUEST_PROCESSORS[viz_type](
+        processed_until = await REQUEST_PROCESSORS[viz_type](
                                     filename=filename,
                                     viz_type=viz_type,
                                     t0=t0,
@@ -472,7 +472,7 @@ def viz_cache_update(table,
                 )
     con.commit()
 
-def process_visualization_request(filename,
+async def process_visualization_request(filename,
                                   viz_type,
                                   t0,
                                   t1,
@@ -511,7 +511,7 @@ def process_visualization_request(filename,
         or False if no (enough) data was available.
     """
 
-    def feed_signal_to_visualize(t_range_to_process):
+    async def feed_signal_to_visualize(t_range_to_process):
         nonlocal cache_item
         try:
             signal_slice = cache_item.signal.sel(time=slice(*t_range_to_process),
@@ -542,8 +542,8 @@ def process_visualization_request(filename,
             # TODO: resample
             raise NotImplementedError
         
-        signal_slice.load()
-        period_slice.load()
+        # signal_slice.load()
+        # period_slice.load()
 
         # Feed signal batches to generators
         for i in range(no_batches):
@@ -554,8 +554,8 @@ def process_visualization_request(filename,
             i1 = min(i0 + BATCH_SIZE, no_spectra)
             # print("i0: %s, i1: %s" %(i0, i1))
             # Take a batch
-            spec_array = signal_slice[:, i0:i1]
-            period_array = period_slice[i0:i1]
+            spec_array = signal_slice[:, i0:i1].load()
+            period_array = period_slice[i0:i1].load()
             # print(spec_array)
 
             # is_nanrow = spec_array.isnull().all(axis=0).any()
@@ -593,12 +593,13 @@ def process_visualization_request(filename,
                             })
 
             processed_until = t1_i
+            await asyncio.sleep(0)
         return processed_until
 
     cache_item = cache.get(filename) or cache.get(request_id)
     if not cache_item:
         print("No such cache item: %s" %request_id)
-    processed_until = feed_signal_to_visualize([t0, t1])
+    processed_until = await feed_signal_to_visualize([t0, t1])
     return processed_until
 
 def release_request(request_id):
@@ -777,7 +778,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                             )
         if not data_request_needed:
             # Process request
-            viz_cache_process_requests(filename, request_id=request_id)
+            await viz_cache_process_requests(filename, request_id=request_id)
         t_mark(t_data)
 
     async def on_stop_visualize_range(self, data):
@@ -827,12 +828,12 @@ class DataVizServiceNamespace(BaseClientNamespace):
                     coordinate_values = np.frombuffer( coordinates[dim], dtype=np.float32 )
                 coordinates.update( {dim: coordinate_values} )
             
-            data_array = ExtendableDataArray(array_module=np)
+            data_array = ExtendableDataArray(array_module=da)
             data_array.init_array(dims=dims,
                                   coords=coordinates,
                                   name=data_type,
                                   )
-            period_array = ExtendableDataArray(array_module=np)
+            period_array = ExtendableDataArray(array_module=da)
             period_array.init_array(dims=('time'),
                                     coords=[[]],
                                     name='_'.join([data_type, 'period'])
@@ -858,7 +859,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
             request_id = value['request_id']
             filename = value['filename']
             if not value.get('spec'):
-                viz_cache_process_requests(filename, request_id=request_id, flush=True)
+                await viz_cache_process_requests(filename, request_id=request_id, flush=True)
                 return
 
             ti = np.array( [value['t']], dtype=np.float32 )
@@ -906,7 +907,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                 #                            [mz, ti]
                 #                            )
                 pass
-            viz_cache_process_requests(filename, request_id=request_id)
+            await viz_cache_process_requests(filename, request_id=request_id)
 
         data_type = data['value']['data_type']
         if data_type == 'signal':
@@ -915,7 +916,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
             print("Processing termination package")
             filename = data['value']['filename']
             request_id = data['value']['request_id']
-            viz_cache_process_requests(filename, request_id=request_id, flush=True)
+            await viz_cache_process_requests(filename, request_id=request_id, flush=True)
         return data['cnt']
     # ----------------------------------------------
 
@@ -936,13 +937,13 @@ class DataVizServiceNamespace(BaseClientNamespace):
         mz = np.frombuffer( value['mz'], dtype=np.float32 )
         t_range = value['t_range']
 
-        signal_array = ExtendableDataArray(array_module=np
+        signal_array = ExtendableDataArray(array_module=da
                                            )
         signal_array.init_array(dims=('mz', 'time'),
                                 coords=[mz, []],
                                 name='signal'
                                 )
-        period_array = ExtendableDataArray(array_module=np
+        period_array = ExtendableDataArray(array_module=da
                                            )
         period_array.init_array(dims=('time'),
                                 coords=[[]],
@@ -996,7 +997,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                   [ti],
                                   'time'
                                   )
-        viz_cache_process_requests(filename_base)
+        await viz_cache_process_requests(filename_base)
 
     async def on_acquisition_finished(self, data):
         global cache
@@ -1004,7 +1005,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
         filename_base = value['filename']
         cache_item = cache[filename_base]
         print("Finished acquiring file: %s" %filename_base)
-        viz_cache_process_requests(filename_base, flush=True)
+        await viz_cache_process_requests(filename_base, flush=True)
 
 
 
