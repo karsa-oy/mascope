@@ -14,7 +14,7 @@ Created on Fri Apr 17 11:35:57 2020
 """
 
 import asyncio
-import json
+# import json
 import os
 import numpy as np
 import dask.array as da
@@ -33,6 +33,7 @@ from time import time
 from karsalib import (
                 BaseClientNamespace,
                 BaseServiceClient,
+                LRUDict,
                 CacheQ,
                 parse_cmd_args,
                 get_client_notification_args,
@@ -55,7 +56,7 @@ NO_DATA_LOGGING_DEAULT = False
 client = None
 
 # Cache for data arrays
-cache = {}
+cache = LRUDict(5)
 
 generator_input_q = None
 shutdown_event = None
@@ -274,7 +275,7 @@ async def viz_cache_process_requests(filename, flush=False, **kwargs):
     # if check_to_release_request:
     #     cur = viz_cache_get('requests', 'request_id', request_id=request_id)
     #     if not cur.fetchone():
-    #         release_request(request_id)
+    #         release_request_id(request_id)
 
 
 def viz_cache_put(table,
@@ -596,24 +597,21 @@ async def process_visualization_request(filename,
             await asyncio.sleep(0)
         return processed_until
 
-    cache_item = cache.get(filename) or cache.get(request_id)
+    cache_item = cache.get(filename)
     if not cache_item:
-        print("No such cache item: %s" %request_id)
+        print(f"No such cache item: {filename}")
     processed_until = await feed_signal_to_visualize([t0, t1])
     return processed_until
 
-def release_request(request_id):
-        viz_cache_release('requests',
-                           request_id=request_id,
-                         )
-        generator_input_cache.cache_delete_key(request_id)
-        try:
-            cache.pop(request_id)
-        except KeyError:
-            pass
-        print(this_func_name(), request_id,
-              'cache_q', generator_input_cache.cache.keys(),
-              'file_cache', cache.keys())
+
+def release_request_id(request_id):
+    viz_cache_release('requests',
+                      request_id=request_id,
+                     )
+    generator_input_cache.cache_delete_key(request_id)
+    print(this_func_name(), request_id,
+            'cache_q', generator_input_cache.cache.keys(),
+            'file_cache', cache.keys())
 
 
 REQUEST_PROCESSORS = {'spectrogram': process_visualization_request,
@@ -692,12 +690,13 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                                     )
             return
 
+        global cache
         # Check if data_request is needed
-        cache_item = cache.get(filename, None) or cache.get(request_id, None)
+        cache_item = cache.get(filename)
         if not cache_item:
             # File not in cache, add
-            cache[request_id] = AttrDict({})
-            cache_item = cache[request_id]
+            cache[filename] = AttrDict({})
+            cache_item = cache[filename]
 
         data_request_needed = True
         if 'signal' not in cache_item:
@@ -790,7 +789,6 @@ class DataVizServiceNamespace(BaseClientNamespace):
                value: JSON data from UI,
                       keys: 'request_ids', list of request ids to release
         """
-        global cache
         value = data['value']
         filename = value['filename']
         request_ids = value['request_ids']
@@ -802,14 +800,13 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                             **{**get_client_notification_args(data),
                                                'namespace': get_namespace(filename)})
         for request_id in request_ids:
-            release_request(request_id)
+            release_request_id(request_id)
     # ---------------------------------
 
     # ========== FileIoService notifications ==========
     async def on_loaded_coordinates(self, data):
             """
             """
-            # print("on_loaded_coordinates")
             global cache
 
             value = data['value']
@@ -839,7 +836,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                     name='_'.join([data_type, 'period'])
                                     )
             # Put to data cache
-            cache[request_id].update({data_array.name: data_array,
+            cache[filename].update({data_array.name: data_array,
                                     period_array.name: period_array,
                                     })
             t_mark(value)
@@ -851,7 +848,6 @@ class DataVizServiceNamespace(BaseClientNamespace):
         async def on_loaded_signal(data):
             """TODO: This is duplicate with on_acquired_spectrum in FileIoPrivateNamespace
             """
-            # print("on_loaded_signal")
             global cache
 
             value = data['value']
@@ -871,8 +867,8 @@ class DataVizServiceNamespace(BaseClientNamespace):
 
             # Get data arrays from cache
             try:
-                signal_array = cache[request_id]['signal']
-                period_array = cache[request_id]['signal_period']
+                signal_array = cache[filename]['signal']
+                period_array = cache[filename]['signal_period']
             except KeyError:
                 # request was cancelled - request_id deleted
                 print(f"Request {request_id} was cancelled")
