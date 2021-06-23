@@ -799,6 +799,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         client_room = data.get('client_room') or data['cookies']['src_sid'][0]
         filename = value['filename']
         data_type = value['data_type']
+        data_type_period = data_type + '_period'
 
         if filename not in cache:
             # File not in cache, load and put
@@ -806,8 +807,17 @@ class FileIoPrivateNamespace(BaseClientNamespace):
             cache[filename] = file_dataset
             t_mark(value)
 
-        file_cache_item = cache[filename]
-        data_item = file_cache_item[data_type]
+        cache_item = cache[filename]
+
+        if data_type not in cache_item:
+            data_array = load_array(filename, data_type)
+            period_array = load_array(filename, data_type_period)
+            new_cache_item = xarray.merge([cache_item, data_array, period_array])
+            new_cache_item.attrs = cache_item.attrs
+            cache[filename] = new_cache_item
+
+        cache_item = cache[filename]
+        data_item = cache_item[data_type]
 
         coordinates = {}
         coordinate_data = {**value,
