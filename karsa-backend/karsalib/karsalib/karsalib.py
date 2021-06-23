@@ -803,12 +803,13 @@ class BaseStreamerClient(BridgeServiceClient):
                     continue
                 except ConnectionError:
                     self.streamer.stop_stream()
-                    self.log(f"Acquisition of {filename} was cancelled.")
+                    self.log(f"Acquisition of {filename} was stopped.")
                     continue
                 except KeyboardInterrupt:
-                    self.streamer.stop_stream()
+                    self.streamer.shutdown()
+                    spec_data = None
                     self.log(f"Acquisition of {filename} was cancelled.")
-                    continue
+                    break
 
                 # Got data
                 if spec_data is not None:

@@ -337,7 +337,16 @@ class TofDaqStreamer(Thread, KInstrument):
     def stop_stream(self):
         """Stop stream before complete
         """
-        self.stop_acquisition()
+        # self.stop_acquisition()
+        self.shutdown_event.set()
+        # Clear all upcoming data from queue
+        while True:
+            try:
+                self.spec_queue.get_nowait()
+                self.tps_queue.get_nowait()
+            except Empty:
+                break
+            sleep(.1)
 
     def shutdown(self):
         """Shutdown procedure
