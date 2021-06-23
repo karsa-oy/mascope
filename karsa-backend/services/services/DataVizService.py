@@ -828,12 +828,12 @@ class DataVizServiceNamespace(BaseClientNamespace):
                     coordinate_values = np.frombuffer( coordinates[dim], dtype=np.float32 )
                 coordinates.update( {dim: coordinate_values} )
             
-            data_array = ExtendableDataArray(array_module=da)
+            data_array = ExtendableDataArray(array_module=da, persist=True)
             data_array.init_array(dims=dims,
                                   coords=coordinates,
                                   name=data_type,
                                   )
-            period_array = ExtendableDataArray(array_module=da)
+            period_array = ExtendableDataArray(array_module=da, persist=True)
             period_array.init_array(dims=('time'),
                                     coords=[[]],
                                     name='_'.join([data_type, 'period'])
@@ -937,14 +937,12 @@ class DataVizServiceNamespace(BaseClientNamespace):
         mz = np.frombuffer( value['mz'], dtype=np.float32 )
         t_range = value['t_range']
 
-        signal_array = ExtendableDataArray(array_module=da
-                                           )
+        signal_array = ExtendableDataArray(array_module=da, persist=True)
         signal_array.init_array(dims=('mz', 'time'),
                                 coords=[mz, []],
                                 name='signal'
                                 )
-        period_array = ExtendableDataArray(array_module=da
-                                           )
+        period_array = ExtendableDataArray(array_module=da, persist=True)
         period_array.init_array(dims=('time'),
                                 coords=[[]],
                                 name='signal_period'

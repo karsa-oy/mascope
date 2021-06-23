@@ -52,7 +52,8 @@ class ExtendableDataArray():
                  array_module=da,
                  dtype=np.float32,
                  sparse=False,
-                 chunk_size=10
+                 chunk_size=10,
+                 persist=False,
                  ):
         """Initialize self
 
@@ -74,6 +75,7 @@ class ExtendableDataArray():
         self.dtype = dtype
         self.sparse = sparse
         self.chunk_size = chunk_size
+        self.persist = persist
 
         self.data_array = xarray.DataArray()
         
@@ -203,6 +205,8 @@ class ExtendableDataArray():
         self.data_array = xarray.concat(to_concat,
                                         dim=dim
                                         )
+        if self.persist:
+            self.data_array = self.data_array.persist()
         # t1 = time.time()
         # print("Concatenation took: %.2f seconds" %(t1-t0))
         # t0 = time.time()
