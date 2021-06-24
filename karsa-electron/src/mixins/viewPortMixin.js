@@ -186,6 +186,7 @@ export const viewPortMixin = {
                 const figure_configs = JSON.parse(fs.readFileSync('configs/figure_config.json', 'utf8'));
                 self.figure_config = shallow_copy(figure_configs.common_config);
                 self.figure_layout_default = shallow_copy(figure_configs[self.id].layout);
+                self.figure_layout = shallow_copy(self.figure_layout_default);
                 self.figure_img_config = figure_configs[self.id].img;
                 self.figure_axes = figure_configs[self.id].axes;
             }
