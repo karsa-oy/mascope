@@ -139,7 +139,7 @@ def cache_get(table,
     return cur
 
 
-async def cache_process_requests(filename, flush=False, **kwargs):
+def cache_process_requests(filename, flush=False, **kwargs):
     global REQUEST_PROCESSORS
     # Get all pending requests for filename
     t_data = {}
@@ -164,7 +164,7 @@ async def cache_process_requests(filename, flush=False, **kwargs):
 
         # Select processing method based on data_type and process request
         t_mark(t_data, f"cache_process_requests:{REQUEST_PROCESSORS[data_type].__name__}")
-        processed_t_range = await REQUEST_PROCESSORS[data_type](
+        processed_t_range = REQUEST_PROCESSORS[data_type](
                                     filename=filename,
                                     data_type=data_type,
                                     t0=t0,
@@ -358,7 +358,7 @@ def cache_update(table,
                 )
     con.commit()
 
-async def process_signal_request(filename,
+def process_signal_request(filename,
                            data_type,
                            t0,
                            t1,
@@ -410,7 +410,6 @@ async def process_signal_request(filename,
             data_item.update({'mz': mz.astype(np.float32).tobytes()
                               })
         service_q.cache_put(data_item)
-        await asyncio.sleep(0)
     processed_t_range = (signal_slice.time[0], ti+period)
     if flush:
         termination_package = {
@@ -424,7 +423,7 @@ async def process_signal_request(filename,
 
     return processed_t_range
 
-async def process_image_request(filename,
+def process_image_request(filename,
                           data_type,
                           t0,
                           t1,
@@ -487,7 +486,6 @@ async def process_image_request(filename,
                 continue
         service_q.cache_put(img_data)
         processed_t_range = (img_slice.time[0], t1_i)
-        await asyncio.sleep(0)
     return processed_t_range
 
 
@@ -716,7 +714,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                                   [ti],
                                   'time'
                                   )
-        await cache_process_requests(filename_base, data_type='signal')
+        cache_process_requests(filename_base, data_type='signal')
         return data['cnt']
 
     async def on_acquired_tps_data(self, data):
@@ -765,7 +763,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                 print("Flush %s array" %key)
                 array.flush()
 
-        await cache_process_requests(filename_base, data_type='signal', flush=True)
+        cache_process_requests(filename_base, data_type='signal', flush=True)
         # cache_release('requests', filename=filename_base, data_type='signal')
 
     async def on_tps_parameter_info(self, data):
@@ -892,7 +890,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                   )
         # Process request(s)
         t_mark(value, 'on_data_request:cache_process_requests')
-        await cache_process_requests(filename, data_type=data_type)
+        cache_process_requests(filename, data_type=data_type)
         t_mark(value, 'on_data_request:out')
 
     async def on_figure_data(self, data):
@@ -918,7 +916,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
                                   'time'
                                   )
         t_mark(value)
-        await cache_process_requests(filename, data_type=viz_type)
+        cache_process_requests(filename, data_type=viz_type)
 
     async def on_stop_data_request(self, data):
         self.log(data)

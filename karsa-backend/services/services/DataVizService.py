@@ -217,7 +217,7 @@ def viz_cache_pop(table,
     return data
 
 
-async def viz_cache_process_requests(filename, flush=False, **kwargs):
+def viz_cache_process_requests(filename, flush=False, **kwargs):
     global REQUEST_PROCESSORS
 
     # check_to_release_request = False
@@ -240,7 +240,7 @@ async def viz_cache_process_requests(filename, flush=False, **kwargs):
         request_id, filename, viz_type, t0, t1, mz0, mz1, t_resolution, client_room = row
 
         # Select processing method based on 'data_type' and process request
-        processed_until = await REQUEST_PROCESSORS[viz_type](
+        processed_until = REQUEST_PROCESSORS[viz_type](
                                     filename=filename,
                                     viz_type=viz_type,
                                     t0=t0,
@@ -472,7 +472,7 @@ def viz_cache_update(table,
                 )
     con.commit()
 
-async def process_visualization_request(filename,
+def process_visualization_request(filename,
                                   viz_type,
                                   t0,
                                   t1,
@@ -511,7 +511,7 @@ async def process_visualization_request(filename,
         or False if no (enough) data was available.
     """
 
-    async def feed_signal_to_visualize(t_range_to_process):
+    def feed_signal_to_visualize(t_range_to_process):
         nonlocal cache_item
         try:
             signal_slice = cache_item.signal.sel(time=slice(*t_range_to_process),
@@ -593,13 +593,12 @@ async def process_visualization_request(filename,
                             })
 
             processed_until = t1_i
-            await asyncio.sleep(0)
         return processed_until
 
     cache_item = cache.get(filename) or cache.get(request_id)
     if not cache_item:
         print("No such cache item: %s" %request_id)
-    processed_until = await feed_signal_to_visualize([t0, t1])
+    processed_until = feed_signal_to_visualize([t0, t1])
     return processed_until
 
 def release_request(request_id):
@@ -778,7 +777,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                             )
         if not data_request_needed:
             # Process request
-            await viz_cache_process_requests(filename, request_id=request_id)
+            viz_cache_process_requests(filename, request_id=request_id)
         t_mark(t_data)
 
     async def on_stop_visualize_range(self, data):
@@ -859,7 +858,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
             request_id = value['request_id']
             filename = value['filename']
             if not value.get('spec'):
-                await viz_cache_process_requests(filename, request_id=request_id, flush=True)
+                viz_cache_process_requests(filename, request_id=request_id, flush=True)
                 return
 
             ti = np.array( [value['t']], dtype=np.float32 )
@@ -907,7 +906,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                 #                            [mz, ti]
                 #                            )
                 pass
-            await viz_cache_process_requests(filename, request_id=request_id)
+            viz_cache_process_requests(filename, request_id=request_id)
 
         data_type = data['value']['data_type']
         if data_type == 'signal':
@@ -916,7 +915,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
             print("Processing termination package")
             filename = data['value']['filename']
             request_id = data['value']['request_id']
-            await viz_cache_process_requests(filename, request_id=request_id, flush=True)
+            viz_cache_process_requests(filename, request_id=request_id, flush=True)
         return data['cnt']
     # ----------------------------------------------
 
@@ -995,7 +994,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                   [ti],
                                   'time'
                                   )
-        await viz_cache_process_requests(filename_base)
+        viz_cache_process_requests(filename_base)
 
     async def on_acquisition_finished(self, data):
         global cache
@@ -1003,7 +1002,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
         filename_base = value['filename']
         cache_item = cache[filename_base]
         print("Finished acquiring file: %s" %filename_base)
-        await viz_cache_process_requests(filename_base, flush=True)
+        viz_cache_process_requests(filename_base, flush=True)
 
 
 
