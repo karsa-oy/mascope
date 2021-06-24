@@ -219,8 +219,9 @@ def viz_cache_pop(table,
 
 def viz_cache_process_requests(filename, flush=False, **kwargs):
     global REQUEST_PROCESSORS
+    global cache
 
-    check_to_release_request = False
+    requests_to_release = []
     rows = viz_cache_pop(
                     'requests',
                     '''
@@ -267,11 +268,17 @@ def viz_cache_process_requests(filename, flush=False, **kwargs):
                             request_id
                             )
         else:
-            check_to_release_request = True
-    if check_to_release_request:
-        cur = viz_cache_get('requests', 'request_id', request_id=request_id)
-        if not cur.fetchone():
-            release_request(request_id)
+            requests_to_release.append(request_id)
+    if requests_to_release:
+        # check requests_to_release are processed completely (for all viz_types) and release
+        for id in set(requests_to_release):
+            cur = viz_cache_get('requests', 'request_id', request_id=id)
+            if not cur.fetchone():
+                release_request(id)
+        # acquired samples are cached under filename key - check to release
+        cur = viz_cache_get('requests', 'request_id', filename=filename)
+        if not cur.fetchone() and filename in cache:
+            del cache[filename]
 
 
 def viz_cache_put(table,
@@ -595,6 +602,7 @@ def process_visualization_request(filename,
     cache_item = cache.get(filename) or cache.get(request_id)
     if not cache_item:
         print("No such cache item: %s" %request_id)
+        return False
     processed_until = feed_signal_to_visualize([t0, t1])
     return processed_until
 
@@ -799,6 +807,10 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                                'namespace': get_namespace(filename)})
         for request_id in request_ids:
             release_request(request_id)
+        # acquired samples are cached under filename key - check to release
+        cur = viz_cache_get('requests', 'request_id', filename=filename)
+        if not cur.fetchone() and filename in cache:
+            del cache[filename]
     # ---------------------------------
 
     # ========== FileIoService notifications ==========
@@ -994,10 +1006,8 @@ class DataVizServiceNamespace(BaseClientNamespace):
         viz_cache_process_requests(filename_base)
 
     async def on_acquisition_finished(self, data):
-        global cache
         value = data['value']
         filename_base = value['filename']
-        cache_item = cache[filename_base]
         print("Finished acquiring file: %s" %filename_base)
         viz_cache_process_requests(filename_base, flush=True)
 
