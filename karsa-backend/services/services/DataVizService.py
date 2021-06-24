@@ -220,7 +220,7 @@ def viz_cache_pop(table,
 def viz_cache_process_requests(filename, flush=False, **kwargs):
     global REQUEST_PROCESSORS
 
-    # check_to_release_request = False
+    check_to_release_request = False
     rows = viz_cache_pop(
                     'requests',
                     '''
@@ -270,11 +270,11 @@ def viz_cache_process_requests(filename, flush=False, **kwargs):
             viz_cache_release('requests',
                               request_id=request_id,
                               )
-            # check_to_release_request = True
-    # if check_to_release_request:
-    #     cur = viz_cache_get('requests', 'request_id', request_id=request_id)
-    #     if not cur.fetchone():
-    #         release_request(request_id)
+            check_to_release_request = True
+    if check_to_release_request:
+        cur = viz_cache_get('requests', 'request_id', request_id=request_id)
+        if not cur.fetchone():
+            release_request(request_id)
 
 
 def viz_cache_put(table,
