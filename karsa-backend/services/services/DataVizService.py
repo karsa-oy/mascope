@@ -267,9 +267,6 @@ def viz_cache_process_requests(filename, flush=False, **kwargs):
                             request_id
                             )
         else:
-            viz_cache_release('requests',
-                              request_id=request_id,
-                              )
             check_to_release_request = True
     if check_to_release_request:
         cur = viz_cache_get('requests', 'request_id', request_id=request_id)
