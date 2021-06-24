@@ -192,7 +192,7 @@ export default {
                 'acquisition_progress',
                 'acquisition_started',
                 'acquisition_finished',
-                // 'acquisition_status',
+                'acquisition_status',
                 'instrument_status'
             ],
             // raw streamer
