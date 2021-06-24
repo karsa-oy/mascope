@@ -163,9 +163,17 @@ export default {
     },
     computed: {
         ...mapState([
-            'url',
             'data_source_selected',
+            'url',
         ]),
+        acquisition_status: {
+            get() {
+                return this.$store.state.acquisition_status;
+            },
+            set(value) {
+                this.$store.commit('acquisition_status', value);
+            }
+        },
         new_file: {
             get() {
                 return this.$store.state.new_file;
@@ -334,7 +342,7 @@ export default {
                 // handlers for for external notifications:
                 this.namespace.on("acquisition_started", (value) => this.be.import_one_way_binding_prop("acquisition_started", value.value));
                 this.namespace.on("acquisition_finished", (value) => this.be.import_one_way_binding_prop("acquisition_finished", value.value));
-                // this.namespace.on("acquisition_status", (value) => this.be.import_one_way_binding_prop("acquisition_status", value.value));
+                this.namespace.on("acquisition_status", (value) => this.be.import_one_way_binding_prop("acquisition_status", value.value));
                 this.namespace.on("acquisition_progress", (value) => this.be.import_one_way_binding_prop("acquisition_progress", value.value.progress, true));
                 this.namespace.on("instrument_status", (value) => this.be.import_two_way_binding_prop("instrument_status", value.value));
                 this.namespace.on("raw_samples", (value) => this.be.import_one_way_binding_prop("raw_samples", value.value));
