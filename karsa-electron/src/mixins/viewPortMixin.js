@@ -9,6 +9,7 @@ var _ = require('underscore');
 export const viewPortMixin = {
     computed: {
         ...mapState([
+                    'acquisition_status',
                     'figure_data',
                     'sample_annotations',
                     'target_to_display',
@@ -182,10 +183,9 @@ export const viewPortMixin = {
             var self = this;
             // Read layouts from config file
             if (fs.existsSync('configs/figure_config.json')) {
-                let figure_configs = JSON.parse(fs.readFileSync('configs/figure_config.json', 'utf8'));
+                const figure_configs = JSON.parse(fs.readFileSync('configs/figure_config.json', 'utf8'));
                 self.figure_config = shallow_copy(figure_configs.common_config);
-                let figure_layout_config = shallow_copy(figure_configs[self.id].layout);
-                self.figure_layout_default = figure_layout_config;
+                self.figure_layout_default = shallow_copy(figure_configs[self.id].layout);
                 self.figure_img_config = figure_configs[self.id].img;
                 self.figure_axes = figure_configs[self.id].axes;
             }
@@ -668,6 +668,29 @@ export const viewPortMixin = {
 
     },
     watch: {
+        acquisition_status: function(new_value) {
+            // Disable zooming while acquisition is running
+            if (new_value === 'running') {
+                this.figure_layout.dragmode = false;
+                this.figure_layout_default.dragmode = false;
+                for (const key in this.figure_cache) {
+                    let cache_item = this.figure_cache[key];
+                    if (cache_item.figure_layout) {
+                        cache_item.figure_layout.dragmode = false;
+                    }
+                }
+            } else {
+                this.figure_layout.dragmode = 'zoom';
+                this.figure_layout_default.dragmode = 'zoom';
+                for (const key in this.figure_cache) {
+                    let cache_item = this.figure_cache[key];
+                    if (cache_item.figure_layout) {
+                        cache_item.figure_layout.dragmode = 'zoom';
+                    }
+                }
+            }
+            Plotly.react(this.id, this.figure_traces, this.figure_layout);
+        },
         figure_data: function(new_value) {
             if ( !_.isEqual(new_value.value.viz_type, this.id) &&
                  !_.isEqual(new_value.value.data_type, this.id))
