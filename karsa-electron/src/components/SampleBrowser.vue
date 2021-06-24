@@ -724,6 +724,7 @@
                                                         :is-row-checkable="(row) => (row.filename && row.filename.indexOf('placeholder')==-1)"
                                                         :header-checkable="false"
                                                         :checked-rows.sync="sample_table_checked_rows"
+                                                        :selected="sample_table_selected_row"
                                                         v-if="e.title === experiment_selected.title">
                                                         <!-- Columns -->
                                                         <b-table-column
@@ -941,6 +942,7 @@ export default {
             sample_table_rows: [],
             sample_table_cols: [],
             sample_table_checked_rows: [],
+            sample_table_selected_row: {},
             sample_attributes: {},
             sample_attributes_default_template: [
                 {'label': "Title",
@@ -1374,6 +1376,9 @@ export default {
                 message: 'Acquisition started: ' + new_value.filename,
                 type: 'is-success'
             })
+
+            this.sample_table_selected_row = {};
+
             this.sample_form_props = {};
             this.sample_form_props.title = "New sample attributes";
             this.sample_form_props.load_template_path = this.getPrefilledTemplatePath(this.project_selected.title, this.experiment_selected.title);
@@ -1500,6 +1505,9 @@ export default {
                 
                 if (row['filename'] == this.sample_selected.filename) {
                     this.sample_table_checked_rows = [row,];
+                }
+                if (row['filename'] == this.new_file.filename) {
+                    this.sample_table_selected_row = row;
                 }
             }
             this.sample_table_cols = cols;
