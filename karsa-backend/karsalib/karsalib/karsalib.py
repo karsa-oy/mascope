@@ -43,7 +43,7 @@ def t_mark(data, note=None):
     t = time.time()
     data['t_mark'][-1][-1] = round(t - data['t_mark'][-1][-1], 3)
     data['t_mark'].append([note or parent_func_name(), t])
-    print('t_mark :', data['t_mark'], data.get('request_id', ''))
+    print('t_mark :', data['t_mark'], data.get('request_id', data.get('filename', '')))
 
 
 class LRUDict(dict):
@@ -739,6 +739,9 @@ class BaseStreamerClient(BridgeServiceClient):
             # Replace spaces with underscore
             filename = filename.replace(' ', '_')
 
+            t_data = {'filename': filename}
+            t_mark(t_data, 'acquisition_start')
+
             await self.emit_private_notification(
                                         'acquisition_coordinates',
                                         {'filename': filename,
@@ -871,6 +874,7 @@ class BaseStreamerClient(BridgeServiceClient):
                                             'acquisition_status',
                                             'not_running',
                                             )
+                    t_mark(t_data, 'acquisition_done')
                     self.log("Exiting acquisition loop.")
                     break # Break out of acquisition loop
         # Out of main loop
