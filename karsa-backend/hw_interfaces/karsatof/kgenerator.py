@@ -102,6 +102,7 @@ class TofDaqStreamer(Thread, KInstrument):
         # Parameters
         self.timeout = 500 # [ms], timeout for TwWaitForNewData
         # Synchronization primitives
+        self.cancel_event = Event()     # Not used, just to harmonize API with file streamers
         self.shutdown_event = Event()   # Set to break out from main loop
         self.active = Event()           # TofDaqStreamer active event
         self.spec_queue = Queue()       # Signal output queue
@@ -256,6 +257,10 @@ class TofDaqStreamer(Thread, KInstrument):
             self._get_and_feed_data()
             # TofDaqStreamer progress
             n = self.desc.nbrWrites * self.desc.nbrBufs # Total number of spectra
+            if not n:
+                # Empty file, cancel
+                self.cancel_event.set()
+                return
             self.progress = ((self.speci+1) / n) * 100. # [%]
          
     def add_log_entry(self, text, timestamp=0):
