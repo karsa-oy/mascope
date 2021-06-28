@@ -23,6 +23,10 @@ start cmd /k karsa-raw-streamer --config=../services/services/raw_streamer_confi
 start cmd /k karsa-fileio-service --ns=H5Data || goto :error
 start cmd /k karsa-raw-streamer --config=../services/services/raw_streamer_config/raw.yaml || goto :error
 start cmd /k karsa-fileio-service --ns=OrbitrapData || goto :error
+
+echo Wait for FileIO services to start:
+timeout 7
+
 start cmd /k karsa-sample-service || goto :error
 start cmd /k karsa-dataviz-service || goto :error
 ::start cmd /k karsa-signal-service || goto :error
