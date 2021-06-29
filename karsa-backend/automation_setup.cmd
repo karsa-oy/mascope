@@ -1,14 +1,15 @@
 @echo off
 
 echo Mascope automation host setup
-echo to be run with elevated privileges
+rem to be run with elevated privileges
 
-rem Map \\vboxsrv\/vagrant as z:
-if not exist z:\ (
- timeout 5
- net use z: \\192.168.1.42 >nul 2>&1
- if not exist z:\ exit /b 2
-)
+rem :: z: check needs access to LAN - local admin does not have it
+rem if not exist z:\ (
+rem  echo Map \\192.168.1.42 as z:\
+rem  timeout 5
+rem  net use z: \\192.168.1.42
+rem  if not exist z:\ exit /b 2
+rem )
 
 echo Disable UAC
 reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" /v EnableLUA /t REG_DWORD /d 0 /f  || goto :error
