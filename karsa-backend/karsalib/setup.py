@@ -7,7 +7,7 @@ with open("README.md") as f:
 
 setuptools.setup(
     name="karsalib",
-    version="0.0.1",
+    version="0.3.0",
     author='Karsa Oy',
     author_email='support@karsa.fi',
     description="Karsa Utils Library",
