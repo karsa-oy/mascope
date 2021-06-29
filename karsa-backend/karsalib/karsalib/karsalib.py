@@ -776,26 +776,47 @@ class BaseStreamerClient(BridgeServiceClient):
             self.log("Entering acquisition loop.")
             MAX_RESPONSE_TIME = 15      # secs to wait for client acknowledgement, then ignore it.
 
-            # inject callback handler to private_ns to handle emit result in the notification namespace
-            def private_ns_data_count(cnt):
-                self.private_ns.cnt = max(cnt, self.private_ns.cnt)
-                self.private_ns.cnt_timestamp = time.time()
+            # # inject callback handler to private_ns to handle emit result in the notification namespace
+            # def private_ns_data_count(cnt):
+            #     self.private_ns.cnt = max(cnt, self.private_ns.cnt)
+            #     self.private_ns.cnt_timestamp = time.time()
 
-            self.private_ns.private_ns_data_count = private_ns_data_count
-            self.private_ns.cnt = 0
-            self.private_ns.cnt_timestamp = time.time()
+            # self.private_ns.private_ns_data_count = private_ns_data_count
+            # self.private_ns.cnt = 0
+            # self.private_ns.cnt_timestamp = time.time()
+            # cnt = 0
+
+            # inject callback handler to public_ns to handle emit result in the notification namespace
+            def public_ns_data_count(cnt):
+                self.public_ns.cnt = max(cnt, self.public_ns.cnt)
+                self.public_ns.cnt_timestamp = time.time()
+
+            self.public_ns.public_ns_data_count = public_ns_data_count
+            self.public_ns.cnt = 0
+            self.public_ns.cnt_timestamp = time.time()
             cnt = 0
+
 
             while True:
                 try:
                     spec_data = self.streamer.spec_queue.get_nowait() # Non-blocking
                     # acquisition ACK: sync acquisition velocity with FileIo capacity
-                    while cnt - self.private_ns.cnt > 4:
-                        if time.time() - self.private_ns.cnt_timestamp > MAX_RESPONSE_TIME:
-                            self.log(f"Warning: no acknowledgement for packets {self.private_ns.cnt}-{cnt} of {filename}")
-                            private_ns_data_count(cnt)
+                    # while cnt - self.private_ns.cnt > 4:
+                    #     if time.time() - self.private_ns.cnt_timestamp > MAX_RESPONSE_TIME:
+                    #         self.log(f"Warning: no acknowledgement for packets {self.private_ns.cnt}-{cnt} of {filename}")
+                    #         private_ns_data_count(cnt)
+                    #         raise ConnectionError
+                    #     await self.sio.sleep(.1)
+
+                    # acquisition ACK: sync acquisition velocity with DataViz capacity
+                    # TODO: tmp solution: use public_ns cnt, since it goes to DataViz and is slower than private_ns.cnt for FileIO
+                    while cnt - self.public_ns.cnt > 4:
+                        if time.time() - self.public_ns.cnt_timestamp > MAX_RESPONSE_TIME:
+                            self.log(f"Warning: no acknowledgement for packets {self.public_ns.cnt}-{cnt} of {filename}")
+                            public_ns_data_count(cnt)
                             raise ConnectionError
                         await self.sio.sleep(.1)
+
                     if hasattr(self.streamer, 'tps_queue'):
                         tps_data = self.streamer.tps_queue.get() # Blocking, since new data expected
                     else:
@@ -824,7 +845,7 @@ class BaseStreamerClient(BridgeServiceClient):
                                             {**spec_data,
                                              'filename': filename
                                              },
-                                            callback="private_ns_data_count",
+                                            # callback="private_ns_data_count",
                                             cnt=cnt,
                                             no_data_logging=True
                                             )
@@ -833,6 +854,8 @@ class BaseStreamerClient(BridgeServiceClient):
                                             {**spec_data,
                                              'filename': filename
                                              },
+                                            callback="public_ns_data_count",
+                                            cnt=cnt,
                                             no_data_logging=True
                                             )
                     # Progress
