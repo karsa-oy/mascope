@@ -215,7 +215,7 @@ export default {
                                                   'value': ""}],
             sample_annotation_fields: {},
             sample_annotation_save_button_type: "is-success",
-            sample_annotation_template_path: "../metadata_templates",
+            sample_annotation_template_path: "./metadata_templates",
             //
 
             filename: '',

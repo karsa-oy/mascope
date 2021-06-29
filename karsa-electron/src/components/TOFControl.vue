@@ -540,7 +540,7 @@ export default {
             scenthound_status: "Offline",       // Offline/Ready/Measuring.../Processing...
             //
             // Method variables
-            ci_template_path: "../metadata_templates/ci_templates",
+            ci_template_path: "./metadata_templates/ci_templates",
             method: {
                 tofdaq: {
                     acquisition_mode: null,
@@ -562,7 +562,7 @@ export default {
                                           'value': ""}],
             log_entry_fields: [],
             log_entry_save_button_type: "is-success",
-            log_entry_template_path: "../metadata_templates/instrument_templates",
+            log_entry_template_path: "./metadata_templates/instrument_templates",
             //
             // variables for desorption config
             desorption_step_modal_filter_in: true,

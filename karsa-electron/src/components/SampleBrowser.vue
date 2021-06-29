@@ -919,7 +919,7 @@ export default {
                  'value': ""},
             ],
             project_attributes_fields: [],
-            project_attributes_template_path: "../metadata_templates/project_templates",
+            project_attributes_template_path: "./metadata_templates/project_templates",
             project_form_props: {},
 
             // Experiment metadata
@@ -931,7 +931,7 @@ export default {
                  'value': ""},
             ],
             experiment_attributes_fields: [],
-            experiment_attributes_template_path: "../metadata_templates/experiment_templates",
+            experiment_attributes_template_path: "./metadata_templates/experiment_templates",
             experiment_edit_form_props: {},
             experiment_plan: null,
             experiment_plan_blob: "",
@@ -955,7 +955,7 @@ export default {
             sample_attributes_key: Math.random(),
             sample_attributes_save_button_type: "is-success",
             sample_attributes_template: [],
-            sample_attributes_template_path: "../metadata_templates/sample_templates",
+            sample_attributes_template_path: "./metadata_templates/sample_templates",
             sample_form_key: Math.random(),
             sample_form_props: {},
         }
@@ -1031,7 +1031,7 @@ export default {
                     };
         },
         getPrefilledTemplatePath(project_title, experiment_title, make_if_missing=false) {
-            const template_path = "../metadata_templates/prefilled_templates/" + ([project_title, experiment_title].join("_"));
+            const template_path = "./metadata_templates/prefilled_templates/" + ([project_title, experiment_title].join("_"));
             if (!fs.existsSync(template_path)) {
                 if (make_if_missing) {
                     fs.mkdirSync(template_path);
