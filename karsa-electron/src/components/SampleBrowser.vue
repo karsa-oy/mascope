@@ -466,7 +466,7 @@
                 <div class="modal-card">
                     <header class="modal-card-head">
                         <p class="modal-card-title">
-                            Project experiment samples
+                            {{project_selected.title}}: {{experiment_selected.title}}
                         </p>
                         <b-button
                             @click="is_modal_sample_table_active=false"
