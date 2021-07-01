@@ -33,6 +33,7 @@ from .lib.TofDaq import (
     TwQueryRegUserDataSize,
     TwReadRegUserData,
     TwGetRegUserDataDesc,
+    TwGetSpecXaxisFromShMem,
     TwStartAcquisition,
     TwStopAcquisition
     )
@@ -68,7 +69,7 @@ def strip_filepath(filepath):
     return os.path.splitext(os.path.basename(filepath))[0]
 
 
-class TofDaqStreamer(Thread, KInstrument):
+class TofDaqStreamer(Thread):
     def __init__(self):
         """Initialize self
 
@@ -92,8 +93,6 @@ class TofDaqStreamer(Thread, KInstrument):
         ret = TwGetDescriptor(self.desc)
         if ret == 4:
             # Success
-            # Initialize karsatof.kinstrument.KInstrument
-            KInstrument.__init__(self, self.desc)
             self.ptr = TSharedMemoryPointer() # TW shared memory pointer
         else:
             # Failed
@@ -113,6 +112,16 @@ class TofDaqStreamer(Thread, KInstrument):
         self.progress = 0               # TofDaqStreamer progress [%]
         self.speci = -1                 # Index of last received spectrum,
                                         # -1 when there is no active acquisition
+
+    @property
+    def mz(self):
+        # Get mz axis from file
+        mz = np.zeros((self.desc.nbrSamples,), dtype=np.double)
+        TwGetSpecXaxisFromShMem(mz,
+                                1,
+                                None
+                                )
+        return mz.astype(np.float32)
 
     @property
     def tps_info(self):
@@ -404,6 +413,19 @@ class H5Streamer(TofDaqStreamer):
         self.speci = -1                 # Index of last received spectrum,
                                         # -1 when there is no active acquisition
 
+    @property
+    def mz(self):
+        # Get mz axis from file
+        mz = np.zeros((self.desc.nbrSamples,), dtype=np.double)
+        TwGetSpecXaxisFromH5(self.desc.currentDataFileName,
+                             mz,
+                             1,
+                             None,
+                             0,
+                             0
+                             )
+        return mz.astype(np.float32)
+
     def _finalize(self):
         # Reset self
         self._reset()
@@ -530,18 +552,6 @@ class H5Streamer(TofDaqStreamer):
         info = [ i.decode('unicode_escape') for i in info ] # bytes to str
         return info
 
-    def _update_mz(self):
-        # Get mz axis from file
-        mz = np.zeros((self.desc.nbrSamples,), dtype=np.double)
-        TwGetSpecXaxisFromH5(self.desc.currentDataFileName,
-                             mz,
-                             1,
-                             None,
-                             0,
-                             0
-                             )
-        self._mz = mz.astype(np.float32)
-
     def _wait_for_queues(self):
         """Wait for tick event to be set before continuing streaming
 
@@ -585,7 +595,6 @@ class H5Streamer(TofDaqStreamer):
                     # Empty file, skip
                     print("Skipping empty file: %s" %self.desc.currentDataFileName)
                     continue
-                self._update_mz()
             except Empty:
                 continue
             # Start streaming
