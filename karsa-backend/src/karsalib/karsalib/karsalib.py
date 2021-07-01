@@ -11,7 +11,7 @@ from socketio import AsyncClientNamespace, AsyncNamespace, AsyncClient
 from socketio.exceptions import BadNamespaceError
 from queue import Empty, Full
 from threading import Thread
-from multiprocessing import Lock, cpu_count
+from multiprocessing import Event, Lock, cpu_count
 
 
 NO_LOGGING_DEFAULT = False
@@ -154,7 +154,18 @@ class QConnect(Thread):
         self.in_q = in_q
         self.out_q = out_q
         self.shutdown_event = shutdown_event
+        self.input_ready = Event()
+        self.input_ready.set()
         self.cache = []
+
+    def put(self, data):
+        self.input_ready.wait()
+        self.input_ready.clear()
+        self.in_q.put(data)
+        self.input_ready.wait()
+
+    def get(self, *args, **kwargs):
+        return self.out_q.get(*args, **kwargs)
 
     def cache_put(self, data):
         if len(self.cache) > self.CACHE_LIMIT:
@@ -177,6 +188,7 @@ class QConnect(Thread):
             except Empty:
                 pass
             except KeyboardInterrupt:
+                self.input_ready.set()
                 break
             if data:
                 if self.fits_filter(data):
@@ -185,15 +197,17 @@ class QConnect(Thread):
                     self.cache_put(data)
                 except Full as e:
                     print("Cache overflow -- skipping input!")
+                finally:
+                    self.input_ready.set()
             if self.out_q.qsize() >= self.OUT_Q_LIMIT:
-                time.sleep(.1)
+                time.sleep(.01)
                 continue
             data = self.cache_get()
             if data:
                 self.out_q.put(data)
                 # print('out_q.put', data.get('request_id', ':'.join([data.get('name','?'), data.get('key','?')])))
             else:
-                time.sleep(.1)
+                time.sleep(.01)
         self.cache = None
         print(f"Exit from {self.__class__.__name__} thread")
 

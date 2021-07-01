@@ -582,7 +582,8 @@ def process_visualization_request(filename,
             t_data = {'request_id': request_id,}
             t_mark(t_data)
             # Put batch to queue to be visualized
-            generator_input_q.put({
+            # generator_input_q.put({
+            generator_input_cache.put({
                             'data': spec_array,
                             'filename': filename,
                             'viz_type': viz_type,

@@ -10,7 +10,11 @@ Sources can be found here:
 
 
 ### Project setup
-1) set up the project from the current repository
+1) go to src folder
+
+cd src
+
+1) run development setup for the project
 
 dev_setup.cmd
 
@@ -18,9 +22,18 @@ dev_setup.cmd
 
 run_services.cmd
 
-3) profiling: py-spy profiler comes along with dev.setup: https://github.com/benfred/py-spy
+
+### Project profiling
+1) py-spy profiler comes along with dev.setup: https://github.com/benfred/py-spy
 
 py-spy record -o profile.svg --pid 12345
+
+
+### Project testing
+#### Unittesting
+1) Unittests are located in test/unit directory
+
+test\unit\run_unittests.cmd
 
 
 ### Compile and build distribution packages
