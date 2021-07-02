@@ -333,6 +333,9 @@ class TestCacheQContents(unittest.TestCase):
 
 
 class TestCacheQOperations(unittest.TestCase):
+   """ With single process setup, no need for in_q and out_q and worker thread -
+       just use cache_put/cache_get directly
+   """
    def setUp(self) -> None:
       self.q1 = Queue()
       self.q2 = Queue()
@@ -368,13 +371,14 @@ class TestCacheQOperations(unittest.TestCase):
       self.assertEqual(n, self.nentries)
 
 
-class TestCacheQThread(unittest.TestCase):
+class TestThreadedCacheQ(unittest.TestCase):
+   """ With multiprocess setup, worker thread is used"""
    def setUp(self) -> None:
       self.q1 = Queue()
       self.q2 = Queue()
       self.stop_event = Event()
       self.cache_q = CacheQ('request_id/data_type/some_index', self.q1, self.q2, self.stop_event)
-      self.cache_q.start()
+      self.cache_q.start()    # start CacheQ worker thread
       self.nentries = 20
       return super().setUp()
 
@@ -382,27 +386,43 @@ class TestCacheQThread(unittest.TestCase):
       self.stop_event.set()
       return super().tearDown()
 
-   def test_thread_proc(self):
+   def test_thread_proc_with_exposed_queues(self):
       time.sleep(1)   # pause main thread to test empty cycles of cache_q thread
       #
       for i in range(self.nentries):
          data = {'request_id': f'id_{i%3}', 'data_type': f'type_{i%6}', 'some_index': f'some_index_{i%8}', 'value': i}
-         # self.q1.put(data)     # in_q.put operations may need to give a time to adapt to cache dict update in the worker thread
-         self.cache_q.put(data)  # 'put' wrapper - uses heavier sync with worker thread - safety TBR
+         self.q1.put(data)    # if a cycle of in_q.puts is too quick, this may need some time to adapt to
+         time.sleep(0.1)      # slower cache dict update in the worker thread
       # OUT_Q_LIMIT elements were pushed to cache_q.out_q
       self.assertEqual(self.cache_q.cache_size(), self.nentries - self.cache_q.OUT_Q_LIMIT)
       #
       n = 0
       while True:
          try:
-               # data = self.q2.get(timeout=.1)
-               data = self.cache_q.get(timeout=.1)
+               data = self.q2.get(timeout=.1)
                n += 1
          except Empty:
                break
       self.assertEqual(n, self.nentries)
       self.assertEqual(self.cache_q.cache_size(), 0)
 
+   def test_thread_proc_with_hidden_queues(self):
+      #
+      for i in range(self.nentries):
+         data = {'request_id': f'id_{i%3}', 'data_type': f'type_{i%6}', 'some_index': f'some_index_{i%8}', 'value': i}
+         self.cache_q.put(data)  # 'put' wrapper uses heavier sync with worker thread - safety TBR
+      # OUT_Q_LIMIT elements were pushed to cache_q.out_q
+      self.assertEqual(self.cache_q.cache_size(), self.nentries - self.cache_q.OUT_Q_LIMIT)
+      #
+      n = 0
+      while True:
+         try:
+               data = self.cache_q.get(timeout=.1)
+               n += 1
+         except Empty:
+               break
+      self.assertEqual(n, self.nentries)
+      self.assertEqual(self.cache_q.cache_size(), 0)
 
 
 
