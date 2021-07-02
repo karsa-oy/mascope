@@ -213,6 +213,7 @@ class QConnect(Thread):
 
 
 class CacheQ(QConnect):
+    """Cached queue emulator: works like a queue with ability to manipulate its content."""
     def __init__(self, cache_key, *arg, **kwarg):
         super().__init__(*arg, **kwarg)
         self.cache = dict()

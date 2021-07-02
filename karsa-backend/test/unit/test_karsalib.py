@@ -308,64 +308,64 @@ cache_q_tripple_index_sequence = [
     [0, 0, 0]
 ]
 
-# class TestCacheQContents(unittest.TestCase):
-#    def setUp(self) -> None:
-#       return super().setUp()
+class TestCacheQContents(unittest.TestCase):
+   def setUp(self) -> None:
+      return super().setUp()
 
-#    def tearDown(self) -> None:
-#       return super().tearDown()
+   def tearDown(self) -> None:
+      return super().tearDown()
 
-#    def test_single_level_cache(self):
-#       nentries = 20
-#       cache_q = CacheQ('request_id', None, None, None)
-#       for i in range(nentries):
-#          data = {'request_id': f'id_{i%3}', 'data_type': f'type_{i%6}', 'value': i}
-#          cache_q.cache_put(data)
-#       self.assertDictEqual(cache_q.cache, cache_q_single_level)
+   def test_single_level_cache(self):
+      nentries = 20
+      cache_q = CacheQ('request_id', None, None, None)
+      for i in range(nentries):
+         data = {'request_id': f'id_{i%3}', 'data_type': f'type_{i%6}', 'value': i}
+         cache_q.cache_put(data)
+      self.assertDictEqual(cache_q.cache, cache_q_single_level)
 
-#    def test_tripple_level_cache(self):
-#       nentries = 20
-#       cache_q = CacheQ('request_id/data_type/some_index', None, None, None)
-#       for i in range(nentries):
-#          data = {'request_id': f'id_{i%3}', 'data_type': f'type_{i%6}', 'some_index': f'some_index_{i%8}', 'value': i}
-#          cache_q.cache_put(data)
-#       self.assertDictEqual(cache_q.cache, cache_q_tripple_level)
+   def test_tripple_level_cache(self):
+      nentries = 20
+      cache_q = CacheQ('request_id/data_type/some_index', None, None, None)
+      for i in range(nentries):
+         data = {'request_id': f'id_{i%3}', 'data_type': f'type_{i%6}', 'some_index': f'some_index_{i%8}', 'value': i}
+         cache_q.cache_put(data)
+      self.assertDictEqual(cache_q.cache, cache_q_tripple_level)
 
 
-# class TestCacheQOperations(unittest.TestCase):
-#    def setUp(self) -> None:
-#       self.q1 = Queue()
-#       self.q2 = Queue()
-#       self.stop_event = Event()
-#       self.cache_q = CacheQ('request_id/data_type/some_index', self.q1, self.q2, self.stop_event)
-#       self.nentries = 20
-#       for i in range(self.nentries):
-#          data = {'request_id': f'id_{i%3}', 'data_type': f'type_{i%6}', 'some_index': f'some_index_{i%8}', 'value': i}
-#          self.cache_q.cache_put(data)
-#       return super().setUp()
+class TestCacheQOperations(unittest.TestCase):
+   def setUp(self) -> None:
+      self.q1 = Queue()
+      self.q2 = Queue()
+      self.stop_event = Event()
+      self.cache_q = CacheQ('request_id/data_type/some_index', self.q1, self.q2, self.stop_event)
+      self.nentries = 20
+      for i in range(self.nentries):
+         data = {'request_id': f'id_{i%3}', 'data_type': f'type_{i%6}', 'some_index': f'some_index_{i%8}', 'value': i}
+         self.cache_q.cache_put(data)
+      return super().setUp()
 
-#    def tearDown(self) -> None:
-#       return super().tearDown()
+   def tearDown(self) -> None:
+      return super().tearDown()
 
-#    def test_ops(self):
-#       # verify sequence of cache_indices
-#       for i in range(25):
-#          self.cache_q._inc_cache_index()
-#          self.assertEqual(self.cache_q.cache_index, cache_q_tripple_index_sequence[i])
-#       # verify delete and size ops
-#       self.assertEqual(self.cache_q.cache_size(), 20)
-#       self.cache_q.cache_delete_key('id_1/type_4/some_index_2')
-#       self.assertEqual(self.cache_q.cache_size(), 19)
+   def test_ops(self):
+      # verify sequence of cache_indices
+      for i in range(25):
+         self.cache_q._inc_cache_index()
+         self.assertEqual(self.cache_q.cache_index, cache_q_tripple_index_sequence[i])
+      # verify delete and size ops
+      self.assertEqual(self.cache_q.cache_size(), 20)
+      self.cache_q.cache_delete_key('id_1/type_4/some_index_2')
+      self.assertEqual(self.cache_q.cache_size(), 19)
 
-#    def test_cache_get(self):
-#       n = 0
-#       while True:
-#          data = self.cache_q.cache_get()
-#          if data is None:
-#                break
-#          n += 1
-#       self.assertEqual(len(self.cache_q.cache), 0)
-#       self.assertEqual(n, self.nentries)
+   def test_cache_get(self):
+      n = 0
+      while True:
+         data = self.cache_q.cache_get()
+         if data is None:
+               break
+         n += 1
+      self.assertEqual(len(self.cache_q.cache), 0)
+      self.assertEqual(n, self.nentries)
 
 
 class TestCacheQThread(unittest.TestCase):
@@ -387,8 +387,8 @@ class TestCacheQThread(unittest.TestCase):
       #
       for i in range(self.nentries):
          data = {'request_id': f'id_{i%3}', 'data_type': f'type_{i%6}', 'some_index': f'some_index_{i%8}', 'value': i}
-         # self.q1.put(data)
-         self.cache_q.put(data)
+         # self.q1.put(data)     # in_q.put operations may need to give a time to adapt to cache dict update in the worker thread
+         self.cache_q.put(data)  # 'put' wrapper - uses heavier sync with worker thread - safety TBR
       # OUT_Q_LIMIT elements were pushed to cache_q.out_q
       self.assertEqual(self.cache_q.cache_size(), self.nentries - self.cache_q.OUT_Q_LIMIT)
       #
