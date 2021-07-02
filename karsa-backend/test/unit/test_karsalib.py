@@ -3,7 +3,7 @@ from multiprocessing import Event, Queue
 from queue import Empty
 import time
 
-from karsalib import CacheQ
+from karsalib import CacheQ, LRUDict
 
 
 cache_q_single_level = {
@@ -423,6 +423,45 @@ class TestThreadedCacheQ(unittest.TestCase):
                break
       self.assertEqual(n, self.nentries)
       self.assertEqual(self.cache_q.cache_size(), 0)
+
+
+class TestLRUDict(unittest.TestCase):
+   def setUp(self) -> None:
+      self.d = LRUDict(3)
+      return super().setUp()
+
+   def tearDown(self) -> None:
+      return super().tearDown()
+
+   def test_LRUDict_operations(self):
+      with self.assertRaises(KeyError):
+         v = self.d['a']
+      with self.assertRaises(KeyError):
+         del self.d['a']
+      self.assertEqual(self.d.get('a', 'nothing'), 'nothing')
+      self.assertEqual(list(self.d.keys()), [])
+      self.assertEqual(list(self.d.values()), [])
+      #
+      self.d['a'] = 1
+      self.d['b'] = 2
+      self.d['c'] = 3
+      self.assertEqual(sorted(list(self.d.keys())), ['a', 'b', 'c'])
+      self.assertEqual(sorted(list(self.d.values())), [1, 2, 3])
+      self.assertEqual(list(self.d.lru_keys), ['a', 'b', 'c'])
+      self.d['d'] = 4
+      self.assertEqual(sorted(list(self.d.keys())), ['b', 'c', 'd'])
+      self.assertEqual(sorted(list(self.d.values())), [2, 3, 4])
+      self.assertEqual(list(self.d.lru_keys), ['b', 'c', 'd'])
+      a = self.d['c']
+      a = self.d['b']
+      self.assertEqual(sorted(list(self.d.keys())), ['b', 'c', 'd'])
+      self.assertEqual(sorted(list(self.d.values())), [2, 3, 4])
+      self.assertEqual(list(self.d.lru_keys), ['d', 'c', 'b'])
+      self.d['e'] = 5
+      self.assertEqual(sorted(list(self.d.keys())), ['b', 'c', 'e'])
+      self.assertEqual(sorted(list(self.d.values())), [2, 3, 5])
+      self.assertEqual(list(self.d.lru_keys), ['c', 'b', 'e'])
+
 
 
 
