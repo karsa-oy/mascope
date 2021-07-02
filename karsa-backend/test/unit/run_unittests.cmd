@@ -11,7 +11,7 @@ if defined CONDA_EXE (
   call ..\..\src\.venv\Scripts\activate || goto :error
 )
 
-python -m unittest discover || goto :error
+python -m unittest discover -v || goto :error
 
 popd
 exit /b 0
