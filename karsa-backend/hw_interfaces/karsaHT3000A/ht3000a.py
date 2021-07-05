@@ -23,3 +23,13 @@ def parse_csv_report(f):
     if 'Sequence step' in d:
         res.append(d)
     return res
+
+
+def dup_cycles(rows):
+    res = []
+    for row in rows:
+        cycles = row.get('Cycle(s)', 1)
+        row['Cycle(s)'] = 1
+        for i in range(int(cycles)):
+            res.append(row)
+    return res
