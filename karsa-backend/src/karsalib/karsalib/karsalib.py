@@ -5,6 +5,7 @@ import getopt
 import asyncio
 import inspect
 from copy import deepcopy
+import string
 import random
 import logging
 from socketio import AsyncClientNamespace, AsyncNamespace, AsyncClient
@@ -44,6 +45,30 @@ def t_mark(data, note=None):
     data['t_mark'][-1][-1] = round(t - data['t_mark'][-1][-1], 3)
     data['t_mark'].append([note or parent_func_name(), t])
     print('t_mark :', data['t_mark'], data.get('request_id', data.get('filename', '')))
+
+def generate_unique_key():
+    """Generate a 15 character long random string
+    Returns
+    -------
+    str
+        Random string with 15 characters
+    """
+    CHARACTERS = (string.ascii_letters + string.digits + '-._~')
+    return ''.join(random.sample(CHARACTERS, 15))
+
+
+class AttrDict(dict):
+    """Dict object that allows accessing values like attributes
+    (dot notation).
+    Example:
+    d = AttrDict({'a': 0})  # initialize AttrDict with a dict
+    d.a                     # returns 0
+    """
+    def __init__(self, *args, **kwargs):
+        """Initialize self
+        """
+        super(AttrDict, self).__init__(*args, **kwargs)
+        self.__dict__ = self
 
 
 class LRUDict(dict):

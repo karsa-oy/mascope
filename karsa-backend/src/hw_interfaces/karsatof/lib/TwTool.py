@@ -14,6 +14,8 @@ if platform.architecture() == ('32bit', 'EPL'):
     libpath = "linux_x86_64"
 if platform.architecture() == ('64bit', 'EPL'):
     libpath = "linux_x86_64"
+if platform.architecture() == ('64bit', 'ELF'):
+    libpath = "linux_x86_64"
 
 if platform.architecture() == ('32bit', ''):
     libpath = "macos_x86_64"

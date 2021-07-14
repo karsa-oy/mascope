@@ -23,6 +23,18 @@ dev_setup.cmd
 run_services.cmd
 
 
+### Project setup for linux
+1) Have VirtualBox and vagrant installed
+
+2) go to vbox\backend folder
+
+cd vbox\backend
+
+1) run development setup for the project in VirtualBox virtual environment
+
+vagrant up
+
+
 ### Project profiling
 1) py-spy profiler comes along with dev.setup: https://github.com/benfred/py-spy
 

@@ -405,7 +405,12 @@ def run():
     try:
         loop.run_until_complete(client.run())
     except KeyboardInterrupt:
-        client.log('Quit')
+        print(f"KeyboardInterrupt for {client.__class__.__name__}")
+    except Exception as e:
+        print(f"Exception '{str(e)}' for {client.__class__.__name__}")
+    finally:
+        print(f'Service stopped.')
+
 
 
 if __name__=='__main__':

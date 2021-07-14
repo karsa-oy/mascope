@@ -14,13 +14,11 @@ Created on Fri Apr 17 11:35:57 2020
 """
 
 import asyncio
-import json
 import os
 import numpy as np
 import dask.array as da
 import sqlite3
 
-from copy import deepcopy
 from datetime import datetime, timedelta
 from multiprocessing import (
                         Queue,
@@ -33,21 +31,21 @@ from time import time
 from karsalib import (
                 BaseClientNamespace,
                 BaseServiceClient,
+                AttrDict,
                 CacheQ,
                 parse_cmd_args,
                 get_client_notification_args,
                 this_func_name,
                 t_mark
                 )
-from karsatof.kworker import ImageGenerator
 from karsatof.kcollector import ExtendableDataArray
+from karsatof.kworker import ImageGenerator
 from karsatof.kimage import (
                     DEFAULT_TRACE,
                     convert_base64_to_img,
                     convert_to_base64,
                     hstack_imgs,
                     )
-from karsatof.kutil import AttrDict
 
 VIZ_TYPES_SUPPORTED = {'spectrogram', 'timeseries', 'waterfall'}
 
@@ -1114,7 +1112,19 @@ def run():
     try:
         loop.run_until_complete(client.run())
     except KeyboardInterrupt:
+        print(f"KeyboardInterrupt for {client.__class__.__name__}")
         shutdown_event.set()
+    except Exception as e:
+        print(f"Exception '{str(e)}' for {client.__class__.__name__}")
+        shutdown_event.set()
+    finally:
+        print(f'Service stopped. Stopping generators...')
+        shutdown_event.set()
+        for gen in client.generator_procs:
+            gen.shutdown_event.set()
+            gen.queue_in.put(None)
+
+
 
 if __name__=='__main__':
     run()
