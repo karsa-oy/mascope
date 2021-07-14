@@ -13,7 +13,6 @@ Created on Thu May  7 12:43:13 2020
 
 import os
 import time
-import subprocess
 import asyncio
 import fnmatch
 import json
@@ -23,27 +22,27 @@ import zarr
 import numpy as np
 import dask.array as da
 
-from multiprocessing import Queue, Event
-from PIL import Image
-from copy import deepcopy
 from datetime import datetime
 from queue import Empty
 
 
 from karsalib import (BaseClientNamespace,
                       BridgeServiceClient,
+                      AttrDict,
                       LRUDict,
                       CacheQ,
-                      Logger,
+                      generate_unique_key,
                       parse_cmd_args, 
                       get_client_notification_args,
                       t_mark
                       )
 from karsatof.kcollector import ExtendableDataArray
 from karsatof.kdatapool import parse_path_from_sample_name
-from karsatof.kimage import (convert_base64_to_img, convert_to_base64)
-from karsatof.kutil import AttrDict, generate_unique_key
+# from karsatof.kimage import (convert_base64_to_img, convert_to_base64)
+# from karsatof.kutil import AttrDict, generate_unique_key      # commented out to avoid extensive initialization in TwTools
+
 from services.DataVizService import VIZ_TYPES_SUPPORTED
+# from services import VIZ_TYPES_SUPPORTED
 
 
 
@@ -1235,7 +1234,12 @@ def run():
     try:
         loop.run_until_complete(client.run())
     except KeyboardInterrupt:
-        pass
+        print(f"KeyboardInterrupt for {client.__class__.__name__}")
+    except Exception as e:
+        print(f"Exception '{str(e)}' for {client.__class__.__name__}")
+    finally:
+        print(f'Service stopped.')
+
 
 
 if __name__=='__main__':

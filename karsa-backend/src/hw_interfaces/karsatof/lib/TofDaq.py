@@ -17,7 +17,7 @@ if platform.architecture() == ('32bit', 'WindowsPE'):
 elif platform.architecture() == ('64bit', 'WindowsPE'):
     libpath = "windows_x64"
 else:
-    raise EnvironmentError
+    raise EnvironmentError(str(platform.architecture()))
 
 tofdaqdll = ct.cdll.LoadLibrary(os.path.join(os.path.dirname(os.path.abspath(__file__)), "dlls", libpath, libname[sys.platform]))
 

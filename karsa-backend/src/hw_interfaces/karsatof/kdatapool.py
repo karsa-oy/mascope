@@ -16,13 +16,10 @@ import pandas as pd
 import datetime_glob
 from datetime import datetime, timedelta
 from shutil import rmtree
-from time import sleep
-from multiprocessing import Lock
 
 # from watchdog.observers import Observer
 # from watchdog.events import FileSystemEventHandler
 
-from .kevent import KEvent
 
 
 METADATA_VERSION_NUMBER = '0.01'

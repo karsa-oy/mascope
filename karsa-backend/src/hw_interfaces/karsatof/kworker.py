@@ -9,8 +9,7 @@ import sys
 import os
 import numpy as np
 
-from time import sleep
-from multiprocessing import Process, Queue, Event
+from multiprocessing import Process
 from PIL.Image import Image
 from sklearn.decomposition import SparseCoder
 from scipy.sparse import csr_matrix
@@ -209,10 +208,16 @@ class ImageGenerator(Process):
 
     def run(self):
         global viz_generators
+        print(f"ImageGenerator started - PID: {os.getpid()}")
         while not self.shutdown_event.is_set():
             try:
                 data = self.queue_in.get()
             except KeyboardInterrupt:
+                print(f"KeyboardInterrupt for PID: {os.getpid()}")
+                self.shutdown_event.set()
+                break
+            except Exception as e:
+                print(f"Exception {str(e)} for PID: {os.getpid()}")
                 self.shutdown_event.set()
                 break
             if data is not None:
@@ -239,6 +244,7 @@ class ImageGenerator(Process):
                     data.update({'traces': [viz]})
                 self.queue_out.put(data)
             else:
+                print(f"ImageGenerator stopped - PID: {os.getpid()}")
                 break
 
 class SpecTraceGenerator(Process):
