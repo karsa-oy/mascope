@@ -6,6 +6,7 @@ Created on Mon Apr 15 15:39:30 2019
 
 import asyncio
 import os
+import sys
 import fnmatch
 import json
 import subprocess
@@ -388,8 +389,6 @@ class SamplePool():
 
         Used for linking sample directories to experiments.
 
-        TODO: Make OS independent
-
         Parameters
         ----------
         source_path : str
@@ -398,14 +397,20 @@ class SamplePool():
             Target directory path (experiment)
         """
 
-        if not os.path.isdir(target_path):
-            # TODO: Is this a safe way to do it? Windows dependent at least
-            subprocess.check_call(
-                'mklink /J "%s" "%s"' % (os.path.abspath(target_path), os.path.abspath(source_path)),
-                shell=True
-                )
-            # Alternative way (requires elevated privileges)
-            # os.symlink(source_path, target_path, target_is_directory=True)
+        # if not os.path.isdir(target_path):
+        if not os.path.exists(target_path):
+            if 'win' in sys.platform:
+                # TODO: Junctions/links are incompatible bw win/linux - switch to urls in .attr files
+                subprocess.check_call(
+                    'mklink /J "%s" "%s"' % (os.path.abspath(target_path), os.path.abspath(source_path)),
+                    shell=True
+                    )
+                # Alternative way (requires elevated privileges)
+                # os.symlink(source_path, target_path, target_is_directory=True)
+            else:
+                os.symlink(os.path.realpath(source_path), os.path.realpath(target_path))
+        else:
+            raise Exception(f"{target_path} exists")
 
     def _remove_link(self, path):
         try:
@@ -603,7 +608,8 @@ class SamplePool():
             # raise ValueError("Sample %s does not exist!" % sample_data_path)
             print("Sample file %s does not exist! Creating link anyway." % sample_data_path)
         # If sample not yet part of the experiment, link it
-        if not os.path.isdir(sample_experiment_path):
+        # if not os.path.isdir(sample_experiment_path):
+        if not os.path.exists(sample_experiment_path):
             self._make_link(sample_data_path, sample_experiment_path)
         # Write attributes
         self._write_attributes(experiment_path, attributes, prefix=sample)
