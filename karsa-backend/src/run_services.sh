@@ -1,6 +1,6 @@
 #!/bin/bash
 # ================================================================
-# Run karsa services on linux
+# Run karsa services on linux desktop
 #
 set -eu -o pipefail
 
