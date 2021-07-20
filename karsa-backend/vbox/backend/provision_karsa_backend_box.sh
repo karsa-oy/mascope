@@ -26,7 +26,7 @@ function install_dev_prerequisites() {
     # VirtualBox workaround: reset network to make it connect to custom repos
     sudo netplan apply
 
-    sudo apt install -y git-all unzip ntpdate
+    sudo apt install -y git-all unzip ntpdate xterm
     # sudo apt install -y xvfb
     sudo apt install -y cmake
     # sudo apt install -y python3-tk python3-dev python3-pip
