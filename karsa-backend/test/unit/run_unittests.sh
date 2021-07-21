@@ -9,6 +9,5 @@ set -eu -o pipefail
 
 my_folder=$(dirname $(realpath $BASH_SOURCE))
 
-pushd $my_folder
-python3 -m unittest discover -v
-popd
+cd $my_folder
+xterm -hold -e python3 -m unittest discover -v

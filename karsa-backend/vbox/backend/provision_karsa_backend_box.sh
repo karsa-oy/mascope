@@ -55,8 +55,13 @@ function install_candies() {
 
 
 function install_default_dev_env() {
-  echo AAA install_default_dev_env placeholder:
-  return 0
+    echo AAA install_default_dev_env:
+
+    echo AAA create karsa shortcuts:
+    ln -f -s /vagrant/src/run_services.sh /home/vagrant/Desktop/karsa_backend
+    ln -f -s /vagrant/test/unit/run_unittests.sh /home/vagrant/Desktop/karsa_unittests
+
+    return 0
 }
 
 
