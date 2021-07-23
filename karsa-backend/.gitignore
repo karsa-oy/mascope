@@ -4,6 +4,7 @@ dist
 *.egg-info
 *.tmp
 *.log
+*.db
 Data
 Projects
 .venv

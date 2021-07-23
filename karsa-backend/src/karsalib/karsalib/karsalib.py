@@ -528,6 +528,8 @@ class BaseServerNamespace(AsyncNamespace):
 
         if 'cookies' not in data:
             data['cookies'] = dict(src_sid=[])
+        elif 'src_sid' not in data['cookies']:
+            data['cookies']['src_sid']=[]
         cookies = data['cookies']
         src_sids = cookies['src_sid']
         # sids are added to the cookies only by this procedure

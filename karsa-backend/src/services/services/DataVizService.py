@@ -1113,12 +1113,12 @@ def run():
         loop.run_until_complete(client.run())
     except KeyboardInterrupt:
         print(f"KeyboardInterrupt for {client.__class__.__name__}")
-        shutdown_event.set()
+        # shutdown_event.set()
     except Exception as e:
         print(f"Exception '{str(e)}' for {client.__class__.__name__}")
-        shutdown_event.set()
+        # shutdown_event.set()
     finally:
-        print(f'Service stopped. Stopping generators...')
+        print(f'Stopping service with generators...')
         shutdown_event.set()
         for gen in client.generator_procs:
             gen.shutdown_event.set()
