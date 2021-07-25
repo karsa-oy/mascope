@@ -30,6 +30,7 @@ setuptools.setup(
         'openpyxl',
         'xarray',
         'zarr',
+        'decorator',
     ],
     entry_points={
         'console_scripts': [
