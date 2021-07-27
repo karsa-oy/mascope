@@ -6,19 +6,31 @@ from decorator import decorator
 from karsalib import parse_cmd_args, \
                     BaseClientNamespace, BaseServiceClient, CacheQ
 from multiprocessing import Event
-from threading import Timer
-
+from threading import Timer, Thread
 
 
 # service_q = None
-samples = {'TofDaq_Data_2021.07.23_02h13m40s': {'t_range_max': 30, 'max_exec_time': 3}}
 
+# samples table contains declarative criteria for successfull request
+samples = {'TofDaq_Data_2021.07.23_02h13m40s': {'t_range_max': 30, 'max_exec_time': 7}}
 
 
 def get_namespace(filename):
     return '/' + filename.split('_')[0]
 
-class TestClientNamespace(BaseClientNamespace):
+# TODO: tmp fix - https://github.com/aio-libs/aiohttp/issues/4324
+from asyncio.proactor_events import _ProactorBasePipeTransport
+@decorator
+def bug_workaround(func, *args, **kwargs):
+    try:
+        return func(*args, **kwargs)
+    except RuntimeError as e:
+        if str(e) != 'Event loop is closed':
+                raise
+_ProactorBasePipeTransport.__del__ = bug_workaround(_ProactorBasePipeTransport.__del__)
+
+
+class BaseTestClientNamespace(BaseClientNamespace):
     endpoints = []
     endpoints_room_sid = [
         # 'loaded_coordinates',   # response to coordinate_request
@@ -43,12 +55,9 @@ class TestClientNamespace(BaseClientNamespace):
         t_range_1 = data['value']['t_range'][1]
         r_type, t_start, t_range_max, max_exec_time = request_id.split('_')
         done = int(t_range_max) <= int(t_range_1)
-        self.parent.done[request_id] = done
-        proc_time = int(time.time()) - int(t_start)
-        in_time =  proc_time < int(max_exec_time)
         if done:
             self.parent.kill_exec_timer(request_id)
-        return done, in_time
+            self.parent.mark_request_done(request_id)
 
 
     # test validators
@@ -61,24 +70,27 @@ class TestClientNamespace(BaseClientNamespace):
     #     # self.log(data['value']['coordinates'])  -  why so long???
     #     # service_q.cache_put(data)
 
+    # TODO: when success, on_loaded_data seem to be called twice - check the output
     async def on_loaded_data(self, data):
-        self.log(data.keys())
+        self.log({k:data['value'][k] for k in ['request_id', 'viz_type', 't_range', 'mz_range']})
+        self.check_request_finished(data)
         # service_q.cache_put(data)
-        _, _ = self.check_request_finished(data)
         return data['cnt']
 
     async def on_figure_data(self, data):
-        self.log(data.keys())
+        self.log({k:data['value'][k] for k in ['request_id', 'viz_type', 't_range', 'mz_range']})
         # service_q.cache_put(data)
-        _, _ = self.check_request_finished(data)
+        self.check_request_finished(data)
 
 
 
-class TestClient(BaseServiceClient):
+class BaseTestClient(BaseServiceClient):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.is_alive = False
         self.done = {}
         self.timers = {}
+        self.stop_event = Event()
         self.cancel_event = Event()
         self.cancel_message = ''
     
@@ -87,41 +99,52 @@ class TestClient(BaseServiceClient):
         # service_q = CacheQ('request_id/viz_type')
         pass
 
+    async def service_main(self):
+        fname = 'TofDaq_Data_2021.07.23_02h13m40s'
 
-    def cancel_request(self, reason):
-        self.cancel_message = reason
-        self.cancel_event.set()
+        # check coordinates - smth wrong here
+        # rq_suffix = self.set_test_params(fname)
+        # await self.emit_coordinate_request(fname, request_id='coordinates_{rq_suffix}')
 
-    def create_exec_timer(self, id, seconds, reason):
-        self.timers[id] = Timer(int(seconds), self.cancel_request, args=[reason,])
-        self.timers[id].start()
-        print('AAAAA timer started', id)
+        # # this one works ok
+        # rq_suffix = self.set_test_params(fname)
+        # await self.emit_visualize_range(fname, request_id=f"fullrange_{rq_suffix}")
 
-    def kill_exec_timer(self, id):
-        timer = self.timers.get(id)
-        if timer:
-            timer.cancel()
-            self.timers.pop(id)
-            print('AAAAA timer killed', id)
+        # this one is unstable
+        # t_start = int(time.time())
+        # t_range_max = 10
+        # rq_suffix = self.set_test_params(fname, t_range_max=10, max_exec_time=5)
+        # await self.emit_visualize_range(fname,
+        #                                 request_id=f'zoom_{rq_suffix}',
+        #                                 mz_range=[100, 200],
+        #                                 t_range=[5, 10])
 
-
-    # decorators
-    @decorator
-    def wait_until_request_completed(func, self, *args, **kwargs):
-        # create done=False flag for this request; corresponding
-        # request handler will set done=True, when request is finished
-        self.done[kwargs['request_id']] = False
-        return func(self, *args, **kwargs)
-
-    @decorator
-    def limit_exec_time(func, self, *args, **kwargs):
-        request_id = kwargs['request_id']
-        _, _, _, max_exec_time = request_id.split('_')
-        self.create_exec_timer(request_id, max_exec_time, f'{request_id} exceeded max execution time {max_exec_time} seconds')
-        return func(self, *args, **kwargs)
+        self.is_alive = True
+        while not self.stop_event.is_set() and not self.cancel_event.is_set():
+            await asyncio.sleep(.5)
+        self.is_alive = False
+        if self.cancel_event.is_set():
+            raise InterruptedError(self.cancel_message)
 
 
     # helpers
+    def run_until_complete(self):
+        try:
+            asyncio.run(self.run())
+            print('Success')
+        except KeyboardInterrupt:
+            print(f"KeyboardInterrupt for {self.__class__.__name__}")
+            raise
+        except InterruptedError as e:
+            print(f"Failure: {str(e)}")
+            raise
+        except Exception as e:
+            print(f"Exception '{str(e)}' for {self.__class__.__name__}")
+            raise
+        finally:
+            print(f'Service stopped.')
+        return
+
     def set_test_params(self, fname: str, t_range_max: int=None, max_exec_time: int=None):
         # read test params from sample attributes file
         # encode test params into request_id via corresponding template
@@ -130,11 +153,56 @@ class TestClient(BaseServiceClient):
         res = f"{int(time.time())}_{t_range_max}_{max_exec_time}"
         return res
 
+    def stop_client(self, reason='Client stopped'):
+        self.stop_event.set()
+        self.log(reason)
+
+    def cancel_client(self, reason):
+        self.cancel_message = reason
+        self.cancel_event.set()
+        self.log(reason)
+
+    def mark_request_done(self, id):
+        self.done[id] = True
+        self.log(id)
+
+    def create_exec_timer(self, id, seconds, reason):
+        self.timers[id] = Timer(int(seconds), self.cancel_client, args=[reason,])
+        self.timers[id].start()
+        self.log(id)
+
+    def kill_exec_timer(self, id):
+        timer = self.timers.get(id)
+        if timer:
+            timer.cancel()
+            self.timers.pop(id)
+            self.log(id)
+
+    async def join_requests(self):
+        while self.daemon.is_alive() and not all(self.done.values()):
+            await asyncio.sleep(0.3)
+        self.log(f"Joined requests: {list(self.done.keys())}")
+
+    # decorators
+    @decorator
+    def hold_until_request_completed(func, self, *args, **kwargs):
+        # create done=False flag for this request; corresponding
+        # request handler will mark request done, when request is finished
+        self.done[kwargs['request_id']] = False
+        return func(self, *args, **kwargs)
+
+    @decorator
+    def limit_exec_time(func, self, *args, **kwargs):
+        request_id = kwargs['request_id']
+        _, _, _, max_exec_time = request_id.split('_')
+        self.create_exec_timer(request_id, max_exec_time, f'processing {func.__name__}({request_id} ...) exceeded max execution time of {max_exec_time} seconds')
+        return func(self, *args, **kwargs)
+
 
     # test API
-    @wait_until_request_completed
+    @hold_until_request_completed
     @limit_exec_time
-    async def test_coordinate_request(self, fname, **kwargs):
+    async def emit_coordinate_request(self, fname, **kwargs):
         await self.ns_handler.emit_client_notification(
                     'coordinate_request',
                     {'filename': fname,
@@ -145,9 +213,9 @@ class TestClient(BaseServiceClient):
                     namespace=get_namespace(fname),
         )
 
-    @wait_until_request_completed
+    @hold_until_request_completed
     @limit_exec_time
-    async def test_visualize_range(self, fname, **kwargs):
+    async def emit_visualize_range(self, fname, **kwargs):
         await self.ns_handler.emit_client_notification(
                     'visualize_range',
                     {'filename': fname,
@@ -161,54 +229,57 @@ class TestClient(BaseServiceClient):
         )
 
 
-    async def service_main(self):
-        fname = 'TofDaq_Data_2021.07.23_02h13m40s'
-
-        # check coordinates - smth wrong here
-        # rq_suffix = self.set_test_params(fname)
-        # await self.test_coordinate_request(fname, request_id='coordinates_{rq_suffix}')
-
-        # this one works ok
-        rq_suffix = self.set_test_params(fname)
-        await self.test_visualize_range(fname, request_id=f"fullrange_{rq_suffix}")
-
-        # this one is unstable
-        # t_start = int(time.time())
-        # t_range_max = 10
-        # rq_suffix = self.set_test_params(fname, t_range_max=10, max_exec_time=5)
-        # await self.test_visualize_range(fname,
-        #                                 request_id=f'zoom_{rq_suffix}',
-        #                                 mz_range=[100, 200],
-        #                                 t_range=[5, 10])
-
-        await asyncio.sleep(2)
-        while not all(self.done.values()) and not self.cancel_event.is_set():
-            await asyncio.sleep(.5)
-        if self.cancel_event.is_set():
-            raise InterruptedError(self.cancel_message)
-
-
-def run():
+def run_client():
+    # Use run_client, when running client service from the terminal
     args = parse_cmd_args()
-    client = TestClient(args['url'],
-                        args['port'],
-                        (args.get('ns', '/'), TestClientNamespace)
-                        )
-    loop = asyncio.get_event_loop()
+    client = BaseTestClient(args['url'],
+                            args['port'],
+                            (args.get('ns', '/'), BaseTestClientNamespace)
+                           )
     try:
-        loop.run_until_complete(client.run())
-        print('Success')
-    except KeyboardInterrupt:
-        print(f"KeyboardInterrupt for {client.__class__.__name__}")
-    except InterruptedError as e:
-        print(f"Failure: {str(e)}")
-    except Exception as e:
-        print(f"Exception '{str(e)}' for {client.__class__.__name__}")
-    finally:
-        print(f'Service stopped.')
-    return
+        client.run_until_complete()
+    except:
+        pass
 
+
+def start_client_as_daemon(timeout=10):
+    import threading
+    args = parse_cmd_args()
+    client = BaseTestClient(args['url'],
+                            args['port'],
+                            (args.get('ns', '/'), BaseTestClientNamespace)
+                           )
+    # client.daemon = threading.Thread(target=client.run_until_complete)
+    client.daemon = threading.Thread(target=client.run_until_complete)
+    client.daemon.start()
+    start = int(time.time())
+    now = int(time.time())
+    while not client.is_alive and now-start < timeout:
+        asyncio.run(asyncio.sleep(.5))
+        now = int(time.time())
+    return client if now-start<timeout else None
+
+
+def test_some_requests():
+    # use this procedure for testing request combinations
+    print('AAAA Start client')
+    client = start_client_as_daemon()
+
+    print('AAAA Run visualize_range')
+    fname = 'TofDaq_Data_2021.07.23_02h13m40s'
+    rq_suffix = client.set_test_params(fname)
+    asyncio.run(client.emit_visualize_range(fname, request_id=f"fullrange_{rq_suffix}"))
+
+    print('AAAA Run some other requests')
+    # something else here
+
+    print('AAAA Wait all requests to be processed')
+    asyncio.run(client.join_requests())
+
+    client.stop_client('AAAA Stop client')
 
 
 if __name__=='__main__':
-    run()
+    # run_client()  # Use it as main loop, when running client service from the terminal
+
+    test_some_requests()    # use it for testing request combinations
