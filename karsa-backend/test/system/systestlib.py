@@ -12,7 +12,7 @@ from threading import Timer, Thread
 # service_q = None
 
 # samples table contains declarative criteria for successfull request
-samples = {'TofDaq_Data_2021.07.23_02h13m40s': {'t_range_max': 30, 'max_exec_time': 5}}
+samples = {'TofDaq_Data_2021.07.23_02h13m40s': {'t_range_max': 30, 'max_exec_time': 15}}
 
 
 def get_namespace(filename):
@@ -109,6 +109,7 @@ class BaseTestClient(BaseServiceClient):
         self.stop_event = Event()
         self.cancel_event = Event()
         self.cancel_message = ''
+        self.target_exception = None
     
     async def init_service(self):
         # global service_q
@@ -129,14 +130,17 @@ class BaseTestClient(BaseServiceClient):
         try:
             asyncio.run(self.run())
             print('Success')
-        except KeyboardInterrupt:
-            print(f"KeyboardInterrupt for {self.__class__.__name__}")
-            raise
-        except InterruptedError as e:
-            print(f"Failure: {str(e)}")
-            raise
+        # except KeyboardInterrupt:
+        #     print(f"KeyboardInterrupt for {self.__class__.__name__}")
+        #     raise
+        # except InterruptedError as e:
+        #     print(f"Failure: {str(e)}")
+        #     raise
+        # except Exception as e:
+        #     print(f"Exception '{str(e)}' for {self.__class__.__name__}")
+        #     raise
         except Exception as e:
-            print(f"Exception '{str(e)}' for {self.__class__.__name__}")
+            self.target_exception = e
             raise
         finally:
             print(f'Service stopped.')
@@ -239,7 +243,7 @@ def run_client():
         pass
 
 
-def start_client_as_daemon(timeout=10):
+def start_test_client_as_daemon(timeout=10):
     import threading
     args = parse_cmd_args()
     client = BaseTestClient(args['url'],
@@ -254,13 +258,13 @@ def start_client_as_daemon(timeout=10):
     while not client.is_alive and now-start < timeout:
         asyncio.run(asyncio.sleep(.5))
         now = int(time.time())
-    return client if now-start<timeout else None
+    return client if now-start < timeout else None
 
 
 def test_some_requests():
     # use this procedure for testing request combinations
     print('-- Start client')
-    client = start_client_as_daemon()
+    client = start_test_client_as_daemon()
 
     fname = 'TofDaq_Data_2021.07.23_02h13m40s'
 
