@@ -45,6 +45,7 @@ class TestBaseTestClient(asynctest.TestCase):
     #                                 mz_range=mz_range,
     #                                 t_range=t_range)
     #     )
+    #     self.verify_client_status()
 
 
 if __name__ == '__main__':
