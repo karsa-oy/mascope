@@ -7,7 +7,7 @@ import threading
 import time
 import asynctest
 
-from TestClient import BaseTestClient, BaseTestClientNamespace, start_client_as_daemon
+from systestlib import start_client_as_daemon
 
 
 class TestBaseTestClient(asynctest.TestCase):
@@ -24,6 +24,21 @@ class TestBaseTestClient(asynctest.TestCase):
         fname = 'TofDaq_Data_2021.07.23_02h13m40s'
         rq_suffix = self.client.set_test_params(fname)
         asyncio.run(self.client.emit_visualize_range(fname, request_id=f"fullrange_{rq_suffix}"))
+
+    # def test_visualize_zoomed_range(self):
+    #     # TODO: fix handlers for a separate use and together with visualize_full_range
+    #     fname = 'TofDaq_Data_2021.07.23_02h13m40s'
+    #     max_exec_time = 30
+    #     t_range_max = 10
+    #     t_range=[5, t_range_max]
+    #     mz_range=[100, 200]
+    #     rq_suffix = self.client.set_test_params(fname, t_range_max=t_range_max, max_exec_time=max_exec_time)
+    #     asyncio.run(
+    #         self.client.emit_visualize_range(fname,
+    #                                 request_id=f'zoom_{rq_suffix}',
+    #                                 mz_range=mz_range,
+    #                                 t_range=t_range)
+    #     )
 
 
 if __name__ == '__main__':

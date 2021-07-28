@@ -58,5 +58,6 @@ Vagrant.configure("2") do |config|
   config.vm.provision "shell", inline: "cd /vagrant/src && python3 -m pip install --user -e services", privileged: false
   config.vm.provision "shell", run: 'always', inline: '/bin/bash -c "echo ========; echo Now run /vagrant/src/run_services.sh in a terminal; echo ========"', privileged: false
   config.vm.provision "shell", run: 'always', inline: '/bin/bash -c "echo ========; echo \"Run unittests in a terminal: /vagrant/test/unit/run_unittests.sh\"; echo ========"', privileged: false
+  config.vm.provision "shell", run: 'always', inline: '/bin/bash -c "echo ========; echo \"Run system tests in a terminal: /vagrant/test/system/run_unittests.sh\"; echo ========"', privileged: false
   
 end

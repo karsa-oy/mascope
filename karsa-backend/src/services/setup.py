@@ -31,6 +31,7 @@ setuptools.setup(
         'xarray',
         'zarr',
         'decorator',
+        'asynctest',
     ],
     entry_points={
         'console_scripts': [
