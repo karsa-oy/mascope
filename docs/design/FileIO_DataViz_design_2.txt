@@ -1,0 +1,60 @@
+Motivation
+
+Create bare-bone fileio-dataviz service communication model without duplication of functions and the most straightforward, clear and intuitive functionality,
+avoiding solutions with elevated complexity (normally it works by splitting complex module into submodules).
+
+
+fileio_service:
+
+- fileio_service operates only with streaming services and knows nothing about other ones;
+- fileio_service has the only endpoints to store the raw data;
+- while storing long samples, meta-data for dynamic reading is stored in a sample.attr file (e.g. fullsize, acquired size...)
+- both streamer and fileio are run inside a specific data_collection namespace (as of now);
+- sample acquisition sequence:
+    - streamer sends notif_1 with the sample name, size, ... to acquire;
+    - on_notif_1 fileio stores this data to sample.attr file;
+    - with notif_2 streamer sends data batches;
+    - fileio is agnostic of state of the acquisition: on_notif_2 just saves data and updates .attr correspondingly;
+    - acquisition ends, when fileio saves enough data up to the file limit specified in notif_1;
+    - on cancelled acqusition, fileio updates .attr correspondingly
+
+
+dataviz_service:
+
+- dataviz works with various data collections, so it can send requiests to corresponding namespaces;
+- dataviz stores requests for sample ranges into a request cache, which is a circular buffer;
+- the request contains required ranges to visualize;
+- dataviz spawns a number of generators (processes) for visualization, as of now;
+- generators get requests from the request cache on by one: 
+    - CacheQ.cache fits this model fine with cache_get and cache_put API;
+    - CacheQ.get_next also marks the request reserved to be skipped by other gens;
+- generator selects a t_subrange/chunk and does visualize (see 'Data visualization' lower):
+    - the gen checks avaliable/acquired t_range limit from sample.attr;
+        - if sample is not acquired yet by this t_range, the gen releases this request;
+    - the gen creats visualization for the chunk subrange;
+    - emits the image;
+    - updates processed_t_range into the request;
+    - releases the request, making it awailable for other gens;
+- request is fully processed, when processed_t_range covers requested t_range:
+    - when fully processed, request is deleted from request cache;
+
+
+Data visualization:
+
+- request to dataviz contains required t_range to visualize;
+- this t_range is drawn in a viewport of a specific size;
+- viewport image quality is defined by resolution - good enough: not too high, neither too low;
+- we choose specific resolution for the viewport from size of a viewport: say 100 stripes;
+- the smaller viewport needs less resolution/stripes;
+- viewport size comes with the request and dataviz selects appropriate resolution for visualization: e.g. 30 or 100;
+- when DataViz gets a request, from vieport size it calculates required resolution and chunk_size;
+- when gen reserves this request:
+    - gen checks processed_t_range from the request;
+    - gen does (processed_t_range + chunk_size) and verifies sample data availability from sample.attr
+        - if data is not available yet, the gen releases the request;
+    - the gen reads sample data of the chunk_size from needed sample position;
+    - the gen calculates average of the data and from the average it builds an image;
+    - the image is emitted;
+    - request is released till next gen locks it for further visualization, or deleted, if fully processed;
+
+
