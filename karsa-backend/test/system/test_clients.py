@@ -20,7 +20,7 @@ class TestBaseTestClient(asynctest.TestCase):
         self.client.stop_client(f'{self.__class__.__name__} tearDown')
         return super().tearDown()
 
-    def join_and_verify(self):
+    def assert_requests_ok(self):
         asyncio.run(self.client.join_requests())
         if self.client.target_exception:
             self.fail(str(self.client.target_exception))
@@ -28,16 +28,16 @@ class TestBaseTestClient(asynctest.TestCase):
 
     # TODO: why on_loaded_data is called twice?
     def test_visualize_full_range(self):
-        fname = 'TofDaq_Data_2021.07.23_02h13m40s_'
+        fname = 'TofDaq_Data_2021.07.30_small'
         rq_suffix = self.client.set_test_params(fname)
         asyncio.run(self.client.emit_visualize_range(fname, request_id=f"fullrange_{rq_suffix}"))
-        self.join_and_verify()
+        self.assert_requests_ok()
 
 
     @unittest.skip("NotImplemented: data format is different for zoomed on_loaded_data")
     def test_visualize_zoomed_range(self):
         # TODO: fix handlers for a separate use and together with visualize_full_range
-        fname = 'TofDaq_Data_2021.07.23_02h13m40s'
+        fname = 'TofDaq_Data_2021.07.30_small'
         max_exec_time = 30
         t_range_max = 10
         t_range=[5, t_range_max]
@@ -49,16 +49,16 @@ class TestBaseTestClient(asynctest.TestCase):
                                     mz_range=mz_range,
                                     t_range=t_range)
         )
-        self.join_and_verify()
+        self.assert_requests_ok()
 
 
     @unittest.skip("NotImplemented: fix test_visualize_zoomed_range")
     def test_visualize_two_ranges_sequentially(self):
-        fname = 'TofDaq_Data_2021.07.23_02h13m40s'
+        fname = 'TofDaq_Data_2021.07.30_small'
 
         rq_suffix = self.client.set_test_params(fname)
         asyncio.run(self.client.emit_visualize_range(fname, request_id=f"fullrange_{rq_suffix}"))
-        self.join_and_verify()     # wait for rq to complete and verify exceptions
+        self.assert_requests_ok()     # wait for rq to complete and verify exceptions
 
         max_exec_time = 30
         t_range_max = 10
@@ -71,12 +71,12 @@ class TestBaseTestClient(asynctest.TestCase):
                                     mz_range=mz_range,
                                     t_range=t_range)
         )
-        self.join_and_verify()
+        self.assert_requests_ok()
 
 
     @unittest.skip("NotImplemented: fix test_visualize_zoomed_range")
     def test_visualize_two_ranges_parallel(self):
-        fname = 'TofDaq_Data_2021.07.23_02h13m40s'
+        fname = 'TofDaq_Data_2021.07.30_small'
 
         max_exec_time = 30    # for parallel rqs max_exec_time increases (TBT: how?)
         rq_suffix = self.client.set_test_params(fname, max_exec_time=max_exec_time)
@@ -93,7 +93,7 @@ class TestBaseTestClient(asynctest.TestCase):
                                     mz_range=mz_range,
                                     t_range=t_range)
         )
-        self.join_and_verify()
+        self.assert_requests_ok()
 
 
     @unittest.skip("TODO: fix data for input files, maybe extend max_exec_time")
@@ -106,7 +106,7 @@ class TestBaseTestClient(asynctest.TestCase):
         rq_suffix = self.client.set_test_params(fname)
         asyncio.run(self.client.emit_visualize_range(fname, request_id=f"fullrange_{rq_suffix}"))
 
-        self.join_and_verify()
+        self.assert_requests_ok()
 
 
 if __name__ == '__main__':
