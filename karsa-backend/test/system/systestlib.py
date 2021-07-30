@@ -94,7 +94,7 @@ class BaseTestClientNamespace(BaseClientNamespace):
 
     async def on_figure_data(self, data):
         # TODO: awkward diff in data format - can it be unified with on_loaded_data format?
-        self.log({k:data['value'].get(k, 'missing') for k in ['request_id']})
+        self.log({k:data['value'].get(k, 'missing') for k in ['request_id', 'data_type', 'y_max', 't']})
         # service_q.cache_put(data)
         self.check_figure_data_request_finished(data)
 
