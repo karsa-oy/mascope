@@ -62,6 +62,17 @@ function install_default_dev_env() {
     ln -f -s /vagrant/test/unit/run_unittests.sh /home/vagrant/Desktop/karsa_unittests
     ln -f -s /vagrant/test/system/run_unittests.sh /home/vagrant/Desktop/karsa_system_tests
 
+    echo AAA copy data for system tests
+    rm -rf /home/vagrant/TofDaq
+    rm -rf /home/vagrant/Projects
+    cp -r -f /vagrant/test/system/TestData/* /home/vagrant/
+    for dt in /home/vagrant/TofDaq/*; do
+        for dn in $dt/*; do
+            fn=$(basename $dn)
+            ln -f -s $dn /home/vagrant/Projects/LinuxProject/Experiment_1/$fn
+        done
+    done
+
     return 0
 }
 
