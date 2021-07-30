@@ -9,20 +9,20 @@ set -eu -o pipefail
 
 cd
 echo running karsa-router-service
-xterm -hold -e karsa-router-service --url 0.0.0.0 &
+xterm -hold -e "karsa-router-service --url 0.0.0.0; bash" &
 
 echo running karsa-fileio-service
 rm -rf FileIo_*.db
-xterm -hold -e karsa-fileio-service --ns TofDaq &
+xterm -hold -e "karsa-fileio-service --ns TofDaq; bash" &
 
 echo running karsa-sample-service
-xterm -hold -e karsa-sample-service &
+xterm -hold -e "karsa-sample-service; bash" &
 
 sleep 10
 
 echo running karsa-dataviz-service
 rm -rf DataViz_*.db
-xterm -hold -e karsa-dataviz-service &
+xterm -hold -e "karsa-dataviz-service; bash" &
 
 # commented out, since karsa-raw-streamer currently fails on linux: TofDaq dependency to be removed
 # xterm -hold -e karsa-raw-streamer --config=/vagrant/src/services/services/raw_streamer_config/h5.yaml

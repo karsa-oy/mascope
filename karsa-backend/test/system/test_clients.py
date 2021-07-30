@@ -28,7 +28,7 @@ class TestBaseTestClient(asynctest.TestCase):
 
     # TODO: why on_loaded_data is called twice?
     def test_visualize_full_range(self):
-        fname = 'TofDaq_Data_2021.07.30_small'
+        fname = 'TofDaq_Data_2021.07.31_small'
         rq_suffix = self.client.set_test_params(fname)
         asyncio.run(self.client.emit_visualize_range(fname, request_id=f"fullrange_{rq_suffix}"))
         self.assert_requests_ok()
@@ -37,7 +37,7 @@ class TestBaseTestClient(asynctest.TestCase):
     @unittest.skip("NotImplemented: data format is different for zoomed on_loaded_data")
     def test_visualize_zoomed_range(self):
         # TODO: fix handlers for a separate use and together with visualize_full_range
-        fname = 'TofDaq_Data_2021.07.30_small'
+        fname = 'TofDaq_Data_2021.07.31_small'
         max_exec_time = 30
         t_range_max = 10
         t_range=[5, t_range_max]
@@ -54,7 +54,7 @@ class TestBaseTestClient(asynctest.TestCase):
 
     @unittest.skip("NotImplemented: fix test_visualize_zoomed_range")
     def test_visualize_two_ranges_sequentially(self):
-        fname = 'TofDaq_Data_2021.07.30_small'
+        fname = 'TofDaq_Data_2021.07.31_small'
 
         rq_suffix = self.client.set_test_params(fname)
         asyncio.run(self.client.emit_visualize_range(fname, request_id=f"fullrange_{rq_suffix}"))
@@ -76,7 +76,7 @@ class TestBaseTestClient(asynctest.TestCase):
 
     @unittest.skip("NotImplemented: fix test_visualize_zoomed_range")
     def test_visualize_two_ranges_parallel(self):
-        fname = 'TofDaq_Data_2021.07.30_small'
+        fname = 'TofDaq_Data_2021.07.31_small'
 
         max_exec_time = 30    # for parallel rqs max_exec_time increases (TBT: how?)
         rq_suffix = self.client.set_test_params(fname, max_exec_time=max_exec_time)
