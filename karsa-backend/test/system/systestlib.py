@@ -12,7 +12,7 @@ from threading import Timer, Thread
 # service_q = None
 
 # samples table contains declarative criteria for successfull request
-samples = {'TofDaq_Data_2021.07.23_02h13m40s': {'t_range_max': 30, 'max_exec_time': 15}}
+samples = {'TofDaq_Data_2021.07.30_small': {'t_range_max': 33, 'max_exec_time': 5}}
 
 
 def get_namespace(filename):
@@ -266,7 +266,7 @@ def test_some_requests():
     print('-- Start client')
     client = start_test_client_as_daemon()
 
-    fname = 'TofDaq_Data_2021.07.23_02h13m40s'
+    fname = 'TofDaq_Data_2021.07.30_small'
 
     # print('-- Run coordinate_request')
     # # TODO: check coordinates - smth wrong here - see handler
