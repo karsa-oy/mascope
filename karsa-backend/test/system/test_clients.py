@@ -7,7 +7,7 @@ import threading
 import time
 import asynctest
 
-from systestlib import start_test_client_as_daemon
+from systestlib import start_test_client_as_daemon, samples
 
 
 class TestBaseTestClient(asynctest.TestCase):
@@ -24,6 +24,19 @@ class TestBaseTestClient(asynctest.TestCase):
         asyncio.run(self.client.join_requests())
         if self.client.target_exception:
             self.fail(str(self.client.target_exception))
+
+
+    # Make sure test environment properly reacts to failures
+    def test_validate_test_environment(self):
+        fname = 'TofDaq_Data_2021.07.31_small'
+        max_exec_time = 3                                   # make it small for convenience
+        t_range_max = samples[fname]['t_range_max'] + 1     # this limit will never be reached
+        rq_suffix = self.client.set_test_params(fname, t_range_max=t_range_max, max_exec_time=max_exec_time)
+        asyncio.run(
+            self.client.emit_visualize_range(fname, request_id=f'zoom_{rq_suffix}'))
+        with self.assertRaises(AssertionError) as ctx:
+            self.assert_requests_ok()
+        self.assertTrue('exceeded max execution time' in str(ctx.exception))
 
 
     # TODO: why on_loaded_data is called twice?
@@ -55,11 +68,9 @@ class TestBaseTestClient(asynctest.TestCase):
     @unittest.skip("NotImplemented: fix test_visualize_zoomed_range")
     def test_visualize_two_ranges_sequentially(self):
         fname = 'TofDaq_Data_2021.07.31_small'
-
         rq_suffix = self.client.set_test_params(fname)
         asyncio.run(self.client.emit_visualize_range(fname, request_id=f"fullrange_{rq_suffix}"))
         self.assert_requests_ok()     # wait for rq to complete and verify exceptions
-
         max_exec_time = 30
         t_range_max = 10
         t_range=[5, t_range_max]
@@ -77,11 +88,9 @@ class TestBaseTestClient(asynctest.TestCase):
     @unittest.skip("NotImplemented: fix test_visualize_zoomed_range")
     def test_visualize_two_ranges_parallel(self):
         fname = 'TofDaq_Data_2021.07.31_small'
-
         max_exec_time = 30    # for parallel rqs max_exec_time increases (TBT: how?)
         rq_suffix = self.client.set_test_params(fname, max_exec_time=max_exec_time)
         asyncio.run(self.client.emit_visualize_range(fname, request_id=f"fullrange_{rq_suffix}"))
-
         max_exec_time = 30
         t_range_max = 10
         t_range=[5, t_range_max]
