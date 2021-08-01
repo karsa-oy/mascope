@@ -13,7 +13,7 @@ from threading import Timer, Thread
 
 # samples table contains declarative criteria for successfull request
 # TODO: read the data from attr file
-samples = {'TofDaq_Data_2021.07.31_small': {'t_range_max': 30, 'max_exec_time': 15}}
+samples = {'TofDaq_Data_2021.07.31_small': {'t_range_max': 30, 'max_exec_time': 10}}
 
 
 def get_namespace(filename):
