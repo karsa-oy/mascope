@@ -28,7 +28,7 @@ from .lib.TofDaq import TwRetVal
 
 from .kinstrument import KInstrument
 
-from .kutil import filetime2datetime
+from karsalib.util import filetime2datetime
 
 from ctypes import create_string_buffer 
 

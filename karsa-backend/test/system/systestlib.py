@@ -3,11 +3,12 @@
 import time
 import asyncio
 from decorator import decorator
-from karsalib import parse_cmd_args, \
-                    BaseClientNamespace, BaseServiceClient, CacheQ
+
 from multiprocessing import Event
 from threading import Timer, Thread
 
+from karsalib.client import BaseClientNamespace, BaseServiceClient
+from karsalib.util import parse_cmd_args
 
 # service_q = None
 

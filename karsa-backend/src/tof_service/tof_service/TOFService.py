@@ -3,8 +3,13 @@ TOF Service
 """
 
 
-from karsalib import BaseClientNamespace, get_client_notification_args, \
-                     BaseStreamerClient, run_streamer_service
+from karsalib.client import (
+                        BaseClientNamespace,
+                        BaseStreamerClient,
+                        run_streamer_service
+                        )
+from karsalib.util import get_client_notification_args
+
 from karsatof.kgenerator import TofDaqStreamer
 
 

@@ -9,7 +9,7 @@ import numpy as np
 
 from scipy.stats import mode
 
-from .kcollector import ExtendableDataArray, IncrementalCOO
+from karsalib.struct import ExtendableDataArray, IncrementalCOO
 from .kcode import find_extrema
 
 class KSegmentSequence():

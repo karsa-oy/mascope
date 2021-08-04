@@ -26,16 +26,15 @@ from datetime import datetime
 from queue import Empty
 
 
-from karsalib import (BaseClientNamespace,
-                      BridgeServiceClient,
-                      AttrDict,
-                      LRUDict,
-                      CacheQ,
-                      generate_unique_key,
-                      parse_cmd_args, 
-                      get_client_notification_args,
-                      t_mark
-                      )
+from karsalib.client import BaseClientNamespace, BridgeServiceClient
+from karsalib.logging import t_mark
+from karsalib.struct import AttrDict, LRUDict, CacheQ
+from karsalib.util import (
+                        generate_unique_key,
+                        get_client_notification_args,
+                        parse_cmd_args
+                        )
+
 from karsatof.kcollector import ExtendableDataArray
 from karsatof.kdatapool import parse_path_from_sample_name
 # from karsatof.kimage import (convert_base64_to_img, convert_to_base64)

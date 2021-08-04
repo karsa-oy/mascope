@@ -16,8 +16,12 @@ import csv
 import os
 import tempfile
 
-from karsalib import BaseClientNamespace, BaseServiceClient, \
-                     parse_cmd_args, get_client_notification_args
+from karsalib.client import (
+                        BaseClientNamespace,
+                        BaseServiceClient
+                        )
+from karsalib.util import parse_cmd_args, get_client_notification_args
+
 from karsatof.kdatapool import SamplePool
 from karsaHT3000A.ht3000a import parse_csv_report, dup_cycles
 
