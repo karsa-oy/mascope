@@ -6,10 +6,12 @@ Created on Tue Jan  7 10:28:20 2020
 
 import numpy as np
 
-from karsatof.lib.TwTool import (TwGetMoleculeMass,
-                                 TwGetIsotopePattern,
-                                 TwDecomposeMass,
-                                 TwGetComposition)
+from karsatof.lib.TwTool import (
+                        TwGetMoleculeMass,
+                        TwGetIsotopePattern,
+                        TwDecomposeMass,
+                        TwGetComposition
+                        )
 
 from ctypes import create_string_buffer
 

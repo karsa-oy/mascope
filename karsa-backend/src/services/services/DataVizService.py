@@ -28,16 +28,11 @@ from multiprocessing import (
 from queue import Empty
 from time import time
 
-from karsalib import (
-                BaseClientNamespace,
-                BaseServiceClient,
-                AttrDict,
-                CacheQ,
-                parse_cmd_args,
-                get_client_notification_args,
-                this_func_name,
-                t_mark
-                )
+from karsalib.client import BaseClientNamespace, BaseServiceClient
+from karsalib.struct import AttrDict, CacheQ
+from karsalib.util import parse_cmd_args, get_client_notification_args
+from karsalib.logging import this_func_name, t_mark
+
 from karsatof.kcollector import ExtendableDataArray
 from karsatof.kworker import ImageGenerator
 from karsatof.kimage import (

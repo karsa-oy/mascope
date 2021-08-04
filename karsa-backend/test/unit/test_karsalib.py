@@ -3,7 +3,7 @@ from multiprocessing import Event, Queue
 from queue import Empty
 import time
 
-from karsalib import CacheQ, LRUDict
+from karsalib.struct import CacheQ, LRUDict
 
 
 cache_q_single_level = {

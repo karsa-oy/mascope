@@ -1,350 +1,59 @@
-import sys
-import os
-import time
-import getopt
 import asyncio
 import inspect
-from copy import deepcopy
-import string
-import random
-import logging
-from socketio import AsyncClientNamespace, AsyncNamespace, AsyncClient
+import time
+
+from queue import Empty
+from socketio import AsyncClientNamespace, AsyncClient
 from socketio.exceptions import BadNamespaceError
-from queue import Empty, Full
-from threading import Thread
-from multiprocessing import Event, Lock, cpu_count
+
+from .logging import (
+                NO_DATA_LOGGING_DEFAULT,
+                NO_LOGGING_DEFAULT,
+                t_mark
+                )
+from .util import parse_cmd_args
 
 
-NO_LOGGING_DEFAULT = False
-NO_DATA_LOGGING_DEFAULT = True
 
-
-def copy_dict(d, ignore_keys=[]):
-    return {k: v for k, v in d.items() if k not in ignore_keys}
-
-def get_client_notification_args(data):
-    """
-    Get shallow copy of client_notificaiton arguments
-    ignoring 'name' and 'value' fields.
-    """
-    return copy_dict(data, ignore_keys=['name', 'value'])
-
-def this_func_name():
-    return inspect.stack()[1][3]
-
-def parent_func_name():
-    return inspect.stack()[2][3]
-
-def t_mark(data, note=None):
-    if 't_mark' not in os.environ:
+def run_streamer_service(StreamerClient,
+                         StreamerPublicNamespace,
+                         StreamerPrivateNamespace):
+    # args: url, port, ns, streamer_type, raw_pool
+    args = parse_cmd_args()
+    # streamer should always be in private namespace with data producer
+    if args['ns'] == '/':
+        print( "The service must be in a private namespace.",
+               "Please restart the service with --ns option."
+              )
         return
-    if 't_mark' not in data:
-        data['t_mark'] = [[note or parent_func_name(), time.time()],]
-        return
-    t = time.time()
-    data['t_mark'][-1][-1] = round(t - data['t_mark'][-1][-1], 3)
-    data['t_mark'].append([note or parent_func_name(), t])
-    print('t_mark :', data['t_mark'], data.get('request_id', data.get('filename', '')))
 
-def generate_unique_key():
-    """Generate a 15 character long random string
-    Returns
-    -------
-    str
-        Random string with 15 characters
-    """
-    CHARACTERS = (string.ascii_letters + string.digits + '-._~')
-    return ''.join(random.sample(CHARACTERS, 15))
-
-
-class AttrDict(dict):
-    """Dict object that allows accessing values like attributes
-    (dot notation).
-    Example:
-    d = AttrDict({'a': 0})  # initialize AttrDict with a dict
-    d.a                     # returns 0
-    """
-    def __init__(self, *args, **kwargs):
-        """Initialize self
-        """
-        super(AttrDict, self).__init__(*args, **kwargs)
-        self.__dict__ = self
-
-
-class LRUDict(dict):
-    def __init__(self, capacity: int, *args, **kwargs):
-        self.capacity = capacity
-        self.lru_keys = []
-        self.lock = Lock()
-        super().__init__(*args, **kwargs)
-
-    def __getitem__(self, key):
-        with self.lock:
-            data = super().__getitem__(key)
-            self.lru_keys.remove(key)
-            self.lru_keys.append(key)
-            return data
-
-    def __setitem__(self, key, value):
-        with self.lock:
-            super().__setitem__(key, value)
-            if key in self.lru_keys:
-                self.lru_keys.remove(key)
-            self.lru_keys.append(key)
-            if len(self.lru_keys) > self.capacity:
-                k = self.lru_keys.pop(0)
-                super().__delitem__(k)
-
-
-class Logger():
-    # log_levels = [
-    #     logging.DEBUG,
-    #     logging.INFO,
-    #     logging.WARNING,
-    #     logging.ERROR,
-    #     logging.CRITICAL,
-    # ]
-    def __init__(self, fname, c_log_level='INFO', f_log_level='DEBUG', mode='r+'):
-        # notification sender configuration and
-        # methods are borrowed from client class
-        self.target_room = None
-        self.emit_client_notification = None
-        # logger configuration
-        self.logger = logging.getLogger(fname)
-        self.logger.setLevel('DEBUG')
-        # console logger
-        if c_log_level:
-            c_handler = logging.StreamHandler()
-            c_handler.setLevel(level=c_log_level)
-            c_format = logging.Formatter('%(message)s')
-            c_handler.setFormatter(c_format)
-            self.logger.addHandler(c_handler)
-        # file logger
-        if f_log_level:
-            try:
-                f_handler = logging.FileHandler(fname + '.log', mode=mode)
-                f_handler.setLevel(level=f_log_level)
-                f_format = logging.Formatter('%(asctime)s %(message)s')
-                f_handler.setFormatter(f_format)
-                self.logger.addHandler(f_handler)
-            except FileNotFoundError:
-                pass
-
-    def configure_notifications(self, sender, target_room):
-        if sender:
-            self.emit_client_notification = sender.__getattribute__('emit_client_notification')
-        if target_room:
-            self.target_room = target_room
-
-    def debug(self, m):
-        self.logger.debug(m)
-
-    def info(self, m):
-        self.logger.info(m)
-
-    def warning(self, m, room=None, namespace='/'):
-        self.logger.warning(m)
-        if self.emit_client_notification and self.logger.isEnabledFor(logging.WARNING):
-            self.emit_client_notification('service_warning', m,
-                                      room=room or self.target_room,
-                                      namespace=namespace,
-                                      no_logging=False,
-                                      no_data_logging=False)
-
-    def error(self, m, room=None, namespace='/'):
-        self.logger.error(m)
-        if self.emit_client_notification and self.logger.isEnabledFor(logging.ERROR):
-            self.emit_client_notification('service_error', m,
-                                      room=room or self.target_room,
-                                      namespace=namespace,
-                                      no_logging=False,
-                                      no_data_logging=False)
-
-    def critical(self, m, room=None, namespace='/'):
-        self.logger.critical(m)
-        if self.emit_client_notification and self.logger.isEnabledFor(logging.CRITICAL):
-            self.emit_client_notification('service_critical_error', m,
-                                      room=room or self.target_room,
-                                      namespace=namespace,
-                                      no_logging=False,
-                                      no_data_logging=False)
-
-
-class QConnect(Thread):
-    OUT_Q_LIMIT = cpu_count()
-    CACHE_LIMIT = 1000000   # TODO: number?
-
-    def __init__(self, in_q=None, out_q=None, shutdown_event=None):
-        Thread.__init__(self)
-        self.in_q = in_q
-        self.out_q = out_q
-        self.shutdown_event = shutdown_event
-        self.input_ready = Event()
-        self.input_ready.set()
-        self.cache = []
-
-    def put(self, data):
-        self.input_ready.wait()
-        self.input_ready.clear()
-        self.in_q.put(data)
-        self.input_ready.wait()
-
-    def get(self, *args, **kwargs):
-        return self.out_q.get(*args, **kwargs)
-
-    def cache_put(self, data):
-        if len(self.cache) > self.CACHE_LIMIT:
-            raise Full
-        self.cache.insert(0, data)
-
-    def cache_get(self):
-        data = self.cache.pop()
-        return data
-
-    def fits_filter(self, data):
-        return False
-
-    def run(self):
-        while not self.shutdown_event.is_set():
-            data = None
-            try:
-                data = self.in_q.get_nowait()
-                # print('in_q.get', data.get('request_id', ':'.join([data.get('name','?'), data.get('key','?')])))
-            except Empty:
-                pass
-            except KeyboardInterrupt:
-                self.input_ready.set()
-                break
-            if data:
-                if self.fits_filter(data):
-                    continue
-                try:
-                    self.cache_put(data)
-                except Full as e:
-                    print("Cache overflow -- skipping input!")
-                finally:
-                    self.input_ready.set()
-            if self.out_q.qsize() >= self.OUT_Q_LIMIT:
-                time.sleep(.01)
-                continue
-            data = self.cache_get()
-            if data:
-                self.out_q.put(data)
-                # print('out_q.put', data.get('request_id', ':'.join([data.get('name','?'), data.get('key','?')])))
-            else:
-                time.sleep(.01)
-        self.cache = None
-        print(f"Exit from {self.__class__.__name__} thread")
-
-
-class CacheQ(QConnect):
-    """Cached queue emulator: works like a queue with ability to manipulate its content."""
-    def __init__(self, cache_key, *arg, **kwarg):
-        super().__init__(*arg, **kwarg)
-        self.cache = dict()
-        self.cache_key_separator = kwarg.get('cache_key_separator', '/')
-        self.cache_key = cache_key.split(self.cache_key_separator)
-        self.cache_index = len(self.cache_key) * [0]
-        self.cache_index[0] = -1
-        self.lock = Lock()
-        self.in_q_filters = []
-
-    def cache_put(self, data):
-        keys = []
-        for k in self.cache_key:
-            keys.append(data.get(k, 'default'))
-        cache_depth = len(keys) - 1
-        cache_level = self.cache
-        with self.lock:
-            for i, k in enumerate(keys):
-                if k not in cache_level:
-                    cache_level[k] = [] if i == cache_depth else {}
-                cache_level = cache_level[k]
-            cache_level.insert(0, data)
-
-    def _inc_cache_level_index(self, dic, index):
-        step = min(len(dic), index + 1)
-        next_index = step % len(dic)
-        index_shift = step // len(dic)
-        return next_index, index_shift
-
-    def _inc_cache_index(self):
-        cache_level = self.cache
-        for i in range(len(self.cache_index)):
-            self.cache_index[i], shift = self._inc_cache_level_index(cache_level, self.cache_index[i])
-            if not shift:
-                break
-            next_key = list(cache_level.keys())[self.cache_index[i]]
-            cache_level = cache_level[next_key]
-
-    def cache_get(self):
-        self.lock.acquire()
-        cache_level_keys = []
-        cache_level_dics = []
-        cache_level = self.cache
-        cache_level_dics.append(cache_level)
+    client = None
+    while True:
         try:
-            self._inc_cache_index()
-        except:
-            self.lock.release()
-            return None
-        for i in self.cache_index:
+            client = StreamerClient(args.get('streamer_type', None),
+                                    args.get('raw_pool', None),
+                                    args['url'],
+                                    args['port'],
+                                    ('/', StreamerPublicNamespace),
+                                    (args['ns'], StreamerPrivateNamespace)
+                                )
+            break
+        except ModuleNotFoundError as e:
+            print(str(e))
             try:
-                key = list(cache_level.keys())[i]
-            except IndexError:
-                self.lock.release()
-                return self.cache_get()
-            cache_level = cache_level[key]
-            cache_level_dics.append(cache_level)
-            cache_level_keys.append(key)
-        data = cache_level.pop()
-        if not cache_level:             # no more data in this cache element - clean up
-            for d, k in reversed(list(zip(cache_level_dics, cache_level_keys))):
-                if not d[k]:
-                    del d[k]
-        self.lock.release()
-        return data
+                time.sleep(5)
+            except KeyboardInterrupt:
+                print('Cancelled')
+                return
+        except:
+            raise
 
-    def cache_delete_key(self, key):
-        with self.lock:
-            if self.in_q:
-                # set ignore-marker for data, which is pending in in_q
-                self.in_q_filters.append(key)
-                self.in_q.put({'name': '__stop_fits_filter', 'key': key})
-            # delete cache hierarchy for the key
-            level_keys = key.split(self.cache_key_separator)
-            cache_level = self.cache
-            key_to_delete = level_keys.pop(0)
-            while level_keys:
-                cache_level = cache_level[key_to_delete]
-                key_to_delete = level_keys.pop(0)
-            if key_to_delete in cache_level:
-                del cache_level[key_to_delete]
+    loop = asyncio.get_event_loop()
+    try:
+        loop.run_until_complete(client.run())
+    except KeyboardInterrupt:
+        client.streamer.shutdown()
 
-    def fits_filter(self, data):
-        with self.lock:
-            # filter out ignore-marker package
-            if data.get('name') == '__stop_fits_filter':
-                # print('__stop_fits_filter', data['key'])
-                self.in_q_filters.remove(data['key'])
-                return True
-            # check if input data fits any filter element
-            for filter in self.in_q_filters:
-                fit = True
-                for k, v in zip(self.cache_key, filter.split(self.cache_key_separator)):
-                    if data.get(k) != v:
-                        fit = False
-                        break
-                if fit:
-                    # print('fits_filter', filter)
-                    return True
-            return False
-
-    def cache_size(self, cache_level=None):
-        cache_level = cache_level or self.cache
-        if isinstance(cache_level, list):
-            return len(cache_level)
-        return sum([self.cache_size(v) for v in cache_level.values()])
 
 class BaseClientNamespace(AsyncClientNamespace):
     """ python-socket.io client namespace for connecting to Router """
@@ -453,141 +162,6 @@ class BaseClientNamespace(AsyncClientNamespace):
     def room_sid(self):
         return self.parent.sio.get_sid(self.namespace)
 
-class BaseServerNamespace(AsyncNamespace):
-    """ socketio server base namespace class """
-
-    def log(self, *arg, **kwarg):
-        print(f"[{self.namespace}.{inspect.stack()[1].function}]", *arg, **kwarg)
-
-    def on_connect(self, sid, environ):
-        self.log("connected to namespace", self.namespace)
-
-    async def on_disconnect(self, sid):
-        self.log(sid, "disconnected from namespace", self.namespace)
-        # clear the app caches, if any, in all app services
-        # TODO:
-        # let affected rooms know the client is gone
-        for r in self.rooms(sid):
-            await self.emit('room_mate_gone', {}, room=r)
-
-    def on_subscribe(self, sid, data):
-        """
-        Initialize client subscriptions. Subscriptions contain notif names
-        the client subscribes for and a room to subscribe into.
-        data: dict(app_name=client_name, endpoints, room)
-        """
-        app_name = data['app_name']
-        endpoints = data['endpoints']
-        room = data.get('room')
-        if room:
-            self.log(f"{app_name}:{sid} joins room {room}")
-            self.enter_room(sid, room)
-        else:
-            self.log(f"{app_name}:{sid} joins rooms {endpoints}")
-            for e in endpoints:
-                self.enter_room(sid, e)
-        self.log(f"{app_name}:{sid} stays in rooms: {self.rooms(sid)}")
-
-    async def on_unsubscribe(self, sid, data):
-        app_name = data['app_name']
-        endpoints = data['endpoints']
-        room = data.get('room')
-        if room:
-            self.log(f"{app_name}:{sid} leaves room {room}")
-            self.leave_room(sid, room)
-            await self.emit('service_state', {}, room=room)
-        else:
-            self.log(f"{app_name}:{sid} leaves rooms {endpoints}")
-            for e in endpoints:
-                self.leave_room(sid, e)
-        self.log(f"{app_name}:{sid} stays in rooms: {self.rooms(sid)}")
-
-
-    async def on_client_notification(self, sid, data):
-        """
-        client_notifications on corresponding API endpoints are forwarded by Router from providers
-        to subscribers via corresponding endpoints, where name = endpoint is a property name.
-        data: dict(name=endpoint_name, value=endpoint_value, ...)
-              other named args are free form, e.g. 
-              room, cookies, no_logging, no_data_logging...
-        """
-        no_logging = data.get('no_logging', False)
-        no_data_logging = data.get('no_data_logging', True)
-        endpoint = data['name']
-        room = data.get('room')
-        namespace = data.get('namespace', self.namespace)
-        cb = data.pop('callback', None)
-        cb_ctx = data.pop('callback_context', None)
-
-        if no_logging:
-            pass
-        elif no_data_logging:
-            self.log(f"{endpoint}: ...")
-        else:
-            self.log(data)
-
-        if 'cookies' not in data:
-            data['cookies'] = dict(src_sid=[])
-        elif 'src_sid' not in data['cookies']:
-            data['cookies']['src_sid']=[]
-        cookies = data['cookies']
-        src_sids = cookies['src_sid']
-        # sids are added to the cookies only by this procedure
-        src_sids.append(sid)
-
-        target_room = room if room else endpoint
-
-        async def srv_callback(*arg, **kwarg):
-            await self.emit('client_notification_callback',
-                            dict(endpoint=endpoint,
-                                 cb_name=cb, cb_ctx=cb_ctx,
-                                 arg=arg, kwarg=kwarg,
-                                 **{**get_client_notification_args(data), 'no_logging': True}),
-                            room=sid,
-                            namespace=self.namespace
-                            )
-        sent_to = len(src_sids) * '>'
-        self.log(f"{endpoint} {sent_to} {namespace}:{target_room}")
-        await self.emit(endpoint, data, room=target_room, namespace=namespace, callback=cb and srv_callback)
-
-
-def parse_cmd_args():
-    """
-    Parse command line arguments for the service application:
-    ------------------------------
-    --url : string
-        Karsa Router url/ip  (default: localhost)
-    --port : int
-        Karsa Router port (default: 5010)
-    """
-    # Set defaults
-    args_cmd = dict()
-    args_file = dict()
-    args_default = dict(url='localhost', port=5010, ns='/')
-    # Parse cmd arguments
-    opts, _ = getopt.getopt(sys.argv[1:], 'o:v',
-                ['config=',
-                 'n_jobs=',
-                 'ns=',
-                 'port=',
-                 'raw_pool=',
-                 'streamer_type=',
-                 'url=',
-                 ])
-    for opt, arg in opts:
-        assert opt[:2]=='--', f"Invalid argument {opt}"
-        key = opt[2:]
-        if key.lower() == 'config':
-            # service config may be defined in yaml file
-            import yaml
-            with open(arg, 'r') as f:
-                args_file = yaml.safe_load(f)
-            continue
-        args_cmd[key] = arg
-    # command line options override the ones from the config file
-    return {**args_default, **args_file, **args_cmd}
-
-
 class BaseServiceClient:
     def log(self, *arg, **kwarg):
         if not NO_LOGGING_DEFAULT:
@@ -647,8 +221,6 @@ class BaseServiceClient:
         await self.init_service()
         await self.service_main()
 
-
-
 class BridgeServiceClient(BaseServiceClient):
     def __init__(self, url, port, public_namespace_data, private_namespace_data):
         self.addr = f'{url}:{port}'
@@ -679,8 +251,6 @@ class BridgeServiceClient(BaseServiceClient):
     async def emit_private_notification(self, name, value, **kwarg):
         await self.private_ns.emit_client_notification(name, value, **kwarg)
     
-    
-
 class BaseStreamerClient(BridgeServiceClient):
     def __init__(self, streamer_type, raw_pool,
                  url, port, public_namespace_data, private_namespace_data):
@@ -727,7 +297,6 @@ class BaseStreamerClient(BridgeServiceClient):
     async def init_service(self):
         while True:
             # TODO: TBR python-socketio BadNamespaceError connection bug
-            from socketio.exceptions import BadNamespaceError
             try:
                 await self.emit_private_notification(
                                             'instrument_status',
@@ -948,41 +517,3 @@ class BaseStreamerClient(BridgeServiceClient):
 
 
 
-def run_streamer_service(StreamerClient,
-                         StreamerPublicNamespace,
-                         StreamerPrivateNamespace):
-    # args: url, port, ns, streamer_type, raw_pool
-    args = parse_cmd_args()
-    # streamer should always be in private namespace with data producer
-    if args['ns'] == '/':
-        print( "The service must be in a private namespace.",
-               "Please restart the service with --ns option."
-              )
-        return
-
-    client = None
-    while True:
-        try:
-            client = StreamerClient(args.get('streamer_type', None),
-                                    args.get('raw_pool', None),
-                                    args['url'],
-                                    args['port'],
-                                    ('/', StreamerPublicNamespace),
-                                    (args['ns'], StreamerPrivateNamespace)
-                                )
-            break
-        except ModuleNotFoundError as e:
-            print(str(e))
-            try:
-                time.sleep(5)
-            except KeyboardInterrupt:
-                print('Cancelled')
-                return
-        except:
-            raise
-
-    loop = asyncio.get_event_loop()
-    try:
-        loop.run_until_complete(client.run())
-    except KeyboardInterrupt:
-        client.streamer.shutdown()

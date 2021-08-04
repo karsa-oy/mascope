@@ -1,7 +1,8 @@
 import socketio
 from aiohttp import web
 import aiohttp_cors
-from karsalib import BaseServerNamespace, parse_cmd_args
+from karsalib.server import BaseServerNamespace
+from karsalib.util import parse_cmd_args
 
 
 class RouterNamespace(BaseServerNamespace):
