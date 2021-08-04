@@ -377,7 +377,7 @@ class TofDaqStreamer(Thread):
         self.stop_acquisition()
 
 
-class H5Streamer(TofDaqStreamer):
+class H5Streamer(TofDaqStreamer, KInstrument):
     def __init__(self):
         """Initialize self
 
