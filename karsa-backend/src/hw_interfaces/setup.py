@@ -32,7 +32,7 @@ setuptools.setup(
         'numpy',
         'pandas',
         'Pillow',
-#        'pythonnet',
+        'pythonnet',
         'scikit-learn',
         'scipy',
         'sparse',
