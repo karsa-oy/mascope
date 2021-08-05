@@ -10,18 +10,12 @@ import os
 import numpy as np
 
 from multiprocessing import Process
-from PIL.Image import Image
 from sklearn.decomposition import SparseCoder
 from scipy.sparse import csr_matrix
 from threading import Thread
 
 from .kcode import find_extrema, find_code_peaks
 from .kpeak import fit_peaks
-from .kimage import (gen_spec_image,
-                     gen_timeseries_trace,
-                     gen_heatmap_image,
-                     convert_to_base64
-                     )
 
 from sklearn.exceptions import ConvergenceWarning
 import warnings
@@ -191,110 +185,6 @@ class KEncoder(Process):
         code = code.astype(np.float32)
         approx = np.dot(code, D).reshape((-1,))
         return i0, i1, code, approx
-
-
-viz_generators = {
-            'spectrogram': gen_heatmap_image,
-            'timeseries': gen_timeseries_trace,
-            'waterfall': gen_spec_image,
-            }
-
-class ImageGenerator(Process):
-    def __init__(self, queue_in, queue_out, shutdown_event):
-        Process.__init__(self)
-        self.queue_in = queue_in
-        self.queue_out = queue_out
-        self.shutdown_event = shutdown_event
-
-    def run(self):
-        global viz_generators
-        print(f"ImageGenerator started - PID: {os.getpid()}")
-        while not self.shutdown_event.is_set():
-            try:
-                data = self.queue_in.get()
-            except KeyboardInterrupt:
-                print(f"KeyboardInterrupt for PID: {os.getpid()}")
-                self.shutdown_event.set()
-                break
-            except Exception as e:
-                print(f"Exception {str(e)} for PID: {os.getpid()}")
-                self.shutdown_event.set()
-                break
-            if data is not None:
-                # Select function to generate the image
-                viz_type = data['viz_type']
-                try:
-                    viz_gen_func = viz_generators[viz_type]
-                except KeyError:
-                    print("Requested visualization type '%s' not available!" %viz_type)
-                    continue
-                data_array = data.pop('data')
-                y_range = data.get('y_range', None)
-                try:
-                    viz = viz_gen_func(data_array,
-                                       y_range=y_range
-                                       )
-                except ZeroDivisionError:
-                    print("Caught ZeroDivisionError in %s" %str(viz_gen_func))
-                    continue
-                except Exception as e:
-                    # TODO: check if this exception handling is right: without it process hangs
-                    # after acq.stopped, often there goes exception: y must be real (y_range-[0, 15.135354995727539])
-                    print(print(f"ImageGenerator {os.getpid()} exception: {str(e)} for y_range {y_range}"))
-                    continue
-                if isinstance(viz, Image):
-                    img_b = convert_to_base64(viz)
-                    data.update({'img': img_b})
-                elif isinstance(viz, dict):
-                    data.update({'traces': [viz]})
-                self.queue_out.put(data)
-            else:
-                print(f"ImageGenerator stopped - PID: {os.getpid()}")
-                break
-
-class SpecTraceGenerator(Process):
-
-    def __init__(self, queue_in, queue_out):
-        Process.__init__(self)
-        self.queue_in = queue_in
-        self.queue_out = queue_out
-
-    def run(self):
-        while True:
-            data = self.queue_in.get()
-            if data is not None:
-                data_array = data.pop('data')
-                y_range = data.pop('y_range', None)
-                img = gen_spec_image(data_array,
-                                     y_range=y_range
-                                     )
-                img_b = convert_to_base64(img)
-                data.update({'img': img_b})
-                self.queue_out.put(data)
-            else:
-                break
-
-class HeatmapGenerator(Process):
-
-    def __init__(self, queue_in, queue_out):
-        Process.__init__(self)
-        self.queue_in = queue_in
-        self.queue_out = queue_out
-
-    def run(self):
-        while True:
-            data = self.queue_in.get()
-            if data is not None:
-                data_array = data.pop('data')
-                y_range = data.pop('y_range', None)
-                img = gen_heatmap_image(data_array,
-                                        y_range=y_range
-                                        )
-                img_b = convert_to_base64(img)
-                data.update({'img': img_b})
-                self.queue_out.put(data)
-            else:
-                break
 
 # -------- Deprecated / experimental code below ---------
 

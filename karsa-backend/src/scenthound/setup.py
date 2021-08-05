@@ -23,6 +23,11 @@ setuptools.setup(
         'Operating System :: OS Independent',
     ],
     install_requires=[
+        'h5sparse',
+        'lmfit',
+        'numpy',
+        'pandas',
+        'scipy',
+        'scikit-learn'
     ]
 )
-

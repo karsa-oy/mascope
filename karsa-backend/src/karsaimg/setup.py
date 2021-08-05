@@ -23,6 +23,13 @@ setuptools.setup(
         'Operating System :: OS Independent',
     ],
     install_requires=[
+        'colorcet',
+        'datashader',
+        'h5py',
+        'numpy',
+        'pandas',
+        'Pillow',
+        'xarray',
     ]
 )
 
