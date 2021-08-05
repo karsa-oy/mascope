@@ -8,27 +8,23 @@ Created on Fri Mar  6 13:45:15 2020
 
 import numpy as np
 import pandas as pd
-import xarray
+import datashader as ds
+import datashader.transfer_functions as tf
+
+import os
 import h5py
 import warnings
+import xarray
 
 from datetime import timedelta
-from copy import copy, deepcopy
-from concurrent.futures import Future
-from concurrent.futures.process import ProcessPoolExecutor
-from multiprocessing import Queue, Event
-from threading import Thread
-from queue import Empty
+from copy import deepcopy
+from multiprocessing import Process
 
 from PIL import Image
 from io import BytesIO
 from base64 import b64decode, b64encode
-
-import datashader as ds
-import datashader.transfer_functions as tf
 from colorcet import fire
 
-from karsalib.struct import QueueSubscription
 
 # JSON compatible template for plotly scatter trace
 DEFAULT_TRACE = {'x': [],
@@ -72,7 +68,7 @@ def convert_base64_to_img(b64_img):
 
     Returns
     -------
-    PIL.Image
+    PIL.Image.Image
         Image object
     """
 
@@ -403,7 +399,7 @@ def hstack_imgs(slice_imgs):
 
     Returns
     -------
-    PIL.Image
+    PIL.Image.Image
         merged image
 
     """
@@ -427,7 +423,7 @@ def hstack_imgs(slice_imgs):
     return merge_img
 
 def read_img_from_h5(filename, location):
-    """Read image from h5 file and return as PIL.Image
+    """Read image from h5 file and return as PIL.Image.Image
 
     Parameters
     ----------
@@ -446,7 +442,7 @@ def read_img_from_h5(filename, location):
     with h5py.File(filename, 'r') as h5f:
         # Read image array from the file
         img_arr = h5f[location][()]
-        # Convert to PIL.Image and return
+        # Convert to PIL.Image.Image and return
         return Image.fromarray(img_arr)
 
 def stack_spec_images(spec_traces,
@@ -563,3 +559,63 @@ def write_img_to_h5(filename, location, img):
         #                    h5py.h5t.STD_U8BE,
         #                    data=img
         #                    )
+
+
+VIZ_GENERATORS = {
+            'spectrogram': gen_heatmap_image,
+            'timeseries': gen_timeseries_trace,
+            'waterfall': gen_spec_image,
+            }
+
+class ImageGenerator(Process):
+    def __init__(self, queue_in, queue_out, shutdown_event):
+        Process.__init__(self)
+        self.queue_in = queue_in
+        self.queue_out = queue_out
+        self.shutdown_event = shutdown_event
+
+    def run(self):
+        global VIZ_GENERATORS
+        print(f"ImageGenerator started - PID: {os.getpid()}")
+        while not self.shutdown_event.is_set():
+            try:
+                data = self.queue_in.get()
+            except KeyboardInterrupt:
+                print(f"KeyboardInterrupt for PID: {os.getpid()}")
+                self.shutdown_event.set()
+                break
+            except Exception as e:
+                print(f"Exception {str(e)} for PID: {os.getpid()}")
+                self.shutdown_event.set()
+                break
+            if data is not None:
+                # Select function to generate the image
+                viz_type = data['viz_type']
+                try:
+                    viz_gen_func = VIZ_GENERATORS[viz_type]
+                except KeyError:
+                    print("Requested visualization type '%s' not available!" %viz_type)
+                    continue
+                data_array = data.pop('data')
+                y_range = data.get('y_range', None)
+                try:
+                    viz = viz_gen_func(data_array,
+                                       y_range=y_range
+                                       )
+                except ZeroDivisionError:
+                    print("Caught ZeroDivisionError in %s" %str(viz_gen_func))
+                    continue
+                except Exception as e:
+                    # TODO: check if this exception handling is right: without it process hangs
+                    # after acq.stopped, often there goes exception: y must be real (y_range-[0, 15.135354995727539])
+                    print(print(f"ImageGenerator {os.getpid()} exception: {str(e)} for y_range {y_range}"))
+                    continue
+                if isinstance(viz, Image.Image):
+                    img_b = convert_to_base64(viz)
+                    data.update({'img': img_b})
+                elif isinstance(viz, dict):
+                    data.update({'traces': [viz]})
+                self.queue_out.put(data)
+            else:
+                print(f"ImageGenerator stopped - PID: {os.getpid()}")
+                break

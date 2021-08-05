@@ -7,7 +7,6 @@ Created on Tue Jan 14 10:42:01 2020
 
 import numpy as np
 import pandas as pd
-import h5py
 
 from multiprocessing import (
                         cpu_count,
@@ -22,11 +21,11 @@ from time import sleep
 from scipy.stats import mode
 from sklearn.preprocessing import normalize
 
-from karsatof.kfeeder import KFeeder
-from karsatof.kcollector import KCollector
-from karsatof.kworker import init_encoders
+from .kfeeder import KFeeder
+from .kcollector import KCollector
+from .kworker import init_encoders
 from karsatof.kgenerator import KAcquisition
-from karsatof.ksegment import KSegmentSequence
+from .ksegment import KSegmentSequence
 
 from karsatof.kutil import (
                         read_peaklist,

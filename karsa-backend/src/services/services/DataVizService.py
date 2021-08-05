@@ -33,13 +33,13 @@ from karsalib.struct import AttrDict, CacheQ
 from karsalib.util import parse_cmd_args, get_client_notification_args
 from karsalib.logging import this_func_name, t_mark
 
-from karsatof.kcollector import ExtendableDataArray
-from karsatof.kworker import ImageGenerator
-from karsatof.kimage import (
-                    DEFAULT_TRACE,
+from karsalib.struct import ExtendableDataArray
+from karsaimg.image import (
                     convert_base64_to_img,
                     convert_to_base64,
+                    DEFAULT_TRACE,
                     hstack_imgs,
+                    ImageGenerator
                     )
 
 VIZ_TYPES_SUPPORTED = {'spectrogram', 'timeseries', 'waterfall'}
