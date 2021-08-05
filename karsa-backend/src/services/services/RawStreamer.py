@@ -14,7 +14,7 @@ from karsalib.util import get_client_notification_args
                      
 # Raw/H5... imports must be here to load them by name from generic karsalib.run_streamer_service
 from karsatof.kgenerator import RawStreamer, H5Streamer
-from karsatof.kdatapool import RawPool, H5Pool
+from karsalib.datapool import RawPool, H5Pool
 
 
 class RawStreamerPublicNamespace(BaseClientNamespace):

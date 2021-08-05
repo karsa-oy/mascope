@@ -4,9 +4,7 @@
 This script runs the file service for Karsa Tarkka TOF system.
 
 FileService connects to the :mod:`~router_service.router_service.Router`
-via socket.io, and handles file i/o synchronization. It holds in memory
-a :class:`~karsa_hw_interfaces.karsatof.kdatapool.KDataPool` instance
-of the currently selected data path.
+via socket.io, and handles file i/o synchronization.
       
 Created on Thu May  7 12:43:13 2020
 """
@@ -22,7 +20,7 @@ from karsalib.client import (
                         )
 from karsalib.util import parse_cmd_args, get_client_notification_args
 
-from karsatof.kdatapool import SamplePool
+from karsalib.datapool import SamplePool
 from karsaHT3000A.ht3000a import parse_csv_report
 
 

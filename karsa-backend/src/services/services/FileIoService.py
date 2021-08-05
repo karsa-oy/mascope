@@ -4,9 +4,7 @@
 This script runs the file service for Karsa Tarkka TOF system.
 
 FileService connects to the :mod:`~router_service.router_service.Router`
-via socket.io, and handles file i/o synchronization. It holds in memory
-a :class:`~karsa_hw_interfaces.karsatof.kdatapool.KDataPool` instance
-of the currently selected data path.
+via socket.io, and handles file i/o synchronization.
       
 Created on Thu May  7 12:43:13 2020
 """
@@ -28,17 +26,15 @@ from queue import Empty
 
 from karsalib.client import BaseClientNamespace, BridgeServiceClient
 from karsalib.logging import t_mark
-from karsalib.struct import AttrDict, LRUDict, CacheQ
+from karsalib.struct import AttrDict, CacheQ, ExtendableDataArray, LRUDict
 from karsalib.util import (
                         generate_unique_key,
                         get_client_notification_args,
                         parse_cmd_args
                         )
 
-from karsatof.kcollector import ExtendableDataArray
-from karsatof.kdatapool import parse_path_from_sample_name
+from karsalib.datapool import parse_path_from_sample_name
 # from karsatof.kimage import (convert_base64_to_img, convert_to_base64)
-# from karsatof.kutil import AttrDict, generate_unique_key      # commented out to avoid extensive initialization in TwTools
 
 from services.DataVizService import VIZ_TYPES_SUPPORTED
 # from services import VIZ_TYPES_SUPPORTED
