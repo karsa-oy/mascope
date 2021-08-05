@@ -28,7 +28,7 @@ import datashader as ds
 import datashader.transfer_functions as tf
 from colorcet import fire
 
-from karsatof.kutil import QueueSubscription
+from karsalib.struct import QueueSubscription
 
 # JSON compatible template for plotly scatter trace
 DEFAULT_TRACE = {'x': [],

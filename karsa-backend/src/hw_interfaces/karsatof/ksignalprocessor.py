@@ -32,8 +32,8 @@ from karsatof.kutil import (
                         read_peaklist,
                         peaklist_to_df,
                         load_peak_dict,
-                        QueueSubscription
                         )
+from karsalib.struct import QueueSubscription
 
 
 class KSignalProcessor(Thread):
