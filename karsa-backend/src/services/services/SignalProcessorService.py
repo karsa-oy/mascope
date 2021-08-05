@@ -16,13 +16,10 @@ from multiprocessing import (Barrier,
 from queue import Empty
 
 from karsalib.client import BaseClientNamespace
-from karsatof.kfeeder import KFeeder, FeederProcessor
-from karsatof.kworker import KEncoder
-from karsatof.kcollector import KCollector
-from karsatof.kutil import (read_peaklist,
-                            peaklist_to_df,
-                            load_peak_dict,
-                            )
+from scenthound.kfeeder import KFeeder, FeederProcessor
+from scenthound.kworker import KEncoder
+from scenthound.kcollector import KCollector
+from scenthond.kpeak import load_peak_dict
 
 
 class SignalProcessorNamespace(BaseClientNamespace):

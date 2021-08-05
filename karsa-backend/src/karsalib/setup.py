@@ -23,8 +23,15 @@ setuptools.setup(
         'Operating System :: OS Independent',
     ],
     install_requires=[
-        'asyncio',
+        'dask[array]',
+        'datetime_glob',
+        'numpy',
+        'pandas',
         'python-socketio',
+        'pyyaml',
+        'scipy',
+        'sparse',
+        'xarray'
     ]
 )
 

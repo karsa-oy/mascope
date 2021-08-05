@@ -10,8 +10,6 @@ Created on Tue Apr  2 13:05:14 2019
 import numpy as np
 
 from scipy.io import loadmat
-from scipy.sparse import lil_matrix
-from sklearn.preprocessing import normalize
 
 from .lib.TwTool import TwTof2Mass, TwMass2Tof
 

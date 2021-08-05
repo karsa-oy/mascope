@@ -6,7 +6,7 @@ Created on Tue Jan  7 10:28:20 2020
 
 import numpy as np
 
-from karsatof.lib.TwTool import (
+from .lib.TwTool import (
                         TwGetMoleculeMass,
                         TwGetIsotopePattern,
                         TwDecomposeMass,

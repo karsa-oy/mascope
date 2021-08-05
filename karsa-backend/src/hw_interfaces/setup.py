@@ -14,7 +14,7 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
 #    packages=setuptools.find_packages(),
-    packages=['karsaorbi', 'karsatof', ],
+    packages=['karsaecu', 'karsaHT3000A', 'karsaorbi', 'karsatof'],
     include_package_data=True,
     python_requires=">=3.6, !=3.9.*",
     classifiers=[
@@ -23,17 +23,12 @@ setuptools.setup(
         'Operating System :: OS Independent',
     ],
     install_requires=[
-	'colorcet',
-        'dask[complete]',
-        'datetime_glob',
         'h5py',
         'h5sparse',
         'numpy',
         'pandas',
         'pythonnet',
-        'scikit-learn',
         'scipy',
-        'sparse',
         'xarray',
     ]
 )

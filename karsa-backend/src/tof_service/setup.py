@@ -23,9 +23,6 @@ setuptools.setup(
         'Operating System :: OS Independent',
     ],
     install_requires=[
-        'asyncio',
-        'numpy',
-        'python-socketio',
     ],
     entry_points={
         'console_scripts': [
@@ -33,4 +30,3 @@ setuptools.setup(
         ],
     }
 )
-

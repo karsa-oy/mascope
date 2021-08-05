@@ -11,26 +11,36 @@ if defined CONDA_EXE (
 )
 
 echo ========================
-echo   2. Install hw_interfaces package:
-echo ========================
-  pip install -e hw_interfaces || goto :error
-
-echo ========================
-echo   3. Install karsalib package:
+echo   2. Install karsalib package:
 echo ========================
   pip install -e karsalib || goto :error
 
 echo ========================
-echo   4. Install backend services:
+echo   3. Install hw_interfaces package:
+echo ========================
+  pip install -e hw_interfaces || goto :error
+
+echo ========================
+echo   4. Install karsaimg package:
+echo ========================
+  pip install -e karsaimg || goto :error
+
+echo ========================
+echo   5. Install scenthound package:
+echo ========================
+  pip install -e scenthound || goto :error
+
+echo ========================
+echo   6. Install backend services:
 echo ========================
   pip install -e router_service || goto :error
   pip install -e tof_service || goto :error
   pip install -e services || goto :error
 
 echo ========================
-echo   5. Dev setup for karsa-backend is done.
+echo   7. Dev setup for karsa-backend is done.
 echo. 
-echo   6. To start the services, run the script:
+echo   8. To start the services, run the script:
 echo     run_services.cmd
 echo ========================
   pip install py-spy || goto :error

@@ -23,15 +23,10 @@ setuptools.setup(
         'Operating System :: OS Independent',
     ],
     install_requires=[
-        'asyncio',
         'dask[array]',
-        'environs',
         'numpy',
-        'openpyxl',
         'xarray',
         'zarr',
-        'decorator',
-        'asynctest',
     ],
     entry_points={
         'console_scripts': [
