@@ -27,7 +27,7 @@ setuptools.setup(
         'h5sparse',
         'numpy',
         'pandas',
-        'pythonnet',
+        'pythonnet ; platform_system=="Windows"',
         'scipy',
         'xarray',
     ]
