@@ -25,8 +25,8 @@ rm -rf DataViz_*.db
 xterm -hold -e "karsa-dataviz-service; bash" &
 
 # commented out, since karsa-raw-streamer currently fails on linux: TofDaq dependency to be removed
-# xterm -hold -e karsa-raw-streamer --config=/vagrant/src/services/services/raw_streamer_config/h5.yaml
-# xterm -hold -e karsa-raw-streamer --config=/vagrant/src/services/services/raw_streamer_config/raw.yaml
-# xterm -hold -e karsa-fileio-service --ns=H5Data
-# xterm -hold -e karsa-fileio-service --ns=OrbitrapData || goto :error
+# xterm -hold -e "karsa-raw-streamer --config=/vagrant/src/services/services/raw_streamer_config/h5.yaml; bash" &
+# xterm -hold -e "karsa-raw-streamer --config=/vagrant/src/services/services/raw_streamer_config/raw.yaml; bash" &
+# xterm -hold -e "karsa-fileio-service --ns=H5Data; bash" &
+# xterm -hold -e "karsa-fileio-service --ns=OrbitrapData; bash" &
 # sleep 7

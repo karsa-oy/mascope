@@ -37,13 +37,14 @@ echo ========================
   pip install -e tof_service || goto :error
   pip install -e services || goto :error
 
+  pip install py-spy || goto :error
+
 echo ========================
 echo   7. Dev setup for karsa-backend is done.
 echo. 
 echo   8. To start the services, run the script:
 echo     run_services.cmd
 echo ========================
-  pip install py-spy || goto :error
   exit /b 0
 
 
