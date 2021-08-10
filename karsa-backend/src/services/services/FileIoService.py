@@ -36,8 +36,7 @@ from karsalib.util import (
 from karsalib.datapool import parse_path_from_sample_name
 # from karsatof.kimage import (convert_base64_to_img, convert_to_base64)
 
-from services.DataVizService import VIZ_TYPES_SUPPORTED
-# from services import VIZ_TYPES_SUPPORTED
+from karsaimg import VIZ_TYPES_SUPPORTED
 
 
 
@@ -1137,7 +1136,8 @@ def open_mfzarr(path, mode='r', concat_dim='time'):
 
     if not os.path.exists(path):
         raise FileNotFoundError("Zarr file %s does not exist" %path)
-    z = zarr.open(path, mode=mode)
+    sync = zarr.ProcessSynchronizer(os.path.join(path, '.sync'))
+    z = zarr.open(path, mode=mode, synchronizer=sync)
     groups = [ g[0] for g in z.groups() ]
     x = xarray.concat([ xarray.open_zarr(path, g) for g in groups ],
                       concat_dim
@@ -1148,14 +1148,16 @@ def open_mfzarr(path, mode='r', concat_dim='time'):
 def read_zarr_attributes(filepath):
     if not os.path.exists(filepath):
         raise ValueError("Zarr file %s does not exist" %filepath)
-    z = zarr.open(filepath, mode='r')
+    sync = zarr.ProcessSynchronizer(os.path.join(filepath, '.sync'))
+    z = zarr.open(filepath, mode='r', synchronizer=sync)
     attributes = z.attrs.asdict()
     return attributes
 
 def write_zarr_attributes(filepath, attributes):
     if not os.path.exists(filepath):
         raise ValueError("Zarr file %s does not exist" %filepath)
-    z = zarr.open(filepath, mode='a')
+    sync = zarr.ProcessSynchronizer(os.path.join(filepath, '.sync'))
+    z = zarr.open(filepath, mode='a', synchronizer=sync)
     z.attrs.update(attributes)
 # ---------------------------------------
 
