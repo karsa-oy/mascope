@@ -42,7 +42,8 @@ from karsaimg.image import (
                     ImageGenerator
                     )
 
-VIZ_TYPES_SUPPORTED = {'spectrogram', 'timeseries', 'waterfall'}
+from services.FileIoService import load_file
+
 
 NO_DATA_LOGGING_DEAULT = False
 client = None
@@ -593,22 +594,18 @@ def process_visualization_request(filename,
             processed_until = t1_i
         return processed_until
 
-    cache_item = cache.get(filename) or cache.get(request_id)
+    cache_item = cache.get(filename, None)
     if not cache_item:
-        print("No such cache item: %s" %request_id)
+        print("No such cache item: %s" %filename)
         return False
     processed_until = feed_signal_to_visualize([t0, t1])
     return processed_until
 
 def release_request(request_id):
         viz_cache_release('requests',
-                           request_id=request_id,
-                         )
+                          request_id=request_id,
+                          )
         generator_input_cache.cache_delete_key(request_id)
-        try:
-            cache.pop(request_id)
-        except KeyError:
-            pass
         print(this_func_name(), request_id,
               'cache_q', generator_input_cache.cache.keys(),
               'file_cache', cache.keys())
@@ -641,8 +638,6 @@ class DataVizServiceNamespace(BaseClientNamespace):
             'acquisition_coordinates',
             'acquired_spectrum',
             'acquisition_finished',
-            # 'loaded_coordinates',
-            # 'loaded_data',
             'service_state',
             'stop_visualize_range',
             'visualize_range',
@@ -679,6 +674,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
         if not mz_range:
             for viz_type in viz_types:
                 # Request full-range images from FileIo directly to client
+                # TODO: Load images from file in DataViz and emit directly
                 await self.emit_client_notification('data_request',
                                                     {'filename': filename,
                                                     'data_type': viz_type,
@@ -691,79 +687,13 @@ class DataVizServiceNamespace(BaseClientNamespace):
             return
 
         # Check if data_request is needed
-        cache_item = cache.get(filename, None) or cache.get(request_id, None)
+        cache_item = cache.get(filename, None)
         if not cache_item:
-            # File not in cache, add
-            cache[request_id] = AttrDict({})
-            cache_item = cache[request_id]
-
-        data_request_needed = True
-        if 'signal' not in cache_item:
-            # Signal not in cache, request coordinates and signal in mz_range
-            # Add dummy item to avoid duplicate requests
-            cache_item.signal = None
-            # Request signal coordinates
-            self.log("Request coordinates")
-            await self.emit_client_notification('coordinate_request',
-                                                {'request_id': request_id,
-                                                 'filename': filename,
-                                                 'data_type': 'signal',
-                                                 'dims': ['mz'],
-                                                 **t_data,
-                                                 },
-                                                namespace=get_namespace(filename)
-                                                )
-            # Request signal
-            self.log("Request signal in range: %s" %str(mz_range))
-            await self.emit_client_notification('data_request',
-                                                {'filename': filename,
-                                                 'data_type': 'signal',
-                                                 'mz_range': mz_range,
-                                                 'request_id': request_id,
-                                                 **t_data,
-                                                },
-                                                namespace=get_namespace(filename)
-                                                )
-        elif cache_item.signal:
-            cached_slice = cache_item.signal.sel(mz=slice(*mz_range),
-                                                 )
-            data_request_needed = True
-            mz_range_missing = mz_range
-
-            if cached_slice.mz.shape[0] > 0:
-                # Requested range at least partly cached
-                # print("cached_slice mz: [%.4f, %.4f]" %(cached_slice.mz[0].item(),
-                #                                         cached_slice.mz[-1].item())
-                #       )
-                cached_mz_range = [cached_slice.mz[0].item(),
-                                   cached_slice.mz[-1].item()
-                                   ]
-                mz_range_missing = [ cached_mz_range[1], cached_mz_range[0] ]
-                data_request_needed = False
-                min_dmz = 1e-2
-                if (cached_mz_range[0] - mz_range[0]) > min_dmz:
-                    # Data missing at the bottom of the range
-                    data_request_needed = True
-                    mz_range_missing[0] = mz_range[0]
-                if (mz_range[1] - cached_mz_range[1]) > min_dmz:
-                    # Data missing at the top of the range
-                    data_request_needed = True
-                    mz_range_missing[1] = mz_range[1]
-                # print("mz_range_missing: [%.4f, %.4f]" %(mz_range_missing[0], mz_range_missing[1])
-                #     )
-
-            # Request signal
-            if data_request_needed:
-                self.log("Emit data request: %s" %mz_range_missing)
-                await self.emit_client_notification('data_request',
-                                                    {'filename': filename,
-                                                    'data_type': 'signal',
-                                                    'mz_range': mz_range_missing,
-                                                    'request_id': request_id,
-                                                    **t_data,
-                                                    },
-                                                    namespace=get_namespace(filename)
-                                                    )
+            # File not in cache, load
+            print("Loading file: %s" %filename)
+            file_dataset = load_file(filename) # TODO: Load a subset of arrays from file
+            cache[filename] = file_dataset
+            
         # Add a request, or add to existing request
         for viz_type in viz_types:
             viz_cache_put_or_update_request(filename,
@@ -774,9 +704,9 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                             client_room,
                                             request_id
                                             )
-        if not data_request_needed:
-            # Process request
-            viz_cache_process_requests(filename, request_id=request_id)
+        # Process request
+        viz_cache_process_requests(filename, request_id=request_id)
+
         t_mark(t_data)
 
     async def on_stop_visualize_range(self, data):
@@ -806,121 +736,6 @@ class DataVizServiceNamespace(BaseClientNamespace):
         if not cur.fetchone() and filename in cache:
             del cache[filename]
     # ---------------------------------
-
-    # ========== FileIoService notifications ==========
-    async def on_loaded_coordinates(self, data):
-            """
-            """
-            # print("on_loaded_coordinates")
-            global cache
-
-            value = data['value']
-            t_mark(value)
-            
-            request_id = value['request_id']
-            filename = value['filename']
-            data_type = value['data_type']
-            coordinates = value['coordinates']
-
-            # Initialize data array
-            dims = coordinates.keys()
-            for dim in dims:
-                coordinate_values = []
-                if len(coordinates[dim]):
-                    coordinate_values = np.frombuffer( coordinates[dim], dtype=np.float32 )
-                coordinates.update( {dim: coordinate_values} )
-            
-            data_array = ExtendableDataArray(array_module=da, persist=True)
-            data_array.init_array(dims=dims,
-                                  coords=coordinates,
-                                  name=data_type,
-                                  )
-            period_array = ExtendableDataArray(array_module=da, persist=True)
-            period_array.init_array(dims=('time'),
-                                    coords=[[]],
-                                    name='_'.join([data_type, 'period'])
-                                    )
-            # Put to data cache
-            cache[request_id].update({data_array.name: data_array,
-                                    period_array.name: period_array,
-                                    })
-            t_mark(value)
-
-    async def on_loaded_data(self, data):
-        """Data loaded from FileIoService
-        """
-
-        async def on_loaded_signal(data):
-            """TODO: This is duplicate with on_acquired_spectrum in FileIoPrivateNamespace
-            """
-            # print("on_loaded_signal")
-            global cache
-
-            value = data['value']
-            # i = value.get('i')
-            request_id = value['request_id']
-            filename = value['filename']
-            if not value.get('spec'):
-                viz_cache_process_requests(filename, request_id=request_id, flush=True)
-                return
-
-            ti = np.array( [value['t']], dtype=np.float32 )
-            period = np.array( [value['period']], dtype=np.float32 )
-            y_max = value['y_max']
-            # self.log(ti.item())
-            spec = np.frombuffer(value['spec'], dtype=np.float32)
-            spec = spec.reshape(-1, 1)
-
-            # Get data arrays from cache
-            try:
-                signal_array = cache[request_id]['signal']
-                period_array = cache[request_id]['signal_period']
-            except KeyError:
-                # request was cancelled - request_id deleted
-                print(f"Request {request_id} was cancelled")
-                return
-
-            if 'mz' in value:
-                # mz coordinates provided with data (Orbitrap)
-                mz = np.frombuffer(value['mz'], dtype=np.float32)
-                mz = mz.reshape(-1,)
-            else:
-                # Use mz coordinates from signal_array (TOF)
-                mz = signal_array.mz
-
-            if ((signal_array.time.shape[0] == 0) or
-                (ti.item() > signal_array.time[-1])
-                ):
-                # self.log("extending time-wise")
-                # Extend data arrays time-wise
-                signal_array.extend_array(spec,
-                                        [mz, ti],
-                                        'time'
-                                        )
-                signal_array.attrs.update({'y_max': y_max})
-                period_array.extend_array(period,
-                                        [ti],
-                                        'time'
-                                        )
-            elif ti.item() in signal_array.time:
-                # self.log("extending mz-wise")
-                # Extend data arrays mz-wise
-                # signal_array.combine_first(spec,
-                #                            [mz, ti]
-                #                            )
-                pass
-            viz_cache_process_requests(filename, request_id=request_id)
-
-        data_type = data['value']['data_type']
-        if data_type == 'signal':
-            await on_loaded_signal(data)
-        elif data_type == 'etx':
-            print("Processing termination package")
-            filename = data['value']['filename']
-            request_id = data['value']['request_id']
-            viz_cache_process_requests(filename, request_id=request_id, flush=True)
-        return data['cnt']
-    # ----------------------------------------------
 
     async def on_acquisition_coordinates(self, data):
         """Initialize acquisition cache with received coordinates
