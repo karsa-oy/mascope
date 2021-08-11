@@ -10,9 +10,6 @@ Sources can be found here:
 
 
 ### Project setup
-1) go to src folder
-
-cd src
 
 1) run development setup for the project
 
