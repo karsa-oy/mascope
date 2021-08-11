@@ -19,10 +19,10 @@ pushd .venv || goto :error
 
 :: Start other services
 start cmd /k karsa-fileio-service --ns=TofDaq || goto :error
-start cmd /k karsa-raw-streamer --config=../services/services/raw_streamer_config/h5.yaml || goto :error
-start cmd /k karsa-fileio-service --ns=H5Data || goto :error
-start cmd /k karsa-raw-streamer --config=../services/services/raw_streamer_config/raw.yaml || goto :error
-start cmd /k karsa-fileio-service --ns=OrbitrapData || goto :error
+:: start cmd /k karsa-raw-streamer --config=../services/services/raw_streamer_config/h5.yaml || goto :error
+:: start cmd /k karsa-fileio-service --ns=H5Data || goto :error
+:: start cmd /k karsa-raw-streamer --config=../services/services/raw_streamer_config/raw.yaml || goto :error
+:: start cmd /k karsa-fileio-service --ns=OrbitrapData || goto :error
 
 echo Wait for FileIO services to start:
 timeout 7
