@@ -366,7 +366,6 @@ export default {
                 this.namespace = this.root_namespace;
                 // handlers for for external notifications:
                 this.namespace.on("figure_data", (value) => this.be.import_one_way_binding_prop("figure_data", value));
-                this.namespace.on("loaded_data", (value, cb) => {this.be.import_one_way_binding_prop("figure_data", value); cb(value.cnt)});
 
                 this.room_sid = this.root_namespace.id;
             }
