@@ -31,7 +31,9 @@ setuptools.setup(
         'pyyaml',
         'scipy',
         'sparse',
-        'xarray'
+        'xarray',
+        'asynctest',
+        'decorator'
     ]
 )
 

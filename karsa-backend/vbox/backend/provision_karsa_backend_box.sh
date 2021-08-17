@@ -12,8 +12,9 @@ echo AAA Setting up dev environment
 os_name=$(lsb_release -si)
 os_version=$(echo $(cat /etc/os-release | grep '^VERSION_ID=') | cut -d '"' -f 2)
 
-if [[ $os_name != "Ubuntu" || $os_version < "20" ]]; then
-	echo AAA $0 is supposed to run on Ubuntu 20, while current one is ${os_name} ${os_version}
+target_os_version="20"
+if [[ $os_name != "Ubuntu" || $os_version < $target_os_version ]]; then
+	echo AAA $0 is supposed to run on Ubuntu $target_os_version, while current one is ${os_name} ${os_version}
 	exit 1
 fi
 
@@ -32,12 +33,12 @@ function install_dev_prerequisites() {
     # sudo apt install -y python3-tk python3-dev python3-pip
     sudo apt install -y python3-pip python3.8-dev python3.8-distutils python3.8-venv
     sudo -H python3 -m pip install -U pip
-    sudo -H python3 -m pip install pillow
+    python3 -m pip install --user pillow
 #    sudo apt install -y docker.io
 
     # workaround OpenSSL bug TODO: check if needed
-    sudo -H python3 -m pip uninstall -y pyOpenSSL cryptography
-    sudo -H python3 -m pip install pyOpenSSL cryptography
+    sudo -H python3 -m pip uninstall -y pyOpenSSL cryptography || true
+    python3 -m pip install --user pyOpenSSL cryptography
 }
 
 
