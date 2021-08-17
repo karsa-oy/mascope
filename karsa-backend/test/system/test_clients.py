@@ -47,15 +47,14 @@ class TestBaseTestClient(asynctest.TestCase):
         self.assert_requests_ok()
 
 
-    @unittest.skip("NotImplemented: data format is different for zoomed on_loaded_data")
     def test_visualize_zoomed_range(self):
-        # TODO: fix handlers for a separate use and together with visualize_full_range
         fname = 'TofDaq_Data_2021.08.02_18h53m56s'
-        max_exec_time = 30
-        t_range_max = 10
-        t_range=[5, t_range_max]
+        max_exec_time = 10
+        # TODO: batch size is 5.xx for the sample - what about other samples?
+        t_range_01 = 21
+        t_range=[5, t_range_01]
         mz_range=[100, 200]
-        rq_suffix = self.client.set_test_params(fname, t_range_max=t_range_max, max_exec_time=max_exec_time)
+        rq_suffix = self.client.set_test_params(fname, t_range_max=t_range_01-1, max_exec_time=max_exec_time)
         asyncio.run(
             self.client.emit_visualize_range(fname,
                                     request_id=f'zoom_{rq_suffix}',
@@ -65,17 +64,18 @@ class TestBaseTestClient(asynctest.TestCase):
         self.assert_requests_ok()
 
 
-    @unittest.skip("NotImplemented: fix test_visualize_zoomed_range")
     def test_visualize_two_ranges_sequentially(self):
         fname = 'TofDaq_Data_2021.08.02_18h53m56s'
         rq_suffix = self.client.set_test_params(fname)
         asyncio.run(self.client.emit_visualize_range(fname, request_id=f"fullrange_{rq_suffix}"))
+
         self.assert_requests_ok()     # wait for rq to complete and verify exceptions
-        max_exec_time = 30
-        t_range_max = 10
-        t_range=[5, t_range_max]
+
+        max_exec_time = 10
+        t_range_01 = 16     # sample batch size is 5.xx
+        t_range=[5, t_range_01]
         mz_range=[100, 200]
-        rq_suffix = self.client.set_test_params(fname, t_range_max=t_range_max, max_exec_time=max_exec_time)
+        rq_suffix = self.client.set_test_params(fname, t_range_max=t_range_01-1, max_exec_time=max_exec_time)
         asyncio.run(
             self.client.emit_visualize_range(fname,
                                     request_id=f'zoom_{rq_suffix}',
@@ -85,17 +85,17 @@ class TestBaseTestClient(asynctest.TestCase):
         self.assert_requests_ok()
 
 
-    @unittest.skip("NotImplemented: fix test_visualize_zoomed_range")
     def test_visualize_two_ranges_parallel(self):
         fname = 'TofDaq_Data_2021.08.02_18h53m56s'
-        max_exec_time = 30    # for parallel rqs max_exec_time increases (TBT: how?)
+        max_exec_time = 10
         rq_suffix = self.client.set_test_params(fname, max_exec_time=max_exec_time)
         asyncio.run(self.client.emit_visualize_range(fname, request_id=f"fullrange_{rq_suffix}"))
-        max_exec_time = 30
-        t_range_max = 10
-        t_range=[5, t_range_max]
+
+        max_exec_time = 10
+        t_range_01 = 16
+        t_range=[5, t_range_01]
         mz_range=[100, 200]
-        rq_suffix = self.client.set_test_params(fname, t_range_max=t_range_max, max_exec_time=max_exec_time)
+        rq_suffix = self.client.set_test_params(fname, t_range_max=t_range_01-1, max_exec_time=max_exec_time)
         asyncio.run(
             self.client.emit_visualize_range(fname,
                                     request_id=f'zoom_{rq_suffix}',
@@ -105,7 +105,7 @@ class TestBaseTestClient(asynctest.TestCase):
         self.assert_requests_ok()
 
 
-    @unittest.skip("TODO: fix data for input files, maybe extend max_exec_time")
+    @unittest.skip("TODO: fix data for both input files")
     def test_visualize_two_files_parallel(self):
         fname = 'file_1'
         rq_suffix = self.client.set_test_params(fname)
