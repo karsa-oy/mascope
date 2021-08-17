@@ -24,7 +24,7 @@ from datetime import datetime
 from queue import Empty
 
 
-from karsalib.client import BaseClientNamespace, BridgeServiceClient
+from karsalib.client import BaseClientNamespace, BaseServiceClient
 from karsalib.logging import t_mark
 from karsalib.struct import AttrDict, CacheQ, ExtendableDataArray, LRUDict
 from karsalib.util import (
@@ -34,9 +34,6 @@ from karsalib.util import (
                         )
 
 from karsalib.datapool import parse_path_from_sample_name
-# from karsatof.kimage import (convert_base64_to_img, convert_to_base64)
-
-from karsaimg import VIZ_TYPES_SUPPORTED
 
 
 
@@ -489,28 +486,7 @@ REQUEST_PROCESSORS = {'signal': process_signal_request,
                       }
 # ------------------------------------------
 
-class FileIoPublicNamespace(BaseClientNamespace):
-    endpoints = []
-    endpoints_room_sid = [
-        # DataViz
-        'figure_data',
-        # //
-        ]
-    endpoints_room_instrument = []
-
-    async def subscribe(self):
-        if self.endpoints:
-            await super().subscribe(self.endpoints)
-        if self.endpoints_room_sid:
-            await super().subscribe(self.endpoints_room_sid, self.room_sid)
-        if self.endpoints_room_instrument:
-            await super().subscribe(self.endpoints_room_instrument, self.room_instrument)
-
-    async def on_figure_data(self, data):
-        await self.parent.private_ns.on_figure_data(data)
-
-
-class FileIoPrivateNamespace(BaseClientNamespace):
+class FileIoNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to MainService """
 
     endpoints = [
@@ -519,7 +495,6 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         'instrument_log_request',
         # //
         # TOFService
-        'acquisition_started',
         'acquisition_coordinates',
         'acquired_spectrum',
         'acquired_tps_data',
@@ -533,8 +508,6 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         # Router
         'service_state',
         # //
-        # DataViz
-        # 'figure_data',            # masked by public endpoint
         # Services
         'coordinate_request',
         'data_request',
@@ -560,50 +533,6 @@ class FileIoPrivateNamespace(BaseClientNamespace):
     # -----------------------------------------
 
     # ========== TOFService requests ==========
-    async def on_acquisition_started(self, data):
-        global cache
-
-        filename = data['value']['filename']
-        # Initialize visualization arrays in file cache and emit request to DataViz
-        for viz_type in VIZ_TYPES_SUPPORTED:
-            # Initialize array
-            filename_viz = filename_to_zarr_path(filename, viz_type)
-            viz_array = ExtendableDataArray(path=filename_viz,
-                                            array_module=np,
-                                            dtype=object,
-                                            chunk_size=1,
-                                            )
-            viz_array.init_array(dims=('time',),
-                                 coords=[[]],
-                                 name=viz_type
-                                 )
-            viz_period = viz_type + '_period'
-            filename_viz_period = filename_to_zarr_path(filename, viz_period)
-            viz_period_array = ExtendableDataArray(path=filename_viz_period,
-                                                   array_module=np,
-                                                   dtype=object,
-                                                   chunk_size=1,
-                                                   )
-            viz_period_array.init_array(dims=('time',),
-                                        coords=[[]],
-                                        name=viz_period
-                                        )
-            # Put to file cache
-            cache[filename].update({viz_type: viz_array,
-                                    viz_period: viz_period_array
-                                    })
-        # Request full-size visualization from DataViz
-        await self.parent.emit_public_notification(
-                'visualize_range',
-                {'filename': filename,
-                 'mz_range': data['value']['mz_range'],
-                 't_range': data['value']['t_range'],
-                 'viz_types': list(VIZ_TYPES_SUPPORTED),
-                 'request_id': generate_unique_key(),
-                 },
-                client_room=self.parent.public_ns.room_sid,
-                )
-
     async def on_acquisition_coordinates(self, data):
         """Initialize acquisition cache with received coordinates
 
@@ -782,7 +711,7 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         cache[filename_base] = cache_item
     # -----------------------------------------
 
-    # =========== DataViz requests ===========
+    # =========== Service requests ===========
     async def on_coordinate_request(self, data):
         global cache
 
@@ -885,31 +814,6 @@ class FileIoPrivateNamespace(BaseClientNamespace):
         t_mark(value, 'on_data_request:cache_process_requests')
         cache_process_requests(filename, data_type=data_type)
         t_mark(value, 'on_data_request:out')
-
-    async def on_figure_data(self, data):
-        # self.log(data)
-        value = data['value']
-        t_mark(value)
-
-        filename = value['filename']
-        viz_type = value['viz_type']
-        
-        ti = np.array([ value['t_range'][0] ], dtype=np.float32)
-        img_str = value.get('img') or json.dumps(value.get('traces'))
-        img_period = value['t_range'][1] - value['t_range'][0]
-
-        viz_array = cache[filename][viz_type]
-        period_array = cache[filename][ (viz_type + '_period') ]
-        viz_array.extend_array(np.array([img_str]),
-                               [ti],
-                               'time'
-                               )
-        period_array.extend_array(np.array( [img_period], dtype=np.float32 ),
-                                  [ti],
-                                  'time'
-                                  )
-        t_mark(value)
-        cache_process_requests(filename, data_type=viz_type)
 
     async def on_stop_data_request(self, data):
         self.log(data)
@@ -1162,7 +1066,7 @@ def write_zarr_attributes(filepath, attributes):
 # ---------------------------------------
 
 
-class FileIoClient(BridgeServiceClient):
+class FileIoClient(BaseServiceClient):
     
     async def init_service(self):
         global service_q
@@ -1172,15 +1076,15 @@ class FileIoClient(BridgeServiceClient):
     async def service_main(self):
         MAX_RESPONSE_TIME = 15          # seconds to wait for the client response, then drop
 
-        def public_ns_data_count(cnt):
-            # the callback is triggered in the notification namespace
-            self.public_ns.cnt = max(cnt, self.public_ns.cnt)
-            self.public_ns.cnt_timestamp = time.time()
+        # def public_ns_data_count(cnt):
+        #     # the callback is triggered in the notification namespace
+        #     self.public_ns.cnt = max(cnt, self.public_ns.cnt)
+        #     self.public_ns.cnt_timestamp = time.time()
 
-        self.public_ns.public_ns_data_count = public_ns_data_count
-        self.public_ns.cnt = 0
-        self.public_ns.cnt_timestamp = time.time()
-        cnt = 0
+        # self.public_ns.public_ns_data_count = public_ns_data_count
+        # self.public_ns.cnt = 0
+        # self.public_ns.cnt_timestamp = time.time()
+        # cnt = 0
 
         while True:
             # Check queue for signal to emit (put in cache_process_requests)
@@ -1189,12 +1093,12 @@ class FileIoClient(BridgeServiceClient):
                 if not data:
                     await self.sio.sleep(.1)
                     continue
-                while cnt - self.public_ns.cnt > 4:
-                    if time.time() - self.public_ns.cnt_timestamp > MAX_RESPONSE_TIME:
-                        # stop waiting frozen packages, if no response in due time
-                        public_ns_data_count(cnt)
-                        break
-                    await self.sio.sleep(.1)
+                # while cnt - self.public_ns.cnt > 4:
+                #     if time.time() - self.public_ns.cnt_timestamp > MAX_RESPONSE_TIME:
+                #         # stop waiting frozen packages, if no response in due time
+                #         public_ns_data_count(cnt)
+                #         break
+                #     await self.sio.sleep(.1)
             except Empty:
                 await self.sio.sleep(.1)
                 continue
@@ -1202,13 +1106,13 @@ class FileIoClient(BridgeServiceClient):
                 break
 
             client_room = data.pop('client_room')
-            cnt += 1
+            # cnt += 1
             await self.emit_public_notification(
                             'loaded_data',
                             data,
                             room=client_room,
-                            callback='public_ns_data_count',
-                            cnt=cnt
+                            # callback='public_ns_data_count',
+                            # cnt=cnt
                             )
             # End of main loop
         await self.sio.disconnect()
@@ -1224,8 +1128,7 @@ def run():
 
     client = FileIoClient(args['url'],
                           args['port'],
-                          ('/', FileIoPublicNamespace),
-                          (args['ns'], FileIoPrivateNamespace)
+                          (args['ns'], FileIoNamespace)
                           )
     loop = asyncio.get_event_loop()
     try:
