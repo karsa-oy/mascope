@@ -19,33 +19,6 @@ from time import sleep
 
 from ctypes import create_string_buffer
 
-from .lib.TofDaq import (
-    TwRetVal,
-    TSharedMemoryDesc,
-    TSharedMemoryPointer,
-    TwAddLogEntry,
-    TwGetDescriptor,
-    TwTofDaqRunning,
-    TwDaqActive,
-    TwWaitForNewData,
-    TwGetBufTimeFromShMem,
-    TwGetTofSpectrumFromShMem,
-    TwQueryRegUserDataSize,
-    TwReadRegUserData,
-    TwGetRegUserDataDesc,
-    TwGetSpecXaxisFromShMem,
-    TwStartAcquisition,
-    TwStopAcquisition
-    )
-from .lib.TwH5 import (
-    TwGetBufTimeFromH5,
-    TwGetH5Descriptor,
-    TwGetRegUserDataFromH5,
-    TwGetSpecXaxisFromH5,
-    TwGetTofSpectrumFromH5,
-    TwH5Desc,
-)
-
 from .kinstrument import KInstrument
 
 
@@ -66,6 +39,24 @@ def strip_filepath(filepath):
 
 
 class TofDaqStreamer(Thread):
+    from .lib.TofDaq import (
+            TwRetVal,
+            TSharedMemoryDesc,
+            TSharedMemoryPointer,
+            TwAddLogEntry,
+            TwGetDescriptor,
+            TwTofDaqRunning,
+            TwDaqActive,
+            TwWaitForNewData,
+            TwGetBufTimeFromShMem,
+            TwGetTofSpectrumFromShMem,
+            TwQueryRegUserDataSize,
+            TwReadRegUserData,
+            TwGetRegUserDataDesc,
+            TwGetSpecXaxisFromShMem,
+            TwStartAcquisition,
+            TwStopAcquisition
+            )
     def __init__(self):
         """Initialize self
 
@@ -83,17 +74,17 @@ class TofDaqStreamer(Thread):
         Thread.__init__(self)
 
         # Initialize TW API related structures 'desc' and 'ptr'
-        if not TwTofDaqRunning():
+        if not TofDaqStreamer.TwTofDaqRunning():
             raise ModuleNotFoundError("TofDaq Recorder not running.")
-        self.desc = TSharedMemoryDesc() # TW shared memory descriptor
-        ret = TwGetDescriptor(self.desc)
+        self.desc = TofDaqStreamer.TSharedMemoryDesc() # TW shared memory descriptor
+        ret = TofDaqStreamer.TwGetDescriptor(self.desc)
         if ret == 4:
             # Success
-            self.ptr = TSharedMemoryPointer() # TW shared memory pointer
+            self.ptr = TofDaqStreamer.TSharedMemoryPointer() # TW shared memory pointer
         else:
             # Failed
             raise Exception("Trying to fetch shared memory " +
-                            "descriptor failed: %s" %TwRetVal(ret).name)
+                            "descriptor failed: %s" %TofDaqStreamer.TwRetVal(ret).name)
         # Parameters
         self.timeout = 500 # [ms], timeout for TwWaitForNewData
         # Synchronization primitives
@@ -113,10 +104,10 @@ class TofDaqStreamer(Thread):
     def mz(self):
         # Get mz axis from file
         mz = np.zeros((self.desc.nbrSamples,), dtype=np.double)
-        TwGetSpecXaxisFromShMem(mz,
-                                1,
-                                None
-                                )
+        TofDaqStreamer.TwGetSpecXaxisFromShMem(mz,
+                                               1,
+                                               None
+                                               )
         return mz.astype(np.float32)
 
     @property
@@ -158,12 +149,12 @@ class TofDaqStreamer(Thread):
         """
         # Get timestamp from TW shared memory
         ti = np.zeros((1,))
-        TwGetBufTimeFromShMem(ti, self.desc.iBuf, self.desc.iWrite)
+        TofDaqStreamer.TwGetBufTimeFromShMem(ti, self.desc.iBuf, self.desc.iWrite)
 
         # == Get and feed mass spectrum data ==
         # Get most recent spectrum from TW shared memory
         spec = np.zeros((self.desc.nbrSamples, ), dtype=np.float32)
-        ret = TwGetTofSpectrumFromShMem(spec, 0, 0, self.desc.iBuf, True)  # [mV/ext]
+        ret = TofDaqStreamer.TwGetTofSpectrumFromShMem(spec, 0, 0, self.desc.iBuf, True)  # [mV/ext]
         if ret == 4: # Success
             # Combine data for output
             spec_data = {
@@ -179,12 +170,12 @@ class TofDaqStreamer(Thread):
         # == Get and feed TPS data ==
         # Query data size
         nel = np.zeros((1,), dtype=int)
-        TwQueryRegUserDataSize(b'/TPS2', nel)
+        TofDaqStreamer.TwQueryRegUserDataSize(b'/TPS2', nel)
         # Get most recent TPS data from TW shared memory
         data = np.zeros((nel.item(), 1),
                         dtype=np.double
                         )
-        ret = TwReadRegUserData(b'/TPS2', nel.item(), data)
+        ret = TofDaqStreamer.TwReadRegUserData(b'/TPS2', nel.item(), data)
         if ret == 4: # Success
             # Combine data for output
             tps_data = {
@@ -211,10 +202,10 @@ class TofDaqStreamer(Thread):
         info = []
         # Query number of parameters
         nel = np.zeros((1,), dtype=int)
-        if TwQueryRegUserDataSize(b'/TPS2', nel) == 4:
+        if TofDaqStreamer.TwQueryRegUserDataSize(b'/TPS2', nel) == 4:
             # Parameter description buffer
             infobuf = create_string_buffer(b'', 256 * nel.item())
-            if TwGetRegUserDataDesc(b'/TPS2', nel, infobuf) == 4:
+            if TofDaqStreamer.TwGetRegUserDataDesc(b'/TPS2', nel, infobuf) == 4:
                 # Parameter descriptions retrieved succesfully
                 # Convert char array to bytes array
                 info = np.asarray(infobuf).view('S256').ravel()
@@ -271,7 +262,7 @@ class TofDaqStreamer(Thread):
         if not isinstance(text, bytes):
             # Convert string to bytes
             text = text.encode()
-        TwAddLogEntry(text, timestamp)
+        TofDaqStreamer.TwAddLogEntry(text, timestamp)
 
     def run(self):
         """Main loop
@@ -284,16 +275,16 @@ class TofDaqStreamer(Thread):
         timeout_counter = 0
         # Main loop
         while not self.shutdown_event.is_set():
-            ret = TwWaitForNewData(self.timeout,
-                                   self.desc,
-                                   self.ptr,
-                                   True
-                                   )
+            ret = TofDaqStreamer.TwWaitForNewData(self.timeout,
+                                                  self.desc,
+                                                  self.ptr,
+                                                  True
+                                                  )
             # Timeout
             if ret == 8:
                 timeout_counter += 1 # Increment counter
                 if self.active.is_set():
-                    if not TwDaqActive():
+                    if not TofDaqStreamer.TwDaqActive():
                         # No active acquisition
                         # TofDaqStreamer has ended
                         pass
@@ -333,7 +324,7 @@ class TofDaqStreamer(Thread):
                 continue
             # Unexpected return value
             else:
-                print("Unexpected return value: %s" %TwRetVal(ret).name)
+                print("Unexpected return value: %s" %TofDaqStreamer.TwRetVal(ret).name)
                 sleep(1)
         # Out of main loop
         print('TofDaqStreamer exiting')
@@ -360,12 +351,12 @@ class TofDaqStreamer(Thread):
     def start_acquisition(self):
         """Start acquisition by calling TW API
         """
-        TwStartAcquisition()
+        TofDaqStreamer.TwStartAcquisition()
 
     def stop_acquisition(self):
         """Stop acquisition by calling TW API
         """
-        TwStopAcquisition()
+        TofDaqStreamer.TwStopAcquisition()
 
     def stop_stream(self):
         """Stop stream before complete
@@ -374,6 +365,14 @@ class TofDaqStreamer(Thread):
 
 
 class H5Streamer(TofDaqStreamer, KInstrument):
+    from .lib.TwH5 import (
+            TwGetBufTimeFromH5,
+            TwGetH5Descriptor,
+            TwGetRegUserDataFromH5,
+            TwGetSpecXaxisFromH5,
+            TwGetTofSpectrumFromH5,
+            TwH5Desc,
+            )
     def __init__(self):
         """Initialize self
 
@@ -389,7 +388,7 @@ class H5Streamer(TofDaqStreamer, KInstrument):
         Thread.__init__(self)
 
         # Initialize with empty TW h5 descriptor
-        self.desc = TwH5Desc()
+        self.desc = H5Streamer.TwH5Desc()
         KInstrument.__init__(self, self.desc)
 
         # Synchronization primitives
@@ -413,13 +412,13 @@ class H5Streamer(TofDaqStreamer, KInstrument):
     def mz(self):
         # Get mz axis from file
         mz = np.zeros((self.desc.nbrSamples,), dtype=np.double)
-        TwGetSpecXaxisFromH5(self.desc.currentDataFileName,
-                             mz,
-                             1,
-                             None,
-                             0,
-                             0
-                             )
+        H5Streamer.TwGetSpecXaxisFromH5(self.desc.currentDataFileName,
+                                        mz,
+                                        1,
+                                        None,
+                                        0,
+                                        0
+                                        )
         return mz.astype(np.float32)
 
     def _finalize(self):
@@ -434,15 +433,15 @@ class H5Streamer(TofDaqStreamer, KInstrument):
         """
         # Get timestamp from TW h5
         ti = np.zeros((1,))
-        TwGetBufTimeFromH5(self.desc.currentDataFileName,
-                           ti,
-                           self.desc.iBuf,
-                           self.desc.iWrite
-                           )
+        H5Streamer.TwGetBufTimeFromH5(self.desc.currentDataFileName,
+                                      ti,
+                                      self.desc.iBuf,
+                                      self.desc.iWrite
+                                      )
         # == Get and feed mass spectrum data ==
         # Get most recent spectrum from TW shared memory
         spec = np.zeros((self.desc.nbrSamples, ), dtype=np.float32)
-        ret = TwGetTofSpectrumFromH5(
+        ret = H5Streamer.TwGetTofSpectrumFromH5(
                                 self.desc.currentDataFileName,
                                 spec,
                                 0,                  # Segment start index
@@ -469,7 +468,7 @@ class H5Streamer(TofDaqStreamer, KInstrument):
         # == Get and feed TPS data ==
         # Query data size
         nel = np.zeros((1,), dtype=int)
-        TwGetRegUserDataFromH5(
+        H5Streamer.TwGetRegUserDataFromH5(
                self.desc.currentDataFileName,
                b'/TPS2',
                0,
@@ -482,7 +481,7 @@ class H5Streamer(TofDaqStreamer, KInstrument):
         data = np.zeros((nel.item(), ),
                         dtype=np.double
                         )
-        ret = TwGetRegUserDataFromH5(
+        ret = H5Streamer.TwGetRegUserDataFromH5(
                self.desc.currentDataFileName,
                b'/TPS2',
                self.desc.iBuf,
@@ -516,7 +515,7 @@ class H5Streamer(TofDaqStreamer, KInstrument):
         info = []
         # Query TPS data size
         nel = np.zeros((1,), dtype=int)
-        TwGetRegUserDataFromH5(
+        H5Streamer.TwGetRegUserDataFromH5(
                     self.desc.currentDataFileName,
                     b'TPS2',
                     0,
@@ -532,7 +531,7 @@ class H5Streamer(TofDaqStreamer, KInstrument):
                         dtype=np.double
                         )
 
-        TwGetRegUserDataFromH5(
+        H5Streamer.TwGetRegUserDataFromH5(
                     self.desc.currentDataFileName,
                     b'TPS2',
                     0,
@@ -579,9 +578,9 @@ class H5Streamer(TofDaqStreamer, KInstrument):
             try:
                 file_to_stream = self.file_queue.get(timeout=.1)
                 # Update TW h5 descriptor
-                ret = TwGetH5Descriptor(file_to_stream.encode(), self.desc)
+                ret = H5Streamer.TwGetH5Descriptor(file_to_stream.encode(), self.desc)
                 if ret != 4:
-                    print("Error reading file: %s" %TwRetVal(ret).name)
+                    print("Error reading file: %s" %H5Streamer.TwRetVal(ret).name)
                     continue
                 # Add fields to comply with TW shared memory descriptor
                 self.desc.currentDataFileName = file_to_stream.encode()
