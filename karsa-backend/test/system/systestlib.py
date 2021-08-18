@@ -36,8 +36,7 @@ class BaseTestClientNamespace(BaseClientNamespace):
     endpoints = []
     endpoints_room_sid = [
         # 'loaded_coordinates',   # response to coordinate_request
-        'loaded_data',          # full-size image
-        'figure_data',          # zoomed-in image
+        'figure_data',
         ]
     endpoints_room_instrument = []
 
@@ -51,16 +50,6 @@ class BaseTestClientNamespace(BaseClientNamespace):
 
 
     # helpers
-
-    def check_loaded_data_request_finished(self, data):
-        # TODO: data format seems to be different when visualizing full range vs zoomed one
-        request_id = data['value']['request_id']
-        t_range_1 = data['value']['t_range'][1]
-        r_type, t_start, t_range_max, max_exec_time = request_id.split('_')
-        done = int(t_range_max) <= int(t_range_1)
-        if done:
-            self.parent.kill_exec_timer(request_id)
-            self.parent.mark_request_done(request_id)
 
     def check_figure_data_request_finished(self, data):
         request_id = data['value']['request_id']
@@ -81,17 +70,6 @@ class BaseTestClientNamespace(BaseClientNamespace):
     #     self.log(data['value']['dims'])     #
     #     # self.log(data['value']['coordinates'])  -  why so long???
     #     # service_q.cache_put(data)
-
-    # TODO: when success, on_loaded_data seem to be called twice - check the output
-    # TODO: on_loaded_data has different signature in visualize_range for full-size vs. for zooms (should it be like that?)
-    #  - data.value.keys() =  ['filename', 'viz_type', 'mz_range', 't_range', 'request_id', 'img']
-    #  - data.value.keys() =  ['data_type', 'filename', 'spec', 't', 'period', 'y_max', 'request_id', 'mz']
-    async def on_loaded_data(self, data):
-        self.log({k:data['value'].get(k, 'missing') for k in ['request_id', 'viz_type', 't_range', 'mz_range']})
-        # self.log({k:data['value'].get(k, 'missing') for k in ['request_id', 'data_type', 'y_max', 't']})
-        self.check_loaded_data_request_finished(data)
-        # service_q.cache_put(data)
-        return data['cnt']
 
 
     async def on_figure_data(self, data):
