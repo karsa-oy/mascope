@@ -532,7 +532,8 @@ class SamplePool():
             project_path = os.path.join(self.projects_root, project)
             project_attrs = self._read_attributes(project_path)
             projects.append({'title': project,
-                             'attributes': project_attrs
+                             'attributes': project_attrs,
+                             'path': project_path
                              })
         return projects
 

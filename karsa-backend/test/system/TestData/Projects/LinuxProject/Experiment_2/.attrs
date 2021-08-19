@@ -1,0 +1,14 @@
+[
+    {
+        "label": "Title",
+        "value": "Experiment_2",
+        "required": true
+    },
+    {
+        "label": "Description",
+        "value": ""
+    },
+    {
+        "metadata_version_number": "0.01"
+    }
+]

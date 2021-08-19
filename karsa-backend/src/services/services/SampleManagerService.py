@@ -93,7 +93,9 @@ class MetadataServiceNamespace(BaseClientNamespace):
         await self.emit_client_notification(
                             'samples',
                             datapool.get_samples(project, experiment),
-                            room=data['client_room']
+                            **{**kwargs,
+                               'room': data['client_room']
+                               },
                             )
 
     async def on_experiment_from_plan(self, data):
@@ -156,7 +158,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
                             datapool.get_samples(),
                             **{**get_client_notification_args(data),
                                'room': data['client_room']
-                               }
+                              }
                             )
 
     async def on_parse_experiment_plan_blob(self, data):
@@ -224,8 +226,10 @@ class MetadataServiceNamespace(BaseClientNamespace):
         await self.emit_client_notification(
                                     'experiments',
                                     experiments,
-                                    room=data['client_room'],
-                                    )
+                                    **{**kwargs,
+                                       'room': data['client_room']
+                                      },
+                                )
     
     async def on_delete_experiment(self, data):
         global datapool
