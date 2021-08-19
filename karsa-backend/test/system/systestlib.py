@@ -1,5 +1,6 @@
 #!/bin/pyton3
 
+import os
 import time
 import asyncio
 from decorator import decorator
@@ -33,7 +34,11 @@ _ProactorBasePipeTransport.__del__ = bug_workaround(_ProactorBasePipeTransport._
 
 
 class BaseTestClientNamespace(BaseClientNamespace):
-    endpoints = []
+    endpoints = [
+        'projects',
+        'project_selected',
+        'experiments',
+        ]
     endpoints_room_sid = [
         # 'loaded_coordinates',   # response to coordinate_request
         'figure_data',
@@ -77,6 +82,23 @@ class BaseTestClientNamespace(BaseClientNamespace):
         # service_q.cache_put(data)
         self.check_figure_data_request_finished(data)
 
+    async def on_projects(self, data):
+        self.parent.projects = {d['title']:d for d in data['value']}
+        self.parent.projects_root = os.path.dirname(data['value'][0]['path'])
+        self.log(self.parent.projects_root, list(self.parent.projects.keys()))
+        self.parent.mark_request_done(id='service_state')
+
+    async def on_project_selected(self, data):
+        self.log(data['value']['title'])
+
+    async def on_experiments(self, data):
+        for e in data['value']:
+            if 'experiments' not in self.parent.projects[e['project']]:
+                self.parent.projects[e['project']]['experiments'] = {}
+            self.parent.projects[e['project']]['experiments'][e['title']] = e
+        p_sel = data['value'][0]['project']
+        self.log(p_sel, list(self.parent.projects[p_sel]['experiments'].keys()))
+        self.parent.mark_request_done(id='project_selected')
 
 
 class BaseTestClient(BaseServiceClient):
@@ -89,6 +111,9 @@ class BaseTestClient(BaseServiceClient):
         self.cancel_event = Event()
         self.cancel_message = ''
         self.target_exception = None
+        self.projects_root = None
+        self.projects = None
+
     
     async def init_service(self):
         # global service_q
@@ -125,11 +150,11 @@ class BaseTestClient(BaseServiceClient):
             print(f'Service stopped.')
         return
 
-    def set_test_params(self, fname: str, t_range_max: int=None, max_exec_time: int=None):
+    def set_test_params(self, fname: str=None, t_range_max: int=None, max_exec_time: int=None):
         # read test params from sample attributes file
         # encode test params into request_id via corresponding template
-        t_range_max = t_range_max or samples[fname]['t_range_max']
-        max_exec_time = max_exec_time or samples[fname]['max_exec_time']
+        t_range_max = t_range_max or samples.get(fname, {}).get('t_range_max')
+        max_exec_time = max_exec_time or samples.get(fname, {}).get('max_exec_time')
         res = f"{int(time.time())}_{t_range_max}_{max_exec_time}"
         return res
 
@@ -163,16 +188,20 @@ class BaseTestClient(BaseServiceClient):
             await asyncio.sleep(0.3)
         self.log(list(self.done.keys()))
 
+    async def emit_client_notification(self, name, value, *args, **kwargs):
+        await self.ns_handler.emit_client_notification(name, value, *args, **kwargs)
+
     # decorators
     @decorator
-    def hold_until_request_completed(func, self, *args, **kwargs):
-        # create done=False flag for this request; corresponding
-        # request handler will mark request done, when request is finished
+    def track_request_id_completed(func, self, *args, **kwargs):
+        # handler of decorated request will use request_id kwarg to mark it done, when the
+        #  request is finished; self.join_requests() will join all the decorated requests
         self.done[kwargs['request_id']] = False
         return func(self, *args, **kwargs)
 
     @decorator
     def limit_exec_time(func, self, *args, **kwargs):
+        '''Limit execution by max_exec_time; max_exec_time is encoded in request_id'''
         request_id = kwargs['request_id']
         _, _, _, max_exec_time = request_id.split('_')
         self.create_exec_timer(request_id, max_exec_time, f'processing {func.__name__}({request_id} ...) exceeded max execution time of {max_exec_time} seconds')
@@ -180,7 +209,7 @@ class BaseTestClient(BaseServiceClient):
 
 
     # test API
-    @hold_until_request_completed
+    @track_request_id_completed
     @limit_exec_time
     async def emit_coordinate_request(self, fname, **kwargs):
         await self.ns_handler.emit_client_notification(
@@ -193,7 +222,7 @@ class BaseTestClient(BaseServiceClient):
                     namespace=get_namespace(fname),
         )
 
-    @hold_until_request_completed
+    @track_request_id_completed
     @limit_exec_time
     async def emit_visualize_range(self, fname, **kwargs):
         await self.ns_handler.emit_client_notification(
@@ -208,6 +237,20 @@ class BaseTestClient(BaseServiceClient):
                     client_room=self.ns_handler.room_sid,
         )
 
+    @track_request_id_completed
+    async def emit_service_state(self, *args, **kwargs):
+        await self.ns_handler.emit_client_notification(
+                name='service_state',
+                value={},
+                )
+
+    @track_request_id_completed
+    async def emit_project_selected(self, pname, *args, **kwargs):
+        await self.ns_handler.emit_client_notification(
+                name='project_selected',
+                value={'title': pname, },
+                client_room=self.ns_handler.room_sid,
+            )
 
 def run_client():
     # Use run_client, when running client service from the terminal
@@ -223,14 +266,12 @@ def run_client():
 
 
 def start_test_client_as_daemon(timeout=10):
-    import threading
     args = parse_cmd_args()
     client = BaseTestClient(args['url'],
                             args['port'],
                             (args.get('ns', '/'), BaseTestClientNamespace)
                            )
-    # client.daemon = threading.Thread(target=client.run_until_complete)
-    client.daemon = threading.Thread(target=client.run_until_complete)
+    client.daemon = Thread(target=client.run_until_complete)
     client.daemon.start()
     start = int(time.time())
     now = int(time.time())
