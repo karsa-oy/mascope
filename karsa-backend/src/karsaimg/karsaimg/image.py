@@ -582,11 +582,9 @@ class ImageGenerator(Process):
                 data = self.queue_in.get()
             except KeyboardInterrupt:
                 print(f"KeyboardInterrupt for PID: {os.getpid()}")
-                self.shutdown_event.set()
                 break
             except Exception as e:
                 print(f"Exception {str(e)} for PID: {os.getpid()}")
-                self.shutdown_event.set()
                 break
             if data is not None:
                 # Select function to generate the image

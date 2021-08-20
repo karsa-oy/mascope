@@ -468,12 +468,40 @@
                         <p class="modal-card-title">
                             {{project_selected.title}}: {{experiment_selected.title}}
                         </p>
+                        <!-- Column visibility dropdown -->
+                        <b-dropdown
+                            aria-role="menu"
+                            type="is-dark"
+                            position="is-bottom-right"
+                            style="top:0px;"
+                            trap-focus
+                            multiple
+                            append-to-body>
+                            <b-button
+                                icon-left="menu"
+                                slot="trigger"
+                                outlined>
+                            </b-button>
+                            <div>
+                                <div v-for="(col, i) in sample_table_cols"
+                                    :key="i"
+                                    class="control">
+                                    <b-checkbox
+                                        v-model="col.visible"
+                                        size="is-small">
+                                        {{ col.label }}
+                                    </b-checkbox>
+                                </div>
+                            </div>
+                        </b-dropdown>
+                        <!-- Close button -->
                         <b-button
+                            icon-left="close"
                             @click="is_modal_sample_table_active=false"
                             is-dark>
-                            x
                         </b-button>
                     </header>
+
                     <section class="modal-card-body">
                         <!-- Sample table -->
                         <b-table 
@@ -490,6 +518,7 @@
                                 :label="col.label"
                                 searchable
                                 sortable
+                                :visible="col.visible === null ? true : col.visible"
                                 v-slot="props">
                                 {{ props.row[col.field] }}
                             </b-table-column>
@@ -969,6 +998,14 @@ export default {
         log: function(...args) {
             console.log('[' + this.name + ']',  ...args);
         },
+        addSampleTableCol() {
+            // TODO: add column when target is added
+            return
+        },
+        addSampleTableRow() {
+            // TODO: On new sample, add row instead of full table update
+            return
+        },
         cancelNewExperiment() {
             this.resetExperimentPlan();
             this.is_modal_new_experiment_active = false;
@@ -1052,11 +1089,10 @@ export default {
                     };
         },
         getSample(sample_filename) {
-            for (let i in this.samples) {
-                if(this.samples[i].filename === sample_filename){
-                    return shallow_copy(this.samples[i]);
-                }
-            }
+            return shallow_copy({
+                            'filename': sample_filename,
+                            ...this.samples[sample_filename]
+                            });
         },
         importSamples() {
             // TODO: Needs an update
@@ -1408,7 +1444,7 @@ export default {
                 // Manual sample info input
                 // Set title prefix
                 let sample_attributes = this.sample_attributes_fields;
-                let sample_no = this.samples.length + 1;
+                let sample_no = Object.keys(this.samples).length + 1;
                 const sample_title_prefix = sample_no.toString().padStart(3, '0') + '_';
                 sample_attributes[0].value = sample_title_prefix;
                 this.sample_form_props.attributes = sample_attributes;
@@ -1451,8 +1487,8 @@ export default {
             let samples = new_value;
             let rows = [];
             let cols = [];
-            for (const i in samples) {
-                let sample = samples[i];
+            for (const sample_id in samples) {
+                let sample = samples[sample_id];
                 let row = {};
                 // Unpack attributes
                 for (let i in sample.attributes) {
@@ -1479,11 +1515,20 @@ export default {
                     }
                     row[prop.toLowerCase()] = sample.properties[prop];
                 }
-                // Hard-coded attributes
-                row['filename'] = sample.filename;
+                // Unpack method
+                for (const par in sample.method) {
+                    if (rows.length == 0) {
+                        cols.push({
+                            'field': par.toLowerCase(),
+                            'label': par,
+                            });
+                    }
+                    row[par.toLowerCase()] = sample.method[par];
+                }
+                // Project and experiment
+                row['filename'] = sample_id
                 row['project'] = sample.project;
                 row['experiment'] = sample.experiment;
-                
                 if (rows.length == 0) {
                     cols = cols.concat([
                         {
@@ -1500,13 +1545,13 @@ export default {
                         }
                     ]);
                 }
-
                 rows.push(row);
-                
-                if (row['filename'] == this.sample_selected.filename) {
+                // Avoid losing sample selection on an update to sample table
+                if (sample_id == this.sample_selected.filename) {
                     this.sample_table_checked_rows = [row,];
                 }
-                if (row['filename'] == this.new_file.filename) {
+                // Highlight sample being (or last) acquired
+                if (sample_id == this.new_file.filename) {
                     this.sample_table_selected_row = row;
                 }
             }

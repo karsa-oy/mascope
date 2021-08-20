@@ -31,7 +31,7 @@ from karsalib.util import (
 from karsalib.datapool import parse_path_from_sample_name
 
 
-
+from karsalib.datapool import METADATA_VERSION_NUMBER
 DATA_VERSION_NUMBER = '0.01'
 
 
@@ -121,24 +121,25 @@ class FileIoNamespace(BaseClientNamespace):
                                 coords=[[]],
                                 name='signal_period'
                                 )
-        # Collect attributes
-        attributes = {'filename': filename_base,
+        # Collect properties
+        properties = {'filename': filename_base,
                       'length': float(t_range[1]),
                       'range': [ float(mz[0]), float(mz[-1]) ],
-                      'data_version': DATA_VERSION_NUMBER
+                      'data_version': DATA_VERSION_NUMBER,
+                      'metadata_version': METADATA_VERSION_NUMBER,
                       }
-        # Write attributes
-        attr_path = os.path.join(
+        # Write properties
+        prop_path = os.path.join(
                         parse_path_from_sample_name(filename_base),
-                        '.attrs'
+                        '.props'
                         )
-        with open(attr_path, 'w') as f:
-            json.dump(attributes, f, indent=4)
+        with open(prop_path, 'w') as f:
+            json.dump(properties, f, indent=4)
 
         # Put to cache
         cache_item_dict = {'signal': signal_array,
                            'signal_period': period_array,
-                           'attrs': attributes,
+                           'attrs': properties, # attach properties to xarray.DataArray attrs
                            }
         cache_item = AttrDict(cache_item_dict)
         cache[filename_base] = cache_item
@@ -211,17 +212,17 @@ class FileIoNamespace(BaseClientNamespace):
                              cache_item.signal_period[-1]
                              )
 
-        # Update attributes
-        attributes = cache_item['attrs']
-        attributes.update({'length': final_length
+        # Update properties
+        properties = cache_item['attrs']
+        properties.update({'length': final_length
                            })
-        # Write attributes
-        attr_path = os.path.join(
+        # Write properties
+        prop_path = os.path.join(
                         parse_path_from_sample_name(filename_base),
-                        '.attrs'
+                        '.props'
                         )
-        with open(attr_path, 'w') as f:
-            json.dump(attributes, f, indent=4)
+        with open(prop_path, 'w') as f:
+            json.dump(properties, f, indent=4)
 
         arrays_to_flush = ['signal', 'signal_period']
         for key in arrays_to_flush:
@@ -348,14 +349,14 @@ def load_file(base_filename, vars=None):
             continue
     # Merge into xarray.Dataset
     dataset = xarray.merge(dss)
-    # Load attributes
-    attr_path = os.path.join(filepath,
-                            '.attrs'
+    # Load properties
+    prop_path = os.path.join(filepath,
+                            '.props'
                             )
-    with open(attr_path, 'r') as f:
-        attributes = json.load(f)
+    with open(prop_path, 'r') as f:
+        properties = json.load(f)
     # Attach to dataset
-    dataset.attrs = attributes
+    dataset.attrs = properties
     return dataset
 
 def open_mfzarr(path, mode='r', concat_dim='time'):

@@ -72,7 +72,6 @@ def parse_path_from_sample_name(sample_name):
 
 
 
-
 class H5Pool():
     def __init__(self, data_path):
         """Initialize self
@@ -343,7 +342,9 @@ class SamplePool():
 
     Assuming folder structure as follows:
 
-    -Projects
+    projects_path:
+
+    -project0
     --experiment0
     ---sample0
     ---sample1
@@ -353,6 +354,8 @@ class SamplePool():
     ---sample4
     --experiment2
     ---sample0
+    -project1
+    ...
 
     """
     def __init__(self, projects_path):
@@ -368,21 +371,98 @@ class SamplePool():
 
         self.projects_root = os.path.abspath(projects_path)
         self.pool = {}
+        self.df = pd.DataFrame()
 
         # If given projects root does not exist, create
         if not os.path.isdir(self.projects_root):
             os.mkdir(self.projects_root)
 
+        self._init_pool_dict()
+        self._init_pool_dataframe()
+
+    def _get_sample_df(self, project=None, experiment=None, sample=None):
+        if project is None:
+            # Return empty dataframe
+            return pd.Series({
+                        'properties': {},
+                        'attributes': {},
+                        'method': {},
+                        'annotations': {},
+                        })
+
+        sample_metadata = self.get_sample_metadata(project,
+                                                   experiment,
+                                                   sample
+                                                   )
+        sample_df = pd.Series(
+                    {**sample_metadata,
+                    #  'peak list': pd.DataFrame.from_dict(
+                    #                 {'mz': [],
+                    #                  'intensity': [],
+                    #                  'peak id': [],
+                    #                  }
+                    #                 ),
+                    #  'target list': pd.DataFrame.from_dict(
+                    #                 {'target id': [],
+                    #                  'concentration': [],
+                    #                  }    
+                    #                 ),
+                     }
+                    )
+        return sample_df
+
+    def _init_pool_dict(self):
+        self.pool = {}
         # Project directories in projects_path
         projects = next( os.walk(self.projects_root) )[1]
+        # Loop through project directories
         for project in projects:
             self.pool.update({ project: {} })
-            project_path = os.path.join(projects_path, project)
+            project_path = os.path.join(self.projects_root, project)
             # Experiment directories in current project directory
             project_experiments = next( os.walk(project_path) )[1]
+            # Loop through experiment directories inside current project
             for experiment in project_experiments:
-                # Update samples of current experiment
-                self.update_experiment_samples(project, experiment)
+                experiment_path = os.path.join(project_path, experiment)
+                # Sample directories in experiment directory
+                experiment_samples = next( os.walk(experiment_path) )[1]
+                self.pool[project].update({ experiment: experiment_samples })
+
+    def _init_pool_dataframe(self):
+        index = []
+        data = []
+        # Project directories in projects_path
+        projects = next( os.walk(self.projects_root) )[1]
+        # Loop through project directories
+        for project in projects:
+            project_path = os.path.join(self.projects_root, project)
+            # Experiment directories in current project directory
+            project_experiments = next( os.walk(project_path) )[1]
+            if project_experiments:
+                # Loop through experiment directories inside current project
+                for experiment in project_experiments:
+                    experiment_path = os.path.join(project_path, experiment)
+                    # Sample directories in experiment directory
+                    sample_dirs = next( os.walk(experiment_path) )[1]
+                    if sample_dirs:
+                        # Loop through samples inside current experiment
+                        for sample in sample_dirs:
+                            sample_df = self._get_sample_df(project, experiment, sample)
+                            index.append((project, experiment, sample))
+                            data.append(sample_df)
+                    else:
+                        index.append((project, experiment, None))
+                        data.append(self._get_sample_df())
+            else:
+                index.append((project, None, None))
+                data.append(self._get_sample_df())
+        
+        multi_index = pd.MultiIndex.from_tuples(index,
+                                                names=('project', 'experiment', 'sample')
+                                                )
+        self.df = pd.DataFrame(index=multi_index,
+                               data=data
+                               )
 
     def _make_link(self, source_path, target_path):
         """Make symbolic link from directory to another
@@ -425,16 +505,9 @@ class SamplePool():
             return {}
         with open(attr_path, 'r') as f:
             attributes = json.load(f)
-
-        if isinstance(attributes, list):
-            if 'metadata_version_number' in attributes[-1]:
-                metadata_version_number = attributes.pop()
-
         return attributes
 
-    def _write_sample_annotation(self, path, prefix, annotation, ext='.annts'):
-        annotation.update({'metadata_version_number': METADATA_VERSION_NUMBER})
-
+    def _write_sample_annotation(self, path, annotation, prefix='', ext='.annts'):
         file_path = os.path.join(path, prefix + ext)
         if not os.path.exists(file_path):
             # Annotations file does not yet exist, create
@@ -449,11 +522,6 @@ class SamplePool():
                 json.dump(annotations, f, indent=4)
 
     def _write_attributes(self, path, attributes, prefix='', ext='.attrs', overwrite=False):
-        if isinstance(attributes, list):
-            attributes.append({'metadata_version_number': METADATA_VERSION_NUMBER})
-        elif isinstance(attributes, dict):
-            attributes.update({'metadata_version_number': METADATA_VERSION_NUMBER})
-
         attr_path = os.path.join(path, prefix + ext)
         if os.path.exists(attr_path) and not overwrite:
             raise ValueError("Attribute file %s exists already!" % attr_path)
@@ -462,18 +530,21 @@ class SamplePool():
             json.dump(attributes, f, indent=4)
     
     def annotate_sample(self, project, experiment, sample, annotation):
-        sample_path = os.path.join(self.projects_root, project, experiment)
-        self._write_sample_annotation(sample_path, sample, annotation)
+        sample_link = os.path.join(self.projects_root, project, experiment, sample)
+        self._write_sample_annotation(sample_link, annotation)
+        # TODO: Update df
 
     def delete_experiment(self, project, experiment):
         experiment_path = os.path.join(self.projects_root, project, experiment)
         rmtree(experiment_path, ignore_errors=False, onerror=None)
-        self.pool.get(project).pop(experiment)
+        self.pool[project].pop(experiment)
+        self.df = self.df.drop((project, experiment))
 
     def delete_project(self, project):
         project_path = os.path.join(self.projects_root, project)
         rmtree(project_path, ignore_errors=False, onerror=None)
         self.pool.pop(project)
+        self.df = self.df.drop(project)
 
     def delete_sample(self, project, experiment, sample):
         sample_link_path = os.path.join(
@@ -484,7 +555,8 @@ class SamplePool():
                                 )
         self._remove_link(sample_link_path)
         # Update self.pool
-        self.update_experiment_samples(project, experiment)
+        self.pool[project][experiment].pop(sample)
+        self.df = self.df.drop((project, experiment, sample))
 
     def edit_experiment(self, project, experiment, attributes):
         '''Edit experiment attributes'''
@@ -498,80 +570,109 @@ class SamplePool():
         # Write new attributes
         self._write_attributes(project_path, attributes, overwrite=True)
 
-    def edit_sample(self, project, experiment, sample, attributes, method):
+    def edit_sample(self, project, experiment, sample, attributes=None, method=None):
         '''Edit sample attributes'''
-        experiment_path = os.path.join(self.projects_root, project, experiment)
-        # Write attributes
-        self._write_attributes(experiment_path, attributes, prefix=sample, overwrite=True)
-        # Write method
-        self._write_attributes(experiment_path, method, prefix=sample, ext='.meth', overwrite=True)
+        sample_link = os.path.join(self.projects_root, project, experiment, sample)
+        if attributes is not None:
+            # Write attributes
+            self._write_attributes(sample_link, attributes, ext='.attrs', overwrite=True)
+            self.df.loc[project, experiment, sample].attributes = attributes
+        if method is not None:
+            # Write method
+            self._write_attributes(sample_link, method, ext='.meth', overwrite=True)
+            self.df.loc[project, experiment, sample].method = method        
+
+    def get_experiment_metadata(self, project, experiment):
+        project_path = os.path.join(self.projects_root, project)
+        experiment_path = os.path.join(project_path, experiment)
+        experiment_attrs = self._read_attributes(experiment_path)
+        experiment_sample_attrs_template = self._read_attributes(
+                                                        experiment_path,
+                                                        ext='.template'
+                                                        )
+        return {'attributes': experiment_attrs,
+                'sample_attributes_template': experiment_sample_attrs_template
+                }
 
     def get_experiments(self, project):
-        project_path = os.path.join(self.projects_root, project)
         experiment_titles = self.pool.get(project).keys()
         experiments = []
         for experiment in experiment_titles:
-            experiment_path = os.path.join(project_path, experiment)
-            experiment_attrs = self._read_attributes(experiment_path)
-            experiment_sample_attrs_template = self._read_attributes(
-                                                            experiment_path,
-                                                            ext='.template'
-                                                            )
+            experiment_metadata = self.get_experiment_metadata(project, experiment)
             experiments.append({
                     'title': experiment,
                     'project': project,
-                    'attributes': experiment_attrs,
-                    'sample_attributes_template': experiment_sample_attrs_template
+                    **experiment_metadata
                     })
         return experiments
+
+    def get_project_metadata(self, project):
+        project_path = os.path.join(self.projects_root, project)
+        project_attrs = self._read_attributes(project_path)
+        return {'attributes': project_attrs,
+                }
 
     def get_projects(self):
         project_titles = self.pool.keys()
         projects = []
         for project in project_titles:
             project_path = os.path.join(self.projects_root, project)
-            project_attrs = self._read_attributes(project_path)
+            project_metadata = self.get_project_metadata(project)
             projects.append({'title': project,
-                             'attributes': project_attrs,
-                             'path': project_path
+                             'path': project_path,
+                             **project_metadata,
                              })
         return projects
 
-    def get_samples(self, project, experiment):
+    def get_sample_metadata(self, project, experiment, sample):
+        sample_link = os.path.join(self.projects_root, project, experiment, sample)
+        # Read attributes
+        sample_exp_attrs = self._read_attributes(sample_link,
+                                                 ext='.attrs'
+                                                 )
+        # Read sample properties from sample directory
+        sample_props = self._read_attributes(sample_link,
+                                             ext='.props'
+                                             )
+        # Read method
+        sample_method = self._read_attributes(sample_link,
+                                              ext='.meth'
+                                              )
+        # Read annotations
+        sample_annotations = self._read_attributes(sample_link,
+                                                   ext='.annts'
+                                                   )
+        return {
+                # 'filename': sample,
+                # 'project': project,
+                # 'experiment': experiment,
+                'properties': sample_props,
+                'attributes': sample_exp_attrs,
+                'method': sample_method,
+                'annotations': sample_annotations,
+                }
+
+    def get_samples(self, project=None, experiment=None):
+        # Clean NaNs
+        flat_df = self.df.reset_index()
+        flat_df_clean = flat_df.loc[flat_df['sample'].dropna().index]
+        df = flat_df_clean.set_index('sample')
+
         if project is None:
-            # Should return all samples
-            # TODO: Need to get samples from FileIO
-            raise NotImplementedError
+            # Return all samples
+            return df
         elif experiment is None:
             # Samples in given project
-            experiments = self.pool.get(project)
+            try:
+                return df.loc[df.project==project]
+            except KeyError:
+                return pd.DataFrame()
         else:
             # Samples in given project and experiment
-            experiments = [experiment]
-            
-        samples = []
-        for experiment in experiments:
-            sample_ids = self.pool.get(project).get(experiment)
-            for sample_id in sample_ids:
-                # Read experiment-specific sample attributes
-                experiment_path = os.path.join(self.projects_root,
-                                               project,
-                                               experiment
-                                               )
-                sample_exp_attrs = self._read_attributes(experiment_path,
-                                                         prefix=sample_id
-                                                         )
-                # Read sample properties
-                sample_path = os.path.join(experiment_path, sample_id)
-                sample_props = self._read_attributes(sample_path)
-                
-                samples.append({'filename': sample_id,
-                                'project': project,
-                                'experiment': experiment,
-                                'properties': sample_props,
-                                'attributes': sample_exp_attrs,
-                                })
-        return samples
+            try:
+                return df.loc[(df.project==project) & (df.experiment==experiment)]
+            except KeyError:
+                return pd.DataFrame()
 
     def new_project(self, project, attributes):
         project_path = os.path.join(self.projects_root, project)
@@ -582,6 +683,14 @@ class SamplePool():
         self._write_attributes(project_path, attributes)
         # Update self.pool
         self.pool.update({ project: {} })
+        new_row_index = pd.MultiIndex.from_tuples(
+                                [(project, None, None)],
+                                names=('project', 'experiment', 'sample')
+                                )
+        self.df = self.df.append(pd.DataFrame(index=new_row_index,
+                                              data=[]
+                                              )
+                                 )
 
     def new_experiment(self, project, experiment, attributes, sample_attributes_template):
         experiment_path = os.path.join(self.projects_root, project, experiment)
@@ -598,57 +707,48 @@ class SamplePool():
         # Update self.pool
         self.pool[project].update({ experiment: [] })
 
-    def new_sample(self, project, experiment, sample, attributes, method):
+        new_row_index = pd.MultiIndex.from_tuples([(project, experiment, None)])
+        self.df = self.df.append(pd.DataFrame(index=new_row_index,
+                                              data=[]
+                                              )
+                                 )
+        # In case of previously empty project, remove NaN index
+        flat_df = self.df.reset_index()
+        flat_df_clean = flat_df.loc[flat_df['experiment'].dropna().index]
+        self.df = flat_df_clean.set_index(self.df.index.names)
+
+    def new_sample(self, project, experiment, sample, attributes, method, annotations, placeholder=False):
+        # Meta-data path
+        experiment_path = os.path.join(self.projects_root, project, experiment)
+        sample_experiment_path = os.path.join(experiment_path, sample)
         # Data path
-        sample_data_path = parse_path_from_sample_name(sample)
-        # Meta-data path
-        experiment_path = os.path.join(self.projects_root, project, experiment)
-        sample_experiment_path = os.path.join(experiment_path, sample)
-        # Check if sample exists
-        if not os.path.isdir(sample_data_path):
-            # raise ValueError("Sample %s does not exist!" % sample_data_path)
-            print("Sample file %s does not exist! Creating link anyway." % sample_data_path)
-        # If sample not yet part of the experiment, link it
-        # if not os.path.isdir(sample_experiment_path):
-        if not os.path.exists(sample_experiment_path):
-            self._make_link(sample_data_path, sample_experiment_path)
+        if placeholder:
+            # Creating a placeholder for a sample, make dummy link
+            sample_data_path = sample_experiment_path
+        else:
+            # Actual sample, link to data file
+            sample_data_path = parse_path_from_sample_name(sample)
+        # Make link from experiment directory to data file
+        self._make_link(sample_data_path, sample_experiment_path)
         # Write attributes
-        self._write_attributes(experiment_path, attributes, prefix=sample)
+        self._write_attributes(sample_data_path, attributes, ext='.attrs')
         # Write method
-        self._write_attributes(experiment_path, method, prefix=sample, ext='.meth')
+        self._write_attributes(sample_data_path, method, ext='.meth')
+        # Write annotations
+        self._write_attributes(sample_data_path, annotations, ext='.annts')
         # Update self.pool
-        self.update_experiment_samples(project, experiment)
-
-    def new_sample_placeholder(self, project, experiment, sample, attributes):
-        # Meta-data path
-        experiment_path = os.path.join(self.projects_root, project, experiment)
-        sample_experiment_path = os.path.join(experiment_path, sample)
-        dummy_link_target = sample_experiment_path
-        self._make_link(dummy_link_target, sample_experiment_path)
-        # Write attributes
-        self._write_attributes(experiment_path, attributes, prefix=sample)
-        # Update self.pool
-        self.update_experiment_samples(project, experiment)
-
-
-    def update_experiment_samples(self, project, experiment):
-        """Update samples under given experiment directory
-
-        Parameters
-        ----------
-        project : str
-            Project directory
-        experiment : str
-            Experiment directory
-        """
-        project_path = os.path.join(self.projects_root, project)
-        experiment_path = os.path.join(project_path, experiment)
-        # Sample directories in experiment directory
-        sample_dirs = next( os.walk(experiment_path) )[1]
-        experiment_samples = []
-        for sample_dir in sample_dirs:
-            experiment_samples.append(sample_dir)
-        self.pool[project].update({ experiment: experiment_samples })
+        self.pool[project][experiment].append(sample)
+        
+        new_row_index = pd.MultiIndex.from_tuples([(project, experiment, sample)])
+        new_row_data = self._get_sample_df(project, experiment, sample)
+        self.df = self.df.append(pd.DataFrame(index=new_row_index,
+                                              data=[new_row_data]
+                                              )
+                                 )
+        # In case of previously empty experiment, remove NaN index
+        flat_df = self.df.reset_index()
+        flat_df_clean = flat_df.loc[flat_df['sample'].dropna().index]
+        self.df = flat_df_clean.set_index(self.df.index.names)
 
 
 

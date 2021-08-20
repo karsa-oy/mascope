@@ -546,6 +546,59 @@ def process_visualization_request(filename,
 
     def feed_ready_images():
         nonlocal cache_item
+        viz_type_period = viz_type + '_period'
+        try:
+            img_slice = cache_item[viz_type].sel(time=slice(t0, t1)).load()
+            period_slice = cache_item[viz_type_period].sel(time=slice(t0, t1)).load()
+        except KeyError as e:
+            print("Error in process_image_request: %s" %e)
+            print("Requested data_type: %s not cached. cache_item.keys: %s" % (viz_type, list(cache_item.keys())) )
+            return False
+
+        processed_until = False
+        if len(img_slice) == 0:
+            return processed_until
+
+        if t_resolution:
+            # TODO: resample
+            raise NotImplementedError
+        
+        # Filter nans
+        not_nan = np.logical_not( img_slice.isnull() )
+        img_slice = img_slice[not_nan]
+        period_slice = period_slice[not_nan]
+
+        # Put to queue to be emitted from service_main
+        for i, img_array in enumerate(img_slice):
+            img_str = img_array.item()
+
+            t0_i = float( img_array.time.item() )
+            t1_i = t0_i + float( period_slice[i].item() )
+
+            img_data = {'filename': filename,
+                        'viz_type': viz_type,
+                        'mz_range': [mz0, mz1],
+                        't_range': [t0_i, t1_i],
+                        'client_room': client_room,
+                        'request_id': request_id,
+                        }
+            if img_str.startswith('data:image/png;base64'):
+                # base64 png
+                img_data.update({'img': img_str})
+            else:
+                # trace
+                try:
+                    traces = json.loads(img_str)
+                    img_data.update({'traces': traces})
+                except json.JSONDecodeError:
+                    print("Erroneous img_blob: %s" %img_str)
+                    continue
+            processed_until = t1_i
+            client.generator_output_q.put(img_data)
+        return processed_until
+
+    def feed_signal_to_visualize(t_range_to_process):
+        nonlocal cache_item
 
         processed_until = t0
 
@@ -799,6 +852,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
         viz_cache_process_requests(filename, request_id=request_id)
 
         t_mark(t_data)
+
 
     async def on_stop_visualize_range(self, data):
         """Release visualization requests from cache
@@ -1081,7 +1135,6 @@ def run():
         print(f'Stopping service with generators...')
         shutdown_event.set()
         for gen in client.generator_procs:
-            gen.shutdown_event.set()
             gen.queue_in.put(None)
 
 
