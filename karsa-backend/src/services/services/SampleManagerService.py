@@ -33,8 +33,6 @@ class MetadataServiceNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to MainService """
 
     endpoints = [
-        # DataViz
-        'stop_data_request',
         # UI
         'experiment_selected',
         'experiment_from_plan',
@@ -57,24 +55,6 @@ class MetadataServiceNamespace(BaseClientNamespace):
         projects = datapool.get_projects(),
     )
 
-    # ========== DataViz requests ========== 
-    async def on_stop_data_request(self, data):
-        try:
-            namespace = '/' + data['value']['filename'].split('_')[0]
-        except KeyError as e:
-            # TODO: Should not end up here
-            self.log(e)
-            # Do not know where to forward it, return
-            return
-        value = data['value']
-        kwargs = get_client_notification_args(data)
-
-        await self.emit_client_notification('stop_data_request',
-                                            value,
-                                            **kwargs,
-                                            namespace=namespace
-                                            )
-
     # ========== UI requests ==========
     async def on_experiment_selected(self, data):
         value = data['value']
@@ -84,15 +64,10 @@ class MetadataServiceNamespace(BaseClientNamespace):
         project = value.get('project')
 
         global datapool
-        if project not in datapool.pool.keys():
-            raise ValueError("Requested project does not exist!")
-        project_experiments = datapool.pool.get(project).keys()
-        if experiment not in project_experiments:
-            raise ValueError("Requested experiment does not exist!")
         # Update sample table data
         await self.emit_client_notification(
                             'samples',
-                            datapool.get_samples(project, experiment),
+                            datapool.get_samples(project, experiment).to_dict(orient='index'),
                             **{**kwargs,
                                'room': data['client_room']
                                },
@@ -144,18 +119,19 @@ class MetadataServiceNamespace(BaseClientNamespace):
                 sample_attributes.append(sample_attr)
 
             filename = '%03d_placeholder' %(i+1)
-            datapool.new_sample_placeholder(project,
-                                            experiment,
-                                            filename,
-                                            sample_attributes
-                                            )
+            datapool.new_sample(project,
+                                experiment,
+                                filename,
+                                sample_attributes,
+                                placeholder=True
+                                )
         
     async def on_import_sample_table_datetime_range(self, data):
         global datapool
         # Update sample table data
         await self.emit_client_notification(
                             'importable_samples',
-                            datapool.get_samples(),
+                            datapool.get_samples().to_dict(orient='index'),
                             **{**get_client_notification_args(data),
                                'room': data['client_room']
                               }
@@ -271,7 +247,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
         # Update sample table data in UIs
         await self.emit_client_notification(
                             'samples',
-                            datapool.get_samples(project, experiment),
+                            datapool.get_samples(project, experiment).to_dict(orient='index'),
                             room='_'.join([project, experiment])
                             )
 
@@ -305,11 +281,12 @@ class MetadataServiceNamespace(BaseClientNamespace):
         # Create placeholders for each sample
         for i, sample_placeholder in enumerate(sample_placeholders):
             filename = '%03d_placeholder' %(i+1)
-            datapool.new_sample_placeholder(project,
-                                            experiment,
-                                            filename,
-                                            sample_placeholder.get('attributes'),
-                                            )
+            datapool.new_sample(project,
+                                experiment,
+                                filename,
+                                sample_placeholder.get('attributes'),
+                                placeholder=True
+                                )
 
         project_experiments = datapool.get_experiments(project)
         await self.emit_client_notification(
@@ -360,6 +337,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
         project = value['project']
         attributes = value.get('attributes')
         method = value.get('method')
+        annotations = value.get('annotations', [])
 
         try:
             samples = datapool.pool.get(project).get(experiment)
@@ -367,7 +345,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
             raise ValueError("Requested project or experiment does not exist!")
         if filename not in samples:
             # New sample attributes
-            datapool.new_sample(project, experiment, filename, attributes, method)
+            datapool.new_sample(project, experiment, filename, attributes, method, annotations)
         else:
             # Edit sample attributes
             datapool.edit_sample(project, experiment, filename, attributes, method)
@@ -375,7 +353,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
         # Update sample table data in UIs
         await self.emit_client_notification(
                             'samples',
-                            datapool.get_samples(project, experiment),
+                            datapool.get_samples(project, experiment).to_dict(orient='index'),
                             room='_'.join([project, experiment])
                             )
     

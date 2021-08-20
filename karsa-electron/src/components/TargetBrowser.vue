@@ -57,57 +57,57 @@
 <!-- End of modals -->
 
 <!-- Main content area -->
+    <section>
+        <!-- Targetlist datatable collapable -->
         <section>
-            <!-- Targetlist datatable collapable -->
-            <section>
-                <b-collapse
-                    :open="false"
-                    class="card"
-                    animation="slide"
-                    aria-id="contentIdForA11y3">
-                    <div
-                        slot="trigger" 
-                        slot-scope="props"
-                        class="card-header"
-                        role="button"
-                        aria-controls="contentIdForA11y3">
-                        <p class="card-header-title">
-                            Targets
-                        </p>
-                        <a class="card-header-icon">
-                        <b-icon
-                            :icon="props.open ? 'menu-down' : 'menu-up'">
-                        </b-icon>
-                        </a>
-                    </div>
-                    <div class="card-content">
-                        <div class="content">
-                            <div class="left-panel-collapsable">
-                                <b-button
-                                    type="is-dark"
-                                    @click="is_excel_clipboard_modal_active=true"
-                                    outlined
-                                    inverted
-                                    size="is-small">
-                                    Import targets
-                                </b-button>
-                                <div><br></div>
-                                <b-table 
-                                    id="targets-datatable"
-                                    style="max-height:400px"
-                                    :columns="target_table_cols"
-                                    :data="target_table_rows" 
-                                    :sticky-header="true"
-                                    :selected.sync="target_table_selected_row" 
-                                    focusable
-                                    sortable>
-                                </b-table>
-                            </div>
+            <b-collapse
+                :open="false"
+                class="card"
+                animation="slide"
+                aria-id="contentIdForA11y3">
+                <div
+                    slot="trigger" 
+                    slot-scope="props"
+                    class="card-header"
+                    role="button"
+                    aria-controls="contentIdForA11y3">
+                    <p class="card-header-title">
+                        Targets
+                    </p>
+                    <a class="card-header-icon">
+                    <b-icon
+                        :icon="props.open ? 'menu-down' : 'menu-up'">
+                    </b-icon>
+                    </a>
+                </div>
+                <div class="card-content">
+                    <div class="content">
+                        <div class="left-panel-collapsable">
+                            <b-button
+                                type="is-dark"
+                                @click="is_excel_clipboard_modal_active=true"
+                                outlined
+                                inverted
+                                size="is-small">
+                                Import targets
+                            </b-button>
+                            <div><br></div>
+                            <b-table 
+                                id="targets-datatable"
+                                style="max-height:400px"
+                                :columns="target_table_cols"
+                                :data="target_table_rows" 
+                                :sticky-header="true"
+                                :selected.sync="target_table_selected_row" 
+                                focusable
+                                sortable>
+                            </b-table>
                         </div>
                     </div>
-                </b-collapse>
-            </section>
+                </div>
+            </b-collapse>
         </section>
+    </section>
 <!-- End of main content area -->
     </div>
 </template>
@@ -276,6 +276,7 @@ export default {
             if (new_value != null) {
                 let keys = Object.keys(new_value);
                 let mz = null;
+                // Loop through columns until find numeric value, assume it to be m/z
                 for (let i=0; keys.length; i++) {
                     mz = parseFloat( new_value[keys[i]] );
                     if (mz) {
