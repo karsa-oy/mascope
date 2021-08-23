@@ -38,6 +38,8 @@ class BaseTestClientNamespace(BaseClientNamespace):
         'projects',
         'project_selected',
         'experiments',
+        'experiment_selected',
+        'samples',
         ]
     endpoints_room_sid = [
         # 'loaded_coordinates',   # response to coordinate_request
@@ -86,20 +88,40 @@ class BaseTestClientNamespace(BaseClientNamespace):
         self.parent.projects = {d['title']:d for d in data['value']}
         self.parent.projects_root = os.path.dirname(data['value'][0]['path'])
         self.log(self.parent.projects_root, list(self.parent.projects.keys()))
-        self.parent.mark_request_done(id='service_state')
+        request_id = data['request_id']
+        self.parent.kill_exec_timer(request_id)
+        self.parent.mark_request_done(request_id)
 
     async def on_project_selected(self, data):
         self.log(data['value']['title'])
 
     async def on_experiments(self, data):
+        # project_selected emits experiments
         for e in data['value']:
             if 'experiments' not in self.parent.projects[e['project']]:
                 self.parent.projects[e['project']]['experiments'] = {}
             self.parent.projects[e['project']]['experiments'][e['title']] = e
         p_sel = data['value'][0]['project']
         self.log(p_sel, list(self.parent.projects[p_sel]['experiments'].keys()))
-        self.parent.mark_request_done(id='project_selected')
+        request_id = data['request_id']
+        self.parent.kill_exec_timer(request_id)
+        self.parent.mark_request_done(request_id)
 
+    async def on_experiment_selected(self, data):
+        self.log(data['value']['project'], data['value']['title'])
+
+    async def on_samples(self, data):
+        # experiment_selected emits samples
+        for n, s in data['value'].items():
+            if 'samples' not in self.parent.projects[s['project']]['experiments'][s['experiment']]:
+                self.parent.projects[s['project']]['experiments'][s['experiment']]['samples'] = {}
+            self.parent.projects[s['project']]['experiments'][s['experiment']]['samples'][n] = s
+            p_sel = s['project']
+            e_sel = s['experiment']
+        self.log(p_sel, list(self.parent.projects[p_sel]['experiments'][e_sel].keys()))
+        request_id = data['request_id']
+        self.parent.kill_exec_timer(request_id)
+        self.parent.mark_request_done(request_id)
 
 class BaseTestClient(BaseServiceClient):
     def __init__(self, *args, **kwargs):
@@ -201,9 +223,14 @@ class BaseTestClient(BaseServiceClient):
 
     @decorator
     def limit_exec_time(func, self, *args, **kwargs):
-        '''Limit execution by max_exec_time; max_exec_time is encoded in request_id'''
+        # Limit execution by max_exec_time;
+        # max_exec_time is encoded in request_id; for some tests exec time is not
+        # important: if so, then requiest_id encoding skipped and default is 5 sec
         request_id = kwargs['request_id']
-        _, _, _, max_exec_time = request_id.split('_')
+        try:
+            _, _, _, max_exec_time = request_id.split('_')
+        except:
+            max_exec_time = 5
         self.create_exec_timer(request_id, max_exec_time, f'processing {func.__name__}({request_id} ...) exceeded max execution time of {max_exec_time} seconds')
         return func(self, *args, **kwargs)
 
@@ -238,18 +265,35 @@ class BaseTestClient(BaseServiceClient):
         )
 
     @track_request_id_completed
+    @limit_exec_time
     async def emit_service_state(self, *args, **kwargs):
         await self.ns_handler.emit_client_notification(
                 name='service_state',
                 value={},
+                request_id=kwargs['request_id'],
                 )
 
     @track_request_id_completed
+    @limit_exec_time
     async def emit_project_selected(self, pname, *args, **kwargs):
         await self.ns_handler.emit_client_notification(
                 name='project_selected',
                 value={'title': pname, },
                 client_room=self.ns_handler.room_sid,
+                request_id=kwargs['request_id'],
+            )
+
+    @track_request_id_completed
+    @limit_exec_time
+    async def emit_experiment_selected(self, pname, ename, *args, **kwargs):
+        await self.ns_handler.emit_client_notification(
+                name='experiment_selected',
+                value={
+                    'project': pname,
+                    'title': ename,
+                },
+                client_room=self.ns_handler.room_sid,
+                request_id=kwargs['request_id'],
             )
 
 def run_client():
