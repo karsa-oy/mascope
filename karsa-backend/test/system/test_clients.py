@@ -12,13 +12,20 @@ from systestlib import start_test_client_as_daemon, samples
 
 
 class TestBaseTestClient(asynctest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.client = start_test_client_as_daemon()
+
+    @classmethod
+    def tearDownClass(cls):
+        asyncio.run(cls.client.join_requests())
+        cls.client.stop_client(f'{cls.__name__} tearDownClass')
+
     def setUp(self) -> None:
-        self.client = start_test_client_as_daemon()
         return super().setUp()
 
     def tearDown(self) -> None:
         asyncio.run(self.client.join_requests())
-        self.client.stop_client(f'{self.__class__.__name__} tearDown')
         return super().tearDown()
 
     def assert_requests_ok(self):
@@ -27,6 +34,8 @@ class TestBaseTestClient(asynctest.TestCase):
             self.fail(str(self.client.target_exception))
 
 
+
+@unittest.skip("TEMP")
 class TestVisualizer(TestBaseTestClient):
     # Make sure test environment properly reacts to failures
     def test_validate_test_environment(self):
@@ -119,29 +128,33 @@ class TestVisualizer(TestBaseTestClient):
         self.assert_requests_ok()
 
 
-class TestSammpleManager(TestBaseTestClient):
-    def setUp(self):
-        super().setUp()
+class TestSampleManager(TestBaseTestClient):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
         # get list of available projects
         asyncio.run(
-            self.client.emit_service_state(request_id='service_state')
+            cls.client.emit_service_state(request_id='service_state')
         )
-        self.assert_requests_ok()   # wait for service_state to be processed
+        cls.assert_requests_ok(cls)   # wait for service_state to be processed
 
     def assert_attrs(self, fname, attrs):
         with open(fname) as f:
-            attrs_1 = json.dumps(json.load(f), sort_keys=True)
+            attrs_1 = json.load(f)
+            # if isinstance(attrs_1, list) and 'metadata_version_number' in attrs_1[-1]:
+            #     attrs_1 = attrs_1[:-1]
+            attrs_1 = json.dumps(attrs_1, sort_keys=True)
             attrs_2 = json.dumps(attrs, sort_keys=True)
-            self.assertTrue(attrs_1, attrs_2)
+            self.assertEqual(attrs_1, attrs_2)
 
-    def test_projects(self):
+    def test_01_projects(self):
         dirs = [d for d in os.listdir(self.client.projects_root) if 
                     os.path.isdir(os.path.join(self.client.projects_root, d))]
         self.assertTrue( sorted(self.client.projects) == sorted(dirs) )
         for p in self.client.projects.values():
             self.assert_attrs(os.path.join(p['path'], '.attrs'), p['attributes'])
 
-    def test_project_selected(self):
+    def test_02_project_selected(self):
         pname = 'LinuxProject'
         asyncio.run(
             self.client.emit_project_selected(pname, request_id='project_selected')
@@ -157,10 +170,27 @@ class TestSammpleManager(TestBaseTestClient):
                     os.path.join(self.client.projects[pname]['path'], e['title'], '.attrs'),
                     e['attributes'])
 
-
-
-    # def test_experiment_selected(self):
-    #     pass
+    def test_03_experiment_selected(self):
+        pname = 'LinuxProject'
+        ename = 'Experiment_1'
+        asyncio.run(
+            self.client.emit_experiment_selected(pname, ename, request_id='experiment_selected')
+        )
+        self.assert_requests_ok()
+        # # validate samples of selected experiment
+        edir = os.path.join(self.client.projects_root, pname, ename)
+        samples = [s for s in os.listdir(edir) if 
+                    os.path.isdir(os.path.join(edir, s))]
+        self.assertTrue( sorted(self.client.projects[pname]['experiments'][ename]['samples'].keys()) == sorted(samples) )
+        for n, s in self.client.projects[pname]['experiments'][ename]['samples'].items():
+            # validate attributes
+            self.assert_attrs(
+                    os.path.join(self.client.projects[pname]['path'], ename, n, '.attrs') ,
+                    s['attributes'])
+            # validate properties
+            self.assert_attrs(
+                    os.path.join(self.client.projects[pname]['path'], ename, n, '.props') ,
+                    s['properties'])
 
     # def test_save_project(self):
     #     print('AAAA', self.client.projects_root, self.client.projects)
