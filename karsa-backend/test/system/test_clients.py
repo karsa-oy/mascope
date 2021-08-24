@@ -150,7 +150,7 @@ class TestSampleManager(TestBaseTestClient):
     def test_01_projects(self):
         dirs = [d for d in os.listdir(self.client.projects_root) if 
                     os.path.isdir(os.path.join(self.client.projects_root, d))]
-        self.assertTrue( sorted(self.client.projects) == sorted(dirs) )
+        self.assertTrue( sorted(self.client.projects) == sorted(dirs), f"{sorted(self.client.projects)} vs. {sorted(dirs)}" )
         for p in self.client.projects.values():
             self.assert_attrs(os.path.join(p['path'], '.attrs'), p['attributes'])
 
@@ -169,6 +169,9 @@ class TestSampleManager(TestBaseTestClient):
             self.assert_attrs(
                     os.path.join(self.client.projects[pname]['path'], e['title'], '.attrs'),
                     e['attributes'])
+            self.assert_attrs(
+                    os.path.join(self.client.projects[pname]['path'], e['title'], '.template'),
+                    e['sample_attributes_template'])
 
     def test_03_experiment_selected(self):
         pname = 'LinuxProject'
@@ -177,7 +180,7 @@ class TestSampleManager(TestBaseTestClient):
             self.client.emit_experiment_selected(pname, ename, request_id='experiment_selected')
         )
         self.assert_requests_ok()
-        # # validate samples of selected experiment
+        # validate samples of selected experiment
         edir = os.path.join(self.client.projects_root, pname, ename)
         samples = [s for s in os.listdir(edir) if 
                     os.path.isdir(os.path.join(edir, s))]
@@ -192,51 +195,61 @@ class TestSampleManager(TestBaseTestClient):
                     os.path.join(self.client.projects[pname]['path'], ename, n, '.props') ,
                     s['properties'])
 
-    # def test_save_project(self):
-    #     print('AAAA', self.client.projects_root, self.client.projects)
+    def test_04_save_project(self):
+        pname = 'NewProject'
+        attrs = 'NewProject attributes'
+        pdir = os.path.join(self.client.projects_root, pname)
+        # make sure no leftovers
+        self.assertFalse(os.path.exists(pdir), pdir)
+        asyncio.run(
+            self.client.emit_save_project(pname, attrs, request_id='save_project')
+        )
+        self.assert_requests_ok()
+        # validate project dir
+        self.assertTrue(os.path.isdir(pdir))
+        # validate attributes
+        attr_path = os.path.join(pdir, '.attrs')
+        self.assert_attrs(attr_path, attrs)
 
-        # asyncio.run(
-        #     self.client.emit_client_notification(
-        #         name='service_state',
-        #         value={},
-        #     )
-        # )
-        # asyncio.run(asyncio.sleep(3))
+    def test_05_save_experiment(self):
+        pname = 'NewProject'
+        ename = 'NewExperiment'
+        attrs = 'NewExperiment attributes'
+        template = 'NewExperiment template'
+        edir = os.path.join(self.client.projects_root, pname, ename)
+        # make sure no leftovers
+        self.assertFalse(os.path.exists(edir), edir)
+        asyncio.run(
+            self.client.emit_save_experiment(pname, ename, attrs, template, request_id='save_experiment')
+        )
+        self.assert_requests_ok()
+        self.assertTrue(os.path.isdir(edir))
+        # validate attrs and template
+        p = os.path.join(edir, '.attrs')
+        self.assert_attrs(p, attrs)
+        p = os.path.join(edir, '.template')
+        self.assert_attrs(p, template)
 
-        # print('AAAA', datapool_path)
-        # datapool = SamplePool(datapool_path)
-        # project_name = 'LinuxProject'
-        # project_path = os.path.join(datapool.projects_root, project_name)
-        # orig_attrs = datapool._read_attributes(project_path)
-        # print('AAAA', datapool.projects_root, orig_attrs)
+    def test_06_delete_experiment(self):
+        pname = 'NewProject'
+        ename = 'NewExperiment'
+        edir = os.path.join(self.client.projects_root, pname, ename)
+        self.assertTrue(os.path.isdir(edir), edir)
+        asyncio.run(
+            self.client.emit_delete_experiment(pname, ename, request_id='delete_experiment')
+        )
+        self.assert_requests_ok()
+        self.assertFalse(os.path.exists(edir), edir)
 
-        # def validator():
-        #     pass
-
-        # request_id = f"saveproject_{int(time.time())}"
-        # asyncio.run(
-        #     self.client.emit_client_notification(
-        #         name='save_project',
-        #         value={
-        #             'request_id': request_id,
-        #             'title': project_name,
-        #             'attributes': request_id,
-        #         },
-        #     )
-        # )
-
-        # while timeout:
-        #     validator()
-
-    # def test_save_experiment(self):
-    #     pass
-
-    # def test_delete_experiment(self):
-    #     pass
-
-    # def test_delete_project(self):
-    #     pass
-
+    def test_06_delete_project(self):
+        pname = 'NewProject'
+        pdir = os.path.join(self.client.projects_root, pname)
+        self.assertTrue(os.path.isdir(pdir), pdir)
+        asyncio.run(
+            self.client.emit_delete_project(pname, request_id='delete_project')
+        )
+        self.assert_requests_ok()
+        self.assertFalse(os.path.exists(pdir), pdir)
 
 
 

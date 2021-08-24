@@ -40,6 +40,9 @@ class BaseTestClientNamespace(BaseClientNamespace):
         'experiments',
         'experiment_selected',
         'samples',
+        'save_experiment',
+        'delete_experiment',
+        'delete_project',
         ]
     endpoints_room_sid = [
         # 'loaded_coordinates',   # response to coordinate_request
@@ -122,6 +125,22 @@ class BaseTestClientNamespace(BaseClientNamespace):
         request_id = data['request_id']
         self.parent.kill_exec_timer(request_id)
         self.parent.mark_request_done(request_id)
+
+    async def on_save_experiment(self, data):
+        request_id = data['request_id']
+        self.parent.kill_exec_timer(request_id)
+        self.parent.mark_request_done(request_id)
+
+    async def on_delete_experiment(self, data):
+        request_id = data['request_id']
+        self.parent.kill_exec_timer(request_id)
+        self.parent.mark_request_done(request_id)
+
+    async def on_delete_project(self, data):
+        request_id = data['request_id']
+        self.parent.kill_exec_timer(request_id)
+        self.parent.mark_request_done(request_id)
+
 
 class BaseTestClient(BaseServiceClient):
     def __init__(self, *args, **kwargs):
@@ -295,6 +314,56 @@ class BaseTestClient(BaseServiceClient):
                 client_room=self.ns_handler.room_sid,
                 request_id=kwargs['request_id'],
             )
+
+    @track_request_id_completed
+    @limit_exec_time
+    async def emit_save_project(self, pname, attrs, *args, **kwargs):
+        await self.ns_handler.emit_client_notification(
+                name='save_project',
+                value={
+                    'title': pname,
+                    'attributes': attrs,
+                },
+                request_id=kwargs['request_id'],
+            )
+
+    @track_request_id_completed
+    @limit_exec_time
+    async def emit_save_experiment(self, pname, ename, attrs, template, *args, **kwargs):
+        await self.ns_handler.emit_client_notification(
+                name='save_experiment',
+                value={
+                    'project': pname,
+                    'title': ename,
+                    'attributes': attrs,
+                    'sample_attributes_template': template,
+                },
+                request_id=kwargs['request_id'],
+            )
+
+    @track_request_id_completed
+    @limit_exec_time
+    async def emit_delete_experiment(self, pname, ename, *args, **kwargs):
+        await self.ns_handler.emit_client_notification(
+                name='delete_experiment',
+                value={
+                    'project': pname,
+                    'experiment': ename,
+                },
+                request_id=kwargs['request_id'],
+            )
+
+    @track_request_id_completed
+    @limit_exec_time
+    async def emit_delete_project(self, pname, *args, **kwargs):
+        await self.ns_handler.emit_client_notification(
+                name='delete_project',
+                value={
+                    'project': pname,
+                },
+                request_id=kwargs['request_id'],
+            )
+
 
 def run_client():
     # Use run_client, when running client service from the terminal

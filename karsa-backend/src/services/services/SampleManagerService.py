@@ -301,6 +301,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
         self.log(value)
         project = value.get('title')
         attributes = value.get('attributes')
+        kwargs = get_client_notification_args(data)
 
         if project not in datapool.pool.keys():
             # New project
@@ -313,6 +314,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
         await self.emit_client_notification(
                                     'projects',
                                     projects,
+                                    **kwargs,
                                     )
 
     async def on_save_sample(self, data):
