@@ -307,19 +307,6 @@ class Element:
             eleshells[key[0] - 1] += val
         return tuple(ele for ele in eleshells if ele)
 
-    @lazyattr
-    def description(self):
-        """Return text description of element."""
-        try:
-            from .elements_descriptions import elements_descriptions
-        except ImportError:
-            try:
-                from elements_descriptions import elements_descriptions
-            except ImportError:
-                return ''
-
-        return elements_descriptions(ELEMENTS, self.symbol)
-
     def validate(self):
         """Check consistency of data. Raise Error on failure."""
         assert self.period in PERIODS
