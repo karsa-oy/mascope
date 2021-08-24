@@ -22,11 +22,11 @@ class TestBaseTestClient(asynctest.TestCase):
         cls.client.stop_client(f'{cls.__name__} tearDownClass')
 
     def setUp(self) -> None:
+        self.client.reset()
         return super().setUp()
 
     def tearDown(self) -> None:
         asyncio.run(self.client.join_requests())
-        self.client.reset()
         return super().tearDown()
 
     def assert_requests_ok(self):
@@ -124,6 +124,8 @@ class TestVisualizer(TestBaseTestClient):
         rq_suffix = self.client.set_test_params(fname)
         asyncio.run(self.client.emit_visualize_range(fname, request_id=f"fullrange_{rq_suffix}"))
         self.assert_requests_ok()
+
+
 
 class TestSampleManager(TestBaseTestClient):
     @classmethod

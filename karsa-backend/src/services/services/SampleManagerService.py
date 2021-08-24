@@ -128,17 +128,19 @@ class MetadataServiceNamespace(BaseClientNamespace):
         
     async def on_import_sample_table_datetime_range(self, data):
         global datapool
+        kwargs = get_client_notification_args(data)
         # Update sample table data
         await self.emit_client_notification(
                             'importable_samples',
                             datapool.get_samples().to_dict(orient='index'),
-                            **{**get_client_notification_args(data),
+                            **{**kwargs,
                                'room': data['client_room']
                               }
                             )
 
     async def on_parse_experiment_plan_blob(self, data):
         value = data['value']
+        kwargs = get_client_notification_args(data)
         # Differentiate autosampler report from generic csv
         autosampler_report = value.startswith("HT3000A Autorun Report")
         # Make temp file for csv reader
@@ -186,7 +188,8 @@ class MetadataServiceNamespace(BaseClientNamespace):
             }
         await self.emit_client_notification('experiment_plan',
                                             experiment_plan,
-                                            room=data['client_room'],
+                                            **{**kwargs,
+                                                'room': data['client_room'],}
                                             )
 
     async def on_project_selected(self, data):
@@ -213,6 +216,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
         value = data['value']
         experiment = value['experiment']
         project = value['project']
+        kwargs = get_client_notification_args(data)
 
         datapool.delete_experiment(project, experiment)
         
@@ -220,7 +224,8 @@ class MetadataServiceNamespace(BaseClientNamespace):
         await self.emit_client_notification(
                         'experiments',
                         project_experiments,
-                        room=project,
+                        **{**kwargs,
+                            'room': project,},
                         )
 
     async def on_delete_project(self, data):
@@ -228,6 +233,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
         self.log(data)
         value = data['value']
         project = value['project']
+        kwargs = get_client_notification_args(data)
 
         datapool.delete_project(project)
 
@@ -235,6 +241,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
         await self.emit_client_notification(
                                     'projects',
                                     projects,
+                                    **kwargs,
                                     )
 
     async def on_delete_sample(self, data):
@@ -244,12 +251,14 @@ class MetadataServiceNamespace(BaseClientNamespace):
         filename = value['filename']
         experiment = value['experiment']
         project = value['project']
+        kwargs = get_client_notification_args(data)
         datapool.delete_sample(project, experiment, filename)
         # Update sample table data in UIs
         await self.emit_client_notification(
                             'samples',
                             datapool.get_samples(project, experiment).to_dict(orient='index'),
-                            room='_'.join([project, experiment])
+                            **{**kwargs,
+                                'room': '_'.join([project, experiment])},
                             )
 
     async def on_save_experiment(self, data):
@@ -260,6 +269,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
         attributes = value.get('attributes')
         sample_attributes_template = value.get('sample_attributes_template')
         sample_placeholders = value.get('sample_placeholders', [])
+        kwargs = get_client_notification_args(data)
         # Create new experiment directory
 
         if project not in datapool.pool.keys():
@@ -293,7 +303,8 @@ class MetadataServiceNamespace(BaseClientNamespace):
         await self.emit_client_notification(
                         'experiments',
                         project_experiments,
-                        room=project,
+                        **{**kwargs,
+                            'room': project,}
                         )
 
     async def on_save_project(self, data):
@@ -341,6 +352,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
         attributes = value.get('attributes')
         method = value.get('method')
         annotations = value.get('annotations', [])
+        kwargs = get_client_notification_args(data)
 
         try:
             samples = datapool.pool.get(project).get(experiment)
@@ -357,7 +369,8 @@ class MetadataServiceNamespace(BaseClientNamespace):
         await self.emit_client_notification(
                             'samples',
                             datapool.get_samples(project, experiment).to_dict(orient='index'),
-                            room='_'.join([project, experiment])
+                            **{**kwargs,
+                                'room': '_'.join([project, experiment])}
                             )
     
     async def on_save_sample_annotation(self, data):
