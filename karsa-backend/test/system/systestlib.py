@@ -145,18 +145,22 @@ class BaseTestClientNamespace(BaseClientNamespace):
 class BaseTestClient(BaseServiceClient):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.reset()
-        self.projects_root = None
-        self.projects = None
-
-    def reset(self):
         self.is_alive = False
         self.done = {}
         self.timers = {}
-        self.cancel_message = ''
-        self.target_exception = None
+        self.reset()
+        self.projects_root = None
+        self.projects = None
         self.stop_event = Event()
         self.cancel_event = Event()
+
+    def reset(self):
+        self.done.clear()
+        for t in self.timers.values():
+            t.cancel()
+        self.timers.clear()
+        self.cancel_message = ''
+        self.target_exception = None
     
     async def init_service(self):
         # global service_q
@@ -220,14 +224,13 @@ class BaseTestClient(BaseServiceClient):
         self.log(id)
 
     def kill_exec_timer(self, id):
-        timer = self.timers.get(id)
+        timer = self.timers.pop(id, None)
         if timer:
             timer.cancel()
-            self.timers.pop(id)
             self.log(id)
 
     async def join_requests(self):
-        while self.daemon.is_alive() and not all(self.done.values()):
+        while self.is_alive and not all(self.done.values()):
             await asyncio.sleep(0.3)
         self.log(list(self.done.keys()))
 
