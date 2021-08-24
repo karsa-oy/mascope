@@ -26,6 +26,7 @@ class TestBaseTestClient(asynctest.TestCase):
 
     def tearDown(self) -> None:
         asyncio.run(self.client.join_requests())
+        self.client.reset()
         return super().tearDown()
 
     def assert_requests_ok(self):
@@ -35,7 +36,6 @@ class TestBaseTestClient(asynctest.TestCase):
 
 
 
-@unittest.skip("TEMP")
 class TestVisualizer(TestBaseTestClient):
     # Make sure test environment properly reacts to failures
     def test_validate_test_environment(self):
@@ -120,13 +120,10 @@ class TestVisualizer(TestBaseTestClient):
         fname = 'file_1'
         rq_suffix = self.client.set_test_params(fname)
         asyncio.run(self.client.emit_visualize_range(fname, request_id=f"fullrange_{rq_suffix}"))
-
         fname = 'file_2'
         rq_suffix = self.client.set_test_params(fname)
         asyncio.run(self.client.emit_visualize_range(fname, request_id=f"fullrange_{rq_suffix}"))
-
         self.assert_requests_ok()
-
 
 class TestSampleManager(TestBaseTestClient):
     @classmethod

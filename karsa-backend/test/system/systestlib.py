@@ -145,16 +145,18 @@ class BaseTestClientNamespace(BaseClientNamespace):
 class BaseTestClient(BaseServiceClient):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.is_alive = False
-        self.done = {}
-        self.timers = {}
-        self.stop_event = Event()
-        self.cancel_event = Event()
-        self.cancel_message = ''
-        self.target_exception = None
+        self.reset()
         self.projects_root = None
         self.projects = None
 
+    def reset(self):
+        self.is_alive = False
+        self.done = {}
+        self.timers = {}
+        self.cancel_message = ''
+        self.target_exception = None
+        self.stop_event = Event()
+        self.cancel_event = Event()
     
     async def init_service(self):
         # global service_q
