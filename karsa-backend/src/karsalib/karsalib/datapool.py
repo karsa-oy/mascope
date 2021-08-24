@@ -544,7 +544,7 @@ class SamplePool():
         project_path = os.path.join(self.projects_root, project)
         rmtree(project_path, ignore_errors=False, onerror=None)
         self.pool.pop(project)
-        self.df = self.df.drop(project)
+        self.df = self.df.drop(project, level=0)
 
     def delete_sample(self, project, experiment, sample):
         sample_link_path = os.path.join(
@@ -714,7 +714,9 @@ class SamplePool():
                                  )
         # In case of previously empty project, remove NaN index
         flat_df = self.df.reset_index()
-        flat_df_clean = flat_df.loc[flat_df['experiment'].dropna().index]
+        flat_df_clean = flat_df.loc[(flat_df.project!=project) |
+                                    (flat_df['experiment'].notna())
+                                    ]
         self.df = flat_df_clean.set_index(self.df.index.names)
 
     def new_sample(self, project, experiment, sample, attributes, method, annotations, placeholder=False):
@@ -723,13 +725,14 @@ class SamplePool():
         sample_experiment_path = os.path.join(experiment_path, sample)
         # Data path
         if placeholder:
-            # Creating a placeholder for a sample, make dummy link
+            # Creating a placeholder for a sample, make dummy sample dir
             sample_data_path = sample_experiment_path
+            os.mkdir(sample_data_path)
         else:
             # Actual sample, link to data file
             sample_data_path = parse_path_from_sample_name(sample)
-        # Make link from experiment directory to data file
-        self._make_link(sample_data_path, sample_experiment_path)
+            # Make link from experiment directory to data file
+            self._make_link(sample_data_path, sample_experiment_path)
         # Write attributes
         self._write_attributes(sample_data_path, attributes, ext='.attrs')
         # Write method
@@ -747,7 +750,11 @@ class SamplePool():
                                  )
         # In case of previously empty experiment, remove NaN index
         flat_df = self.df.reset_index()
-        flat_df_clean = flat_df.loc[flat_df['sample'].dropna().index]
+        # flat_df_clean = flat_df.loc[flat_df['sample'].dropna().index]
+        flat_df_clean = flat_df.loc[(flat_df.project!=project) |
+                                    (flat_df.experiment!=experiment) |
+                                    (flat_df['sample'].notna())
+                                    ]
         self.df = flat_df_clean.set_index(self.df.index.names)
 
 
