@@ -22,11 +22,11 @@ class TestBaseTestClient(asynctest.TestCase):
         cls.client.stop_client(f'{cls.__name__} tearDownClass')
 
     def setUp(self) -> None:
-        self.client.reset()
         return super().setUp()
 
     def tearDown(self) -> None:
         asyncio.run(self.client.join_requests())
+        self.client.reset()
         return super().tearDown()
 
     def assert_requests_ok(self):
@@ -36,8 +36,9 @@ class TestBaseTestClient(asynctest.TestCase):
 
 
 
-class TestVisualizer(TestBaseTestClient):
+class TestValidateTester(TestBaseTestClient):
     # Make sure test environment properly reacts to failures
+    # BE CAREFUL: raised assertion kills main TestClient thread
     def test_validate_test_environment(self):
         fname = 'TofDaq_Data_2021.08.02_18h53m56s'
         max_exec_time = 3                                   # make it small for convenience
@@ -50,6 +51,8 @@ class TestVisualizer(TestBaseTestClient):
         self.assertTrue('exceeded max execution time' in str(ctx.exception))
 
 
+
+class TestVisualizer(TestBaseTestClient):
     def test_visualize_full_range(self):
         fname = 'TofDaq_Data_2021.08.02_18h53m56s'
         rq_suffix = self.client.set_test_params(fname)
