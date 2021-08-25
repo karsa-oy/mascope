@@ -264,10 +264,10 @@ class BaseStreamerClient(BridgeServiceClient):
         self.streamer = getattr(m, f'{streamer_type}Streamer')()
 
         self.raw_pool = None
-        self.raw_pool_path = raw_pool
         if raw_pool:
             m = importlib.import_module('.datapool', 'karsalib')
             self.raw_pool = getattr(m, f'{streamer_type}Pool')(raw_pool)
+            self.raw_pool.path = raw_pool
 
         super().__init__(url, port, public_namespace_data, private_namespace_data)
         priv_ns_name, _ = private_namespace_data
