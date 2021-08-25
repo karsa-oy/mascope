@@ -1,6 +1,7 @@
 import asyncio
 import inspect
 import time
+import importlib
 
 from queue import Empty
 from socketio import AsyncClientNamespace, AsyncClient
@@ -254,19 +255,20 @@ class BridgeServiceClient(BaseServiceClient):
 class BaseStreamerClient(BridgeServiceClient):
     def __init__(self, streamer_type, raw_pool,
                  url, port, public_namespace_data, private_namespace_data):
-        # Caller must have corresponding streamer and pool classes imported
-        try:
-            streamer_class = inspect.stack()[1][0].f_globals[f"{streamer_type}Streamer"]
-        except KeyError:
-            s = f"Invalid streamer_type : {streamer_type}" if streamer_type else \
-                f"Missing streamer_type argument"
-            raise Exception(s)
-        self.streamer = streamer_class()
+        streamer_info = {
+            'H5': {'package': 'karsatof', 'module': '.kgenerator'},
+            'Raw': {'package': 'karsaorbi', 'module': '.kogenerator'},
+        }
+        m = importlib.import_module(streamer_info[streamer_type]['module'],
+                                    streamer_info[streamer_type]['package'])
+        self.streamer = getattr(m, f'{streamer_type}Streamer')()
+
         self.raw_pool = None
         self.raw_pool_path = raw_pool
         if raw_pool:
-            raw_pool_class = inspect.stack()[1][0].f_globals[f"{streamer_type}Pool"]
-            self.raw_pool = raw_pool_class(raw_pool)
+            m = importlib.import_module('.datapool', 'karsalib')
+            self.raw_pool = getattr(m, f'{streamer_type}Pool')(raw_pool)
+
         super().__init__(url, port, public_namespace_data, private_namespace_data)
         priv_ns_name, _ = private_namespace_data
         self.instrument_data = {'name': priv_ns_name,
