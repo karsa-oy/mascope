@@ -127,7 +127,7 @@ class RawStreamerServiceClient(BaseStreamerClient):
     async def init_service(self):
         await super().init_service()
         assert self.raw_pool, 'Missing raw_pool argument'
-        await self.raw_pool.scan_dir(self.raw_pool_path)
+        await self.raw_pool.scan_dir(self.raw_pool.path)
 
 
 
