@@ -42,6 +42,5 @@
     "tps": {
         "settings_file": "test_file.txt",
         "settings_file_directory": null
-    },
-    "metadata_version_number": "0.01"
+    }
 }
