@@ -76,42 +76,15 @@ Revisions
 2005.x.x
     Initial release.
 
-Examples
---------
->>> from molmass import Formula
->>> f = Formula('D2O')  # heavy water
->>> f.formula  # hill notation
-'[2H]2O'
->>> f.empirical
-'[2H]2O'
->>> f.mass  # average mass
-20.02760855624
->>> f.isotope.massnumber  # nominal mass
-20
->>> f.isotope.mass  # monoisotopic mass
-20.02311817581
->>> f.atoms
-3
->>> print(f.composition())
-Element  Number  Relative mass  Fraction %
-2H            2       4.028204     20.1133
-O             1      15.999405     79.8867
-Total:        3      20.027609    100.0000
->>> print(f.spectrum())
-Relative mass    Fraction %      Intensity
-20.023118         99.757000     100.000000
-21.027335          0.038000       0.038093
-22.027363          0.205000       0.205499
-
 """
 
 __version__ = '2020.6.10'
 
 __all__ = (
     'analyze', 'Formula', 'FormulaError', 'Spectrum', 'Composition',
-    'test', 'main', 'from_fractions', 'from_elements', 'from_oligo',
-    'from_peptide', 'from_sequence', 'from_string', 'hill_sorted',
-    'GROUPS', 'AMINOACIDS', 'DEOXYNUCLEOTIDES', 'PREPROCESSORS'
+    'test', 'main', 'from_elements',
+    'from_sequence', 'from_string', 'hill_sorted',
+    'GROUPS'
 )
 
 import sys
@@ -121,9 +94,9 @@ import copy
 from functools import reduce
 
 try:
-    from .elements import ELEMENTS, Isotope, ELECTRON
-except ImportError:
     from elements import ELEMENTS, Isotope, ELECTRON
+except ImportError:
+    from .elements import ELEMENTS, Isotope, ELECTRON
 
 
 def analyze(formula, maxatoms=250):
@@ -138,6 +111,7 @@ def analyze(formula, maxatoms=250):
 
         if len(str(f)) <= 50:
             result.append(f'Formula: {f}')
+        result.append("Charge: %s%s" %(('+' if f.charge>0 else ''), f.charge))
         if formula != f.formula:
             result.append(f'Hill notation: {f.formula}')
         if f.formula != f.empirical:
@@ -148,6 +122,7 @@ def analyze(formula, maxatoms=250):
             result.append(f'\nAverage mass: {f.mass:.{prec}f}')
         result.extend((
             f'Monoisotopic mass: {f.isotope.mass:.{prec}f}',
+            f'm/z:  {f.mz:.{prec}f}',
             f'Nominal mass: {f.isotope.massnumber}'))
 
         c = f.composition()
@@ -516,7 +491,7 @@ class Formula:
         
     @lazyattr
     def mz(self):
-        """Return molecular mass corrected by ion charge.
+        """Return monoisotopic mass corrected by ion charge.
 
         Examples
         --------
@@ -531,9 +506,9 @@ class Formula:
 
         """        
         if self.charge != 0:
-            return (self.mass - ELECTRON.mass * self.charge) / abs(self.charge)
+            return (self.isotope.mass - ELECTRON.mass * self.charge) / abs(self.charge)
             
-        return self.mass
+        return 0
 
     @lazyattr
     def mass(self):
@@ -642,32 +617,6 @@ class Formula:
         Return type is dict{massnumber: list[mass, fraction]}.
 
         Calculated by combining the mass numbers of the elemental isotopes.
-
-        Examples
-        --------
-        >>> def _(spectrum):
-        ...     for key, val in spectrum.items():
-        ...         print(f'{key}, {val[0]:.4f}, {val[1]*100:.6f}%')
-        >>> _(Formula('D').spectrum())
-        2, 2.0141, 100.000000%
-        >>> _(Formula('H').spectrum())
-        1, 1.0078, 99.988500%
-        2, 2.0141, 0.011500%
-        >>> _(Formula('D2').spectrum())
-        4, 4.0282, 100.000000%
-        >>> _(Formula('DH').spectrum())
-        3, 3.0219, 99.988500%
-        4, 4.0282, 0.011500%
-        >>> _(Formula('H2').spectrum())
-        2, 2.0157, 99.977001%
-        3, 3.0219, 0.022997%
-        4, 4.0282, 0.000001%
-        >>> _(Formula('DHO').spectrum())
-        19, 19.0168, 99.745528%
-        20, 20.0215, 0.049468%
-        21, 21.0211, 0.204981%
-        22, 22.0274, 0.000024%
-
         """
         spectrum = {0: [0.0, 1.0]}
         elements = self._elements
@@ -891,38 +840,6 @@ def from_string(formula, groups=None):
 
     Supports simple, non-nested, arithmetic (+ and *), abbreviations of
     common chemical groups, peptides, oligos, and mass fractions.
-
-    Examples
-    --------
-    >>> from_string('Valohp')
-    '(C5H8NO2)'
-    >>> from_string('HLeu2OH')
-    'H(C6H11NO)2OH'
-    >>> from_string('D2O')
-    '[2H]2O'
-    >>> from_string('O: 0.26, 30Si: 0.74')
-    'O2[30Si]3'
-    >>> from_string('PhNH2.HCl')
-    '(C6H5)NH2HCl'
-    >>> from_string('CuSO4.5H2O')
-    'CuSO4(H2O)5'
-    >>> from_string('CuSO4+5*H2O')
-    'CuSO4(H2O)5'
-    >>> from_string('ssdna(AC)')
-    '((C10H12N5O5P)(C9H12N3O6P)H2O)'
-    >>> from_string('peptide(GG)')
-    '((C2H3NO)2H2O)'
-    >>> from_string("C8H14Br4+H+")
-    '[C8H14Br4H]+'
-    >>> from_string("C8H14Br4+-")
-    'C8H14Br4'
-    >>> from_string("C14H17N2O_-")
-    '[C14H17N2O]-'
-    >>> from_string("C56H75I4N13O2Pt2++")
-    '[C56H75I4N13O2Pt2]2+'
-    >>> from_string("C56H75I4N13O2Pt2_2+")
-    '[C56H75I4N13O2Pt2]2+'
-
     """
     try:
         formula = formula.strip().replace(' ', '')
@@ -935,40 +852,14 @@ def from_string(formula, groups=None):
     if groups:
         for grp in reversed(sorted(groups)):
             formula = formula.replace(grp, f'({groups[grp]})')
-
-    # list of mass fractions
-    if ':' in formula and ',' in formula:
-        fractions = {}
-        try:
-            for item in formula.split(','):
-                item = item.split(':')
-                fractions[item[0].strip()] = float(item[1].strip())
-        except Exception as exc:
-            raise FormulaError(
-                'invalid list of mass fractions', formula) from exc
-        return from_fractions(fractions)
-
-    # oligos and peptides
-    if len(formula) > 1:
-        fset = set(formula)
-        if fset <= set('ATCG') and fset & set('ATG'):
-            return from_oligo(formula, 'ssdna')
-        if fset <= set('AUCG') and fset & set('AG'):
-            return from_oligo(formula, 'ssrna')
-        if fset <= set(AMINOACIDS.keys()) and fset & set('AEGMLQRT'):
-            return from_peptide(formula)
-        for dtype, func in PREPROCESSORS.items():
-            for match in re.findall(dtype + r'\((.*?)\)', formula):
-                formula = formula.replace(f'{dtype}({match})', func(match))
-
-    # Deuterium
-    formula = re.sub('(D)(?![a-z])', '[2H]', formula)
     
     # Charge
     charge = 0
-    m = re.search("([\]_]{1,})([0-9]{1,})([+-]{1,})$", formula)
+    m = re.search("([_]{1,})([0-9]{1,})([+-]{1,})$", formula)
     if m:
+        # Search for multi-charged (e.g. *_2-)
         if m.groups()[1] == '':
+            # Do we ever end up in here?
             charge = int("%s1" % m.groups()[2])
         else:
             charge = int("%s%s" % (m.groups()[2], m.groups()[1]))
@@ -979,6 +870,7 @@ def from_string(formula, groups=None):
         elif m.groups()[0] == "]":
             formula = formula.split("]")[0] + "]"
     else:
+        # Search for singly charged (e.g. *_- or *-)
         m = re.search("([\]_]?)([+-]{1,})$", formula)
         charge = 0
         if m:
@@ -1005,7 +897,13 @@ def from_string(formula, groups=None):
             formula = formula.replace(match[0], f'({match[2]}){match[1]}')
         formula = formula.replace('+', '')
     if '-' in formula:
-        FormulaError('subtraction not supported yet')
+        # Check for parenthesis
+        for match in re.findall(
+            r'([(]{1,})([\w]*)([-]{1,})([\w]*)([)]{1,})', formula
+        ):
+            a, b = match[1], match[3]
+            sub = (Formula(a) - Formula(b))
+            formula = formula.replace( ''.join(match), sub.formula )
         
     #Charge
     if charge != 0:
@@ -1046,77 +944,6 @@ def from_elements(elements, divisor=1, *fmt):
     return ''.join(formula)
 
 
-def from_fractions(fractions, maxcount=10, precision=1e-4):
-    """Return formula string from elemental mass fractions.
-
-    Examples
-    --------
-    >>> from_fractions({'H': 0.112, 'O': 0.888})
-    'H2O'
-    >>> from_fractions({'D': 0.2, 'O': 0.8})
-    'O[2H]2'
-    >>> from_fractions({'H': 8.97, 'C': 59.39, 'O': 31.64})
-    'C5H9O2'
-    >>> from_fractions({'O': 0.26, '30Si': 0.74})
-    'O2[30Si]3'
-
-    """
-    if not fractions:
-        return ''
-    # divide normalized fractions by element/isotope mass
-    numbers = {}
-    sumfractions = sum(fractions.values())
-    for symbol, fraction in fractions.items():
-        if symbol == 'D':  # Deuterium
-            symbol = '2H'
-        if symbol[0].isupper():
-            try:
-                mass = ELEMENTS[symbol].mass
-            except KeyError as exc:
-                raise FormulaError(f"unknown element '{symbol}'") from exc
-        else:
-            if symbol.startswith('['):
-                symbol = symbol[1:-1]
-            i = 0
-            while symbol[i].isdigit():
-                i += 1
-            massnum = int(symbol[:i])
-            symbol = symbol[i:]
-            try:
-                mass = ELEMENTS[symbol].isotopes[massnum].mass
-            except KeyError as exc:
-                raise FormulaError(
-                    f"unknown isotope '[{massnum}{symbol}]'") from exc
-            symbol = f'[{massnum}{symbol}]'
-        numbers[symbol] = fraction / (sumfractions * mass)
-
-    # divide numbers by smallest number
-    smallest = min(numbers.values())
-    for symbol in numbers:
-        numbers[symbol] /= smallest
-
-    # find smallest factor that turns all numbers into integers
-    precision *= len(numbers)
-    best = 1e6
-    factor = 1
-    for i in range(1, maxcount):
-        x = sum(abs((i * n) - round(i * n)) for n in numbers.values())
-        if x < best:
-            best = x
-            factor = i
-            if best < i * precision:
-                break
-
-    formula = []
-    for symbol, number in sorted(numbers.items()):
-        count = int(round(factor * number))
-        if count > 1:
-            formula.append(f'{symbol}{count}')
-        else:
-            formula.append(symbol)
-    return ''.join(formula)
-
-
 def from_sequence(sequence, items):
     """Translate sequence using items dict and return histogram of items in
     translated sequence as formula string.
@@ -1142,55 +969,6 @@ def from_sequence(sequence, items):
         elif num:
             formula.append(f'({items[key]}){num}')
     return ''.join(formula)
-
-
-def from_peptide(sequence):
-    """Return chemical formula for polymer of unmodified amino acids.
-
-    >>> from_peptide('GG')
-    '((C2H3NO)2H2O)'
-    >>> f = Formula(from_peptide('GPAVL IMCFY WHKRQ NEDST'))
-    >>> print(f.formula, f.atoms, round(f.mass, 6))
-    C107H159N29O30S2 327 2395.717936
-
-    """
-    sequence = sequence.replace(' ', '')
-    return f'({from_sequence(sequence, AMINOACIDS)}H2O)'
-
-
-def from_oligo(sequence, dtype='ssdna'):
-    """Return chemical formula for polymer of unmodified (deoxy)nucleotides.
-
-    Dtype is 'ssdna', 'dsdna', 'ssrna', or 'dsrna'.
-    Each strand includes a 5' monophosphate.
-
-    Examples
-    --------
-    >>> from_oligo('AC', 'ssdna')
-    '((C10H12N5O5P)(C9H12N3O6P)H2O)'
-    >>> from_oligo('AU', 'dsrna')
-    '((C10H12N5O6P)2(C9H11N2O8P)2(H2O)2)'
-
-    >>> f = Formula(from_oligo('ATC G', 'dsdna'))
-    >>> print(f.formula, f.atoms, round(f.mass, 6))
-    C78H102N30O50P8 268 2507.609138
-    >>> f = Formula(from_oligo('AUC G', 'ssrna'))
-    >>> print(f.formula, f.atoms, round(f.mass, 6))
-    C38H49N15O29P4 135 1303.775567
-
-    """
-    dtype = dtype.lower()
-    sequence = sequence.replace(' ', '')
-    items = NUCLEOTIDES if 'rna' in dtype else DEOXYNUCLEOTIDES
-    if dtype.startswith('ds'):
-        complements = items['complements']
-        t = ''.join(complements[i] for i in sequence)
-        formula = from_sequence(sequence + t, items)
-        formula = f'({formula}(H2O)2)'
-    else:
-        formula = from_sequence(sequence, items)
-        formula = f'({formula}H2O)'
-    return formula
 
 
 def hill_sorted(symbols):
@@ -1378,57 +1156,6 @@ GROUPS = {
     'Xan': 'C13H9O',
 }
 
-# Amino acids - H2O
-AMINOACIDS = {
-    'G': 'C2H3NO',  # Glycine, Gly
-    'P': 'C5H7NO',  # Proline, Pro
-    'A': 'C3H5NO',  # Alanine, Ala
-    'V': 'C5H9NO',  # Valine, Val
-    'L': 'C6H11NO',  # Leucine, Leu
-    'I': 'C6H11NO',  # Isoleucine, Ile
-    'M': 'C5H9NOS',  # Methionine, Met
-    'C': 'C3H5NOS',  # Cysteine, Cys
-    'F': 'C9H9NO',  # Phenylalanine, Phe
-    'Y': 'C9H9NO2',  # Tyrosine, Tyr
-    'W': 'C11H10N2O',  # Tryptophan, Trp
-    'H': 'C6H7N3O',  # Histidine, His
-    'K': 'C6H12N2O',  # Lysine, Lys
-    'R': 'C6H12N4O',  # Arginine, Arg
-    'Q': 'C5H8N2O2',  # Glutamine, Gln
-    'N': 'C4H6N2O2',  # Asparagine, Asn
-    'E': 'C5H7NO3',  # Glutamic Acid, Glu
-    'D': 'C4H5NO3',  # Aspartic Acid, Asp
-    'S': 'C3H5NO2',  # Serine, Ser
-    'T': 'C4H7NO2',  # Threonine, Thr
-}
-
-# Deoxynucleotide monophosphates - H2O
-DEOXYNUCLEOTIDES = {
-    'A': 'C10H12N5O5P',
-    'T': 'C10H13N2O7P',
-    'C': 'C9H12N3O6P',
-    'G': 'C10H12N5O6P',
-    'complements': {'A': 'T', 'T': 'A', 'C': 'G', 'G': 'C'},
-}
-
-# Nucleotide monophosphates - H2O
-NUCLEOTIDES = {
-    'A': 'C10H12N5O6P',
-    'U': 'C9H11N2O8P',
-    'C': 'C9H12N3O7P',
-    'G': 'C10H12N5O7P',
-    'complements': {'A': 'U', 'U': 'A', 'C': 'G', 'G': 'C'},
-}
-
-# Formula preprocessors
-PREPROCESSORS = {
-    'peptide': from_peptide,
-    'ssdna': lambda x: from_oligo(x, 'ssdna'),
-    'dsdna': lambda x: from_oligo(x, 'dsdna'),
-    'ssrna': lambda x: from_oligo(x, 'ssrna'),
-    'dsrna': lambda x: from_oligo(x, 'dsrna'),
-}
-
 
 def test(verbose=False):
     """Test the module and the examples in docstrings."""
@@ -1449,12 +1176,6 @@ def test(verbose=False):
         ('PhSiMe3', 'C9H14Si', 150.29566),
         ('Ph(CO)C(CH3)3', 'C11H14O', 162.23156),
         ('HGlyGluTyrOH', 'C16H21N3O7', 367.35864),
-        ('HCysTyrIleGlnAsnCysProLeuNH2', 'C41H65N11O11S2', 952.1519),
-        ('HCysp(Trt)Tyrp(Tbu)IleGlnp(Trt)Asnp(Trt)ProLeuGlyNH2',
-         'C101H113N11O11S', 1689.13532),
-        ('CGCGAATTCGCG', 'C116H148N46O73P12', 3726.4),
-        ('MDRGEQGLLK', 'C47H83N15O16S', 1146.3),
-        ('CDCl3', 'C[2H]Cl3', 120.384),
         ('[13C]Cl4', '[13C]Cl4', 154.8153),
         ('C5(PhBu(EtCHBr)2)3', 'C53H78Br6', 1194.626),
         ('AgCuRu4(H)2[CO]12{PPh3}2', 'C48H32AgCuO12P2Ru4', 1438.4022),
@@ -1525,21 +1246,13 @@ def main(argv=None):
         prog='molmass'
     )
     opt = parser.add_option
-    opt('--web', dest='web', action='store_true', default=False,
-        help='start web application and open it in a web browser')
+
     opt('--test', dest='test', action='store_true', default=False,
         help='test the module')
     opt('-v', '--verbose', dest='verbose', action='store_true', default=False)
 
     settings, formula = parser.parse_args()
 
-    if settings.web:
-        try:
-            from . import molmass_web  # noqa: delayed import
-        except ImportError:
-            import molmass_web  # noqa: delayed import
-
-        return molmass_web.main()
     if settings.test:
         test(settings.verbose)
         return 0
