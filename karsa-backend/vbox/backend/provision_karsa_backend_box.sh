@@ -59,7 +59,7 @@ function install_default_dev_env() {
     echo AAA install_default_dev_env:
 
     echo AAA create karsa shortcuts:
-    ln -f -s /vagrant/ /home/vagrant/Desktop/backend_src
+    ln -f -s /vagrant/ /home/vagrant/Desktop/backend_src || true
     ln -f -s /vagrant/run_services.sh /home/vagrant/Desktop/run_backend
     ln -f -s /vagrant/test/unit/run_unittests.sh /home/vagrant/Desktop/run_unittests
     ln -f -s /vagrant/test/system/run_unittests.sh /home/vagrant/Desktop/run_system_tests
