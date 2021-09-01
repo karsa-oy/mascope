@@ -25,7 +25,7 @@ setuptools.setup(
     install_requires=[
         'dask[array]',
         'datetime_glob',
-        'numpy',
+        'numpy==1.20',	# this is due to numba requirement: numpy<1.21,>=1.17
         'pandas',
         'python-socketio',
         'pyyaml',

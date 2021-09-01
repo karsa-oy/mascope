@@ -34,7 +34,7 @@ setuptools.setup(
             'karsa-sample-service = services.SampleManagerService:run',
             'karsa-dataviz-service = services.DataVizService:run',
             'karsa-signal-service = services.SignalProcessorService:run',
-            'karsa-raw-streamer = services.RawStreamer:run',
+            'karsa-file-streamer = services.FileStreamer:run',
         ],
     }
 )

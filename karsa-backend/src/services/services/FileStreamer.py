@@ -1,5 +1,5 @@
 """
-RawStreamer Service
+FileStreamer Service
 """
 
 import os
@@ -13,7 +13,7 @@ from karsalib.client import (
 from karsalib.util import get_client_notification_args
 
 
-class RawStreamerPublicNamespace(BaseClientNamespace):
+class FileStreamerPublicNamespace(BaseClientNamespace):
     # raw service public (root) interfaces
     # the public namespace is primarily exposed to the root namespace
     # via a room_instrument = private_namespace_name.
@@ -59,7 +59,7 @@ class RawStreamerPublicNamespace(BaseClientNamespace):
                                     )
 
 
-class RawStreamerPrivateNamespace(BaseClientNamespace):
+class FileStreamerPrivateNamespace(BaseClientNamespace):
     # raw service private interfaces
     endpoints = [
             'raw_import',
@@ -92,7 +92,7 @@ class RawStreamerPrivateNamespace(BaseClientNamespace):
             print("dt1 not valid JSON datetime")
             return
 
-        raw_sample_table = await self.parent.raw_pool.get_datetime_range(dt0, dt1)
+        raw_sample_table = await self.parent.data_pool.get_datetime_range(dt0, dt1)
 
         await self.emit_client_notification('raw_samples',
                                             raw_sample_table,
@@ -114,27 +114,27 @@ class RawStreamerPrivateNamespace(BaseClientNamespace):
         self.parent.streamer.stop_stream()
 
 
-class RawStreamerServiceClient(BaseStreamerClient):
+class FileStreamerServiceClient(BaseStreamerClient):
     def __init__(self, *args, **kwargs):
         # this allows BaseStreamerClient.__init__ to see caller's context,
-        # which is needed for dynamic instantiation of a streamer and a raw_pool
+        # which is needed for dynamic instantiation of a streamer and a data_pool
         super().__init__(*args, **kwargs)
 
     # @property
     # def instrument_name(self):
-    #     return os.path.basename(os.path.normpath(self.raw_pool.data_root))
+    #     return os.path.basename(os.path.normpath(self.data_pool.data_root))
 
     async def init_service(self):
         await super().init_service()
-        assert self.raw_pool, 'Missing raw_pool argument'
-        await self.raw_pool.scan_dir(self.raw_pool.path)
+        assert self.data_pool, 'Missing data_pool argument'
+        await self.data_pool.scan_dir(self.data_pool.path)
 
 
 
 def run():
-    run_streamer_service(RawStreamerServiceClient,
-                         RawStreamerPublicNamespace,
-                         RawStreamerPrivateNamespace
+    run_streamer_service(FileStreamerServiceClient,
+                         FileStreamerPublicNamespace,
+                         FileStreamerPrivateNamespace
                         )
 
 
