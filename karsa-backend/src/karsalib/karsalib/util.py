@@ -95,7 +95,7 @@ def parse_cmd_args():
                  'n_jobs=',
                  'ns=',
                  'port=',
-                 'raw_pool=',
+                 'data_pool=',
                  'streamer_type=',
                  'url=',
                  ])

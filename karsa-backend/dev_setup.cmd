@@ -59,7 +59,7 @@ echo ========================
 echo ========================
 echo   1. Create and activate virtual environment:
 echo ========================
-  python -m venv .venv || goto :error
+rem  python -m venv .venv || goto :error
   call .venv\Scripts\activate || goto :error
   pushd src
   exit /b 0

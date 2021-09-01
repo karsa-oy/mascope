@@ -88,17 +88,17 @@ class TOFServicePrivateNamespace(BaseClientNamespace):
 class TOFServiceClient(BaseStreamerClient):
     # TofDaq Recorder must be running.
 
-    def __init__(self, streamer_type, raw_pool,
+    def __init__(self, streamer_type, data_pool,
                  url, port, public_namespace_data, private_namespace_data):
         # this allows BaseStreamerClient.__init__ to see caller's context,
-        # which is needed for dynamic instantiation of a streamer and a raw_pool
-        super().__init__(streamer_type or 'TofDaq', raw_pool,
+        # which is needed for dynamic instantiation of a streamer and a data_pool
+        super().__init__(streamer_type or 'TofDaq', data_pool,
                          url, port, public_namespace_data, private_namespace_data)
         self.acknowledge_acquisition = False    # do not sync acq.speed with FileIO capacity
 
     async def init_service(self):
         await super().init_service()
-        assert self.raw_pool == None, 'TofDaq service does not use raw_pool argument'
+        assert self.data_pool == None, 'TofDaq service does not use data_pool argument'
 
 
 def run():

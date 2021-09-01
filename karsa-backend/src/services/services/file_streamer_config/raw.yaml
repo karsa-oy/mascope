@@ -3,4 +3,4 @@ url: localhost
 port: 5010
 ns: OrbitrapData
 streamer_type: Raw
-raw_pool: "Z:/Data/Orbitrap Data and Documents/Orbitrap Data 2020"
+data_pool: "Z:/Data/Orbitrap Data and Documents/Orbitrap Data 2020"

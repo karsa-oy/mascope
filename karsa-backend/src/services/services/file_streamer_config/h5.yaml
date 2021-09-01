@@ -3,4 +3,4 @@ url: localhost
 port: 5010
 ns: H5Data
 streamer_type: H5
-raw_pool: Z:/Data/KLTOF2
+data_pool: Z:/Data/KLTOF2
