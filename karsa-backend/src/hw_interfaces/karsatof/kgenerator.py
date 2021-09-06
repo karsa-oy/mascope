@@ -38,55 +38,10 @@ def strip_filepath(filepath):
     return os.path.splitext(os.path.basename(filepath))[0]
 
 
-class TofDaqStreamer(Thread):
-    from .lib.TofDaq import (
-            TwRetVal,
-            TSharedMemoryDesc,
-            TSharedMemoryPointer,
-            TwAddLogEntry,
-            TwGetDescriptor,
-            TwTofDaqRunning,
-            TwDaqActive,
-            TwWaitForNewData,
-            TwGetBufTimeFromShMem,
-            TwGetTofSpectrumFromShMem,
-            TwQueryRegUserDataSize,
-            TwReadRegUserData,
-            TwGetRegUserDataDesc,
-            TwGetSpecXaxisFromShMem,
-            TwStartAcquisition,
-            TwStopAcquisition
-            )
+class BaseStreamer():
+    """Base class for TofDaqStreamer and H5Streamer to inherit common methods from.
+    """
     def __init__(self):
-        """Initialize self
-
-        Inherits 'karsatof.kinstrument.KInstrument' which provides some
-        convenience methods for instrument functions. TofDaq Recorder must 
-        be running before initializing.
-
-        Raises
-        ------
-        Exception
-            Exception is raised if TofDaq Recorder is not running, or if
-            fetching 'TwSharedMemoryDesc' fails for another reason.
-        """
-        print("TofDaqStreamer initializing")
-        Thread.__init__(self)
-
-        # Initialize TW API related structures 'desc' and 'ptr'
-        if not TofDaqStreamer.TwTofDaqRunning():
-            raise ModuleNotFoundError("TofDaq Recorder not running.")
-        self.desc = TofDaqStreamer.TSharedMemoryDesc() # TW shared memory descriptor
-        ret = TofDaqStreamer.TwGetDescriptor(self.desc)
-        if ret == 4:
-            # Success
-            self.ptr = TofDaqStreamer.TSharedMemoryPointer() # TW shared memory pointer
-        else:
-            # Failed
-            raise Exception("Trying to fetch shared memory " +
-                            "descriptor failed: %s" %TofDaqStreamer.TwRetVal(ret).name)
-        # Parameters
-        self.timeout = 500 # [ms], timeout for TwWaitForNewData
         # Synchronization primitives
         self.shutdown_event = Event()   # Set to break out from main loop
         self.active = Event()           # TofDaqStreamer active event
@@ -99,17 +54,6 @@ class TofDaqStreamer(Thread):
         self.progress = 0               # TofDaqStreamer progress [%]
         self.speci = -1                 # Index of last received spectrum,
                                         # -1 when there is no active acquisition
-
-    @property
-    def mz(self):
-        # Get mz axis from file
-        mz = np.zeros((self.desc.nbrSamples,), dtype=np.double)
-        TofDaqStreamer.TwGetSpecXaxisFromShMem(mz,
-                                               1,
-                                               None
-                                               )
-        return mz.astype(np.float32)
-
     @property
     def tps_info(self):
         """List of TPS  names
@@ -143,6 +87,126 @@ class TofDaqStreamer(Thread):
         # Feed poison pill
         self.spec_queue.put(None)
         self.tps_queue.put(None)
+
+    def _reset(self):
+        """Reset per acquisition attributes
+        """
+        self.filename = None
+        self.progress = 0
+        self.speci = -1
+
+    def _update(self):
+        """Update per acquisition attributes. If new data is available, feed into queues.
+        """
+        # Check for updates
+        state = self._check()
+        if state == 0:
+            # No update
+            return
+        # Update
+        if state == 2:
+            # New file, update attributes
+            h5_filepath = self.desc.currentDataFileName.decode() # TW h5 file full path
+            self.filename = strip_filepath(h5_filepath)
+            tof_period_s = self.desc.tofPeriod
+            if tof_period_s > 1:
+                # Convert [ns]->[s] if needed
+                tof_period_s *= 1e-9 
+            self.interval = tof_period_s * self.desc.nbrWaveforms # [s]
+            self.length = (self.desc.nbrWrites * self.desc.nbrBufs) * self.interval # [s]
+            print("TofDaqStreamer started: %s" %self.filename)
+            # Check again for new data
+            state = self._check()
+        if state == 1:
+            # New data
+            new_speci = (self.desc.iWrite * self.desc.nbrBufs) + self.desc.iBuf
+            if new_speci - self.speci > 1:
+                print("Warning: Skipped a spec!")
+            self.speci = new_speci
+            print(self.speci)
+            self._get_and_feed_data()
+            # TofDaqStreamer progress
+            n = self.desc.nbrWrites * self.desc.nbrBufs # Total number of spectra
+            self.progress = ((self.speci+1) / n) * 100. # [%]
+         
+    def shutdown(self):
+        """Shutdown procedure
+        """
+        self.shutdown_event.set()
+        # Clear left-over data from queues
+        while True:
+            try:
+                self.spec_queue.get_nowait()
+                self.tps_queue.get_nowait()
+            except Empty:
+                break
+            sleep(.1)
+        # Close queues
+        self.spec_queue.close()
+        self.spec_queue.join_thread()
+        self.tps_queue.close()
+        self.tps_queue.join_thread()
+
+class TofDaqStreamer(BaseStreamer, Thread):
+    from .lib.TofDaq import (
+            TwRetVal,
+            TSharedMemoryDesc,
+            TSharedMemoryPointer,
+            TwAddLogEntry,
+            TwGetDescriptor,
+            TwTofDaqRunning,
+            TwDaqActive,
+            TwWaitForNewData,
+            TwGetBufTimeFromShMem,
+            TwGetTofSpectrumFromShMem,
+            TwQueryRegUserDataSize,
+            TwReadRegUserData,
+            TwGetRegUserDataDesc,
+            TwGetSpecXaxisFromShMem,
+            TwStartAcquisition,
+            TwStopAcquisition
+            )
+    def __init__(self):
+        """Initialize self
+
+        Inherits 'karsatof.kinstrument.KInstrument' which provides some
+        convenience methods for instrument functions. TofDaq Recorder must 
+        be running before initializing.
+
+        Raises
+        ------
+        Exception
+            Exception is raised if TofDaq Recorder is not running, or if
+            fetching 'TwSharedMemoryDesc' fails for another reason.
+        """
+        print("TofDaqStreamer initializing")
+        BaseStreamer.__init__(self)
+        Thread.__init__(self)
+
+        # Initialize TW API related structures 'desc' and 'ptr'
+        if not TofDaqStreamer.TwTofDaqRunning():
+            raise ModuleNotFoundError("TofDaq Recorder not running.")
+        self.desc = TofDaqStreamer.TSharedMemoryDesc() # TW shared memory descriptor
+        ret = TofDaqStreamer.TwGetDescriptor(self.desc)
+        if ret == 4:
+            # Success
+            self.ptr = TofDaqStreamer.TSharedMemoryPointer() # TW shared memory pointer
+        else:
+            # Failed
+            raise Exception("Trying to fetch shared memory " +
+                            "descriptor failed: %s" %TofDaqStreamer.TwRetVal(ret).name)
+        # Parameters
+        self.timeout = 500 # [ms], timeout for TwWaitForNewData
+
+    @property
+    def mz(self):
+        # Get mz axis from file
+        mz = np.zeros((self.desc.nbrSamples,), dtype=np.double)
+        TofDaqStreamer.TwGetSpecXaxisFromShMem(mz,
+                                               1,
+                                               None
+                                               )
+        return mz.astype(np.float32)
 
     def _get_and_feed_data(self):
         """Read data from the shared memory and put to queues
@@ -213,47 +277,6 @@ class TofDaqStreamer(Thread):
                 info = [ i.decode('unicode_escape') for i in info ] # bytes to str
         return info
 
-    def _reset(self):
-        """Reset per acquisition attributes
-        """
-        self.filename = None
-        self.progress = 0
-        self.speci = -1
-
-    def _update(self):
-        """Update per acquisition attributes. If new data is available, feed into queues.
-        """
-        # Check for updates
-        state = self._check()
-        if state == 0:
-            # No update
-            return
-        # Update
-        if state == 2:
-            # New file, update attributes
-            h5_filepath = self.desc.currentDataFileName.decode() # TW h5 file full path
-            self.filename = strip_filepath(h5_filepath)
-            tof_period_s = self.desc.tofPeriod
-            if tof_period_s > 1:
-                # Convert [ns]->[s] if needed
-                tof_period_s *= 1e-9 
-            self.interval = tof_period_s * self.desc.nbrWaveforms # [s]
-            self.length = (self.desc.nbrWrites * self.desc.nbrBufs) * self.interval # [s]
-            print("TofDaqStreamer started: %s" %self.filename)
-            # Check again for new data
-            state = self._check()
-        if state == 1:
-            # New data
-            new_speci = (self.desc.iWrite * self.desc.nbrBufs) + self.desc.iBuf
-            if new_speci - self.speci > 1:
-                print("Warning: Skipped a spec!")
-            self.speci = new_speci
-            print(self.speci)
-            self._get_and_feed_data()
-            # TofDaqStreamer progress
-            n = self.desc.nbrWrites * self.desc.nbrBufs # Total number of spectra
-            self.progress = ((self.speci+1) / n) * 100. # [%]
-         
     def add_log_entry(self, text, timestamp=0):
         if timestamp:
             # Convert seconds to filetime
@@ -330,24 +353,6 @@ class TofDaqStreamer(Thread):
         print('TofDaqStreamer exiting')
         self.shutdown()
 
-    def shutdown(self):
-        """Shutdown procedure
-        """
-        self.shutdown_event.set()
-        # Clear left-over data from queues
-        while True:
-            try:
-                self.spec_queue.get_nowait()
-                self.tps_queue.get_nowait()
-            except Empty:
-                break
-            sleep(.1)
-        # Close queues
-        self.spec_queue.close()
-        self.spec_queue.join_thread()
-        self.tps_queue.close()
-        self.tps_queue.join_thread()
-
     def start_acquisition(self):
         """Start acquisition by calling TW API
         """
@@ -364,7 +369,7 @@ class TofDaqStreamer(Thread):
         self.stop_acquisition()
 
 
-class H5Streamer(TofDaqStreamer, KInstrument):
+class H5Streamer(BaseStreamer, KInstrument):
     from .lib.TwH5 import (
             TwGetBufTimeFromH5,
             TwGetH5Descriptor,
@@ -385,6 +390,7 @@ class H5Streamer(TofDaqStreamer, KInstrument):
             Exception is raised if fetching 'TwH5Desc' fails for some reason.
         """
         print("H5Streamer initializing")
+        BaseStreamer.__init__(self)
         Thread.__init__(self)
 
         # Initialize with empty TW h5 descriptor
@@ -395,18 +401,6 @@ class H5Streamer(TofDaqStreamer, KInstrument):
         # Streamer specific
         self.file_queue = Queue()       # Queue for files to stream
         self.cancel_event = Event()     # Set to cancel current stream
-        # Common with TofDaqStreamer
-        self.shutdown_event = Event()   # Set to break out from main loop
-        self.active = Event()           # TofDaqStreamer active event
-        self.spec_queue = Queue()       # Signal output queue
-        self.tps_queue = Queue()        # TPS output queue
-        # Per acquisition attributes
-        self.filename = None            # Filename base from TW h5 file
-        self.interval = None            # TofDaqStreamer interval [s]
-        self.length = None              # TofDaqStreamer length [s]
-        self.progress = 0               # TofDaqStreamer progress [%]
-        self.speci = -1                 # Index of last received spectrum,
-                                        # -1 when there is no active acquisition
 
     @property
     def mz(self):
@@ -420,13 +414,6 @@ class H5Streamer(TofDaqStreamer, KInstrument):
                                         0
                                         )
         return mz.astype(np.float32)
-
-    def _finalize(self):
-        # Reset self
-        self._reset()
-        # Feed poison pill
-        self.spec_queue.put(None)
-        self.tps_queue.put(None)
 
     def _get_and_feed_data(self):
         """Read data from the h5 and put to queues
@@ -627,24 +614,6 @@ class H5Streamer(TofDaqStreamer, KInstrument):
         # Out of main loop
         print('H5Streamer exiting')
         self.shutdown()
-
-    def shutdown(self):
-        """Shutdown procedure
-        """
-        self.shutdown_event.set()
-        # Clear all left-over data from queue
-        while True:
-            try:
-                self.spec_queue.get_nowait()
-                self.tps_queue.get_nowait()
-            except Empty:
-                break
-            sleep(.1)
-        # Close queues
-        self.spec_queue.close()
-        self.spec_queue.join_thread()
-        self.tps_queue.close()
-        self.tps_queue.join_thread()
 
     def start_stream(self, filename):
         if os.path.isfile(filename):
