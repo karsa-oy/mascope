@@ -42,14 +42,6 @@ class TestMolMass(unittest.TestCase):
             self.assertEqual(f.charge, charge)
             self.assertAlmostEqual(f.mz, mz, places=7)
 
-    #   with self.assertRaises(KeyError):
-    #      v = self.d['a']
-    #   with self.assertRaises(KeyError):
-    #      del self.d['a']
-    #   self.assertEqual(self.d.get('a', 'nothing'), 'nothing')
-    #   self.assertEqual(list(self.d.keys()), [])
-    #   self.assertEqual(list(self.d.values()), [])
-
 
 
 if __name__ == '__main__':

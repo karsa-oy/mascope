@@ -135,7 +135,7 @@ def analyze(formula, maxatoms=250):
                 result.extend((
                     '\nMass Distribution',
                     f'\nMost abundant mass: {s.peak[0]:.{prec}f} '
-                    f'({s.peak[1] * 100:.3f}%)',
+                    f'({ s.peak[1] * 100:.3f}%)',
                     f'Mean mass: {s.mean:.{prec}f}\n',
                     str(s)
                 ))
@@ -692,11 +692,9 @@ class Formula:
         spectrum = self.spectrum(minfract=minfract)
         mz_spectrum = {}
         
-        max_intensity = max([val[1] for val in spectrum.values()])
-        
         # Correct mass with charge
         for key, val in spectrum.items():
-            percentage = val[1] / max_intensity * 100.
+            percentage = val[1]
             if percentage >= isotope_threshold:
                 mz = (val[0] - ELECTRON.mass * self.charge) / abs(self.charge) if self.charge != 0 else val[0]
                 mz_spectrum[key] = [mz, percentage]
