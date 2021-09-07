@@ -29,7 +29,7 @@ timeout 7
 
 start cmd /k karsa-sample-service || goto :error
 start cmd /k karsa-dataviz-service || goto :error
-::start cmd /k karsa-signal-service || goto :error
+start cmd /k karsa-signal-service || goto :error
 popd
 
 exit /b 0

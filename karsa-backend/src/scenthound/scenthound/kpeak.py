@@ -496,7 +496,6 @@ def score_peak_id(kevent, peaklist, found_peaks, corr_avg_s=10, cache=False):
     return peak_df
 
 
-from matplotlib import pyplot as plt
 
 def identify_peaks(
         kevent,
