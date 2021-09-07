@@ -60,7 +60,7 @@
 			"font": {
 				"color": "#fff"
 				},
-			"showlegend": false,
+			"showlegend": true,
 			"dragmode": "zoom",
 			"autosize": true,
 			"hovermode": "closest",
@@ -155,7 +155,7 @@
 				"ticktext": [],
 				"visible": true
 				},
-			"showlegend": false,
+			"showlegend": true,
 			"dragmode": "zoom",
 			"autosize": true,
 			"hoverinfo": "name+y",
