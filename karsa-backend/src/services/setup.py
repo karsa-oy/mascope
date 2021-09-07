@@ -30,11 +30,12 @@ setuptools.setup(
     ],
     entry_points={
         'console_scripts': [
+            'karsa-dataviz-service = services.DataVizService:run',
+            'karsa-file-streamer = services.FileStreamer:run',
             'karsa-fileio-service = services.FileIoService:run',
             'karsa-sample-service = services.SampleManagerService:run',
-            'karsa-dataviz-service = services.DataVizService:run',
             'karsa-signal-service = services.SignalProcessorService:run',
-            'karsa-file-streamer = services.FileStreamer:run',
+            'karsa-target-service = services.TargetService:run'
         ],
     }
 )
