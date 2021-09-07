@@ -18,6 +18,9 @@ xterm -hold -e "karsa-fileio-service --ns TofDaq; bash" &
 echo running karsa-sample-service
 xterm -hold -e "karsa-sample-service; bash" &
 
+echo running karsa-signal-service
+xterm -hold -e "karsa-signal-service; bash" &
+
 sleep 10
 
 echo running karsa-dataviz-service
