@@ -13,7 +13,9 @@ export default new Vuex.Store({
 		figure_data: {},
 		figure_double_click: null,
 		figure_ranges: {},
+		integrate_target_ions: {},
 		new_file: "",
+		peak_data: {},
 		project_selected: {'title': "", 'attributes': []},
 		projects: [],
 		root_namespace: null,
@@ -28,7 +30,8 @@ export default new Vuex.Store({
 				'experiment': "",
 				},
 		stop_visualize_range: {},
-		target_to_display: {},
+		target_ion_intensities: [],
+		target_to_display: null,
 		tofdaq_log_entry: {},
 		url: "",
 		visualize_range: {},
@@ -58,8 +61,14 @@ export default new Vuex.Store({
 		figure_ranges(state, payload) {
 			state.figure_ranges = payload;
 		},
+		integrate_target_ions(state, payload) {
+			state.integrate_target_ions = payload;
+		},
 		new_file(state, payload) {
 			state.new_file = payload;
+		},
+		peak_data(state, payload) {
+			state.peak_data = payload;
 		},
 		project_selected(state, payload) {
 			state.project_selected = payload;
@@ -81,6 +90,9 @@ export default new Vuex.Store({
 		},
 		stop_visualize_range(state, payload) {
 			state.stop_visualize_range = payload;
+		},
+		target_ion_intensities(state, payload) {
+			state.target_ion_intensities = payload;
 		},
 		target_to_display(state, payload) {
 			state.target_to_display = payload;

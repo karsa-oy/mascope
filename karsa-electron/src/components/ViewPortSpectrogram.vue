@@ -41,6 +41,19 @@ export default {
     },
     data: function() {
         return {
+            figure_traces_default: [
+                {
+                    'name': "Found peaks",
+                    'legendgroup': "Found peaks",
+                    x: [0],
+                    y: [0],
+                    'mode': 'lines',
+                    'line': {'color': '#ffffff',
+                             'width': 1},
+                    'visible': 'legendonly',
+                    'showlegend': true,
+                }
+            ],
         }
     },
 

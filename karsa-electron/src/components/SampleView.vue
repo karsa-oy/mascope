@@ -182,6 +182,14 @@ export default {
                 this.$store.commit('figure_ranges', value);
             }
         },
+        peak_data: {
+            get() {
+                return this.$store.state.peak_data;
+            },
+            set(value) {
+                this.$store.commit('peak_data', value);
+            }
+        },
         sample_annotations: {
             get() {
                 return this.$store.state.sample_annotations;
@@ -280,6 +288,16 @@ export default {
                                     )
         },
 
+        requestPeakData() {
+            if (this.filename) {
+                this.be.export_one_way_binding_prop('peak_data_request',
+                                                    {'filename': this.filename},
+                                                    null,
+                                                    this.room_sid
+                                                    );
+            }
+        },
+
     },
 
     watch: {
@@ -305,6 +323,7 @@ export default {
                                   'mz_range': new_value.properties.range,
                                   'id': Math.random().toString(36).substring(2)
                                   };
+            this.requestPeakData();
         },
         stop_visualize_range: function(new_value, old_value) {
             if (_.isEqual(new_value.request_ids, old_value.request_ids)) {
@@ -350,6 +369,7 @@ export default {
             if (_.isEqual(new_value.request_id, old_value.request_id)) {
                 return
             }
+
             return this.be.export_one_way_binding_prop('visualize_range',
                                                        {...new_value,
                                                         'viz_types': this.viz_types,
@@ -366,6 +386,12 @@ export default {
                 this.namespace = this.root_namespace;
                 // handlers for for external notifications:
                 this.namespace.on("figure_data", (value) => this.be.import_one_way_binding_prop("figure_data", value));
+                this.namespace.on("peak_data", (value) => this.be.import_one_way_binding_prop(
+                                                                "peak_data",
+                                                                {'mz': new Float32Array(value.value.mz),
+                                                                 'height': new Float32Array(value.value.height)
+                                                                 }
+                                                                ));
 
                 this.room_sid = this.root_namespace.id;
             }
