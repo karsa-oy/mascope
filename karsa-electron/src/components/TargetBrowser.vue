@@ -37,7 +37,7 @@
                         <button
                             class="button"
                             type="button"
-                            @click="ImportExcelTargets()"
+                            @click="importExcelTargets()"
                             is-dark>
                             Import
                         </button>
@@ -137,8 +137,25 @@ export default {
         ...mapState([
             'figure_double_click',
             'root_namespace',
+            'sample_selected',
             // 'targets',
         ]),
+        integrate_target_ions: {
+            get() {
+                return this.$store.state.integrate_target_ions;
+            },
+            set(value) {
+                this.$store.commit('integrate_target_ions', value);
+            }
+        },
+        target_ion_intensities: {
+            get() {
+                return this.$store.state.target_ion_intensities;
+            },
+            set(value) {
+                this.$store.commit('target_ion_intensities', value);
+            }
+        },
         // target_list_request: {
         //     get() {
         //         return this.$store.state.target_list_request;
@@ -182,16 +199,41 @@ export default {
         this.be = new BECom(this);
     },
     mounted: function() {
-        this.ReadTargetsFromFile();
+        this.readTargetsFromFile();
     },
     methods: {
-        ImportExcelTargets() {
-            this.target_table_cols = this.excel_clipboard_table_cols;
-            this.target_table_rows = this.excel_clipboard_table_rows;
-            this.is_excel_clipboard_modal_active = false;
-            this.WriteTargetsToFile();
+        requestTargetIntensities() {
+            // Find m/z column, assuming the first numeric column is m/z
+            let mz_field = null;
+            for (const i in this.target_table_cols) {
+                mz_field = this.target_table_cols[i].field;
+                let mz = Number( this.target_table_rows[0][mz_field] );
+                if (mz) {
+                    break
+                }
+            }
+            if (!mz_field) {
+                console.log("No mz field found from target table columns");
+                return
+            }
+            // Collect m/z value of each row
+            let mzs = [];
+            for (const j in this.target_table_rows) {
+                const row = this.target_table_rows[j];
+                mzs.push(Number(row[mz_field]));
+            }
+            this.integrate_target_ions = {'filename': this.sample_selected.filename,
+                                          'mz': mzs,
+                                          't_range': null,
+                                          };
         },
-        ParseExcelClipboard: function(clipboard_text) {
+        importExcelTargets() {
+            this.targets = {'cols': this.excel_clipboard_table_cols,
+                            'rows': this.excel_clipboard_table_rows
+                            };
+            this.is_excel_clipboard_modal_active = false;
+        },
+        parseExcelClipboard: function(clipboard_text) {
             // Split full text to rows
             let clip_rows = clipboard_text.split(String.fromCharCode(10));
             // Split each row to columns
@@ -233,14 +275,14 @@ export default {
             this.excel_clipboard_table_rows = rows;
             this.excel_clipboard_text = "";
         },  
-        ReadTargetsFromFile() {
+        readTargetsFromFile() {
             let target_table_data = JSON.parse(
                                         fs.readFileSync('configs/target_list.json')
                                         );
             this.target_table_cols = target_table_data.cols;
             this.target_table_rows = target_table_data.rows;
         },
-        WriteTargetsToFile() {
+        writeTargetsToFile() {
             let target_table_data = {"cols": this.target_table_cols,
                                      "rows": this.target_table_rows
                                      };
@@ -254,7 +296,7 @@ export default {
             if (new_value === old_value || !new_value.length) {
                 return
             }
-            this.ParseExcelClipboard(new_value);
+            this.parseExcelClipboard(new_value);
         },
         excel_clipboard_use_header: function(new_value) {
             if (new_value) {
@@ -269,7 +311,28 @@ export default {
         figure_double_click: function() {
             this.target_table_selected_row = null;
         },
-        target_table_selected_row:function(new_value, old_value) {
+        integrate_target_ions: function(new_value, old_value) {
+            if (_.isEqual(new_value, old_value)) {
+                return
+            }
+            this.be.export_one_way_binding_prop('integrate_target_ions',
+                                                {...new_value,
+                                                 'room': this.room_sid,
+                                                 'uid': Math.random(),
+                                                 },
+                                                old_value,
+                                                this.room_sid
+                                                );
+        },
+        target_ion_intensities: function(new_value) {
+            this.target_table_cols.push({'field': "intensity",
+                                         'label': "Intensity"
+                                         });
+            for (const i in this.target_table_rows) {
+                this.target_table_rows[i]['intensity'] = new_value[i];
+            }
+        },
+        target_table_selected_row: function(new_value, old_value) {
             if ( _.isEqual(new_value, old_value) ) {
                 return false;
             }
@@ -278,9 +341,9 @@ export default {
                 let mz = null;
                 // Loop through columns until find numeric value, assume it to be m/z
                 for (let i=0; keys.length; i++) {
-                    mz = parseFloat( new_value[keys[i]] );
+                    mz = Number( new_value[keys[i]] );
                     if (mz) {
-                        this.target_to_display = parseFloat(mz);
+                        this.target_to_display = mz;
                         return
                     }
                 }
@@ -294,12 +357,15 @@ export default {
             }
             this.target_table_cols = new_data.cols;
             this.target_table_rows = new_data.rows;
+            this.writeTargetsToFile();
+            this.requestTargetIntensities();
         },
         'root_namespace.connected': function(new_value) {
             if ( new_value === true )
             {
                 this.namespace = this.root_namespace;
                 // handlers for for external notifications:
+                this.namespace.on("target_ion_intensities", (value) => this.be.import_one_way_binding_prop("target_ion_intensities", value.value));
                 this.namespace.on("targets", (value) => this.be.import_one_way_binding_prop("targets", value.value));
                 this.room_sid = this.root_namespace.id;
                 this.be.subscribe(this.endpoints, this.room_sid);

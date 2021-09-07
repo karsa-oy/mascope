@@ -11,6 +11,7 @@ export const viewPortMixin = {
         ...mapState([
                     'acquisition_status',
                     'figure_data',
+                    'peak_data',
                     'sample_annotations',
                     'target_to_display',
                     ]),
@@ -62,12 +63,16 @@ export const viewPortMixin = {
                 },
             figure_config: {},
             figure_traces: [],
+            figure_traces_default: [],
             figure_img_config: {},
             figure_layout: {},
             figure_layout_default: {},
             figure_queue: Promise.resolve(),
 
-            mz_precision: 4,
+            peak_traces: [],
+            peak_traces_visible: false,
+
+            mz_precision: 4, // Number of decimals in m/z readings
             
             zoom_stack: [],
         }
@@ -134,18 +139,20 @@ export const viewPortMixin = {
             console.log('[' + this.name + ']',  ...args);
         },
 
-        figure_cache_add_ref(zoom_stack_item_id) {
-            if ( Object.keys(this.figure_cache).includes(zoom_stack_item_id) ) {
-                ++this.figure_cache[zoom_stack_item_id].ref_count;
-                return this.figure_cache[zoom_stack_item_id];
+        figure_cache_add_ref(zoom_stack_item) {
+            if ( Object.keys(this.figure_cache).includes(zoom_stack_item.id) ) {
+                // Increment counter of existing item
+                ++this.figure_cache[zoom_stack_item.id].ref_count;
+                return this.figure_cache[zoom_stack_item.id];
             }
-            this.figure_cache[zoom_stack_item_id] = {
+            // Add new figure cache item
+            this.figure_cache[zoom_stack_item.id] = {
                     'ref_count': 1,
                     't_filled_range': [Number.MAX_SAFE_INTEGER, 0],
                     'figure_layout': shallow_copy(this.figure_layout_default),
                     'figure_traces': [],
                     };
-            return this.figure_cache[zoom_stack_item_id];
+            return this.figure_cache[zoom_stack_item.id];
         },
 
         figure_cache_release_ref(zoom_stack_item_id) {
@@ -159,7 +166,56 @@ export const viewPortMixin = {
         figure_cache_get(zoom_stack_item_id) {
             if ( _.isUndefined(zoom_stack_item_id) )
                 return false;
-            return this.figure_cache[zoom_stack_item_id];
+            return this.figure_cache[zoom_stack_item_id]
+        },
+
+        getPeakTraces(mz_range=null) {
+            // this.log("getPeakTraces, mz_range: ", mz_range);
+            if (!this.peak_traces_visible) {
+                // this.log("getPeakTraces return 0 traces");
+                return []
+            }
+            if (!mz_range) {
+                // this.log("getPeakTraces return all ", this.peak_traces.length," traces");
+                return this.peak_traces
+            }
+            let peak_traces = [];
+            let mz_axis = this.figure_axes.mz;
+            if (mz_axis) {
+                const m0 = mz_range[0];
+                const m1 = mz_range[1];
+                for (let i in this.peak_traces) {
+                    let peak_trace = this.peak_traces[i];
+                    // peak_trace.showlegend = !peak_traces.length;
+                    if (peak_trace[mz_axis][0] >= m0 && peak_trace[mz_axis][0] <= m1) {
+                        peak_traces.push(peak_trace);
+                    }
+                }
+            }
+            // this.log("getPeakTraces return ", peak_traces.length, " traces");
+            return peak_traces
+        },
+
+        getTargetTraces() {
+            // Add target trace if target selected
+            if (this.target_to_display) {
+                let mz = this.target_to_display;
+                let mz_axis = this.figure_axes.mz;
+                let time_axis = this.figure_axes.time;
+                if (mz_axis) {
+                    // Add target trace
+                    let target_traces = [{
+                        [time_axis]: this.figure_cache.t_maxrange,
+                        [mz_axis]: [mz, mz],
+                        'mode': 'lines',
+                        'line': {'color': '#8c67ef'},
+                        'name': mz.toFixed(this.mz_precision),
+                        'showlegend': true,
+                        }];
+                    return target_traces
+                }
+            }
+            return []
         },
 
         zoom_stack_search(mz_range) {
@@ -256,6 +312,8 @@ export const viewPortMixin = {
                 // Signal double click to all ViewPorts
                 self.figure_double_click = Math.random();
             });
+            // Legend click event
+            figure_div.on('plotly_legendclick', (eventData) => this.on_plotly_legendclick(eventData));
             // Right click event
             figure_div.addEventListener('contextmenu', function(ev) {
                 ev.preventDefault();
@@ -279,6 +337,33 @@ export const viewPortMixin = {
                     break
             }
             return eventData
+        },
+
+        on_plotly_legendclick(eventData) {
+            var self = this;
+            // let clicked_trace_index = eventData.curveNumber;
+            //  Loop through figure traces
+            for (let i in eventData.data) {
+                let trace = eventData.data[i];
+                // In case of a legendgroup master trace, toggle visibility
+                if (trace.legendgroup && trace.showlegend && trace.name === trace.legendgroup) {
+                    //  Choose appropriate action based on legendgroup property
+                    switch (trace.legendgroup) {
+                        case "Found peaks": {
+                            // Reverse visibility logic due to delay in eventData update (bacause of double-click handling)
+                            self.peak_traces_visible = trace.visible == 'legendonly' ? true : false;
+                            if (self.peak_traces_visible) {
+                                let mz_range = self.zoom_stack.slice(-1)[0].mz_range;
+                                self.figure_traces = [
+                                    ...self.figure_traces,
+                                    ...self.getPeakTraces(mz_range)
+                                    ];
+                            }
+                            self.update_figure();
+                        }
+                    }
+                }
+            }
         },
 
         async _on_figure_ranges(new_value, old_value) {
@@ -316,24 +401,6 @@ export const viewPortMixin = {
                 // Zoom in loaded sample
                 this.visualize_range_on_zoom_in(old_value, new_value);
             }
-            // Add target trace if target selected
-            if (this.target_to_display) {
-                let mz = this.target_to_display;
-                let mz_axis = this.figure_axes.mz;
-                let time_axis = this.figure_axes.time;
-                if (mz_axis) {
-                    // Add target trace
-                    let target_traces = [{
-                        [time_axis]: new_value.t_range,
-                        [mz_axis]: [mz, mz],
-                        'mode': 'lines',
-                        'line': {'color': '#8c67ef'}
-                        }];
-                    let zoom_stack_item = this.zoom_stack.slice(-1)[0]
-                    let figure_cache_item = this.figure_cache_get(zoom_stack_item.id);
-                    figure_cache_item.figure_traces.push(...target_traces);
-                }
-            }
         },
 
         async _on_figure_data(json_data) {
@@ -341,8 +408,8 @@ export const viewPortMixin = {
             if ( _.isEmpty(json_data) ) {
                 // reset the figure
                 self.figure_layout = shallow_copy(self.figure_layout_default);
-                self.figure_traces = [];
-                await Plotly.react(self.id, self.figure_traces, self.figure_layout);
+                self.figure_traces = shallow_copy(self.figure_traces_default);
+                await self.update_figure();
                 return;
             }
             let data = json_data.value;
@@ -397,22 +464,13 @@ export const viewPortMixin = {
             let traces = data.traces; // array
             if (traces) {
                 // If traces in json_data, add to figure
-                for (let i=0; i<traces.length; i++) {
-                    cache_item.figure_traces.push(traces[i]);
-                }
+                cache_item.figure_traces.push(...traces);
             }
 
             // if latest zoom stack item updated, draw the figure
             if ( _.isEqual(zoom_stack_item_id,
                            self.zoom_stack.slice(-1)[0].id) ) {
-                self.figure_layout = cache_item.figure_layout;
-                self.figure_traces = cache_item.figure_traces;
-                await Plotly.update(self.id,
-                                   self.figure_traces,
-                                   {...self.figure_layout,
-                                    annotations: shallow_copy(this.figure_annotations)
-                                    }
-                                   );
+                await self.update_figure(shallow_copy(self.zoom_stack.slice(-1)[0]));
             }
         },
 
@@ -420,11 +478,13 @@ export const viewPortMixin = {
             this.reset_figure_cache();
             this.reset_figure();
             this.update_figure();
+            this.peak_traces = [];
         },
 
         reset_figure() {
             this.figure_layout = shallow_copy(this.figure_layout_default);
-            this.figure_traces = [];
+            this.figure_traces = shallow_copy(self.figure_traces_default);
+            this.peak_traces = [];
         },
 
         reset_figure_cache() {
@@ -445,29 +505,40 @@ export const viewPortMixin = {
         },
 
         async update_figure(zoom_stack_item=null) {
+            // This function is destructive for zoom_stack_item, do not use refs
             // this.log(zoom_stack_item);
-            // the function is destructive for zoom_stack_item - don't use refs
             var self = this;
             if ( !_.isNull(zoom_stack_item) ) {
                 let cache_item = self.figure_cache_get(zoom_stack_item.id);
-                let mz_range = zoom_stack_item.mz_range;
-                let t_range = zoom_stack_item.t_range;
+                self.figure_layout = {
+                            ...cache_item.figure_layout,
+                            'annotations': shallow_copy(this.figure_annotations)
+                            };
+                self.figure_traces = [
+                                ...self.figure_traces_default,
+                                ...cache_item.figure_traces
+                                ];
+                
                 let mz_axis = this.figure_axes.mz;
                 let time_axis = this.figure_axes.time;
-                if (mz_axis) {
-                    cache_item.figure_layout[mz_axis+"axis"].range = mz_range;
-                }
+                let t_range = zoom_stack_item.t_range;
                 if (time_axis) {
-                    cache_item.figure_layout[time_axis+"axis"].range = t_range;
+                    self.figure_layout[time_axis+"axis"].range = t_range;
                 }
-                self.figure_layout = cache_item.figure_layout;
-                self.figure_traces = cache_item.figure_traces;
+                if (mz_axis) {
+                    let mz_range = zoom_stack_item.mz_range;
+                    self.figure_layout[mz_axis+"axis"].range = mz_range;
+                    self.figure_traces = [
+                            ...self.figure_traces,
+                            ...self.getPeakTraces(mz_range),
+                            ...self.getTargetTraces(),
+                            ];
+                }
             }
-            // self.log(this.figure_annotations);
             await Plotly.react(self.id,
-                                self.figure_traces,
-                                self.figure_layout
-                                );
+                               self.figure_traces,
+                               self.figure_layout
+                               );
         },
 
         visualize_range_on_sample_selected(new_ranges) {
@@ -483,10 +554,9 @@ export const viewPortMixin = {
                 zoom_stack_item
                 );
             // Increment figure_cache ref counter
-            this.figure_cache_add_ref(zoom_stack_item.id);
+            this.figure_cache_add_ref(zoom_stack_item);
             // Update figure
             let cur_ranges = shallow_copy(this.zoom_stack.slice(-1)[0]);
-            // Set new ranges
             this.update_figure(cur_ranges);
             // Request full range visualization from DataViz (ranges null)
             this.visualize_range = {'filename': this.filename,
@@ -569,7 +639,7 @@ export const viewPortMixin = {
                 zoom_stack_item
                 );
             // Increment figure_cache ref counter
-            self.figure_cache_add_ref(zoom_stack_item.id);
+            self.figure_cache_add_ref(zoom_stack_item);
             // Update figure
             let cur_ranges = shallow_copy(self.zoom_stack.slice(-1)[0]);
             // Set new ranges
@@ -616,7 +686,7 @@ export const viewPortMixin = {
                 return
             }
             // reset traces
-            self.figure_traces = [];
+            self.figure_traces = shallow_copy(self.figure_traces_default);
             // remove last zoom and take current zoom into view
             let zoom_stack_item_to_remove = self.zoom_stack.pop();
             let zoom_stack_item_to_restore = shallow_copy(self.zoom_stack.slice(-1)[0]);
@@ -713,35 +783,38 @@ export const viewPortMixin = {
                 return self._on_figure_ranges(new_value, old_value); }
             );
         },
-        // target_to_display: function(new_value, old_value) {
-        //     if ( _.isEqual(new_value, old_value) || _.isEmpty(this.filename) ) {
-        //         return false;
-        //     }
-        //     if (new_value == null) {
-        //         this.visualize_range_on_zoom_out();
-        //         return
-        //     }
-        //     let mz = new_value;
-        //     let target_mz_range = [mz-.5, mz+.5];
-        //     let prev_ranges = shallow_copy(this.zoom_stack.slice(-1)[0]);
-        //     let new_ranges = {'mz_range': target_mz_range,
-        //                       't_range': prev_ranges.t_range};
-        //     // Make volatile zoom-in
-        //     this.visualize_range_on_zoom_in(prev_ranges, new_ranges, true);
-        //     let mz_axis = this.figure_axes.mz;
-        //     let time_axis = this.figure_axes.time;
-        //     if (mz_axis) {
-        //         // Add target trace
-        //         let target_traces = [{
-        //             [time_axis]: new_ranges.t_range,
-        //             [mz_axis]: [mz, mz],
-        //             'mode': 'lines',
-        //             'line': {'color': '#8c67ef'}
-        //             }];
-        //         let zoom_stack_item = this.zoom_stack.slice(-1)[0]
-        //         let figure_cache_item = this.figure_cache_get(zoom_stack_item.id);
-        //         figure_cache_item.figure_traces.push(...target_traces);
-        //     }
-        // },
+        peak_data: async function() {
+            const MAX_NO_PEAKS = 5000;
+            if (this.peak_data.mz.length < MAX_NO_PEAKS) {
+                let mz_axis = this.figure_axes.mz;
+                if (mz_axis) {
+                    // let zoom_stack_item = this.zoom_stack.slice(-1)[0]
+                    // let figure_cache_item = this.figure_cache_get(zoom_stack_item.id);
+                    let time_axis = this.figure_axes.time;
+                    let peak_traces = [];
+                    for (let i in this.peak_data.mz) {
+                        let m = this.peak_data.mz[i];
+                        // let y = this.peak_data.height[i];
+                        let peak_trace = {
+                                [time_axis]: this.figure_cache.t_maxrange,
+                                [mz_axis]: [m, m],
+                                'mode': 'lines',
+                                'line': {'color': '#ffffff',
+                                        'width': 1
+                                        },
+                                'visible': true,
+                                'name': m.toFixed(this.mz_precision),
+                                'legendgroup': "Found peaks",
+                                'showlegend': false,
+                                };
+                        peak_traces.push(peak_trace);
+                    }    
+                    this.peak_traces = peak_traces;
+                    // Update figures
+                    // this.updateFoundPeakTraces();
+                    // this.update_figure(this.zoom_stack.slice(-1)[0]);
+                }
+            }
+        },
     },
 }
