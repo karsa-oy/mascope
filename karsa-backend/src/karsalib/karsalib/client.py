@@ -4,8 +4,10 @@ import time
 import importlib
 
 from queue import Empty
+from karsalib.struct import CacheQ
 from socketio import AsyncClientNamespace, AsyncClient
 from socketio.exceptions import BadNamespaceError
+from multiprocessing import Lock
 
 from .logging import (
                 NO_DATA_LOGGING_DEFAULT,
@@ -255,6 +257,10 @@ class BridgeServiceClient(BaseServiceClient):
 class BaseStreamerClient(BridgeServiceClient):
     def __init__(self, streamer_type, data_pool,
                  url, port, public_namespace_data, private_namespace_data):
+        self.requests = CacheQ('client_room')
+        self.request_in_progress = dict()
+        self.lock = Lock()
+
         streamer_info = {
             'H5': {'package': 'karsatof', 'module': '.kgenerator'},
             'Raw': {'package': 'karsaorbi', 'module': '.kogenerator'},
@@ -262,7 +268,7 @@ class BaseStreamerClient(BridgeServiceClient):
         }
         m = importlib.import_module(streamer_info[streamer_type]['module'],
                                     streamer_info[streamer_type]['package'])
-        self.streamer = getattr(m, f'{streamer_type}Streamer')()
+        self.streamer = getattr(m, f'{streamer_type}Streamer')(client=self)
 
         self.data_pool = None
         if data_pool:
