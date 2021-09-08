@@ -555,7 +555,7 @@ class SamplePool():
                                 )
         self._remove_link(sample_link_path)
         # Update self.pool
-        self.pool[project][experiment].remove(sample)
+        self.pool[project][experiment].pop(sample)
         self.df = self.df.drop((project, experiment, sample))
 
     def edit_experiment(self, project, experiment, attributes):

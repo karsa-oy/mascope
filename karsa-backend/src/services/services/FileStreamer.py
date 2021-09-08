@@ -63,7 +63,6 @@ class FileStreamerPrivateNamespace(BaseClientNamespace):
     # raw service private interfaces
     endpoints = [
             'raw_import',
-            'raw_import_status',
             'stop_raw_import',
             # 'raw_stream_request',
             'import_raw_table_datetime_range',
@@ -76,6 +75,7 @@ class FileStreamerPrivateNamespace(BaseClientNamespace):
 
     async def on_import_raw_table_datetime_range(self, data):
         kwargs = get_client_notification_args(data)
+
         dt0_json = data['value'].get('dt0', '')
         dt1_json = data['value'].get('dt1', '')
         if dt0_json == '' or dt1_json == '':
@@ -91,7 +91,9 @@ class FileStreamerPrivateNamespace(BaseClientNamespace):
         except ValueError:
             print("dt1 not valid JSON datetime")
             return
+
         raw_sample_table = await self.parent.data_pool.get_datetime_range(dt0, dt1)
+
         await self.emit_client_notification('raw_samples',
                                             raw_sample_table,
                                             **{**kwargs,
@@ -99,67 +101,17 @@ class FileStreamerPrivateNamespace(BaseClientNamespace):
                                                }
                                             )
 
-
     async def on_raw_import(self, data):
-        client_room = data['client_room']
-        data_1 = {'client_room': client_room, 'files': []}
-        for v in data['value']:
-            fname = os.path.join(v['path'], v['filename'])
-            if not os.path.isfile(fname):
-                raise ValueError("File does not exist: %s" %fname)
-            data_1['files'].append(fname)
-        with self.parent.lock:
-            # keep single set of files to import for key=client_room
-            self.parent.requests.cache_delete_key(client_room)
-            self.parent.requests.cache_put(data_1)
-
-
-    async def on_raw_import_status(self, data):
-        kwargs = get_client_notification_args(data)
-        client_room = data['client_room']
-        progress_data = []
-        for fname, data in self.parent.request_in_progress.get(client_room, {}).items():
-            progress_data.append([fname, data['progress']])
-        raw_import_data = {
-            'progress': progress_data,
-            'queue': self.parent.requests.cache.get(client_room, []),
-        }
-        await self.emit_client_notification('raw_import_data',
-                                            raw_import_data,
-                                            **{**kwargs,
-                                               'room': data['client_room'],
-                                               }
-                                           )
-
+        for raw_file in data['value']:
+            full_file_path = os.path.join( raw_file.get('path'), raw_file.get('filename') )
+            self.parent.streamer.start_stream(full_file_path)
 
     async def on_stop_raw_import(self, data):
-        # Without data.value, stop streaming files in progress,
-        # otherwise stop files or remove files from import list by filenames
-        client_room = data['client_room']
-        value = data['value']
-        with self.parent.lock:
-            if not value:
-                # stop all running imports
-                for fname, progress_data in self.parent.request_in_progress[client_room].items():
-                    self.log(fname)
-                    progress_data['streamer'].stop_stream()
-            else:
-                for v in value:
-                    # remove file from import lists if there
-                    fname = os.path.join(v['path'], v['filename'])
-                    #TODO: possible sync problem - modify CacheQ for get(key) operation
-                    requests_data = self.parent.requests.cache.get(client_room, [])
-                    for d in requests_data:
-                        try:
-                            d['files'].remove(fname)
-                            self.log(fname)
-                        except ValueError:
-                            pass
-                    # if file is in progress, then stop importing
-                    progress_data = self.parent.request_in_progress.get(client_room, {}).get(fname)
-                    if progress_data:
-                        self.log(fname)
-                        progress_data['streamer'].stop_stream()
+        # TODO: do we need to remove only specific files from the queue?
+        # for raw_file in data['value']:
+        #     full_file_path = os.path.join( raw_file.get('path'), raw_file.get('filename') )
+        #     self.parent.streamer.stop_stream(full_file_path)
+        self.parent.streamer.stop_stream()
 
 
 class FileStreamerServiceClient(BaseStreamerClient):
