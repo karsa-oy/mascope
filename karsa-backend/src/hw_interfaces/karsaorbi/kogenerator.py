@@ -39,28 +39,30 @@ def strip_filepath(filepath):
 
 
 class RawStreamer(Thread):
-    def __init__(self, mz_precision=4):
+    def __init__(self, client, mz_precision=4):
         print("RawStreamer initializing")
         Thread.__init__(self)
         # Parameters
+        self.client = client
         self._mz_precision = mz_precision
         # Thermo Fischer RawFileReaderFactory
         self.raw = None
         # Synchronization primitives
         # Streamer specific
-        self.file_queue = Queue()       # Queue for files to stream
-        self.cancel_event = Event()     # Set to cancel current stream
+        self.requests = client.requests     # Queue for files to stream
+        self.request_in_progress = client.request_in_progress
+        self.cancel_event = Event()         # Set to cancel current stream
         # Common with TofDaqStreamer
-        self.shutdown_event = Event()   # Set to break out from main loop
-        self.active = Event()           # RawStreamer active event
-        self.spec_queue = Queue()       # Signal output queue
+        self.shutdown_event = Event()       # Set to break out from main loop
+        self.active = Event()               # RawStreamer active event
+        self.spec_queue = Queue()           # Signal output queue
         # Per acquisition attributes
-        self.filename = None            # Filename base from TW h5 file
-        self.interval = None            # RawStreamer interval [s]
-        self.length = None              # RawStreamer length [s]
-        self.progress = 0               # RawStreamer progress [%]
-        self.speci = -1                 # Index of last received spectrum,
-                                        # -1 when there is no active acquisition
+        self.filename = None                # Filename base from TW h5 file
+        self.interval = None                # RawStreamer interval [s]
+        self.length = None                  # RawStreamer length [s]
+        self.progress = 0                   # RawStreamer progress [%]
+        self.speci = -1                     # Index of last received spectrum,
+                                            # -1 when there is no active acquisition
 
     @property
     def mz(self):
@@ -176,27 +178,57 @@ class RawStreamer(Thread):
         # Cancel or shutdown
         return False
 
+    def _get_next_file_to_stream(self):
+        # get next request to process
+        data = self.requests.cache_get()
+        if not data:
+            return None, None
+        try:
+            fname = data['files'].pop(0)
+        except IndexError:
+            return None, None
+        client_room = data['client_room']
+        if data['files']:
+            # not all requested files are processed - put request back to queue
+            self.requests.cache_put(data)
+        return client_room, fname
+
+    def _update_request_in_progress(self, client_room, fname):
+        with self.client.lock:
+            if client_room not in self.request_in_progress:
+                self.request_in_progress[client_room] = {}
+            self.request_in_progress[client_room][fname] = {
+                'progress': round(self.progress, 2),
+                'streamer': self,
+            }
+
+    def _remove_request_in_progress(self, client_room, fname):
+        with self.client.lock:
+            del self.request_in_progress[client_room][fname]
+            if not self.request_in_progress[client_room]:
+                del self.request_in_progress[client_room]
+
     def run(self):
         print("RawStreamer running")
         # Main loop
         while not self.shutdown_event.is_set():
+            client_room, fname = self._get_next_file_to_stream()
+            if not fname:
+                sleep(.5)
+                continue
+
+            # Initialize Raw file reader
             try:
-                file_to_stream = self.file_queue.get(timeout=.1)
-                # Initialize Raw file reader
-                try:
-                    self.raw = ThermoBusiness.RawFileReaderFactory.ReadFile(
-                                                                    file_to_stream
-                                                                    )
-                    self.raw.SelectInstrument(0, 1)
-                except Exception as e:
-                    print("Error reading file %s: %s" %(file_to_stream, e))
-                    continue
-            except Empty:
+                self.raw = ThermoBusiness.RawFileReaderFactory.ReadFile(fname)
+                self.raw.SelectInstrument(0, 1)
+            except Exception as e:
+                print("Error reading file %s: %s" %(fname, e))
                 continue
 
             # Start streaming
             # Update self and feed data into queue
             self._update()
+            self._update_request_in_progress(client_room, fname)
             # Set active flag 
             self.active.set()
             # Loop through the file and feed to queues
@@ -206,6 +238,7 @@ class RawStreamer(Thread):
             for scan in scans:
                 # Update self and feed data into queue
                 self._update(scan)
+                self._update_request_in_progress(client_room, fname)
                 # Wait for queues to be empty
                 if self._wait_for_queues():
                     # Empty
@@ -217,6 +250,7 @@ class RawStreamer(Thread):
             self.active.clear()
             self.cancel_event.clear()
             self._finalize()
+            self._remove_request_in_progress(client_room, fname)
             print("RawStream finished")
         # Out of main loop
         print('RawStreamer exiting')
@@ -232,16 +266,14 @@ class RawStreamer(Thread):
                 self.spec_queue.get_nowait()
             except Empty:
                 break
+            except ValueError:
+                break
+            except KeyboardInterrupt:
+                break
             sleep(.1)
         # Close queues
         self.spec_queue.close()
         self.spec_queue.join_thread()
-
-    def start_stream(self, filename):
-        if os.path.isfile(filename):
-            self.file_queue.put(filename)
-        else:
-            raise ValueError("File does not exist: %s" %filename)
 
     def stop_stream(self):
         """Stop stream before complete
