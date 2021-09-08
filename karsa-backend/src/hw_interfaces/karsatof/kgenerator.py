@@ -38,7 +38,7 @@ def strip_filepath(filepath):
     return os.path.splitext(os.path.basename(filepath))[0]
 
 
-class BaseStreamer():
+class BaseStreamer(Thread):
     """Base class for TofDaqStreamer and H5Streamer to inherit common methods from.
     """
     def __init__(self):
@@ -147,7 +147,7 @@ class BaseStreamer():
         self.tps_queue.close()
         self.tps_queue.join_thread()
 
-class TofDaqStreamer(BaseStreamer, Thread):
+class TofDaqStreamer(BaseStreamer):
     from .lib.TofDaq import (
             TwRetVal,
             TSharedMemoryDesc,
@@ -376,9 +376,10 @@ class H5Streamer(BaseStreamer, KInstrument):
             TwGetRegUserDataFromH5,
             TwGetSpecXaxisFromH5,
             TwGetTofSpectrumFromH5,
+            TwCloseH5,
             TwH5Desc,
             )
-    def __init__(self):
+    def __init__(self, client):
         """Initialize self
 
         Inherits 'karsatof.kinstrument.KInstrument' which provides some
@@ -399,8 +400,10 @@ class H5Streamer(BaseStreamer, KInstrument):
 
         # Synchronization primitives
         # Streamer specific
-        self.file_queue = Queue()       # Queue for files to stream
-        self.cancel_event = Event()     # Set to cancel current stream
+        self.client = client
+        self.requests = client.requests         # Queue for files to stream
+        self.request_in_progress = client.request_in_progress
+        self.cancel_event = Event()             # Set to cancel current stream
 
     @property
     def mz(self):
@@ -552,6 +555,36 @@ class H5Streamer(BaseStreamer, KInstrument):
         # Cancel or shutdown
         return False
 
+    def _get_next_file_to_stream(self):
+        # get next request to process
+        data = self.requests.cache_get()
+        if not data:
+            return None, None
+        try:
+            fname = data['files'].pop(0)
+        except IndexError:
+            return None, None
+        client_room = data['client_room']
+        if data['files']:
+            # not all requested files are processed - put request back to queue
+            self.requests.cache_put(data)
+        return client_room, fname
+
+    def _update_request_in_progress(self, client_room, fname):
+        with self.client.lock:
+            if client_room not in self.request_in_progress:
+                self.request_in_progress[client_room] = {}
+            self.request_in_progress[client_room][fname] = {
+                'progress': round(self.progress, 2),
+                'streamer': self,
+            }
+
+    def _remove_request_in_progress(self, client_room, fname):
+        with self.client.lock:
+            del self.request_in_progress[client_room][fname]
+            if not self.request_in_progress[client_room]:
+                del self.request_in_progress[client_room]
+
     def run(self):
         """Main loop
 
@@ -562,26 +595,29 @@ class H5Streamer(BaseStreamer, KInstrument):
         print("H5Streamer running")
         # Main loop
         while not self.shutdown_event.is_set():
-            try:
-                file_to_stream = self.file_queue.get(timeout=.1)
-                # Update TW h5 descriptor
-                ret = H5Streamer.TwGetH5Descriptor(file_to_stream.encode(), self.desc)
-                if ret != 4:
-                    print("Error reading file: %s" %H5Streamer.TwRetVal(ret).name)
-                    continue
-                # Add fields to comply with TW shared memory descriptor
-                self.desc.currentDataFileName = file_to_stream.encode()
-                self.desc.iBuf = 0
-                self.desc.iWrite = 0
-                if not (self.desc.nbrWrites and self.desc.nbrBufs):
-                    # Empty file, skip
-                    print("Skipping empty file: %s" %self.desc.currentDataFileName)
-                    continue
-            except Empty:
+            client_room, fname = self._get_next_file_to_stream()
+            if not fname:
+                sleep(.5)
                 continue
+
+            # Update TW h5 descriptor
+            ret = H5Streamer.TwGetH5Descriptor(fname.encode(), self.desc)
+            if ret != 4:
+                print("Error reading file: %s" %H5Streamer.TwRetVal(ret).name)
+                continue
+            # Add fields to comply with TW shared memory descriptor
+            self.desc.currentDataFileName = fname.encode()
+            self.desc.iBuf = 0
+            self.desc.iWrite = 0
+            if not (self.desc.nbrWrites and self.desc.nbrBufs):
+                # Empty file, skip
+                print("Skipping empty file: %s" %self.desc.currentDataFileName)
+                continue
+
             # Start streaming
             # Update self and feed data into queue
             self._update()
+            self._update_request_in_progress(client_room, fname)
             # Set active flag 
             self.active.set()
             # Loop through the file and feed to queues
@@ -595,6 +631,7 @@ class H5Streamer(BaseStreamer, KInstrument):
                     self.desc.iBuf = ibuf
                     # Update self and feed data into queue
                     self._update()
+                    self._update_request_in_progress(client_room, fname)
                     # Wait for queues to be empty
                     if self._wait_for_queues():
                         # Empty
@@ -610,16 +647,34 @@ class H5Streamer(BaseStreamer, KInstrument):
             self.active.clear()
             self.cancel_event.clear()
             self._finalize()
+            self._remove_request_in_progress(client_room, fname)
+            H5Streamer.TwCloseH5(fname.encode())
             print("h5Stream finished")
         # Out of main loop
         print('H5Streamer exiting')
         self.shutdown()
 
-    def start_stream(self, filename):
-        if os.path.isfile(filename):
-            self.file_queue.put(filename)
-        else:
-            raise ValueError("File does not exist: %s" %filename)
+    def shutdown(self):
+        """Shutdown procedure
+        """
+        self.shutdown_event.set()
+        # Clear all left-over data from queue
+        while True:
+            try:
+                self.spec_queue.get_nowait()
+                self.tps_queue.get_nowait()
+            except Empty:
+                break
+            except ValueError:
+                break
+            except KeyboardInterrupt:
+                break
+            sleep(.1)
+        # Close queues
+        self.spec_queue.close()
+        self.spec_queue.join_thread()
+        self.tps_queue.close()
+        self.tps_queue.join_thread()
 
     def stop_stream(self):
         """Stop stream before complete
