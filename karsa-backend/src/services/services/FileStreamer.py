@@ -10,7 +10,7 @@ from karsalib.client import (
                         BaseStreamerClient,
                         run_streamer_service
                         )
-from karsalib.util import get_client_notification_args
+from karsalib.util import get_client_notification_args, copy_dict
 
 
 class FileStreamerPublicNamespace(BaseClientNamespace):
@@ -99,30 +99,34 @@ class FileStreamerPrivateNamespace(BaseClientNamespace):
                                                }
                                             )
 
-
-    async def on_raw_import(self, data):
-        client_room = data['client_room']
-        data_1 = {'client_room': client_room, 'files': []}
+    def _create_generator_request(self, data):
+        kwargs = get_client_notification_args(data)
+        rdata = {**kwargs, 'files': []}
         for v in data['value']:
             fname = os.path.join(v['path'], v['filename'])
             if not os.path.isfile(fname):
                 raise ValueError("File does not exist: %s" %fname)
-            data_1['files'].append(fname)
+            fdata = {'filename': fname, 'filesize': v['filesize'], 'datetime': v['datetime']}
+            rdata['files'].append(fdata)
+        return rdata
+
+    async def on_raw_import(self, data):
+        rdata = self._create_generator_request(data)
         with self.parent.lock:
-            # keep single set of files to import for key=client_room
-            self.parent.requests.cache_delete_key(client_room)
-            self.parent.requests.cache_put(data_1)
+            # keep single set of files for client_room in requests CacheQ
+            self.parent.requests.cache_delete_key(rdata['client_room'])
+            self.parent.requests.cache_put(rdata)
 
 
     async def on_raw_import_status(self, data):
         kwargs = get_client_notification_args(data)
         client_room = data['client_room']
         progress_data = []
-        for fname, data in self.parent.request_in_progress.get(client_room, {}).items():
-            progress_data.append([fname, data['progress']])
+        for fdata in self.parent.request_in_progress.get(client_room, {}).values():
+            progress_data.append(copy_dict(fdata, ignore_keys=['streamer']))
         raw_import_data = {
             'progress': progress_data,
-            'queue': self.parent.requests.cache.get(client_room, []),
+            'queue': self.parent.requests.cache.get(client_room, [[]])[0],
         }
         await self.emit_client_notification('raw_import_data',
                                             raw_import_data,
@@ -140,26 +144,28 @@ class FileStreamerPrivateNamespace(BaseClientNamespace):
         with self.parent.lock:
             if not value:
                 # stop all running imports
-                for fname, progress_data in self.parent.request_in_progress[client_room].items():
-                    self.log(fname)
-                    progress_data['streamer'].stop_stream()
+                for fdata in self.parent.request_in_progress[client_room].values():
+                    fdata['streamer'].stop_stream()
+                    self.log(fdata['filename'])
             else:
                 for v in value:
-                    # remove file from import lists if there
+                    # remove fname from import lists if there
                     fname = os.path.join(v['path'], v['filename'])
                     #TODO: possible sync problem - modify CacheQ for get(key) operation
-                    requests_data = self.parent.requests.cache.get(client_room, [])
-                    for d in requests_data:
-                        try:
-                            d['files'].remove(fname)
+                    rdata = self.parent.requests.cache.get(client_room, [[]])[0]
+                    i = 0
+                    while i < len(rdata['files']):
+                        fdata = rdata['files'][i]
+                        if fdata['filename'] == fname:
+                            rdata['files'].pop(i)
                             self.log(fname)
-                        except ValueError:
-                            pass
+                        else:
+                            i += 1
                     # if file is in progress, then stop importing
-                    progress_data = self.parent.request_in_progress.get(client_room, {}).get(fname)
-                    if progress_data:
+                    fdata = self.parent.request_in_progress.get(client_room, {}).get(fname)
+                    if fdata:
+                        fdata['streamer'].stop_stream()
                         self.log(fname)
-                        progress_data['streamer'].stop_stream()
 
 
 class FileStreamerServiceClient(BaseStreamerClient):

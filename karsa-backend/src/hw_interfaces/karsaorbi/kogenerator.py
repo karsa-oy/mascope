@@ -180,24 +180,23 @@ class RawStreamer(Thread):
 
     def _get_next_file_to_stream(self):
         # get next request to process
-        data = self.requests.cache_get()
-        if not data:
+        rdata = self.requests.cache_get()
+        if not rdata or not rdata['files']:
             return None, None
-        try:
-            fname = data['files'].pop(0)
-        except IndexError:
-            return None, None
-        client_room = data['client_room']
-        if data['files']:
+        fdata = rdata['files'].pop(0)
+        client_room = rdata['client_room']
+        if rdata['files']:
             # not all requested files are processed - put request back to queue
-            self.requests.cache_put(data)
-        return client_room, fname
+            self.requests.cache_put(rdata)
+        return client_room, fdata
 
-    def _update_request_in_progress(self, client_room, fname):
+    def _update_request_in_progress(self, client_room, fdata):
         with self.client.lock:
             if client_room not in self.request_in_progress:
                 self.request_in_progress[client_room] = {}
+            fname = fdata['filename']
             self.request_in_progress[client_room][fname] = {
+                **fdata,
                 'progress': round(self.progress, 2),
                 'streamer': self,
             }
@@ -212,10 +211,11 @@ class RawStreamer(Thread):
         print("RawStreamer running")
         # Main loop
         while not self.shutdown_event.is_set():
-            client_room, fname = self._get_next_file_to_stream()
-            if not fname:
+            client_room, fdata = self._get_next_file_to_stream()
+            if not fdata:
                 sleep(.5)
                 continue
+            fname = fdata['filename']
 
             # Initialize Raw file reader
             try:
@@ -228,7 +228,7 @@ class RawStreamer(Thread):
             # Start streaming
             # Update self and feed data into queue
             self._update()
-            self._update_request_in_progress(client_room, fname)
+            self._update_request_in_progress(client_room, fdata)
             # Set active flag 
             self.active.set()
             # Loop through the file and feed to queues
@@ -238,7 +238,7 @@ class RawStreamer(Thread):
             for scan in scans:
                 # Update self and feed data into queue
                 self._update(scan)
-                self._update_request_in_progress(client_room, fname)
+                self._update_request_in_progress(client_room, fdata)
                 # Wait for queues to be empty
                 if self._wait_for_queues():
                     # Empty

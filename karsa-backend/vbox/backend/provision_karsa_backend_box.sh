@@ -67,6 +67,7 @@ function install_default_dev_env() {
     echo AAA copy data for system tests
     rm -rf /home/vagrant/TofDaq
     rm -rf /home/vagrant/Projects
+    rm -rf /home/vagrant/DataPool
     cp -r -f /vagrant/test/system/TestData/* /home/vagrant/
     for dt in /home/vagrant/TofDaq/*; do
         for dn in $dt/*; do
