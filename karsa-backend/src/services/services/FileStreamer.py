@@ -126,7 +126,7 @@ class FileStreamerPrivateNamespace(BaseClientNamespace):
             progress_data.append(copy_dict(fdata, ignore_keys=['streamer']))
         raw_import_data = {
             'progress': progress_data,
-            'queue': self.parent.requests.cache.get(client_room, [[]])[0],
+            'queue': self.parent.requests.cache.get(client_room, [{}])[0],
         }
         await self.emit_client_notification('raw_import_data',
                                             raw_import_data,
@@ -152,9 +152,9 @@ class FileStreamerPrivateNamespace(BaseClientNamespace):
                     # remove fname from import lists if there
                     fname = os.path.join(v['path'], v['filename'])
                     #TODO: possible sync problem - modify CacheQ for get(key) operation
-                    rdata = self.parent.requests.cache.get(client_room, [[]])[0]
+                    rdata = self.parent.requests.cache.get(client_room, [{}])[0]
                     i = 0
-                    while i < len(rdata['files']):
+                    while i < len(rdata.get('files', [])):
                         fdata = rdata['files'][i]
                         if fdata['filename'] == fname:
                             rdata['files'].pop(i)
