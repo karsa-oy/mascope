@@ -166,7 +166,7 @@ class TofDaqStreamer(BaseStreamer):
             TwStartAcquisition,
             TwStopAcquisition
             )
-    def __init__(self):
+    def __init__(self, *arg, **kwarg):
         """Initialize self
 
         Inherits 'karsatof.kinstrument.KInstrument' which provides some
