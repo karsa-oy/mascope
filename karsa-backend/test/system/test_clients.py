@@ -40,7 +40,7 @@ class TestValidateTester(TestBaseTestClient):
     # Make sure test environment properly reacts to failures
     # BE CAREFUL: raised assertion kills main TestClient thread
     def test_validate_test_environment(self):
-        fname = 'TofDaq_Data_2021.08.02_18h53m56s'
+        fname = 'TofDaq_Data_2021.08.02_01h01m01s'
         max_exec_time = 3                                   # make it small for convenience
         t_range_max = samples[fname]['t_range_max'] + 1     # this limit will never be reached
         rq_suffix = self.client.set_test_params(fname, t_range_max=t_range_max, max_exec_time=max_exec_time)
@@ -54,14 +54,14 @@ class TestValidateTester(TestBaseTestClient):
 
 class TestVisualizer(TestBaseTestClient):
     def test_visualize_full_range(self):
-        fname = 'TofDaq_Data_2021.08.02_18h53m56s'
+        fname = 'TofDaq_Data_2021.08.02_01h01m01s'
         rq_suffix = self.client.set_test_params(fname)
         asyncio.run(self.client.emit_visualize_range(fname, request_id=f"fullrange_{rq_suffix}"))
         self.assert_requests_ok()
 
 
     def test_visualize_zoomed_range(self):
-        fname = 'TofDaq_Data_2021.08.02_18h53m56s'
+        fname = 'TofDaq_Data_2021.08.02_01h01m01s'
         max_exec_time = 10
         # TODO: batch size is 5.xx for the sample - what about other samples?
         t_range_01 = 21
@@ -78,7 +78,7 @@ class TestVisualizer(TestBaseTestClient):
 
 
     def test_visualize_two_ranges_sequentially(self):
-        fname = 'TofDaq_Data_2021.08.02_18h53m56s'
+        fname = 'TofDaq_Data_2021.08.02_01h01m01s'
         rq_suffix = self.client.set_test_params(fname)
         asyncio.run(self.client.emit_visualize_range(fname, request_id=f"fullrange_{rq_suffix}"))
 
@@ -99,7 +99,7 @@ class TestVisualizer(TestBaseTestClient):
 
 
     def test_visualize_two_ranges_parallel(self):
-        fname = 'TofDaq_Data_2021.08.02_18h53m56s'
+        fname = 'TofDaq_Data_2021.08.02_01h01m01s'
         max_exec_time = 10
         rq_suffix = self.client.set_test_params(fname, max_exec_time=max_exec_time)
         asyncio.run(self.client.emit_visualize_range(fname, request_id=f"fullrange_{rq_suffix}"))
