@@ -6,15 +6,21 @@ import asyncio
 import time
 import asynctest
 import json
+import datetime
+import shutil
+from ntpath import basename
 
+from karsalib.util import parse_cmd_args
 from systestlib import start_test_client_as_daemon, samples
 
 
 
-class TestBaseTestClient(asynctest.TestCase):
+class BaseTestClientCase(asynctest.TestCase):
+    input_args = parse_cmd_args()
+
     @classmethod
     def setUpClass(cls):
-        cls.client = start_test_client_as_daemon()
+        cls.client = start_test_client_as_daemon(**cls.input_args)
 
     @classmethod
     def tearDownClass(cls):
@@ -29,14 +35,14 @@ class TestBaseTestClient(asynctest.TestCase):
         self.client.reset()
         return super().tearDown()
 
-    def assert_requests_ok(self):
-        asyncio.run(self.client.join_requests())
+    def assert_requests_ok(self, request_ids=None):
+        asyncio.run(self.client.join_requests(request_ids))
         if self.client.target_exception:
-            self.fail(str(self.client.target_exception))
+            raise Exception(str(self.client.target_exception))
 
 
-
-class TestValidateTester(TestBaseTestClient):
+# @unittest.skip("TMP")
+class TestValidateTesterCase(BaseTestClientCase):
     # Make sure test environment properly reacts to failures
     # BE CAREFUL: raised assertion kills main TestClient thread
     def test_validate_test_environment(self):
@@ -46,13 +52,13 @@ class TestValidateTester(TestBaseTestClient):
         rq_suffix = self.client.set_test_params(fname, t_range_max=t_range_max, max_exec_time=max_exec_time)
         asyncio.run(
             self.client.emit_visualize_range(fname, request_id=f'zoom_{rq_suffix}'))
-        with self.assertRaises(AssertionError) as ctx:
+        with self.assertRaises(Exception) as ctx:
             self.assert_requests_ok()
         self.assertTrue('exceeded max execution time' in str(ctx.exception))
 
 
-
-class TestVisualizer(TestBaseTestClient):
+# @unittest.skip("TMP")
+class TestVisualizerCase(BaseTestClientCase):
     def test_visualize_full_range(self):
         fname = 'TofDaq_Data_2021.08.02_01h01m01s'
         rq_suffix = self.client.set_test_params(fname)
@@ -129,14 +135,14 @@ class TestVisualizer(TestBaseTestClient):
         self.assert_requests_ok()
 
 
-
-class TestSampleManager(TestBaseTestClient):
+# @unittest.skip("TMP")
+class TestSampleManagerCase(BaseTestClientCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
         # get list of available projects
         asyncio.run(
-            cls.client.emit_service_state(request_id='service_state')
+            cls.client.emit_service_state()
         )
         cls.assert_requests_ok(cls)   # wait for service_state to be processed
 
@@ -159,7 +165,7 @@ class TestSampleManager(TestBaseTestClient):
     def test_02_project_selected(self):
         pname = 'LinuxProject'
         asyncio.run(
-            self.client.emit_project_selected(pname, request_id='project_selected')
+            self.client.emit_project_selected(pname)
         )
         self.assert_requests_ok()
         # validate experiments of selected project
@@ -179,7 +185,7 @@ class TestSampleManager(TestBaseTestClient):
         pname = 'LinuxProject'
         ename = 'Experiment_1'
         asyncio.run(
-            self.client.emit_experiment_selected(pname, ename, request_id='experiment_selected')
+            self.client.emit_experiment_selected(pname, ename)
         )
         self.assert_requests_ok()
         # validate samples of selected experiment
@@ -204,7 +210,7 @@ class TestSampleManager(TestBaseTestClient):
         # make sure no leftovers
         self.assertFalse(os.path.exists(pdir), pdir)
         asyncio.run(
-            self.client.emit_save_project(pname, attrs, request_id='save_project')
+            self.client.emit_save_project(pname, attrs)
         )
         self.assert_requests_ok()
         # validate project dir
@@ -222,7 +228,7 @@ class TestSampleManager(TestBaseTestClient):
         # make sure no leftovers
         self.assertFalse(os.path.exists(edir), edir)
         asyncio.run(
-            self.client.emit_save_experiment(pname, ename, attrs, template, request_id='save_experiment')
+            self.client.emit_save_experiment(pname, ename, attrs, template)
         )
         self.assert_requests_ok()
         self.assertTrue(os.path.isdir(edir))
@@ -238,7 +244,7 @@ class TestSampleManager(TestBaseTestClient):
         edir = os.path.join(self.client.projects_root, pname, ename)
         self.assertTrue(os.path.isdir(edir), edir)
         asyncio.run(
-            self.client.emit_delete_experiment(pname, ename, request_id='delete_experiment')
+            self.client.emit_delete_experiment(pname, ename)
         )
         self.assert_requests_ok()
         self.assertFalse(os.path.exists(edir), edir)
@@ -248,10 +254,144 @@ class TestSampleManager(TestBaseTestClient):
         pdir = os.path.join(self.client.projects_root, pname)
         self.assertTrue(os.path.isdir(pdir), pdir)
         asyncio.run(
-            self.client.emit_delete_project(pname, request_id='delete_project')
+            self.client.emit_delete_project(pname)
         )
         self.assert_requests_ok()
         self.assertFalse(os.path.exists(pdir), pdir)
+
+
+# @unittest.skip("TMP")
+class TestFileStreamerCase(BaseTestClientCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.input_args = {
+            'url': 'localhost',
+            'port': 5010,
+            'ns': 'H5Data',
+        }
+        super().setUpClass()
+        # declarative input data: win tests can not read it from OS correctly
+        cls.data_collection_time = '2021.08.02'
+        # datetime range with no samples
+        cls.dt_range_empty = {'dt0': datetime.datetime(2021, 8, 1).strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+                              'dt1': datetime.datetime(2021, 8, 2).strftime('%Y-%m-%dT%H:%M:%S.%fZ')}
+        # datetime range with samples;
+        cls.dt_range_all = {'dt0': datetime.datetime(2021, 8, 1).strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+                           'dt1': datetime.datetime(2021, 8, 3).strftime('%Y-%m-%dT%H:%M:%S.%fZ')}
+        cls.raw_samples = ['1-DataFile_2021.08.02-01h01m00s.h5',
+                           '2-DataFile_2021.08.02-01h01m00s.h5',
+                           '3-DataFile_2021.08.02-01h01m00s.h5',
+                           '4-DataFile_2021.08.02-01h01m00s.h5']
+        cls.raw_samples_stripped = [os.path.splitext(s)[0] for s in cls.raw_samples]
+        cls.data_collection_path = os.path.abspath(os.path.join(os.curdir, cls.client.instrument_name))
+        if os.path.isdir(cls.data_collection_path):
+            shutil.rmtree(cls.data_collection_path)
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        if os.path.isdir(cls.data_collection_path):
+            time.sleep(1)
+            shutil.rmtree(cls.data_collection_path)
+
+    def test_01_import_raw_table_datetime_range_empty(self):
+        asyncio.run(
+            self.client.emit_import_raw_table_datetime_range(
+                self.dt_range_empty,
+                max_exec_time=3)
+        )
+        self.assert_requests_ok()
+        self.assertEqual(self.client.raw_samples, [])
+
+    def test_02_import_raw_table_datetime_range(self):
+        # pre-defined DataPool structure is the test pre-requisite, since
+        # file system operations can not be used for varification until
+        # FileStreamer and unittests are run on different platforms (win/linux)
+        # TODO: workaround - declarative sorted list of raw samples;
+        # file list from os?
+        asyncio.run(
+            self.client.emit_import_raw_table_datetime_range(
+                self.dt_range_all,
+                max_exec_time=3)
+        )
+        self.assert_requests_ok()
+        # self.raw_samples = os.listdir(self.client.raw_samples_dir)
+        self.assertEqual(self.client.raw_samples, self.raw_samples)
+
+    def test_03_raw_import_interrupted_with_status_checks(self):
+        # send raw_import and check raw_import_status
+        asyncio.run(
+            self.client.emit_raw_import(
+                self.client.raw_samples_data,
+                request_id=None)    # don't track the request for completion
+        )
+        asyncio.run(asyncio.sleep(1))
+        asyncio.run(
+            self.client.emit_raw_import_status(
+                request_id='raw_import_status',
+                max_exec_time=3)
+        )
+        self.assert_requests_ok(['raw_import_status',])
+        self.assertEqual(
+            basename(self.client.raw_import_status_data['progress'][0]['filename']),
+            self.raw_samples[0]
+        )
+        self.assertEqual(
+            [basename(f['filename']) for f in self.client.raw_import_status_data['queue']['files']],
+            self.raw_samples[1:]
+        )
+        # send stop_raw_import for sample in progress and check raw_import_status
+        asyncio.run(
+            self.client.emit_stop_raw_import()
+        )
+        asyncio.run(asyncio.sleep(3))
+        asyncio.run(
+            self.client.emit_raw_import_status(
+                request_id='raw_import_status',
+                max_exec_time=3)
+        )
+        self.assert_requests_ok(['raw_import_status',])
+        self.assertEqual(
+            basename(self.client.raw_import_status_data['progress'][0]['filename']),
+            self.raw_samples[1]
+        )
+        self.assertEqual(
+            [basename(f['filename']) for f in self.client.raw_import_status_data['queue']['files']],
+            self.raw_samples[2:]
+        )
+        # send stop_raw_import for the rest of samples and check raw_import_status
+        asyncio.run(
+            self.client.emit_stop_raw_import(self.client.raw_samples_data[1:])
+        )
+        self.assert_requests_ok()
+        asyncio.run(asyncio.sleep(1))   # let generator update raw import status
+        asyncio.run(
+            self.client.emit_raw_import_status(
+                request_id='raw_import_status',
+                max_exec_time=3)
+        )
+        self.assert_requests_ok(['raw_import_status',])
+        self.assertEqual(self.client.raw_import_status_data['progress'], [])
+        self.assertEqual(self.client.raw_import_status_data['queue'], {})
+        if os.path.isdir(self.data_collection_path):
+            # this check does not work, when running tests on windows
+            names = os.listdir(os.path.join(self.data_collection_path, self.client.data_collection_date))
+            names = sorted([n.replace(f'{self.client.instrument_name}_', '', 1) for n in names])
+            self.assertEqual(names, self.raw_samples_stripped[0:2])
+
+
+    def test_04_raw_import(self):
+        asyncio.run(
+            self.client.emit_raw_import(
+                self.client.raw_samples_data[2:],
+                max_exec_time=25)
+        )
+        self.assert_requests_ok()
+        if os.path.isdir(self.data_collection_path):
+            # this check does not work, when running tests on windows
+            names = os.listdir(os.path.join(self.data_collection_path, self.client.data_collection_date))
+            names = sorted([n.replace(f'{self.client.instrument_name}_', '', 1) for n in names])
+            self.assertEqual(names, self.raw_samples_stripped)
 
 
 

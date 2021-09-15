@@ -11,6 +11,7 @@ import numpy as np
 import scipy.sparse as sparse
 
 from os import path
+from ntpath import basename
 from datetime import datetime, timedelta
 
 from .lib.TwH5 import (
@@ -103,10 +104,10 @@ class KSpectra(KInstrument):
         # Try to parse local time from filename
         try:
             pattern = u'Data_%Y.%m.%d_%Hh%Mm%Ss.h5'
-            #datestr = path.basename(filename)
+            #datestr = basename(filename)
             #datestr = path.splitext(datestr)[0]
             #datestr = datestr.split('_')[-1]
-            dt0_loc = datetime.strptime(path.basename(filename), pattern)
+            dt0_loc = datetime.strptime(basename(filename), pattern)
             dt0_loc += timedelta(microseconds=dt0.microsecond)
             dt1_loc = dt0_loc + timedelta(seconds=dts)
             self.dt0_loc = dt0_loc  # start datetime local

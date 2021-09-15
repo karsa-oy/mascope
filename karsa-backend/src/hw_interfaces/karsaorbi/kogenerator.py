@@ -8,14 +8,12 @@ Created on Tue Apr 09 13:08:29 2019
 """
 
 import os
-
 import numpy as np
-
 from threading import Thread
 from multiprocessing import Event, Queue
 from queue import Empty
-
 from time import sleep
+from ntpath import basename
 
 
 from .lib import Business as ThermoBusiness
@@ -35,7 +33,7 @@ def strip_filepath(filepath):
     str
         Base filename
     """
-    return os.path.splitext(os.path.basename(filepath))[0]
+    return os.path.splitext(basename(filepath))[0]
 
 
 class RawStreamer(Thread):
