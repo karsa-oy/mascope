@@ -128,7 +128,7 @@ class FileStreamerPrivateNamespace(BaseClientNamespace):
             'progress': progress_data,
             'queue': self.parent.requests.cache.get(client_room, [{}])[0],
         }
-        await self.emit_client_notification('raw_import_data',
+        await self.emit_client_notification('raw_import_status_data',
                                             raw_import_data,
                                             **{**kwargs,
                                                'room': data['client_room'],
@@ -176,7 +176,7 @@ class FileStreamerServiceClient(BaseStreamerClient):
 
     # @property
     # def instrument_name(self):
-    #     return os.path.basename(os.path.normpath(self.data_pool.data_root))
+        # return self.private_ns.namespace.replace('/', '')
 
     async def init_service(self):
         await super().init_service()

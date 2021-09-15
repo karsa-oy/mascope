@@ -1,6 +1,7 @@
 #!/bin/pyton3
 
 import os
+from ntpath import basename
 import time
 import asyncio
 from decorator import decorator
@@ -34,6 +35,7 @@ _ProactorBasePipeTransport.__del__ = bug_workaround(_ProactorBasePipeTransport._
 
 
 class BaseTestClientNamespace(BaseClientNamespace):
+    room_data_sources = 'room_data_sources'
     endpoints = [
         'projects',
         'project_selected',
@@ -43,6 +45,10 @@ class BaseTestClientNamespace(BaseClientNamespace):
         'save_experiment',
         'delete_experiment',
         'delete_project',
+        'raw_samples',
+        'acquisition_started',
+        'acquisition_finished',
+        'raw_import_status_data',
         ]
     endpoints_room_sid = [
         # 'loaded_coordinates',   # response to coordinate_request
@@ -141,6 +147,42 @@ class BaseTestClientNamespace(BaseClientNamespace):
         self.parent.kill_exec_timer(request_id)
         self.parent.mark_request_done(request_id)
 
+    async def on_raw_samples(self, data):
+        # on_import_raw_table_datetime_range emits raw_samples
+        value = data['value']
+        self.parent.raw_samples_dir = None if not value['rows'] else value['rows'][0]['path']
+        self.parent.data_collection_date = None if not value['rows'] else basename(value['rows'][0]['path'])
+        self.parent.raw_samples = sorted([s['filename'] for s in value['rows']])
+        self.parent.raw_samples_data = value['rows']
+        request_id = data['request_id']
+        self.parent.kill_exec_timer(request_id)
+        self.parent.mark_request_done(request_id)
+
+    async def on_acquisition_started(self, data):
+        # TODO: to be updated with multi-generator FileStreamer
+        self.parent.sample_in_progress = [data['value']['filename'], time.time()]
+
+    async def on_acquisition_finished(self, data):
+        # on_raw_import envokes acquisition_started/acquisition_finished
+        # TODO: to be updated with multi-generator FileStreamer
+        assert(data['value']['filename'] == self.parent.sample_in_progress[0])
+        self.parent.sample_in_progress[1] = round(time.time() - self.parent.sample_in_progress[1], 1)
+        self.parent.acquired_samples.append(self.parent.sample_in_progress)
+        self.parent.sample_in_progress = None
+        self.log(self.parent.acquired_samples)
+        if len(self.parent.acquired_samples) == len(self.parent.raw_samples):
+            # TODO: update acquisition_finished emits to keep raw_import notif.context
+            # request_id = data['request_id']
+            request_id = 'raw_import'
+            self.parent.kill_exec_timer(request_id)
+            self.parent.mark_request_done(request_id)
+
+    async def on_raw_import_status_data(self, data):
+        self.parent.raw_import_status_data = data['value']
+        request_id = data['request_id']
+        self.parent.kill_exec_timer(request_id)
+        self.parent.mark_request_done(request_id)
+
 
 class BaseTestClient(BaseServiceClient):
     def __init__(self, *args, **kwargs):
@@ -149,10 +191,9 @@ class BaseTestClient(BaseServiceClient):
         self.done = {}
         self.timers = {}
         self.reset()
-        self.projects_root = None
-        self.projects = None
         self.stop_event = Event()
         self.cancel_event = Event()
+        self.DEFAULT_MAX_EXEC_TIME = 5
 
     def reset(self):
         self.done.clear()
@@ -175,21 +216,18 @@ class BaseTestClient(BaseServiceClient):
         if self.cancel_event.is_set():
             raise InterruptedError(self.cancel_message)
 
+    @property
+    def instrument_name(self):
+        return self.ns_handler.namespace.replace('/', '')
 
     # helpers
     def run_until_complete(self):
         try:
             asyncio.run(self.run())
             print('Success')
-        # except KeyboardInterrupt:
-        #     print(f"KeyboardInterrupt for {self.__class__.__name__}")
-        #     raise
-        # except InterruptedError as e:
-        #     print(f"Failure: {str(e)}")
-        #     raise
-        # except Exception as e:
-        #     print(f"Exception '{str(e)}' for {self.__class__.__name__}")
-        #     raise
+        except KeyboardInterrupt:
+            print(f"KeyboardInterrupt for {self.__class__.__name__}")
+            raise
         except Exception as e:
             self.target_exception = e
             raise
@@ -229,10 +267,18 @@ class BaseTestClient(BaseServiceClient):
             timer.cancel()
             self.log(id)
 
-    async def join_requests(self):
-        while self.is_alive and not all(self.done.values()):
-            await asyncio.sleep(0.3)
-        self.log(list(self.done.keys()))
+    async def join_requests(self, request_ids=None):
+        if request_ids:
+            while self.is_alive:
+                done = [self.done[id] for id in request_ids]
+                if all(done):
+                    break
+                await asyncio.sleep(.3)
+            self.log(request_ids)
+        else:
+            while self.is_alive and not all(self.done.values()):
+                await asyncio.sleep(.3)
+            self.log(list(self.done.keys()))
 
     async def emit_client_notification(self, name, value, *args, **kwargs):
         await self.ns_handler.emit_client_notification(name, value, *args, **kwargs)
@@ -240,22 +286,30 @@ class BaseTestClient(BaseServiceClient):
     # decorators
     @decorator
     def track_request_id_completed(func, self, *args, **kwargs):
-        # handler of decorated request will use request_id kwarg to mark it done, when the
-        #  request is finished; self.join_requests() will join all the decorated requests
-        self.done[kwargs['request_id']] = False
+        # If request_id is not None, then handler of decorated request
+        # will use request_id kwarg to mark it done, when the request is
+        # finished; self.join_requests() will join all the decorated requests
+        request_id = kwargs.get('request_id', func.__name__.replace('emit_', '', 1))
+        if not request_id is None:
+            self.done[request_id] = False
         return func(self, *args, **kwargs)
 
     @decorator
     def limit_exec_time(func, self, *args, **kwargs):
-        # Limit execution by max_exec_time;
-        # max_exec_time is encoded in request_id; for some tests exec time is not
-        # important: if so, then requiest_id encoding skipped and default is 5 sec
-        request_id = kwargs['request_id']
-        try:
-            _, _, _, max_exec_time = request_id.split('_')
-        except:
-            max_exec_time = 5
-        self.create_exec_timer(request_id, max_exec_time, f'processing {func.__name__}({request_id} ...) exceeded max execution time of {max_exec_time} seconds')
+        # If request_id is not None, then decorator will
+        # limit execution by max_exec_time;
+        # max_exec_time comes in kwargs, or encoded
+        # in request_id; for some tests exec time is not important: if so,
+        # then max_exec_time is set to default (5 sec)
+        request_id = kwargs.get('request_id', func.__name__.replace('emit_', '', 1))
+        max_exec_time = kwargs.get('max_exec_time')
+        if not request_id is None:
+            if max_exec_time is None:
+                try:
+                    _, _, _, max_exec_time = request_id.split('_')
+                except:
+                    max_exec_time = self.DEFAULT_MAX_EXEC_TIME
+            self.create_exec_timer(request_id, max_exec_time, f'processing {func.__name__}({request_id} ...) exceeded max execution time of {max_exec_time} seconds')
         return func(self, *args, **kwargs)
 
 
@@ -294,7 +348,8 @@ class BaseTestClient(BaseServiceClient):
         await self.ns_handler.emit_client_notification(
                 name='service_state',
                 value={},
-                request_id=kwargs['request_id'],
+                request_id=kwargs.get('request_id', 'service_state'),
+                max_exec_time=kwargs.get('max_exec_time'),
                 )
 
     @track_request_id_completed
@@ -304,7 +359,8 @@ class BaseTestClient(BaseServiceClient):
                 name='project_selected',
                 value={'title': pname, },
                 client_room=self.ns_handler.room_sid,
-                request_id=kwargs['request_id'],
+                request_id=kwargs.get('request_id', 'project_selected'),
+                max_exec_time=kwargs.get('max_exec_time'),
             )
 
     @track_request_id_completed
@@ -317,7 +373,8 @@ class BaseTestClient(BaseServiceClient):
                     'title': ename,
                 },
                 client_room=self.ns_handler.room_sid,
-                request_id=kwargs['request_id'],
+                request_id=kwargs.get('request_id', 'experiment_selected'),
+                max_exec_time=kwargs.get('max_exec_time'),
             )
 
     @track_request_id_completed
@@ -329,7 +386,8 @@ class BaseTestClient(BaseServiceClient):
                     'title': pname,
                     'attributes': attrs,
                 },
-                request_id=kwargs['request_id'],
+                request_id=kwargs.get('request_id', 'save_project'),
+                max_exec_time=kwargs.get('max_exec_time'),
             )
 
     @track_request_id_completed
@@ -343,7 +401,8 @@ class BaseTestClient(BaseServiceClient):
                     'attributes': attrs,
                     'sample_attributes_template': template,
                 },
-                request_id=kwargs['request_id'],
+                request_id=kwargs.get('request_id', 'save_experiment'),
+                max_exec_time=kwargs.get('max_exec_time'),
             )
 
     @track_request_id_completed
@@ -355,7 +414,8 @@ class BaseTestClient(BaseServiceClient):
                     'project': pname,
                     'experiment': ename,
                 },
-                request_id=kwargs['request_id'],
+                request_id=kwargs.get('request_id', 'delete_experiment'),
+                max_exec_time=kwargs.get('max_exec_time'),
             )
 
     @track_request_id_completed
@@ -366,7 +426,57 @@ class BaseTestClient(BaseServiceClient):
                 value={
                     'project': pname,
                 },
-                request_id=kwargs['request_id'],
+                request_id=kwargs.get('request_id', 'delete_project'),
+                max_exec_time=kwargs.get('max_exec_time'),
+            )
+
+    @track_request_id_completed
+    @limit_exec_time
+    async def emit_import_raw_table_datetime_range(self, dt_range, *args, **kwargs):
+        await self.ns_handler.emit_client_notification(
+                name='import_raw_table_datetime_range',
+                value=dt_range,
+                client_room=self.ns_handler.room_sid,
+                # these args are for testing
+                request_id=kwargs.get('request_id', 'import_raw_table_datetime_range'),
+                max_exec_time=kwargs.get('max_exec_time'),
+            )
+
+    @track_request_id_completed
+    @limit_exec_time
+    async def emit_raw_import(self, raw_samples_data, *args, **kwargs):
+        self.raw_samples = [s['filename'] for s in raw_samples_data]
+        self.raw_samples_data = raw_samples_data
+        self.acquired_samples = []
+        await self.ns_handler.emit_client_notification(
+                name='raw_import',
+                value=raw_samples_data,
+                client_room=self.ns_handler.room_sid,
+                request_id=kwargs.get('request_id', 'raw_import'),
+                max_exec_time=kwargs.get('max_exec_time'),
+            )
+
+    @track_request_id_completed
+    @limit_exec_time
+    async def emit_raw_import_status(self, *args, **kwargs):
+        await self.ns_handler.emit_client_notification(
+                name='raw_import_status',
+                value={},
+                client_room=self.ns_handler.room_sid,
+                request_id=kwargs.get('request_id', 'raw_import_status'),
+                max_exec_time=kwargs.get('max_exec_time'),
+            )
+
+    # so far no reliable way to trace the request completed
+    # @track_request_id_completed
+    # @limit_exec_time
+    async def emit_stop_raw_import(self, raw_samples_data=[], *args, **kwargs):
+        await self.ns_handler.emit_client_notification(
+                name='stop_raw_import',
+                value=raw_samples_data,
+                client_room=self.ns_handler.room_sid,
+                # request_id=kwargs.get('request_id', 'stop_raw_import'),
+                # max_exec_time=kwargs.get('max_exec_time'),
             )
 
 
@@ -383,11 +493,10 @@ def run_client():
         pass
 
 
-def start_test_client_as_daemon(timeout=10):
-    args = parse_cmd_args()
-    client = BaseTestClient(args['url'],
-                            args['port'],
-                            (args.get('ns', '/'), BaseTestClientNamespace)
+def start_test_client_as_daemon(timeout=10, **kwargs):
+    client = BaseTestClient(kwargs['url'],
+                            kwargs['port'],
+                            (kwargs.get('ns', '/'), BaseTestClientNamespace)
                            )
     client.daemon = Thread(target=client.run_until_complete)
     client.daemon.start()
@@ -400,9 +509,10 @@ def start_test_client_as_daemon(timeout=10):
 
 
 def test_some_requests():
-    # use this procedure for testing request combinations
+    # use this procedure for debugging request combinations
     print('-- Start client')
-    client = start_test_client_as_daemon()
+    args = parse_cmd_args()
+    client = start_test_client_as_daemon(**args)
 
     fname = 'TofDaq_Data_2021.08.02_01h01m01s'
 
