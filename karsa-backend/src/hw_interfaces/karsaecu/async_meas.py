@@ -8,15 +8,12 @@ import socket
 from timeit import default_timer as timer
 #from datetime import timedelta
 
-from karsaecu.karsa_async_client import AsyncTCPClient
+from async_client import AsyncTCPClient
+from messages import ETX, MIN_MEAS_MSG_SIZE, STX
 
-KRS_MEAS_PORT = 65143            # The port used by the server
 
-STX = 0x02
-ETX = 0x03
+KRS_MEAS_PORT = 65143           # KECU notification port
 
-MIN_MEAS_MSG_SIZE = 6       # DIO Data : Header (4) + Node (1) + data (1)
-MEAS_MSG_HEADER_LEN = 4     # STX (1) + CMD (1) + LEN (1) + ETX (1)
 
 class KarsaMeasClient(AsyncTCPClient):
     def __init__(self):
