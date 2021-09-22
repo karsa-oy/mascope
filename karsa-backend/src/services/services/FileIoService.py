@@ -40,7 +40,7 @@ client = None
 
 # Cache for data arrays
 cache = LRUDict(10)
-
+        
 
 class FileIoNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to MainService """
@@ -401,6 +401,14 @@ def read_zarr_attributes(filepath):
     z = zarr.open(filepath, mode='r', synchronizer=sync)
     attributes = z.attrs.asdict()
     return attributes
+
+def update_zarr_array_coord(base_filename, var, dim, coord):
+    array_path = filename_to_zarr_path(base_filename, var)
+    sync = zarr.ProcessSynchronizer(os.path.join(array_path, '.sync'))
+    zarr_array = zarr.open(array_path, mode='a', synchronizer=sync)
+    zarr_array[dim][:] = coord
+    for group_name, group in zarr_array.groups():
+        group[dim][:] = coord
 
 def write_zarr_attributes(filepath, attributes):
     if not os.path.exists(filepath):
