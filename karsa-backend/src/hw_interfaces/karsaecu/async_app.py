@@ -3,29 +3,14 @@ import sys
 import time
 
 from time import sleep
-from karsaecu.karsa_async_client import AsyncTCPClient
+from async_client import AsyncTCPClient
 
-KRS_APP_PORT = 65142            # The port used by the server
+from messages import Command
+from nodes import KRS_MAX_NODES, NodeType
 
-CMD_GET_VERSION = 0x01
-CMD_RESET_NODE = 0x02
-CMD_GET_NODE_LIST = 0x03
-CMD_GET_NODE_DATA = 0x04
-CMD_SET_NODE_DATA = 0x05
-CMD_START_MFC_MEAS = 0x10
-CMD_STOP_MFC_MEAS = 0x11
-CMD_START_AI_MEAS = 0x12
-CMD_STOP_AI_MEAS = 0x13
-CMD_START_DIO_MEAS = 0x14
-CMD_STOP_DIO_MEAS = 0x15
+KRS_APP_PORT = 65142        # KECU command port
 
-KRS_NODE_TYPE_MFC = 0
-KRS_NODE_TYPE_DIO = 1
-KRS_NODE_TYPE_AI = 2
 
-ALL_NODES = 0x00
-
-KRS_MAX_NODES = 32
 
 class KarsaClient(AsyncTCPClient):
     def __init__(self):
@@ -35,7 +20,7 @@ class KarsaClient(AsyncTCPClient):
         self._nodeTypes = bytearray(KRS_MAX_NODES)
         
     async def getVersion(self):
-        nBytes, ver = await self.sendCmdWaitResp(CMD_GET_VERSION, [])
+        nBytes, ver = await self.sendCmdWaitResp(Command.CMD_READ_FW_VERSION.value, [])
         if (nBytes == 2):
             print("Karsa FW version {0}.{1}".format(ver[0], ver[1]))
             return
@@ -43,7 +28,7 @@ class KarsaClient(AsyncTCPClient):
 
     async def getNodeList(self):
         self._nodeCnt = 0
-        nBytes, resp = await self.sendCmdWaitResp(CMD_GET_NODE_LIST, [])
+        nBytes, resp = await self.sendCmdWaitResp(Command.CMD_GET_NODE_LIST.value, [])
         if (nBytes > 0):
             self._nodeCnt = nBytes >> 1
             if (self._nodeCnt > 0):
@@ -59,11 +44,11 @@ class KarsaClient(AsyncTCPClient):
         payload[1] = (obj & 0xFF)
         payload[2] = (obj >> 8)
         payload[3] = subIndex
-        nBytes, resp = await self.sendCmdWaitResp(CMD_GET_NODE_DATA, payload)
+        nBytes, resp = await self.sendCmdWaitResp(Command.CMD_GET_NODE_DATA.value, payload)
         if (nBytes > 0):
-            return nBytes,resp
+            return resp.decode('utf-8')
         print("Failed to get Node 0x{0:02X} data".format(nId))
-        return 0, None
+        return None
 
     async def setNodeData(self, nId, obj, subIndex, l, data):
         payload = bytearray(4+l)
@@ -74,7 +59,7 @@ class KarsaClient(AsyncTCPClient):
         for i in range(0, l):
             payload[4+i] = data & 0xFF
             data >>= 8
-        nBytes, resp = await self.sendCmdWaitResp(CMD_SET_NODE_DATA, payload)
+        nBytes, resp = await self.sendCmdWaitResp(Command.CMD_SET_NODE_DATA.value, payload)
         if (resp != None and resp[0] == 0x00):
             return False
         print("Failed to Write Data to Node 0x{0:02X}".format(nId))
@@ -83,7 +68,7 @@ class KarsaClient(AsyncTCPClient):
     async def resetNode(self, nId):
         payload = bytearray(1)
         payload[0] = nId
-        nBytes, resp = await self.sendCmdWaitResp(CMD_RESET_NODE, payload)
+        nBytes, resp = await self.sendCmdWaitResp(Command.CMD_RESET_NODE.value, payload)
         if (resp != None and resp[0] == 0x00):
             return
         print("Failed to reset Node 0x{0:02X}".format(nId))
@@ -94,26 +79,26 @@ class KarsaClient(AsyncTCPClient):
             print("{0} nodes found".format(self._nodeCnt))
             for n in range(self._nodeCnt):
                 print("\nNode 0x{0:02X}, Type {1} :".format(self._nodeList[n], self._nodeTypes[n]))
-                nbytes, data = await self.getNodeData(self._nodeList[n],0x1008,0x00)
-                if (nbytes > 0):
-                    print("  Device name : {0}".format(data.decode("utf-8")))
-                nbytes, data = await self.getNodeData(self._nodeList[n], 0x1009, 0x00)
-                if (nbytes > 0):
-                    print("  HW Version  : {0}".format(data.decode("utf-8")))
-                nbytes, data = await self.getNodeData(self._nodeList[n], 0x100A, 0x00)
-                if (nbytes > 0):
-                    print("  SW Version  : {0}".format(data.decode("utf-8")))
+                data = await self.getNodeData(self._nodeList[n],0x1008,0x00)
+                if data:
+                    print("  Device name : {0}".format(data))
+                data = await self.getNodeData(self._nodeList[n], 0x1009, 0x00)
+                if data:
+                    print("  HW Version  : {0}".format(data))
+                data = await self.getNodeData(self._nodeList[n], 0x100A, 0x00)
+                if data:
+                    print("  SW Version  : {0}".format(data))
         else:
             print("No nodes found")
 
-    async def startMfcMeas(self,nId,obj,subIndex,interval):
+    async def startMfcMeas(self, nId, obj, subIndex, interval):
         payload = bytearray(5)
         payload[0] = nId
         payload[1] = (obj & 0xFF)
         payload[2] = (obj >> 8)
         payload[3] = subIndex
         payload[4] = interval
-        nBytes, resp = await self.sendCmdWaitResp(CMD_START_MFC_MEAS, payload)
+        nBytes, resp = await self.sendCmdWaitResp(Command.CMD_START_MFC_MEAS.value, payload)
         if (resp != None and resp[0] == 0x00):
             return False, None
         else:
@@ -127,7 +112,7 @@ class KarsaClient(AsyncTCPClient):
         payload[1] = (obj & 0xFF)
         payload[2] = (obj >> 8)
         payload[3] = subIndex
-        nBytes, resp = await self.sendCmdWaitResp(CMD_STOP_MFC_MEAS, payload)
+        nBytes, resp = await self.sendCmdWaitResp(Command.CMD_STOP_MFC_MEAS.value, payload)
         if (resp != None and resp[0] == 0x00):
             return False
         else:
@@ -141,7 +126,7 @@ class KarsaClient(AsyncTCPClient):
         payload[0] = nId
         payload[1] = chMask
         payload[2] = interval
-        nBytes, resp = await self.sendCmdWaitResp(CMD_START_AI_MEAS, payload)
+        nBytes, resp = await self.sendCmdWaitResp(Command.CMD_START_AI_MEAS.value, payload)
         if (resp != None and resp[0] == 0x00):
             return False, None
         else:
@@ -153,7 +138,7 @@ class KarsaClient(AsyncTCPClient):
         payload = bytearray(2)
         payload[0] = nId
         payload[1] = chMask
-        nBytes, resp = await self.sendCmdWaitResp(CMD_STOP_AI_MEAS, payload)
+        nBytes, resp = await self.sendCmdWaitResp(Command.CMD_STOP_AI_MEAS.value, payload)
         if (resp != None and resp[0] == 0x00):
             return False
         else:
@@ -166,7 +151,7 @@ class KarsaClient(AsyncTCPClient):
         payload = bytearray(2)
         payload[0] = nId
         payload[1] = interval
-        nBytes, resp = await self.sendCmdWaitResp(CMD_START_DIO_MEAS, payload)
+        nBytes, resp = await self.sendCmdWaitResp(Command.CMD_START_DIO_MEAS.value, payload)
         if (resp != None and resp[0] == 0x00):
             return False, None
         else:
@@ -174,10 +159,10 @@ class KarsaClient(AsyncTCPClient):
                 print("Failed to start DIO measurement, Node 0x{0:02X}, err = 0x{1:02X}".format(nId, resp[0]))
         return True, resp
 
-    async def stopDioMeas(self,nId):
+    async def stopDioMeas(self, nId):
         payload = bytearray(1)
         payload[0] = nId
-        nBytes, resp = await self.sendCmdWaitResp(CMD_STOP_DIO_MEAS, payload)
+        nBytes, resp = await self.sendCmdWaitResp(Command.CMD_STOP_DIO_MEAS.value, payload)
         if (resp != None and resp[0] == 0x00):
             return False
         else:
@@ -185,6 +170,8 @@ class KarsaClient(AsyncTCPClient):
                 print("CMD_STOP_DIO_MEAS resp {0}, status = 0x{1:02X}".format(nBytes, resp[0]))
         print("Error stopping DIO measurement")
         return True
+
+
 
 async def main():
     '''Main program'''
@@ -202,14 +189,14 @@ async def main():
     if (tcp._nodeCnt > 0):
         for n in range(tcp._nodeCnt):
             time.sleep(1)
-            if (tcp._nodeTypes[n] == KRS_NODE_TYPE_MFC):
+            if (tcp._nodeTypes[n] == NodeType.KRS_NODE_TYPE_MFC.value):
                 await tcp.startMfcMeas(tcp._nodeList[n], 0x2004, 0x03, 10)
                 await tcp.startMfcMeas(tcp._nodeList[n], 0x2503, 0x01, 10)
                 await tcp.startMfcMeas(0x00, 0x2C00, 0x01, 30)
                 await tcp.startMfcMeas(0x00, 0x2540, 0x01, 30)
-            if (tcp._nodeTypes[n] == KRS_NODE_TYPE_DIO):
+            if (tcp._nodeTypes[n] == NodeType.KRS_NODE_TYPE_DIO.value):
                 await tcp.startDioMeas(tcp._nodeList[n], 50)
-            if (tcp._nodeTypes[n] == KRS_NODE_TYPE_AI):
+            if (tcp._nodeTypes[n] == NodeType.KRS_NODE_TYPE_AI.value):
                 await tcp.startAiMeas(tcp._nodeList[n], 0x03, 30)
 
         time.sleep(30)
@@ -217,12 +204,12 @@ async def main():
         # tcp.stopMfcMeas(0x00,0x0000,0x00) # stop all measurements from all MFC nodes
         for n in range(tcp._nodeCnt):
             time.sleep(2)
-            if (tcp._nodeTypes[n] == KRS_NODE_TYPE_MFC):
+            if (tcp._nodeTypes[n] == NodeType.KRS_NODE_TYPE_MFC.value):
                 # tcp.stopMfcMeas(tcp._nodeList[n],0x2004,0x03)
                 await tcp.stopMfcMeas(tcp._nodeList[n], 0x0000, 0x00) # stop all measurements from the node
-            if (tcp._nodeTypes[n] == KRS_NODE_TYPE_DIO):
+            if (tcp._nodeTypes[n] == NodeType.KRS_NODE_TYPE_DIO.value):
                 await tcp.stopDioMeas(tcp._nodeList[n])
-            if (tcp._nodeTypes[n] == KRS_NODE_TYPE_AI):
+            if (tcp._nodeTypes[n] == NodeType.KRS_NODE_TYPE_AI.value):
                 await tcp.stopAiMeas(tcp._nodeList[n], 0x03)
 
     # time.sleep(3)
