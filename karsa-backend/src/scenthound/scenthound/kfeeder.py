@@ -16,7 +16,7 @@ from multiprocessing import Queue, Barrier
 
 #from .kcode import thresholding
 
-from karsavlm.msspectrum.utils import (
+from .karsavlm.msspectrum.utils import (
                     binary_search_for_left_range,
                     binary_search_for_right_range
                     )
