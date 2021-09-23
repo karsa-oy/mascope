@@ -15,6 +15,7 @@ from queue import Empty
 from time import sleep
 from ctypes import create_string_buffer
 from ntpath import basename
+import inspect
 
 from .kinstrument import KInstrument
 
@@ -51,6 +52,10 @@ class BaseStreamer():
         self.progress = 0               # TofDaqStreamer progress [%]
         self.speci = -1                 # Index of last received spectrum,
                                         # -1 when there is no active acquisition
+
+    def log(self, *arg, **kwarg):
+        print(f"[{self.__class__.__name__}.{inspect.stack()[1].function}]", *arg, **kwarg)
+
     @property
     def tps_info(self):
         """List of TPS  names
@@ -111,16 +116,16 @@ class BaseStreamer():
                 tof_period_s *= 1e-9 
             self.interval = tof_period_s * self.desc.nbrWaveforms # [s]
             self.length = (self.desc.nbrWrites * self.desc.nbrBufs) * self.interval # [s]
-            print("TofDaqStreamer started: %s" %self.filename)
+            self.log("started: %s" %self.filename)
             # Check again for new data
             state = self._check()
         if state == 1:
             # New data
             new_speci = (self.desc.iWrite * self.desc.nbrBufs) + self.desc.iBuf
             if new_speci - self.speci > 1:
-                print("Warning: Skipped a spec!")
+                self.log("Warning: Skipped a spec!")
             self.speci = new_speci
-            print(self.speci)
+            self.log(self.speci)
             self._get_and_feed_data()
             # TofDaqStreamer progress
             n = self.desc.nbrWrites * self.desc.nbrBufs # Total number of spectra
@@ -176,7 +181,7 @@ class TofDaqStreamer(BaseStreamer, Thread):
             Exception is raised if TofDaq Recorder is not running, or if
             fetching 'TwSharedMemoryDesc' fails for another reason.
         """
-        print("TofDaqStreamer initializing")
+        self.log("initializing")
         BaseStreamer.__init__(self)
         Thread.__init__(self)
 
@@ -291,7 +296,7 @@ class TofDaqStreamer(BaseStreamer, Thread):
         Loop until 'self.shutdown_event' is set.
         """
 
-        print("TofDaqStreamer running")
+        self.log("started")
         timeout_counter = 0
         # Main loop
         while not self.shutdown_event.is_set():
@@ -332,7 +337,7 @@ class TofDaqStreamer(BaseStreamer, Thread):
                     self.active.clear()
                     # Reset self
                     self._finalize()
-                    print("TofDaqStreamer finished")
+                    self.log("finished streaming")
             # New data
             elif ret == 4:
                 # Reset timeout counter
@@ -344,10 +349,10 @@ class TofDaqStreamer(BaseStreamer, Thread):
                 continue
             # Unexpected return value
             else:
-                print("Unexpected return value: %s" %TofDaqStreamer.TwRetVal(ret).name)
+                self.log("Unexpected return value: %s" %TofDaqStreamer.TwRetVal(ret).name)
                 sleep(1)
         # Out of main loop
-        print('TofDaqStreamer exiting')
+        self.log("stopped")
         self.shutdown()
 
     def start_acquisition(self):
@@ -386,7 +391,7 @@ class H5Streamer(BaseStreamer, KInstrument):
         Exception
             Exception is raised if fetching 'TwH5Desc' fails for some reason.
         """
-        print("H5Streamer initializing")
+        self.log("initializing")
         BaseStreamer.__init__(self)
         Thread.__init__(self)
 
@@ -599,7 +604,7 @@ class H5Streamer(BaseStreamer, KInstrument):
         Loop until 'self.shutdown_event' is set.
         """
 
-        print("H5Streamer running")
+        self.log("started")
         # Main loop
         while not self.shutdown_event.is_set():
             client_room, fdata = self._get_next_file_to_stream()
@@ -611,7 +616,7 @@ class H5Streamer(BaseStreamer, KInstrument):
             # Update TW h5 descriptor
             ret = H5Streamer.TwGetH5Descriptor(fname.encode(), self.desc)
             if ret != 4:
-                print("Error reading file: %s" %H5Streamer.TwRetVal(ret).name)
+                self.log("Error reading file: %s" %H5Streamer.TwRetVal(ret).name)
                 continue
             # Add fields to comply with TW shared memory descriptor
             self.desc.currentDataFileName = fname.encode()
@@ -619,10 +624,11 @@ class H5Streamer(BaseStreamer, KInstrument):
             self.desc.iWrite = 0
             if not (self.desc.nbrWrites and self.desc.nbrBufs):
                 # Empty file, skip
-                print("Skipping empty file: %s" %self.desc.currentDataFileName)
+                self.log("Skipping empty file: %s" %self.desc.currentDataFileName)
                 continue
 
             # Start streaming
+            self.log(f"started streaming {fname}")
             # Update self and feed data into queue
             self._update()
             self._update_request_in_progress(client_room, fdata)
@@ -656,9 +662,10 @@ class H5Streamer(BaseStreamer, KInstrument):
             self.cancel_event.clear()
             self._finalize()
             self._remove_request_in_progress(client_room, fname)
-            print("h5Stream finished")
+            H5Streamer.TwCloseH5(fname.encode())
+            self.log(f"finished streaming {fname}")
         # Out of main loop
-        print('H5Streamer exiting')
+        self.log("stopped")
         self.shutdown()
 
     def shutdown(self):

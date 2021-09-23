@@ -6,10 +6,12 @@ Created on Mon Apr 15 15:39:30 2019
 
 import asyncio
 import os
+from ntpath import dirname, basename
 import sys
 import fnmatch
 import json
 import subprocess
+import re
 
 import numpy as np
 import pandas as pd
@@ -73,7 +75,7 @@ def parse_path_from_sample_name(sample_name):
 
 
 class H5Pool():
-    def __init__(self, data_path):
+    def __init__(self, pool_attrs={}):
         """Initialize self
 
         Parameters
@@ -82,12 +84,12 @@ class H5Pool():
             Root data path
         """
 
-        self.data_root = data_path
+        self.pool_attrs = pool_attrs
         self.pool = pd.DataFrame()
 
     async def scan_dir(self,
                        path=None,
-                       fname_filter='*.h5'
+                       fname_filter=None
                        ):
         """Scan directory for h5 files
         
@@ -103,8 +105,8 @@ class H5Pool():
 
         """
         
-        if path is None:
-            path = self.data_root
+        path = path or self.pool_attrs.get('path', '.')
+        fname_filter = fname_filter or self.pool_attrs.get('mask', '*.h5')
 
         print("Scanning: %s" % str(path))
 
@@ -135,47 +137,55 @@ class H5Pool():
             dir_files = next( os.walk(dir_path) )[2]
             for filename in fnmatch.filter(dir_files, fname_filter):
                 await asyncio.sleep(0)
-                # Try to parse time from filename
-                file_no_ext = os.path.splitext(filename)[0]
                 try:
-                    time_str = file_no_ext.split('_')[-1] # Separator _
-                    file_time = datetime.strptime(time_str, '%Hh%Mm%Ss')
+                    full_file_path = os.path.join(dir_path, filename)
+                    self.add_file(full_file_path)
+                    print(full_file_path)
                 except ValueError:
-                    try:
-                        time_str = file_no_ext.split('-')[-1] # Separator -
-                        file_time = datetime.strptime(time_str, '%Hh%Mm%Ss')
-                    except ValueError:
-                        print("Skipped file: %s due to invalid datetime format" %filename)
-                        continue
-                file_datetime = dir_date + timedelta(hours=file_time.hour,
-                                                     minutes=file_time.minute,
-                                                     seconds=file_time.second
-                                                     )
-                # Append to pool
-                rawfile = os.path.join(path, dirname, filename)
-
-                size_bytes = os.stat(rawfile).st_size
-                size_mb = round(2**-20 * size_bytes, 2)
-
-                df_row = pd.DataFrame(
-                                index=[filename],
-                                data=[[
-                                    filename,
-                                    file_datetime,
-                                    size_mb,
-                                    dir_path
-                                    ]],
-                                columns=[
-                                    'filename',
-                                    'datetime',
-                                    'filesize',
-                                    'path'
-                                    ]
-                                )
-                self.pool = self.pool.append(df_row)
-                print(str(rawfile))
-        self.pool = self.pool.sort_index()
+                    continue
         print("Done")
+
+
+    def add_file(self, full_file_path):
+        # Try to parse time from filename
+        filename = basename(full_file_path)
+        file_no_ext = os.path.splitext(filename)[0]
+        try:
+            delims = '[-_]'
+            [*_, date_str, time_str] = re.split(delims, file_no_ext)
+            file_time = datetime.strptime(time_str, '%Hh%Mm%Ss')
+            dir_date = datetime.strptime(date_str, '%Y.%m.%d')
+        except ValueError:
+            print("Skipped file: %s due to invalid datetime format" %filename)
+            raise
+        file_datetime = dir_date + timedelta(hours=file_time.hour,
+                                            minutes=file_time.minute,
+                                            seconds=file_time.second
+                                            )
+        # Append to pool
+        size_bytes = os.stat(full_file_path).st_size
+        size_mb = round(2**-20 * size_bytes, 2)
+        df_row = pd.DataFrame(
+                        index=[filename],
+                        data=[[
+                            filename,
+                            file_datetime,
+                            size_mb,
+                            dirname(full_file_path),
+                            ]],
+                        columns=[
+                            'filename',
+                            'datetime',
+                            'filesize',
+                            'path'
+                            ]
+                        )
+        self.pool = self.pool.append(df_row).sort_index()
+
+
+    def remove_file(self, full_file_path):
+        filename = basename(full_file_path)
+        self.pool = self.pool.drop(filename)
 
     async def get_datetime_range(self,
                                  start_datetime=datetime(1970, 1, 1),
@@ -213,7 +223,7 @@ class H5Pool():
 
 
 class RawPool():
-    def __init__(self, data_path):
+    def __init__(self, pool_attrs={}):
         """Initialize self
 
         Parameters
@@ -222,12 +232,12 @@ class RawPool():
             Root data path
         """
 
-        self.data_root = data_path
+        self.pool_attrs = pool_attrs
         self.pool = pd.DataFrame()
 
     async def scan_dir(self,
                        path=None,
-                       fname_filter='*.raw'
+                       fname_filter=None
                        ):
         """Scan directory for raw files
         
@@ -243,8 +253,8 @@ class RawPool():
 
         """
         
-        if path is None:
-            path = self.data_root
+        path = path or self.pool_attrs.get('path', '.')
+        fname_filter = fname_filter or self.pool_attrs.get('mask', '*.raw')
 
         print("Scanning: %s" % str(path))
 
@@ -267,40 +277,50 @@ class RawPool():
         # Loop through files in root, assumed to be named by date
         for filename in fnmatch.filter(files, fname_filter):
             await asyncio.sleep(0)
-            # Try to parse time from filename
-            matcher = datetime_glob.Matcher(pattern='%Y%m%d %H%M *')
-            file_datetime_match = matcher.match(filename)
-            if not file_datetime_match:
-                print("Skipped file: %s due to invalid datetime format" %filename)
+            try:
+                full_file_path = os.path.join(path, filename)
+                self.add_file(full_file_path)
+                print(full_file_path)
+            except ValueError:
                 continue
-            file_datetime = file_datetime_match.as_datetime()
-
-            # Append to pool
-            rawfile = os.path.join(path, filename)
-
-            size_bytes = os.stat(rawfile).st_size
-            size_mb = round(2**-20 * size_bytes, 2)
-
-            df_row = pd.DataFrame(
-                            index=[filename],
-                            data=[[
-                                filename,
-                                file_datetime,
-                                size_mb,
-                                path
-                                ]],
-                            columns=[
-                                'filename',
-                                'datetime',
-                                'filesize',
-                                'path'
-                                ]
-                            )
-            self.pool = self.pool.append(df_row)
-            print(str(rawfile))
-
-        self.pool = self.pool.sort_index()
         print("Done")
+
+
+    def add_file(self, full_file_path):
+        filename = basename(full_file_path)
+        path = dirname(full_file_path)
+        # Try to parse time from filename
+        matcher = datetime_glob.Matcher(pattern='%Y%m%d %H%M *')
+        file_datetime_match = matcher.match(filename)
+        if not file_datetime_match:
+            print("Skipped file: %s due to invalid datetime format" %filename)
+            raise ValueError
+        # Append to pool
+        file_datetime = file_datetime_match.as_datetime()
+        size_bytes = os.stat(full_file_path).st_size
+        size_mb = round(2**-20 * size_bytes, 2)
+        df_row = pd.DataFrame(
+                        index=[filename],
+                        data=[[
+                            filename,
+                            file_datetime,
+                            size_mb,
+                            path
+                            ]],
+                        columns=[
+                            'filename',
+                            'datetime',
+                            'filesize',
+                            'path'
+                            ]
+                        )
+        self.pool = self.pool.append(df_row).sort_index()
+
+
+    def remove_file(self, full_file_path):
+        filename = basename(full_file_path)
+        self.pool = self.pool.drop(filename)
+
 
     async def get_datetime_range(self,
                                  start_datetime=datetime(1970, 1, 1),

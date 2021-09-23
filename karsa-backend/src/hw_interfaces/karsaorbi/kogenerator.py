@@ -14,6 +14,7 @@ from multiprocessing import Event, Queue
 from queue import Empty
 from time import sleep
 from ntpath import basename
+import inspect
 
 
 from .lib import Business as ThermoBusiness
@@ -38,7 +39,7 @@ def strip_filepath(filepath):
 
 class RawStreamer(Thread):
     def __init__(self, client, mz_precision=4):
-        print("RawStreamer initializing")
+        self.log("initializing")
         Thread.__init__(self)
         # Parameters
         self.client = client
@@ -61,6 +62,9 @@ class RawStreamer(Thread):
         self.progress = 0                   # RawStreamer progress [%]
         self.speci = -1                     # Index of last received spectrum,
                                             # -1 when there is no active acquisition
+
+    def log(self, *arg, **kwarg):
+        print(f"[{self.__class__.__name__}.{inspect.stack()[1].function}]", *arg, **kwarg)
 
     @property
     def mz(self):
@@ -149,11 +153,11 @@ class RawStreamer(Thread):
             self.filename = strip_filepath(raw_filepath)            
             self.length = self.raw.RunHeaderEx.EndTime * 60. # [s]
             self.interval = self.length / self.raw.RunHeaderEx.LastSpectrum # [s]
-            print("RawStreamer started: %s" %self.filename)
+            self.log("started. %s" %self.filename)
         else:
             # New data
             self.speci = scan - 1
-            print(self.speci)
+            self.log(self.speci)
             self._get_and_feed_data()
             # RawStreamer progress
             self.progress = (scan / self.raw.RunHeaderEx.LastSpectrum) * 100. # [%]
@@ -206,7 +210,7 @@ class RawStreamer(Thread):
                 del self.request_in_progress[client_room]
 
     def run(self):
-        print("RawStreamer running")
+        self.log("started")
         # Main loop
         while not self.shutdown_event.is_set():
             client_room, fdata = self._get_next_file_to_stream()
@@ -220,10 +224,11 @@ class RawStreamer(Thread):
                 self.raw = ThermoBusiness.RawFileReaderFactory.ReadFile(fname)
                 self.raw.SelectInstrument(0, 1)
             except Exception as e:
-                print("Error reading file %s: %s" %(fname, e))
+                self.log("Error reading file %s: %s" %(fname, e))
                 continue
 
             # Start streaming
+            self.log(f"started streaming {fname}")
             # Update self and feed data into queue
             self._update()
             self._update_request_in_progress(client_room, fdata)
@@ -249,9 +254,9 @@ class RawStreamer(Thread):
             self.cancel_event.clear()
             self._finalize()
             self._remove_request_in_progress(client_room, fname)
-            print("RawStream finished")
+            self.log(f"finished streaming {fname}")
         # Out of main loop
-        print('RawStreamer exiting')
+        self.log("stopped")
         self.shutdown()
 
     def shutdown(self):

@@ -4,10 +4,10 @@ import time
 import importlib
 
 from queue import Empty
-from karsalib.struct import CacheQ
+from karsalib.struct import CacheQ, FSWatcher
 from socketio import AsyncClientNamespace, AsyncClient
 from socketio.exceptions import BadNamespaceError
-from multiprocessing import Lock
+from multiprocessing import Event, Lock
 
 from .logging import (
                 NO_DATA_LOGGING_DEFAULT,
@@ -21,7 +21,7 @@ from .util import parse_cmd_args
 def run_streamer_service(StreamerClient,
                          StreamerPublicNamespace,
                          StreamerPrivateNamespace):
-    # args: url, port, ns, streamer_type, data_pool
+    # args: url, port, ns, streamer_type, data_pool_path, data_pool_mask
     args = parse_cmd_args()
     # streamer should always be in private namespace with data producer
     if args['ns'] == '/':
@@ -32,9 +32,13 @@ def run_streamer_service(StreamerClient,
 
     client = None
     while True:
+        data_pool_path = args.get('data_pool_path')
+        data_pool_mask = args.get('data_pool_mask')
+        data_pool = None if not data_pool_path else \
+            {'path': data_pool_path, 'mask': data_pool_mask}
         try:
             client = StreamerClient(args.get('streamer_type', None),
-                                    args.get('data_pool', None),
+                                    data_pool,
                                     args['url'],
                                     args['port'],
                                     ('/', StreamerPublicNamespace),
@@ -185,6 +189,8 @@ class BaseServiceClient:
         # root ns handler is needed to communicate with router at re-connect
         if '/' not in self.sio.namespace_handlers:
             self.sio.register_namespace( BaseClientNamespace('/') )
+        # for shutdown sync with threads
+        self.shutdown_event = Event()
 
     async def emit_client_notification(self, name, value, **kwarg):
         await self.ns_handler.emit_client_notification(name, value, **kwarg)
@@ -216,8 +222,16 @@ class BaseServiceClient:
         """
         Overridable main function of the service
         """
-        while True:
-            await self.sio.sleep(1)
+        try:
+            while not self.shutdown_event.is_set():
+                await self.sio.sleep(1)
+        except KeyboardInterrupt:
+            self.log('KeyboardInterrupt')
+        except Exception as e:
+            self.log(str(e))
+        finally:
+            self.shutdown_event.set()
+
 
     async def run(self):
         await self.connect()
@@ -247,6 +261,8 @@ class BridgeServiceClient(BaseServiceClient):
         # cross-references
         self.public_ns.parent = self
         self.private_ns.parent = self
+        # for shutdown sync with threads
+        self.shutdown_event = Event()
 
     async def emit_public_notification(self, name, value, **kwarg):
         await self.public_ns.emit_client_notification(name, value, **kwarg)
@@ -273,8 +289,8 @@ class BaseStreamerClient(BridgeServiceClient):
         self.data_pool = None
         if data_pool:
             m = importlib.import_module('.datapool', 'karsalib')
-            self.data_pool = getattr(m, f'{streamer_type}Pool')(data_pool)
-            self.data_pool.path = data_pool
+            self.data_pool = getattr(m, f'{streamer_type}Pool')(pool_attrs=data_pool)
+            self.watcher = FSWatcher(client=self, target_attrs=data_pool, recursive=True)
 
         super().__init__(url, port, public_namespace_data, private_namespace_data)
         priv_ns_name, _ = private_namespace_data
@@ -331,8 +347,11 @@ class BaseStreamerClient(BridgeServiceClient):
 
 
     async def service_main(self):
+        self.log('started')
+        self.watcher.run_as_daemon()
+
         # Main loop
-        while True:
+        while not self.shutdown_event.is_set():
             # Catch Ctrl+C
             try:
                 # Check for active acquisition
@@ -342,7 +361,9 @@ class BaseStreamerClient(BridgeServiceClient):
                     continue
             except KeyboardInterrupt:
                 # Exit
-                break
+                self.log('KeyboardInterrupt')
+                self.shutdown_event.set()
+                continue
 
             # Initialize acquisition
             self.log("Initializing acquisition.")
@@ -450,6 +471,7 @@ class BaseStreamerClient(BridgeServiceClient):
                     self.log(f"Acquisition of {filename} was stopped.")
                     continue
                 except KeyboardInterrupt:
+                    self.shutdown_event.set()
                     self.streamer.shutdown()
                     spec_data = None
                     self.log(f"Acquisition of {filename} was cancelled.")
@@ -523,6 +545,7 @@ class BaseStreamerClient(BridgeServiceClient):
         # Out of main loop
         # Kill Acquisition
         self.streamer.shutdown()
+        self.log('stopped')
 
 
 
