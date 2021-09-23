@@ -181,8 +181,21 @@ class FileStreamerServiceClient(BaseStreamerClient):
     async def init_service(self):
         await super().init_service()
         assert self.data_pool, 'Missing data_pool argument'
-        await self.data_pool.scan_dir(self.data_pool.path)
+        await self.data_pool.scan_dir()
 
+    def on_filesystem_object_created(self, path):
+        try:
+            self.data_pool.add_file(path)
+            self.log(path)
+        except ValueError:
+            pass
+
+    def on_filesystem_object_deleted(self, path):
+        try:
+            self.data_pool.remove_file(path)
+            self.log(path)
+        except Exception as e:
+            self.log(str(e))
 
 
 def run():

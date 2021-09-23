@@ -1,16 +1,16 @@
 import dask.array as da
 import numpy as np
-
 import array
 import xarray
 import sparse
 import time
-
+import inspect
 from multiprocessing import Event, Lock, cpu_count
 from queue import Empty, Full
 from scipy.sparse import coo_matrix
 from threading import Thread
-
+from watchdog.observers import Observer
+from watchdog.events import PatternMatchingEventHandler
 
 
 class AttrDict(dict):
@@ -785,3 +785,52 @@ class QueueSubscription():
         """
 
         return self.q.qsize(self.ident, *args, **kwargs)
+
+
+class FSWatcher:
+    class FSEventHandler(PatternMatchingEventHandler):
+        def __init__(self, client, mask):
+            self.client = client
+            super().__init__(patterns=[mask,])
+
+        def on_created(self, event):
+            self.client.on_filesystem_object_created(event.src_path)
+
+        def on_deleted(self, event):
+            self.client.on_filesystem_object_deleted(event.src_path)
+
+    def log(self, *arg, **kwarg):
+        print(f"[{self.__class__.__name__}.{inspect.stack()[1].function}]", *arg, **kwarg)
+
+    def __init__(self, client, target_attrs, recursive=False):
+        self.client = client
+        self.target_attrs = target_attrs
+        self.recursive = recursive
+        self.observer = Observer()
+        self.handler = self.FSEventHandler(self.client, self.target_attrs['mask'])
+
+    def start(self):
+        self.observer.schedule(self.handler, self.target_attrs['path'], recursive=self.recursive)
+        self.observer.start()
+        self.log('started')
+
+    def stop(self):
+        self.observer.stop()
+        self.observer.join()
+        self.log('stopped')
+
+    def run(self):
+        self.start()
+        try:
+            while not self.client.shutdown_event.is_set():
+                time.sleep(1)
+        except KeyboardInterrupt:
+            self.log('KeyboardInterrupt')
+            self.client.shutdown_event.set()
+        except Exception as e:
+            self.log(str(e))
+            self.client.shutdown_event.set()
+        self.stop()
+
+    def run_as_daemon(self):
+        Thread(target=self.run).start()

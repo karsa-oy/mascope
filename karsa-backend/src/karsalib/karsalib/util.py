@@ -95,7 +95,8 @@ def parse_cmd_args():
                  'n_jobs=',
                  'ns=',
                  'port=',
-                 'data_pool=',
+                 'data_pool_path=',
+                 'data_pool_mask=',
                  'streamer_type=',
                  'url=',
                  ])
