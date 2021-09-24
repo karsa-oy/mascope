@@ -24,7 +24,6 @@ class FileStreamerPublicNamespace(BaseClientNamespace):
     endpoints_room_sid = []
     endpoints_room_data_sources = [
         'instrument_data_request',
-        'service_state',
         ]
     endpoints_room_instrument = [
         'instrument_data_request',
