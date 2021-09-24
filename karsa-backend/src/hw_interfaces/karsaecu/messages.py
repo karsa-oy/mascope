@@ -6,11 +6,13 @@ ETX = 0x03      # End byte
 
 # Command message minimum length
 APP_CMD_MIN_LEN = 4     # STX (1) + CMD (1) + LEN (1) + ETX (1)
+
 # Reply (to command) message minimum length
 APP_RSP_MIN_LEN = 5     # STX (1) + CMD (1) + LEN (1) + STATUS (1) + ETX (1)
 
 # Notification message minimum length
 MIN_MEAS_MSG_SIZE = 6   # DIO Data : Header (4) + Node (1) + data (1)
+
 # Notification message header lemgth
 MEAS_MSG_HEADER_LEN = 4 # STX (1) + CMD (1) + LEN (1) + ETX (1)
 
