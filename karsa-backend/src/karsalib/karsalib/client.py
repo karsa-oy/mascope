@@ -275,6 +275,7 @@ class BaseStreamerClient(BridgeServiceClient):
                  url, port, public_namespace_data, private_namespace_data):
         self.requests = CacheQ('client_room')
         self.request_in_progress = dict()
+        self.watcher = None
         self.lock = Lock()
 
         streamer_info = {
@@ -348,7 +349,8 @@ class BaseStreamerClient(BridgeServiceClient):
 
     async def service_main(self):
         self.log('started')
-        self.watcher.run_as_daemon()
+        if self.watcher:
+            self.watcher.run_as_daemon()
 
         # Main loop
         while not self.shutdown_event.is_set():

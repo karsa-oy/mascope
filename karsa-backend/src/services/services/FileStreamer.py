@@ -168,15 +168,6 @@ class FileStreamerPrivateNamespace(BaseClientNamespace):
 
 
 class FileStreamerServiceClient(BaseStreamerClient):
-    def __init__(self, *args, **kwargs):
-        # this allows BaseStreamerClient.__init__ to see caller's context,
-        # which is needed for dynamic instantiation of a streamer and a data_pool
-        super().__init__(*args, **kwargs)
-
-    # @property
-    # def instrument_name(self):
-        # return self.private_ns.namespace.replace('/', '')
-
     async def init_service(self):
         await super().init_service()
         assert self.data_pool, 'Missing data_pool argument'
