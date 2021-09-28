@@ -1,5 +1,6 @@
-from collections import namedtuple
+from dataclasses import dataclass, field
 from enum import Enum
+from typing import Callable
 
 from .client import AsyncTCPClient
 from .messages import Command
@@ -44,32 +45,133 @@ class NodeType(Enum):
     # //
 
 
-Device = namedtuple('Device', ['node_id', 'node_type', 'description'])
+
+@dataclass
+class Device:
+    node_id: NodeId
+    node_type: NodeId = field(default=NodeType.UNKNOWN, init=False)
+    description: str
+
+
+@dataclass
+class AiChannel:
+    description: str
+    voltage: float = field(default=None, init=False)
+    unit: str
+    conversion: Callable[[float], float]
+    value: float = field(default=None, init=False)
+    
+@dataclass
+class AiDevice(Device):
+    # Configuration
+    node_type = NodeType.AI
+    channels: 'list[AiChannel]'
+    # //
+    
+
+@dataclass
+class DioChannel:
+    description: str
+    io: bool
+    state: bool = field(default=None, init=False)
+
+@dataclass
+class DioDevice(Device):
+    # Configuration
+    node_type = NodeType.DIO
+    channels: 'list[DioChannel]'
+    # //
+    
+
+@dataclass
+class MfcParameter:
+    index: int
+    subindex: int
+    description: str
+    settable: bool
+    unit: str = ""
+    value: float = field(default=None, init=False)
+
+
+MFC_PARAMETER_CFG = [
+    MfcParameter(0x2F00, 0x01, "Flow setpoint", settable=True),
+    MfcParameter(0x2C00, 0x01, "Flow monitor value", settable=False),
+    MfcParameter(0x2503, 0x01, "Medium temperature", settable=False, unit="C"),
+    MfcParameter(0x2004, 0x02, "Device status, temperature", settable=False, unit="C"),
+    MfcParameter(0x2004, 0x03, "Device status, voltage", settable=False, unit="V"),
+]
+
+MFC_PARAMETERS = dict()
+for par in MFC_PARAMETER_CFG:
+    if par.index not in MFC_PARAMETERS:
+        MFC_PARAMETERS.update({par.index: dict()})
+    MFC_PARAMETERS[par.index].update({par.subindex: par})
+
+@dataclass
+class MfcDevice(Device):
+    # Configuration
+    node_type = NodeType.MFC
+    parameters = MFC_PARAMETERS
+    flow_unit: str
+    # //
+
+
+MION_AI_CHANNELS = [
+    AiChannel("", unit="", conversion=lambda x: x),
+]
+
+MION_DIO_CHANNELS = [
+    DioChannel("", io=1),
+    DioChannel("", io=1),
+    DioChannel("", io=1),
+    DioChannel("", io=1),
+    DioChannel("", io=0),
+    DioChannel("", io=0),
+    DioChannel("", io=0),
+    DioChannel("", io=0),
+]
+
+
+SH_AI_CHANNELS = [
+    AiChannel("", unit="", conversion=lambda x: x),
+]
+
+SH_DIO_CHANNELS = [
+    DioChannel("", io=1),
+    DioChannel("", io=1),
+    DioChannel("", io=1),
+    DioChannel("", io=1),
+    DioChannel("", io=0),
+    DioChannel("", io=0),
+    DioChannel("", io=0),
+    DioChannel("", io=0),
+]
+
 
 DEVICE_CFG = [
     # MION
-    Device(NodeId.MION_MFC1_SRC1_EXH, NodeType.MFC, "MION MFC1, Source 1 exhaust, vacuum, 100mlpm"),
-    Device(NodeId.MION_MFC2_SRC1_CRR, NodeType.MFC, "MION MFC2, Source 1 carrier, pressure, 100mlpm"),
-    Device(NodeId.MION_MFC3_SRC2_EXH, NodeType.MFC, "MION MFC3, Source 2 exhaust, vacuum, 100mlpm"),
-    Device(NodeId.MION_MFC4_SRC2_CRR, NodeType.MFC, "MION MFC4, Source 2 carrier, pressure, 100mlpm"),
-    Device(NodeId.MION_MFC5_MAIN, NodeType.MFC, "MION MFC5, Main flow, vacuum, 50lpm"),
-    Device(NodeId.MION_DIO, NodeType.DIO, "MION digital I/O, 4ch in, 4ch out"),
-    Device(NodeId.MION_AI, NodeType.AI, "MION analog in, 6ch in"),
+    MfcDevice(NodeId.MION_MFC1_SRC1_EXH, "MION MFC1, Source 1 exhaust, vacuum, 100mlpm", flow_unit="mlpm"),
+    MfcDevice(NodeId.MION_MFC2_SRC1_CRR, "MION MFC2, Source 1 carrier, pressure, 100mlpm", flow_unit="mlpm"),
+    MfcDevice(NodeId.MION_MFC3_SRC2_EXH, "MION MFC3, Source 2 exhaust, vacuum, 100mlpm", flow_unit="mlpm"),
+    MfcDevice(NodeId.MION_MFC4_SRC2_CRR, "MION MFC4, Source 2 carrier, pressure, 100mlpm", flow_unit="mlpm"),
+    MfcDevice(NodeId.MION_MFC5_MAIN, "MION MFC5, Main flow, vacuum, 50lpm", flow_unit="lpm"),
+    DioDevice(NodeId.MION_DIO, "MION digital I/O, 4ch in, 4ch out", MION_DIO_CHANNELS),
+    AiDevice(NodeId.MION_AI, "MION analog in, 6ch in", MION_AI_CHANNELS),
     # //
     # Calibrator
-    Device(NodeId.CALIB_MFC, NodeType.MFC, "Calibrator sample flow, pressure, 5lpm"),
+    MfcDevice(NodeId.CALIB_MFC, "Calibrator sample flow, pressure, 5lpm", flow_unit="lpm"),
     # //
     # Flushplate
-    Device(NodeId.FLSHP_MFC, NodeType.MFC, "Flush plate counterflow, pressure, 5lpm"),
+    MfcDevice(NodeId.FLSHP_MFC, "Flush plate counterflow, pressure, 5lpm", flow_unit="lpm"),
     # //
     # Scenthound
-    Device(NodeId.SH_MFC1_SHT2, NodeType.MFC, "SH MFC1, Sheath 2, pressure, 50lpm"),
-    Device(NodeId.SH_MFC2_EXH, NodeType.MFC, "SH MFC2, Exhaust, vacuum, 50lpm"),
-    Device(NodeId.SH_MFC3_SMP, NodeType.MFC, "SH MFC3, Sample, pressure, 5lpm"),
-    Device(NodeId.SH_MFC4_SHT1, NodeType.MFC, "SH MFC4, Sheath 1, pressure, 5lpm"),
-    Device(NodeId.SH_MFC5_RGT, NodeType.MFC, "SH MFC5, reagent, pressure, 100mlpm"),
-    Device(NodeId.SH_DIO, NodeType.DIO, "SH digital I/O, 4ch in, 4ch out"),
-    Device(NodeId.SH_AI, NodeType.AI, "SH analog in, 6ch in"),
+    MfcDevice(NodeId.SH_MFC1_SHT2, "SH MFC1, Sheath 2, pressure, 50lpm", flow_unit="lpm"),
+    MfcDevice(NodeId.SH_MFC2_EXH, "SH MFC2, Exhaust, vacuum, 50lpm", flow_unit="lpm"),
+    MfcDevice(NodeId.SH_MFC3_SMP, "SH MFC3, Sample, pressure, 5lpm", flow_unit="lpm"),
+    MfcDevice(NodeId.SH_MFC4_SHT1, "SH MFC4, Sheath 1, pressure, 5lpm", flow_unit="lpm"),
+    MfcDevice(NodeId.SH_MFC5_RGT, "SH MFC5, reagent, pressure, 100mlpm", flow_unit="mlpm"),
+    DioDevice(NodeId.SH_DIO, "SH digital I/O, 4ch in, 4ch out", SH_DIO_CHANNELS),
+    AiDevice(NodeId.SH_AI, "SH analog in, 6ch in", SH_AI_CHANNELS),
     # //
 ]
 
@@ -77,20 +179,16 @@ DEVICES = {
     device.node_id: device for device in DEVICE_CFG
 }
 
+
 class BaseNode():
     def __init__(self, client: AsyncTCPClient, device: Device):
         self._client = client
+        self._device = device
         self._id = device.node_id.value
         self._type = device.node_type.value
         self.__dict__.update(device._asdict())
 
-    async def _start_measurement(self, *args, **kwargs):
-        raise NotImplementedError("Subclasses of BaseNode should implement _start_measurement method")
-
-    async def _stop_measurement(self, *args, **kwargs):
-        raise NotImplementedError("Subclasses of BaseNode should implement _stop_measurement method")
-
-    async def get_data(self, index, subindex):
+    async def _get_data(self, index, subindex):
         payload = bytearray(4)
         payload[0] = self._id
         payload[1] = (index & 0xFF)
@@ -98,27 +196,7 @@ class BaseNode():
         payload[3] = subindex
         return await self._client.send_cmd_wait_resp(Command.CMD_GET_NODE_DATA.value, payload)
 
-    async def get_device_name(self):
-        return await self.get_data(0x1008,
-                                   0x00
-                                   )
-
-    async def get_hw_version(self):
-        return await self.get_data(0x1009,
-                                   0x00
-                                   )
- 
-    async def get_sw_version(self):
-        return await self.get_data(0x100A,
-                                   0x00
-                                   )
-
-    async def reset(self):
-        payload = bytearray(1)
-        payload[0] = self._id
-        return await self.send_cmd_wait_resp(Command.CMD_RESET_NODE.value, payload)
-
-    async def set_data(self, index, subindex, data):
+    async def _set_data(self, index, subindex, data):
         l = len(data)
         payload = bytearray(4+l)
         payload[0] = self._id
@@ -130,6 +208,32 @@ class BaseNode():
             data >>= 8
         return await self._client.send_cmd_wait_resp(Command.CMD_SET_NODE_DATA.value, payload)
 
+    async def _start_measurement(self, *args, **kwargs):
+        raise NotImplementedError("Subclasses of BaseNode should implement _start_measurement method")
+
+    async def _stop_measurement(self, *args, **kwargs):
+        raise NotImplementedError("Subclasses of BaseNode should implement _stop_measurement method")
+
+    async def get_device_name(self):
+        return await self._get_data(0x1008,
+                                    0x00
+                                    )
+
+    async def get_hw_version(self):
+        return await self._get_data(0x1009,
+                                    0x00
+                                    )
+ 
+    async def get_sw_version(self):
+        return await self._get_data(0x100A,
+                                    0x00
+                                    )
+
+    async def reset(self):
+        payload = bytearray(1)
+        payload[0] = self._id
+        return await self._client.send_cmd_wait_resp(Command.CMD_RESET_NODE.value, payload)
+
     async def start_measurement(self, *args, **kwargs):
         return await self._start_measurement(*args, **kwargs)
 
@@ -138,7 +242,7 @@ class BaseNode():
 
 
 class AiNode(BaseNode):
-    def __init__(self, client: AsyncTCPClient, device: Device):
+    def __init__(self, client: AsyncTCPClient, device: AiDevice):
         if device.node_type != NodeType.AI:
             raise TypeError("Tried to initialize %s for device of type %s" %(self, device.node_type))
         super().__init__(client, device)
@@ -156,9 +260,23 @@ class AiNode(BaseNode):
         payload[1] = channel_mask
         return await self._client.send_cmd_wait_resp(Command.CMD_STOP_AI_MEAS.value, payload)
 
+    async def on_NTF_AI_MEAS_DATA_CH_1_4(self, data):
+        if len(data) != 8:
+            raise Exception("Invalid payload")
+        for i, d in enumerate( range(0, len(data), 2) ):
+            ch_index = i
+            ch_value = data[d:d+1] # LSB first
+
+    async def on_NTF_AI_MEAS_DATA_CH_5_6(self, data):
+        if len(data) != 4:
+            raise Exception("Invalid payload")
+        for i, d in enumerate( range(0, len(data), 2) ):
+            ch_index = i + 4
+            ch_value = data[d:d+1] # LSB first
+
 
 class DioNode(BaseNode):
-    def __init__(self, client: AsyncTCPClient, device: Device):
+    def __init__(self, client: AsyncTCPClient, device: DioDevice):
         if device.node_type != NodeType.DIO:
             raise TypeError("Tried to initialize %s for device of type %s" %(self, device.node_type))
         super().__init__(client, device)
@@ -174,9 +292,14 @@ class DioNode(BaseNode):
         payload[0] = self._id
         return await self._client.send_cmd_wait_resp(Command.CMD_STOP_DIO_MEAS.value, payload)
 
+    async def on_NTF_DIO_MEAS_DATA(self, data):
+        if len(data) != 1:
+            raise Exception("Invalid payload")
+        # Unpack byte into bits
+
 
 class MfcNode(BaseNode):
-    def __init__(self, client: AsyncTCPClient, device: Device):
+    def __init__(self, client: AsyncTCPClient, device: MfcDevice):
         if device.node_type != NodeType.MFC:
             raise TypeError("Tried to initialize %s for device of type %s" %(self, device.node_type))
         super().__init__(client, device)
@@ -197,6 +320,16 @@ class MfcNode(BaseNode):
         payload[2] = (index >> 8)
         payload[3] = subindex
         return await self._client.send_cmd_wait_resp(Command.CMD_STOP_MFC_MEAS.value, payload)
+
+    async def on_NTF_MFC_MEAS_DATA(self, data):
+        if len(data) < 4 or len(data) > 8:
+            raise Exception("Invalid payload")
+        index = data[0:2] # LSB first
+        subindex = data[2]
+        value = data[3:] # LSB first
+
+        self._device.index[index][subindex].value = value
+
 
 
 NODES = {

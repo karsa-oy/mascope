@@ -9,7 +9,8 @@ from timeit import default_timer as timer
 #from datetime import timedelta
 
 from .client import AsyncTCPClient
-from .messages import ETX, MIN_MEAS_MSG_SIZE, STX
+from .messages import ETX, MIN_MEAS_MSG_SIZE, STX, Notification
+from .nodes import NodeId
 
 
 KRS_MEAS_PORT = 65143           # KECU notification port
@@ -19,22 +20,26 @@ class KarsaMeasClient(AsyncTCPClient):
     def __init__(self):
         super().__init__(KRS_MEAS_PORT)
 
-    async def getData(self):
+    async def get_data(self):
         # Read start header
-        r1 = await self._reader.readexactly(3)
-        stx, cmd, length = r1
+        header = await self._reader.readexactly(3)
+        stx, type_, length = header
         # Read rest of the msg
-        r2 = await self._reader.readexactly(length + 1)
-        payload = r2[:-1]
-        etx = r2[-1]
-        nBytes = len(r1) + len(r2)
-        if ( (nBytes >= MIN_MEAS_MSG_SIZE) and
-             (stx == STX) and
-             (nBytes-4 == length) and
-             (etx == ETX) ):
-            # print(nBytes-4, payload)
-            return nBytes-4, payload
-        return 0, None
+        payload_etx = await self._reader.readexactly(length + 1)
+        payload = payload_etx[:-1]
+        etx = payload_etx[-1]
+        nbytes = len(header) + len(payload_etx)
+        # Validate message format
+        if ((nbytes >= MIN_MEAS_MSG_SIZE) and
+            (stx == STX) and
+            (nbytes-4 == length) and
+            (etx == ETX)
+            ):
+            node_id = NodeId(payload[0])
+            ntf = Notification(type_)
+            data = payload[1:]
+            return node_id, ntf, data#.decode('utf-8')
+        raise Exception("Failed to read data")
 
 
 async def main():
@@ -45,12 +50,12 @@ async def main():
         await tcp.connect()
 
         while True:
-            nbytes, data = await tcp.getData()
-            if (nbytes > 0):
-                print("RX :", end='')
-                for i in range(nbytes):
-                    print(" {0:02X}".format(data[i]), end='')
-                print("")    
+            ntf, node_id, data = await tcp.get_data()
+            # if len(data):
+            #     print("RX :", end='')
+            #     for d in data:
+            #         print(" {0:02X}".format(d), end='')
+            #     print("")    
 
     except Exception as e:
         print("Connection to Karsa Measurement port failed: %s" %e)
