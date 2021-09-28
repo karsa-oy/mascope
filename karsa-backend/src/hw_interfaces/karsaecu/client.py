@@ -9,17 +9,17 @@ BUFFER_SIZE = 256   # TCP socket reader buffer size limit
 
 
 class AsyncTCPClient():
-    def __init__(self, port):
+    def __init__(self, port: int) -> None:
         self._port = port
         self._reader = None
         self._writer = None
         self._connected = False
 
     @property
-    def connected(self):
+    def connected(self) -> bool:
         return self._connected
 
-    def close(self):
+    def close(self) -> None:
         print("closing the socket")
         # close the socket
         self._writer.close()
@@ -28,7 +28,7 @@ class AsyncTCPClient():
         # make sure other routines know the socket is closed
         self._reader = self._writer = None
 
-    async def connect(self):
+    async def connect(self) -> None:
         print("Connecting to %s:%s..." %(KRS_HOST, self._port))
         self._reader, self._writer = await asyncio.open_connection(
                                                     KRS_HOST,
@@ -38,7 +38,7 @@ class AsyncTCPClient():
         print("Connected!")
         self._connected = True
 
-    async def get_response(self, command):
+    async def get_response(self, command: bytes) -> str:
         """Read response to command message from the socket.
 
         Parameters
@@ -74,7 +74,16 @@ class AsyncTCPClient():
             raise Exception( ErrorCode(status) )
         raise Exception
         
-    async def send_cmd(self, command, payload):
+    async def send_cmd(self, command: bytes, payload: bytes) -> None:
+        """[summary]
+
+        Parameters
+        ----------
+        command : bytes
+            [description]
+        payload : bytes
+            [description]
+        """
         l = len(payload)
         c = bytearray(APP_CMD_MIN_LEN + l)
         c[0] = STX
@@ -87,6 +96,20 @@ class AsyncTCPClient():
         self._writer.write(c)
         await self._writer.drain()
         
-    async def send_cmd_wait_resp(self, command, payload):
+    async def send_cmd_wait_resp(self, command: bytes, payload: bytes) -> str:
+        """[summary]
+
+        Parameters
+        ----------
+        command : bytes
+            [description]
+        payload : bytes
+            [description]
+
+        Returns
+        -------
+        str
+            [description]
+        """
         await self.send_cmd(command, payload)
         return await self.get_response(command)

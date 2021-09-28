@@ -1,5 +1,5 @@
+from collections import namedtuple
 from enum import Enum
-
 
 STX = 0x02      # Start byte
 ETX = 0x03      # End byte
@@ -24,6 +24,7 @@ class Command(Enum):
     CMD_GET_NODE_LIST = 0x03
     CMD_GET_NODE_DATA = 0x04
     CMD_SET_NODE_DATA = 0x05
+
     CMD_START_MFC_MEAS = 0x10
     CMD_STOP_MFC_MEAS = 0x11
     CMD_START_AI_MEAS = 0x12
@@ -39,6 +40,7 @@ class Notification(Enum):
     NTF_AI_MEAS_DATA_CH_5_6 = 0x81
     NTF_DIO_MEAS_DATA = 0x82
     NTF_MFC_MEAS_DATA = 0x83
+
     NTF_NODE_INSERTED = 0x90
     NTF_NODE_REMOVED = 0x91
     # //
