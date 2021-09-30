@@ -50,6 +50,10 @@ class KECUServiceClient(BaseServiceClient):
 
         while True:
             node_id, ntf, data = await kecu.wait_for_notification()
+            # Notify app
+            ntf_handler = getattr(kecu._app, 'on_{}'.format(ntf))
+            await ntf_handler(node_id)
+            # Notify node
             ntf_handler = getattr(kecu.nodes[node_id], 'on_{}'.format(ntf))
             await ntf_handler(data)
 
