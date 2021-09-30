@@ -46,7 +46,7 @@ class NodeType(Enum):
 
 
 
-@dataclass
+@dataclass(frozen=True)
 class Device:
     node_id: NodeId
     node_type: NodeId = field(default=NodeType.UNKNOWN, init=False)
@@ -61,7 +61,7 @@ class AiChannel:
     conversion: Callable[[float], float]
     value: float = field(default=None, init=False)
     
-@dataclass
+@dataclass(frozen=True)
 class AiDevice(Device):
     # Configuration
     node_type = NodeType.AI
@@ -75,7 +75,7 @@ class DioChannel:
     io: bool
     state: bool = field(default=None, init=False)
 
-@dataclass
+@dataclass(frozen=True)
 class DioDevice(Device):
     # Configuration
     node_type = NodeType.DIO
@@ -107,7 +107,7 @@ for par in MFC_PARAMETER_CFG:
         MFC_PARAMETERS.update({par.index: dict()})
     MFC_PARAMETERS[par.index].update({par.subindex: par})
 
-@dataclass
+@dataclass(frozen=True)
 class MfcDevice(Device):
     # Configuration
     node_type = NodeType.MFC
@@ -186,7 +186,6 @@ class BaseNode():
         self._device = device
         self._id = device.node_id.value
         self._type = device.node_type.value
-        self.__dict__.update(device._asdict())
 
     async def _get_data(self, index, subindex):
         payload = bytearray(4)
@@ -265,14 +264,18 @@ class AiNode(BaseNode):
             raise Exception("Invalid payload")
         for i, d in enumerate( range(0, len(data), 2) ):
             ch_index = i
-            ch_value = data[d:d+1] # LSB first
+            ch_value_b = data[d:d+1]
+            ch_value_int = int.from_bytes(ch_value_b, byteorder='little', signed=True)
+            self._device.channels[ch_index].voltage = ch_value_int
 
     async def on_NTF_AI_MEAS_DATA_CH_5_6(self, data):
         if len(data) != 4:
             raise Exception("Invalid payload")
         for i, d in enumerate( range(0, len(data), 2) ):
             ch_index = i + 4
-            ch_value = data[d:d+1] # LSB first
+            ch_value_b = data[d:d+1]
+            ch_value_int = int.from_bytes(ch_value_b, byteorder='little', signed=True)
+            self._device.channels[ch_index].voltage = ch_value_int
 
 
 class DioNode(BaseNode):
@@ -295,7 +298,12 @@ class DioNode(BaseNode):
     async def on_NTF_DIO_MEAS_DATA(self, data):
         if len(data) != 1:
             raise Exception("Invalid payload")
-        # Unpack byte into bits
+        # Convert byte to int
+        data_int = int.from_bytes(data, byteorder='little')
+        # Unpack byte into bit string
+        bit_string = format(data_int, '08b')
+        for i, bit in enumerate(bit_string):
+            self._device.channels[i].state = bool(int(bit))
 
 
 class MfcNode(BaseNode):
@@ -324,11 +332,14 @@ class MfcNode(BaseNode):
     async def on_NTF_MFC_MEAS_DATA(self, data):
         if len(data) < 4 or len(data) > 8:
             raise Exception("Invalid payload")
-        index = data[0:2] # LSB first
-        subindex = data[2]
-        value = data[3:] # LSB first
-
-        self._device.index[index][subindex].value = value
+        index_b = data[0:2]
+        index_int = int.from_bytes(index_b, byteorder='little', signed=False)
+        subindex_b = data[2]
+        subindex_int = int.from_bytes(subindex_b, byteorder='little', signed=False)
+        value_b = data[3:]
+        # TODO: Infer data type from value_b length and convert
+        # value_int = int.from_bytes(value_b, byteorder='little', signed=True)
+        # self._device.index[index_int][subindex_int].value = value_int
 
 
 

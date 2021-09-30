@@ -33,7 +33,11 @@ class KarsaClient(AsyncTCPClient):
             node = NODES[node_type](self, device)
             self._node_dict.update({node_id: node})
 
-
+    async def on_NODE_INSERTED(self, node_id):
+        pass
+    
+    async def on_NODE_REMOVED(self, node_id):
+        pass
 
 async def main():
     '''Main program'''
