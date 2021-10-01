@@ -49,39 +49,63 @@ class NodeType(Enum):
 @dataclass(frozen=True)
 class Device:
     node_id: NodeId
-    node_type: NodeId = field(default=NodeType.UNKNOWN, init=False)
     description: str
+
+    node_type: NodeId = field(default=NodeType.UNKNOWN, init=False)    
 
 
 @dataclass
 class AiChannel:
     description: str
-    voltage: float = field(default=None, init=False)
     unit: str
     conversion: Callable[[float], float]
+    callbacks: 'list[Callable]' = field(default_factory=list)
+
     value: float = field(default=None, init=False)
+    _value: float = field(init=False, repr=False)
+    voltage: float = field(default=None, init=False)
+    _voltage: float = field(init=False, repr=False)
+
+    @property
+    def value(self) -> float:
+        return self._value
+
+    @value.setter
+    def value(self, value: float):
+        self._value = value
+        for cb in self.callbacks:
+            cb('%s : %s' %(self, self.value))
+
+    @property
+    def voltage(self) -> float:
+        return self._voltage
+
+    @voltage.setter
+    def voltage(self, voltage: float):
+        self._voltage = voltage
+        self.value = self.conversion(voltage)
+        
     
 @dataclass(frozen=True)
 class AiDevice(Device):
-    # Configuration
-    node_type = NodeType.AI
     channels: 'list[AiChannel]'
-    # //
+
+    node_type = NodeType.AI
     
 
 @dataclass
 class DioChannel:
     description: str
     io: bool
+
     state: bool = field(default=None, init=False)
 
 @dataclass(frozen=True)
 class DioDevice(Device):
-    # Configuration
-    node_type = NodeType.DIO
     channels: 'list[DioChannel]'
-    # //
-    
+
+    node_type = NodeType.DIO
+
 
 @dataclass
 class MfcParameter:
@@ -90,6 +114,7 @@ class MfcParameter:
     description: str
     settable: bool
     unit: str = ""
+
     value: float = field(default=None, init=False)
 
 
@@ -109,11 +134,10 @@ for par in MFC_PARAMETER_CFG:
 
 @dataclass(frozen=True)
 class MfcDevice(Device):
-    # Configuration
+    flow_unit: str
+
     node_type = NodeType.MFC
     parameters = MFC_PARAMETERS
-    flow_unit: str
-    # //
 
 
 MION_AI_CHANNELS = [

@@ -1,25 +1,31 @@
 import asyncio
 import tkinter as tk
 
-# from .nodes import DEVICES
+from collections import defaultdict
+
+from karsaecu.nodes import NodeId
+from services.KECUService import KECU
+
 
 
 class App(tk.Tk):
-    def __init__(self, loop, interval=.1):
+    def __init__(self, loop, tasks=[], interval=.1):
         super().__init__()
         self.loop = loop
         self.protocol("WM_DELETE_WINDOW", self.close)
-        self.tasks = []
-        self.tasks.append(loop.create_task(self.data_getter()))
+        self.tasks = tasks
         self.tasks.append(loop.create_task(self.updater(interval)))
+        self.fields = defaultdict(list)
         self.build()
         self.style()
 
     def build(self):
         
         class Field():
-            def __init__(self, label, parent_frame, monitorable, settable, toggleable):
+            def __init__(self, label, parent_frame, monitorable, settable, toggleable, row=None, column=None):
                 self.frame = tk.Frame(parent_frame)
+                if row is not None and column is not None:
+                    self.frame.grid(row=row, column=column)
                 self.label = tk.Label(self.frame, text=label).grid(row=0, column=0)
                 if monitorable:
                     self.mon_value = tk.DoubleVar()
@@ -62,40 +68,44 @@ class App(tk.Tk):
                     raise ValueError("Cannot toggle non-toggleable Field")
              
         class MfcField(Field):
-            def __init__(self, label, parent_frame):
+            def __init__(self, label, parent_frame, **kwargs):
                 super().__init__(label,
                                  parent_frame,
                                  monitorable=True,
                                  settable=True,
-                                 toggleable=False
+                                 toggleable=False,
+                                 **kwargs
                                  )
         class ToggleField(Field):
-            def __init__(self, label, parent_frame):
+            def __init__(self, label, parent_frame, **kwargs):
                 super().__init__(label,
                                  parent_frame,
                                  monitorable=False,
                                  settable=False,
-                                 toggleable=True
+                                 toggleable=True,
+                                 **kwargs
                                  )
         class VoltageField(Field):
-            def __init__(self, label, parent_frame):
+            def __init__(self, label, parent_frame, **kwargs):
                 super().__init__(label,
                                  parent_frame,
                                  monitorable=True,
                                  settable=True,
-                                 toggleable=True
+                                 toggleable=True,
+                                 **kwargs
                                  )
         class ValueField(Field):
-            def __init__(self, label, parent_frame):
+            def __init__(self, label, parent_frame, **kwargs):
                 super().__init__(label,
                                  parent_frame,
                                  monitorable=True,
                                  settable=False,
-                                 toggleable=False
+                                 toggleable=False,
+                                 **kwargs
                                  )
         class IndicatorField(ToggleField):
-            def __init__(self, label, parent_frame):
-                super().__init__(label, parent_frame)
+            def __init__(self, label, parent_frame, **kwargs):
+                super().__init__(label, parent_frame, **kwargs)
                 self.checkbox.configure(state=tk.DISABLED)
 
         # Main frame
@@ -125,34 +135,58 @@ class App(tk.Tk):
         mion_sensor_frame.grid(row=5, column=0)
 
         # MION:Common
-        MfcField("Main flow", mion_common_frame).frame.grid(row=0, column=0)
+        self.fields[NodeId.MION_MFC5_MAIN].append(
+            MfcField("Main flow", mion_common_frame, row=0, column=0)
+            )
         VoltageField("Accelerator voltage", mion_common_frame).frame.grid(row=1, column=0)
         # /
         # MION:IS1
-        MfcField("Carrier flow", mion_is1_frame).frame.grid(row=0, column=0)
-        MfcField("Exhaust flow", mion_is1_frame).frame.grid(row=1, column=0)
-        VoltageField("Deflector voltage", mion_is1_frame).frame.grid(row=2, column=0)
+        self.fields[NodeId.MION_MFC2_SRC1_CRR].append(
+            MfcField("Carrier flow", mion_is1_frame, row=0, column=0)
+            )
+        self.fields[NodeId.MION_MFC1_SRC1_EXH].append(
+            MfcField("Exhaust flow", mion_is1_frame, row=1, column=0)
+            )
+        VoltageField("Deflector voltage", mion_is1_frame, row=2, column=0)
         # /
         # MION:IS2
-        MfcField("Carrier flow", mion_is2_frame).frame.grid(row=0, column=0)
-        MfcField("Exhaust flow", mion_is2_frame).frame.grid(row=1, column=0)
-        VoltageField("Deflector voltage", mion_is2_frame).frame.grid(row=2, column=0)
+        self.fields[NodeId.MION_MFC4_SRC2_CRR].append(
+            MfcField("Carrier flow", mion_is2_frame, row=0, column=0)
+            )
+        self.fields[NodeId.MION_MFC3_SRC2_EXH].append(
+            MfcField("Exhaust flow", mion_is2_frame, row=1, column=0)
+            )
+        VoltageField("Deflector voltage", mion_is2_frame, row=2, column=0)
         # /
         # MION:X-ray
-        ToggleField("Emission", mion_xray_frame).frame.grid(row=0, column=0)            
-        IndicatorField("Enabled", mion_xray_frame).frame.grid(row=1, column=0)
-        IndicatorField("Interlock", mion_xray_frame).frame.grid(row=2, column=0)    
-        IndicatorField("Tube life", mion_xray_frame).frame.grid(row=3, column=0)    
+        self.fields[NodeId.MION_DIO].append(
+            ToggleField("Emission", mion_xray_frame, row=0, column=0)
+            )
+        self.fields[NodeId.MION_DIO].append(
+            IndicatorField("Enabled", mion_xray_frame, row=1, column=0)
+            )
+        self.fields[NodeId.MION_DIO].append(
+            IndicatorField("Interlock", mion_xray_frame, row=2, column=0)
+            )
+        self.fields[NodeId.MION_DIO].append(
+            IndicatorField("Tube life", mion_xray_frame, row=3, column=0)
+        )
         # /
         # MION:Ion filter
-        ToggleField("Power", mion_if_frame).frame.grid(row=0, column=0)
-        ValueField("HV+", mion_if_frame).frame.grid(row=1, column=0)
-        ValueField("HV-", mion_if_frame).frame.grid(row=2, column=0)
+        ToggleField("Power", mion_if_frame, row=0, column=0)
+        ValueField("HV+", mion_if_frame, row=1, column=0)
+        ValueField("HV-", mion_if_frame, row=2, column=0)
         # /
         # MION:Sensors
-        ValueField("Humidity", mion_sensor_frame).frame.grid(row=0, column=0)
-        ValueField("Temperature", mion_sensor_frame).frame.grid(row=1, column=0)
-        ValueField("Pressure", mion_sensor_frame).frame.grid(row=2, column=0)
+        self.fields[NodeId.MION_AI].append(
+            ValueField("Humidity", mion_sensor_frame, row=0, column=0)
+            )
+        self.fields[NodeId.MION_AI].append(
+            ValueField("Temperature", mion_sensor_frame, row=1, column=0)
+            )
+        self.fields[NodeId.MION_AI].append(
+            ValueField("Pressure", mion_sensor_frame, row=2, column=0)
+            )
         # /
         # //
 
@@ -161,20 +195,30 @@ class App(tk.Tk):
         
         sh_mfc_frame.grid(row=0, column=0)
         # SH:Flows
-        MfcField("Reagent flow", sh_mfc_frame).frame.grid(row=0, column=0)
-        MfcField("Sample flow", sh_mfc_frame).frame.grid(row=1, column=0)
-        MfcField("Exhaust flow", sh_mfc_frame).frame.grid(row=2, column=0)
-        MfcField("Sheath 1 flow", sh_mfc_frame).frame.grid(row=3, column=0)
-        MfcField("Sheath 2 flow", sh_mfc_frame).frame.grid(row=4, column=0)
+        self.fields[NodeId.SH_MFC5_RGT].append(
+            MfcField("Reagent flow", sh_mfc_frame, row=0, column=0)
+            )
+        self.fields[NodeId.SH_MFC3_SMP].append(
+            MfcField("Sample flow", sh_mfc_frame, row=1, column=0)
+            )
+        self.fields[NodeId.SH_MFC2_EXH].append(
+            MfcField("Exhaust flow", sh_mfc_frame, row=2, column=0)
+            )
+        self.fields[NodeId.SH_MFC4_SHT1].append(
+            MfcField("Sheath 1 flow", sh_mfc_frame, row=3, column=0)
+            )
+        self.fields[NodeId.SH_MFC1_SHT2].append(
+            MfcField("Sheath 2 flow", sh_mfc_frame, row=4, column=0)
+            )
         # /
         # //
 
         # # Calibrator
-        MfcField("Carrier flow", cal_frame).frame.grid(row=0, column=0)
+        self.fields[NodeId.CALIB_MFC] = MfcField("Carrier flow", cal_frame, row=0, column=0)
         # # //
 
         # # Flushplate
-        MfcField("Counter flow", fp_frame).frame.grid(row=0, column=0)
+        self.fields[NodeId.FLSHP_MFC] = MfcField("Counter flow", fp_frame, row=0, column=0)
         # # //
 
     def close(self):
@@ -182,11 +226,6 @@ class App(tk.Tk):
             task.cancel()
         self.loop.stop()
         self.destroy()
-
-    async def data_getter(self):
-        while True:
-            await asyncio.sleep(1)
-            # node_id, ntf, data = await kecu.wait_for_notification()
 
     def style(self):
         self.title("KECU")
@@ -199,8 +238,22 @@ class App(tk.Tk):
             await asyncio.sleep(interval)
 
 
+kecu = KECU()
+
+async def main():
+    while True:
+        node_id, ntf, data = await kecu.wait_for_notification()
+        # Notify app
+        ntf_handler = getattr(kecu._app, 'on_{}'.format(ntf))
+        await ntf_handler(node_id)
+        # Notify node
+        ntf_handler = getattr(kecu.nodes[node_id], 'on_{}'.format(ntf))
+        await ntf_handler(data)
+
+
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()
-    app = App(loop)
+    data_getter_task = loop.create_task(main())
+    app = App(loop, tasks=[data_getter_task])
     loop.run_forever()
     loop.close()
