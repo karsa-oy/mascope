@@ -2,7 +2,7 @@ import inspect
 
 from socketio import AsyncNamespace
 
-from .util import get_client_notification_args
+from .util import get_client_notification_context
 
 
 
@@ -95,7 +95,7 @@ class BaseServerNamespace(AsyncNamespace):
                             dict(endpoint=endpoint,
                                  cb_name=cb, cb_ctx=cb_ctx,
                                  arg=arg, kwarg=kwarg,
-                                 **{**get_client_notification_args(data), 'no_logging': True}),
+                                 **{**get_client_notification_context(data), 'no_logging': True}),
                             room=sid,
                             namespace=self.namespace
                             )
