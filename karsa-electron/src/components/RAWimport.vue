@@ -343,7 +343,11 @@ export default {
                 this.namespace.on("acquisition_started", (value) => this.be.import_one_way_binding_prop("acquisition_started", value.value));
                 this.namespace.on("acquisition_finished", (value) => this.be.import_one_way_binding_prop("acquisition_finished", value.value));
                 this.namespace.on("acquisition_status", (value) => this.be.import_one_way_binding_prop("acquisition_status", value.value));
-                this.namespace.on("acquisition_progress", (value) => this.be.import_one_way_binding_prop("acquisition_progress", value.value.progress, true));
+                this.namespace.on("acquisition_progress", (value, cb) => {
+                        this.be.import_one_way_binding_prop("acquisition_progress", value.value.progress, true);
+                        cb({...value.value, client_room: value.client_room});
+                    }
+                );
                 this.namespace.on("instrument_status", (value) => this.be.import_two_way_binding_prop("instrument_status", value.value));
                 this.namespace.on("raw_samples", (value) => this.be.import_one_way_binding_prop("raw_samples", value.value));
 

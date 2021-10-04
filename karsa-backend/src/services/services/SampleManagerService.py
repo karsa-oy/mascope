@@ -18,7 +18,7 @@ from karsalib.client import (
                         BaseClientNamespace,
                         BaseServiceClient
                         )
-from karsalib.util import parse_cmd_args, get_client_notification_args
+from karsalib.util import parse_cmd_args, get_client_notification_context
 
 from karsatof.kdatapool import SamplePool
 from karsaHT3000A.ht3000a import parse_csv_report, dup_cycles
@@ -59,7 +59,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
     async def on_experiment_selected(self, data):
         value = data['value']
         self.log(value)
-        kwargs = get_client_notification_args(data)
+        kwargs = get_client_notification_context(data)
         experiment = value.get('title')
         project = value.get('project')
 
@@ -128,7 +128,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
         
     async def on_import_sample_table_datetime_range(self, data):
         global datapool
-        kwargs = get_client_notification_args(data)
+        kwargs = get_client_notification_context(data)
         # Update sample table data
         await self.emit_client_notification(
                             'importable_samples',
@@ -140,7 +140,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
 
     async def on_parse_experiment_plan_blob(self, data):
         value = data['value']
-        kwargs = get_client_notification_args(data)
+        kwargs = get_client_notification_context(data)
         # Differentiate autosampler report from generic csv
         autosampler_report = value.startswith("HT3000A Autorun Report")
         # Make temp file for csv reader
@@ -195,7 +195,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
     async def on_project_selected(self, data):
         global datapool
         value = data['value']
-        kwargs = get_client_notification_args(data)
+        kwargs = get_client_notification_context(data)
         project = value.get('title')
 
         if project not in datapool.pool.keys():
@@ -216,7 +216,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
         value = data['value']
         experiment = value['experiment']
         project = value['project']
-        kwargs = get_client_notification_args(data)
+        kwargs = get_client_notification_context(data)
 
         datapool.delete_experiment(project, experiment)
         
@@ -233,7 +233,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
         self.log(data)
         value = data['value']
         project = value['project']
-        kwargs = get_client_notification_args(data)
+        kwargs = get_client_notification_context(data)
 
         datapool.delete_project(project)
 
@@ -251,7 +251,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
         filename = value['filename']
         experiment = value['experiment']
         project = value['project']
-        kwargs = get_client_notification_args(data)
+        kwargs = get_client_notification_context(data)
         datapool.delete_sample(project, experiment, filename)
         # Update sample table data in UIs
         await self.emit_client_notification(
@@ -269,7 +269,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
         attributes = value.get('attributes')
         sample_attributes_template = value.get('sample_attributes_template')
         sample_placeholders = value.get('sample_placeholders', [])
-        kwargs = get_client_notification_args(data)
+        kwargs = get_client_notification_context(data)
         # Create new experiment directory
 
         if project not in datapool.pool.keys():
@@ -312,7 +312,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
         self.log(value)
         project = value.get('title')
         attributes = value.get('attributes')
-        kwargs = get_client_notification_args(data)
+        kwargs = get_client_notification_context(data)
 
         if project not in datapool.pool.keys():
             # New project
@@ -352,7 +352,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
         attributes = value.get('attributes')
         method = value.get('method')
         annotations = value.get('annotations', [])
-        kwargs = get_client_notification_args(data)
+        kwargs = get_client_notification_context(data)
 
         try:
             samples = datapool.pool.get(project).get(experiment)

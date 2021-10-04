@@ -291,7 +291,8 @@ class TestFileStreamerCase(BaseTestClientCase):
     def tearDownClass(cls):
         super().tearDownClass()
         if os.path.isdir(cls.data_collection_path):
-            time.sleep(1)
+            # the data_pool dir may be locked for some time
+            time.sleep(3)
             shutil.rmtree(cls.data_collection_path)
 
     def test_01_import_raw_table_datetime_range_empty(self):

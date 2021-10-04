@@ -9,14 +9,15 @@ Created on Tue Apr 09 13:08:29 2019
 
 import os
 import numpy as np
-from threading import Thread
+from threading import Thread, current_thread
 from multiprocessing import (Event, Queue)
 from queue import Empty
-from time import sleep
+from time import time, sleep
 from ctypes import create_string_buffer
 from ntpath import basename
 import inspect
 
+from karsalib.util import get_client_notification_context
 from .kinstrument import KInstrument
 
 
@@ -40,12 +41,6 @@ class BaseStreamer():
     """Base class for TofDaqStreamer and H5Streamer to inherit common methods from.
     """
     def __init__(self):
-        # Synchronization primitives
-        self.shutdown_event = Event()   # Set to break out from main loop
-        self.active = Event()           # TofDaqStreamer active event
-        self.spec_queue = Queue()       # Signal output queue
-        self.tps_queue = Queue()        # TPS output queue
-        # Per acquisition attributes
         self.filename = None            # Filename base from TW h5 file
         self.interval = None            # TofDaqStreamer interval [s]
         self.length = None              # TofDaqStreamer length [s]
@@ -96,6 +91,14 @@ class BaseStreamer():
         self.filename = None
         self.progress = 0
         self.speci = -1
+
+    def _get_tps_info(self):
+        # virtual method
+        pass
+
+    def _get_and_feed_data(self):
+        # virtual method
+        pass
 
     def _update(self):
         """Update per acquisition attributes. If new data is available, feed into queues.
@@ -183,6 +186,10 @@ class TofDaqStreamer(BaseStreamer, Thread):
         """
         self.log("initializing")
         BaseStreamer.__init__(self)
+        self.active = Event()           # Streamer active event
+        self.spec_queue = Queue()       # Signal output queue
+        self.tps_queue = Queue()        # TPS output queue
+        self.shutdown_event = Event()   # Set to break out from main loop
         Thread.__init__(self)
 
         # Initialize TW API related structures 'desc' and 'ptr'
@@ -209,6 +216,27 @@ class TofDaqStreamer(BaseStreamer, Thread):
                                                None
                                                )
         return mz.astype(np.float32)
+
+
+    def _check(self):
+        """Check for state change
+
+        Returns
+        -------
+        int
+            State change: 2 new file, 1 new data, 0 nothing new
+        """
+        curr_filename = strip_filepath( self.desc.currentDataFileName.decode() )
+        if self.filename != curr_filename:
+            # New file
+            return 2
+        curr_speci = (self.desc.iWrite * self.desc.nbrBufs) + self.desc.iBuf
+        if self.speci < curr_speci:
+            # New data
+            return 1
+        # Nothing new
+        return 0
+
 
     def _get_and_feed_data(self):
         """Read data from the shared memory and put to queues
@@ -371,6 +399,9 @@ class TofDaqStreamer(BaseStreamer, Thread):
         self.stop_acquisition()
 
 
+
+MAX_RESPONSE_TIME = 5      # secs to wait for notification acknowledgement, then ignore it.
+
 class H5Streamer(BaseStreamer, KInstrument):
     from .lib.TwH5 import (
             TwGetBufTimeFromH5,
@@ -393,30 +424,21 @@ class H5Streamer(BaseStreamer, KInstrument):
         """
         self.log("initializing")
         BaseStreamer.__init__(self)
+        self.filename = None
+        self.target_filename = None
+        self.ack_progress = -1
+        self.rcontext = {}
+        self.fdata = {}
+        self.client = client
+        self.requests = client.requests                 # Queue for files to stream
+        self.responses = client.responses               # Queue for streamers notifications
+        self.shutdown_event = client.shutdown_event     # Set to break out from main loop
+        self.cancel_event = Event()                     # Set to cancel current stream
         Thread.__init__(self)
 
         # Initialize with empty TW h5 descriptor
         self.desc = H5Streamer.TwH5Desc()
         KInstrument.__init__(self, self.desc)
-
-        # Synchronization primitives
-        # Streamer specific
-        self.client = client
-        self.requests = client.requests         # Queue for files to stream
-        self.request_in_progress = client.request_in_progress
-        self.cancel_event = Event()             # Set to cancel current stream
-        # Common with TofDaqStreamer
-        self.shutdown_event = Event()           # Set to break out from main loop
-        self.active = Event()                   # TofDaqStreamer active event
-        self.spec_queue = Queue()               # Signal output queue
-        self.tps_queue = Queue()                # TPS output queue
-        # Per acquisition attributes
-        self.filename = None                    # Filename base from TW h5 file
-        self.interval = None                    # TofDaqStreamer interval [s]
-        self.length = None                      # TofDaqStreamer length [s]
-        self.progress = 0                       # TofDaqStreamer progress [%]
-        self.speci = -1                         # Index of last received spectrum,
-                                                # -1 when there is no active acquisition
 
     @property
     def mz(self):
@@ -431,81 +453,24 @@ class H5Streamer(BaseStreamer, KInstrument):
                                         )
         return mz.astype(np.float32)
 
-    def _get_and_feed_data(self):
-        """Read data from the h5 and put to queues
-        """
-        # Get timestamp from TW h5
-        ti = np.zeros((1,))
-        H5Streamer.TwGetBufTimeFromH5(self.desc.currentDataFileName,
-                                      ti,
-                                      self.desc.iBuf,
-                                      self.desc.iWrite
-                                      )
-        # == Get and feed mass spectrum data ==
-        # Get most recent spectrum from TW shared memory
-        spec = np.zeros((self.desc.nbrSamples, ), dtype=np.float32)
-        ret = H5Streamer.TwGetTofSpectrumFromH5(
-                                self.desc.currentDataFileName,
-                                spec,
-                                0,                  # Segment start index
-                                0,                  # Segment end index
-                                self.desc.iBuf,     # Buf start index
-                                self.desc.iBuf,     # Buf end index
-                                self.desc.iWrite,   # Write start index
-                                self.desc.iWrite,   # Write end index
-                                True,               # BufWrite linked
-                                True                # Normalize to
-                                )                   # [mV/ext]
-        if ret == 4: # Success
-            # Combine data for output
-            spec_data = {
-                    'filename': self.filename,  # Current file basename
-                    'i': self.speci,            # Current spectrum integer index
-                    't': float(ti),             # Timestamp [s]
-                    'period': self.interval,    # Collection period [s]
-                    'spec': spec.tobytes()      # Serialized spectrum [float32]
-                    }
-            # Feed
-            self.spec_queue.put(spec_data)
+    def _check(self):
+        """Check for state change
 
-        # == Get and feed TPS data ==
-        # Query data size
-        nel = np.zeros((1,), dtype=int)
-        H5Streamer.TwGetRegUserDataFromH5(
-               self.desc.currentDataFileName,
-               b'/TPS2',
-               0,
-               0,
-               nel,
-               None,
-               None
-               )
-        # Get TPS data from TW h5
-        data = np.zeros((nel.item(), ),
-                        dtype=np.double
-                        )
-        ret = H5Streamer.TwGetRegUserDataFromH5(
-               self.desc.currentDataFileName,
-               b'/TPS2',
-               self.desc.iBuf,
-               self.desc.iWrite,
-               nel,
-               data,
-               None # char buffer for info
-               )
-        if ret == 4: # Success
-            # Combine data for output
-            tps_data = {
-                'filename': self.filename,          # Current file basename
-                'i': self.speci,                    # Current spectrum integer index
-                't': float(ti),                     # Timestamp [s]
-                'period': self.interval,            # Collection period [s]
-                'data': data.astype(np.float32  # convert to float32
-                                ).tobytes(      # serialize
-                                )                   # Serialized TPS data [float32]
-                }
-            # Feed
-            self.tps_queue.put(tps_data)
+        Returns
+        -------
+        int
+            State change: 2 new file, 1 new data, 0 nothing new
+        """
+        if self.progress == 0 and self.ack_progress == -1:
+            # New file
+            return 2
+        curr_speci = (self.desc.iWrite * self.desc.nbrBufs) + self.desc.iBuf
+        if self.speci < curr_speci:
+            # New data
+            return 1
+        # Nothing new
+        return 0
+
 
     def _get_tps_info(self):
         """Get TPS parameter descriptions from TW h5
@@ -550,23 +515,279 @@ class H5Streamer(BaseStreamer, KInstrument):
         info = [ i.decode('unicode_escape') for i in info ] # bytes to str
         return info
 
-    def _wait_for_queues(self):
-        """Wait for tick event to be set before continuing streaming
 
-        Returns
-        -------
-        bool
-            True if ticked, False if cancel or shutdown
+    # the service communication protocol implementation
+    def _feed_initial_data(self):
+        notifications = [
+            {   # TODO: remove acquisition_status for acquisition_started
+                'name': 'acquisition_status',
+                'value': 'running',
+                'context': self.rcontext,
+            },
+            {
+                'name': 'acquisition_coordinates',
+                'value': {
+                    'filename': self.target_filename,
+                    'mz': self.mz.tobytes(),
+                    't_range': [0, self.length]
+                },
+                'context': self.rcontext,
+            },
+            {
+                'name': 'tps_parameter_info',
+                'value': {
+                    'filename': self.target_filename,
+                    'tps_info': self.tps_info,
+                },
+                'context': self.rcontext,
+            },
+            {
+                'name': 'acquisition_started',
+                'value': {
+                    'filename': self.target_filename,
+                    'mz_range': [float(self.mz[0]), float(self.mz[-1])],
+                    't_range': [0, self.length]
+                },
+                'context': self.rcontext,
+            },
+            {
+                'name': 'acquisition_progress',
+                'value': {
+                    'source_filename': self.filename,
+                    'target_filename': self.target_filename,
+                    'progress': self.progress,
+                    'ack_progress': self.ack_progress,
+                },
+                'context': {
+                    **self.rcontext,
+                    'callback': 'cb_progress',
+                },
+            },
+        ]
+        for n in notifications:
+            self.responses.cache_put(n)
+
+    def _feed_spec_data(self, spec_data):
+        notifications = [
+            {
+                'name': 'acquired_spectrum',
+                'value': {
+                    **spec_data,
+                    'filename': self.target_filename,
+                },
+                'context': self.rcontext,
+            },
+            {
+                'name': 'acquisition_progress',
+                'value': {
+                    'source_filename': self.filename,
+                    'target_filename': self.target_filename,
+                    'progress': self.progress,
+                    'ack_progress': self.ack_progress,
+                },
+                'context': {
+                    **self.rcontext,
+                    'callback': 'cb_progress',
+                },
+            },
+        ]
+        for n in notifications:
+            self.responses.cache_put(n)
+
+    def _feed_tps_data(self, tps_data):
+        notifications = [
+            {
+                'name': 'acquired_tps_data',
+                'value': {
+                    **tps_data,
+                    'filename': self.target_filename,
+                },
+                'context': self.rcontext,
+            },
+        ]
+        for n in notifications:
+            self.responses.cache_put(n)
+
+    def _feed_final_data(self):
+        notifications = [
+            # {
+            #     'name': 'acquisition_progress',
+            #     'value': {
+            #         'source_filename': self.filename,
+            #         'target_filename': self.target_filename,
+            #         'progress': self.progress,
+            #         'ack_progress': self.ack_progress,
+            #     },
+            #     'context': {
+            #         **self.rcontext,
+            #         'callback': 'cb_progress',
+            #     },
+            # },
+            {
+                'name': 'acquisition_finished',
+                'value': {
+                    'filename': self.target_filename,
+                },
+                'context': self.rcontext,
+            },
+            {   # TODO: remove acquisition_status for acquisition_finished
+                'name': 'acquisition_status',
+                'value': 'not_running',
+                'context': self.rcontext,
+            },
+        ]
+        for n in notifications:
+            self.responses.cache_put(n)
+
+    def _get_and_feed_data(self):
+        """Read data from the h5 and put to queues
         """
-        while not (self.cancel_event.is_set() or self.shutdown_event.is_set()):
-            if self.spec_queue.qsize() or self.tps_queue.qsize():
-                # Still something in queue
-                sleep(.1)
-            else:
-                # Queues empty
-                return True
-        # Cancel or shutdown
-        return False
+        # Get timestamp from TW h5
+        ti = np.zeros((1,))
+        H5Streamer.TwGetBufTimeFromH5(self.desc.currentDataFileName,
+                                      ti,
+                                      self.desc.iBuf,
+                                      self.desc.iWrite
+                                      )
+        # == Get and feed mass spectrum data ==
+        # Get most recent spectrum from TW shared memory
+        spec = np.zeros((self.desc.nbrSamples, ), dtype=np.float32)
+        ret = H5Streamer.TwGetTofSpectrumFromH5(
+                                self.desc.currentDataFileName,
+                                spec,
+                                0,                  # Segment start index
+                                0,                  # Segment end index
+                                self.desc.iBuf,     # Buf start index
+                                self.desc.iBuf,     # Buf end index
+                                self.desc.iWrite,   # Write start index
+                                self.desc.iWrite,   # Write end index
+                                True,               # BufWrite linked
+                                True                # Normalize to
+                                )                   # [mV/ext]
+        if ret == 4: # Success
+            # Combine data for output
+            spec_data = {
+                    'filename': self.filename,  # Current file basename
+                    'i': self.speci,            # Current spectrum integer index
+                    't': float(ti),             # Timestamp [s]
+                    'period': self.interval,    # Collection period [s]
+                    'spec': spec.tobytes()      # Serialized spectrum [float32]
+                    }
+            # Feed
+            self._feed_spec_data(spec_data)
+
+        # == Get and feed TPS data ==
+        # Query data size
+        nel = np.zeros((1,), dtype=int)
+        H5Streamer.TwGetRegUserDataFromH5(
+               self.desc.currentDataFileName,
+               b'/TPS2',
+               0,
+               0,
+               nel,
+               None,
+               None
+               )
+        # Get TPS data from TW h5
+        data = np.zeros((nel.item(), ),
+                        dtype=np.double
+                        )
+        ret = H5Streamer.TwGetRegUserDataFromH5(
+               self.desc.currentDataFileName,
+               b'/TPS2',
+               self.desc.iBuf,
+               self.desc.iWrite,
+               nel,
+               data,
+               None # char buffer for info
+               )
+        if ret == 4: # Success
+            tps_data = {
+                'filename': self.filename,          # Current file basename
+                'i': self.speci,                    # Current spectrum integer index
+                't': float(ti),                     # Timestamp [s]
+                'period': self.interval,            # Collection period [s]
+                'data': data.astype(np.float32  # convert to float32
+                                ).tobytes(      # serialize
+                                )                   # Serialized TPS data [float32]
+                }
+            self._feed_tps_data(tps_data)
+
+
+    def _update(self):
+        """Update per acquisition attributes. If new data is available, feed into queues.
+        """
+        # Check for updates
+        state = self._check()
+        if state == 0:      # No update
+            return
+        if state == 2:      # New sample
+            # New file, update attributes
+            tof_period_s = self.desc.tofPeriod
+            if tof_period_s > 1:
+                # Convert [ns]->[s] if needed
+                tof_period_s *= 1e-9 
+            self.interval = tof_period_s * self.desc.nbrWaveforms # [s]
+            self.length = (self.desc.nbrWrites * self.desc.nbrBufs) * self.interval # [s]
+            self.log("started: %s" %self.filename)
+            self._feed_initial_data()
+            if not self.wait_for_ack():
+                raise TimeoutError
+
+            # Check again for new data
+            state = self._check()
+        if state == 1:      # New data
+            new_speci = (self.desc.iWrite * self.desc.nbrBufs) + self.desc.iBuf
+            if new_speci - self.speci > 1:
+                self.log("Warning: Skipped a spec!")
+            self.speci = new_speci
+            self.log(self.speci)
+            # Streamer progress
+            n = self.desc.nbrWrites * self.desc.nbrBufs # Total number of spectra
+            self.progress = round(((self.speci+1) / n) * 100., 2) # [%]
+            self._get_and_feed_data()
+            if not self.wait_for_ack():
+                raise TimeoutError
+
+
+    def _initialize(self):
+        self.filename = basename(self.fdata['filename'])
+        self.target_filename = '_'.join([self.client.instrument_name, self.filename]).replace(' ', '_')
+        self.job_id = (self.rcontext['client_room'], self.filename)
+        with self.client.lock:
+            self.client.in_progress[self.job_id] = self
+
+    def _reset(self):
+        """Reset per acquisition attributes
+        """
+        with self.client.lock:
+            self.client.in_progress.pop(self.job_id, None)
+        self.job_id = None
+        self.filename = None
+        self.target_filename = None
+        self.rcontext = {}
+        self.fdata = {}
+        self.progress = 0
+        self.ack_progress = -1
+        self.speci = -1
+
+    def wait_for_ack(self, timeout=MAX_RESPONSE_TIME):
+        res = True
+        t0 = time()
+        while self.ack_progress < self.progress:
+            if time() - t0 > timeout:
+                self.log(f"Warning: {self.filename} - no progress acknowledgement for {timeout} sec.")
+                res = False
+                break
+            sleep(.3)
+        return res
+
+    def _finalize(self):
+        """Finalize acquisition
+        """
+        self._feed_final_data()
+        self.wait_for_ack()
+        self._reset()
 
     def _get_next_file_to_stream(self):
         # get next request to process
@@ -574,28 +795,12 @@ class H5Streamer(BaseStreamer, KInstrument):
         if not rdata or not rdata['files']:
             return None, None
         fdata = rdata['files'].pop(0)
-        client_room = rdata['client_room']
+        rcontext = get_client_notification_context(rdata)
         if rdata['files']:
             # not all requested files are processed - put request back to queue
             self.requests.cache_put(rdata)
-        return client_room, fdata
+        return rcontext, fdata
 
-    def _update_request_in_progress(self, client_room, fdata):
-        with self.client.lock:
-            if client_room not in self.request_in_progress:
-                self.request_in_progress[client_room] = {}
-            fname = fdata['filename']
-            self.request_in_progress[client_room][fname] = {
-                **fdata,
-                'progress': round(self.progress, 2),
-                'streamer': self,
-            }
-
-    def _remove_request_in_progress(self, client_room, fname):
-        with self.client.lock:
-            del self.request_in_progress[client_room][fname]
-            if not self.request_in_progress[client_room]:
-                del self.request_in_progress[client_room]
 
     def run(self):
         """Main loop
@@ -603,23 +808,24 @@ class H5Streamer(BaseStreamer, KInstrument):
         Poll TW API for new data at interval set by 'self.timeout'. 
         Loop until 'self.shutdown_event' is set.
         """
-
-        self.log("started")
+        self.log(f"started {current_thread().name}")
         # Main loop
         while not self.shutdown_event.is_set():
-            client_room, fdata = self._get_next_file_to_stream()
-            if not fdata:
+            self.rcontext, self.fdata = self._get_next_file_to_stream()
+            if not self.fdata:
                 sleep(.5)
                 continue
-            fname = fdata['filename']
+            self._initialize()
 
             # Update TW h5 descriptor
-            ret = H5Streamer.TwGetH5Descriptor(fname.encode(), self.desc)
+            full_fname = self.fdata['filename']
+            ret = H5Streamer.TwGetH5Descriptor(full_fname.encode(), self.desc)
             if ret != 4:
-                self.log("Error reading file: %s" %H5Streamer.TwRetVal(ret).name)
+                # self.log("Error reading file: %s" %H5Streamer.TwRetVal(ret).name)
+                self.log("Error reading file: %s" %full_fname)
                 continue
             # Add fields to comply with TW shared memory descriptor
-            self.desc.currentDataFileName = fname.encode()
+            self.desc.currentDataFileName = full_fname.encode()
             self.desc.iBuf = 0
             self.desc.iWrite = 0
             if not (self.desc.nbrWrites and self.desc.nbrBufs):
@@ -628,67 +834,43 @@ class H5Streamer(BaseStreamer, KInstrument):
                 continue
 
             # Start streaming
-            self.log(f"started streaming {fname}")
-            # Update self and feed data into queue
-            self._update()
-            self._update_request_in_progress(client_room, fdata)
-            # Set active flag 
-            self.active.set()
-            # Loop through the file and feed to queues
-            # Loop through all 'writes'
-            for iwrite in range(self.desc.nbrWrites):
-                # Increment write index
-                self.desc.iWrite = iwrite
-                # Loop through all 'bufs' per 'write'
-                for ibuf in range(self.desc.nbrBufs):
-                    # Increment buf index
-                    self.desc.iBuf = ibuf
-                    # Update self and feed data into queue
-                    self._update()
-                    self._update_request_in_progress(client_room, fdata)
-                    # Wait for queues to be empty
-                    if self._wait_for_queues():
-                        # Empty
-                        continue
-                    else:
-                        # Shutdown
+            self.log(f"started streaming {self.filename}")
+            try:
+                # Update self and feed initial data into queue
+                self._update()
+                # Loop through the file and all 'writes'
+                for iwrite in range(self.desc.nbrWrites):
+                    # Increment write index
+                    self.desc.iWrite = iwrite
+                    # Loop through all 'bufs' per 'write'
+                    for ibuf in range(self.desc.nbrBufs):
+                        # Increment buf index
+                        self.desc.iBuf = ibuf
+                        # Update self and feed data into queue
+                        self._update()
+                    # Out of buf loop
+                    # Check for cancel and shutdown flags
+                    if self.cancel_event.is_set() or self.shutdown_event.is_set():
                         break
-                # Out of buf loop
-                # Check for cancel and shutdown flags
-                if self.cancel_event.is_set() or self.shutdown_event.is_set():
-                    break
+            except TimeoutError:
+                self.log(f"Streaming of {self.filename} interrupted due to timeout")
             # Out of write loop
-            self.active.clear()
+            self.log(f"finished streaming {self.filename}")
+            H5Streamer.TwCloseH5(full_fname.encode())
             self.cancel_event.clear()
             self._finalize()
-            self._remove_request_in_progress(client_room, fname)
-            H5Streamer.TwCloseH5(fname.encode())
-            self.log(f"finished streaming {fname}")
         # Out of main loop
-        self.log("stopped")
+        self.log(f"stopped {current_thread().name}")
         self.shutdown()
+
+
+    def run_as_daemon(self):
+        Thread(target=self.run).start()
 
     def shutdown(self):
         """Shutdown procedure
         """
-        self.shutdown_event.set()
-        # Clear all left-over data from queue
-        while True:
-            try:
-                self.spec_queue.get_nowait()
-                self.tps_queue.get_nowait()
-            except Empty:
-                break
-            except ValueError:
-                break
-            except KeyboardInterrupt:
-                break
-            sleep(.1)
-        # Close queues
-        self.spec_queue.close()
-        self.spec_queue.join_thread()
-        self.tps_queue.close()
-        self.tps_queue.join_thread()
+        self.client.shutdown_event.set()
 
     def stop_stream(self):
         """Stop stream before complete
