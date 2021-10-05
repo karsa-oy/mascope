@@ -534,6 +534,18 @@ class H5Streamer(BaseStreamer, KInstrument):
                 },
                 'context': self.rcontext,
             },
+            {  # TODO: remove this public notification after moving DataViz to private_ns
+                'name': 'acquisition_coordinates',
+                'value': {
+                    'filename': self.target_filename,
+                    'mz': self.mz.tobytes(),
+                    't_range': [0, self.length]
+                },
+                'context': {
+                    **self.rcontext,
+                    'namespace': '/',
+                },
+            },
             {
                 'name': 'tps_parameter_info',
                 'value': {
@@ -577,6 +589,17 @@ class H5Streamer(BaseStreamer, KInstrument):
                     'filename': self.target_filename,
                 },
                 'context': self.rcontext,
+            },
+            {  # TODO: remove this public notification after moving DataViz to private_ns
+                'name': 'acquired_spectrum',
+                'value': {
+                    **spec_data,
+                    'filename': self.target_filename,
+                },
+                'context': {
+                    **self.rcontext,
+                    'namespace': '/',
+                },
             },
             {
                 'name': 'acquisition_progress',
@@ -630,6 +653,16 @@ class H5Streamer(BaseStreamer, KInstrument):
                     'filename': self.target_filename,
                 },
                 'context': self.rcontext,
+            },
+            {  # TODO: remove this public notification after moving DataViz to private_ns
+                'name': 'acquisition_finished',
+                'value': {
+                    'filename': self.target_filename,
+                },
+                'context': {
+                    **self.rcontext,
+                    'namespace': '/',
+                },
             },
             {   # TODO: remove acquisition_status for acquisition_finished
                 'name': 'acquisition_status',
@@ -858,6 +891,7 @@ class H5Streamer(BaseStreamer, KInstrument):
             # Out of write loop
             self.log(f"finished streaming {self.filename}")
             H5Streamer.TwCloseH5(full_fname.encode())
+            # return 4
             self.cancel_event.clear()
             self._finalize()
         # Out of main loop

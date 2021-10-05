@@ -1003,7 +1003,8 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                   'time'
                                   )
         viz_cache_process_requests(filename_base)
-        return data['cnt']
+        # TODO: TOFStreamerClient still uses cnt in callback - remove after updating TOFStreamerClient
+        return data.get('cnt')
 
     async def on_acquisition_finished(self, data):
         value = data['value']
