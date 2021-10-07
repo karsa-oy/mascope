@@ -569,8 +569,8 @@ class BaseStreamerClient(BridgeServiceClient):
                                }
         self.public_ns.room_instrument = priv_ns_name
         self.requests = CacheQ('client_room')
-        self.responses = CacheQ('client_room')
         self.in_progress = dict()
+        self.responses = CacheQ('client_room/filename')
         self.watcher = None
         self.lock = Lock()
 
@@ -659,10 +659,7 @@ class BaseStreamerClient(BridgeServiceClient):
             await self.emit_private_notification(
                 data['name'],
                 data['value'],
-                **{
-                    **data['context'],
-                    'room': data.get('client_room'),
-                },
+                **data['context'],
             )
         self.shutdown_event.set()
         self.log('stopped')

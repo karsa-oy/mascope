@@ -18,6 +18,7 @@ from ntpath import basename
 import inspect
 
 from karsalib.util import get_client_notification_context
+from numpy.lib.index_tricks import RClass
 from .kinstrument import KInstrument
 
 
@@ -524,6 +525,10 @@ class H5Streamer(BaseStreamer, KInstrument):
                 'name': 'acquisition_status',
                 'value': 'running',
                 'context': self.rcontext,
+                'context': {
+                    **self.rcontext,
+                    'room': None,
+                },
             },
             {
                 'name': 'acquisition_coordinates',
@@ -532,7 +537,10 @@ class H5Streamer(BaseStreamer, KInstrument):
                     'mz': self.mz.tobytes(),
                     't_range': [0, self.length]
                 },
-                'context': self.rcontext,
+                'context': {
+                    **self.rcontext,
+                    'room': None,
+                },
             },
             {  # TODO: remove this public notification after moving DataViz to private_ns
                 'name': 'acquisition_coordinates',
@@ -544,6 +552,7 @@ class H5Streamer(BaseStreamer, KInstrument):
                 'context': {
                     **self.rcontext,
                     'namespace': '/',
+                    'room': None,
                 },
             },
             {
@@ -552,7 +561,10 @@ class H5Streamer(BaseStreamer, KInstrument):
                     'filename': self.target_filename,
                     'tps_info': self.tps_info,
                 },
-                'context': self.rcontext,
+                'context': {
+                    **self.rcontext,
+                    'room': None,
+                },
             },
             {
                 'name': 'acquisition_started',
@@ -561,7 +573,10 @@ class H5Streamer(BaseStreamer, KInstrument):
                     'mz_range': [float(self.mz[0]), float(self.mz[-1])],
                     't_range': [0, self.length]
                 },
-                'context': self.rcontext,
+                'context': {
+                    **self.rcontext,
+                    'room': None,
+                },
             },
             {
                 'name': 'acquisition_progress',
@@ -573,11 +588,14 @@ class H5Streamer(BaseStreamer, KInstrument):
                 },
                 'context': {
                     **self.rcontext,
+                    'room': None,
                     'callback': 'cb_progress',
                 },
             },
         ]
         for n in notifications:
+            job_id_data = {'client_room':self.client_room, 'filename':self.filename}
+            n.update(job_id_data)   # job_id_data needed for self.responses CacheQ indexing
             self.responses.cache_put(n)
 
     def _feed_spec_data(self, spec_data):
@@ -588,7 +606,10 @@ class H5Streamer(BaseStreamer, KInstrument):
                     **spec_data,
                     'filename': self.target_filename,
                 },
-                'context': self.rcontext,
+                'context': {
+                    **self.rcontext,
+                    'room': None,
+                },
             },
             {  # TODO: remove this public notification after moving DataViz to private_ns
                 'name': 'acquired_spectrum',
@@ -599,6 +620,7 @@ class H5Streamer(BaseStreamer, KInstrument):
                 'context': {
                     **self.rcontext,
                     'namespace': '/',
+                    'room': None,
                 },
             },
             {
@@ -611,11 +633,14 @@ class H5Streamer(BaseStreamer, KInstrument):
                 },
                 'context': {
                     **self.rcontext,
+                    'room': None,
                     'callback': 'cb_progress',
                 },
             },
         ]
         for n in notifications:
+            job_id_data = {'client_room':self.client_room, 'filename':self.filename}
+            n.update(job_id_data)
             self.responses.cache_put(n)
 
     def _feed_tps_data(self, tps_data):
@@ -626,10 +651,15 @@ class H5Streamer(BaseStreamer, KInstrument):
                     **tps_data,
                     'filename': self.target_filename,
                 },
-                'context': self.rcontext,
+                'context': {
+                    **self.rcontext,
+                    'room': None,
+                },
             },
         ]
         for n in notifications:
+            job_id_data = {'client_room':self.client_room, 'filename':self.filename}
+            n.update(job_id_data)
             self.responses.cache_put(n)
 
     def _feed_final_data(self):
@@ -644,6 +674,7 @@ class H5Streamer(BaseStreamer, KInstrument):
             #     },
             #     'context': {
             #         **self.rcontext,
+            #         'room': None,
             #         'callback': 'cb_progress',
             #     },
             # },
@@ -652,7 +683,10 @@ class H5Streamer(BaseStreamer, KInstrument):
                 'value': {
                     'filename': self.target_filename,
                 },
-                'context': self.rcontext,
+                'context': {
+                    **self.rcontext,
+                    'room': None,
+                },
             },
             {  # TODO: remove this public notification after moving DataViz to private_ns
                 'name': 'acquisition_finished',
@@ -662,15 +696,21 @@ class H5Streamer(BaseStreamer, KInstrument):
                 'context': {
                     **self.rcontext,
                     'namespace': '/',
+                    'room': None,
                 },
             },
             {   # TODO: remove acquisition_status for acquisition_finished
                 'name': 'acquisition_status',
                 'value': 'not_running',
-                'context': self.rcontext,
+                'context': {
+                    **self.rcontext,
+                    'room': None,
+                },
             },
         ]
         for n in notifications:
+            job_id_data = {'client_room':self.client_room, 'filename':self.filename}
+            n.update(job_id_data)
             self.responses.cache_put(n)
 
     def _get_and_feed_data(self):
@@ -787,7 +827,8 @@ class H5Streamer(BaseStreamer, KInstrument):
     def _initialize(self):
         self.filename = basename(self.fdata['filename'])
         self.target_filename = '_'.join([self.client.instrument_name, self.filename]).replace(' ', '_')
-        self.job_id = (self.rcontext['client_room'], self.filename)
+        self.client_room = self.rcontext['client_room']
+        self.job_id = (self.client_room, self.filename)
         with self.client.lock:
             self.client.in_progress[self.job_id] = self
 
@@ -820,12 +861,14 @@ class H5Streamer(BaseStreamer, KInstrument):
         """Finalize acquisition
         """
         self._feed_final_data()
-        self.wait_for_ack()
+        if not self.cancel_event.is_set() and not self.shutdown_event.is_set():
+            self.wait_for_ack()
         self._reset()
 
     def _get_next_file_to_stream(self):
         # get next request to process
-        rdata = self.requests.cache_get()
+        with self.client.lock:
+            rdata = self.requests.cache_get()
         if not rdata or not rdata['files']:
             return None, None
         fdata = rdata['files'].pop(0)
@@ -890,10 +933,11 @@ class H5Streamer(BaseStreamer, KInstrument):
                 self.log(f"Streaming of {self.filename} interrupted due to timeout")
             # Out of write loop
             self.log(f"finished streaming {self.filename}")
-            H5Streamer.TwCloseH5(full_fname.encode())
-            # return 4
-            self.cancel_event.clear()
+            res = H5Streamer.TwCloseH5(full_fname.encode())
+            if res != 4:
+                self.log(f"Warning: error closing {self.filename} ({res})")
             self._finalize()
+            self.cancel_event.clear()
         # Out of main loop
         self.log(f"stopped {current_thread().name}")
         self.shutdown()

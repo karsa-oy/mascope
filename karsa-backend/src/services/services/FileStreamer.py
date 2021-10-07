@@ -147,36 +147,46 @@ class FileStreamerPrivateNamespace(BaseClientNamespace):
         client_room = data['client_room']
         value = data['value']
         with self.parent.lock:
-            if not value:
-                # stop all running imports by client_room
+            if not value:   # stop all running imports by client_room
                 for streamer in self.parent.in_progress.values():
-                    if streamer.rcontext.get('client_room', '') != client_room:
+                    if streamer.rcontext.get('client_room', ' ') != client_room:
                         continue
                     self.log(streamer.filename)
                     streamer.stop_stream()
                     self.parent.responses.cache_delete_key(client_room)
 
-            else:
+            else:   # stop all running imports by filenames
                 for v in value:
                     # remove fname from import lists if there
-                    fname = os.path.join(v['path'], v['filename'])
+                    filename = v['filename']
+                    full_filename = os.path.join(v['path'], filename)
                     #TODO: possible sync problem - modify CacheQ for get(key) operation
+                    # clean up the fname from requests[client_room]
                     rdata = self.parent.requests.cache.get(client_room, [{}])[0]
                     i = 0
                     while i < len(rdata.get('files', [])):
                         fdata = rdata['files'][i]
-                        if fdata['filename'] == fname:
+                        if fdata['filename'] == full_filename:
                             rdata['files'].pop(i)
-                            self.log(fname)
+                            self.log(filename)
                         else:
                             i += 1
-                    # if file is in progress, then stop importing
-                    in_progress_key = (client_room, v['filename'])
+                    # stop importing fname, if in_progress
+                    in_progress_key = (client_room, filename)
                     streamer = self.parent.in_progress.get(in_progress_key, {})
                     if streamer:
                         streamer.stop_stream()
-                        self.log(fname)
-                    # TODO: clean up self.parent.responses[client_room] from fname packets
+                        self.log(filename)
+                    # clean up fname from already queued responses, if any
+                    try:
+                        self.parent.responses.cache_delete_key(self.parent.responses.cache_key_separator.join([client_room, filename]))
+                    except KeyError:
+                        pass
+                rdata = self.parent.requests.cache.get(client_room)
+                # delete request altogether, if no files left to handle
+                if rdata and not rdata[0].get('files'):
+                    self.parent.requests.cache_delete_key(client_room)
+
 
     def cb_progress(self, data):
         job_id = (data['client_room'], data['source_filename'])
