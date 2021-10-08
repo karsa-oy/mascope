@@ -117,23 +117,25 @@ class FileStreamerPrivateNamespace(BaseClientNamespace):
             self.parent.requests.cache_put(rdata)
 
     async def on_raw_import_status(self, data):
-        kwargs = get_client_notification_context(data)
-        client_room = data['client_room']
-        progress_data = []
-        for streamer in self.parent.streamers:
-            if streamer.rcontext['client_room'] != client_room:
-                continue
-            pdata = dict(
-                filename=streamer.filename,
-                target_filename=streamer.target_filename,
-                progress=streamer.progress,
-                ack_progress=streamer.ack_progress,
-            )
-            progress_data.append(pdata)
-        raw_import_data = {
-            'progress': progress_data,
-            'queue': self.parent.requests.cache.get(client_room, [{}])[0],
-        }
+        import time
+        with self.parent.lock:
+            kwargs = get_client_notification_context(data)
+            client_room = data['client_room']
+            progress_data = []
+            for (c_room, f_name), streamer in self.parent.in_progress.items():
+                if c_room != client_room:
+                    continue
+                pdata = dict(
+                    filename=streamer.filename,
+                    target_filename=streamer.target_filename,
+                    progress=streamer.progress,
+                    ack_progress=streamer.ack_progress,
+                )
+                progress_data.append(pdata)
+            raw_import_data = {
+                'progress': progress_data,
+                'queue': self.parent.requests.cache.get(client_room, [{}])[0],
+            }
         await self.emit_client_notification('raw_import_status_data',
                                             raw_import_data,
                                             **{**kwargs,
@@ -148,13 +150,12 @@ class FileStreamerPrivateNamespace(BaseClientNamespace):
         value = data['value']
         with self.parent.lock:
             if not value:   # stop all running imports by client_room
-                for streamer in self.parent.in_progress.values():
-                    if streamer.rcontext.get('client_room', ' ') != client_room:
+                for (c_room, f_name), streamer in self.parent.in_progress.items():
+                    if c_room != client_room:
                         continue
-                    self.log(streamer.filename)
+                    self.log(c_room, f_name)
                     streamer.stop_stream()
                     self.parent.responses.cache_delete_key(client_room)
-
             else:   # stop all running imports by filenames
                 for v in value:
                     # remove fname from import lists if there
@@ -186,7 +187,6 @@ class FileStreamerPrivateNamespace(BaseClientNamespace):
                 # delete request altogether, if no files left to handle
                 if rdata and not rdata[0].get('files'):
                     self.parent.requests.cache_delete_key(client_room)
-
 
     def cb_progress(self, data):
         job_id = (data['client_room'], data['source_filename'])
