@@ -9,9 +9,10 @@ from services.KECUService import KECU
 
 
 class App(tk.Tk):
-    def __init__(self, loop, tasks=[], interval=.1):
+    def __init__(self, loop, kecu, tasks=[], interval=.1):
         super().__init__()
         self.loop = loop
+        self.kecu = kecu
         self.protocol("WM_DELETE_WINDOW", self.close)
         self.tasks = tasks
         self.tasks.append(loop.create_task(self.updater(interval)))
@@ -29,19 +30,31 @@ class App(tk.Tk):
                 self.label = tk.Label(self.frame, text=label).grid(row=0, column=0)
                 if monitorable:
                     self.mon_value = tk.DoubleVar()
-                    self.mon_entry = tk.Entry(self.frame, textvariable=self.mon_value, state='disabled')
+                    self.mon_entry = tk.Entry(self.frame,
+                                              textvariable=self.mon_value,
+                                              state='disabled'
+                                              )
                     self.mon_entry.grid(row=0, column=2)
                 else:
                     self.mon_value = None
                 if settable:
                     self.set_value = tk.DoubleVar()
-                    self.set_entry = tk.Entry(self.frame, textvariable=self.set_value)
+                    self.prev_set_value = self.set_value.get()
+                    self.set_entry = tk.Entry(self.frame,
+                                              textvariable=self.set_value,
+                                              )
+                    self.set_entry.bind('<Key-Return>', self.on_setpoint_changed)
+                    self.set_entry.bind('<FocusOut>', self.reset_setpoint)
                     self.set_entry.grid(row=0, column=1)
                 else:
                     self.set_value = None
+                    self.prev_set_value = None
                 if toggleable:
                     self.cb_value = tk.BooleanVar()
-                    self.checkbox = tk.Checkbutton(self.frame, variable=self.cb_value)
+                    self.checkbox = tk.Checkbutton(self.frame,
+                                                   variable=self.cb_value,
+                                                   command=self.on_checkbox_toggled
+                                                   )
                     self.checkbox.grid(row=0, column=3)
                 else:
                     self.cb_value = None
@@ -58,14 +71,24 @@ class App(tk.Tk):
                     raise ValueError("Non-settable Field has no setpoint")
                 return self.set_value.get()
 
+            def on_checkbox_toggled(self):
+                print("Checbox toggled, new state: %s" %self.cb_value.get())
+
+            def on_setpoint_changed(self, event):
+                # TODO: Possibly add validation here
+                self.set(self.set_value.get())
+
             def set(self, new_setpoint):
                 if self.set_value is None:
                     raise ValueError("Cannot set non-settable Field")
+                self.prev_set_value = self.set_value.get()
                 return self.set_value.set(new_setpoint)
 
-            def toggle(self, new_state=None):
-                if self.cb_value is None:
-                    raise ValueError("Cannot toggle non-toggleable Field")
+            def update_monitor(self, new_value):
+                self.mon_value.set(new_value)
+
+            def reset_setpoint(self, event):
+                self.set_value.set(self.prev_set_value)
              
         class MfcField(Field):
             def __init__(self, label, parent_frame, **kwargs):
@@ -108,7 +131,7 @@ class App(tk.Tk):
                 super().__init__(label, parent_frame, **kwargs)
                 self.checkbox.configure(state=tk.DISABLED)
 
-        # Main frame
+        # Main frame components
         mion_frame = tk.LabelFrame(text="MION", bd=1)
         sh_frame = tk.LabelFrame(text="Scenthound", bd=1)
         cal_frame = tk.LabelFrame(text="Calibrator", bd=1)
@@ -138,7 +161,7 @@ class App(tk.Tk):
         self.fields[NodeId.MION_MFC5_MAIN].append(
             MfcField("Main flow", mion_common_frame, row=0, column=0)
             )
-        VoltageField("Accelerator voltage", mion_common_frame).frame.grid(row=1, column=0)
+        VoltageField("Accelerator voltage", mion_common_frame, row=1, column=0)
         # /
         # MION:IS1
         self.fields[NodeId.MION_MFC2_SRC1_CRR].append(
@@ -254,6 +277,6 @@ async def main():
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()
     data_getter_task = loop.create_task(main())
-    app = App(loop, tasks=[data_getter_task])
+    app = App(loop, kecu, tasks=[data_getter_task])
     loop.run_forever()
     loop.close()
