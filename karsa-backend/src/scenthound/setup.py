@@ -14,7 +14,7 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
 #    packages=setuptools.find_packages(),
-    packages=['karsavlm', 'scenthound'],
+    packages=['scenthound'],
     include_package_data=True,
     python_requires=">=3.6",
     classifiers=[
