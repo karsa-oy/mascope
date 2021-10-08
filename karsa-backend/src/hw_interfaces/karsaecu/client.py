@@ -3,7 +3,7 @@ import asyncio
 from .errors import ErrorCode
 from .messages import APP_CMD_MIN_LEN, APP_RSP_MIN_LEN, ETX, STX
 
-KRS_HOST = '192.168.1.200'  # KECU IP
+KRS_HOST = '192.168.1.201'  # KECU IP
 
 BUFFER_SIZE = 256   # TCP socket reader buffer size limit
 
@@ -19,10 +19,13 @@ class AsyncTCPClient():
     def connected(self) -> bool:
         return self._connected
 
-    def close(self) -> None:
+    async def close(self) -> None:
         print("closing the socket")
         # close the socket
         self._writer.close()
+        await self._writer.wait_closed()
+        # read everything from buffer
+        await self._reader.read(-1)
         # no longer connected
         self._connected = False
         # make sure other routines know the socket is closed
@@ -48,8 +51,8 @@ class AsyncTCPClient():
 
         Returns
         -------
-        str
-            Response message payload converted to string
+        bytes
+            Response message payload
         """
         # Read response message header, to get payload length
         header = await self._reader.read(3)
@@ -68,7 +71,7 @@ class AsyncTCPClient():
             (etx == ETX) and
             (not status)
             ):
-            return payload.decode('utf-8')
+            return payload
         # Check for error code
         if status:
             raise Exception( ErrorCode(status) )

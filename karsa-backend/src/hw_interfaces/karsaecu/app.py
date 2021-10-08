@@ -39,6 +39,9 @@ class KarsaClient(AsyncTCPClient):
     async def on_NODE_REMOVED(self, node_id):
         pass
 
+
+
+
 async def main():
     '''Main program'''
     tcp = KarsaClient()
