@@ -1,3 +1,5 @@
+import struct
+
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Callable
@@ -142,6 +144,11 @@ class MfcDevice(Device):
 
 MION_AI_CHANNELS = [
     AiChannel("", unit="", conversion=lambda x: x),
+    AiChannel("", unit="", conversion=lambda x: x),
+    AiChannel("", unit="", conversion=lambda x: x),
+    AiChannel("", unit="", conversion=lambda x: x),
+    AiChannel("", unit="", conversion=lambda x: x),
+    AiChannel("", unit="", conversion=lambda x: x)
 ]
 
 MION_DIO_CHANNELS = [
@@ -158,6 +165,11 @@ MION_DIO_CHANNELS = [
 
 SH_AI_CHANNELS = [
     AiChannel("", unit="", conversion=lambda x: x),
+    AiChannel("", unit="", conversion=lambda x: x),
+    AiChannel("", unit="", conversion=lambda x: x),
+    AiChannel("", unit="", conversion=lambda x: x),
+    AiChannel("", unit="", conversion=lambda x: x),
+    AiChannel("", unit="", conversion=lambda x: x)
 ]
 
 SH_DIO_CHANNELS = [
@@ -270,17 +282,17 @@ class AiNode(BaseNode):
             raise TypeError("Tried to initialize %s for device of type %s" %(self, device.node_type))
         super().__init__(client, device)
         
-    async def _start_measurement(self, channel_mask, interval):
+    async def _start_measurement(self, interval):
         payload = bytearray(3)
         payload[0] = self._id
-        payload[1] = channel_mask
+        payload[1] = 0x03 # Channel mask, start measurement on all channels
         payload[2] = interval
         return await self._client.send_cmd_wait_resp(Command.CMD_START_AI_MEAS.value, payload)
 
-    async def _stop_measurement(self, channel_mask):
+    async def _stop_measurement(self):
         payload = bytearray(2)
         payload[0] = self._id
-        payload[1] = channel_mask
+        payload[1] = 0x03 # Channel mask, stop measurement on all channels
         return await self._client.send_cmd_wait_resp(Command.CMD_STOP_AI_MEAS.value, payload)
 
     async def on_NTF_AI_MEAS_DATA_CH_1_4(self, data):
@@ -289,8 +301,9 @@ class AiNode(BaseNode):
         for i, d in enumerate( range(0, len(data), 2) ):
             ch_index = i
             ch_value_b = data[d:d+1]
-            ch_value_int = int.from_bytes(ch_value_b, byteorder='little', signed=True)
-            self._device.channels[ch_index].voltage = ch_value_int
+            value = struct.unpack('h', ch_value_b) # Signed16
+            self._device.channels[ch_index].voltage = value
+            print("AI Channel %s: %.4f" %(ch_index, value))
 
     async def on_NTF_AI_MEAS_DATA_CH_5_6(self, data):
         if len(data) != 4:
@@ -298,8 +311,9 @@ class AiNode(BaseNode):
         for i, d in enumerate( range(0, len(data), 2) ):
             ch_index = i + 4
             ch_value_b = data[d:d+1]
-            ch_value_int = int.from_bytes(ch_value_b, byteorder='little', signed=True)
-            self._device.channels[ch_index].voltage = ch_value_int
+            value = struct.unpack('h', ch_value_b) # Signed16
+            self._device.channels[ch_index].voltage = value
+            print("AI Channel %s: %.4f" %(ch_index, value))
 
 
 class DioNode(BaseNode):
@@ -345,7 +359,7 @@ class MfcNode(BaseNode):
         payload[4] = interval
         return await self._client.send_cmd_wait_resp(Command.CMD_START_MFC_MEAS.value, payload)
 
-    async def _stop_measurement(self, index, subindex):
+    async def _stop_measurement(self, index=0x0000, subindex=0x00):
         payload = bytearray(4)
         payload[0] = self._id
         payload[1] = (index & 0xFF)
@@ -361,9 +375,19 @@ class MfcNode(BaseNode):
         subindex_b = data[2]
         subindex_int = int.from_bytes(subindex_b, byteorder='little', signed=False)
         value_b = data[3:]
-        # TODO: Infer data type from value_b length and convert
-        # value_int = int.from_bytes(value_b, byteorder='little', signed=True)
-        # self._device.index[index_int][subindex_int].value = value_int
+        if len(value_b) == 1:
+            raise NotImplementedError("on_NTF_MFC_MEAS_DATA: length 1 not supported")
+        elif len(value_b) == 2:
+            # Unsigned16
+            dtype = 'H'
+        elif len(value_b) == 3:
+            raise NotImplementedError("on_NTF_MFC_MEAS_DATA: length 3 not supported")
+        elif len(value_b) == 4:
+            # Real32
+            dtype = 'f'
+        value = struct.unpack(dtype, value_b)
+        self._device.parameters[index_int][subindex_int].value = value
+        print("MFC Parameter %s: %.4f" %(self._device.parameters[index_int][subindex_int].description, value))
 
 
 

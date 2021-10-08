@@ -20,6 +20,11 @@ class KECU():
         await self._app.connect()
         await self._meas.connect()
 
+    async def disconnect(self):
+        # TODO: Stop all measurements
+        await self._app.close()
+        await self._meas.close()
+
     async def initialize(self):
         await self._app.get_node_list()
         self.nodes = self._app._node_dict
@@ -28,6 +33,7 @@ class KECU():
 
     async def wait_for_notification(self):
         return await self._meas.get_data()
+
 
 
 
