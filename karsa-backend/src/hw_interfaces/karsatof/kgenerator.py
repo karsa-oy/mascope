@@ -17,7 +17,7 @@ from ctypes import create_string_buffer
 from ntpath import basename
 import inspect
 
-from karsalib.util import get_client_notification_context
+from karsalib.util import copy_dict, get_client_notification_context
 from numpy.lib.index_tricks import RClass
 from .kinstrument import KInstrument
 
@@ -520,6 +520,13 @@ class H5Streamer(BaseStreamer, KInstrument):
 
     # the service communication protocol implementation
     def _feed_initial_data(self):
+        progress_data = {
+            'client_room': self.client_room,
+            'source_filename': self.filename,
+            'target_filename': self.target_filename,
+            'progress': self.progress,
+            'ack_progress': self.ack_progress,
+        }
         notifications = [
             {   # TODO: remove acquisition_status for acquisition_started
                 'name': 'acquisition_status',
@@ -540,6 +547,8 @@ class H5Streamer(BaseStreamer, KInstrument):
                 'context': {
                     **self.rcontext,
                     'room': None,
+                    'callback': 'cb_progress',
+                    'callback_data': progress_data,
                 },
             },
             {  # TODO: remove this public notification after moving DataViz to private_ns
@@ -580,25 +589,26 @@ class H5Streamer(BaseStreamer, KInstrument):
             },
             {
                 'name': 'acquisition_progress',
-                'value': {
-                    'source_filename': self.filename,
-                    'target_filename': self.target_filename,
-                    'progress': self.progress,
-                    'ack_progress': self.ack_progress,
-                },
+                'value': progress_data,
                 'context': {
                     **self.rcontext,
                     'room': None,
-                    'callback': 'cb_progress',
                 },
             },
         ]
         for n in notifications:
             job_id_data = {'client_room':self.client_room, 'filename':self.filename}
-            n.update(job_id_data)   # job_id_data needed for self.responses CacheQ indexing
+            n.update(job_id_data)   # job_id_data needed for CacheQ indexing of self.responses
             self.responses.cache_put(n)
 
     def _feed_spec_data(self, spec_data):
+        progress_data = {
+            'client_room': self.client_room,
+            'source_filename': self.filename,
+            'target_filename': self.target_filename,
+            'progress': self.progress,
+            'ack_progress': self.ack_progress,
+        }
         notifications = [
             {
                 'name': 'acquired_spectrum',
@@ -609,6 +619,8 @@ class H5Streamer(BaseStreamer, KInstrument):
                 'context': {
                     **self.rcontext,
                     'room': None,
+                    'callback': 'cb_progress',
+                    'callback_data': progress_data,
                 },
             },
             {  # TODO: remove this public notification after moving DataViz to private_ns
@@ -625,16 +637,10 @@ class H5Streamer(BaseStreamer, KInstrument):
             },
             {
                 'name': 'acquisition_progress',
-                'value': {
-                    'source_filename': self.filename,
-                    'target_filename': self.target_filename,
-                    'progress': self.progress,
-                    'ack_progress': self.ack_progress,
-                },
+                'value': progress_data,
                 'context': {
                     **self.rcontext,
                     'room': None,
-                    'callback': 'cb_progress',
                 },
             },
         ]
@@ -664,20 +670,6 @@ class H5Streamer(BaseStreamer, KInstrument):
 
     def _feed_final_data(self):
         notifications = [
-            # {
-            #     'name': 'acquisition_progress',
-            #     'value': {
-            #         'source_filename': self.filename,
-            #         'target_filename': self.target_filename,
-            #         'progress': self.progress,
-            #         'ack_progress': self.ack_progress,
-            #     },
-            #     'context': {
-            #         **self.rcontext,
-            #         'room': None,
-            #         'callback': 'cb_progress',
-            #     },
-            # },
             {
                 'name': 'acquisition_finished',
                 'value': {
@@ -872,7 +864,7 @@ class H5Streamer(BaseStreamer, KInstrument):
         if not rdata or not rdata['files']:
             return None, None
         fdata = rdata['files'].pop(0)
-        rcontext = get_client_notification_context(rdata)
+        rcontext = copy_dict(rdata, ignore_keys=['files',])
         if rdata['files']:
             # not all requested files are processed - put request back to queue
             self.requests.cache_put(rdata)

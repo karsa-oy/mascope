@@ -141,6 +141,7 @@ class FileIoNamespace(BaseClientNamespace):
         cache_item = AttrDict(cache_item_dict)
         cache[filename_base] = cache_item
         # print("cache: %s" %str(cache))
+        return data['callback_data']
 
     async def on_acquired_spectrum(self, data):
         """Receive new spectrum, add to cache
@@ -182,6 +183,7 @@ class FileIoNamespace(BaseClientNamespace):
                                   [ti],
                                   'time'
                                   )
+        return data['callback_data']
 
     async def on_acquired_tps_data(self, data):
         global cache
