@@ -13,8 +13,8 @@ setuptools.setup(
     description="Karsa Utils Library",
     long_description=long_description,
     long_description_content_type="text/markdown",
-#    packages=setuptools.find_packages(),
-    packages=['karsalib', ],
+    #packages=setuptools.find_packages(),
+    packages=['karsalib', 'karsalib/molmass'],
     include_package_data=True,
     python_requires=">=3.6",
     classifiers=[
@@ -33,7 +33,8 @@ setuptools.setup(
         'sparse',
         'xarray',
         'asynctest',
-        'decorator'
+        'decorator',
+        'watchdog'
     ]
 )
 
