@@ -1,0 +1,17 @@
+version: "3.9"
+services:
+  backend:
+    build:
+      context: ./karsa-backend
+    volumes:
+      - ./karsa-backend/src:/karse-backend/src
+    network_mode: "host"
+  electron:
+    build:
+      context: ./karsa-electron
+    volumes:
+      - /tmp/.X11-unix:/temp/.X11-unix
+      - ./karsa-electron/src:/karsa-electron/src
+    environment:
+      - DISPLAY=:0
+    network_mode: "host"

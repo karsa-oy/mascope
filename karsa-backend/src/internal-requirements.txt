@@ -1,0 +1,12 @@
+# the -e flag enables hotswapping
+
+# packages
+-e ./karsalib
+-e ./hw_interfaces
+-e ./karsaimg
+-e ./scenthound
+
+# services
+-e ./router_service
+-e ./tof_service
+-e ./services
