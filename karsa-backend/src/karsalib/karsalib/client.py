@@ -32,7 +32,7 @@ def run_streamer_service(StreamerClient,
 
     client = None
     while True:
-        streamer_type = args['streamer_type']
+        streamer_type = args.get('streamer_type')
         n_jobs = int(args.get('n_jobs', 1))
         streamer_opts = {'type': streamer_type, 'n_jobs': n_jobs}
         data_pool_path = args.get('data_pool_path')
@@ -280,7 +280,7 @@ class TOFStreamerClient(BridgeServiceClient):
     def __init__(self, streamer_opts, data_pool,
                  url, port, public_namespace_data, private_namespace_data):
         super().__init__(url, port, public_namespace_data, private_namespace_data)
-        streamer_type = streamer_opts['type']
+        streamer_type = streamer_opts['type'] or 'TofDaq'
         priv_ns_name, _ = private_namespace_data
         self.instrument_data = {'name': priv_ns_name,
                                 'type': streamer_type,
