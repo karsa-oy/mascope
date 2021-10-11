@@ -78,6 +78,9 @@ class App(tk.Tk):
                 # TODO: Possibly add validation here
                 self.set(self.set_value.get())
 
+            def reset_setpoint(self, event):
+                self.set_value.set(self.prev_set_value)
+
             def set(self, new_setpoint):
                 if self.set_value is None:
                     raise ValueError("Cannot set non-settable Field")
@@ -86,10 +89,7 @@ class App(tk.Tk):
 
             def update_monitor(self, new_value):
                 self.mon_value.set(new_value)
-
-            def reset_setpoint(self, event):
-                self.set_value.set(self.prev_set_value)
-             
+     
         class MfcField(Field):
             def __init__(self, label, parent_frame, **kwargs):
                 super().__init__(label,
@@ -99,7 +99,7 @@ class App(tk.Tk):
                                  toggleable=False,
                                  **kwargs
                                  )
-        class ToggleField(Field):
+        class DoField(Field):
             def __init__(self, label, parent_frame, **kwargs):
                 super().__init__(label,
                                  parent_frame,
@@ -126,7 +126,7 @@ class App(tk.Tk):
                                  toggleable=False,
                                  **kwargs
                                  )
-        class IndicatorField(ToggleField):
+        class DiField(DoField):
             def __init__(self, label, parent_frame, **kwargs):
                 super().__init__(label, parent_frame, **kwargs)
                 self.checkbox.configure(state=tk.DISABLED)
@@ -158,45 +158,35 @@ class App(tk.Tk):
         mion_sensor_frame.grid(row=5, column=0)
 
         # MION:Common
-        self.fields[NodeId.MION_MFC5_MAIN].append(
-            MfcField("Main flow", mion_common_frame, row=0, column=0)
-            )
+        self.fields[NodeId.MION_MFC5_MAIN] = MfcField("Main flow", mion_common_frame, row=0, column=0)
         VoltageField("Accelerator voltage", mion_common_frame, row=1, column=0)
         # /
         # MION:IS1
-        self.fields[NodeId.MION_MFC2_SRC1_CRR].append(
-            MfcField("Carrier flow", mion_is1_frame, row=0, column=0)
-            )
-        self.fields[NodeId.MION_MFC1_SRC1_EXH].append(
-            MfcField("Exhaust flow", mion_is1_frame, row=1, column=0)
-            )
+        self.fields[NodeId.MION_MFC2_SRC1_CRR] = MfcField("Carrier flow", mion_is1_frame, row=0, column=0)
+        self.fields[NodeId.MION_MFC1_SRC1_EXH] = MfcField("Exhaust flow", mion_is1_frame, row=1, column=0)
         VoltageField("Deflector voltage", mion_is1_frame, row=2, column=0)
         # /
         # MION:IS2
-        self.fields[NodeId.MION_MFC4_SRC2_CRR].append(
-            MfcField("Carrier flow", mion_is2_frame, row=0, column=0)
-            )
-        self.fields[NodeId.MION_MFC3_SRC2_EXH].append(
-            MfcField("Exhaust flow", mion_is2_frame, row=1, column=0)
-            )
+        self.fields[NodeId.MION_MFC4_SRC2_CRR] = MfcField("Carrier flow", mion_is2_frame, row=0, column=0)
+        self.fields[NodeId.MION_MFC3_SRC2_EXH] = MfcField("Exhaust flow", mion_is2_frame, row=1, column=0)
         VoltageField("Deflector voltage", mion_is2_frame, row=2, column=0)
         # /
         # MION:X-ray
         self.fields[NodeId.MION_DIO].append(
-            ToggleField("Emission", mion_xray_frame, row=0, column=0)
+            DoField("Emission", mion_xray_frame, row=0, column=0)
             )
         self.fields[NodeId.MION_DIO].append(
-            IndicatorField("Enabled", mion_xray_frame, row=1, column=0)
+            DiField("Enabled", mion_xray_frame, row=1, column=0)
             )
         self.fields[NodeId.MION_DIO].append(
-            IndicatorField("Interlock", mion_xray_frame, row=2, column=0)
+            DiField("Interlock", mion_xray_frame, row=2, column=0)
             )
         self.fields[NodeId.MION_DIO].append(
-            IndicatorField("Tube life", mion_xray_frame, row=3, column=0)
+            DiField("Tube life", mion_xray_frame, row=3, column=0)
         )
         # /
         # MION:Ion filter
-        ToggleField("Power", mion_if_frame, row=0, column=0)
+        DoField("Power", mion_if_frame, row=0, column=0)
         ValueField("HV+", mion_if_frame, row=1, column=0)
         ValueField("HV-", mion_if_frame, row=2, column=0)
         # /
@@ -218,21 +208,11 @@ class App(tk.Tk):
         
         sh_mfc_frame.grid(row=0, column=0)
         # SH:Flows
-        self.fields[NodeId.SH_MFC5_RGT].append(
-            MfcField("Reagent flow", sh_mfc_frame, row=0, column=0)
-            )
-        self.fields[NodeId.SH_MFC3_SMP].append(
-            MfcField("Sample flow", sh_mfc_frame, row=1, column=0)
-            )
-        self.fields[NodeId.SH_MFC2_EXH].append(
-            MfcField("Exhaust flow", sh_mfc_frame, row=2, column=0)
-            )
-        self.fields[NodeId.SH_MFC4_SHT1].append(
-            MfcField("Sheath 1 flow", sh_mfc_frame, row=3, column=0)
-            )
-        self.fields[NodeId.SH_MFC1_SHT2].append(
-            MfcField("Sheath 2 flow", sh_mfc_frame, row=4, column=0)
-            )
+        self.fields[NodeId.SH_MFC5_RGT] = MfcField("Reagent flow", sh_mfc_frame, row=0, column=0)
+        self.fields[NodeId.SH_MFC3_SMP] = MfcField("Sample flow", sh_mfc_frame, row=1, column=0)
+        self.fields[NodeId.SH_MFC2_EXH] = MfcField("Exhaust flow", sh_mfc_frame, row=2, column=0)
+        self.fields[NodeId.SH_MFC4_SHT1] = MfcField("Sheath 1 flow", sh_mfc_frame, row=3, column=0)
+        self.fields[NodeId.SH_MFC1_SHT2] = MfcField("Sheath 2 flow", sh_mfc_frame, row=4, column=0)
         # /
         # //
 
