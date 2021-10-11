@@ -130,9 +130,7 @@ MFC_PARAMETER_CFG = [
 
 MFC_PARAMETERS = dict()
 for par in MFC_PARAMETER_CFG:
-    if par.index not in MFC_PARAMETERS:
-        MFC_PARAMETERS.update({par.index: dict()})
-    MFC_PARAMETERS[par.index].update({par.subindex: par})
+    MFC_PARAMETERS.update({ (par.index, par.subindex): par })
 
 @dataclass(frozen=True)
 class MfcDevice(Device):
@@ -386,7 +384,7 @@ class MfcNode(BaseNode):
             # Real32
             dtype = 'f'
         value = struct.unpack(dtype, value_b)
-        self._device.parameters[index_int][subindex_int].value = value
+        self._device.parameters[(index_int, subindex_int)].value = value
         print("MFC Parameter %s: %.4f" %(self._device.parameters[index_int][subindex_int].description, value))
 
 
