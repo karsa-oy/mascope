@@ -401,7 +401,8 @@ class TofDaqStreamer(BaseStreamer, Thread):
 
 
 
-MAX_RESPONSE_TIME = 5      # secs to wait for notification acknowledgement, then ignore it.
+MAX_RESPONSE_TIME = 5       # secs to wait for notification acknowledgement, then ignore it.
+PROGRESS_SHIFT = 7          # shift with acknowledged progress
 
 class H5Streamer(BaseStreamer, KInstrument):
     from .lib.TwH5 import (
@@ -796,7 +797,7 @@ class H5Streamer(BaseStreamer, KInstrument):
             self.length = (self.desc.nbrWrites * self.desc.nbrBufs) * self.interval # [s]
             self.log("started: %s" %self.filename)
             self._feed_initial_data()
-            if not self.wait_for_ack():
+            if not self.wait_for_ack():     # wait for initial request to pass thru
                 raise TimeoutError
 
             # Check again for new data
@@ -811,7 +812,8 @@ class H5Streamer(BaseStreamer, KInstrument):
             n = self.desc.nbrWrites * self.desc.nbrBufs # Total number of spectra
             self.progress = round(((self.speci+1) / n) * 100., 2) # [%]
             self._get_and_feed_data()
-            if not self.wait_for_ack():
+            # allow PROGRESS_SHIFT to make it quicker
+            if not self.wait_for_ack(progress_shift=PROGRESS_SHIFT):
                 raise TimeoutError
 
 
@@ -837,10 +839,11 @@ class H5Streamer(BaseStreamer, KInstrument):
         self.ack_progress = -1
         self.speci = -1
 
-    def wait_for_ack(self, timeout=MAX_RESPONSE_TIME):
+    def wait_for_ack(self, progress_shift=0, timeout=MAX_RESPONSE_TIME):
         res = True
         t0 = time()
-        while self.ack_progress < self.progress:
+        # while self.ack_progress < self.progress:
+        while self.progress - self.ack_progress > progress_shift:
             if time() - t0 > timeout:
                 self.log(f"Warning: {self.filename} - no progress acknowledgement for {timeout} sec.")
                 res = False
@@ -853,7 +856,7 @@ class H5Streamer(BaseStreamer, KInstrument):
         """
         self._feed_final_data()
         if not self.cancel_event.is_set() and not self.shutdown_event.is_set():
-            self.wait_for_ack()
+            self.wait_for_ack()     # wait till all packages are processed
         self._reset()
 
     def _get_next_file_to_stream(self):

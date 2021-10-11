@@ -165,7 +165,8 @@ class BaseTestClientNamespace(BaseClientNamespace):
     async def on_acquisition_finished(self, data):
         # on_raw_import envokes acquisition_started/acquisition_finished
         # TODO: to be updated with multi-generator FileStreamer
-        assert(data['value']['filename'] == self.parent.sample_in_progress[0])
+        assert data['value']['filename'] == self.parent.sample_in_progress[0], \
+            f"{data['value']['filename']} != {self.parent.sample_in_progress[0]}"
         self.parent.sample_in_progress[1] = round(time.time() - self.parent.sample_in_progress[1], 1)
         self.parent.acquired_samples.append(self.parent.sample_in_progress)
         self.parent.sample_in_progress = None
