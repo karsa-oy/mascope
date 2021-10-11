@@ -23,7 +23,7 @@ import dask.array as da
 from karsalib.client import BaseClientNamespace, BaseServiceClient
 from karsalib.logging import t_mark
 from karsalib.struct import AttrDict, ExtendableDataArray, LRUDict
-from karsalib.util import parse_cmd_args
+from karsalib.util import get_client_notification_context, parse_cmd_args
 
 from karsalib.datapool import parse_path_from_sample_name
 
@@ -90,6 +90,7 @@ class FileIoNamespace(BaseClientNamespace):
 
         value = data['value']
         filename_base = value.get('filename')
+        kwargs = get_client_notification_context(data)
         print("Start acquiring sample: %s" %filename_base)
         
         mz = np.frombuffer( value['mz'], dtype=np.float32 )
@@ -100,7 +101,7 @@ class FileIoNamespace(BaseClientNamespace):
         if os.path.exists(filename_signal):
             # Should hit here only when trying to import a file which has already been imported/acquired
             print("File %s exists already! Canceling import" %filename_base)
-            await self.emit_client_notification('stop_raw_import', {})
+            await self.emit_client_notification('stop_raw_import', {}, **kwargs)
             return
 
         signal_array = ExtendableDataArray(path=filename_signal,

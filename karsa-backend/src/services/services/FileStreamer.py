@@ -190,8 +190,9 @@ class FileStreamerPrivateNamespace(BaseClientNamespace):
 
     def cb_progress(self, data):
         job_id = (data['client_room'], data['source_filename'])
-        streamer = self.parent.in_progress[job_id]
-        streamer.ack_progress = data['progress']
+        streamer = self.parent.in_progress.get(job_id)
+        if streamer:
+            streamer.ack_progress = data['progress']
 
 
 class FileStreamerServiceClient(BaseStreamerClient):
