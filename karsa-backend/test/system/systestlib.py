@@ -159,22 +159,17 @@ class BaseTestClientNamespace(BaseClientNamespace):
         self.parent.mark_request_done(request_id)
 
     async def on_acquisition_started(self, data):
-        # TODO: to be updated with multi-generator FileStreamer
-        self.parent.sample_in_progress = [data['value']['filename'], time.time()]
+        self.parent.sample_in_progress[data['value']['filename']] = time.time()
 
     async def on_acquisition_finished(self, data):
         # on_raw_import envokes acquisition_started/acquisition_finished
-        # TODO: to be updated with multi-generator FileStreamer
-        assert data['value']['filename'] == self.parent.sample_in_progress[0], \
-            f"{data['value']['filename']} != {self.parent.sample_in_progress[0]}"
-        self.parent.sample_in_progress[1] = round(time.time() - self.parent.sample_in_progress[1], 1)
-        self.parent.acquired_samples.append(self.parent.sample_in_progress)
-        self.parent.sample_in_progress = None
+        fname = data['value']['filename']
+        self.parent.acquired_samples.append(
+            [fname, round(time.time() - self.parent.sample_in_progress.pop(fname))]
+        )
         self.log(self.parent.acquired_samples)
         if len(self.parent.acquired_samples) == len(self.parent.raw_samples):
-            # TODO: update acquisition_finished emits to keep raw_import notif.context
-            # request_id = data['request_id']
-            request_id = 'raw_import'
+            request_id = data['request_id']
             self.parent.kill_exec_timer(request_id)
             self.parent.mark_request_done(request_id)
 
@@ -449,6 +444,7 @@ class BaseTestClient(BaseServiceClient):
         self.raw_samples = [s['filename'] for s in raw_samples_data]
         self.raw_samples_data = raw_samples_data
         self.acquired_samples = []
+        self.sample_in_progress = {}
         await self.ns_handler.emit_client_notification(
                 name='raw_import',
                 value=raw_samples_data,

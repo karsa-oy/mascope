@@ -401,8 +401,8 @@ class TofDaqStreamer(BaseStreamer, Thread):
 
 
 
-MAX_RESPONSE_TIME = 5       # secs to wait for notification acknowledgement, then ignore it.
-PROGRESS_SHIFT = 7          # shift with acknowledged progress
+MAX_RESPONSE_TIME = 5       # secs to wait for notification acknowledgement
+PROGRESS_SHIFT = 10         # shift with acknowledged progress
 
 class H5Streamer(BaseStreamer, KInstrument):
     from .lib.TwH5 import (
