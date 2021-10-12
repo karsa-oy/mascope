@@ -1,10 +1,121 @@
 import asyncio
+import sys
 import tkinter as tk
 
 from collections import defaultdict
 
-from karsaecu.nodes import NodeId
+from karsaecu.nodes import DEVICES, NodeId
 from services.KECUService import KECU
+
+
+class Field():
+    def __init__(self, label, parent_frame, monitorable, settable, toggleable, row=None, column=None):
+        self.frame = tk.Frame(parent_frame)
+        if row is not None and column is not None:
+            self.frame.grid(row=row, column=column)
+        self.label = tk.Label(self.frame, text=label).grid(row=0, column=0)
+        if monitorable:
+            self.mon_value = tk.DoubleVar()
+            self.mon_entry = tk.Entry(self.frame,
+                                        textvariable=self.mon_value,
+                                        state='disabled'
+                                        )
+            self.mon_entry.grid(row=0, column=2)
+        else:
+            self.mon_value = None
+        if settable:
+            self.set_value = tk.DoubleVar()
+            self.prev_set_value = self.set_value.get()
+            self.set_entry = tk.Entry(self.frame,
+                                        textvariable=self.set_value,
+                                        )
+            self.set_entry.bind('<Key-Return>', self.on_setpoint_changed)
+            self.set_entry.bind('<FocusOut>', self.reset_setpoint)
+            self.set_entry.grid(row=0, column=1)
+        else:
+            self.set_value = None
+            self.prev_set_value = None
+        if toggleable:
+            self.cb_value = tk.BooleanVar()
+            self.checkbox = tk.Checkbutton(self.frame,
+                                            variable=self.cb_value,
+                                            command=self.on_checkbox_toggled
+                                            )
+            self.checkbox.grid(row=0, column=3)
+        else:
+            self.cb_value = None
+
+    @property
+    def monitor(self):
+        if self.mon_value is None:
+            raise ValueError("Cannot monitor non-monitorable Field")
+        return self.mon_value.get()
+
+    @property
+    def setpoint(self):
+        if self.set_value is None:
+            raise ValueError("Non-settable Field has no setpoint")
+        return self.set_value.get()
+
+    def on_checkbox_toggled(self):
+        print("Checbox toggled, new state: %s" %self.cb_value.get())
+
+    def on_setpoint_changed(self, event):
+        # TODO: Possibly add validation here
+        self.set(self.set_value.get())
+
+    def reset_setpoint(self, event):
+        self.set_value.set(self.prev_set_value)
+
+    def set(self, new_setpoint):
+        if self.set_value is None:
+            raise ValueError("Cannot set non-settable Field")
+        self.prev_set_value = self.set_value.get()
+        return self.set_value.set(new_setpoint)
+
+    def update_monitor(self, new_value):
+        self.mon_value.set(new_value)
+
+class MfcField(Field):
+    def __init__(self, label, parent_frame, **kwargs):
+        super().__init__(label,
+                            parent_frame,
+                            monitorable=True,
+                            settable=True,
+                            toggleable=False,
+                            **kwargs
+                            )
+class DoField(Field):
+    def __init__(self, label, parent_frame, **kwargs):
+        super().__init__(label,
+                            parent_frame,
+                            monitorable=False,
+                            settable=False,
+                            toggleable=True,
+                            **kwargs
+                            )
+class VoltageField(Field):
+    def __init__(self, label, parent_frame, **kwargs):
+        super().__init__(label,
+                            parent_frame,
+                            monitorable=True,
+                            settable=True,
+                            toggleable=True,
+                            **kwargs
+                            )
+class MonitorField(Field):
+    def __init__(self, label, parent_frame, **kwargs):
+        super().__init__(label,
+                            parent_frame,
+                            monitorable=True,
+                            settable=False,
+                            toggleable=False,
+                            **kwargs
+                            )
+class DiField(DoField):
+    def __init__(self, label, parent_frame, **kwargs):
+        super().__init__(label, parent_frame, **kwargs)
+        self.checkbox.configure(state=tk.DISABLED)
 
 
 
@@ -21,116 +132,7 @@ class App(tk.Tk):
         self.style()
 
     def build(self):
-        
-        class Field():
-            def __init__(self, label, parent_frame, monitorable, settable, toggleable, row=None, column=None):
-                self.frame = tk.Frame(parent_frame)
-                if row is not None and column is not None:
-                    self.frame.grid(row=row, column=column)
-                self.label = tk.Label(self.frame, text=label).grid(row=0, column=0)
-                if monitorable:
-                    self.mon_value = tk.DoubleVar()
-                    self.mon_entry = tk.Entry(self.frame,
-                                              textvariable=self.mon_value,
-                                              state='disabled'
-                                              )
-                    self.mon_entry.grid(row=0, column=2)
-                else:
-                    self.mon_value = None
-                if settable:
-                    self.set_value = tk.DoubleVar()
-                    self.prev_set_value = self.set_value.get()
-                    self.set_entry = tk.Entry(self.frame,
-                                              textvariable=self.set_value,
-                                              )
-                    self.set_entry.bind('<Key-Return>', self.on_setpoint_changed)
-                    self.set_entry.bind('<FocusOut>', self.reset_setpoint)
-                    self.set_entry.grid(row=0, column=1)
-                else:
-                    self.set_value = None
-                    self.prev_set_value = None
-                if toggleable:
-                    self.cb_value = tk.BooleanVar()
-                    self.checkbox = tk.Checkbutton(self.frame,
-                                                   variable=self.cb_value,
-                                                   command=self.on_checkbox_toggled
-                                                   )
-                    self.checkbox.grid(row=0, column=3)
-                else:
-                    self.cb_value = None
-
-            @property
-            def monitor(self):
-                if self.mon_value is None:
-                    raise ValueError("Cannot monitor non-monitorable Field")
-                return self.mon_value.get()
-
-            @property
-            def setpoint(self):
-                if self.set_value is None:
-                    raise ValueError("Non-settable Field has no setpoint")
-                return self.set_value.get()
-
-            def on_checkbox_toggled(self):
-                print("Checbox toggled, new state: %s" %self.cb_value.get())
-
-            def on_setpoint_changed(self, event):
-                # TODO: Possibly add validation here
-                self.set(self.set_value.get())
-
-            def reset_setpoint(self, event):
-                self.set_value.set(self.prev_set_value)
-
-            def set(self, new_setpoint):
-                if self.set_value is None:
-                    raise ValueError("Cannot set non-settable Field")
-                self.prev_set_value = self.set_value.get()
-                return self.set_value.set(new_setpoint)
-
-            def update_monitor(self, new_value):
-                self.mon_value.set(new_value)
-     
-        class MfcField(Field):
-            def __init__(self, label, parent_frame, **kwargs):
-                super().__init__(label,
-                                 parent_frame,
-                                 monitorable=True,
-                                 settable=True,
-                                 toggleable=False,
-                                 **kwargs
-                                 )
-        class DoField(Field):
-            def __init__(self, label, parent_frame, **kwargs):
-                super().__init__(label,
-                                 parent_frame,
-                                 monitorable=False,
-                                 settable=False,
-                                 toggleable=True,
-                                 **kwargs
-                                 )
-        class VoltageField(Field):
-            def __init__(self, label, parent_frame, **kwargs):
-                super().__init__(label,
-                                 parent_frame,
-                                 monitorable=True,
-                                 settable=True,
-                                 toggleable=True,
-                                 **kwargs
-                                 )
-        class ValueField(Field):
-            def __init__(self, label, parent_frame, **kwargs):
-                super().__init__(label,
-                                 parent_frame,
-                                 monitorable=True,
-                                 settable=False,
-                                 toggleable=False,
-                                 **kwargs
-                                 )
-        class DiField(DoField):
-            def __init__(self, label, parent_frame, **kwargs):
-                super().__init__(label, parent_frame, **kwargs)
-                self.checkbox.configure(state=tk.DISABLED)
-
+        global kecu
         # Main frame components
         mion_frame = tk.LabelFrame(text="MION", bd=1)
         sh_frame = tk.LabelFrame(text="Scenthound", bd=1)
@@ -167,8 +169,14 @@ class App(tk.Tk):
         VoltageField("Deflector voltage", mion_is1_frame, row=2, column=0)
         # /
         # MION:IS2
-        self.fields[NodeId.MION_MFC4_SRC2_CRR] = MfcField("Carrier flow", mion_is2_frame, row=0, column=0)
-        self.fields[NodeId.MION_MFC3_SRC2_EXH] = MfcField("Exhaust flow", mion_is2_frame, row=1, column=0)
+        field = MfcField("Carrier flow", mion_is2_frame, row=0, column=0)
+        self.fields[NodeId.MION_MFC4_SRC2_CRR] = field
+        field = MfcField("Exhaust flow", mion_is2_frame, row=1, column=0)
+        self.fields[NodeId.MION_MFC3_SRC2_EXH] = field
+        device = kecu.nodes.get(NodeId.MION_MFC3_SRC2_EXH, None)
+        if device:
+            device.parameters[(0x2F00, 0x01)].callbacks.append(field.set)
+            device.parameters[(0x2C00, 0x01)].callbacks.append(field.update_monitor)
         VoltageField("Deflector voltage", mion_is2_frame, row=2, column=0)
         # /
         # MION:X-ray
@@ -187,18 +195,18 @@ class App(tk.Tk):
         # /
         # MION:Ion filter
         DoField("Power", mion_if_frame, row=0, column=0)
-        ValueField("HV+", mion_if_frame, row=1, column=0)
-        ValueField("HV-", mion_if_frame, row=2, column=0)
+        MonitorField("HV+", mion_if_frame, row=1, column=0)
+        MonitorField("HV-", mion_if_frame, row=2, column=0)
         # /
         # MION:Sensors
         self.fields[NodeId.MION_AI].append(
-            ValueField("Humidity", mion_sensor_frame, row=0, column=0)
+            MonitorField("Humidity", mion_sensor_frame, row=0, column=0)
             )
         self.fields[NodeId.MION_AI].append(
-            ValueField("Temperature", mion_sensor_frame, row=1, column=0)
+            MonitorField("Temperature", mion_sensor_frame, row=1, column=0)
             )
         self.fields[NodeId.MION_AI].append(
-            ValueField("Pressure", mion_sensor_frame, row=2, column=0)
+            MonitorField("Pressure", mion_sensor_frame, row=2, column=0)
             )
         # /
         # //
@@ -240,11 +248,16 @@ class App(tk.Tk):
             self.update()
             await asyncio.sleep(interval)
 
-
 kecu = KECU()
 
-async def main():
+async def initialize_kecu():
+    global kecu
+    await kecu.connect()
+    await kecu.initialize()
+
+async def measure():
     while True:
+        print('.')
         node_id, ntf, data = await kecu.wait_for_notification()
         # Notify app
         ntf_handler = getattr(kecu._app, 'on_{}'.format(ntf))
@@ -256,7 +269,9 @@ async def main():
 
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()
-    data_getter_task = loop.create_task(main())
-    app = App(loop, kecu, tasks=[data_getter_task])
+    if len(sys.argv) > 1 and sys.argv[1] == 'kecu':
+        loop.run_until_complete(initialize_kecu())
+    measure_task = loop.create_task(measure())
+    app = App(loop, kecu, tasks=[measure_task])
     loop.run_forever()
     loop.close()
