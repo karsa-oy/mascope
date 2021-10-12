@@ -47,26 +47,12 @@ class NodeType(Enum):
     # //
 
 
-
-@dataclass(frozen=True)
-class Device:
-    node_id: NodeId
-    description: str
-
-    node_type: NodeId = field(default=NodeType.UNKNOWN, init=False)    
-
-
 @dataclass
-class AiChannel:
+class Channel:
     description: str
-    unit: str
-    conversion: Callable[[float], float]
-    callbacks: 'list[Callable]' = field(default_factory=list)
-
+    callbacks: 'list[Callable]' = field(default_factory=list, init=False)
     value: float = field(default=None, init=False)
     _value: float = field(init=False, repr=False)
-    voltage: float = field(default=None, init=False)
-    _voltage: float = field(init=False, repr=False)
 
     @property
     def value(self) -> float:
@@ -76,7 +62,16 @@ class AiChannel:
     def value(self, value: float):
         self._value = value
         for cb in self.callbacks:
-            cb('%s : %s' %(self, self.value))
+            cb(self.value)
+
+
+@dataclass
+class AiChannel(Channel):
+    unit: str = ""
+    conversion: Callable[[float], float] = lambda x : x
+
+    voltage: float = field(default=None, init=False)
+    _voltage: float = field(init=False, repr=False)
 
     @property
     def voltage(self) -> float:
@@ -86,59 +81,6 @@ class AiChannel:
     def voltage(self, voltage: float):
         self._voltage = voltage
         self.value = self.conversion(voltage)
-        
-    
-@dataclass(frozen=True)
-class AiDevice(Device):
-    channels: 'list[AiChannel]'
-
-    node_type = NodeType.AI
-    
-
-@dataclass
-class DioChannel:
-    description: str
-    io: bool
-
-    state: bool = field(default=None, init=False)
-
-@dataclass(frozen=True)
-class DioDevice(Device):
-    channels: 'list[DioChannel]'
-
-    node_type = NodeType.DIO
-
-
-@dataclass
-class MfcParameter:
-    index: int
-    subindex: int
-    description: str
-    settable: bool
-    unit: str = ""
-
-    value: float = field(default=None, init=False)
-
-
-MFC_PARAMETER_CFG = [
-    MfcParameter(0x2F00, 0x01, "Flow setpoint", settable=True),
-    MfcParameter(0x2C00, 0x01, "Flow monitor value", settable=False),
-    MfcParameter(0x2503, 0x01, "Medium temperature", settable=False, unit="C"),
-    MfcParameter(0x2004, 0x02, "Device status, temperature", settable=False, unit="C"),
-    MfcParameter(0x2004, 0x03, "Device status, voltage", settable=False, unit="V"),
-]
-
-MFC_PARAMETERS = dict()
-for par in MFC_PARAMETER_CFG:
-    MFC_PARAMETERS.update({ (par.index, par.subindex): par })
-
-@dataclass(frozen=True)
-class MfcDevice(Device):
-    flow_unit: str
-
-    node_type = NodeType.MFC
-    parameters = MFC_PARAMETERS
-
 
 MION_AI_CHANNELS = [
     AiChannel("", unit="", conversion=lambda x: x),
@@ -148,6 +90,22 @@ MION_AI_CHANNELS = [
     AiChannel("", unit="", conversion=lambda x: x),
     AiChannel("", unit="", conversion=lambda x: x)
 ]
+
+SH_AI_CHANNELS = [
+    AiChannel("", unit="", conversion=lambda x: x),
+    AiChannel("", unit="", conversion=lambda x: x),
+    AiChannel("", unit="", conversion=lambda x: x),
+    AiChannel("", unit="", conversion=lambda x: x),
+    AiChannel("", unit="", conversion=lambda x: x),
+    AiChannel("", unit="", conversion=lambda x: x)
+]
+
+@dataclass
+class DioChannel(Channel):
+    io: bool
+
+    value: bool = field(default=None, init=False)
+    _value: bool = field(init=False, repr=False)
 
 MION_DIO_CHANNELS = [
     DioChannel("", io=1),
@@ -160,16 +118,6 @@ MION_DIO_CHANNELS = [
     DioChannel("", io=0),
 ]
 
-
-SH_AI_CHANNELS = [
-    AiChannel("", unit="", conversion=lambda x: x),
-    AiChannel("", unit="", conversion=lambda x: x),
-    AiChannel("", unit="", conversion=lambda x: x),
-    AiChannel("", unit="", conversion=lambda x: x),
-    AiChannel("", unit="", conversion=lambda x: x),
-    AiChannel("", unit="", conversion=lambda x: x)
-]
-
 SH_DIO_CHANNELS = [
     DioChannel("", io=1),
     DioChannel("", io=1),
@@ -180,6 +128,58 @@ SH_DIO_CHANNELS = [
     DioChannel("", io=0),
     DioChannel("", io=0),
 ]
+
+@dataclass
+class MfcChannel(Channel):
+    index: int = None
+    subindex: int = None
+    settable: bool = None
+    unit: str = ""
+
+
+MFC_CHANNEL_CFG = [
+    MfcChannel("Flow setpoint", 0x2F00, 0x01, settable=True),
+    MfcChannel("Flow monitor value", 0x2C00, 0x01, settable=False),
+    MfcChannel("Medium temperature", 0x2503, 0x01, settable=False, unit="C"),
+    MfcChannel("Device status, temperature", 0x2004, 0x02, settable=False, unit="C"),
+    MfcChannel("Device status, voltage", 0x2004, 0x03, settable=False, unit="V"),
+]
+
+MFC_CHANNELS = dict()
+for par in MFC_CHANNEL_CFG:
+    MFC_CHANNELS.update({ (par.index, par.subindex): par })
+
+
+
+@dataclass(frozen=True)
+class Device:
+    node_id: NodeId
+    description: str
+
+    node_type: NodeId = field(default=NodeType.UNKNOWN, init=False)    
+
+
+@dataclass(frozen=True)
+class AiDevice(Device):
+    channels: 'list[AiChannel]'
+
+    node_type = NodeType.AI
+    
+
+@dataclass(frozen=True)
+class DioDevice(Device):
+    channels: 'list[DioChannel]'
+
+    node_type = NodeType.DIO
+
+
+@dataclass(frozen=True)
+class MfcDevice(Device):
+    flow_unit: str
+
+    node_type = NodeType.MFC
+    parameters = MFC_CHANNELS
+
 
 
 DEVICE_CFG = [
@@ -221,7 +221,7 @@ class BaseNode():
         self._id = device.node_id.value
         self._type = device.node_type.value
 
-    async def _get_data(self, index, subindex):
+    async def _get_data(self, index: int, subindex: int):
         payload = bytearray(4)
         payload[0] = self._id
         payload[1] = (index & 0xFF)
@@ -229,7 +229,7 @@ class BaseNode():
         payload[3] = subindex
         return await self._client.send_cmd_wait_resp(Command.CMD_GET_NODE_DATA.value, payload)
 
-    async def _set_data(self, index, subindex, data):
+    async def _set_data(self, index: int, subindex: int, data):
         l = len(data)
         payload = bytearray(4+l)
         payload[0] = self._id
@@ -280,7 +280,7 @@ class AiNode(BaseNode):
             raise TypeError("Tried to initialize %s for device of type %s" %(self, device.node_type))
         super().__init__(client, device)
         
-    async def _start_measurement(self, interval):
+    async def _start_measurement(self, interval: int):
         payload = bytearray(3)
         payload[0] = self._id
         payload[1] = 0x03 # Channel mask, start measurement on all channels
@@ -320,7 +320,7 @@ class DioNode(BaseNode):
             raise TypeError("Tried to initialize %s for device of type %s" %(self, device.node_type))
         super().__init__(client, device)
 
-    async def _start_measurement(self, interval):
+    async def _start_measurement(self, interval: int):
         payload = bytearray(2)
         payload[0] = self._id
         payload[1] = interval
@@ -339,7 +339,7 @@ class DioNode(BaseNode):
         # Unpack byte into bit string
         bit_string = format(data_int, '08b')
         for i, bit in enumerate(bit_string):
-            self._device.channels[i].state = bool(int(bit))
+            self._device.channels[i].value = bool(int(bit))
 
 
 class MfcNode(BaseNode):
@@ -348,7 +348,7 @@ class MfcNode(BaseNode):
             raise TypeError("Tried to initialize %s for device of type %s" %(self, device.node_type))
         super().__init__(client, device)
 
-    async def _start_measurement(self, index, subindex, interval):
+    async def _start_measurement(self, index: int, subindex: int, interval: int):
         payload = bytearray(5)
         payload[0] = self._id
         payload[1] = (index & 0xFF)
