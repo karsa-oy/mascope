@@ -389,6 +389,9 @@ class MfcNode(BaseNode):
         value = struct.unpack(dtype, value_b)[0]
         self._device.channels[(index_int, subindex_int)].value = value
 
+    async def set_flow(self, value):
+        payload = struct.pack('f', value) # Real32
+        return await self._set_data(self, 0x2F00, 0x01, payload) # Flow setpoint
 
 NODES = {
     NodeType.AI: AiNode,

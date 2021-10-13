@@ -25,6 +25,7 @@ class Field():
             self.mon_value = None
         if settable:
             self.set_value = tk.DoubleVar()
+            self.set_value_callbacks = [print]
             self.prev_set_value = self.set_value.get()
             self.set_entry = tk.Entry(self.frame,
                                         textvariable=self.set_value,
@@ -37,6 +38,7 @@ class Field():
             self.prev_set_value = None
         if toggleable:
             self.cb_value = tk.BooleanVar()
+            self.cb_value_callbacks = []
             self.checkbox = tk.Checkbutton(self.frame,
                                             variable=self.cb_value,
                                             command=self.on_checkbox_toggled
@@ -59,10 +61,14 @@ class Field():
 
     def on_checkbox_toggled(self):
         print("Checbox toggled, new state: %s" %self.cb_value.get())
+        for callback in self.cb_value_callbacks:
+            callback(self.cb_value.get())
 
     def on_setpoint_changed(self, event):
         # TODO: Possibly add validation here
         self.set(self.set_value.get())
+        for callback in self.set_value_callbacks:
+            callback(self.set_value.get())
 
     def reset_setpoint(self, event):
         self.set_value.set(self.prev_set_value)
@@ -169,8 +175,8 @@ class App(tk.Tk):
         VoltageField("Deflector voltage", mion_is1_frame, row=2, column=0)
         # /
         # MION:IS2
-        field = MfcField("Carrier flow", mion_is2_frame, row=0, column=0)
-        self.fields[NodeId.MION_MFC4_SRC2_CRR] = field
+        self.fields[NodeId.MION_MFC4_SRC2_CRR] = MfcField("Carrier flow", mion_is2_frame, row=0, column=0)
+
         field = MfcField("Exhaust flow", mion_is2_frame, row=1, column=0)
         self.fields[NodeId.MION_MFC3_SRC2_EXH] = field
         node = kecu.nodes.get(NodeId.MION_MFC3_SRC2_EXH, None)
@@ -179,6 +185,7 @@ class App(tk.Tk):
             print("Device: %s Channels: %s" %(device, device.channels))
             device.channels[(0x2F00, 0x01)].callbacks.append(field.set)
             device.channels[(0x2C00, 0x01)].callbacks.append(field.update_monitor)
+            field.set_value_callbacks.append(device.set_flow)
         VoltageField("Deflector voltage", mion_is2_frame, row=2, column=0)
         # /
         # MION:X-ray
