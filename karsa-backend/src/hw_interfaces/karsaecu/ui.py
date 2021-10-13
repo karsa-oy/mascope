@@ -4,7 +4,7 @@ import tkinter as tk
 
 from collections import defaultdict
 
-from karsaecu.nodes import DEVICES, NodeId
+from karsaecu.nodes import DEVICES, NODES, NodeId, NodeType
 from services.KECUService import KECU
 
 
@@ -173,10 +173,12 @@ class App(tk.Tk):
         self.fields[NodeId.MION_MFC4_SRC2_CRR] = field
         field = MfcField("Exhaust flow", mion_is2_frame, row=1, column=0)
         self.fields[NodeId.MION_MFC3_SRC2_EXH] = field
-        device = kecu.nodes.get(NodeId.MION_MFC3_SRC2_EXH, None)
-        if device:
-            device.parameters[(0x2F00, 0x01)].callbacks.append(field.set)
-            device.parameters[(0x2C00, 0x01)].callbacks.append(field.update_monitor)
+        node = kecu.nodes.get(NodeId.MION_MFC3_SRC2_EXH, None)
+        if node:
+            device = node._device
+            print("Device: %s Channels: %s" %(device, device.channels))
+            device.channels[(0x2F00, 0x01)].callbacks.append(field.set)
+            device.channels[(0x2C00, 0x01)].callbacks.append(field.update_monitor)
         VoltageField("Deflector voltage", mion_is2_frame, row=2, column=0)
         # /
         # MION:X-ray
@@ -248,30 +250,56 @@ class App(tk.Tk):
             self.update()
             await asyncio.sleep(interval)
 
+
 kecu = KECU()
 
 async def initialize_kecu():
     global kecu
     await kecu.connect()
     await kecu.initialize()
+    for node_id, node in kecu._app._node_dict.items():
+        if node._device.node_type == NodeType.MFC:
+            await node.start_measurement(index=0x2F00, subindex=0x01, interval=100)
+            await node.start_measurement(index=0x2C00, subindex=0x01, interval=100)
+        # else:
+        #     resp = await node.start_measurement(interval=100)
+
 
 async def measure():
-    while True:
-        print('.')
-        node_id, ntf, data = await kecu.wait_for_notification()
-        # Notify app
-        ntf_handler = getattr(kecu._app, 'on_{}'.format(ntf))
-        await ntf_handler(node_id)
-        # Notify node
-        ntf_handler = getattr(kecu.nodes[node_id], 'on_{}'.format(ntf))
-        await ntf_handler(data)
-
+    global kecu
+    try:
+        while True:
+            print('.')
+            node_id, ntf, data = await kecu.wait_for_notification()
+            print('..')
+            try:
+                # Notify app
+                ntf_handler = getattr(kecu._app, 'on_{}'.format(ntf.name))
+                # print("Notify app")
+                await ntf_handler(node_id)
+            except AttributeError:
+                pass
+            try:
+                # Notify node
+                print('on_{}({})'.format(ntf.name, data))
+                ntf_handler = getattr(kecu.nodes[node_id], 'on_{}'.format(ntf.name))
+                print("Notify node")
+                await ntf_handler(data)
+                print("Notified")
+            except Exception as e:
+                print(e)
+    except asyncio.CancelledError:
+        print("measure task cancelled")
+        await kecu.disconnect()
 
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()
+    tasks = []
     if len(sys.argv) > 1 and sys.argv[1] == 'kecu':
         loop.run_until_complete(initialize_kecu())
-    measure_task = loop.create_task(measure())
-    app = App(loop, kecu, tasks=[measure_task])
-    loop.run_forever()
-    loop.close()
+        tasks.append( loop.create_task(measure()) )
+    app = App(loop, kecu, tasks=tasks)
+    try:
+        loop.run_forever()
+    except KeyboardInterrupt:
+        app.close()
