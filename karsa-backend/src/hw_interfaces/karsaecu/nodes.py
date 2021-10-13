@@ -54,6 +54,9 @@ class Channel:
     value: float = field(default=None, init=False)
     _value: float = field(init=False, repr=False)
 
+    def __post_init__(self):
+        self.callbacks.append(print)
+
     @property
     def value(self) -> float:
         return self._value
@@ -138,11 +141,11 @@ class MfcChannel(Channel):
 
 
 MFC_CHANNEL_CFG = [
-    MfcChannel("Flow setpoint", 0x2F00, 0x01, settable=True),
-    MfcChannel("Flow monitor value", 0x2C00, 0x01, settable=False),
-    MfcChannel("Medium temperature", 0x2503, 0x01, settable=False, unit="C"),
-    MfcChannel("Device status, temperature", 0x2004, 0x02, settable=False, unit="C"),
-    MfcChannel("Device status, voltage", 0x2004, 0x03, settable=False, unit="V"),
+    MfcChannel("Flow setpoint", index=0x2F00, subindex=0x01, settable=True),
+    MfcChannel("Flow monitor value", index=0x2C00, subindex=0x01, settable=False),
+    MfcChannel("Medium temperature", index=0x2503, subindex=0x01, settable=False, unit="C"),
+    MfcChannel("Device status, temperature", index=0x2004, subindex=0x02, settable=False, unit="C"),
+    MfcChannel("Device status, voltage", index=0x2004, subindex=0x03, settable=False, unit="V"),
 ]
 
 MFC_CHANNELS = dict()
@@ -178,7 +181,7 @@ class MfcDevice(Device):
     flow_unit: str
 
     node_type = NodeType.MFC
-    parameters = MFC_CHANNELS
+    channels = MFC_CHANNELS
 
 
 
@@ -298,8 +301,8 @@ class AiNode(BaseNode):
             raise Exception("Invalid payload")
         for i, d in enumerate( range(0, len(data), 2) ):
             ch_index = i
-            ch_value_b = data[d:d+1]
-            value = struct.unpack('h', ch_value_b) # Signed16
+            ch_value_b = data[d:d+2]
+            value = struct.unpack('h', ch_value_b)[0] # Signed16
             self._device.channels[ch_index].voltage = value
             print("AI Channel %s: %.4f" %(ch_index, value))
 
@@ -308,8 +311,8 @@ class AiNode(BaseNode):
             raise Exception("Invalid payload")
         for i, d in enumerate( range(0, len(data), 2) ):
             ch_index = i + 4
-            ch_value_b = data[d:d+1]
-            value = struct.unpack('h', ch_value_b) # Signed16
+            ch_value_b = data[d:d+2]
+            value = struct.unpack('h', ch_value_b)[0] # Signed16
             self._device.channels[ch_index].voltage = value
             print("AI Channel %s: %.4f" %(ch_index, value))
 
@@ -370,7 +373,7 @@ class MfcNode(BaseNode):
             raise Exception("Invalid payload")
         index_b = data[0:2]
         index_int = int.from_bytes(index_b, byteorder='little', signed=False)
-        subindex_b = data[2]
+        subindex_b = data[2:3]
         subindex_int = int.from_bytes(subindex_b, byteorder='little', signed=False)
         value_b = data[3:]
         if len(value_b) == 1:
@@ -383,10 +386,8 @@ class MfcNode(BaseNode):
         elif len(value_b) == 4:
             # Real32
             dtype = 'f'
-        value = struct.unpack(dtype, value_b)
-        self._device.parameters[(index_int, subindex_int)].value = value
-        print("MFC Parameter %s: %.4f" %(self._device.parameters[index_int][subindex_int].description, value))
-
+        value = struct.unpack(dtype, value_b)[0]
+        self._device.channels[(index_int, subindex_int)].value = value
 
 
 NODES = {

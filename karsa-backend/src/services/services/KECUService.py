@@ -1,6 +1,7 @@
 import asyncio
 
 from karsaecu.app import KarsaClient
+from karsaecu.errors import ErrorCode
 from karsaecu.meas import KarsaMeasClient
 
 from karsalib.client import BaseClientNamespace, BaseServiceClient
@@ -22,6 +23,12 @@ class KECU():
 
     async def disconnect(self):
         # TODO: Stop all measurements
+        for node_id, node in self._app._node_dict.items():
+            try:
+                await node.stop_measurement()
+            except Exception as e:
+                print(e)
+                pass
         await self._app.close()
         await self._meas.close()
 
