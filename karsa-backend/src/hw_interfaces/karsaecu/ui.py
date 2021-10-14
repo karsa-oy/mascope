@@ -25,7 +25,7 @@ class Field():
             self.mon_value = None
         if settable:
             self.set_value = tk.DoubleVar()
-            self.set_value_callbacks = [print]
+            self.set_value_callbacks = []
             self.prev_set_value = self.set_value.get()
             self.set_entry = tk.Entry(self.frame,
                                         textvariable=self.set_value,
@@ -62,13 +62,13 @@ class Field():
     def on_checkbox_toggled(self):
         print("Checbox toggled, new state: %s" %self.cb_value.get())
         for callback in self.cb_value_callbacks:
-            callback(self.cb_value.get())
+            asyncio.create_task( callback(self.cb_value.get()) )
 
     def on_setpoint_changed(self, event):
         # TODO: Possibly add validation here
         self.set(self.set_value.get())
         for callback in self.set_value_callbacks:
-            callback(self.set_value.get())
+            asyncio.create_task( callback(self.set_value.get()) )
 
     def reset_setpoint(self, event):
         self.set_value.set(self.prev_set_value)
@@ -182,10 +182,9 @@ class App(tk.Tk):
         node = kecu.nodes.get(NodeId.MION_MFC3_SRC2_EXH, None)
         if node:
             device = node._device
-            print("Device: %s Channels: %s" %(device, device.channels))
             device.channels[(0x2F00, 0x01)].callbacks.append(field.set)
             device.channels[(0x2C00, 0x01)].callbacks.append(field.update_monitor)
-            field.set_value_callbacks.append(device.set_flow)
+            field.set_value_callbacks.append(node.set_flow)
         VoltageField("Deflector voltage", mion_is2_frame, row=2, column=0)
         # /
         # MION:X-ray
@@ -208,15 +207,27 @@ class App(tk.Tk):
         MonitorField("HV-", mion_if_frame, row=2, column=0)
         # /
         # MION:Sensors
-        self.fields[NodeId.MION_AI].append(
-            MonitorField("Humidity", mion_sensor_frame, row=0, column=0)
-            )
-        self.fields[NodeId.MION_AI].append(
-            MonitorField("Temperature", mion_sensor_frame, row=1, column=0)
-            )
-        self.fields[NodeId.MION_AI].append(
-            MonitorField("Pressure", mion_sensor_frame, row=2, column=0)
-            )
+        field = MonitorField("Humidity", mion_sensor_frame, row=0, column=0)
+        self.fields[NodeId.MION_AI].append(field)
+        node = kecu.nodes.get(NodeId.MION_AI, None)
+        if node:
+            device = node._device
+            print("Device: %s Channels: %s" %(device, device.channels))
+            device.channels[0].callbacks.append(field.update_monitor)
+        field = MonitorField("Temperature", mion_sensor_frame, row=1, column=0)
+        self.fields[NodeId.MION_AI].append(field)
+        node = kecu.nodes.get(NodeId.MION_AI, None)
+        if node:
+            device = node._device
+            print("Device: %s Channels: %s" %(device, device.channels))
+            device.channels[1].callbacks.append(field.update_monitor)
+        field = MonitorField("Pressure", mion_sensor_frame, row=2, column=0)
+        self.fields[NodeId.MION_AI].append(field)
+        node = kecu.nodes.get(NodeId.MION_AI, None)
+        if node:
+            device = node._device
+            print("Device: %s Channels: %s" %(device, device.channels))
+            device.channels[2].callbacks.append(field.update_monitor)
         # /
         # //
 
@@ -268,8 +279,8 @@ async def initialize_kecu():
         if node._device.node_type == NodeType.MFC:
             await node.start_measurement(index=0x2F00, subindex=0x01, interval=100)
             await node.start_measurement(index=0x2C00, subindex=0x01, interval=100)
-        # else:
-        #     resp = await node.start_measurement(interval=100)
+        else:
+            await node.start_measurement(interval=100)
 
 
 async def measure():
