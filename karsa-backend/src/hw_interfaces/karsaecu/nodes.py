@@ -87,12 +87,12 @@ class AiChannel(Channel):
             self.value = self.conversion(voltage)
 
 MION_AI_CHANNELS = [
-    AiChannel("RH", unit="%", conversion=lambda x: 100*x),
-    AiChannel("T", unit="C", conversion=lambda x: 100*x-40),
+    AiChannel("RH", unit="%", conversion=lambda x: 100.0*x),
+    AiChannel("T", unit="C", conversion=lambda x: 100.0*x-40.0),
     AiChannel("P", unit="bar", conversion=lambda x: 0.4*x),
     AiChannel("N/C", unit="", conversion=lambda x: x),
-    AiChannel("Ion filter", unit="V", conversion=lambda x: 101*x+0),
-    AiChannel("Ion filter", unit="V", conversion=lambda x: 101*x+0)
+    AiChannel("Ion filter", unit="V", conversion=lambda x: 101.0*x+0.0),
+    AiChannel("Ion filter", unit="V", conversion=lambda x: 101.0*x+0.0)
 ]
 
 SH_AI_CHANNELS = [
@@ -344,6 +344,7 @@ class DioNode(BaseNode):
         bit_string = format(data_int, '08b')
         for i, bit in enumerate(bit_string):
             self._device.channels[i].value = bool(int(bit))
+            print("DIO Channel %s: %s" %(i, bool(int(bit))))
 
     async def set_channel(self, channel_index, value):
         # payload = struct.pack('f', value) # Real32

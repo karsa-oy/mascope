@@ -9,7 +9,8 @@ from services.KECUService import KECU
 
 
 class Field():
-    def __init__(self, label, parent_frame, monitorable, settable, toggleable, row=None, column=None):
+    def __init__(self, node_id, label, parent_frame, monitorable, settable, toggleable, row=None, column=None):
+        self.node_id = node_id
         self.frame = tk.Frame(parent_frame)
         if row is not None and column is not None:
             self.frame.grid(row=row, column=column)
@@ -79,50 +80,93 @@ class Field():
         self.prev_set_value = self.set_value.get()
         return self.set_value.set(new_setpoint)
 
+    def update_checkbox(self, new_value):
+        self.cb_value.set(bool(new_value))
+
     def update_monitor(self, new_value):
         self.mon_value.set(new_value)
+        
+    def update_setpoint(self, new_value):
+        self.set(new_value)
+
+
+class DiField(Field):
+    def __init__(self, node_id, channel, label, parent_frame, **kwargs):
+        super().__init__(node_id,
+                         label,
+                         parent_frame,
+                         monitorable=False,
+                         settable=False,
+                         toggleable=True,
+                         **kwargs
+                         )
+        self.checkbox.configure(state=tk.DISABLED)
+        global kecu
+        node = kecu.nodes.get(node_id, None)
+        if node:
+            device = node._device
+            device.channels[channel].callbacks.append(self.update_checkbox)
+
+class DoField(Field):
+    def __init__(self, node_id, channel, label, parent_frame, **kwargs):
+        super().__init__(node_id,
+                         label,
+                         parent_frame,
+                         monitorable=False,
+                         settable=False,
+                         toggleable=True,
+                         **kwargs
+                         )
+        global kecu
+        node = kecu.nodes.get(node_id, None)
+        if node:
+            device = node._device
+            # device.channels[channel].callbacks.append()
 
 class MfcField(Field):
-    def __init__(self, label, parent_frame, **kwargs):
-        super().__init__(label,
-                            parent_frame,
-                            monitorable=True,
-                            settable=True,
-                            toggleable=False,
-                            **kwargs
-                            )
-class DoField(Field):
-    def __init__(self, label, parent_frame, **kwargs):
-        super().__init__(label,
-                            parent_frame,
-                            monitorable=False,
-                            settable=False,
-                            toggleable=True,
-                            **kwargs
-                            )
-class VoltageField(Field):
-    def __init__(self, label, parent_frame, **kwargs):
-        super().__init__(label,
-                            parent_frame,
-                            monitorable=True,
-                            settable=True,
-                            toggleable=True,
-                            **kwargs
-                            )
-class MonitorField(Field):
-    def __init__(self, label, parent_frame, **kwargs):
-        super().__init__(label,
-                            parent_frame,
-                            monitorable=True,
-                            settable=False,
-                            toggleable=False,
-                            **kwargs
-                            )
-class DiField(DoField):
-    def __init__(self, label, parent_frame, **kwargs):
-        super().__init__(label, parent_frame, **kwargs)
-        self.checkbox.configure(state=tk.DISABLED)
+    def __init__(self, node_id, label, parent_frame, **kwargs):
+        super().__init__(node_id,
+                         label,
+                         parent_frame,
+                         monitorable=True,
+                         settable=True,
+                         toggleable=False,
+                         **kwargs
+                         )
+        global kecu
+        node = kecu.nodes.get(self.node_id, None)
+        if node:
+            device = node._device
+            device.channels[(0x2F00, 0x01)].callbacks.append(self.update_setpoint) # On read setpoint
+            device.channels[(0x2C00, 0x01)].callbacks.append(self.update_monitor) # On read actual flow
+            self.set_value_callbacks.append(node.set_flow)
 
+class MonitorField(Field):
+    def __init__(self, node_id, channel, label, parent_frame, **kwargs):
+        super().__init__(node_id,
+                         label,
+                         parent_frame,
+                         monitorable=True,
+                         settable=False,
+                         toggleable=False,
+                         **kwargs
+                         )
+        global kecu
+        node = kecu.nodes.get(NodeId.MION_AI, None)
+        if node:
+            device = node._device
+            device.channels[channel].callbacks.append(self.update_monitor)
+
+class VoltageField(Field):
+    def __init__(self, node_id, label, parent_frame, **kwargs):
+        super().__init__(node_id,
+                         label,
+                         parent_frame,
+                         monitorable=True,
+                         settable=True,
+                         toggleable=True,
+                         **kwargs
+                         )
 
 
 class App(tk.Tk):
@@ -166,85 +210,49 @@ class App(tk.Tk):
         mion_sensor_frame.grid(row=5, column=0)
 
         # MION:Common
-        self.fields[NodeId.MION_MFC5_MAIN] = MfcField("Main flow", mion_common_frame, row=0, column=0)
-        VoltageField("Accelerator voltage", mion_common_frame, row=1, column=0)
+        self.fields[NodeId.MION_MFC5_MAIN] = MfcField(NodeId.MION_MFC5_MAIN, "Main flow", mion_common_frame, row=0, column=0)
+        VoltageField(NodeId.ALL_NODES, "Accelerator voltage", mion_common_frame, row=1, column=0)
         # /
         # MION:IS1
-        self.fields[NodeId.MION_MFC2_SRC1_CRR] = MfcField("Carrier flow", mion_is1_frame, row=0, column=0)
-        self.fields[NodeId.MION_MFC1_SRC1_EXH] = MfcField("Exhaust flow", mion_is1_frame, row=1, column=0)
-        VoltageField("Deflector voltage", mion_is1_frame, row=2, column=0)
+        self.fields[NodeId.MION_MFC2_SRC1_CRR] = MfcField(NodeId.MION_MFC2_SRC1_CRR, "Carrier flow", mion_is1_frame, row=0, column=0)
+        self.fields[NodeId.MION_MFC1_SRC1_EXH] = MfcField(NodeId.MION_MFC1_SRC1_EXH, "Exhaust flow", mion_is1_frame, row=1, column=0)
+        VoltageField(NodeId.ALL_NODES, "Deflector voltage", mion_is1_frame, row=2, column=0)
         # /
         # MION:IS2
-        self.fields[NodeId.MION_MFC4_SRC2_CRR] = MfcField("Carrier flow", mion_is2_frame, row=0, column=0)
+        self.fields[NodeId.MION_MFC4_SRC2_CRR] = MfcField(NodeId.MION_MFC4_SRC2_CRR, "Carrier flow", mion_is2_frame, row=0, column=0)
 
-        field = MfcField("Exhaust flow", mion_is2_frame, row=1, column=0)
+        field = MfcField(NodeId.MION_MFC3_SRC2_EXH, "Exhaust flow", parent_frame=mion_is2_frame, row=1, column=0)
         self.fields[NodeId.MION_MFC3_SRC2_EXH] = field
-        node = kecu.nodes.get(NodeId.MION_MFC3_SRC2_EXH, None)
-        if node:
-            device = node._device
-            device.channels[(0x2F00, 0x01)].callbacks.append(field.set) # On read setpoint
-            device.channels[(0x2C00, 0x01)].callbacks.append(field.update_monitor) # On read actual flow
-            field.set_value_callbacks.append(node.set_flow)
-        VoltageField("Deflector voltage", mion_is2_frame, row=2, column=0)
+
+        VoltageField(NodeId.ALL_NODES, "Deflector voltage", mion_is2_frame, row=2, column=0)
         # /
         # MION:X-ray
-        field = DoField("Emission", mion_xray_frame, row=0, column=0)
+        field = DoField(NodeId.MION_DIO, 4, "Emission", mion_xray_frame, row=0, column=0)
         self.fields[NodeId.MION_DIO].append(field)
-        # node = kecu.nodes.get(NodeId.MION_DIO, None)
-        # if node:
-        #     device = node._device
-        #     print("Device: %s Channels: %s" %(device, device.channels))
-        #     # device.channels[4].callbacks.append()
-        #     field.set_value_callbacks.append(node.set_flow)
 
-        field = DiField("Enabled", mion_xray_frame, row=1, column=0)
+        field = DiField(NodeId.MION_DIO, 1, "Enabled", mion_xray_frame, row=1, column=0)
         self.fields[NodeId.MION_DIO].append(field)
-        node = kecu.nodes.get(NodeId.MION_DIO, None)
-        if node:
-            device = node._device
-            device.channels[1].callbacks.append(field.on_checkbox_toggled)
 
-        field = DiField("Interlock", mion_xray_frame, row=2, column=0)
+        field = DiField(NodeId.MION_DIO, 2, "Interlock", mion_xray_frame, row=2, column=0)
         self.fields[NodeId.MION_DIO].append(field)
-        node = kecu.nodes.get(NodeId.MION_DIO, None)
-        if node:
-            device = node._device
-            device.channels[2].callbacks.append(field.on_checkbox_toggled)
 
-        field = DiField("Tube life", mion_xray_frame, row=3, column=0)
+        field = DiField(NodeId.MION_DIO, 0, "Tube life", mion_xray_frame, row=3, column=0)
         self.fields[NodeId.MION_DIO].append(field)
-        node = kecu.nodes.get(NodeId.MION_DIO, None)
-        if node:
-            device = node._device
-            device.channels[0].callbacks.append(field.on_checkbox_toggled)
         # /
         # MION:Ion filter
-        DoField("Power", mion_if_frame, row=0, column=0)
-        MonitorField("HV+", mion_if_frame, row=1, column=0)
-        MonitorField("HV-", mion_if_frame, row=2, column=0)
+        DoField(NodeId.MION_DIO, 5, "Power", mion_if_frame, row=0, column=0)
+        MonitorField(NodeId.MION_AI, 4, "HV+", mion_if_frame, row=1, column=0)
+        MonitorField(NodeId.MION_AI, 5, "HV-", mion_if_frame, row=2, column=0)
         # /
         # MION:Sensors
-        field = MonitorField("Humidity", mion_sensor_frame, row=0, column=0)
+        field = MonitorField(NodeId.MION_AI, 0, "Humidity", mion_sensor_frame, row=0, column=0)
         self.fields[NodeId.MION_AI].append(field)
-        node = kecu.nodes.get(NodeId.MION_AI, None)
-        if node:
-            device = node._device
-            print("Device: %s Channels: %s" %(device, device.channels))
-            device.channels[0].callbacks.append(field.update_monitor)
-        field = MonitorField("Temperature", mion_sensor_frame, row=1, column=0)
+
+        field = MonitorField(NodeId.MION_AI, 1, "Temperature", mion_sensor_frame, row=1, column=0)
         self.fields[NodeId.MION_AI].append(field)
-        node = kecu.nodes.get(NodeId.MION_AI, None)
-        if node:
-            device = node._device
-            print("Device: %s Channels: %s" %(device, device.channels))
-            device.channels[1].callbacks.append(field.update_monitor)
-        field = MonitorField("Pressure", mion_sensor_frame, row=2, column=0)
+
+        field = MonitorField(NodeId.MION_AI, 2, "Pressure", mion_sensor_frame, row=2, column=0)
         self.fields[NodeId.MION_AI].append(field)
-        node = kecu.nodes.get(NodeId.MION_AI, None)
-        if node:
-            device = node._device
-            print("Device: %s Channels: %s" %(device, device.channels))
-            device.channels[2].callbacks.append(field.update_monitor)
         # /
         # //
 
@@ -253,20 +261,20 @@ class App(tk.Tk):
         
         sh_mfc_frame.grid(row=0, column=0)
         # SH:Flows
-        self.fields[NodeId.SH_MFC5_RGT] = MfcField("Reagent flow", sh_mfc_frame, row=0, column=0)
-        self.fields[NodeId.SH_MFC3_SMP] = MfcField("Sample flow", sh_mfc_frame, row=1, column=0)
-        self.fields[NodeId.SH_MFC2_EXH] = MfcField("Exhaust flow", sh_mfc_frame, row=2, column=0)
-        self.fields[NodeId.SH_MFC4_SHT1] = MfcField("Sheath 1 flow", sh_mfc_frame, row=3, column=0)
-        self.fields[NodeId.SH_MFC1_SHT2] = MfcField("Sheath 2 flow", sh_mfc_frame, row=4, column=0)
+        self.fields[NodeId.SH_MFC5_RGT] = MfcField(NodeId.SH_MFC5_RGT, "Reagent flow", sh_mfc_frame, row=0, column=0)
+        self.fields[NodeId.SH_MFC3_SMP] = MfcField(NodeId.SH_MFC3_SMP, "Sample flow", sh_mfc_frame, row=1, column=0)
+        self.fields[NodeId.SH_MFC2_EXH] = MfcField(NodeId.SH_MFC2_EXH, "Exhaust flow", sh_mfc_frame, row=2, column=0)
+        self.fields[NodeId.SH_MFC4_SHT1] = MfcField(NodeId.SH_MFC4_SHT1, "Sheath 1 flow", sh_mfc_frame, row=3, column=0)
+        self.fields[NodeId.SH_MFC1_SHT2] = MfcField(NodeId.SH_MFC1_SHT2, "Sheath 2 flow", sh_mfc_frame, row=4, column=0)
         # /
         # //
 
         # # Calibrator
-        self.fields[NodeId.CALIB_MFC] = MfcField("Carrier flow", cal_frame, row=0, column=0)
+        self.fields[NodeId.CALIB_MFC] = MfcField(NodeId.CALIB_MFC, "Carrier flow", cal_frame, row=0, column=0)
         # # //
 
         # # Flushplate
-        self.fields[NodeId.FLSHP_MFC] = MfcField("Counter flow", fp_frame, row=0, column=0)
+        self.fields[NodeId.FLSHP_MFC] = MfcField(NodeId.FLSHP_MFC, "Counter flow", fp_frame, row=0, column=0)
         # # //
 
     def close(self):
