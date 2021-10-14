@@ -182,24 +182,41 @@ class App(tk.Tk):
         node = kecu.nodes.get(NodeId.MION_MFC3_SRC2_EXH, None)
         if node:
             device = node._device
-            device.channels[(0x2F00, 0x01)].callbacks.append(field.set)
-            device.channels[(0x2C00, 0x01)].callbacks.append(field.update_monitor)
+            device.channels[(0x2F00, 0x01)].callbacks.append(field.set) # On read setpoint
+            device.channels[(0x2C00, 0x01)].callbacks.append(field.update_monitor) # On read actual flow
             field.set_value_callbacks.append(node.set_flow)
         VoltageField("Deflector voltage", mion_is2_frame, row=2, column=0)
         # /
         # MION:X-ray
-        self.fields[NodeId.MION_DIO].append(
-            DoField("Emission", mion_xray_frame, row=0, column=0)
-            )
-        self.fields[NodeId.MION_DIO].append(
-            DiField("Enabled", mion_xray_frame, row=1, column=0)
-            )
-        self.fields[NodeId.MION_DIO].append(
-            DiField("Interlock", mion_xray_frame, row=2, column=0)
-            )
-        self.fields[NodeId.MION_DIO].append(
-            DiField("Tube life", mion_xray_frame, row=3, column=0)
-        )
+        field = DoField("Emission", mion_xray_frame, row=0, column=0)
+        self.fields[NodeId.MION_DIO].append(field)
+        # node = kecu.nodes.get(NodeId.MION_DIO, None)
+        # if node:
+        #     device = node._device
+        #     print("Device: %s Channels: %s" %(device, device.channels))
+        #     # device.channels[4].callbacks.append()
+        #     field.set_value_callbacks.append(node.set_flow)
+
+        field = DiField("Enabled", mion_xray_frame, row=1, column=0)
+        self.fields[NodeId.MION_DIO].append(field)
+        node = kecu.nodes.get(NodeId.MION_DIO, None)
+        if node:
+            device = node._device
+            device.channels[1].callbacks.append(field.on_checkbox_toggled)
+
+        field = DiField("Interlock", mion_xray_frame, row=2, column=0)
+        self.fields[NodeId.MION_DIO].append(field)
+        node = kecu.nodes.get(NodeId.MION_DIO, None)
+        if node:
+            device = node._device
+            device.channels[2].callbacks.append(field.on_checkbox_toggled)
+
+        field = DiField("Tube life", mion_xray_frame, row=3, column=0)
+        self.fields[NodeId.MION_DIO].append(field)
+        node = kecu.nodes.get(NodeId.MION_DIO, None)
+        if node:
+            device = node._device
+            device.channels[0].callbacks.append(field.on_checkbox_toggled)
         # /
         # MION:Ion filter
         DoField("Power", mion_if_frame, row=0, column=0)
