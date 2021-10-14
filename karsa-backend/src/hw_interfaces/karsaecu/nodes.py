@@ -86,12 +86,12 @@ class AiChannel(Channel):
         self.value = self.conversion(voltage)
 
 MION_AI_CHANNELS = [
-    AiChannel("", unit="", conversion=lambda x: x),
-    AiChannel("", unit="", conversion=lambda x: x),
-    AiChannel("", unit="", conversion=lambda x: x),
-    AiChannel("", unit="", conversion=lambda x: x),
-    AiChannel("", unit="", conversion=lambda x: x),
-    AiChannel("", unit="", conversion=lambda x: x)
+    AiChannel("RH", unit="%", conversion=lambda x: 100*x),
+    AiChannel("T", unit="C", conversion=lambda x: 100*x-40),
+    AiChannel("P", unit="bar", conversion=lambda x: 0.4*x),
+    AiChannel("N/C", unit="", conversion=lambda x: x),
+    AiChannel("Ion filter", unit="V", conversion=lambda x: 101*x+0),
+    AiChannel("Ion filter", unit="V", conversion=lambda x: 101*x+0)
 ]
 
 SH_AI_CHANNELS = [
@@ -239,9 +239,10 @@ class BaseNode():
         payload[1] = (index & 0xFF)
         payload[2] = (index >> 8)
         payload[3] = subindex
-        for i in range(0, l):
-            payload[4+i] = data & 0xFF
-            data >>= 8
+        # for i in range(0, l):
+        #     payload[4+i] = data & 0xFF
+        #     data >>= 8
+        payload[4:] = data
         return await self._client.send_cmd_wait_resp(Command.CMD_SET_NODE_DATA.value, payload)
 
     async def _start_measurement(self, *args, **kwargs):
@@ -302,7 +303,8 @@ class AiNode(BaseNode):
         for i, d in enumerate( range(0, len(data), 2) ):
             ch_index = i
             ch_value_b = data[d:d+2]
-            value = struct.unpack('h', ch_value_b)[0] # Signed16
+            value_int = struct.unpack('h', ch_value_b)[0] # Signed16
+            value = value_int * 1e-3
             self._device.channels[ch_index].voltage = value
             print("AI Channel %s: %.4f" %(ch_index, value))
 
@@ -312,7 +314,8 @@ class AiNode(BaseNode):
         for i, d in enumerate( range(0, len(data), 2) ):
             ch_index = i + 4
             ch_value_b = data[d:d+2]
-            value = struct.unpack('h', ch_value_b)[0] # Signed16
+            value_int = struct.unpack('h', ch_value_b)[0] # Signed16
+            value = value_int * 1e-3
             self._device.channels[ch_index].voltage = value
             print("AI Channel %s: %.4f" %(ch_index, value))
 
@@ -391,7 +394,7 @@ class MfcNode(BaseNode):
 
     async def set_flow(self, value):
         payload = struct.pack('f', value) # Real32
-        return await self._set_data(self, 0x2F00, 0x01, payload) # Flow setpoint
+        return await self._set_data(0x2F00, 0x01, payload) # Flow setpoint
 
 NODES = {
     NodeType.AI: AiNode,
