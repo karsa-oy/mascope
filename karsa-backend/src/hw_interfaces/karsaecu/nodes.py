@@ -106,20 +106,17 @@ SH_AI_CHANNELS = [
 
 @dataclass
 class DioChannel(Channel):
-    io: bool
-
-    value: bool = field(default=None, init=False)
-    _value: bool = field(init=False, repr=False)
+    io: bool = None
 
 MION_DIO_CHANNELS = [
-    DioChannel("", io=1),
-    DioChannel("", io=1),
-    DioChannel("", io=1),
-    DioChannel("", io=1),
-    DioChannel("", io=0),
-    DioChannel("", io=0),
-    DioChannel("", io=0),
-    DioChannel("", io=0),
+    DioChannel("X-ray alert", io=1),
+    DioChannel("X-ray enabled", io=1),
+    DioChannel("X-ray interlock", io=1),
+    DioChannel("X-ray active", io=1),
+    DioChannel("X-ray emission", io=0),
+    DioChannel("Ion filter toggle", io=0),
+    DioChannel("N/C", io=0),
+    DioChannel("N/C", io=0),
 ]
 
 SH_DIO_CHANNELS = [
@@ -348,6 +345,10 @@ class DioNode(BaseNode):
         for i, bit in enumerate(bit_string):
             self._device.channels[i].value = bool(int(bit))
 
+    async def set_channel(self, channel_index, value):
+        # payload = struct.pack('f', value) # Real32
+        # return await self._set_data(0x2F00, 0x01, payload) # Flow setpoint
+        return
 
 class MfcNode(BaseNode):
     def __init__(self, client: AsyncTCPClient, device: MfcDevice):
