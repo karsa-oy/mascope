@@ -83,7 +83,8 @@ class AiChannel(Channel):
     @voltage.setter
     def voltage(self, voltage: float):
         self._voltage = voltage
-        self.value = self.conversion(voltage)
+        if not isinstance(voltage, property):
+            self.value = self.conversion(voltage)
 
 MION_AI_CHANNELS = [
     AiChannel("RH", unit="%", conversion=lambda x: 100*x),
