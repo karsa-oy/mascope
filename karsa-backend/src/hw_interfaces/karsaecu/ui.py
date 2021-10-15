@@ -62,14 +62,14 @@ class Field():
 
     def on_checkbox_toggled(self):
         print("Checbox toggled, new state: %s" %self.cb_value.get())
-        for callback in self.cb_value_callbacks:
-            asyncio.create_task( callback(self.cb_value.get()) )
+        for cb, cb_args in self.cb_value_callbacks:
+            asyncio.create_task( cb(*cb_args, self.cb_value.get()) )
 
     def on_setpoint_changed(self, event):
         # TODO: Possibly add validation here
         self.set(self.set_value.get())
-        for callback in self.set_value_callbacks:
-            asyncio.create_task( callback(self.set_value.get()) )
+        for cb, cb_args in self.set_value_callbacks:
+            asyncio.create_task( cb(*cb_args, self.set_value.get()) )
 
     def reset_setpoint(self, event):
         self.set_value.set(self.prev_set_value)
@@ -118,10 +118,12 @@ class DoField(Field):
                          **kwargs
                          )
         global kecu
+        self.channel = channel
         node = kecu.nodes.get(node_id, None)
         if node:
             device = node._device
-            # device.channels[channel].callbacks.append()
+            device.channels[channel].callbacks.append(self.update_checkbox)
+            self.cb_value_callbacks.append((node.set_channel, self.channel))
 
 class MfcField(Field):
     def __init__(self, node_id, label, parent_frame, **kwargs):
@@ -139,7 +141,7 @@ class MfcField(Field):
             device = node._device
             device.channels[(0x2F00, 0x01)].callbacks.append(self.update_setpoint) # On read setpoint
             device.channels[(0x2C00, 0x01)].callbacks.append(self.update_monitor) # On read actual flow
-            self.set_value_callbacks.append(node.set_flow)
+            self.set_value_callbacks.append((node.set_flow,))
 
 class MonitorField(Field):
     def __init__(self, node_id, channel, label, parent_frame, **kwargs):
@@ -258,7 +260,6 @@ class App(tk.Tk):
 
         # # Scenthound
         sh_mfc_frame = tk.LabelFrame(sh_frame, text="Mass flow controllers", bd=1)
-        
         sh_mfc_frame.grid(row=0, column=0)
         # SH:Flows
         self.fields[NodeId.SH_MFC5_RGT] = MfcField(NodeId.SH_MFC5_RGT, "Reagent flow", sh_mfc_frame, row=0, column=0)
@@ -302,9 +303,14 @@ async def initialize_kecu():
     await kecu.initialize()
     for node_id, node in kecu._app._node_dict.items():
         if node._device.node_type == NodeType.MFC:
-            await node.start_measurement(index=0x2F00, subindex=0x01, interval=100)
-            await node.start_measurement(index=0x2C00, subindex=0x01, interval=100)
-        else:
+            pass
+            # await node.start_measurement(index=0x2F00, subindex=0x01, interval=100)
+            # await node.start_measurement(index=0x2C00, subindex=0x01, interval=100)
+        elif node._device.node_type == NodeType.AI:
+            pass
+            # await node.start_measurement(interval=100)
+        elif node._device.node_type == NodeType.DIO:
+            pass
             await node.start_measurement(interval=100)
 
 
@@ -313,7 +319,10 @@ async def measure():
     try:
         while True:
             print('.')
-            node_id, ntf, data = await kecu.wait_for_notification()
+            try:
+                node_id, ntf, data = await asyncio.wait_for(kecu.wait_for_notification(), timeout=1)
+            except asyncio.TimeoutError:
+                continue
             print('..')
             try:
                 # Notify app
