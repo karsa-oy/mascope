@@ -98,6 +98,7 @@ def parse_cmd_args():
                  'data_pool_path=',
                  'data_pool_mask=',
                  'streamer_type=',
+                 'target_data_pool_path=',
                  'url=',
                  ])
     for opt, arg in opts:

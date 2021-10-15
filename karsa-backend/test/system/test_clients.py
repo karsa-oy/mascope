@@ -283,8 +283,8 @@ class TestFileStreamerCase(BaseTestClientCase):
                            '3-DataFile_2021.08.02-01h01m00s.h5',
                            '4-DataFile_2021.08.02-01h01m00s.h5']
         cls.data_collection_path = os.path.abspath(os.path.join(os.curdir, cls.client.instrument_name))
-        if os.path.isdir(cls.data_collection_path):
-            shutil.rmtree(cls.data_collection_path)
+        # if os.path.isdir(cls.data_collection_path):
+        #     shutil.rmtree(cls.data_collection_path)
 
     @classmethod
     def tearDownClass(cls):

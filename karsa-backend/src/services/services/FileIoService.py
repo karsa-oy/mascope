@@ -10,7 +10,6 @@ Created on Thu May  7 12:43:13 2020
 """
 
 import os
-import time
 import asyncio
 import fnmatch
 import json
@@ -32,11 +31,137 @@ from karsalib.datapool import METADATA_VERSION_NUMBER
 DATA_VERSION_NUMBER = '0.01'
 
 
-
 client = None
 
 # Cache for data arrays
 cache = LRUDict(10)
+
+
+from shutil import rmtree
+class zarr_sdk:
+    @staticmethod
+    def acquisition_coordinates(data, data_root='', overwrite=False):
+        # First filesystem operation in acquisition api sequence:
+        #   acquisition_coordinates - tps_parameter_info -
+        #   acquired_spectrum - acquired_tps_data - acquisition_finished
+        # Returns acquisition item shared through the acquisiiton api
+        value = data['value']
+        filename = value.get('filename')
+        mz = np.frombuffer( value['mz'], dtype=np.float32 )
+        t_range = value['t_range']
+
+        data_path = parse_path_from_sample_name(filename)
+        data_path = os.path.join(data_root, data_path)
+        if os.path.exists(data_path):
+            if overwrite:
+                rmtree(data_path)
+            else:
+                raise FileExistsError(data_path)
+        filename_signal = filename_to_zarr_path(filename, 'signal')
+        filename_signal = os.path.join(data_root, filename_signal)
+        signal_array = ExtendableDataArray(path=filename_signal,
+                                            array_module=da
+                                            )
+        signal_array.init_array(dims=('mz', 'time'),
+                                coords=[mz, []],
+                                name='signal'
+                                )
+        filename_period = filename_to_zarr_path(filename, 'signal_period')
+        filename_period = os.path.join(data_root, filename_period)
+        period_array = ExtendableDataArray(path=filename_period,
+                                            array_module=np
+                                            )
+        period_array.init_array(dims=('time'),
+                                coords=[[]],
+                                name='signal_period'
+                                )
+        properties = {'filename': filename,
+                        'length': float(t_range[1]),
+                        'range': [ float(mz[0]), float(mz[-1]) ],
+                        'data_version': DATA_VERSION_NUMBER,
+                        'metadata_version': METADATA_VERSION_NUMBER,
+                    }
+        prop_path = os.path.join(
+                        data_root,
+                        parse_path_from_sample_name(filename),
+                        '.props'
+                        )
+        with open(prop_path, 'w') as f:
+            json.dump(properties, f, indent=4)
+
+        return {'data_root': data_root,
+                'signal': signal_array,
+                'signal_period': period_array,
+                'attrs': properties,
+                }
+
+    @staticmethod
+    def tps_parameter_info(data, item):
+        value = data['value']
+        filename = filename_to_zarr_path(value['filename'], 'tps')
+        filename = os.path.join(item['data_root'], filename)
+        tps_info = value['tps_info']
+        tps_array = ExtendableDataArray(path=filename,
+                                        array_module=da
+                                        )
+        tps_array.init_array(dims=('parameter', 'time'),
+                             coords=[tps_info, []],
+                             name='tps'
+                             )
+        item.update({'tps': tps_array})
+
+    @staticmethod
+    def acquired_spectrum(data, item):
+        value = data['value']
+        ti = np.array( [value['t']], dtype=np.float32 )
+        period = np.array( [value['period']], dtype=np.float32 )
+        # print(ti.item())
+        spec = np.frombuffer(value['spec'], dtype=np.float32)
+        spec = spec.reshape(-1, 1)
+        if 'mz' in value:
+            # mz coordinates provided with data (Orbitrap)
+            mz = np.frombuffer(value['mz'], dtype=np.float32)
+            mz = mz.reshape(-1,)
+        else:
+            # Use mz coordinates from signal_array (TOF)
+            mz = item['signal']['mz']
+        # Extend data arrays (write to file)
+        item['signal'].extend_array(spec,
+                                    [mz, ti],
+                                    'time')
+        item['signal_period'].extend_array(period,
+                                            [ti],
+                                            'time')
+
+    @staticmethod
+    def acquired_tps_data(data, item):
+        value = data['value']
+        ti = np.array( [value.get('t')], dtype=np.float32 )
+        tps_data = np.frombuffer( value.get('data'), dtype=np.float32)
+        tps_data = tps_data.reshape(-1, 1)
+        tps_info = item['tps']['parameter']
+        item['tps'].extend_array(tps_data,
+                                [tps_info, ti],
+                                'time'
+                                )
+
+    @staticmethod
+    def acquisition_finished(data, item):
+        filename = data['value']['filename']
+        final_length = float(item['signal'].time[-1] + item['signal_period'][-1])
+        # Update properties
+        item['attrs'].update({'length': final_length})
+        # Write properties
+        prop_path = os.path.join(item['data_root'],
+                                parse_path_from_sample_name(filename),
+                                '.props')
+        with open(prop_path, 'w') as f:
+            json.dump(item['attrs'], f, indent=4)
+        # flush arrays
+        arrays = [item['signal'], item['signal_period']]
+        for a in arrays:
+            if isinstance(a, ExtendableDataArray):
+                a.flush()
         
 
 class FileIoNamespace(BaseClientNamespace):
@@ -87,62 +212,19 @@ class FileIoNamespace(BaseClientNamespace):
             keys: 'mz' and 'time'
         """
         global cache
-
-        value = data['value']
-        filename_base = value.get('filename')
+        filename = data['value']['filename']
+        self.log(filename)
         kwargs = get_client_notification_context(data)
-        print("Start acquiring sample: %s" %filename_base)
-        
-        mz = np.frombuffer( value['mz'], dtype=np.float32 )
-        t_range = value['t_range']
-
-        filename_signal = filename_to_zarr_path(filename_base, 'signal')
-
-        if os.path.exists(filename_signal):
-            # Should hit here only when trying to import a file which has already been imported/acquired
-            print("File %s exists already! Canceling import" %filename_base)
+        try:
+            cache_item = zarr_sdk.acquisition_coordinates(data)
+        except FileExistsError:
+            self.log(f"FileExistsError: {filename} acquisition cancelled")
             await self.emit_client_notification('stop_raw_import', {}, **kwargs)
-            return
-
-        signal_array = ExtendableDataArray(path=filename_signal,
-                                           array_module=da
-                                           )
-        signal_array.init_array(dims=('mz', 'time'),
-                                coords=[mz, []],
-                                name='signal'
-                                )
-        filename_period = filename_to_zarr_path(filename_base, 'signal_period')
-        period_array = ExtendableDataArray(path=filename_period,
-                                           array_module=np
-                                           )
-        period_array.init_array(dims=('time'),
-                                coords=[[]],
-                                name='signal_period'
-                                )
-        # Collect properties
-        properties = {'filename': filename_base,
-                      'length': float(t_range[1]),
-                      'range': [ float(mz[0]), float(mz[-1]) ],
-                      'data_version': DATA_VERSION_NUMBER,
-                      'metadata_version': METADATA_VERSION_NUMBER,
-                      }
-        # Write properties
-        prop_path = os.path.join(
-                        parse_path_from_sample_name(filename_base),
-                        '.props'
-                        )
-        with open(prop_path, 'w') as f:
-            json.dump(properties, f, indent=4)
-
-        # Put to cache
-        cache_item_dict = {'signal': signal_array,
-                           'signal_period': period_array,
-                           'attrs': properties, # attach properties to xarray.DataArray attrs
-                           }
-        cache_item = AttrDict(cache_item_dict)
-        cache[filename_base] = cache_item
-        # print("cache: %s" %str(cache))
+            return {}
+        cache_item = AttrDict(cache_item)
+        cache[filename] = cache_item
         return data['callback_data']
+
 
     async def on_acquired_spectrum(self, data):
         """Receive new spectrum, add to cache
@@ -153,106 +235,45 @@ class FileIoNamespace(BaseClientNamespace):
             keys: 'filename', 'i', 't', 'spec', 'period', ('mz')
         """
         global cache
-
-        value = data['value']
-        filename_base = value['filename']
-
-        ti = np.array( [value['t']], dtype=np.float32 )
-        period = np.array( [value['period']], dtype=np.float32 )
-        print(ti.item())
-        spec = np.frombuffer(value['spec'], dtype=np.float32)
-        spec = spec.reshape(-1, 1)
-
-        # Get data arrays from cache
-        signal_array = cache[filename_base].signal
-        period_array = cache[filename_base].signal_period
-
-        if 'mz' in value:
-            # mz coordinates provided with data (Orbitrap)
-            mz = np.frombuffer(value['mz'], dtype=np.float32)
-            mz = mz.reshape(-1,)
-        else:
-            # Use mz coordinates from signal_array (TOF)
-            mz = signal_array.mz
-
-        # Extend data arrays (write to file)
-        signal_array.extend_array(spec,
-                                  [mz, ti],
-                                  'time'
-                                  )
-        period_array.extend_array(period,
-                                  [ti],
-                                  'time'
-                                  )
+        filename = data['value']['filename']
+        cache_item = cache.get(filename)
+        if not cache_item:
+            self.log(f"Warning: {filename} was skipped")
+            return
+        zarr_sdk.acquired_spectrum(data, cache_item)
         return data['callback_data']
+
 
     async def on_acquired_tps_data(self, data):
         global cache
+        filename = data['value']['filename']
+        cache_item = cache.get(filename)
+        if not cache_item:
+            self.log(f"Warning: {filename} was skipped")
+            return
+        zarr_sdk.acquired_tps_data(data, cache_item)
 
-        value = data['value']
-        filename_base = value.get('filename')
-        ti = np.array( [value.get('t')], dtype=np.float32 )
-        tps_data = np.frombuffer( value.get('data'), dtype=np.float32)
-        tps_data = tps_data.reshape(-1, 1)
-        tps_array = cache[filename_base].tps
-        tps_info = tps_array.parameter
-        tps_array.extend_array(tps_data,
-                               [tps_info, ti],
-                               'time'
-                               )
 
     async def on_acquisition_finished(self, data):
         global cache
-        value = data['value']
-        filename_base = value['filename']
-        cache_item = cache[filename_base]
-        print("Finished acquiring file: %s" %filename_base)
-        
-        final_length = float(cache_item.signal.time[-1] +
-                             cache_item.signal_period[-1]
-                             )
+        filename = data['value']['filename']
+        self.log(filename)
+        cache_item = cache.get(filename)
+        if not cache_item:
+            self.log(f"Warning: {filename} was skipped")
+            return
+        zarr_sdk.acquisition_finished(data, cache_item)
 
-        # Update properties
-        properties = cache_item['attrs']
-        properties.update({'length': final_length
-                           })
-        # Write properties
-        prop_path = os.path.join(
-                        parse_path_from_sample_name(filename_base),
-                        '.props'
-                        )
-        with open(prop_path, 'w') as f:
-            json.dump(properties, f, indent=4)
-
-        arrays_to_flush = ['signal', 'signal_period']
-        for key in arrays_to_flush:
-            # Flush arrays
-            array = cache_item.get(key)
-            if isinstance(array, ExtendableDataArray):
-                print("Flush %s array" %key)
-                array.flush()
 
     async def on_tps_parameter_info(self, data):
         global cache
-
-        value = data['value']
-        filename_base = value.get('filename')
-        filename = filename_to_zarr_path(filename_base, 'tps')
-
-        print("Writing TPS data into: %s" %filename)
-
-        tps_info = value.get('tps_info')
-        
-        tps_array = ExtendableDataArray(path=filename,
-                                        array_module=da
-                                        )
-        tps_array.init_array(dims=('parameter', 'time'),
-                             coords=[tps_info, []],
-                             name='tps'
-                             )
-        cache_item = cache[filename_base]
-        cache_item.update({'tps': tps_array})
-        cache[filename_base] = cache_item
+        filename = data['value']['filename']
+        self.log(filename)
+        cache_item = cache.get(filename)
+        if not cache_item:
+            self.log(f"Warning: {filename} was skipped")
+            return
+        zarr_sdk.tps_parameter_info(data, cache_item)
     # -----------------------------------------
 
 

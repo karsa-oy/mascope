@@ -189,6 +189,8 @@ class FileStreamerPrivateNamespace(BaseClientNamespace):
                     self.parent.requests.cache_delete_key(client_room)
 
     def cb_progress(self, data):
+        if not data:
+            return
         job_id = (data['client_room'], data['source_filename'])
         streamer = self.parent.in_progress.get(job_id)
         if streamer:
