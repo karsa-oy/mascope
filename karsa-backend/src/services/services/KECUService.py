@@ -38,6 +38,40 @@ class KECU():
         # for node_id, node in self._app._node_dict.items():
         #     node.start_measurement(interval=10)
 
+    async def run(self):
+        try:
+            while True:
+                print('.')
+                try:
+                    node_id, ntf, data = await asyncio.wait_for(
+                                            self.wait_for_notification(),
+                                            timeout=1
+                                            )
+                except asyncio.TimeoutError:
+                    continue
+                print('..')
+                try:
+                    # Notify app
+                    ntf_handler = getattr(self._app,
+                                          'on_{}'.format(ntf.name)
+                                          )
+                    await ntf_handler(node_id)
+                except AttributeError:
+                    pass
+                try:
+                    # Notify node
+                    # print('on_{}({})'.format(ntf.name, data))
+                    ntf_handler = getattr(self.nodes[node_id],
+                                          'on_{}'.format(ntf.name)
+                                          )
+                    await ntf_handler(data)
+                except Exception as e:
+                    print(e)
+        except asyncio.CancelledError:
+            print("KECU.run() task cancelled")
+        finally:
+            await self.disconnect()
+
     async def wait_for_notification(self):
         return await self._meas.get_data()
 
@@ -62,13 +96,7 @@ class KECUServiceClient(BaseServiceClient):
         global kecu
 
         while True:
-            node_id, ntf, data = await kecu.wait_for_notification()
-            # Notify app
-            ntf_handler = getattr(kecu._app, 'on_{}'.format(ntf))
-            await ntf_handler(node_id)
-            # Notify node
-            ntf_handler = getattr(kecu.nodes[node_id], 'on_{}'.format(ntf))
-            await ntf_handler(data)
+            await asyncio.sleep(1)
 
 
 def run():
