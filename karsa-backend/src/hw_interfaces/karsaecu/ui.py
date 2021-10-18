@@ -61,15 +61,14 @@ class Field():
         return self.set_value.get()
 
     def on_checkbox_toggled(self):
-        print("Checbox toggled, new state: %s" %self.cb_value.get())
-        for cb, cb_args in self.cb_value_callbacks:
-            asyncio.create_task( cb(*cb_args, self.cb_value.get()) )
+        for cb in self.cb_value_callbacks:
+            asyncio.create_task( cb(self.channel, self.cb_value.get()) )
 
     def on_setpoint_changed(self, event):
         # TODO: Possibly add validation here
         self.set(self.set_value.get())
-        for cb, cb_args in self.set_value_callbacks:
-            asyncio.create_task( cb(*cb_args, self.set_value.get()) )
+        for cb in self.set_value_callbacks:
+            asyncio.create_task( cb(self.set_value.get()) )
 
     def reset_setpoint(self, event):
         self.set_value.set(self.prev_set_value)
@@ -123,7 +122,7 @@ class DoField(Field):
         if node:
             device = node._device
             device.channels[channel].callbacks.append(self.update_checkbox)
-            self.cb_value_callbacks.append((node.set_channel, self.channel))
+            self.cb_value_callbacks.append(node.set_channel)
 
 class MfcField(Field):
     def __init__(self, node_id, label, parent_frame, **kwargs):
@@ -141,7 +140,7 @@ class MfcField(Field):
             device = node._device
             device.channels[(0x2F00, 0x01)].callbacks.append(self.update_setpoint) # On read setpoint
             device.channels[(0x2C00, 0x01)].callbacks.append(self.update_monitor) # On read actual flow
-            self.set_value_callbacks.append((node.set_flow,))
+            self.set_value_callbacks.append(node.set_flow)
 
 class MonitorField(Field):
     def __init__(self, node_id, channel, label, parent_frame, **kwargs):
@@ -191,10 +190,10 @@ class App(tk.Tk):
         cal_frame = tk.LabelFrame(text="Calibrator", bd=1)
         fp_frame = tk.LabelFrame(text="Flushplate", bd=1)
         # Grid 'em
-        mion_frame.grid(row=0, column=0)
-        sh_frame.grid(row=1, column=0)
-        cal_frame.grid(row=2, column=0)
-        fp_frame.grid(row=3, column=0)
+        mion_frame.grid(row=0, column=0, sticky='EW')
+        sh_frame.grid(row=1, column=0, sticky='EW')
+        cal_frame.grid(row=2, column=0, sticky='EW')
+        fp_frame.grid(row=3, column=0, sticky='EW')
 
         # MION frame
         mion_common_frame = tk.LabelFrame(mion_frame, text="Common", bd=1)
@@ -287,7 +286,7 @@ class App(tk.Tk):
     def style(self):
         self.title("KECU")
         # self.geometry('400x400')
-        self.configure(background='grey')
+        # self.configure(background='grey')
 
     async def updater(self, interval):
         while True:
@@ -304,52 +303,22 @@ async def initialize_kecu():
     for node_id, node in kecu._app._node_dict.items():
         if node._device.node_type == NodeType.MFC:
             pass
-            # await node.start_measurement(index=0x2F00, subindex=0x01, interval=100)
-            # await node.start_measurement(index=0x2C00, subindex=0x01, interval=100)
+            await node.start_measurement(index=0x2F00, subindex=0x01, interval=100)
+            await node.start_measurement(index=0x2C00, subindex=0x01, interval=100)
         elif node._device.node_type == NodeType.AI:
             pass
-            # await node.start_measurement(interval=100)
+            await node.start_measurement(interval=100)
         elif node._device.node_type == NodeType.DIO:
             pass
             await node.start_measurement(interval=100)
 
-
-async def measure():
-    global kecu
-    try:
-        while True:
-            print('.')
-            try:
-                node_id, ntf, data = await asyncio.wait_for(kecu.wait_for_notification(), timeout=1)
-            except asyncio.TimeoutError:
-                continue
-            print('..')
-            try:
-                # Notify app
-                ntf_handler = getattr(kecu._app, 'on_{}'.format(ntf.name))
-                # print("Notify app")
-                await ntf_handler(node_id)
-            except AttributeError:
-                pass
-            try:
-                # Notify node
-                print('on_{}({})'.format(ntf.name, data))
-                ntf_handler = getattr(kecu.nodes[node_id], 'on_{}'.format(ntf.name))
-                print("Notify node")
-                await ntf_handler(data)
-                print("Notified")
-            except Exception as e:
-                print(e)
-    except asyncio.CancelledError:
-        print("measure task cancelled")
-        await kecu.disconnect()
 
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()
     tasks = []
     if len(sys.argv) > 1 and sys.argv[1] == 'kecu':
         loop.run_until_complete(initialize_kecu())
-        tasks.append( loop.create_task(measure()) )
+        tasks.append( loop.create_task(kecu.run()) )
     app = App(loop, kecu, tasks=tasks)
     try:
         loop.run_forever()

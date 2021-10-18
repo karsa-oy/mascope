@@ -54,8 +54,8 @@ class Channel:
     value: float = field(default=None, init=False)
     _value: float = field(init=False, repr=False)
 
-    def __post_init__(self):
-        self.callbacks.append(print)
+    # def __post_init__(self):
+    #     self.callbacks.append(print)
 
     @property
     def value(self) -> float:
@@ -304,7 +304,7 @@ class AiNode(BaseNode):
             value_int = struct.unpack('h', ch_value_b)[0] # Signed16
             value = value_int * 1e-3
             self._device.channels[ch_index].voltage = value
-            print("AI Channel %s: %.4f" %(ch_index, value))
+            # print("AI Channel %s: %.4f" %(ch_index, value))
 
     async def on_NTF_AI_MEAS_DATA_CH_5_6(self, data):
         if len(data) != 4:
@@ -315,7 +315,7 @@ class AiNode(BaseNode):
             value_int = struct.unpack('h', ch_value_b)[0] # Signed16
             value = value_int * 1e-3
             self._device.channels[ch_index].voltage = value
-            print("AI Channel %s: %.4f" %(ch_index, value))
+            # print("AI Channel %s: %.4f" %(ch_index, value))
 
 
 class DioNode(BaseNode):
@@ -341,15 +341,17 @@ class DioNode(BaseNode):
         # Convert byte to int
         data_int = int.from_bytes(data, byteorder='little')
         # Unpack byte into bit string
-        bit_string = format(data_int, '08b')
+        bit_string = format(data_int, '08b')[::-1] # Reverse bit order
         for i, bit in enumerate(bit_string):
             self._device.channels[i].value = bool(int(bit))
-            print("DIO Channel %s: %s" %(i, bool(int(bit))))
+            # print("DIO Channel %s: %s" %(i, bool(int(bit))))
 
     async def set_channel(self, channel_index, value):
-        # payload = struct.pack('f', value) # Real32
-        # return await self._set_data(0x2F00, 0x01, payload) # Flow setpoint
-        return
+        self._device.channels[channel_index].value = value
+        binary_string = ''.join(['%i' %ch.value for ch in self._device.channels])[::-1]
+        payload = int(binary_string, 2).to_bytes(len(binary_string) // 8, byteorder='little')
+        return await self._set_data(0x6200, 0x01, payload) # Flow setpoint
+
 
 class MfcNode(BaseNode):
     def __init__(self, client: AsyncTCPClient, device: MfcDevice):
