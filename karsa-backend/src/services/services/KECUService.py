@@ -3,6 +3,7 @@ import asyncio
 from karsaecu.app import KarsaClient
 from karsaecu.errors import ErrorCode
 from karsaecu.meas import KarsaMeasClient
+from karsaecu.nodes import NodeType
 
 from karsalib.client import BaseClientNamespace, BaseServiceClient
 from karsalib.util import parse_cmd_args
@@ -76,6 +77,17 @@ class KECU():
         return await self._meas.get_data()
 
 
+async def initialize_kecu(kecu):
+    await kecu.connect()
+    await kecu.initialize()
+    for node_id, node in kecu._app._node_dict.items():
+        if node._device.node_type == NodeType.MFC:
+            await node.start_measurement(index=0x2F00, subindex=0x01, interval=10) # Flow setpoint
+            await node.start_measurement(index=0x2C00, subindex=0x01, interval=10) # Flow monitor
+        elif node._device.node_type == NodeType.AI:
+            await node.start_measurement(interval=10)
+        elif node._device.node_type == NodeType.DIO:
+            await node.start_measurement(interval=10)
 
 
 class KECUServiceNamespace(BaseClientNamespace):
