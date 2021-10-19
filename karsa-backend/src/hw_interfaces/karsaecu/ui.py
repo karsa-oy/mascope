@@ -5,7 +5,7 @@ import tkinter as tk
 from collections import defaultdict
 
 from karsaecu.nodes import DEVICES, NODES, NodeId, NodeType
-from services.KECUService import KECU
+from services.KECUService import KECU, initialize_kecu
 
 
 class Field():
@@ -18,9 +18,9 @@ class Field():
         if monitorable:
             self.mon_value = tk.DoubleVar()
             self.mon_entry = tk.Entry(self.frame,
-                                        textvariable=self.mon_value,
-                                        state='disabled'
-                                        )
+                                      textvariable=self.mon_value,
+                                      state='disabled'
+                                      )
             self.mon_entry.grid(row=0, column=2)
         else:
             self.mon_value = None
@@ -29,8 +29,8 @@ class Field():
             self.set_value_callbacks = []
             self.prev_set_value = self.set_value.get()
             self.set_entry = tk.Entry(self.frame,
-                                        textvariable=self.set_value,
-                                        )
+                                      textvariable=self.set_value,
+                                      )
             self.set_entry.bind('<Key-Return>', self.on_setpoint_changed)
             self.set_entry.bind('<FocusOut>', self.reset_setpoint)
             self.set_entry.grid(row=0, column=1)
@@ -41,9 +41,9 @@ class Field():
             self.cb_value = tk.BooleanVar()
             self.cb_value_callbacks = []
             self.checkbox = tk.Checkbutton(self.frame,
-                                            variable=self.cb_value,
-                                            command=self.on_checkbox_toggled
-                                            )
+                                           variable=self.cb_value,
+                                           command=self.on_checkbox_toggled
+                                           )
             self.checkbox.grid(row=0, column=3)
         else:
             self.cb_value = None
@@ -83,9 +83,12 @@ class Field():
         self.cb_value.set(bool(new_value))
 
     def update_monitor(self, new_value):
-        self.mon_value.set(new_value)
+        self.mon_value.set(round(new_value, 2))
         
     def update_setpoint(self, new_value):
+        if self.frame.focus_get() == self.set_entry:
+            # Avoid resetting setpoint while trying to adjust it
+            return
         self.set(new_value)
 
 
@@ -296,28 +299,12 @@ class App(tk.Tk):
 
 kecu = KECU()
 
-async def initialize_kecu():
-    global kecu
-    await kecu.connect()
-    await kecu.initialize()
-    for node_id, node in kecu._app._node_dict.items():
-        if node._device.node_type == NodeType.MFC:
-            pass
-            await node.start_measurement(index=0x2F00, subindex=0x01, interval=100)
-            await node.start_measurement(index=0x2C00, subindex=0x01, interval=100)
-        elif node._device.node_type == NodeType.AI:
-            pass
-            await node.start_measurement(interval=100)
-        elif node._device.node_type == NodeType.DIO:
-            pass
-            await node.start_measurement(interval=100)
-
 
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()
     tasks = []
     if len(sys.argv) > 1 and sys.argv[1] == 'kecu':
-        loop.run_until_complete(initialize_kecu())
+        loop.run_until_complete(initialize_kecu(kecu))
         tasks.append( loop.create_task(kecu.run()) )
     app = App(loop, kecu, tasks=tasks)
     try:
