@@ -1,16 +1,18 @@
 import asyncio
+import csv
+
+from datetime import datetime
 
 from karsaecu.app import KarsaClient
 from karsaecu.errors import ErrorCode
 from karsaecu.meas import KarsaMeasClient
-from karsaecu.nodes import NodeType
+from karsaecu.nodes import NodeType, DEVICES
 
 from karsalib.client import BaseClientNamespace, BaseServiceClient
 from karsalib.util import parse_cmd_args
 
 
 kecu = None
-
 
 class KECU():
     def __init__(self) -> None:
@@ -36,8 +38,6 @@ class KECU():
     async def initialize(self):
         await self._app.get_node_list()
         self.nodes = self._app._node_dict
-        # for node_id, node in self._app._node_dict.items():
-        #     node.start_measurement(interval=10)
 
     async def run(self):
         try:
@@ -75,6 +75,36 @@ class KECU():
 
     async def wait_for_notification(self):
         return await self._meas.get_data()
+
+    async def writer(self, filename='test.csv', interval=1):
+        # Write header
+        field_names = ['timestamp',
+                       *[(node_id.name+'('+channel.description+')')
+                         for node_id, device in DEVICES.items() for _, channel in device.channels.items()
+                         ]
+                       ]
+        with open(filename, 'a') as f:
+            writer = csv.writer(f)
+            writer.writerow(field_names)
+
+        while True:
+            # Write values
+            timestamp = datetime.now().isoformat()
+            values = [timestamp]
+            for node_id, device in DEVICES.items():
+                for _, channel in device.channels.items():
+                    if node_id in self.nodes:
+                        values.append(channel.value)
+                    else:
+                        values.append(None)
+
+            with open(filename, 'a') as f:
+                writer = csv.writer(f)
+                writer.writerow([timestamp, *values])
+
+            # Wait for interval
+            await asyncio.sleep(interval)
+    
 
 
 async def initialize_kecu(kecu):

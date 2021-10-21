@@ -94,6 +94,7 @@ MION_AI_CHANNELS = [
     AiChannel("Ion filter", unit="V", conversion=lambda x: 101.0*x+0.0),
     AiChannel("Ion filter", unit="V", conversion=lambda x: 101.0*x+0.0)
 ]
+MION_AI_CHANNELS = {i: ch for i, ch in enumerate(MION_AI_CHANNELS)}
 
 SH_AI_CHANNELS = [
     AiChannel("", unit="", conversion=lambda x: x),
@@ -103,6 +104,7 @@ SH_AI_CHANNELS = [
     AiChannel("", unit="", conversion=lambda x: x),
     AiChannel("", unit="", conversion=lambda x: x)
 ]
+SH_AI_CHANNELS = {i: ch for i, ch in enumerate(SH_AI_CHANNELS)}
 
 @dataclass
 class DioChannel(Channel):
@@ -118,6 +120,7 @@ MION_DIO_CHANNELS = [
     DioChannel("N/C", io=0),
     DioChannel("N/C", io=0),
 ]
+MION_DIO_CHANNELS = {i: ch for i, ch in enumerate(MION_DIO_CHANNELS)}
 
 SH_DIO_CHANNELS = [
     DioChannel("", io=1),
@@ -129,6 +132,7 @@ SH_DIO_CHANNELS = [
     DioChannel("", io=0),
     DioChannel("", io=0),
 ]
+SH_DIO_CHANNELS = {i: ch for i, ch in enumerate(SH_DIO_CHANNELS)}
 
 @dataclass
 class MfcChannel(Channel):
@@ -348,7 +352,7 @@ class DioNode(BaseNode):
 
     async def set_channel(self, channel_index, value):
         self._device.channels[channel_index].value = value
-        binary_string = ''.join(['%i' %ch.value for ch in self._device.channels])[::-1]
+        binary_string = ''.join(['%i' %ch.value for _, ch in self._device.channels.items()])[::-1]
         payload = int(binary_string, 2).to_bytes(len(binary_string) // 8, byteorder='little')
         return await self._set_data(0x6200, 0x01, payload) # Flow setpoint
 

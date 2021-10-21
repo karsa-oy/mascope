@@ -4,8 +4,11 @@ import tkinter as tk
 
 from collections import defaultdict
 
-from karsaecu.nodes import DEVICES, NODES, NodeId, NodeType
+from karsaecu.nodes import NodeId
 from services.KECUService import KECU, initialize_kecu
+
+
+kecu = None
 
 
 class Field():
@@ -48,6 +51,8 @@ class Field():
         else:
             self.cb_value = None
 
+        self.disable()
+
     @property
     def monitor(self):
         if self.mon_value is None:
@@ -59,6 +64,26 @@ class Field():
         if self.set_value is None:
             raise ValueError("Non-settable Field has no setpoint")
         return self.set_value.get()
+
+    def disable(self):
+        try:
+            self.set_entry.configure(state=tk.DISABLED)
+        except AttributeError:
+            pass
+        try:
+            self.checkbox.configure(state=tk.DISABLED)
+        except AttributeError:
+            pass
+
+    def enable(self):
+        try:
+            self.set_entry.configure(state=tk.NORMAL)
+        except AttributeError:
+            pass
+        try:
+            self.checkbox.configure(state=tk.NORMAL)
+        except AttributeError:
+            pass
 
     def on_checkbox_toggled(self):
         for cb in self.cb_value_callbacks:
@@ -108,6 +133,12 @@ class DiField(Field):
         if node:
             device = node._device
             device.channels[channel].callbacks.append(self.update_checkbox)
+
+    def enable(self):
+        try:
+            self.set_entry.configure(state=tk.NORMAL)
+        except AttributeError:
+            pass
 
 class DoField(Field):
     def __init__(self, node_id, channel, label, parent_frame, **kwargs):
@@ -184,6 +215,7 @@ class App(tk.Tk):
         self.fields = defaultdict(list)
         self.build()
         self.style()
+        self.update_fields()
 
     def build(self):
         global kecu
@@ -214,49 +246,35 @@ class App(tk.Tk):
         mion_sensor_frame.grid(row=5, column=0)
 
         # MION:Common
-        self.fields[NodeId.MION_MFC5_MAIN] = MfcField(NodeId.MION_MFC5_MAIN, "Main flow", mion_common_frame, row=0, column=0)
+        self.fields[NodeId.MION_MFC5_MAIN].append(MfcField(NodeId.MION_MFC5_MAIN, "Main flow", mion_common_frame, row=0, column=0))
         VoltageField(NodeId.ALL_NODES, "Accelerator voltage", mion_common_frame, row=1, column=0)
         # /
         # MION:IS1
-        self.fields[NodeId.MION_MFC2_SRC1_CRR] = MfcField(NodeId.MION_MFC2_SRC1_CRR, "Carrier flow", mion_is1_frame, row=0, column=0)
-        self.fields[NodeId.MION_MFC1_SRC1_EXH] = MfcField(NodeId.MION_MFC1_SRC1_EXH, "Exhaust flow", mion_is1_frame, row=1, column=0)
+        self.fields[NodeId.MION_MFC2_SRC1_CRR].append(MfcField(NodeId.MION_MFC2_SRC1_CRR, "Carrier flow", mion_is1_frame, row=0, column=0))
+        self.fields[NodeId.MION_MFC1_SRC1_EXH].append(MfcField(NodeId.MION_MFC1_SRC1_EXH, "Exhaust flow", mion_is1_frame, row=1, column=0))
         VoltageField(NodeId.ALL_NODES, "Deflector voltage", mion_is1_frame, row=2, column=0)
         # /
         # MION:IS2
-        self.fields[NodeId.MION_MFC4_SRC2_CRR] = MfcField(NodeId.MION_MFC4_SRC2_CRR, "Carrier flow", mion_is2_frame, row=0, column=0)
-
-        field = MfcField(NodeId.MION_MFC3_SRC2_EXH, "Exhaust flow", parent_frame=mion_is2_frame, row=1, column=0)
-        self.fields[NodeId.MION_MFC3_SRC2_EXH] = field
-
+        self.fields[NodeId.MION_MFC4_SRC2_CRR].append(MfcField(NodeId.MION_MFC4_SRC2_CRR, "Carrier flow", mion_is2_frame, row=0, column=0))
+        self.fields[NodeId.MION_MFC3_SRC2_EXH].append(MfcField(NodeId.MION_MFC3_SRC2_EXH, "Exhaust flow", parent_frame=mion_is2_frame, row=1, column=0))
         VoltageField(NodeId.ALL_NODES, "Deflector voltage", mion_is2_frame, row=2, column=0)
         # /
         # MION:X-ray
-        field = DoField(NodeId.MION_DIO, 4, "Emission", mion_xray_frame, row=0, column=0)
-        self.fields[NodeId.MION_DIO].append(field)
-
-        field = DiField(NodeId.MION_DIO, 1, "Enabled", mion_xray_frame, row=1, column=0)
-        self.fields[NodeId.MION_DIO].append(field)
-
-        field = DiField(NodeId.MION_DIO, 2, "Interlock", mion_xray_frame, row=2, column=0)
-        self.fields[NodeId.MION_DIO].append(field)
-
-        field = DiField(NodeId.MION_DIO, 0, "Tube life", mion_xray_frame, row=3, column=0)
-        self.fields[NodeId.MION_DIO].append(field)
+        self.fields[NodeId.MION_DIO].append(DoField(NodeId.MION_DIO, 4, "Emission", mion_xray_frame, row=0, column=0))
+        self.fields[NodeId.MION_DIO].append(DiField(NodeId.MION_DIO, 3, "Active", mion_xray_frame, row=1, column=0))
+        self.fields[NodeId.MION_DIO].append(DiField(NodeId.MION_DIO, 1, "Enabled", mion_xray_frame, row=2, column=0))
+        self.fields[NodeId.MION_DIO].append(DiField(NodeId.MION_DIO, 2, "Interlock", mion_xray_frame, row=3, column=0))
+        self.fields[NodeId.MION_DIO].append(DiField(NodeId.MION_DIO, 0, "Alert", mion_xray_frame, row=4, column=0))
         # /
         # MION:Ion filter
-        DoField(NodeId.MION_DIO, 5, "Power", mion_if_frame, row=0, column=0)
-        MonitorField(NodeId.MION_AI, 4, "HV+", mion_if_frame, row=1, column=0)
-        MonitorField(NodeId.MION_AI, 5, "HV-", mion_if_frame, row=2, column=0)
+        self.fields[NodeId.MION_DIO].append(DoField(NodeId.MION_DIO, 5, "Power", mion_if_frame, row=0, column=0))   
+        self.fields[NodeId.MION_AI].append(MonitorField(NodeId.MION_AI, 4, "HV+", mion_if_frame, row=1, column=0))
+        self.fields[NodeId.MION_AI].append(MonitorField(NodeId.MION_AI, 5, "HV-", mion_if_frame, row=2, column=0))
         # /
         # MION:Sensors
-        field = MonitorField(NodeId.MION_AI, 0, "Humidity", mion_sensor_frame, row=0, column=0)
-        self.fields[NodeId.MION_AI].append(field)
-
-        field = MonitorField(NodeId.MION_AI, 1, "Temperature", mion_sensor_frame, row=1, column=0)
-        self.fields[NodeId.MION_AI].append(field)
-
-        field = MonitorField(NodeId.MION_AI, 2, "Pressure", mion_sensor_frame, row=2, column=0)
-        self.fields[NodeId.MION_AI].append(field)
+        self.fields[NodeId.MION_AI].append(MonitorField(NodeId.MION_AI, 0, "Humidity", mion_sensor_frame, row=0, column=0))
+        self.fields[NodeId.MION_AI].append(MonitorField(NodeId.MION_AI, 1, "Temperature", mion_sensor_frame, row=1, column=0))
+        self.fields[NodeId.MION_AI].append(MonitorField(NodeId.MION_AI, 2, "Pressure", mion_sensor_frame, row=2, column=0))
         # /
         # //
 
@@ -264,20 +282,20 @@ class App(tk.Tk):
         sh_mfc_frame = tk.LabelFrame(sh_frame, text="Mass flow controllers", bd=1)
         sh_mfc_frame.grid(row=0, column=0)
         # SH:Flows
-        self.fields[NodeId.SH_MFC5_RGT] = MfcField(NodeId.SH_MFC5_RGT, "Reagent flow", sh_mfc_frame, row=0, column=0)
-        self.fields[NodeId.SH_MFC3_SMP] = MfcField(NodeId.SH_MFC3_SMP, "Sample flow", sh_mfc_frame, row=1, column=0)
-        self.fields[NodeId.SH_MFC2_EXH] = MfcField(NodeId.SH_MFC2_EXH, "Exhaust flow", sh_mfc_frame, row=2, column=0)
-        self.fields[NodeId.SH_MFC4_SHT1] = MfcField(NodeId.SH_MFC4_SHT1, "Sheath 1 flow", sh_mfc_frame, row=3, column=0)
-        self.fields[NodeId.SH_MFC1_SHT2] = MfcField(NodeId.SH_MFC1_SHT2, "Sheath 2 flow", sh_mfc_frame, row=4, column=0)
+        self.fields[NodeId.SH_MFC5_RGT].append(MfcField(NodeId.SH_MFC5_RGT, "Reagent flow", sh_mfc_frame, row=0, column=0))
+        self.fields[NodeId.SH_MFC3_SMP].append(MfcField(NodeId.SH_MFC3_SMP, "Sample flow", sh_mfc_frame, row=1, column=0))
+        self.fields[NodeId.SH_MFC2_EXH].append(MfcField(NodeId.SH_MFC2_EXH, "Exhaust flow", sh_mfc_frame, row=2, column=0))
+        self.fields[NodeId.SH_MFC4_SHT1].append(MfcField(NodeId.SH_MFC4_SHT1, "Sheath 1 flow", sh_mfc_frame, row=3, column=0))
+        self.fields[NodeId.SH_MFC1_SHT2].append(MfcField(NodeId.SH_MFC1_SHT2, "Sheath 2 flow", sh_mfc_frame, row=4, column=0))
         # /
         # //
 
         # # Calibrator
-        self.fields[NodeId.CALIB_MFC] = MfcField(NodeId.CALIB_MFC, "Carrier flow", cal_frame, row=0, column=0)
+        self.fields[NodeId.CALIB_MFC].append(MfcField(NodeId.CALIB_MFC, "Carrier flow", cal_frame, row=0, column=0))
         # # //
 
         # # Flushplate
-        self.fields[NodeId.FLSHP_MFC] = MfcField(NodeId.FLSHP_MFC, "Counter flow", fp_frame, row=0, column=0)
+        self.fields[NodeId.FLSHP_MFC].append(MfcField(NodeId.FLSHP_MFC, "Counter flow", fp_frame, row=0, column=0))
         # # //
 
     def close(self):
@@ -291,21 +309,36 @@ class App(tk.Tk):
         # self.geometry('400x400')
         # self.configure(background='grey')
 
+    def update_fields(self):
+        global kecu
+        for node, node_fields in self.fields.items():
+            for field in node_fields:
+                field.enable()
+                if node in kecu.nodes:
+                    field.enable()
+                else:
+                    field.disable()
+
     async def updater(self, interval):
         while True:
             self.update()
             await asyncio.sleep(interval)
 
 
-kecu = KECU()
-
 
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()
     tasks = []
-    if len(sys.argv) > 1 and sys.argv[1] == 'kecu':
+    
+    if len(sys.argv) > 1 and 'kecu' in sys.argv:
+        kecu = KECU()
         loop.run_until_complete(initialize_kecu(kecu))
+        # KECU main loop
         tasks.append( loop.create_task(kecu.run()) )
+        if 'csv' in sys.argv:
+            # KECU csv writer
+            tasks.append( loop.create_task(kecu.writer()) )
+
     app = App(loop, kecu, tasks=tasks)
     try:
         loop.run_forever()
