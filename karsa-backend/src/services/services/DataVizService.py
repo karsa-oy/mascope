@@ -16,6 +16,7 @@ Created on Fri Apr 17 11:35:57 2020
 import asyncio
 import json
 import os
+from re import I
 import numpy as np
 import dask.array as da
 import sqlite3
@@ -32,7 +33,7 @@ from time import time
 from karsalib.client import BaseClientNamespace, BaseServiceClient
 from karsalib.struct import AttrDict, CacheQ
 from karsalib.util import (generate_unique_key,
-                           get_client_notification_args,
+                           get_client_notification_context,
                            parse_cmd_args
                            )
 from karsalib.logging import this_func_name, t_mark
@@ -892,7 +893,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
         value = data['value']
         filename_base = value.get('filename')
         print("Start acquiring sample: %s" %filename_base)
-        
+
         # Cache raw signal in memory
         mz = np.frombuffer( value['mz'], dtype=np.float32 )
         t_range = value['t_range']
@@ -1002,7 +1003,8 @@ class DataVizServiceNamespace(BaseClientNamespace):
                                   'time'
                                   )
         viz_cache_process_requests(filename_base)
-        return data['cnt']
+        # TODO: TOFStreamerClient still uses cnt in callback - remove after updating TOFStreamerClient
+        return data.get('cnt')
 
     async def on_acquisition_finished(self, data):
         value = data['value']

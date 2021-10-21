@@ -484,7 +484,7 @@ class SamplePool():
                                data=data
                                )
 
-    def _make_link(self, source_path, target_path):
+    def _make_link(self, source_path, target_path, overwrite=False):
         """Make symbolic link from directory to another
 
         Used for linking sample directories to experiments.
@@ -497,7 +497,8 @@ class SamplePool():
             Target directory path (experiment)
         """
 
-        # if not os.path.isdir(target_path):
+        if overwrite and os.path.exists(target_path):
+            self._remove_link(target_path)
         if not os.path.exists(target_path):
             if 'win' in sys.platform:
                 # TODO: Junctions/links are incompatible bw win/linux - switch to urls in .attr files
@@ -752,13 +753,13 @@ class SamplePool():
             # Actual sample, link to data file
             sample_data_path = parse_path_from_sample_name(sample)
             # Make link from experiment directory to data file
-            self._make_link(sample_data_path, sample_experiment_path)
+            self._make_link(sample_data_path, sample_experiment_path, overwrite=True)
         # Write attributes
-        self._write_attributes(sample_data_path, attributes, ext='.attrs')
+        self._write_attributes(sample_data_path, attributes, ext='.attrs', overwrite=True)
         # Write method
-        self._write_attributes(sample_data_path, method, ext='.meth')
+        self._write_attributes(sample_data_path, method, ext='.meth', overwrite=True)
         # Write annotations
-        self._write_attributes(sample_data_path, annotations, ext='.annts')
+        self._write_attributes(sample_data_path, annotations, ext='.annts', overwrite=True)
         # Update self.pool
         self.pool[project][experiment].append(sample)
         
@@ -776,169 +777,3 @@ class SamplePool():
                                     (flat_df['sample'].notna())
                                     ]
         self.df = flat_df_clean.set_index(self.df.index.names)
-
-
-
-# class KWatchDog(Thread):
-#     """Thread watching for file system changes in a set path including subfolders.
-    
-#     ...
-    
-#     Attributes
-#     ----------
-#     stop : bool
-#         Shutdown flag
-#     path : str
-#         Path to watch
-#     filewatch : KFileWatch
-#         KFileWatch instance, defining the actions to be taken when change
-#         is detected
-#     observer : Observer
-#         watchdog module Observer instance
-
-#     """
-    
-#     def __init__(self,
-#                  path,
-#                  file_queue=None,
-#                  datapool=None,
-#                  dl_path=None):
-#         """Initialize self
-        
-#         Watchdog is automatically started at initialization
-
-#         Parameters
-#         ----------
-#         path : str
-#             Path to watch
-#         file_queue : Queue, optional
-#             Passed to KFileWatch. The default is None.
-#         datapool : KDataPool, optional
-#             Passed to KFileWatch. The default is None.
-#         dl_path : str, optional
-#             Passed to KFileWatch. The default is None.
-#         """
-        
-#         Thread.__init__(self)
-#         self.stop = False
-#         if os.path.exists(path):
-#             self.path = path
-#             self.start_watch(file_queue, datapool, dl_path)
-#         else:
-#             warnings.warn('Specified path does not exist. KWatchDog not started.')
-#             self.observer = None
-            
-#     def start_watch(self, file_queue, datapool, dl_path):
-#         """Start watchdog
-        
-#         Instantiate KFileWatch and watchdog.observers.Observer
-#         to monitor the set path for file system changes.
-
-#         Parameters
-#         ----------
-#         file_queue : Queue, optional
-#             Passed to KFileWatch. The default is None.
-#         datapool : KDataPool, optional
-#             Passed to KFileWatch. The default is None.
-#         dl_path : str, optional
-#             Passed to KFileWatch. The default is None.
-#         """
-        
-#         self.filewatch = KFileWatch(file_queue, datapool, dl_path)
-#         self.observer = Observer()
-#         self.observer.schedule(self.filewatch, self.path, recursive=True)
-#         self.observer.start()
-    
-#     def run(self):
-#         """Main loop"""
-        
-#         while not self.stop:
-#             sleep(1)
-#         if self.observer is not None:
-#             self.observer.stop()
-    
-#     def stop_watch(self):
-#         """Set shutdown flag"""
-        
-#         self.stop = True
-
-# class KFileWatch(FileSystemEventHandler):
-#     """Class to define the actions to be taken when KWatchDog detects changes
-#     in the file system.
-    
-#     ...
-    
-#     Attributes
-#     ----------
-#     file_queue : Queue or None
-#         Queue to put new file into
-#     datapool : KDataPool or None
-#         KDataPool to append new file into
-#     dl_path : str or None
-#         Path to copy the new file into
-#     new_file : str or None
-#         File name of the last new file after initialization
-#     last_complete : str or None
-#         File name of the second to last new file
-
-#     """
-
-#     def __init__(self, file_queue, datapool, dl_path):
-#         """Initialize self
-
-#         Parameters
-#         ----------
-#         file_queue : Queue
-#             Queue to put new file into
-#         datapool : KDataPool or None
-#             KDataPool to append new file into
-#         dl_path : str or None
-#             Path to copy the new file into
-#         """
-        
-#         FileSystemEventHandler.__init__(self)
-#         self.file_queue = file_queue # Put new file to queue
-#         self.datapool = datapool # Append new file to datapool
-#         self.dl_path = dl_path # Directory to download the new file into
-#         self.new_file = None
-#         self.last_complete = None
-        
-#     def on_created(self, event):
-#         """Action to be taken when new file is detected
-        
-#         It updates the attributes 'new_file' and 'last_complete',
-#         copies the 'last_complete' file into 'dl_path' if defined,
-#         puts the 'last_copied' file into 'file_queue' if defined and
-#         lastly appends 'last_copied' to 'datapool' if defined.
-        
-
-#         Parameters
-#         ----------
-#         event : FileSystemEvent
-#             Detected event in the file system
-#         """
-        
-#         # File was created
-#         if self.new_file is not None:
-#             self.last_complete = self.new_file[:]
-#         self.new_file = event.src_path
-#         # Perform actions to the second to last file
-#         #(TofDaq Recorder creates a file template beforehand in trigger mode)
-#         if self.last_complete is not None:
-#             if self.dl_path is not None:
-#                 # Download
-#                 if not os.path.isdir(self.dl_path):
-#                     os.mkdir(self.dl_path)
-#                 datedir = os.path.split(os.path.split(self.last_complete)[0])[1]
-#                 dst_dir = os.path.join(self.dl_path, datedir)
-#                 if not os.path.isdir(dst_dir):
-#                     os.mkdir(dst_dir)
-#                 fnam = os.path.basename(self.last_complete)
-#                 dst = os.path.join(dst_dir, fnam)
-#                 print('Downloading file: %s' %fnam)
-#                 shutil.copy(self.last_complete, dst)
-#                 last_copied = dst
-#             if self.file_queue is not None:
-#                 self.file_queue.put(last_copied)
-#             if self.datapool is not None:
-#                 self.datapool.append_pool(last_copied)

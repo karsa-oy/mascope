@@ -282,7 +282,6 @@ class TestFileStreamerCase(BaseTestClientCase):
                            '2-DataFile_2021.08.02-01h01m00s.h5',
                            '3-DataFile_2021.08.02-01h01m00s.h5',
                            '4-DataFile_2021.08.02-01h01m00s.h5']
-        cls.raw_samples_stripped = [os.path.splitext(s)[0] for s in cls.raw_samples]
         cls.data_collection_path = os.path.abspath(os.path.join(os.curdir, cls.client.instrument_name))
         if os.path.isdir(cls.data_collection_path):
             shutil.rmtree(cls.data_collection_path)
@@ -291,7 +290,8 @@ class TestFileStreamerCase(BaseTestClientCase):
     def tearDownClass(cls):
         super().tearDownClass()
         if os.path.isdir(cls.data_collection_path):
-            time.sleep(1)
+            # the data_pool dir may be locked for some time
+            time.sleep(3)
             shutil.rmtree(cls.data_collection_path)
 
     def test_01_import_raw_table_datetime_range_empty(self):
@@ -305,7 +305,7 @@ class TestFileStreamerCase(BaseTestClientCase):
 
     def test_02_import_raw_table_datetime_range(self):
         # pre-defined DataPool structure is the test pre-requisite, since
-        # file system operations can not be used for varification until
+        # file system operations can not be used for verification until
         # FileStreamer and unittests are run on different platforms (win/linux)
         # TODO: workaround - declarative sorted list of raw samples;
         # file list from os?
@@ -344,7 +344,9 @@ class TestFileStreamerCase(BaseTestClientCase):
         asyncio.run(
             self.client.emit_stop_raw_import()
         )
-        asyncio.run(asyncio.sleep(3))
+        # TODO: ugly workaround - so far no reliable way to trace stop_raw_import complete - just wait
+        asyncio.run(asyncio.sleep(7))
+
         asyncio.run(
             self.client.emit_raw_import_status(
                 request_id='raw_import_status',
@@ -363,8 +365,9 @@ class TestFileStreamerCase(BaseTestClientCase):
         asyncio.run(
             self.client.emit_stop_raw_import(self.client.raw_samples_data[1:])
         )
-        self.assert_requests_ok()
-        asyncio.run(asyncio.sleep(1))   # let generator update raw import status
+        # TODO: ugly workaround - so far no reliable way to trace stop_raw_import complete - just wait
+        asyncio.run(asyncio.sleep(7))
+
         asyncio.run(
             self.client.emit_raw_import_status(
                 request_id='raw_import_status',
@@ -373,25 +376,25 @@ class TestFileStreamerCase(BaseTestClientCase):
         self.assert_requests_ok(['raw_import_status',])
         self.assertEqual(self.client.raw_import_status_data['progress'], [])
         self.assertEqual(self.client.raw_import_status_data['queue'], {})
+        # only 2 target files were created, other two were cancelled
         if os.path.isdir(self.data_collection_path):
             # this check does not work, when running tests on windows
             names = os.listdir(os.path.join(self.data_collection_path, self.client.data_collection_date))
             names = sorted([n.replace(f'{self.client.instrument_name}_', '', 1) for n in names])
-            self.assertEqual(names, self.raw_samples_stripped[0:2])
-
+            self.assertEqual(names, self.raw_samples[0:2])
 
     def test_04_raw_import(self):
         asyncio.run(
             self.client.emit_raw_import(
                 self.client.raw_samples_data[2:],
-                max_exec_time=25)
+                max_exec_time=60)
         )
         self.assert_requests_ok()
         if os.path.isdir(self.data_collection_path):
             # this check does not work, when running tests on windows
             names = os.listdir(os.path.join(self.data_collection_path, self.client.data_collection_date))
             names = sorted([n.replace(f'{self.client.instrument_name}_', '', 1) for n in names])
-            self.assertEqual(names, self.raw_samples_stripped)
+            self.assertEqual(names, self.raw_samples)
 
 
 

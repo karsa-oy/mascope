@@ -46,13 +46,11 @@ class RawStreamer(Thread):
         self._mz_precision = mz_precision
         # Thermo Fischer RawFileReaderFactory
         self.raw = None
-        # Synchronization primitives
-        # Streamer specific
         self.requests = client.requests     # Queue for files to stream
         self.request_in_progress = client.request_in_progress
         self.cancel_event = Event()         # Set to cancel current stream
+        self.shutdown_event = client.shutdown_event     # Set to break out from main loop
         # Common with TofDaqStreamer
-        self.shutdown_event = Event()       # Set to break out from main loop
         self.active = Event()               # RawStreamer active event
         self.spec_queue = Queue()           # Signal output queue
         # Per acquisition attributes

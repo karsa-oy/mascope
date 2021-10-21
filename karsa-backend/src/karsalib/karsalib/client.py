@@ -32,13 +32,16 @@ def run_streamer_service(StreamerClient,
 
     client = None
     while True:
+        streamer_type = args.get('streamer_type')
+        n_jobs = int(args.get('n_jobs', 1))
+        streamer_opts = {'type': streamer_type, 'n_jobs': n_jobs}
         data_pool_path = args.get('data_pool_path')
         data_pool_mask = args.get('data_pool_mask')
-        data_pool = None if not data_pool_path else \
+        data_pool_opts = None if not data_pool_path else \
             {'path': data_pool_path, 'mask': data_pool_mask}
         try:
-            client = StreamerClient(args.get('streamer_type', None),
-                                    data_pool,
+            client = StreamerClient(streamer_opts,
+                                    data_pool_opts,
                                     args['url'],
                                     args['port'],
                                     ('/', StreamerPublicNamespace),
@@ -59,7 +62,8 @@ def run_streamer_service(StreamerClient,
     try:
         loop.run_until_complete(client.run())
     except KeyboardInterrupt:
-        client.streamer.shutdown()
+        for s in client.streamers:
+            s.shutdown()
 
 
 class BaseClientNamespace(AsyncClientNamespace):
@@ -269,12 +273,23 @@ class BridgeServiceClient(BaseServiceClient):
 
     async def emit_private_notification(self, name, value, **kwarg):
         await self.private_ns.emit_client_notification(name, value, **kwarg)
-    
-class BaseStreamerClient(BridgeServiceClient):
-    def __init__(self, streamer_type, data_pool,
+
+
+# TODO: Sync TOFStreamerClient with TOFService and maybe BaseStreamerClient
+class TOFStreamerClient(BridgeServiceClient):
+    def __init__(self, streamer_opts, data_pool,
                  url, port, public_namespace_data, private_namespace_data):
+        super().__init__(url, port, public_namespace_data, private_namespace_data)
+        streamer_type = streamer_opts['type'] or 'TofDaq'
+        priv_ns_name, _ = private_namespace_data
+        self.instrument_data = {'name': priv_ns_name,
+                                'type': streamer_type,
+                               }
+        self.public_ns.room_instrument = priv_ns_name
+        self.acknowledge_acquisition = True
         self.requests = CacheQ('client_room')
         self.request_in_progress = dict()
+        self.watcher = None
         self.lock = Lock()
 
         streamer_info = {
@@ -291,14 +306,6 @@ class BaseStreamerClient(BridgeServiceClient):
             m = importlib.import_module('.datapool', 'karsalib')
             self.data_pool = getattr(m, f'{streamer_type}Pool')(pool_attrs=data_pool)
             self.watcher = FSWatcher(client=self, target_attrs=data_pool, recursive=True)
-
-        super().__init__(url, port, public_namespace_data, private_namespace_data)
-        priv_ns_name, _ = private_namespace_data
-        self.instrument_data = {'name': priv_ns_name,
-                                'type': streamer_type,
-                               }
-        self.public_ns.room_instrument = priv_ns_name
-        self.acknowledge_acquisition = True
 
     @property
     def instrument_name(self):
@@ -348,7 +355,8 @@ class BaseStreamerClient(BridgeServiceClient):
 
     async def service_main(self):
         self.log('started')
-        self.watcher.run_as_daemon()
+        if self.watcher:
+            self.watcher.run_as_daemon()
 
         # Main loop
         while not self.shutdown_event.is_set():
@@ -488,7 +496,7 @@ class BaseStreamerClient(BridgeServiceClient):
                                              'filename': filename
                                              },
                                             # callback="private_ns_data_count",
-                                            cnt=cnt,
+                                            # cnt=cnt,
                                             no_data_logging=True
                                             )
                     await self.emit_public_notification(
@@ -548,4 +556,110 @@ class BaseStreamerClient(BridgeServiceClient):
         self.log('stopped')
 
 
+class BaseStreamerClient(BridgeServiceClient):
+    def __init__(self, streamer_opts, data_pool_opts,
+                 url, port, public_namespace_data, private_namespace_data):
+        super().__init__(url, port, public_namespace_data, private_namespace_data)
+        streamer_type = streamer_opts['type']
+        n_jobs = streamer_opts['n_jobs']
+        self.streamers = []
+        priv_ns_name, _ = private_namespace_data
+        self.instrument_data = {'name': priv_ns_name,
+                                'type': streamer_type,
+                               }
+        self.public_ns.room_instrument = priv_ns_name
+        self.requests = CacheQ('client_room')
+        self.in_progress = dict()
+        self.responses = CacheQ('client_room/filename')
+        self.watcher = None
+        self.lock = Lock()
 
+        streamer_info = {
+            'H5': {'package': 'karsatof', 'module': '.kgenerator'},
+            'Raw': {'package': 'karsaorbi', 'module': '.kogenerator'},
+            'TofDaq': {'package': 'karsatof', 'module': '.kgenerator'},
+        }
+        m = importlib.import_module(streamer_info[streamer_type]['module'],
+                                    streamer_info[streamer_type]['package'])
+        for _ in range(n_jobs):
+            self.streamers.append( getattr(m, f'{streamer_type}Streamer')(client=self) )
+
+        self.data_pool = None
+        if data_pool_opts:
+            m = importlib.import_module('.datapool', 'karsalib')
+            self.data_pool = getattr(m, f'{streamer_type}Pool')(pool_attrs=data_pool_opts)
+            self.watcher = FSWatcher(client=self, target_attrs=data_pool_opts, recursive=True)
+
+    @property
+    def instrument_name(self):
+        return self.instrument_data.get('name')
+
+    async def initialize_streamers(self):
+        """
+        Instantuate streamer instance.
+        Should be called from within overridden init_service.
+        """
+        while True:
+            try:
+                for i, s in enumerate(self.streamers):
+                    s.run_as_daemon()
+                    self.log(f'{s.__class__.__name__}: {i+1}/{len(self.streamers)}')
+                break
+            except Exception as e:
+                self.log(f'{e}\nRetrying...')
+                await self.sio.sleep(2)
+                continue
+
+
+    async def init_service(self):
+        while True:
+            # TODO: TBR python-socketio BadNamespaceError connection bug
+            try:
+                await self.emit_private_notification(
+                                            'instrument_status',
+                                            'not_ready',
+                                            no_data_logging=False
+                                            )
+                break
+            except BadNamespaceError:
+                await self.sio.sleep(.1)
+                continue
+        await self.initialize_streamers()
+        await self.emit_private_notification(
+                                    'instrument_status',
+                                    'ready',
+                                    no_data_logging=False,
+                                    )
+        await self.emit_public_notification(
+                                    'instrument_data',
+                                    self.instrument_data,
+                                    room=self.public_ns.room_data_sources,
+                                    no_data_logging=False
+                                    )
+
+
+    async def service_main(self):
+        self.log('started')
+        if self.watcher:
+            self.watcher.run_as_daemon()
+
+        while not self.shutdown_event.is_set():
+            try:
+                data = self.responses.cache_get()
+                if not data:
+                    await asyncio.sleep(.5)
+                    continue
+            except KeyboardInterrupt:
+                self.log('KeyboardInterrupt')
+                break
+            except Exception as e:
+                self.log(str(e))
+                break
+
+            await self.emit_private_notification(
+                data['name'],
+                data['value'],
+                **data['context'],
+            )
+        self.shutdown_event.set()
+        self.log('stopped')

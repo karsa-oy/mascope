@@ -69,7 +69,7 @@ def generate_unique_key():
     CHARACTERS = (string.ascii_letters + string.digits + '-._~')
     return ''.join(random.sample(CHARACTERS, 15))
 
-def get_client_notification_args(data):
+def get_client_notification_context(data):
     """
     Get shallow copy of client_notificaiton arguments
     ignoring 'name' and 'value' fields.
