@@ -76,20 +76,32 @@ class KECU():
     async def wait_for_notification(self):
         return await self._meas.get_data()
 
-    async def writer(self, filename='test.csv', interval=1):
-        # Write header
+    async def writer(self, interval=1):
+        def new_file():
+            filename = datetime.now().strftime('%Y%m%d') + '_kecu.dat'
+            with open(filename, 'a') as f:
+                writer = csv.writer(f)
+                writer.writerow(field_names)
+            return filename
+
         field_names = ['timestamp',
                        *[(node_id.name+'('+channel.description+')')
                          for node_id, device in DEVICES.items() for _, channel in device.channels.items()
                          ]
                        ]
-        with open(filename, 'a') as f:
-            writer = csv.writer(f)
-            writer.writerow(field_names)
-
+        
+        date_now = datetime.now()
+        date_prev = date_now
+        filename = new_file()
+        
         while True:
+            date_now = datetime.now()
+            if date_now.day != date_prev.day:
+                # New file per day
+                filename = new_file()
+            date_prev = date_now
             # Write values
-            timestamp = datetime.now().isoformat()
+            timestamp = date_now.isoformat()
             values = [timestamp]
             for node_id, device in DEVICES.items():
                 for _, channel in device.channels.items():
@@ -100,7 +112,7 @@ class KECU():
 
             with open(filename, 'a') as f:
                 writer = csv.writer(f)
-                writer.writerow([timestamp, *values])
+                writer.writerow(values)
 
             # Wait for interval
             await asyncio.sleep(interval)
