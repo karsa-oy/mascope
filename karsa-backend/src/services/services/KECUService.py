@@ -105,7 +105,9 @@ class KECU():
             values = [timestamp]
             for node_id, device in DEVICES.items():
                 for _, channel in device.channels.items():
-                    if node_id in self.nodes:
+                    if (node_id in self.nodes and
+                        not isinstance(channel.value, property)
+                        ):
                         values.append(channel.value)
                     else:
                         values.append(None)
