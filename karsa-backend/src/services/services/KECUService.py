@@ -79,9 +79,12 @@ class KECU():
     async def writer(self, interval=1):
         def new_file():
             filename = datetime.now().strftime('%Y%m%d') + '_kecu.dat'
-            with open(filename, 'a') as f:
-                writer = csv.writer(f)
-                writer.writerow(field_names)
+            try:
+                with open(filename, 'x') as f:
+                    writer = csv.writer(f)
+                    writer.writerow(field_names)
+            except FileExistsError:
+                pass
             return filename
 
         field_names = ['timestamp',
