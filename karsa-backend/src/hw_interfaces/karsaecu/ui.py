@@ -129,10 +129,11 @@ class DiField(Field):
                          )
         self.checkbox.configure(state=tk.DISABLED)
         global kecu
-        node = kecu.nodes.get(node_id, None)
-        if node:
-            device = node._device
-            device.channels[channel].callbacks.append(self.update_checkbox)
+        if kecu:
+            node = kecu.nodes.get(node_id, None)
+            if node:
+                device = node._device
+                device.channels[channel].callbacks.append(self.update_checkbox)
 
     def enable(self):
         try:
@@ -152,11 +153,12 @@ class DoField(Field):
                          )
         global kecu
         self.channel = channel
-        node = kecu.nodes.get(node_id, None)
-        if node:
-            device = node._device
-            device.channels[channel].callbacks.append(self.update_checkbox)
-            self.cb_value_callbacks.append(node.set_channel)
+        if kecu:
+            node = kecu.nodes.get(node_id, None)
+            if node:
+                device = node._device
+                device.channels[channel].callbacks.append(self.update_checkbox)
+                self.cb_value_callbacks.append(node.set_channel)
 
 class MfcField(Field):
     def __init__(self, node_id, label, parent_frame, **kwargs):
@@ -169,12 +171,13 @@ class MfcField(Field):
                          **kwargs
                          )
         global kecu
-        node = kecu.nodes.get(self.node_id, None)
-        if node:
-            device = node._device
-            device.channels[(0x2F00, 0x01)].callbacks.append(self.update_setpoint) # On read setpoint
-            device.channels[(0x2C00, 0x01)].callbacks.append(self.update_monitor) # On read actual flow
-            self.set_value_callbacks.append(node.set_flow)
+        if kecu:
+            node = kecu.nodes.get(node_id, None)
+            if node:
+                device = node._device
+                device.channels[(0x2F00, 0x01)].callbacks.append(self.update_setpoint) # On read setpoint
+                device.channels[(0x2C00, 0x01)].callbacks.append(self.update_monitor) # On read actual flow
+                self.set_value_callbacks.append(node.set_flow)
 
 class MonitorField(Field):
     def __init__(self, node_id, channel, label, parent_frame, **kwargs):
@@ -187,10 +190,11 @@ class MonitorField(Field):
                          **kwargs
                          )
         global kecu
-        node = kecu.nodes.get(NodeId.MION_AI, None)
-        if node:
-            device = node._device
-            device.channels[channel].callbacks.append(self.update_monitor)
+        if kecu:
+            node = kecu.nodes.get(node_id, None)
+            if node:
+                device = node._device
+                device.channels[channel].callbacks.append(self.update_monitor)
 
 class VoltageField(Field):
     def __init__(self, node_id, label, parent_frame, **kwargs):
@@ -314,7 +318,7 @@ class App(tk.Tk):
         for node, node_fields in self.fields.items():
             for field in node_fields:
                 field.enable()
-                if node in kecu.nodes:
+                if kecu and node in kecu.nodes:
                     field.enable()
                 else:
                     field.disable()
