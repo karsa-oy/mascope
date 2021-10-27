@@ -55,10 +55,10 @@ class AsyncTCPClient():
             Response message payload
         """
         # Read response message header, to get payload length
-        header = await self._reader.read(3)
+        header = await self._reader.readexactly(3)
         stx, cmd, length = header
         # Read rest of the response message
-        status_payload_etx = await self._reader.read(length + 1)
+        status_payload_etx = await self._reader.readexactly(length + 1)
         status = status_payload_etx[0]
         payload = status_payload_etx[1:-1]
         etx = status_payload_etx[-1]
