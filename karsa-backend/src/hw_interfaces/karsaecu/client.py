@@ -41,7 +41,7 @@ class AsyncTCPClient():
         print("Connected!")
         self._connected = True
 
-    async def get_response(self, command: bytes) -> str:
+    async def get_response(self, command: bytes) -> bytes:
         """Read response to command message from the socket.
 
         Parameters
@@ -55,9 +55,11 @@ class AsyncTCPClient():
             Response message payload
         """
         # Read response message header, to get payload length
+        print("get_response(): read header")
         header = await self._reader.readexactly(3)
         stx, cmd, length = header
         # Read rest of the response message
+        print("get_response(): read payload")
         status_payload_etx = await self._reader.readexactly(length + 1)
         status = status_payload_etx[0]
         payload = status_payload_etx[1:-1]
@@ -72,6 +74,7 @@ class AsyncTCPClient():
             (not status)
             ):
             return payload
+        print("get_response(): Something went wrong with msg: %s" %(header+status_payload_etx))
         # Check for error code
         if status:
             raise Exception( ErrorCode(status) )
