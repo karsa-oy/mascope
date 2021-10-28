@@ -50,6 +50,8 @@ class KECU():
                                             )
                 except asyncio.TimeoutError:
                     continue
+                except Exception as e:
+                    print("Exception in KECU.run(): %s" %e)
                 print('..')
                 try:
                     # Notify app

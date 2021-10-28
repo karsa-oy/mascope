@@ -20,11 +20,13 @@ class KarsaMeasClient(AsyncTCPClient):
     def __init__(self):
         super().__init__(KRS_MEAS_PORT)
 
-    async def get_data(self):
+    async def get_data(self) -> bytes:
         # Read start header
+        print("get_data(): read header")
         header = await self._reader.readexactly(3)
         stx, type_, length = header
         # Read rest of the msg
+        print("get_data(): read payload")
         payload_etx = await self._reader.readexactly(length + 1)
         payload = payload_etx[:-1]
         etx = payload_etx[-1]
@@ -38,7 +40,8 @@ class KarsaMeasClient(AsyncTCPClient):
             node_id = NodeId(payload[0])
             ntf = Notification(type_)
             data = payload[1:]
-            return node_id, ntf, data#.decode('utf-8')
+            return node_id, ntf, data
+        print("get_data(): Something went wrong with msg: %s" %(header+payload_etx))
         raise Exception("Failed to read data")
 
 
