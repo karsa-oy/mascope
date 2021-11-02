@@ -59,8 +59,8 @@ class KECU():
                                           'on_{}'.format(ntf.name)
                                           )
                     await ntf_handler(node_id)
-                except AttributeError:
-                    pass
+                except Exception as e:
+                    print(e)
                 try:
                     # Notify node
                     # print('on_{}({})'.format(ntf.name, data))
