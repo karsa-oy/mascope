@@ -383,6 +383,7 @@ class TestFileStreamerCase(BaseTestClientCase):
             names = sorted([n.replace(f'{self.client.instrument_name}_', '', 1) for n in names])
             self.assertEqual(names, self.raw_samples[0:2])
 
+    # @unittest.skip("TMP")
     def test_04_raw_import(self):
         asyncio.run(
             self.client.emit_raw_import(

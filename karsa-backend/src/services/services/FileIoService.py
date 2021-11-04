@@ -9,6 +9,7 @@ via socket.io, and handles file i/o synchronization.
 Created on Thu May  7 12:43:13 2020
 """
 
+import ntpath
 import os
 import asyncio
 import fnmatch
@@ -40,10 +41,10 @@ cache = LRUDict(10)
 from shutil import rmtree
 class zarr_sdk:
     @staticmethod
-    def acquisition_coordinates(data, data_root='', overwrite=False):
+    def init_signal_dataset(data, data_root='', overwrite=False):
         # First filesystem operation in acquisition api sequence:
-        #   acquisition_coordinates - tps_parameter_info -
-        #   acquired_spectrum - acquired_tps_data - acquisition_finished
+        #   init_signal_dataset - init_tps_dataset - init_viz_dataset -
+        #   update_signal_dataset - update_tps_dataset - finalize_dataset
         # Returns acquisition item shared through the acquisiiton api
         value = data['value']
         filename = value.get('filename')
@@ -77,6 +78,7 @@ class zarr_sdk:
                                 )
         properties = {'filename': filename,
                         'length': float(t_range[1]),
+                        'committed_length': 0.,
                         'range': [ float(mz[0]), float(mz[-1]) ],
                         'data_version': DATA_VERSION_NUMBER,
                         'metadata_version': METADATA_VERSION_NUMBER,
@@ -92,14 +94,14 @@ class zarr_sdk:
         return {'data_root': data_root,
                 'signal': signal_array,
                 'signal_period': period_array,
-                'attrs': properties,
+                'props': properties,
                 }
 
     @staticmethod
-    def tps_parameter_info(data, item):
+    def init_tps_dataset(data, item):
         value = data['value']
         filename = filename_to_zarr_path(value['filename'], 'tps')
-        filename = os.path.join(item['data_root'], filename)
+        filename = os.path.join(item.get('data_root', ''), filename)
         tps_info = value['tps_info']
         tps_array = ExtendableDataArray(path=filename,
                                         array_module=da
@@ -111,7 +113,35 @@ class zarr_sdk:
         item.update({'tps': tps_array})
 
     @staticmethod
-    def acquired_spectrum(data, item):
+    def init_viz_dataset(filename_base, viz_type, item):
+        # initialize viz_type mfzarr
+        filename_viz = filename_to_zarr_path(filename_base, viz_type)
+        filename_viz = os.path.join(item.get('data_root', ''), filename_viz)
+        viz_array = ExtendableDataArray(path=filename_viz,
+                                        array_module=np,
+                                        dtype=object,
+                                        chunk_size=1,
+                                        )
+        viz_array.init_array(dims=('time',),
+                                coords=[[]],
+                                name=viz_type
+                                )
+        viz_period = viz_type + '_period'
+        filename_viz_period = filename_to_zarr_path(filename_base, viz_period)
+        filename_viz_period = os.path.join(item.get('data_root', ''), filename_viz_period)
+        viz_period_array = ExtendableDataArray(path=filename_viz_period,
+                                                array_module=np,
+                                                dtype=object,
+                                                chunk_size=1,
+                                                )
+        viz_period_array.init_array(dims=('time',),
+                                    coords=[[]],
+                                    name=viz_period
+                                    )
+        item.update( {viz_type: viz_array, viz_period: viz_period_array} )
+
+    @staticmethod
+    def update_signal_dataset(data, item):
         value = data['value']
         ti = np.array( [value['t']], dtype=np.float32 )
         period = np.array( [value['period']], dtype=np.float32 )
@@ -132,9 +162,18 @@ class zarr_sdk:
         item['signal_period'].extend_array(period,
                                             [ti],
                                             'time')
+        # Update committed_length in .props, when new chunk is committed
+        if item['signal'].delayed_write is None:
+            committed_length = float(item['signal'].time[-1] + item['signal_period'][-1])
+            item['props'].update({'committed_length': committed_length})
+            prop_path = os.path.join(item.get('data_root', ''),
+                                    parse_path_from_sample_name(value['filename']),
+                                    '.props')
+            with open(prop_path, 'w') as f:
+                json.dump(item['props'], f, indent=4)
 
     @staticmethod
-    def acquired_tps_data(data, item):
+    def update_tps_dataset(data, item):
         value = data['value']
         ti = np.array( [value.get('t')], dtype=np.float32 )
         tps_data = np.frombuffer( value.get('data'), dtype=np.float32)
@@ -146,23 +185,23 @@ class zarr_sdk:
                                 )
 
     @staticmethod
-    def acquisition_finished(data, item):
+    def finalize_dataset(data, item):
         filename = data['value']['filename']
         final_length = float(item['signal'].time[-1] + item['signal_period'][-1])
         # Update properties
-        item['attrs'].update({'length': final_length})
+        item['props'].update({'length': final_length})
         # Write properties
-        prop_path = os.path.join(item['data_root'],
+        prop_path = os.path.join(item.get('data_root', ''),
                                 parse_path_from_sample_name(filename),
                                 '.props')
         with open(prop_path, 'w') as f:
-            json.dump(item['attrs'], f, indent=4)
+            json.dump(item['props'], f, indent=4)
         # flush arrays
         arrays = [item['signal'], item['signal_period']]
         for a in arrays:
             if isinstance(a, ExtendableDataArray):
                 a.flush()
-        
+
 
 class FileIoNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to MainService """
@@ -216,7 +255,7 @@ class FileIoNamespace(BaseClientNamespace):
         self.log(filename)
         kwargs = get_client_notification_context(data)
         try:
-            cache_item = zarr_sdk.acquisition_coordinates(data)
+            cache_item = zarr_sdk.init_signal_dataset(data)
         except FileExistsError:
             self.log(f"FileExistsError: {filename} acquisition cancelled")
             await self.emit_client_notification('stop_raw_import', {}, **kwargs)
@@ -237,10 +276,22 @@ class FileIoNamespace(BaseClientNamespace):
         global cache
         filename = data['value']['filename']
         cache_item = cache.get(filename)
+        kwargs = get_client_notification_context(data)
         if not cache_item:
             self.log(f"Warning: {filename} was skipped")
             return
-        zarr_sdk.acquired_spectrum(data, cache_item)
+        zarr_sdk.update_signal_dataset(data, cache_item)
+        if cache_item['signal'].delayed_write is None :
+            # updates to signal mfzarrs are committed - notify
+            await self.emit_client_notification(
+                    'dataset_updated',
+                    {'data_type': 'signal', **cache_item['props']},
+                    # TODO: switch to private notification after moving DataViz to private_ns
+                    **{ **kwargs,
+                        'namespace': '/',
+                        'room': None,
+                    }
+                  )
         return data['callback_data']
 
 
@@ -251,18 +302,28 @@ class FileIoNamespace(BaseClientNamespace):
         if not cache_item:
             self.log(f"Warning: {filename} was skipped")
             return
-        zarr_sdk.acquired_tps_data(data, cache_item)
+        zarr_sdk.update_tps_dataset(data, cache_item)
 
 
     async def on_acquisition_finished(self, data):
         global cache
         filename = data['value']['filename']
-        self.log(filename)
         cache_item = cache.get(filename)
+        kwargs = get_client_notification_context(data)
+        self.log(filename)
         if not cache_item:
             self.log(f"Warning: {filename} was skipped")
             return
-        zarr_sdk.acquisition_finished(data, cache_item)
+        zarr_sdk.finalize_dataset(data, cache_item)
+        await self.emit_client_notification(
+                'dataset_updated',
+                {'data_type': 'signal', **cache_item['props']},
+                # TODO: switch to private notification after moving DataViz to private_ns
+                **{ **kwargs,
+                    'namespace': '/',
+                    'room': None,
+                }
+            )
 
 
     async def on_tps_parameter_info(self, data):
@@ -273,7 +334,7 @@ class FileIoNamespace(BaseClientNamespace):
         if not cache_item:
             self.log(f"Warning: {filename} was skipped")
             return
-        zarr_sdk.tps_parameter_info(data, cache_item)
+        zarr_sdk.init_tps_dataset(data, cache_item)
     # -----------------------------------------
 
 
@@ -313,8 +374,11 @@ def get_file_data_vars(filepath):
         zarrs.append(var.strip('.zarr'))
     return zarrs
 
-def load_array(base_filename, var):
-    """Load a stored variable in a file into a xarray.Dataset object
+def load_array(base_filename, var, prev_array=None):
+    """Load a stored mfzarr variable from file into a xarray.Dataset object.
+       If the variable receives another chunk of mfzarr data, then subsequent
+       load_array calls with non-empty prev_array will update
+       previously created dataset from the updated variable.
 
     Parameters
     ----------
@@ -322,23 +386,28 @@ def load_array(base_filename, var):
         Base filename
     var : str
         Variable (zarr array) name
+    prev_array: xarray DataArray, optional
+        Previously loaded array to update with the updated var. By default None.
 
     Returns
     -------
     xarray.Dataset
         Loaded data
     """
-    print("Loading array: %s from file: %s" %(base_filename, var))
+    # print("Loading array %s : %s" %(base_filename, var))
     var_path = filename_to_zarr_path(base_filename, var)
     # Load data from file
     try:
-        dataset = open_mfzarr(var_path)
+        dataset = open_mfzarr(var_path, prev_array=prev_array)
     except FileNotFoundError as e:
         print("FileNotFoundError: Error reading %s, %s" %(var_path, e))
     return dataset
 
-def load_file(base_filename, vars=None):
-    """Load all stored variables in a file into a xarray.Dataset object
+def load_file(base_filename, vars=None, prev_dataset=None):
+    """Load stored mfzarr variables into an xarray.Dataset object.
+       If the variables receive another chunk of data, then subsequent
+       load_file calls with non-empty prev_dataset will update
+       previously created dataset from updated variables.
 
     Parameters
     ----------
@@ -347,6 +416,8 @@ def load_file(base_filename, vars=None):
     vars : list, optional
         List of variable (zarr array) names to load. By default None,
         all variables are loaded.
+    prev_dataset: xarray dataset, optional
+        Previously loaded dataset to update with updated vars. By default None.
 
     Returns
     -------
@@ -358,15 +429,20 @@ def load_file(base_filename, vars=None):
         # Get all saved variable names
         zarrs = get_file_data_vars(filepath)
         vars = [ zarr.strip('.zarr') for zarr in zarrs ]
-    print("Loading variables: %s file: %s" %(str(vars), base_filename))
-    # Load data from file
+    # Load arrays from mfzarrs
+    print(f"Loading {vars} from {base_filename}")
     dss = []
+    zarr_groups = {}
     for var in vars:
+        prev_item = None if prev_dataset is None else prev_dataset.get(var)
+        if prev_item is not None:
+            prev_item.attrs['zarr_groups'] = prev_dataset.attrs.get('zarr_groups', {}).get(var, [])
         try:
-            var_ds = load_array(base_filename, var)
+            var_ds = load_array(base_filename, var, prev_item)
             dss.append(var_ds)
+            zarr_groups[var] = var_ds.attrs['zarr_groups']
         except Exception as e:
-            print("Failed to load data: %s" %e)
+            print("Failed to load data: %s" %str(e))
             continue
     # Merge into xarray.Dataset
     dataset = xarray.merge(dss)
@@ -375,12 +451,14 @@ def load_file(base_filename, vars=None):
                             '.props'
                             )
     with open(prop_path, 'r') as f:
-        properties = json.load(f)
+        props = json.load(f)
     # Attach to dataset
-    dataset.attrs = properties
+    dataset.attrs['props'] = props
+    dataset.attrs['zarr_groups'] = zarr_groups
     return dataset
 
-def open_mfzarr(path, mode='r', concat_dim='time'):
+
+def open_mfzarr(path, mode='r', concat_dim='time', prev_array=None):
     """Load data from a multi-file zarr into a xarray.Dataset
 
     Parameters
@@ -392,6 +470,9 @@ def open_mfzarr(path, mode='r', concat_dim='time'):
     concat_dim : str, optional
         Dimension name along which to concatenate the files,
         by default 'time'
+    prev_array: xarray DataArray, optional
+        Previously loaded array to update with new mfzarr data chunk,
+        by default None.
 
     Returns
     -------
@@ -409,10 +490,17 @@ def open_mfzarr(path, mode='r', concat_dim='time'):
     sync = zarr.ProcessSynchronizer(os.path.join(path, '.sync'))
     z = zarr.open(path, mode=mode, synchronizer=sync)
     groups = [ g[0] for g in z.groups() ]
-    x = xarray.concat([ xarray.open_zarr(path, g) for g in groups ],
-                      concat_dim
-                      )
+    zarr_groups = list(groups)
+    if prev_array is not None:
+        prev_groups = prev_array.attrs.get('zarr_groups', [])
+        for g in prev_groups:
+            groups.remove(g)
+    x = xarray.concat([xarray.open_zarr(path, g, consolidated=False) for g in groups], concat_dim)
+    # print(f"{ntpath.basename(path)} {'loaded' if prev_array is None else 'updated'} from group {groups}")
+    if prev_array is not None:
+        x = xarray.concat([prev_array.to_dataset(), x], concat_dim)
     x.attrs = z.attrs.asdict()
+    x.attrs['zarr_groups'] = zarr_groups
     return x
     
 def read_zarr_attributes(filepath):
