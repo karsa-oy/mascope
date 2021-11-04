@@ -523,6 +523,8 @@ class H5Streamer(BaseStreamer, KInstrument):
 
     #======== The service communication protocol implementation ===============
     def _feed_notifications(self, gen_notifications, streamer_notifications):
+        # gen_notifications are sent always, and streamer_notifications
+        # are sent in streamer mode, when target_data_pool_path is None
         if self.client.target_data_pool_path:
             notifications = gen_notifications
         else:
@@ -600,7 +602,7 @@ class H5Streamer(BaseStreamer, KInstrument):
         ]
         self._feed_notifications(gen_notifications, streamer_notifications)
         if self.client.target_data_pool_path:
-            self.item = zarr_sdk.acquisition_coordinates(sn_data, self.client.target_data_pool_path)
+            self.item = zarr_sdk.init_signal_dataset(sn_data, self.client.target_data_pool_path)
             self.ack_progress = self.progress
 
     def _feed_tps_parameter_info(self):
@@ -623,7 +625,7 @@ class H5Streamer(BaseStreamer, KInstrument):
         ]
         self._feed_notifications(gen_notifications, streamer_notifications)
         if self.client.target_data_pool_path:
-            zarr_sdk.tps_parameter_info(sn_data, self.item)
+            zarr_sdk.init_tps_dataset(sn_data, self.item)
 
     def _feed_spec_data(self, spec_data):
         progress_data = {
@@ -669,10 +671,29 @@ class H5Streamer(BaseStreamer, KInstrument):
                 },
             },
         ]
-        self._feed_notifications(gen_notifications, streamer_notifications)
         if self.client.target_data_pool_path:
-            zarr_sdk.acquired_spectrum(sn_data, self.item)
+            # target_data_pool_path specified - store data locally
+            zarr_sdk.update_signal_dataset(sn_data, self.item)
+            if self.item['signal'].delayed_write is None:
+                # updates to signal mfzarrs are committed - notify
+                dataset_updated = {
+                    # TODO: switch to private notification after moving DataViz to private_ns
+                    'name': 'dataset_updated',
+                    'value': {
+                        'data_type': 'signal',
+                        **self.item['props'],
+                    },
+                    'context': {
+                        **self.rcontext,
+                        'namespace': '/',
+                        'room': None,
+                    },
+                }
+                gen_notifications.append(dataset_updated)
+            # if data is stored locally, ack_progress is set locally,
+            # otherwise by acquired_spectrum callback
             self.ack_progress = self.progress
+        self._feed_notifications(gen_notifications, streamer_notifications)
 
     def _feed_tps_data(self, tps_data):
         sn_data = {
@@ -694,7 +715,7 @@ class H5Streamer(BaseStreamer, KInstrument):
         ]
         self._feed_notifications(gen_notifications, streamer_notifications)
         if self.client.target_data_pool_path:
-            zarr_sdk.acquired_tps_data(sn_data, self.item)
+            zarr_sdk.update_tps_dataset(sn_data, self.item)
 
     def _feed_final_data(self):
         sn_data = {
@@ -730,9 +751,25 @@ class H5Streamer(BaseStreamer, KInstrument):
                 },
             },
         ]
-        self._feed_notifications(gen_notifications, streamer_notifications)
         if self.client.target_data_pool_path and self.item:
-            zarr_sdk.acquisition_finished(sn_data, self.item)
+            zarr_sdk.finalize_dataset(sn_data, self.item)
+            # updates to signal mfzarrs are finalized - notify
+            dataset_updated = {
+                # TODO: switch to private notification after moving DataViz to private_ns
+                'name': 'dataset_updated',
+                'value': {
+                    'data_type': 'signal',
+                    **self.item['props'],
+                },
+                'context': {
+                    **self.rcontext,
+                    'namespace': '/',
+                    'room': None,
+                },
+            }
+            gen_notifications.append(dataset_updated)
+        self._feed_notifications(gen_notifications, streamer_notifications)
+
 # ==========================================================================
 
 

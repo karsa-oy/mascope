@@ -15,8 +15,10 @@ Created on Fri Apr 17 11:35:57 2020
 
 import asyncio
 import json
+import ntpath
 import os
 from re import I
+import re
 import numpy as np
 import dask.array as da
 import sqlite3
@@ -28,10 +30,10 @@ from multiprocessing import (
                         cpu_count
                         )
 from queue import Empty
-from time import time
+from time import time, sleep
 
 from karsalib.client import BaseClientNamespace, BaseServiceClient
-from karsalib.struct import AttrDict, CacheQ
+from karsalib.struct import AttrDict, CacheQ, LRUDict
 from karsalib.util import (generate_unique_key,
                            get_client_notification_context,
                            parse_cmd_args
@@ -48,17 +50,16 @@ from karsaimg.image import (
                     ImageGenerator
                     )
 
-from services.FileIoService import filename_to_zarr_path, load_file
+from services.FileIoService import filename_to_zarr_path, load_file, zarr_sdk
 
 
 NO_DATA_LOGGING_DEAULT = False
 client = None
 
 # Cache for data arrays
-cache = {}
+cache = LRUDict(10)     # TODO: fix system test failure, if LRUDict more than 2
 
 generator_input_q = None
-shutdown_event = None
 generator_input_cache = None
 
 # Cache for requests and visualizations
@@ -234,7 +235,7 @@ def viz_cache_process_requests(filename, flush=False, **kwargs):
     global REQUEST_PROCESSORS
     global cache
 
-    requests_to_release = []
+    # requests_to_release = []
     rows = viz_cache_pop(
                     'requests',
                     '''
@@ -292,18 +293,18 @@ def viz_cache_process_requests(filename, flush=False, **kwargs):
                           request_id,
                           persist_in_cache
                           )
-        # else:
-        #     requests_to_release.append(request_id)
-    if requests_to_release:
-        # check requests_to_release are processed completely (for all viz_types) and release
-        for id in set(requests_to_release):
-            cur = viz_cache_get('requests', 'request_id', request_id=id)
-            if not cur.fetchone():
-                release_request(id)
-        # acquired samples are cached under filename key - check to release
-        cur = viz_cache_get('requests', 'request_id', filename=filename)
-        # if not cur.fetchone() and filename in cache:
-        #     del cache[filename]
+    #     else:
+    #         requests_to_release.append(request_id)
+    # if requests_to_release:
+    #     # check requests_to_release are processed for all viz_types, then release
+    #     for id in set(requests_to_release):
+    #         cur = viz_cache_get('requests', 'request_id', request_id=id)
+    #         if not cur.fetchone():
+    #             force_release_request(id)
+    #     # # samples in proc are cached under filename key - check if any request uses the sample
+    #     # cur = viz_cache_get('requests', 'request_id', filename=filename)
+    #     # if not cur.fetchone() and filename in cache:
+    #     #     del cache[filename]   # TODO: can not delete, since some cleanup may be on the way
 
 
 def viz_cache_put(filename,
@@ -600,72 +601,11 @@ def process_visualization_request(filename,
 
     def feed_signal_to_visualize(t_range_to_process):
         nonlocal cache_item
-
-        processed_until = t0
-
-        try:
-            img_slice = cache_item[viz_type].sel(time=slice(t0, t1)).load()
-        except KeyError as e:
-            print("KeyError in feed_ready_images: %s: %s" %(viz_type, str(e)))
-            return processed_until
-        viz_type_period = viz_type + '_period'
-        try:
-            period_slice = cache_item[viz_type_period].sel(time=slice(t0, t1)).load()
-        except KeyError as e:
-            print("KeyError in feed_ready_images: %s %s" %(viz_type_period, str(e)))
-            return processed_until
-
-        if len(img_slice) == 0:
-            return processed_until
-
-        if t_resolution:
-            # TODO: resample
-            raise NotImplementedError
-        
-        # Filter nans
-        not_nan = np.logical_not( img_slice.isnull() )
-        img_slice = img_slice[not_nan]
-        period_slice = period_slice[not_nan]
-
-        # Put to queue to be emitted from service_main
-        for i, img_array in enumerate(img_slice):
-            img_str = img_array.item()
-
-            t0_i = float( img_array.time.item() )
-            t1_i = t0_i + float( period_slice[i].item() )
-
-            img_data = {'filename': filename,
-                        'viz_type': viz_type,
-                        'mz_range': [mz0, mz1],
-                        't_range': [t0_i, t1_i],
-                        'client_room': client_room,
-                        'request_id': request_id,
-                        }
-            if img_str.startswith('data:image/png;base64'):
-                # base64 png
-                img_data.update({'img': img_str})
-            else:
-                # trace
-                try:
-                    traces = json.loads(img_str)
-                    img_data.update({'traces': traces})
-                except json.JSONDecodeError:
-                    print("Erroneous img_blob: %s" %img_str)
-                    continue
-            processed_until = t1_i
-            # print("Feed ready images until: %s" %processed_until)
-            client.generator_output_q.put(img_data)
-        return processed_until
-
-    def feed_signal_to_visualize(t_range_to_process):
-        nonlocal cache_item
-
         signal_slice = cache_item.signal.sel(time=slice(*t_range_to_process),
                                                 mz=slice(mz0, mz1)
                                                 )
         period_slice = cache_item.signal_period.sel(time=slice(*t_range_to_process)
                                                 )
-
         processed_until = t_range_to_process[0]
 
         if 0 in signal_slice.shape:
@@ -716,7 +656,7 @@ def process_visualization_request(filename,
             t0_i = float( spec_array.time[0] )
             t1_i = float( spec_array.time[-1] ) + float( period_array[-1] )
 
-            print("Processing range: %s" %str((t0_i, t1_i)))
+            print(f"Processing {viz_type} range: {[t0_i, t1_i]}")
 
             t_data = {'request_id': request_id,}
             t_mark(t_data)
@@ -744,8 +684,8 @@ def process_visualization_request(filename,
     if not cache_item:
         print("No such cache item: %s" %filename)
         return False
-    if (mz0 == cache_item.attrs['range'][0] and
-        mz1 == cache_item.attrs['range'][1] and
+    if (mz0 == cache_item.props['range'][0] and
+        mz1 == cache_item.props['range'][1] and
         not persist_in_cache
         ):
         processed_until = feed_ready_images()
@@ -753,14 +693,13 @@ def process_visualization_request(filename,
         processed_until = feed_signal_to_visualize([t0, t1])
     return processed_until
 
-def release_request(request_id):
-        viz_cache_release('requests',
-                          request_id=request_id,
-                          )
-        generator_input_cache.cache_delete_key(request_id)
-        print(this_func_name(), request_id,
-              'cache_q', generator_input_cache.cache.keys(),
-              'file_cache', cache.keys())
+def force_release_request(request_id):
+    # Force releasing cache - needed to interrupt workflow,
+    # in a normal mode cache cleans up by itself.
+    viz_cache_release('requests',
+                        request_id=request_id,
+                        )
+    generator_input_cache.cache_delete_key(request_id)
 
 
 REQUEST_PROCESSORS = {'spectrogram': process_visualization_request,
@@ -787,10 +726,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to Router """
 
     endpoints = [
-            'acquisition_coordinates',
-            'acquired_spectrum',
-            'acquisition_finished',
-            'service_state',
+            'dataset_updated',
             'stop_visualize_range',
             'visualize_range',
             ]
@@ -833,11 +769,11 @@ class DataVizServiceNamespace(BaseClientNamespace):
 
         if mz_range is None:
             # Full mz range
-            mz_range = cache_item.attrs['range']
+            mz_range = cache_item.props['range']
             
         if t_range is None:
             # Full time range
-            t_range = [0, cache_item.attrs['length']]
+            t_range = [0, cache_item.props['length']]
             
         # Add a request, or add to existing request
         for viz_type in viz_types:
@@ -851,7 +787,6 @@ class DataVizServiceNamespace(BaseClientNamespace):
                           )
         # Process request
         viz_cache_process_requests(filename, request_id=request_id)
-
         t_mark(t_data)
 
 
@@ -872,147 +807,68 @@ class DataVizServiceNamespace(BaseClientNamespace):
             return
         t_mark(value)
         for request_id in request_ids:
-            release_request(request_id)
+            force_release_request(request_id)
         # acquired samples are cached under filename key - check to release
         cur = viz_cache_get('requests', 'request_id', filename=filename)
         if not cur.fetchone() and filename in cache:
             del cache[filename]
+
     
-    # ---------------------------------
+    # ------Streamer/FileIo request---------------
 
-    async def on_acquisition_coordinates(self, data):
-        """Initialize acquisition cache with received coordinates
-
-        Parameters
-        ----------
-        data : dict
-            keys: 'mz' and 'time'
-        """
-        global cache
+    async def on_dataset_updated(self, data):
+        # trigger full-size image with every commit of signal dataset
+        def update_cache_item(dataset, item_to_update=None):
+            if not item_to_update:
+                return AttrDict({
+                    'dataset': dataset,
+                    'signal': dataset.signal,
+                    'signal_period': dataset.signal_period,
+                    'props': dataset.attrs['props'],
+                })
+            else:
+                item_to_update.dataset = dataset
+                item_to_update.signal = dataset.signal
+                item_to_update.signal_period = dataset.signal_period
+                item_to_update.props = dataset.attrs['props']
+                return item_to_update
 
         value = data['value']
-        filename_base = value.get('filename')
-        print("Start acquiring sample: %s" %filename_base)
-
-        # Cache raw signal in memory
-        mz = np.frombuffer( value['mz'], dtype=np.float32 )
-        t_range = value['t_range']
-        mz_range = [ float(mz[0]), float(mz[-1]) ]
-
-        signal_array = ExtendableDataArray(array_module=da, persist=True)
-        signal_array.init_array(dims=('mz', 'time'),
-                                coords=[mz, []],
-                                name='signal'
-                                )
-        period_array = ExtendableDataArray(array_module=da, persist=True)
-        period_array.init_array(dims=('time'),
-                                coords=[[]],
-                                name='signal_period'
-                                )
-        # Collect attributes
-        attributes = {'filename': filename_base,
-                      'length': float(t_range[1]),
-                      'range': mz_range,
-                      }
-        # Put to cache
-        cache_item_dict = {'signal': signal_array,
-                           'signal_period': period_array,
-                           'attrs': attributes,
-                           }
-
-        # Initialize arrays for full-range visualizations to write to disk
+        if value['data_type'] != 'signal':
+            raise NotImplementedError(f"Expected data_type: signal - got {value['data_type']}")
+        filename = value['filename']
+        full_length = value['length']
+        committed_length = value['committed_length']
         request_id = generate_unique_key()
-        for viz_type in VIZ_TYPES_SUPPORTED:
-            filename_viz = filename_to_zarr_path(filename_base, viz_type)
-            viz_array = ExtendableDataArray(path=filename_viz,
-                                            array_module=np,
-                                            dtype=object,
-                                            chunk_size=1,
-                                            )
-            viz_array.init_array(dims=('time',),
-                                 coords=[[]],
-                                 name=viz_type
-                                 )
-            viz_period = viz_type + '_period'
-            filename_viz_period = filename_to_zarr_path(filename_base, viz_period)
-            viz_period_array = ExtendableDataArray(path=filename_viz_period,
-                                                   array_module=np,
-                                                   dtype=object,
-                                                   chunk_size=1,
-                                                   )
-            viz_period_array.init_array(dims=('time',),
-                                        coords=[[]],
-                                        name=viz_period
-                                        )
-            # Put to file cache
-            cache_item_dict.update({viz_type: viz_array,
-                                    viz_period: viz_period_array
-                                    })
-            # Add a request
-            viz_cache_put_or_update_request(filename_base,
-                                            viz_type,
-                                            t_range,
-                                            mz_range,
-                                            t_resolution=None,
-                                            client_room='',
-                                            request_id=request_id,
-                                            persist_in_cache=True
-                                            )
-
-        cache_item = AttrDict(cache_item_dict)
-        cache[filename_base] = cache_item
-
-    async def on_acquired_spectrum(self, data):
-        """Receive new spectrum, add to cache
-
-        Parameters
-        ----------
-        data : dict
-            keys: 'filename', 'i', 't', 'spec', 'period', ('mz')
-        """
-        global cache
-
-        value = data['value']
-        filename_base = value['filename']
-
-        ti = np.array( [value['t']], dtype=np.float32 )
-        period = np.array( [value['period']], dtype=np.float32 )
-        print(ti.item())
-        spec = np.frombuffer(value['spec'], dtype=np.float32)
-        spec = spec.reshape(-1, 1)
-
-        # Get data arrays from cache
-        signal_array = cache[filename_base].signal
-        period_array = cache[filename_base].signal_period
-
-        if 'mz' in value:
-            # mz coordinates provided with data (Orbitrap)
-            mz = np.frombuffer(value['mz'], dtype=np.float32)
-            mz = mz.reshape(-1,)
-        else:
-            # Use mz coordinates from signal_array (TOF)
-            mz = signal_array.mz
-
-        # Extend data arrays (write to file)
-        signal_array.extend_array(spec,
-                                  [mz, ti],
-                                  'time'
-                                  )
-        period_array.extend_array(period,
-                                  [ti],
-                                  'time'
-                                  )
-        viz_cache_process_requests(filename_base)
-        # TODO: TOFStreamerClient still uses cnt in callback - remove after updating TOFStreamerClient
-        return data.get('cnt')
-
-    async def on_acquisition_finished(self, data):
-        value = data['value']
-        filename_base = value['filename']
-        print("Finished acquiring file: %s" %filename_base)
-        # TODO: Update request end times
-        viz_cache_process_requests(filename_base, flush=True)
-
+        if committed_length == 0:  # sample just created, not updated yet
+            self.log('Ready for visualizing', filename)
+        elif committed_length != full_length:  # sample is updated
+            cache_item = cache.get(filename)
+            if cache_item is None:
+                self.log(f"Start visualizing {filename} up to {committed_length}")
+                ds = load_file(filename, vars=['signal', 'signal_period'])
+                cache_item = update_cache_item(ds)
+                for viz_type in VIZ_TYPES_SUPPORTED:
+                    zarr_sdk.init_viz_dataset(filename, viz_type, cache_item)
+                    viz_cache_put_or_update_request(
+                        filename,
+                        viz_type,
+                        t_range=[0, full_length],
+                        mz_range=value['range'],
+                        t_resolution=None,
+                        client_room='',
+                        request_id=request_id,
+                        persist_in_cache=True
+                    )
+                cache[filename] = cache_item
+            else:
+                self.log(f"Continue visualizing {filename} up to {committed_length}")
+                ds = load_file(filename, vars=['signal', 'signal_period'], prev_dataset=cache_item['dataset'])
+                update_cache_item(ds, cache_item)
+            viz_cache_process_requests(filename)
+        elif committed_length == full_length:  # sample is done
+            self.log(f"Finish visualizing {filename}: final length {committed_length}")
+            viz_cache_process_requests(filename, flush=True)
 
 
 class DataVizServiceClient(BaseServiceClient):
@@ -1022,16 +878,14 @@ class DataVizServiceClient(BaseServiceClient):
 
     async def init_service(self):
         global generator_input_q
-        global shutdown_event
         global generator_input_cache
 
         generator_input_q = Queue()
         self.generator_input_q =  Queue()
-        shutdown_event = Event()
         generator_input_cache = CacheQ('request_id/viz_type',
                                     generator_input_q,
                                     self.generator_input_q,
-                                    shutdown_event
+                                    self.shutdown_event
                                     )
         self.generator_output_q = Queue()
         self.generator_procs = []
@@ -1040,18 +894,20 @@ class DataVizServiceClient(BaseServiceClient):
             self.log("ImageGenerator %s/%s" %(i+1, self.n_jobs))
             gen_proc = ImageGenerator(self.generator_input_q,
                                       self.generator_output_q,
-                                      shutdown_event
+                                      self.shutdown_event
                                       )
             gen_proc.start()
             self.generator_procs.append(gen_proc)
             await self.sio.sleep(1)
-            
+
 
     async def service_main(self):
+        global cache
+
         # start input cache thread
         generator_input_cache.start()
 
-        while True:
+        while not self.shutdown_event.is_set():
             # Check queues for new images
             try:
                 img_data = self.generator_output_q.get_nowait()
@@ -1059,39 +915,39 @@ class DataVizServiceClient(BaseServiceClient):
                 await self.sio.sleep(.1)
                 continue
             except KeyboardInterrupt:
+                self.log('KeyboardInterrupt')
+                break
+            except Exception as e:
+                self.log(str(e))
                 break
 
             t_mark(img_data)
 
             # Got new image
-            persist_in_cache = img_data.pop('persist_in_cache', None)
-
+            persist_in_cache = img_data.pop('persist_in_cache', False)
             if persist_in_cache:
-                global cache
                 # Cache image
                 filename = img_data['filename']
                 viz_type = img_data['viz_type']
                 ti = np.array([ img_data['t_range'][0] ], dtype=np.float32)
                 img_str = img_data.get('img') or json.dumps(img_data.get('traces'))
                 img_period = img_data['t_range'][1] - img_data['t_range'][0]
-
                 try:
                     viz_array = cache[filename][viz_type]
                     period_array = cache[filename][ (viz_type + '_period') ]
-                except KeyError:
-                    print("Key error! cache keys: %s" %str(list(cache.keys())))
-                viz_array.extend_array(np.array([img_str]),
-                                       [ti],
-                                       'time'
-                                       )
-                period_array.extend_array(np.array( [img_period], dtype=np.float32 ),
-                                          [ti],
-                                          'time'
-                                          )
-                viz_cache_process_requests(filename=filename,
-                                           persist_in_cache=False
-                                           )
-
+                    viz_array.extend_array(np.array([img_str]),
+                                        [ti],
+                                        'time'
+                                        )
+                    period_array.extend_array(np.array( [img_period], dtype=np.float32 ),
+                                            [ti],
+                                            'time'
+                                            )
+                    viz_cache_process_requests(filename=filename,
+                                            persist_in_cache=False
+                                            )
+                except KeyError as e:
+                    self.log("Key error:", str(e))
             # Emit figure data
             client_room = img_data.pop('client_room')
             if client_room:
@@ -1106,15 +962,15 @@ class DataVizServiceClient(BaseServiceClient):
             # End of main loop
         # Exit
         # Kill generator_input_cache thread
-        shutdown_event.set()
-        # Terminate image generators
+        self.shutdown_event.set()
+        self.log('stopped')
+        # Terminate image generators: TODO: use self.shutdown_event here too
         [proc.terminate() for proc in self.generator_procs]
         await self.sio.disconnect()
 
 
 def run():
     global client
-    global shutdown_event
 
     print("PID: %s" %os.getpid())
 
@@ -1129,13 +985,11 @@ def run():
         loop.run_until_complete(client.run())
     except KeyboardInterrupt:
         print(f"KeyboardInterrupt for {client.__class__.__name__}")
-        # shutdown_event.set()
-    # except Exception as e:
-    #     print(f"Exception '{str(e)}' for {client.__class__.__name__}")
-        # shutdown_event.set()
+    except Exception as e:
+        print(f"Exception '{str(e)}' for {client.__class__.__name__}")
     finally:
         print(f'Stopping service with generators...')
-        shutdown_event.set()
+        client.shutdown_event.set()
         for gen in client.generator_procs:
             gen.queue_in.put(None)
 
