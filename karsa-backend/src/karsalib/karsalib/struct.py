@@ -794,10 +794,22 @@ class FSWatcher:
             super().__init__(patterns=[mask,])
 
         def on_created(self, event):
-            self.client.on_filesystem_object_created(event.src_path)
+            try:
+                self.client.on_filesystem_object_created(event.src_path)
+            except AttributeError:
+                pass
+
+        def on_modified(self, event):
+            try:
+                self.client.on_filesystem_object_modified(event.src_path)
+            except AttributeError:
+                pass
 
         def on_deleted(self, event):
-            self.client.on_filesystem_object_deleted(event.src_path)
+            try:
+                self.client.on_filesystem_object_deleted(event.src_path)
+            except AttributeError:
+                pass
 
     def log(self, *arg, **kwarg):
         print(f"[{self.__class__.__name__}.{inspect.stack()[1].function}]", *arg, **kwarg)

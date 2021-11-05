@@ -606,7 +606,7 @@ class ImageGenerator(Process):
                 except Exception as e:
                     # TODO: check if this exception handling is right: without it process hangs
                     # after acq.stopped, often there goes exception: y must be real (y_range-[0, 15.135354995727539])
-                    print(print(f"ImageGenerator {os.getpid()} exception: {str(e)} for y_range {y_range}"))
+                    print(f"ImageGenerator {os.getpid()} exception: {str(e)} for y_range {y_range}")
                     continue
                 if isinstance(viz, Image.Image):
                     img_b = convert_to_base64(viz)

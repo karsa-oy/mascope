@@ -294,7 +294,9 @@ class MetadataServiceNamespace(BaseClientNamespace):
             datapool.new_sample(project,
                                 experiment,
                                 filename,
-                                sample_placeholder.get('attributes'),
+                                sample_placeholder.get('attributes', []),
+                                sample_placeholder.get('method', {}),
+                                sample_placeholder.get('annotations', []),
                                 placeholder=True
                                 )
 

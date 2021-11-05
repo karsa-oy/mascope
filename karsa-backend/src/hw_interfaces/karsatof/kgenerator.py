@@ -19,6 +19,7 @@ import inspect
 
 from karsalib.util import copy_dict, get_client_notification_context
 from numpy.lib.index_tricks import RClass
+from services.FileIoService import zarr_sdk
 from .kinstrument import KInstrument
 
 
@@ -401,8 +402,8 @@ class TofDaqStreamer(BaseStreamer):
 
 
 
-MAX_RESPONSE_TIME = 5       # secs to wait for notification acknowledgement, then ignore it.
-PROGRESS_SHIFT = 7          # shift with acknowledged progress
+MAX_RESPONSE_TIME = 5       # secs to wait for notification acknowledgement
+PROGRESS_SHIFT = 10         # shift with acknowledged progress
 
 class H5Streamer(BaseStreamer, KInstrument):
     from .lib.TwH5 import (
@@ -429,6 +430,7 @@ class H5Streamer(BaseStreamer, KInstrument):
         BaseStreamer.__init__(self)
         self.filename = None
         self.target_filename = None
+        self.item = None                                # data item to stream/store
         self.ack_progress = -1
         self.rcontext = {}
         self.fdata = {}
@@ -519,7 +521,19 @@ class H5Streamer(BaseStreamer, KInstrument):
         return info
 
 
-    # the service communication protocol implementation
+    #======== The service communication protocol implementation ===============
+    def _feed_notifications(self, gen_notifications, streamer_notifications):
+        # gen_notifications are sent always, and streamer_notifications
+        # are sent in streamer mode, when target_data_pool_path is None
+        if self.client.target_data_pool_path:
+            notifications = gen_notifications
+        else:
+            notifications = [*gen_notifications, *streamer_notifications]
+        for n in notifications:
+            job_id_data = {'client_room':self.client_room, 'filename':self.filename}
+            n.update(job_id_data)   # job_id_data needed for CacheQ indexing of self.responses
+            self.responses.cache_put(n)
+
     def _feed_initial_data(self):
         progress_data = {
             'client_room': self.client_room,
@@ -528,49 +542,19 @@ class H5Streamer(BaseStreamer, KInstrument):
             'progress': self.progress,
             'ack_progress': self.ack_progress,
         }
-        notifications = [
+        sn_data = {
+            'name': 'acquisition_coordinates',
+            'value': {
+                'filename': self.target_filename,
+                'mz': self.mz.tobytes(),
+                't_range': [0, self.length]
+            },
+        }
+        gen_notifications = [
             {   # TODO: remove acquisition_status for acquisition_started
                 'name': 'acquisition_status',
                 'value': 'running',
                 'context': self.rcontext,
-                'context': {
-                    **self.rcontext,
-                    'room': None,
-                },
-            },
-            {
-                'name': 'acquisition_coordinates',
-                'value': {
-                    'filename': self.target_filename,
-                    'mz': self.mz.tobytes(),
-                    't_range': [0, self.length]
-                },
-                'context': {
-                    **self.rcontext,
-                    'room': None,
-                    'callback': 'cb_progress',
-                    'callback_data': progress_data,
-                },
-            },
-            {  # TODO: remove this public notification after moving DataViz to private_ns
-                'name': 'acquisition_coordinates',
-                'value': {
-                    'filename': self.target_filename,
-                    'mz': self.mz.tobytes(),
-                    't_range': [0, self.length]
-                },
-                'context': {
-                    **self.rcontext,
-                    'namespace': '/',
-                    'room': None,
-                },
-            },
-            {
-                'name': 'tps_parameter_info',
-                'value': {
-                    'filename': self.target_filename,
-                    'tps_info': self.tps_info,
-                },
                 'context': {
                     **self.rcontext,
                     'room': None,
@@ -597,10 +581,51 @@ class H5Streamer(BaseStreamer, KInstrument):
                 },
             },
         ]
-        for n in notifications:
-            job_id_data = {'client_room':self.client_room, 'filename':self.filename}
-            n.update(job_id_data)   # job_id_data needed for CacheQ indexing of self.responses
-            self.responses.cache_put(n)
+        streamer_notifications = [
+            {
+                **sn_data,
+                'context': {
+                    **self.rcontext,
+                    'room': None,
+                    'callback': 'cb_progress',
+                    'callback_data': progress_data,
+                },
+            },
+            {  # TODO: remove this public notification after moving DataViz to private_ns
+                **sn_data,
+                'context': {
+                    **self.rcontext,
+                    'namespace': '/',
+                    'room': None,
+                },
+            },
+        ]
+        self._feed_notifications(gen_notifications, streamer_notifications)
+        if self.client.target_data_pool_path:
+            self.item = zarr_sdk.init_signal_dataset(sn_data, self.client.target_data_pool_path)
+            self.ack_progress = self.progress
+
+    def _feed_tps_parameter_info(self):
+        sn_data = {
+            'name': 'tps_parameter_info',
+            'value': {
+                'filename': self.target_filename,
+                'tps_info': self.tps_info,
+            },
+        }
+        gen_notifications = []
+        streamer_notifications = [
+            {
+                **sn_data,
+                'context': {
+                    **self.rcontext,
+                    'room': None,
+                },
+            },
+        ]
+        self._feed_notifications(gen_notifications, streamer_notifications)
+        if self.client.target_data_pool_path:
+            zarr_sdk.init_tps_dataset(sn_data, self.item)
 
     def _feed_spec_data(self, spec_data):
         progress_data = {
@@ -610,32 +635,14 @@ class H5Streamer(BaseStreamer, KInstrument):
             'progress': self.progress,
             'ack_progress': self.ack_progress,
         }
-        notifications = [
-            {
-                'name': 'acquired_spectrum',
-                'value': {
-                    **spec_data,
-                    'filename': self.target_filename,
-                },
-                'context': {
-                    **self.rcontext,
-                    'room': None,
-                    'callback': 'cb_progress',
-                    'callback_data': progress_data,
-                },
+        sn_data = {
+            'name': 'acquired_spectrum',
+            'value': {
+                **spec_data,
+                'filename': self.target_filename,
             },
-            {  # TODO: remove this public notification after moving DataViz to private_ns
-                'name': 'acquired_spectrum',
-                'value': {
-                    **spec_data,
-                    'filename': self.target_filename,
-                },
-                'context': {
-                    **self.rcontext,
-                    'namespace': '/',
-                    'room': None,
-                },
-            },
+        }
+        gen_notifications = [
             {
                 'name': 'acquisition_progress',
                 'value': progress_data,
@@ -645,53 +652,79 @@ class H5Streamer(BaseStreamer, KInstrument):
                 },
             },
         ]
-        for n in notifications:
-            job_id_data = {'client_room':self.client_room, 'filename':self.filename}
-            n.update(job_id_data)
-            self.responses.cache_put(n)
-
-    def _feed_tps_data(self, tps_data):
-        notifications = [
+        streamer_notifications = [
             {
-                'name': 'acquired_tps_data',
-                'value': {
-                    **tps_data,
-                    'filename': self.target_filename,
-                },
+                **sn_data,
                 'context': {
                     **self.rcontext,
                     'room': None,
-                },
-            },
-        ]
-        for n in notifications:
-            job_id_data = {'client_room':self.client_room, 'filename':self.filename}
-            n.update(job_id_data)
-            self.responses.cache_put(n)
-
-    def _feed_final_data(self):
-        notifications = [
-            {
-                'name': 'acquisition_finished',
-                'value': {
-                    'filename': self.target_filename,
-                },
-                'context': {
-                    **self.rcontext,
-                    'room': None,
+                    'callback': 'cb_progress',
+                    'callback_data': progress_data,
                 },
             },
             {  # TODO: remove this public notification after moving DataViz to private_ns
-                'name': 'acquisition_finished',
-                'value': {
-                    'filename': self.target_filename,
-                },
+                **sn_data,
                 'context': {
                     **self.rcontext,
                     'namespace': '/',
                     'room': None,
                 },
             },
+        ]
+        if self.client.target_data_pool_path:
+            # target_data_pool_path specified - store data locally
+            zarr_sdk.update_signal_dataset(sn_data, self.item)
+            if self.item['signal'].delayed_write is None:
+                # updates to signal mfzarrs are committed - notify
+                dataset_updated = {
+                    # TODO: switch to private notification after moving DataViz to private_ns
+                    'name': 'dataset_updated',
+                    'value': {
+                        'data_type': 'signal',
+                        **self.item['props'],
+                    },
+                    'context': {
+                        **self.rcontext,
+                        'namespace': '/',
+                        'room': None,
+                    },
+                }
+                gen_notifications.append(dataset_updated)
+            # if data is stored locally, ack_progress is set locally,
+            # otherwise by acquired_spectrum callback
+            self.ack_progress = self.progress
+        self._feed_notifications(gen_notifications, streamer_notifications)
+
+    def _feed_tps_data(self, tps_data):
+        sn_data = {
+            'name': 'acquired_tps_data',
+            'value': {
+                **tps_data,
+                'filename': self.target_filename,
+            },
+        }
+        gen_notifications = []
+        streamer_notifications = [
+            {
+                **sn_data,
+                'context': {
+                    **self.rcontext,
+                    'room': None,
+                },
+            },
+        ]
+        self._feed_notifications(gen_notifications, streamer_notifications)
+        if self.client.target_data_pool_path:
+            zarr_sdk.update_tps_dataset(sn_data, self.item)
+
+    def _feed_final_data(self):
+        sn_data = {
+            'name': 'acquisition_finished',
+            'value': {
+                'filename': self.target_filename,
+            },
+        }
+        gen_notifications = [
             {   # TODO: remove acquisition_status for acquisition_finished
                 'name': 'acquisition_status',
                 'value': 'not_running',
@@ -700,11 +733,45 @@ class H5Streamer(BaseStreamer, KInstrument):
                     'room': None,
                 },
             },
+            {   # acquisition_finished for progress bar
+                **sn_data,
+                'context': {
+                    **self.rcontext,
+                    'room': None,
+                },
+            },
         ]
-        for n in notifications:
-            job_id_data = {'client_room':self.client_room, 'filename':self.filename}
-            n.update(job_id_data)
-            self.responses.cache_put(n)
+        streamer_notifications = [
+            {  # TODO: remove this public notification after moving DataViz to private_ns
+                **sn_data,
+                'context': {
+                    **self.rcontext,
+                    'namespace': '/',
+                    'room': None,
+                },
+            },
+        ]
+        if self.client.target_data_pool_path and self.item:
+            zarr_sdk.finalize_dataset(sn_data, self.item)
+            # updates to signal mfzarrs are finalized - notify
+            dataset_updated = {
+                # TODO: switch to private notification after moving DataViz to private_ns
+                'name': 'dataset_updated',
+                'value': {
+                    'data_type': 'signal',
+                    **self.item['props'],
+                },
+                'context': {
+                    **self.rcontext,
+                    'namespace': '/',
+                    'room': None,
+                },
+            }
+            gen_notifications.append(dataset_updated)
+        self._feed_notifications(gen_notifications, streamer_notifications)
+
+# ==========================================================================
+
 
     def _get_and_feed_data(self):
         """Read data from the h5 and put to queues
@@ -796,11 +863,10 @@ class H5Streamer(BaseStreamer, KInstrument):
                 tof_period_s *= 1e-9 
             self.interval = tof_period_s * self.desc.nbrWaveforms # [s]
             self.length = (self.desc.nbrWrites * self.desc.nbrBufs) * self.interval # [s]
-            self.log("started: %s" %self.filename)
             self._feed_initial_data()
-            if not self.wait_for_ack():     # wait for initial request to pass thru
+            if not self.wait_for_ack():     # wait for acq data initialization
                 raise TimeoutError
-
+            self._feed_tps_parameter_info()
             # Check again for new data
             state = self._check()
         if state == 1:      # New data
@@ -834,6 +900,7 @@ class H5Streamer(BaseStreamer, KInstrument):
         self.job_id = None
         self.filename = None
         self.target_filename = None
+        self.item = None
         self.rcontext = {}
         self.fdata = {}
         self.progress = 0
@@ -843,7 +910,6 @@ class H5Streamer(BaseStreamer, KInstrument):
     def wait_for_ack(self, progress_shift=0, timeout=MAX_RESPONSE_TIME):
         res = True
         t0 = time()
-        # while self.ack_progress < self.progress:
         while self.progress - self.ack_progress > progress_shift:
             if time() - t0 > timeout:
                 self.log(f"Warning: {self.filename} - no progress acknowledgement for {timeout} sec.")
@@ -856,7 +922,7 @@ class H5Streamer(BaseStreamer, KInstrument):
         """Finalize acquisition
         """
         self._feed_final_data()
-        if not self.cancel_event.is_set() and not self.shutdown_event.is_set():
+        if self.item and not self.cancel_event.is_set() and not self.shutdown_event.is_set():
             self.wait_for_ack()     # wait till all packages are processed
         self._reset()
 
@@ -925,7 +991,9 @@ class H5Streamer(BaseStreamer, KInstrument):
                     if self.cancel_event.is_set() or self.shutdown_event.is_set():
                         break
             except TimeoutError:
-                self.log(f"Streaming of {self.filename} interrupted due to timeout")
+                self.log(f"Streaming {self.filename} interrupted due to timeout")
+            except FileExistsError:     # only in import mode
+                self.log(f"Importing {self.filename} cancelled: target exists")
             # Out of write loop
             self.log(f"finished streaming {self.filename}")
             res = H5Streamer.TwCloseH5(full_fname.encode())

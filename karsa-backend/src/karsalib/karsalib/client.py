@@ -1,4 +1,5 @@
 import asyncio
+from enum import Enum
 import inspect
 import time
 import importlib
@@ -34,7 +35,9 @@ def run_streamer_service(StreamerClient,
     while True:
         streamer_type = args.get('streamer_type')
         n_jobs = int(args.get('n_jobs', 1))
-        streamer_opts = {'type': streamer_type, 'n_jobs': n_jobs}
+        # existing target_data_pool_path switches from mode.stream to mode.store
+        target_data_pool_path = args.get('target_data_pool_path')
+        streamer_opts = {'type': streamer_type, 'n_jobs': n_jobs, 'target_data_pool_path': target_data_pool_path}
         data_pool_path = args.get('data_pool_path')
         data_pool_mask = args.get('data_pool_mask')
         data_pool_opts = None if not data_pool_path else \
@@ -142,10 +145,10 @@ class BaseClientNamespace(AsyncClientNamespace):
         else:
             self.log(f"{endpoint} callback: {cb_name}(*{arg}, **{kwarg})")
         fn_cb = self.__getattribute__(cb_name)
-        if cb_ctx:
-            fn_cb(cb_ctx, *arg, **kwarg)
-        else:
+        if cb_ctx is None:
             fn_cb(*arg, **kwarg)
+        else:
+            fn_cb(cb_ctx, *arg, **kwarg)
 
     async def emit_client_notification(self, name, value, **kwarg):
         """
@@ -562,6 +565,8 @@ class BaseStreamerClient(BridgeServiceClient):
         super().__init__(url, port, public_namespace_data, private_namespace_data)
         streamer_type = streamer_opts['type']
         n_jobs = streamer_opts['n_jobs']
+        # target_data_pool_path switches bw stream/store modes
+        self.target_data_pool_path = streamer_opts['target_data_pool_path']
         self.streamers = []
         priv_ns_name, _ = private_namespace_data
         self.instrument_data = {'name': priv_ns_name,
