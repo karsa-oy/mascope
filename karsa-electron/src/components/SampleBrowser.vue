@@ -1428,13 +1428,13 @@ export default {
 
             if (this.autosave_on) {
                 // Auto-save sample
-                for (let i in this.samples) {
+                for (let sample_id in this.samples) {
                     // Find first placeholder sample
-                    if (this.samples[i].filename.indexOf('placeholder') != -1) {
+                    if (sample_id.indexOf('placeholder') != -1) {
                         // Copy attributes from placeholder
-                        this.sample_attributes_fields = shallow_copy(this.samples[i].attributes);
+                        this.sample_attributes_fields = shallow_copy(this.samples[sample_id].attributes);
                         // Delete placeholder
-                        this.removeSample(this.samples[i].filename);
+                        this.removeSample(sample_id);
                         break
                     }
                 }
