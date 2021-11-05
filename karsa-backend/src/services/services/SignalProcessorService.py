@@ -256,16 +256,16 @@ class SignalProcessorNamespace(BaseClientNamespace):
         if not cache_item:
             # File not in cache, load
             print("Loading file: %s" %filename)
-            cache_item = load_file(filename) # TODO: Load a subset of arrays from file
+            cache_item = load_file(filename, vars=['signal'])
             cache[filename] = cache_item
 
         if mz_range is None:
             # Full mz range
-            mz_range = cache_item.attrs['range']
+            mz_range = cache_item.attrs['props']['range']
             
         if t_range is None:
             # Full time range
-            t_range = [0, cache_item.attrs['length']]
+            t_range = [0, cache_item.attrs['props']['length']]
 
         sum_spectrum = cache_item.signal.sel(
                             mz=slice(*mz_range)
