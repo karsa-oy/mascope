@@ -21,7 +21,7 @@ import dask.array as da
 
 
 from karsalib.client import BaseClientNamespace, BaseServiceClient
-from karsalib.logging import t_mark
+from karsalib.logging import t_mark, this_func_name
 from karsalib.struct import AttrDict, ExtendableDataArray, LRUDict
 from karsalib.util import get_client_notification_context, parse_cmd_args
 
@@ -397,10 +397,7 @@ def load_array(base_filename, var, prev_array=None):
     # print("Loading array %s : %s" %(base_filename, var))
     var_path = filename_to_zarr_path(base_filename, var)
     # Load data from file
-    try:
-        dataset = open_mfzarr(var_path, prev_array=prev_array)
-    except FileNotFoundError as e:
-        print("FileNotFoundError: Error reading %s, %s" %(var_path, e))
+    dataset = open_mfzarr(var_path, prev_array=prev_array)
     return dataset
 
 def load_file(base_filename, vars=None, prev_dataset=None):
@@ -442,9 +439,8 @@ def load_file(base_filename, vars=None, prev_dataset=None):
             dss.append(var_ds)
             zarr_groups[var] = var_ds.attrs['zarr_groups']
         except Exception as e:
-            print("Failed to load data: %s" %str(e))
-            continue
-    # Merge into xarray.Dataset
+            raise Exception(f"{this_func_name()}: Failed to load {base_filename}/{var} data: {str(e)}")
+    # Merge arrays into xarray.Dataset
     dataset = xarray.merge(dss)
     # Load properties
     prop_path = os.path.join(filepath,

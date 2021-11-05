@@ -656,12 +656,11 @@ def process_visualization_request(filename,
             t0_i = float( spec_array.time[0] )
             t1_i = float( spec_array.time[-1] ) + float( period_array[-1] )
 
-            print(f"Processing {viz_type} range: {[t0_i, t1_i]}")
+            print(f"Processing {filename}/{viz_type} range: {[t0_i, t1_i]}")
 
             t_data = {'request_id': request_id,}
             t_mark(t_data)
             # Put batch to queue to be visualized
-            # generator_input_q.put({
             generator_input_cache.put({
                             'data': spec_array,
                             'filename': filename,
@@ -835,18 +834,25 @@ class DataVizServiceNamespace(BaseClientNamespace):
 
         value = data['value']
         if value['data_type'] != 'signal':
-            raise NotImplementedError(f"Expected data_type: signal - got {value['data_type']}")
+            raise ValueError(f"Expected data_type: signal - got {value['data_type']}")
         filename = value['filename']
         full_length = value['length']
         committed_length = value['committed_length']
         request_id = generate_unique_key()
         if committed_length == 0:  # sample just created, not updated yet
             self.log('Ready for visualizing', filename)
+            cache[filename] = {}
         elif committed_length != full_length:  # sample is updated
             cache_item = cache.get(filename)
-            if cache_item is None:
+            if not cache_item:
                 self.log(f"Start visualizing {filename} up to {committed_length}")
-                ds = load_file(filename, vars=['signal', 'signal_period'])
+                try:
+                    ds = load_file(filename, vars=['signal', 'signal_period'])
+                except Exception as e:
+                    self.log(f"Failed visualizing {filename} up to {committed_length}: {str(e)}")
+                    if cache_item:
+                        cache_item['crippled'] = True
+                    return
                 cache_item = update_cache_item(ds)
                 for viz_type in VIZ_TYPES_SUPPORTED:
                     zarr_sdk.init_viz_dataset(filename, viz_type, cache_item)
@@ -863,12 +869,20 @@ class DataVizServiceNamespace(BaseClientNamespace):
                 cache[filename] = cache_item
             else:
                 self.log(f"Continue visualizing {filename} up to {committed_length}")
-                ds = load_file(filename, vars=['signal', 'signal_period'], prev_dataset=cache_item['dataset'])
+                try:
+                    ds = load_file(filename, vars=['signal', 'signal_period'], prev_dataset=cache_item['dataset'])
+                except Exception as e:
+                    self.log(f"Failed visualizing {filename} up to {committed_length}: {str(e)}")
+                    cache_item['crippled'] = True
+                    return
                 update_cache_item(ds, cache_item)
             viz_cache_process_requests(filename)
         elif committed_length == full_length:  # sample is done
             self.log(f"Finish visualizing {filename}: final length {committed_length}")
             viz_cache_process_requests(filename, flush=True)
+            cache_item = cache.get(filename)
+            if cache_item and cache_item.get('crippled', False):
+                del cache[filename]   # don't leave crippled item in file cache
 
 
 class DataVizServiceClient(BaseServiceClient):
@@ -928,26 +942,30 @@ class DataVizServiceClient(BaseServiceClient):
             if persist_in_cache:
                 # Cache image
                 filename = img_data['filename']
-                viz_type = img_data['viz_type']
-                ti = np.array([ img_data['t_range'][0] ], dtype=np.float32)
-                img_str = img_data.get('img') or json.dumps(img_data.get('traces'))
-                img_period = img_data['t_range'][1] - img_data['t_range'][0]
-                try:
-                    viz_array = cache[filename][viz_type]
-                    period_array = cache[filename][ (viz_type + '_period') ]
-                    viz_array.extend_array(np.array([img_str]),
-                                        [ti],
-                                        'time'
-                                        )
-                    period_array.extend_array(np.array( [img_period], dtype=np.float32 ),
+                cache_item = cache.get(filename)
+                if not cache_item:
+                    self.log(f"Skip visualizing {filename} - data not in cache.")
+                else:
+                    viz_type = img_data['viz_type']
+                    ti = np.array([ img_data['t_range'][0] ], dtype=np.float32)
+                    img_str = img_data.get('img') or json.dumps(img_data.get('traces'))
+                    img_period = img_data['t_range'][1] - img_data['t_range'][0]
+                    try:
+                        viz_array = cache_item[viz_type]
+                        period_array = cache_item[ (viz_type + '_period') ]
+                        viz_array.extend_array(np.array([img_str]),
                                             [ti],
                                             'time'
                                             )
-                    viz_cache_process_requests(filename=filename,
-                                            persist_in_cache=False
-                                            )
-                except KeyError as e:
-                    self.log("Key error:", str(e))
+                        period_array.extend_array(np.array( [img_period], dtype=np.float32 ),
+                                                [ti],
+                                                'time'
+                                                )
+                        viz_cache_process_requests(filename=filename,
+                                                persist_in_cache=False
+                                                )
+                    except KeyError as e:
+                        self.log("Key error:", str(e))
             # Emit figure data
             client_room = img_data.pop('client_room')
             if client_room:
