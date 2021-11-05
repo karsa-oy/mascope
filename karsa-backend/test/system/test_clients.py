@@ -41,7 +41,7 @@ class BaseTestClientCase(asynctest.TestCase):
             raise Exception(str(self.client.target_exception))
 
 
-@unittest.skip("TMP")
+# @unittest.skip("TMP")
 class TestValidateTesterCase(BaseTestClientCase):
     # Make sure test environment properly reacts to failures
     # BE CAREFUL: raised assertion kills main TestClient thread
@@ -57,7 +57,7 @@ class TestValidateTesterCase(BaseTestClientCase):
         self.assertTrue('exceeded max execution time' in str(ctx.exception))
 
 
-@unittest.skip("TMP")
+# @unittest.skip("TMP")
 class TestVisualizerCase(BaseTestClientCase):
     def test_visualize_full_range(self):
         fname = 'TofDaq_Data_2021.08.02_01h01m01s'
@@ -124,7 +124,7 @@ class TestVisualizerCase(BaseTestClientCase):
         self.assert_requests_ok()
 
 
-    @unittest.skip("TODO: fix data for both input files")
+    # @unittest.skip("TODO: fix data for both input files")
     def test_visualize_two_files_parallel(self):
         fname = 'file_1'
         rq_suffix = self.client.set_test_params(fname)
@@ -135,7 +135,7 @@ class TestVisualizerCase(BaseTestClientCase):
         self.assert_requests_ok()
 
 
-@unittest.skip("TMP")
+# @unittest.skip("TMP")
 class TestSampleManagerCase(BaseTestClientCase):
     @classmethod
     def setUpClass(cls):
