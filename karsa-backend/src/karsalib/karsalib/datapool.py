@@ -740,7 +740,7 @@ class SamplePool():
                                     ]
         self.df = flat_df_clean.set_index(self.df.index.names)
 
-    def new_sample(self, project, experiment, sample, attributes, method, annotations, placeholder=False):
+    def new_sample(self, project, experiment, sample, attributes=[], method={}, annotations=[], placeholder=False):
         # Meta-data path
         experiment_path = os.path.join(self.projects_root, project, experiment)
         sample_experiment_path = os.path.join(experiment_path, sample)
