@@ -41,7 +41,7 @@ class BaseTestClientCase(asynctest.TestCase):
             raise Exception(str(self.client.target_exception))
 
 
-# @unittest.skip("TMP")
+@unittest.skip("TMP")
 class TestValidateTesterCase(BaseTestClientCase):
     # Make sure test environment properly reacts to failures
     # BE CAREFUL: raised assertion kills main TestClient thread
@@ -57,7 +57,7 @@ class TestValidateTesterCase(BaseTestClientCase):
         self.assertTrue('exceeded max execution time' in str(ctx.exception))
 
 
-# @unittest.skip("TMP")
+@unittest.skip("TMP")
 class TestVisualizerCase(BaseTestClientCase):
     def test_visualize_full_range(self):
         fname = 'TofDaq_Data_2021.08.02_01h01m01s'
@@ -135,7 +135,7 @@ class TestVisualizerCase(BaseTestClientCase):
         self.assert_requests_ok()
 
 
-# @unittest.skip("TMP")
+@unittest.skip("TMP")
 class TestSampleManagerCase(BaseTestClientCase):
     @classmethod
     def setUpClass(cls):
@@ -319,13 +319,13 @@ class TestFileStreamerCase(BaseTestClientCase):
         self.assertEqual(self.client.raw_samples, self.raw_samples)
 
     def test_03_raw_import_interrupted_with_status_checks(self):
-        # send raw_import and check raw_import_status
+        ## send raw_import and check raw_import_status
         asyncio.run(
             self.client.emit_raw_import(
                 self.client.raw_samples_data,
                 request_id=None)    # don't track the request for completion
         )
-        asyncio.run(asyncio.sleep(1))
+        asyncio.run(asyncio.sleep(3))   # let sample #1 to start importing
         asyncio.run(
             self.client.emit_raw_import_status(
                 request_id='raw_import_status',
@@ -340,13 +340,14 @@ class TestFileStreamerCase(BaseTestClientCase):
             [basename(f['filename']) for f in self.client.raw_import_status_data['queue']['files']],
             self.raw_samples[1:]
         )
-        # send stop_raw_import for sample in progress and check raw_import_status
+
+        ## send stop_raw_import for sample in progress (sample #1 should be stopped) and
+        ## check raw_import_status - the rest of the samples should continue visualizing
         asyncio.run(
             self.client.emit_stop_raw_import()
         )
         # TODO: ugly workaround - so far no reliable way to trace stop_raw_import complete - just wait
-        asyncio.run(asyncio.sleep(7))
-
+        asyncio.run(asyncio.sleep(3))   # let #1 to stop and #2 to be taken to import
         asyncio.run(
             self.client.emit_raw_import_status(
                 request_id='raw_import_status',
@@ -361,13 +362,13 @@ class TestFileStreamerCase(BaseTestClientCase):
             [basename(f['filename']) for f in self.client.raw_import_status_data['queue']['files']],
             self.raw_samples[2:]
         )
-        # send stop_raw_import for the rest of samples and check raw_import_status
+
+        ## send stop_raw_import for the rest of samples and check raw_import_status
         asyncio.run(
             self.client.emit_stop_raw_import(self.client.raw_samples_data[1:])
         )
         # TODO: ugly workaround - so far no reliable way to trace stop_raw_import complete - just wait
-        asyncio.run(asyncio.sleep(7))
-
+        asyncio.run(asyncio.sleep(3))   # #2 should be stopped and #3, #4 should remove from progress list
         asyncio.run(
             self.client.emit_raw_import_status(
                 request_id='raw_import_status',
