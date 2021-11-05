@@ -439,7 +439,8 @@ def load_file(base_filename, vars=None, prev_dataset=None):
             dss.append(var_ds)
             zarr_groups[var] = var_ds.attrs['zarr_groups']
         except Exception as e:
-            raise Exception(f"{this_func_name()}: Failed to load {base_filename}/{var} data: {str(e)}")
+            print(f"{this_func_name()}: Failed to load {base_filename}/{var} data: {str(e)}")
+            continue
     # Merge arrays into xarray.Dataset
     dataset = xarray.merge(dss)
     # Load properties
