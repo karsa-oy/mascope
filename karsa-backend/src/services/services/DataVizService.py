@@ -827,8 +827,14 @@ class DataVizServiceNamespace(BaseClientNamespace):
                 })
             else:
                 item_to_update.dataset = dataset
-                item_to_update.signal = dataset.signal
-                item_to_update.signal_period = dataset.signal_period
+                try:
+                    item_to_update.signal = dataset.signal
+                except:
+                    pass    # sometimes signal data is not ready yet
+                try:
+                    item_to_update.signal_period = dataset.signal_period
+                except:
+                    pass
                 item_to_update.props = dataset.attrs['props']
                 return item_to_update
 
