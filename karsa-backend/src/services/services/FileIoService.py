@@ -492,8 +492,8 @@ def open_mfzarr(path, mode='r', concat_dim='time', prev_array=None):
         prev_groups = prev_array.attrs.get('zarr_groups', [])
         for g in prev_groups:
             groups.remove(g)
+    # print(f"{ntpath.basename(path)} {'loading' if prev_array is None else 'updating'} from group {groups}")
     x = xarray.concat([xarray.open_zarr(path, g, consolidated=False) for g in groups], concat_dim)
-    # print(f"{ntpath.basename(path)} {'loaded' if prev_array is None else 'updated'} from group {groups}")
     if prev_array is not None:
         x = xarray.concat([prev_array.to_dataset(), x], concat_dim)
     x.attrs = z.attrs.asdict()
