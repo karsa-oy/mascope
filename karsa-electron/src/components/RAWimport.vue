@@ -73,6 +73,12 @@
                                 @click="import_raw_table_checked_rows=[]; is_raw_import_modal_active=false;">
                                 Cancel
                             </button>
+                            <b-upload v-model="batch_import_list" class="file-label" rounded>
+                                <span class="file-cta">
+                                    <b-icon class="file-icon" icon="upload"></b-icon>
+                                    <span class="file-label">Batch Import...</span>
+                                </span>
+                            </b-upload>
                         </footer>
                     </div>
                 </div>
@@ -131,6 +137,15 @@
                                                 ) ? false : true">
                                         {{acquisition_control_label}}
                                 </b-button>
+                                <b-button
+                                    type="is-dark"
+                                    @click="on_button_acquisition_status()"
+                                    outlined
+                                    inverted
+                                    :disabled="(instrument_status=='ready'
+                                                ) ? false : true">
+                                        Status
+                                </b-button>
                                 <div><br></div>
                             </div>
                         </div>
@@ -145,6 +160,7 @@
 
 <script type="text/javascript">
 "use strict";
+import csv from "jquery-csv";
 import Vue from "vue";
 import { mapState } from 'vuex';
 import Buefy from "buefy";
@@ -214,6 +230,7 @@ export default {
             import_raw_table_cols: [],
             import_raw_table_checked_rows: [],
             import_raw_table_datetime_range: {},
+            batch_import_list: {},
         }
     },
     created: function() {
@@ -282,7 +299,7 @@ export default {
             // if (new_value === old_value) {
             //     return false;
             // }
-            this.acquisition_control_label = 'Import ' +  this.data_source_selected.name +  ' file';
+            this.acquisition_control_label = 'Import ' +  this.data_source_selected.name;
             this.acquisition_in_progress = false;
         },
         // import_raw_table_checked_rows: function(new_value, old_value) {
@@ -336,6 +353,20 @@ export default {
             if (!this.import_end_time || Date.parse(new_value) > Date.parse(this.import_end_time))
                 this.import_end_time = new Date(Date.parse(new_value));
         },
+        batch_import_list: async function(new_value) {
+            if (!new_value.text) {
+                return
+            }
+            this.is_raw_import_modal_active=false;
+            this.import_raw_table_checked_rows=[];
+            this.import_raw_table_rows = [];
+            this.import_raw_table_cols = [];
+            this.import_start_time = null;
+            this.import_end_time = null;
+            let data = await new_value.text();
+            data = csv.toObjects(data);
+            this.raw_import = data;
+        },
         'namespace.connected': function(new_value) {
             if ( new_value === true )
             {
@@ -347,7 +378,8 @@ export default {
                 this.namespace.on("instrument_status", (value) => this.be.import_two_way_binding_prop("instrument_status", value.value));
                 this.namespace.on("raw_samples", (value) => this.be.import_one_way_binding_prop("raw_samples", value.value));
 
-                this.acquisition_control_label = 'Import ' +  this.data_source_selected.name +  ' file';
+                // this.acquisition_control_label = 'Import ' +  this.data_source_selected.name +  ' file';
+                this.acquisition_control_label = 'Import ' +  this.data_source_selected.name;
                 this.be.subscribe(this.endpoints,
                                   null // room set to null to subscribe to endpoints directly
                                   );
