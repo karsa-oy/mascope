@@ -3,6 +3,7 @@ FileStreamer Service
 """
 
 import os
+import re
 from datetime import datetime
 
 from karsalib.client import (
@@ -10,7 +11,7 @@ from karsalib.client import (
                         BaseStreamerClient,
                         run_streamer_service
                         )
-from karsalib.util import get_client_notification_context, copy_dict
+from karsalib.util import get_client_notification_context
 
 
 class FileStreamerPublicNamespace(BaseClientNamespace):
@@ -98,15 +99,20 @@ class FileStreamerPrivateNamespace(BaseClientNamespace):
                                                }
                                             )
 
+    def get_src_data(self, fname):
+        data_root = self.parent.data_pool.pool_attrs.get('path', '.')
+        fdate, ftime = re.split('-|_', os.path.splitext(fname)[0])[-2:]
+        path = os.path.join(data_root, fdate)
+        full_fname = os.path.join(path, fname)
+        size = round((os.path.getsize(full_fname)) / 2**20, 2)  # in MB
+        return {'filename': fname, 'path': path, 'filesize': size, 'datetime': f'{fdate} {ftime}'}
+
     def _create_generator_request(self, data):
         kwargs = get_client_notification_context(data)
         rdata = {**kwargs, 'files': []}
         for v in data['value']:
-            fname = os.path.join(v['path'], v['filename'])
-            if not os.path.isfile(fname):
-                raise ValueError("File does not exist: %s" %fname)
-            fdata = {'filename': fname, 'filesize': v['filesize'], 'datetime': v['datetime']}
-            rdata['files'].append(fdata)
+            fdata = self.get_src_data(v['filename'])   # TODO: pass exception to UI
+            rdata['files'].append({**v, **fdata})
         return rdata
 
     async def on_raw_import(self, data):

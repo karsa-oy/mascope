@@ -16,8 +16,9 @@ from time import time, sleep
 from ctypes import create_string_buffer
 from ntpath import basename
 import inspect
+from datetime import datetime
 
-from karsalib.util import copy_dict, get_client_notification_context
+from karsalib.util import copy_dict
 from numpy.lib.index_tricks import RClass
 from services.FileIoService import zarr_sdk
 from .kinstrument import KInstrument
@@ -564,7 +565,9 @@ class H5Streamer(BaseStreamer, KInstrument):
                 'value': {
                     'filename': self.target_filename,
                     'mz_range': [float(self.mz[0]), float(self.mz[-1])],
-                    't_range': [0, self.length]
+                    't_range': [0, self.length],
+                    'project': self.project,
+                    'experiment': self.experiment,
                 },
                 'context': {
                     **self.rcontext,
@@ -767,6 +770,28 @@ class H5Streamer(BaseStreamer, KInstrument):
                 },
             }
             gen_notifications.append(dataset_updated)
+        if all([self.project, self.experiment]):
+            # save sample data to experiment, if project/experiment defined in request
+            sample_data = {
+                'filename': self.target_filename,
+                'experiment': self.experiment,
+                'project': self.project,
+                'attributes': [
+                    {'label':'Title', 'value': self.title},
+                    {'label':'Description', 'value': self.description},
+                ],
+                'method': None,
+            }
+            sample_to_save = {
+                'name': 'save_sample',
+                'value': sample_data,
+                'context': {
+                    **self.rcontext,
+                    'namespace': '/',
+                    'room': None,
+                },
+            }
+            gen_notifications.append(sample_to_save)
         self._feed_notifications(gen_notifications, streamer_notifications)
 
 # ==========================================================================
@@ -884,8 +909,16 @@ class H5Streamer(BaseStreamer, KInstrument):
 
 
     def _initialize(self):
-        self.filename = basename(self.fdata['filename'])
-        self.target_filename = '_'.join([self.client.instrument_name, self.filename]).replace(' ', '_')
+        """Initialize acquisition attributes
+        """
+        def init_sample_data():
+            self.filename = self.fdata['filename']
+            self.target_filename = '_'.join([self.client.instrument_name, self.filename]).replace(' ', '_')
+            self.project = self.fdata.get('project')
+            self.experiment = self.project and self.fdata.get('experiment')
+            self.title = self.fdata.get('title', self.target_filename)
+            self.description = self.fdata.get('description', '')
+        init_sample_data()
         self.client_room = self.rcontext['client_room']
         self.job_id = (self.client_room, self.filename)
         with self.client.lock:
@@ -894,11 +927,17 @@ class H5Streamer(BaseStreamer, KInstrument):
     def _reset(self):
         """Reset per acquisition attributes
         """
+        def reset_sample_data():
+            self.filename = None
+            self.target_filename = None
+            self.project = None
+            self.experiment = None
+            self.title = None
+            self.description = None
         with self.client.lock:
             self.client.in_progress.pop(self.job_id, None)
         self.job_id = None
-        self.filename = None
-        self.target_filename = None
+        reset_sample_data()
         self.item = None
         self.rcontext = {}
         self.fdata = {}
@@ -955,7 +994,7 @@ class H5Streamer(BaseStreamer, KInstrument):
             self._initialize()
 
             # Update TW h5 descriptor
-            full_fname = self.fdata['filename']
+            full_fname = os.path.join(self.fdata['path'], self.fdata['filename'])
             ret = H5Streamer.TwGetH5Descriptor(full_fname.encode(), self.desc)
             if ret != 4:
                 # self.log("Error reading file: %s" %H5Streamer.TwRetVal(ret).name)

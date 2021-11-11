@@ -1411,46 +1411,46 @@ export default {
                 duration: 5000,
                 message: 'Acquisition started: ' + new_value.filename,
                 type: 'is-success'
-            })
+            });
+
+            if ( _.isEmpty(this.experiment_selected) || _.isEmpty(this.experiment_selected.title) ) {
+                return
+            }
 
             this.sample_table_selected_row = {};
 
-            this.sample_form_props = {};
-            this.sample_form_props.title = "New sample attributes";
-            this.sample_form_props.load_template_path = this.getPrefilledTemplatePath(this.project_selected.title, this.experiment_selected.title);
-            this.sample_form_props.filename = new_value.filename;
-            this.sample_form_props.method = new_value.method;
-            this.sample_form_props.project = this.project_selected.title;
-            this.sample_form_props.experiment = this.experiment_selected.title;
-            
-            // Initialize sample attribute fields
-            this.sample_attributes_fields = shallow_copy(this.experiment_selected.sample_attributes_template);
+            // project/experiment not in args - the UI takes care of saving the sample to experiment
+            if ( _.isEmpty(new_value.project) || _.isEmpty(new_value.experiment) ) {
+                this.sample_form_props = {};
+                this.sample_form_props.title = "New sample attributes";
+                this.sample_form_props.load_template_path = this.getPrefilledTemplatePath(this.project_selected.title, this.experiment_selected.title);
+                this.sample_form_props.filename = new_value.filename;
+                this.sample_form_props.method = new_value.method;
+                this.sample_form_props.project = this.project_selected.title;
+                this.sample_form_props.experiment = this.experiment_selected.title;
 
-            if (this.autosave_on) {
-                // Auto-save sample
-                for (let sample_id in this.samples) {
-                    // Find first placeholder sample
-                    if (sample_id.indexOf('placeholder') != -1) {
-                        // Copy attributes from placeholder
-                        this.sample_attributes_fields = shallow_copy(this.samples[sample_id].attributes);
-                        // Delete placeholder
-                        this.removeSample(sample_id);
-                        break
-                    }
+                this.sample_attributes_fields = shallow_copy(this.experiment_selected.sample_attributes_template);
+
+                if (this.autosave_on) {
+                    // Auto-save sample
+                    let sample_attributes = this.sample_attributes_fields;
+                    let sample_no = Object.keys(this.samples).length + 1;
+                    const sample_title_prefix = sample_no.toString().padStart(3, '0') + '_';
+                    sample_attributes[0].value = sample_title_prefix;
+
+                    this.saveSample();
+                } else {
+                    // Manual sample info input
+                    // Set title prefix
+                    let sample_attributes = this.sample_attributes_fields;
+                    let sample_no = Object.keys(this.samples).length + 1;
+                    const sample_title_prefix = sample_no.toString().padStart(3, '0') + '_';
+                    sample_attributes[0].value = sample_title_prefix;
+                    this.sample_form_props.attributes = sample_attributes;
+                    this.sample_attributes_fields = sample_attributes;
+                    this.launchSampleAttributeModal();
                 }
-                // Save sample
-                this.saveSample();
-            } else {
-                // Manual sample info input
-                // Set title prefix
-                let sample_attributes = this.sample_attributes_fields;
-                let sample_no = Object.keys(this.samples).length + 1;
-                const sample_title_prefix = sample_no.toString().padStart(3, '0') + '_';
-                sample_attributes[0].value = sample_title_prefix;
-                this.sample_form_props.attributes = sample_attributes;
-                this.sample_attributes_fields = sample_attributes;
-                this.launchSampleAttributeModal();
-            }   
+            }
         },
         project_selected: function(new_value, old_value) {
             if ( _.isEqual(new_value.title, old_value.title) ) {
