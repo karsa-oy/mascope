@@ -54,13 +54,13 @@ class Logger():
             try:
                 f_handler = logging.FileHandler(fname + '.log', mode=mode)
                 f_handler.setLevel(level=f_log_level)
-                f_format = logging.Formatter('%(asctime)s %(message)s')
+                f_format = logging.Formatter('%(message)s')
                 f_handler.setFormatter(f_format)
                 self.logger.addHandler(f_handler)
             except FileNotFoundError:
                 pass
 
-    def configure_notifications(self, sender, target_room):
+    def configure_notifications(self, sender=None, target_room=None):
         if sender:
             self.emit_client_notification = sender.__getattribute__('emit_client_notification')
         if target_room:
@@ -72,28 +72,28 @@ class Logger():
     def info(self, m):
         self.logger.info(m)
 
-    def warning(self, m, room=None, namespace='/'):
+    async def warning(self, m, room=None, namespace=None):
         self.logger.warning(m)
         if self.emit_client_notification and self.logger.isEnabledFor(logging.WARNING):
-            self.emit_client_notification('service_warning', m,
+            await self.emit_client_notification('service_warning', m,
                                       room=room or self.target_room,
                                       namespace=namespace,
                                       no_logging=False,
                                       no_data_logging=False)
 
-    def error(self, m, room=None, namespace='/'):
+    async def error(self, m, room=None, namespace=None):
         self.logger.error(m)
         if self.emit_client_notification and self.logger.isEnabledFor(logging.ERROR):
-            self.emit_client_notification('service_error', m,
+            await self.emit_client_notification('service_error', m,
                                       room=room or self.target_room,
                                       namespace=namespace,
                                       no_logging=False,
                                       no_data_logging=False)
 
-    def critical(self, m, room=None, namespace='/'):
+    async def critical(self, m, room=None, namespace=None):
         self.logger.critical(m)
         if self.emit_client_notification and self.logger.isEnabledFor(logging.CRITICAL):
-            self.emit_client_notification('service_critical_error', m,
+            await self.emit_client_notification('service_critical_error', m,
                                       room=room or self.target_room,
                                       namespace=namespace,
                                       no_logging=False,

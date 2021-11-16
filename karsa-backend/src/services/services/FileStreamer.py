@@ -12,6 +12,7 @@ from karsalib.client import (
                         run_streamer_service
                         )
 from karsalib.util import get_client_notification_context
+from karsalib.logging import Logger, parent_func_name
 
 
 class FileStreamerPublicNamespace(BaseClientNamespace):
@@ -107,16 +108,20 @@ class FileStreamerPrivateNamespace(BaseClientNamespace):
         size = round((os.path.getsize(full_fname)) / 2**20, 2)  # in MB
         return {'filename': fname, 'path': path, 'filesize': size, 'datetime': f'{fdate} {ftime}'}
 
-    def _create_generator_request(self, data):
+    async def _create_generator_request(self, data):
         kwargs = get_client_notification_context(data)
         rdata = {**kwargs, 'files': []}
         for v in data['value']:
-            fdata = self.get_src_data(v['filename'])   # TODO: pass exception to UI
+            try:
+                fdata = self.get_src_data(v['filename'])
+            except Exception as e:
+                await self.parent.push_alert(str(e))
+                raise
             rdata['files'].append({**v, **fdata})
         return rdata
 
     async def on_raw_import(self, data):
-        rdata = self._create_generator_request(data)
+        rdata = await self._create_generator_request(data)
         with self.parent.lock:
             # keep single set of files for client_room in requests CacheQ
             self.parent.requests.cache_delete_key(rdata['client_room'])
@@ -204,7 +209,12 @@ class FileStreamerPrivateNamespace(BaseClientNamespace):
 
 
 class FileStreamerServiceClient(BaseStreamerClient):
+    async def push_alert(self, msg, room=None, namespace=None):
+        await self.push_log.error(f"[{self.__class__.__name__}.{parent_func_name()}] {msg}", room=room, namespace=namespace)
+
     async def init_service(self):
+        self.push_log = Logger(self.__class__.__name__, f_log_level=None)
+        self.push_log.configure_notifications(sender=self.private_ns)
         await super().init_service()
         assert self.data_pool, 'Missing data_pool argument'
         await self.data_pool.scan_dir()
