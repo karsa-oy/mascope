@@ -209,7 +209,8 @@ export default {
                 'acquisition_started',
                 'acquisition_finished',
                 'acquisition_status',
-                'instrument_status'
+                'instrument_status',
+                'service_error',
             ],
             // raw streamer
             acquisition_control_label: null,
@@ -220,6 +221,7 @@ export default {
             is_raw_import_modal_active: false,
             raw_samples: [],
             instrument_status: "not_ready",		// not_ready/ready
+            service_error: "",
             raw_import: [],
             // variables for import modal
             import_start_time: null,
@@ -302,6 +304,22 @@ export default {
             this.acquisition_control_label = 'Import ' +  this.data_source_selected.name;
             this.acquisition_in_progress = false;
         },
+        service_error: function(new_value) {
+            if (_.isEmpty(new_value)) {
+                return false;
+            }
+            this.$buefy.dialog.alert({
+                title: 'Error',
+                message: new_value,
+                type: 'is-danger',
+                hasIcon: true,
+                icon: 'times-circle',
+                iconPack: 'fa',
+                ariaRole: 'alertdialog',
+                ariaModal: true
+            });
+            this.service_error = '';
+        },
         // import_raw_table_checked_rows: function(new_value, old_value) {
         //     if ( _.isEqual(new_value, old_value) ) {
         //         return false;
@@ -376,6 +394,7 @@ export default {
                 this.namespace.on("acquisition_status", (value) => this.be.import_one_way_binding_prop("acquisition_status", value.value));
                 this.namespace.on("acquisition_progress", (value) => this.be.import_one_way_binding_prop("acquisition_progress", value.value.progress, true));
                 this.namespace.on("instrument_status", (value) => this.be.import_two_way_binding_prop("instrument_status", value.value));
+                this.namespace.on("service_error", (value) => this.be.import_two_way_binding_prop("service_error", value.value));
                 this.namespace.on("raw_samples", (value) => this.be.import_one_way_binding_prop("raw_samples", value.value));
 
                 // this.acquisition_control_label = 'Import ' +  this.data_source_selected.name +  ' file';
