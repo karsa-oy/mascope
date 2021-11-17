@@ -136,13 +136,11 @@ class FileStreamerPrivateNamespace(BaseClientNamespace):
             for (c_room, f_name), streamer in self.parent.in_progress.items():
                 if c_room != client_room:
                     continue
-                pdata = dict(
-                    filename=streamer.filename,
-                    target_filename=streamer.target_filename,
-                    progress=streamer.progress,
-                    ack_progress=streamer.ack_progress,
-                )
-                progress_data.append(pdata)
+                progress_data.append({
+                    **streamer.fdata,
+                    'progress': streamer.progress,
+                    'ack_progress': streamer.ack_progress,
+                })
             raw_import_data = {
                 'progress': progress_data,
                 'queue': self.parent.requests.cache.get(client_room, [{}])[0],
@@ -171,14 +169,13 @@ class FileStreamerPrivateNamespace(BaseClientNamespace):
                 for v in value:
                     # remove fname from import lists if there
                     filename = v['filename']
-                    full_filename = os.path.join(v['path'], filename)
                     #TODO: possible sync problem - modify CacheQ for get(key) operation
                     # clean up the fname from requests[client_room]
                     rdata = self.parent.requests.cache.get(client_room, [{}])[0]
                     i = 0
                     while i < len(rdata.get('files', [])):
                         fdata = rdata['files'][i]
-                        if fdata['filename'] == full_filename:
+                        if fdata['filename'] == filename:
                             rdata['files'].pop(i)
                             self.log(filename)
                         else:
