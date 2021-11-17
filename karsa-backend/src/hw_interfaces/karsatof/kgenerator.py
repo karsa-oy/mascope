@@ -555,7 +555,6 @@ class H5Streamer(BaseStreamer, KInstrument):
             {   # TODO: remove acquisition_status for acquisition_started
                 'name': 'acquisition_status',
                 'value': 'running',
-                'context': self.rcontext,
                 'context': {
                     **self.rcontext,
                     'room': None,

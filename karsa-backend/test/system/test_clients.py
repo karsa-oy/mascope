@@ -124,14 +124,13 @@ class TestVisualizerCase(BaseTestClientCase):
         self.assert_requests_ok()
 
 
-    # @unittest.skip("TODO: fix data for both input files")
     def test_visualize_two_files_parallel(self):
-        fname = 'file_1'
+        fname = 'TofDaq_Data_2021.08.02_01h01m01s'
         rq_suffix = self.client.set_test_params(fname)
-        asyncio.run(self.client.emit_visualize_range(fname, request_id=f"fullrange_{rq_suffix}"))
-        fname = 'file_2'
+        asyncio.run(self.client.emit_visualize_range(fname, request_id=f"fullrange1_{rq_suffix}"))
+        # fname = 'file_2'
         rq_suffix = self.client.set_test_params(fname)
-        asyncio.run(self.client.emit_visualize_range(fname, request_id=f"fullrange_{rq_suffix}"))
+        asyncio.run(self.client.emit_visualize_range(fname, request_id=f"fullrange2_{rq_suffix}"))
         self.assert_requests_ok()
 
 

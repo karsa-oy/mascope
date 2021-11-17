@@ -75,7 +75,7 @@
                             </button>
                             <b-upload v-model="batch_import_list" class="file-label" rounded>
                                 <span class="file-cta">
-                                    <b-icon class="file-icon" icon="upload"></b-icon>
+                                    <b-icon class="file-icon" icon="file-document-outline"></b-icon>
                                     <span class="file-label">Batch Import...</span>
                                 </span>
                             </b-upload>
@@ -85,6 +85,81 @@
             </b-modal>
         </section>
         <!-- End of raw import modal -->
+        <!-- Modal for raw import status-->
+        <section class="raw-import-status-modal">
+            <b-modal :active.sync="is_raw_import_status_modal_active"
+                has-modal-card
+                trap-focus
+                :can-cancel="true"
+                aria-role="dialog"
+                aria-modal>
+                <div class="columns">
+                    <!-- <div class="modal-card" style="width: 500px; height: 700px"> -->
+                    <div class="modal-card" style="width: auto; height:  700px">
+                        <header class="modal-card-head">
+                            <p class="modal-card-title">Status of {{data_source_selected.name}} Import...</p>
+                            <button
+                                class="button"
+                                type="button"
+                                @click="on_button_acquisition_status();">
+                                Refresh
+                            </button>
+                        </header>
+                        <section class="modal-card-body">
+                            <b-table
+                                :data="raw_import_status_rows"
+                                :columns="raw_import_status_cols"
+                                :checkable="true"
+                                :checked-rows.sync="raw_import_status_checked_rows"
+                                :striped="true"
+                                :narrowed="true"
+                                :hoverable="true"
+                                draggable
+                                @dragstart="DragStart"
+                                @drop="DragDrop"
+                                @dragover="DragOver"
+                                @dragleave="DragLeave">
+                            </b-table>
+                        </section>
+                        <footer class="modal-card-foot">
+                            <b-tooltip
+                                label="Import samples by modified import list"
+                                position="is-right">
+                                <button
+                                    class="button"
+                                    type="button"
+                                    @click="import_raw_table_checked_rows=raw_import_status_rows;
+                                            is_raw_import_status_modal_active=false;
+                                            ImportSamples();"
+                                    :disabled="(is_raw_import_data_modified) ? false : true">
+                                    Import
+                                </button>
+                                <div/>
+                            </b-tooltip>
+                            <button
+                                class="button"
+                                type="button"
+                                @click="raw_import_status_checked_rows=[]; is_raw_import_status_modal_active=false;">
+                                Cancel
+                            </button>
+                            <div style="position:absolute; right:20px">
+                                <b-tooltip
+                                    label="Remove selected items from import list"
+                                    position="is-left">
+                                    <b-button
+                                        type="is-dark"
+                                        icon-left="delete"
+                                        :disabled="(raw_import_status_checked_rows.length==0) ? true : false"
+                                        @click="RemoveCheckedRows();">
+                                    </b-button>
+                                </b-tooltip>
+                            </div>
+                        </footer>
+                    </div>
+                </div>
+            </b-modal>
+        </section>
+        <!-- End of raw import status modal -->
         <!-- End of modals -->
 
         <!-- Main content area -->
@@ -210,6 +285,7 @@ export default {
                 'acquisition_finished',
                 'acquisition_status',
                 'instrument_status',
+                'raw_import_status_data',
                 'service_error',
             ],
             // raw streamer
@@ -233,6 +309,16 @@ export default {
             import_raw_table_checked_rows: [],
             import_raw_table_datetime_range: {},
             batch_import_list: {},
+            // raw import status vars
+            is_raw_import_status_modal_active: false,
+            is_raw_import_data_modified: false,
+            raw_import_status_data: {},
+            raw_import_status_rows: [],
+            raw_import_status_cols: [],
+            raw_import_status_checked_rows: [],
+            // raw import status dialog vars
+            draggingRow: null,
+            draggingRowIndex: null,
         }
     },
     created: function() {
@@ -287,6 +373,59 @@ export default {
                 this.is_raw_import_modal_active = true;
             }
         },
+        on_button_acquisition_status() {
+            this.be.emit_client_notification(
+                'raw_import_status',
+                {},
+            )
+            this.is_raw_import_data_modified = false;
+            this.raw_import_status_checked_rows = []
+            this.is_raw_import_status_modal_active = true;
+        },
+        DragStart(payload) {
+            this.draggingRow = payload.row
+            this.draggingRowIndex = payload.index
+            payload.event.dataTransfer.effectAllowed = 'move'
+        },
+        DragOver(payload) {
+            payload.event.dataTransfer.dropEffect = 'move'
+            payload.event.target.closest('tr').classList.add('is-selected')
+            payload.event.preventDefault()
+        },
+        DragLeave(payload) {
+            payload.event.target.closest('tr').classList.remove('is-selected')
+            payload.event.preventDefault()
+        },
+        DragDrop(payload) {
+            payload.event.target.closest('tr').classList.remove('is-selected')
+            const iFrom = this.draggingRowIndex
+            const iTo = payload.index
+            this.$buefy.toast.open({
+                message:`Import list item moved from row ${iFrom + 1} to row ${iTo + 1}`,
+                type: 'is-success',
+                duration: 3000,
+            })
+            this.ArrayMoveRow(this.raw_import_status_rows, iFrom, iTo)
+            this.is_raw_import_data_modified = true
+        },
+        RemoveCheckedRows() {
+            let rows = this.raw_import_status_checked_rows;
+            this.raw_import_status_checked_rows = [];
+            this.$buefy.toast.open({
+                message:`Removed ${rows.length} items from import list`,
+                type: 'is-success',
+                duration: 3000,
+            })
+            rows.forEach(
+                row => this.raw_import_status_rows.splice(this.raw_import_status_rows.indexOf(row), 1)
+            );
+            this.is_raw_import_data_modified = true
+        },
+        ArrayMoveRow(a, iFrom, iTo) {
+            let e = a[iFrom];
+            a.splice(iFrom, 1);
+            a.splice(iTo, 0, e);
+        },
     },
     watch: {
         acquisition_started: function(new_value) {
@@ -336,6 +475,30 @@ export default {
             }
             this.import_raw_table_cols = new_data.cols;
             this.import_raw_table_rows = new_data.rows;
+        },
+        raw_import_status_data: function(new_data){
+            // // data left for debugging:
+            // new_data = {
+            //     progress: [
+            //         {filename: '1-DataFile_2021.08.02-01h01m00s.h5', target_filename: 'H5Data_1-DataFile_2021.08.02-01h01m00s.h5',
+            //          datetime: '2021.08.02 01h01m00s', filesize: 2.96, path: 'test\\system\\TestData\\DataPool\\H5\\2021.08.02', progress: 30.0, ack_progress: 16.67},
+            //     ],
+            //     queue: {
+            //         context: { client_room: 'ZbRWlHlHocoMPKrwAABP', room: null, no_logging: false, no_data_logging: true, cookies: {src_sid: ['ZbRWlHlHocoMPKrwAABP']} },
+            //         files: [
+            //             {filename: '2-DataFile_2021.08.02-01h01m00s.h5', datetime: '2021.08.02 01h01m00s', filesize: 2.96, path: 'test\\system\\TestData\\DataPool\\H5\\2021.08.02'},
+            //             {filename: '3-DataFile_2021.08.02-01h01m00s.h5', datetime: '2021.08.02 01h01m00s', filesize: 2.96, path: 'test\\system\\TestData\\DataPool\\H5\\2021.08.02'},
+            //             {filename: '4-DataFile_2021.08.02-01h01m00s.h5', datetime: '2021.08.02 01h01m00s', filesize: 2.96, path: 'test\\system\\TestData\\DataPool\\H5\\2021.08.02'},
+            //         ]
+            //     }
+            // };
+
+            this.raw_import_status_rows = new_data.progress.concat(new_data.queue.files || []);
+            let titles = new Set([]);
+            this.raw_import_status_rows.forEach( r => titles = new Set([...titles, ...Object.keys(r)]) );
+            let cols = []
+            titles.forEach( t => cols = cols.concat({field: t, label: t}) )
+            this.raw_import_status_cols = [...cols]
         },
         raw_import: function(new_value, old_value) {
             return this.be.export_one_way_binding_prop('raw_import',
@@ -396,8 +559,7 @@ export default {
                 this.namespace.on("instrument_status", (value) => this.be.import_two_way_binding_prop("instrument_status", value.value));
                 this.namespace.on("service_error", (value) => this.be.import_two_way_binding_prop("service_error", value.value));
                 this.namespace.on("raw_samples", (value) => this.be.import_one_way_binding_prop("raw_samples", value.value));
-
-                // this.acquisition_control_label = 'Import ' +  this.data_source_selected.name +  ' file';
+                this.namespace.on("raw_import_status_data", (value) => this.be.import_one_way_binding_prop("raw_import_status_data", value.value));
                 this.acquisition_control_label = 'Import ' +  this.data_source_selected.name;
                 this.be.subscribe(this.endpoints,
                                   null // room set to null to subscribe to endpoints directly
