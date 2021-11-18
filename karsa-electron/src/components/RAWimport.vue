@@ -132,7 +132,7 @@
                                             is_raw_import_status_modal_active=false;
                                             ImportSamples();"
                                     :disabled="(is_raw_import_data_modified) ? false : true">
-                                    Import
+                                    ReImport
                                 </button>
                                 <div/>
                             </b-tooltip>
