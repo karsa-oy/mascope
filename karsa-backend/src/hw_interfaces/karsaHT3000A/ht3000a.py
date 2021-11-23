@@ -33,3 +33,10 @@ def dup_cycles(rows):
         for i in range(int(cycles)):
             res.append(row)
     return res
+
+
+# example of usage
+if __name__ == "__main__":
+    with open('test.csv') as f:
+        res = parse_csv_report(f)
+        res = dup_cycles(res)

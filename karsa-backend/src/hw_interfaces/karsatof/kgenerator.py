@@ -776,10 +776,7 @@ class H5Streamer(BaseStreamer, KInstrument):
                 'filename': self.target_filename,
                 'experiment': self.experiment,
                 'project': self.project,
-                'attributes': [
-                    {'label':'Title', 'value': self.title},
-                    {'label':'Description', 'value': self.description},
-                ],
+                'attributes': [{'label': k, 'value': v} for (k,v) in self.attrs.items()],
                 'method': None,
             }
             sample_to_save = {
@@ -914,10 +911,13 @@ class H5Streamer(BaseStreamer, KInstrument):
         def init_sample_data():
             self.filename = self.fdata['filename']
             self.target_filename = '_'.join([self.client.instrument_name, self.filename]).replace(' ', '_')
-            self.project = self.fdata.get('project')
-            self.experiment = self.project and self.fdata.get('experiment')
-            self.title = self.fdata.get('title', self.target_filename)
-            self.description = self.fdata.get('description', '')
+            self.attrs = self.fdata.pop('attrs')    # attrs normally contain sci data coming along with the sample
+            self.project = self.attrs.pop('project', None)
+            self.experiment = self.project and self.attrs.pop('experiment', None)
+            if 'title' not in self.attrs:
+                self.attrs['title'] = self.filename
+            if 'description' not in self.attrs:
+                self.attrs['description'] = ''
         init_sample_data()
         self.client_room = self.rcontext['client_room']
         self.job_id = (self.client_room, self.filename)
@@ -932,8 +932,6 @@ class H5Streamer(BaseStreamer, KInstrument):
             self.target_filename = None
             self.project = None
             self.experiment = None
-            self.title = None
-            self.description = None
         with self.client.lock:
             self.client.in_progress.pop(self.job_id, None)
         self.job_id = None
@@ -994,7 +992,7 @@ class H5Streamer(BaseStreamer, KInstrument):
             self._initialize()
 
             # Update TW h5 descriptor
-            full_fname = os.path.join(self.fdata['path'], self.fdata['filename'])
+            full_fname = os.path.join(self.fdata['path'], self.filename)
             ret = H5Streamer.TwGetH5Descriptor(full_fname.encode(), self.desc)
             if ret != 4:
                 # self.log("Error reading file: %s" %H5Streamer.TwRetVal(ret).name)

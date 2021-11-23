@@ -112,12 +112,14 @@ class FileStreamerPrivateNamespace(BaseClientNamespace):
         kwargs = get_client_notification_context(data)
         rdata = {**kwargs, 'files': []}
         for v in data['value']:
+            filename = v.pop('filename')
             try:
-                fdata = self.get_src_data(v['filename'])
+                fprops = self.get_src_data(filename)
             except Exception as e:
                 await self.parent.push_alert(str(e))
                 raise
-            rdata['files'].append({**v, **fdata})
+            # attrs normally contain sci data coming along with the sample
+            rdata['files'].append({**fprops, 'attrs': v})
         return rdata
 
     async def on_raw_import(self, data):
