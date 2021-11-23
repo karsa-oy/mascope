@@ -13,6 +13,8 @@ export default new Vuex.Store({
 		figure_data: {},
 		figure_double_click: null,
 		figure_ranges: {},
+		identified_ions: {},
+		identify_peaks: {},
 		integrate_target_ions: {},
 		new_file: "",
 		peak_data: {},
@@ -60,6 +62,12 @@ export default new Vuex.Store({
 		},
 		figure_ranges(state, payload) {
 			state.figure_ranges = payload;
+		},
+		identified_ions(state, payload) {
+			state.identified_ions = payload;
+		},
+		identify_peaks(state, payload) {
+			state.identify_peaks = payload;
 		},
 		integrate_target_ions(state, payload) {
 			state.integrate_target_ions = payload;

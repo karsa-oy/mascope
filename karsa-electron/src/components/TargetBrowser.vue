@@ -136,10 +136,26 @@ export default {
     computed: {
         ...mapState([
             'figure_double_click',
+            'peak_data',
             'root_namespace',
             'sample_selected',
-            // 'targets',
         ]),
+        identified_ions: {
+            get() {
+                return this.$store.state.identified_ions;
+            },
+            set(value) {
+                this.$store.commit('identified_ions', value);
+            }
+        },
+        identify_peaks: {
+            get() {
+                return this.$store.state.identify_peaks;
+            },
+            set(value) {
+                this.$store.commit('identify_peaks', value);
+            }
+        },
         integrate_target_ions: {
             get() {
                 return this.$store.state.integrate_target_ions;
@@ -156,14 +172,6 @@ export default {
                 this.$store.commit('target_ion_intensities', value);
             }
         },
-        // target_list_request: {
-        //     get() {
-        //         return this.$store.state.target_list_request;
-        //     },
-        //     set(value) {
-        //         this.$store.commit('target_list_request', value);
-        //     }
-        // },
         target_to_display: {
             get() {
                 return this.$store.state.target_to_display;
@@ -311,6 +319,23 @@ export default {
         figure_double_click: function() {
             this.target_table_selected_row = null;
         },
+        identified_ions: function(new_value) {
+            // TODO: Do something with this data
+            return new_value
+        },
+        identify_peaks: function(new_value, old_value) {
+            if (_.isEqual(new_value, old_value)) {
+                return
+            }
+            this.be.export_one_way_binding_prop('identify_peaks',
+                                                {...new_value,
+                                                 'room': this.room_sid,
+                                                 'uid': Math.random(),
+                                                 },
+                                                old_value,
+                                                this.room_sid
+                                                );
+        },
         integrate_target_ions: function(new_value, old_value) {
             if (_.isEqual(new_value, old_value)) {
                 return
@@ -323,6 +348,11 @@ export default {
                                                 old_value,
                                                 this.room_sid
                                                 );
+        },
+        peak_data: function(new_value) {
+            this.identify_peaks = {'peaks': new_value,
+                                   'targets': this.targets
+                                   };
         },
         target_ion_intensities: function(new_value) {
             this.target_table_cols.push({'field': "intensity",
@@ -365,6 +395,7 @@ export default {
             {
                 this.namespace = this.root_namespace;
                 // handlers for for external notifications:
+                this.namespace.on("identified_ions", (value) => this.be.import_one_way_binding_prop("identified_ions", value.value));
                 this.namespace.on("target_ion_intensities", (value) => this.be.import_one_way_binding_prop("target_ion_intensities", value.value));
                 this.namespace.on("targets", (value) => this.be.import_one_way_binding_prop("targets", value.value));
                 this.room_sid = this.root_namespace.id;
