@@ -57,7 +57,7 @@ NO_DATA_LOGGING_DEAULT = False
 client = None
 
 # Cache for data arrays
-cache = LRUDict(10)     # TODO: fix system test failure, if LRUDict more than 2
+cache = LRUDict(10)
 
 generator_input_q = None
 generator_input_cache = None

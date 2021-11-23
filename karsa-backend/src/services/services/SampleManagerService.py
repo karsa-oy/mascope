@@ -252,7 +252,10 @@ class MetadataServiceNamespace(BaseClientNamespace):
         experiment = value['experiment']
         project = value['project']
         kwargs = get_client_notification_context(data)
-        datapool.delete_sample(project, experiment, filename)
+        try:
+            datapool.delete_sample(project, experiment, filename)
+        except Exception as e:
+            self.log('Error:', str(e))
         # Update sample table data in UIs
         await self.emit_client_notification(
                             'samples',
@@ -332,8 +335,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
 
     async def on_save_sample(self, data):
         """Write attributes of a sample to disk. Make a symbolic link from
-        the sample directory in 'data_path' to 'project_path'/experiment 
-
+        the sample directory in 'data_path' to 'project_path'/experiment
         Parameters
         ----------
         data : [type]

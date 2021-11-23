@@ -22,14 +22,46 @@ setuptools.setup(
         'License :: Other/Proprietary License',
         'Operating System :: OS Independent',
     ],
-    install_requires=[
-        'h5py',
-        'h5sparse',
-        'numpy',
-        'pandas',
-        'pythonnet ; platform_system=="Windows"',
-        'scipy',
-        'xarray',
-    ]
+    # install_requires=[
+    #     'h5py',
+    #     'h5sparse',
+    #     'numpy',
+    #     'pandas',
+    #     'pythonnet ; platform_system=="Windows"',
+    #     'scipy',
+    #     'xarray',
+    # ],
+    extras_require={
+        'karsaecu': [
+        ],
+        'karsaHT3000A': [
+        ],
+        'karsatof': [
+            'h5py',
+            'h5sparse',
+            'numpy',
+            'pandas',
+            'scipy',
+            'xarray',
+        ],
+        'karsaorbi': [
+            'numpy',
+            'pythonnet ; platform_system=="Windows"',
+        ],
+        'all': [
+            'h5py',
+            'h5sparse',
+            'numpy',
+            'pandas',
+            'pythonnet ; platform_system=="Windows"',
+            'scipy',
+            'xarray',
+        ],
+    },
+    entry_points={
+        'console_scripts': [
+            'autosampler_log_to_batch_import = karsaHT3000A.autosampler_log_to_batch_import:run',
+        ],
+    }
 )
 

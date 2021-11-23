@@ -1,7 +1,7 @@
 @echo off
 
 :: Activate virtual environment
-call ..\.venv\Scripts\activate || goto :error
+call ..\..\.venv\Scripts\activate || goto :error
 
 :: Build
 python -m pip install wheel twine
