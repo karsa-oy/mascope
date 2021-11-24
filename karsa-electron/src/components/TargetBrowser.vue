@@ -109,7 +109,11 @@
                                 :columns="peak_table_cols"
                                 :data="peak_table_rows" 
                                 :sticky-header="true"
-                                :selected.sync="peak_table_selected_row" 
+                                :selected.sync="peak_table_selected_row"
+                                :header-checkable="false"
+                                checkable
+                                :checked-rows.sync="peak_table_checked_rows"
+                                :is-row-checkable="(row) => row == peak_table_selected_row"
                                 focusable
                                 sortable>
                             </b-table>
@@ -203,6 +207,7 @@ export default {
             excel_clipboard_table_rows: [],
             excel_clipboard_use_header: false,
             // Peak table
+            peak_table_checked_rows: [],
             peak_table_cols: [],
             peak_table_rows: [],
             peak_table_selected_row: {},
@@ -333,7 +338,7 @@ export default {
             }
         },
         figure_double_click: function() {
-            this.target_table_selected_row = null;
+            this.peak_table_selected_row = null;
         },
         identified_ions: function(new_value) {
             // Format data to sample table
@@ -350,18 +355,28 @@ export default {
                     for (let k in keys) {
                         let key = keys[k];
                         let value = peak[key];
+                        if (Number(value) && value != 0) {
+                            value = Math.round((value + Number.EPSILON) * 10000) / 10000;
+                        }
                         if (rows.length == 0) {
                             let col = {
                                 'field': key.toLowerCase(),
                                 'label': key,
                                 };
                             col.searchable = true;
+                            if (Number(value) != null) {
+                                col.sortable = true;
+                            }
                             col.visible = true;
                             cols.push(col);
                         }
                         row[key.toLowerCase()] = value;
                     }
                     rows.push(row);
+                    if (row['peak mz'] > -1) {
+                        console.log("push checked row");
+                        this.peak_table_checked_rows.push(row);
+                    }
                 }
             }
             this.peak_table_cols = cols;
