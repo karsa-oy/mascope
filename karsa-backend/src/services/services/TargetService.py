@@ -25,8 +25,8 @@ class TargetServiceNamespace(BaseClientNamespace):
         client_room = data.get('client_room') or data['cookies']['src_sid'][0]
         value = data['value']
         
-        peak_mzs = np.frombuffer(value['peaks']['mz'], dtype=np.float32)
-        peak_heis = np.frombuffer(value['peaks']['height'], dtype=np.float32)
+        peak_mzs = np.frombuffer(value['peaks']['mz'], dtype=np.float32).astype(float)
+        peak_heis = np.frombuffer(value['peaks']['height'], dtype=np.float32).astype(float)
         targets = value['targets']
 
         mz_tolerance = 10 # ppm
@@ -67,12 +67,14 @@ class TargetServiceNamespace(BaseClientNamespace):
         match_df = calculate_target_match_score(match_df)
         # Compare score with thresholds
         identified_ion_ids = filter_target_matches(match_df, mz_tolerance, iso_abu_tolerance, min_iso_abu)
-        identified_ion_compositions = [match_df.loc[match_df_ind, 'ion composition']
-                                       for match_df_ind in identified_ion_ids
-                                       ]
+        identified_ion_peaks = [match_df[match_df.id==match_df_id].fillna(value=-1).to_dict(orient='index')
+                                for match_df_id in identified_ion_ids
+                                ]
+
+        self.log(identified_ion_peaks)
 
         await self.emit_client_notification('identified_ions',
-                                            identified_ion_compositions, # TODO: Which data to return?
+                                            identified_ion_peaks, # TODO: Which data to return?
                                             room=client_room
                                             )
 
@@ -171,7 +173,7 @@ def filter_target_matches(match_df, mz_tolerance, iso_abu_tolerance, min_iso_abu
     list
         List of 'id' field values for identified targets
     """
-    target_ids, target_id_unique_ind = np.unique(match_df.id, return_index=True)
+    target_ids = np.unique(match_df.id)
     identified_ions_mask = [False] * len(target_ids)
     for target_id in target_ids:
         target = match_df[(match_df.id == target_id) &
@@ -183,7 +185,7 @@ def filter_target_matches(match_df, mz_tolerance, iso_abu_tolerance, min_iso_abu
             identified_ions_mask[target_id] = True
 
     identified_ion_ids = [match_df_ind
-                          for i, match_df_ind in enumerate(target_id_unique_ind)
+                          for i, match_df_ind in enumerate(target_ids)
                             if identified_ions_mask[i]
                           ]
     
@@ -207,8 +209,8 @@ def match_peaks_to_targets(peak_mzs, peak_heights, target_ion_df, mz_tolerance):
     Returns
     -------
     pandas.DataFrame
-        Input dataframe with added columns for 'peak mz' and 'peak height', containing
-        measured values for matched targets, nan where no matching peak was found.
+        Input dataframe with added columns for 'peak id', 'peak mz' and 'peak height',
+        containing measured values for matched targets, nan where no matching peak was found.
 
     Raises
     ------
@@ -222,6 +224,7 @@ def match_peaks_to_targets(peak_mzs, peak_heights, target_ion_df, mz_tolerance):
         for match_i in match_is:
             if target_ion_df.loc[match_i, 'peak mz'] is not None:
                 raise NotImplementedError("Target already has a matching peak")
+            target_ion_df.loc[match_i, 'peak id'] = peak_i
             target_ion_df.loc[match_i, 'peak mz'] = peak_mz
             target_ion_df.loc[match_i, 'peak height'] = peak_heights[peak_i]
     return target_ion_df
