@@ -338,12 +338,11 @@ export default {
                                                        );
         },
         target_to_display: function(new_value, old_value) {
-            this.log("target_to_display: ", new_value);
             if ( !new_value || _.isEqual(new_value, old_value) || _.isEmpty(this.filename) ) {
                 return false;
             }
             let mz = new_value;
-            let target_mz_range = [mz-.5, mz+.5];
+            let target_mz_range = [mz-.1, mz+.1];
             let new_figure_ranges = {'filename': this.filename,
                                      'id': Math.random().toString(36).substring(2),
                                      't_range': this.figure_ranges.t_range,

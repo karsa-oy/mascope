@@ -102,6 +102,17 @@
                                 focusable
                                 sortable>
                             </b-table>
+                            <div><br></div>
+                            <b-table 
+                                id="peaks-datatable"
+                                style="max-height:400px"
+                                :columns="peak_table_cols"
+                                :data="peak_table_rows" 
+                                :sticky-header="true"
+                                :selected.sync="peak_table_selected_row" 
+                                focusable
+                                sortable>
+                            </b-table>
                         </div>
                     </div>
                 </div>
@@ -191,6 +202,11 @@ export default {
             excel_clipboard_table_cols: [],
             excel_clipboard_table_rows: [],
             excel_clipboard_use_header: false,
+            // Peak table
+            peak_table_cols: [],
+            peak_table_rows: [],
+            peak_table_selected_row: {},
+            // 
             // Target table
             targets: [],
             target_table_rows: [],
@@ -320,8 +336,36 @@ export default {
             this.target_table_selected_row = null;
         },
         identified_ions: function(new_value) {
-            // TODO: Do something with this data
-            return new_value
+            // Format data to sample table
+            let identified_ions = new_value;
+            let rows = [];
+            let cols = [];
+            for (const ion in identified_ions) {
+                const identified_ion_peaks = identified_ions[ion];
+                for (const peak_i in identified_ion_peaks) {
+                    let peak = identified_ion_peaks[peak_i];
+                    let row = {};
+                    // Unpack attributes
+                    let keys = Object.keys(peak);
+                    for (let k in keys) {
+                        let key = keys[k];
+                        let value = peak[key];
+                        if (rows.length == 0) {
+                            let col = {
+                                'field': key.toLowerCase(),
+                                'label': key,
+                                };
+                            col.searchable = true;
+                            col.visible = true;
+                            cols.push(col);
+                        }
+                        row[key.toLowerCase()] = value;
+                    }
+                    rows.push(row);
+                }
+            }
+            this.peak_table_cols = cols;
+            this.peak_table_rows = rows;
         },
         identify_peaks: function(new_value, old_value) {
             if (_.isEqual(new_value, old_value)) {
@@ -362,21 +406,22 @@ export default {
                 this.target_table_rows[i]['intensity'] = new_value[i];
             }
         },
-        target_table_selected_row: function(new_value, old_value) {
+        peak_table_selected_row: function(new_value, old_value) {
             if ( _.isEqual(new_value, old_value) ) {
                 return false;
             }
             if (new_value != null) {
-                let keys = Object.keys(new_value);
-                let mz = null;
-                // Loop through columns until find numeric value, assume it to be m/z
-                for (let i=0; keys.length; i++) {
-                    mz = Number( new_value[keys[i]] );
+                let mz = new_value['mz'];
+                // let keys = Object.keys(new_value);
+                // let mz = null;
+                // // Loop through columns until find numeric value, assume it to be m/z
+                // for (let i=0; keys.length; i++) {
+                //     mz = Number( new_value[keys[i]] );
                     if (mz) {
                         this.target_to_display = mz;
                         return
                     }
-                }
+                // }
             } else {
                 this.target_to_display = null;
             }
