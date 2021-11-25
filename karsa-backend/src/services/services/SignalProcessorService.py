@@ -35,132 +35,20 @@ class SignalProcessorNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to Router """
 
     endpoints = [
-                # 'acquisition_coordinates',
-                #  'acquired_spectrum',
-                #  'acquisition_finished',
+                 'fit_mz_calib_function',
                  'mz_calibrate_samples',
                  'peak_data_request',
                  ]
     
-    async def on_acquisition_coordinates(self, data):
-        """Initialize acquisition cache with received coordinates
-
-        Parameters
-        ----------
-        data : dict
-            keys: 'mz' and 'time'
-        """
-        global cache
-
+    async def on_fit_mz_calib_function(self, data):
         value = data['value']
-        filename_base = value.get('filename')
-        print("Start acquiring sample: %s" %filename_base)
-        
-        # Cache raw signal in memory
-        mz = np.frombuffer( value['mz'], dtype=np.float32 )
-        t_range = value['t_range']
-        mz_range = [ float(mz[0]), float(mz[-1]) ]
 
-        signal_array = ExtendableDataArray(array_module=da, persist=True)
-        signal_array.init_array(dims=('mz', 'time'),
-                                coords=[mz, []],
-                                name='signal'
-                                )
-        period_array = ExtendableDataArray(array_module=da, persist=True)
-        period_array.init_array(dims=('time'),
-                                coords=[[]],
-                                name='signal_period'
-                                )
-        # Collect attributes
-        attributes = {'filename': filename_base,
-                      'length': float(t_range[1]),
-                      'range': mz_range,
-                      }
-        # Put to cache
-        cache_item_dict = {'signal': signal_array,
-                           'signal_period': period_array,
-                           'attrs': attributes,
-                           }
-
-        # TODO: # Initialize arrays for processed signal to write to disk
-        # filename_viz = filename_to_zarr_path(filename_base, viz_type)
-        # viz_array = ExtendableDataArray(path=filename_viz,
-        #                                 array_module=np,
-        #                                 dtype=object,
-        #                                 chunk_size=1,
-        #                                 )
-        # viz_array.init_array(dims=('time',),
-        #                         coords=[[]],
-        #                         name=viz_type
-        #                         )
-        # viz_period = viz_type + '_period'
-        # filename_viz_period = filename_to_zarr_path(filename_base, viz_period)
-        # viz_period_array = ExtendableDataArray(path=filename_viz_period,
-        #                                         array_module=np,
-        #                                         dtype=object,
-        #                                         chunk_size=1,
-        #                                         )
-
-
-        cache_item = AttrDict(cache_item_dict)
-        cache[filename_base] = cache_item
-
-        global u_list
-        global feeder
-        global collector
-
-        mz = np.frombuffer( data.get('mz'), dtype=np.float32 )
-        feeder.preprocessor.fit(mz, u_list)
-        #collector.processor.fit(feeder.preprocessor.borders)
-
-    async def on_acquired_spectrum(self, data):
-        """Receive new spectrum, add to cache
-
-        Parameters
-        ----------
-        data : dict
-            keys: 'filename', 'i', 't', 'spec', 'period', ('mz')
-        """
-        global cache
-
-        value = data['value']
-        filename_base = value['filename']
-
-        ti = np.array( [value['t']], dtype=np.float32 )
-        period = np.array( [value['period']], dtype=np.float32 )
-        print(ti.item())
-        spec = np.frombuffer(value['spec'], dtype=np.float32)
-        spec = spec.reshape(-1, 1)
-
-        # Get data arrays from cache
-        signal_array = cache[filename_base].signal
-        period_array = cache[filename_base].signal_period
-
-        if 'mz' in value:
-            # mz coordinates provided with data (Orbitrap)
-            mz = np.frombuffer(value['mz'], dtype=np.float32)
-            mz = mz.reshape(-1,)
-        else:
-            # Use mz coordinates from signal_array (TOF)
-            mz = signal_array.mz
-
-        # Extend data arrays (write to file)
-        signal_array.extend_array(spec,
-                                  [mz, ti],
-                                  'time'
-                                  )
-        period_array.extend_array(period,
-                                  [ti],
-                                  'time'
+        new_mz = mz_calibrate_tof(value['peak_tofs'],
+                                  value['peak_mzs'],
+                                  value['exact_mzs'],
+                                  int(np.max(value['peak_tofs'])+1) # TODO: nbrSamples
                                   )
         
-    async def on_acquisition_finished(self, data):
-        """Acquisition finished, feed poison pill to KFeeder        
-        """
-        value = data['value']
-        filename_base = value['filename']
-        global feeder
-        feeder.queue_in.put(None)
 
     async def on_mz_calibrate_samples(self, data):
         self.log(data)
@@ -278,10 +166,12 @@ class SignalProcessorNamespace(BaseClientNamespace):
                                           )
         peak_mz = sum_spectrum.mz[peak_ind].values.astype(np.float32)
         peak_hei = peak_props['peak_heights'].astype(np.float32)
+        peak_ind = peak_ind.astype(np.float32)
 
         peak_data = {
                 'mz': peak_mz.tobytes(),
-                'height': peak_hei.tobytes()
+                'height': peak_hei.tobytes(),
+                'tof': peak_ind.tobytes()
                 }
 
         await self.emit_client_notification('peak_data',
