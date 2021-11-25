@@ -553,8 +553,7 @@ def process_visualization_request(filename,
             img_slice = cache_item[viz_type].sel(time=slice(t0, t1)).load()
             period_slice = cache_item[viz_type_period].sel(time=slice(t0, t1)).load()
         except KeyError as e:
-            print("Error in process_image_request: %s" %e)
-            print("Requested data_type: %s not cached. cache_item.keys: %s" % (viz_type, list(cache_item.keys())) )
+            print("Requested data_type: %s not cached. cache_item.keys: %s" % (e, list(cache_item.keys())) )
             return False
 
         processed_until = False
