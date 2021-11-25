@@ -388,7 +388,8 @@ export default {
                 this.namespace.on("peak_data", (value) => this.be.import_one_way_binding_prop(
                                                                 "peak_data",
                                                                 {'mz': new Float32Array(value.value.mz),
-                                                                 'height': new Float32Array(value.value.height)
+                                                                 'height': new Float32Array(value.value.height),
+                                                                 'tof': new Float32Array(value.value.tof)
                                                                  }
                                                                 ));
 

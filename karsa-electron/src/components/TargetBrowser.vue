@@ -34,26 +34,69 @@
                         <div><br></div>
                     </section>
                     <footer class="modal-card-foot">
-                        <button
-                            class="button"
-                            type="button"
-                            @click="importExcelTargets()"
-                            is-dark>
+                        <b-button
+                            @click="importExcelTargets()">
                             Import
-                        </button>
-                        <button
-                            class="button"
-                            type="button"
-                            is-dark
+                        </b-button>
+                        <b-button
                             @click="is_excel_clipboard_modal_active=false">
                             Cancel
-                        </button>
+                        </b-button>
                     </footer>
                 </div>
             </div>
         </b-modal>
     </section>
     <!-- End of Excel import modal -->
+    <!-- Mass calibration modal -->
+    <section class="mzcalib-modal">
+        <b-modal :active.sync="is_mz_calib_modal_active"
+            has-modal-card
+            trap-focus
+            :can-cancel="true"
+            aria-role="dialog"
+            aria-modal>
+            <div class="columns">
+                <div class="modal-card" style="width: 500px; height: 700px">
+                    <header class="modal-card-head">
+                        <p class="modal-card-title">Mass calibration</p>
+                    </header>
+                    <section class="modal-card-body" style="text-align: center">
+                        <b-table 
+                            id="mz-calib-compound-table"
+                            style="max-height:400px"
+                            :columns="mz_calib_compound_table_cols"
+                            :data="mz_calib_compound_table_rows" 
+                            :sticky-header="true"
+                            :selected.sync="mz_calib_compound_table_selected_row"
+                            checkable
+                            :checked-rows.sync="mz_calib_compound_table_checked_rows"
+                            focusable
+                            sortable>
+                        </b-table>
+                        <div><br></div>
+                        <b-table 
+                            id="mz-calib-peak-table"
+                            style="max-height:400px"
+                            :columns="mz_calib_peak_table_cols"
+                            :data="mz_calib_peak_table_rows" 
+                            :sticky-header="true"
+                            focusable>
+                        </b-table>
+                        <div><br></div>
+                        <b-button
+                            @click="fitMzCalibFunction">
+                            Fit
+                        </b-button>
+                    </section>
+                    <footer class="modal-card-foot">
+
+                    </footer>
+                </div>
+            </div>
+        </b-modal>
+    </section>
+    <!-- End of mass calibration modal -->
 <!-- End of modals -->
 
 <!-- Main content area -->
@@ -104,6 +147,7 @@
                             </b-table>
                             <div><br></div>
                             <b-table 
+                                @contextmenu="rightClickPeakTableRow"
                                 id="peaks-datatable"
                                 style="max-height:400px"
                                 :columns="peak_table_cols"
@@ -117,6 +161,12 @@
                                 focusable
                                 sortable>
                             </b-table>
+                            <div><br></div>
+                            <b-button
+                                @click="mzCalibrateButtonClicked"
+                                type="is-dark">
+                                m/z calibrate
+                            </b-button>
                         </div>
                     </div>
                 </div>
@@ -206,6 +256,15 @@ export default {
             excel_clipboard_table_cols: [],
             excel_clipboard_table_rows: [],
             excel_clipboard_use_header: false,
+            // Mass calibration
+            is_mz_calib_modal_active: false,
+            mz_calib_compound_table_checked_rows: [],
+            mz_calib_compound_table_cols: [],
+            mz_calib_compound_table_rows: [],
+            mz_calib_compound_table_selected_row: {},
+            mz_calib_peak_table_cols: [],
+            mz_calib_peak_table_rows: [],
+            // 
             // Peak table
             peak_table_checked_rows: [],
             peak_table_cols: [],
@@ -231,6 +290,33 @@ export default {
         this.readTargetsFromFile();
     },
     methods: {
+        fitMzCalibFunction() {
+            let peak_tofs = this.mz_calib_peak_table_rows.map(row => row['peak tof']);
+            let peak_mzs = this.mz_calib_peak_table_rows.map(row => row['peak mz']);
+            let exact_mzs = this.mz_calib_peak_table_rows.map(row => row['mz']);
+            let mz_calib_data = {'peak_tofs': peak_tofs,
+                                 'peak_mzs': peak_mzs,
+                                 'exact_mzs': exact_mzs
+                                 };
+            this.be.export_one_way_binding_prop('fit_mz_calib_function',
+                                                {...mz_calib_data,
+                                                 'room': this.room_sid,
+                                                 'uid': Math.random(),
+                                                 },
+                                                null,
+                                                this.room_sid
+                                                );
+        },
+        mzCalibrateButtonClicked() {
+            // Set up compound table
+            this.mz_calib_compound_table_cols = this.peak_table_cols;
+            this.mz_calib_compound_table_rows = this.peak_table_rows.filter(function(row) {
+                return row['peak id'] != -1
+            });
+            this.mz_calib_compound_table_checked_rows = this.mz_calib_compound_table_rows;
+            this.updateMzCalibPeaks();
+            this.is_mz_calib_modal_active = true;
+        },
         requestTargetIntensities() {
             // Find m/z column, assuming the first numeric column is m/z
             let mz_field = null;
@@ -255,6 +341,9 @@ export default {
                                           'mz': mzs,
                                           't_range': null,
                                           };
+        },
+        rightClickPeakTableRow(row) {
+            console.log(row);
         },
         importExcelTargets() {
             this.targets = {'cols': this.excel_clipboard_table_cols,
@@ -310,6 +399,28 @@ export default {
                                         );
             this.target_table_cols = target_table_data.cols;
             this.target_table_rows = target_table_data.rows;
+        },
+        updateMzCalibPeaks() {
+            this.mz_calib_peak_table_cols = [
+                                {'field': 'ion composition', 'label': "Ion composition"},
+                                {'field': 'mz', 'label': "Ion m/z"},
+                                // {'field': 'peak id', 'label': "Peak ID"},
+                                {'field': 'peak mz', 'label': "Peak m/z"},
+                                {'field': 'peak tof', 'label': "Peak TOF", 'visible': false}
+                                ];
+            this.mz_calib_peak_table_rows = [];
+            for (let i in this.mz_calib_compound_table_rows) {
+                const compound_row = this.mz_calib_compound_table_rows[i];
+                if (this.mz_calib_compound_table_checked_rows.indexOf(compound_row) == -1) {
+                    continue
+                }
+                let row = {};
+                for (let j in this.mz_calib_peak_table_cols) {
+                    let key = this.mz_calib_peak_table_cols[j].field;
+                    row[key] = compound_row[key];
+                }
+                this.mz_calib_peak_table_rows.push(row);
+            }
         },
         writeTargetsToFile() {
             let target_table_data = {"cols": this.target_table_cols,
@@ -408,18 +519,16 @@ export default {
                                                 this.room_sid
                                                 );
         },
+        mz_calib_compound_table_checked_rows: function() {
+            this.updateMzCalibPeaks();
+        },
         peak_data: function(new_value) {
             this.identify_peaks = {'peaks': new_value,
                                    'targets': this.targets
                                    };
         },
-        target_ion_intensities: function(new_value) {
-            this.target_table_cols.push({'field': "intensity",
-                                         'label': "Intensity"
-                                         });
-            for (const i in this.target_table_rows) {
-                this.target_table_rows[i]['intensity'] = new_value[i];
-            }
+        peak_table_checked_rows: function(new_value) {
+            console.log(new_value);
         },
         peak_table_selected_row: function(new_value, old_value) {
             if ( _.isEqual(new_value, old_value) ) {
@@ -439,6 +548,14 @@ export default {
                 // }
             } else {
                 this.target_to_display = null;
+            }
+        },
+        target_ion_intensities: function(new_value) {
+            this.target_table_cols.push({'field': "intensity",
+                                         'label': "Intensity"
+                                         });
+            for (const i in this.target_table_rows) {
+                this.target_table_rows[i]['intensity'] = new_value[i];
             }
         },
         targets: function(new_data, old_data){

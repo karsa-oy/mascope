@@ -27,6 +27,7 @@ class TargetServiceNamespace(BaseClientNamespace):
         
         peak_mzs = np.frombuffer(value['peaks']['mz'], dtype=np.float32).astype(float)
         peak_heis = np.frombuffer(value['peaks']['height'], dtype=np.float32).astype(float)
+        peak_tofs = np.frombuffer(value['peaks']['tof'], dtype=np.float32).astype(float)
         targets = value['targets']
 
         mz_tolerance = 10 # ppm
@@ -63,6 +64,13 @@ class TargetServiceNamespace(BaseClientNamespace):
                                 )
         # Find matching targets for found peaks
         match_df = match_peaks_to_targets(peak_mzs, peak_heis, target_df, mz_tolerance)
+        id_peak_tofs = []
+        for id in match_df['peak id']:
+            if not np.isnan(id):
+                id_peak_tofs.append(peak_tofs[int(id)])
+            else:
+                id_peak_tofs.append(None)
+        match_df['peak tof'] = id_peak_tofs
         # Calculate isotope ratios and mz errors
         match_df = calculate_target_match_score(match_df)
         # Compare score with thresholds
@@ -155,7 +163,8 @@ def calculate_target_match_score(match_df):
 
 
 def filter_target_matches(match_df, mz_tolerance, iso_abu_tolerance, min_iso_abu):
-    """Compare target identification score with thresholds given as input arguments
+    """Compare target identification score with thresholds given as input arguments,
+    Return 'id's of target ions with one or more peaks identified.
 
     Parameters
     ----------
@@ -176,12 +185,14 @@ def filter_target_matches(match_df, mz_tolerance, iso_abu_tolerance, min_iso_abu
     target_ids = np.unique(match_df.id)
     identified_ions_mask = [False] * len(target_ids)
     for target_id in target_ids:
+        # Test each target against thresholds
         target = match_df[(match_df.id == target_id) &
                             (match_df.relabu >= min_iso_abu) &
                             (np.abs(match_df['mz error']) <= mz_tolerance) &
                             (np.abs(match_df['iso abu error']) <= iso_abu_tolerance)
                             ]
         if len(target):
+            #  At least one peak identified for current target
             identified_ions_mask[target_id] = True
 
     identified_ion_ids = [match_df_ind
