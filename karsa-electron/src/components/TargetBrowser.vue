@@ -146,6 +146,34 @@
                                 sortable>
                             </b-table>
                             <div><br></div>
+                            <!-- Column visibility dropdown -->
+                            <b-dropdown
+                                aria-role="menu"
+                                type="is-dark"
+                                position="is-bottom-right"
+                                style="top:0px;"
+                                trap-focus
+                                multiple
+                                append-to-body>
+                                <b-button
+                                    icon-left="menu"
+                                    slot="trigger"
+                                    size="is-small"
+                                    type="is-dark"
+                                    outlined>
+                                </b-button>
+                                <div>
+                                    <div v-for="(col, i) in peak_table_cols"
+                                        :key="i"
+                                        class="control">
+                                        <b-checkbox
+                                            v-model="col.visible"
+                                            size="is-small">
+                                            {{ col.label }}
+                                        </b-checkbox>
+                                    </div>
+                                </div>
+                            </b-dropdown>
                             <b-table 
                                 @contextmenu="rightClickPeakTableRow"
                                 id="peaks-datatable"
@@ -201,6 +229,7 @@ export default {
     computed: {
         ...mapState([
             'figure_double_click',
+            'figure_ranges',
             'peak_data',
             'root_namespace',
             'sample_selected',
@@ -345,6 +374,56 @@ export default {
         rightClickPeakTableRow(row) {
             console.log(row);
         },
+        updatePeakTableData(data, mz_range=null) {
+            // Format data to sample table
+            let identified_ions = data;
+            let rows = [];
+            let cols = [];
+            for (const ion in identified_ions) {
+                const identified_ion_peaks = identified_ions[ion];
+                let skip = false;
+                for (const peak_i in identified_ion_peaks) {
+                    let peak = identified_ion_peaks[peak_i];
+                    let row = {};
+                    // Unpack attributes
+                    let keys = Object.keys(peak);
+                    for (let k in keys) {
+                        let key = keys[k];
+                        let value = peak[key];
+                        if (mz_range && key=='mz') {
+                            if (value < mz_range[0] || value > mz_range[1]) {
+                                skip = true;
+                                break
+                            }
+                        }
+                        if (Number(value) && value != 0) {
+                            value = Math.round((value + Number.EPSILON) * 10000) / 10000;
+                        }
+                        if (rows.length == 0 && !skip) {
+                            let col = {
+                                'field': key.toLowerCase(),
+                                'label': key,
+                                };
+                            col.searchable = true;
+                            if (Number(value) != null) {
+                                col.sortable = true;
+                            }
+                            col.visible = true;
+                            cols.push(col);
+                        }
+                        row[key.toLowerCase()] = value;
+                    }
+                    if (!skip) {
+                        rows.push(row);
+                        if (row['peak mz'] > -1) {
+                            this.peak_table_checked_rows.push(row);
+                        }
+                    }
+                }
+            }
+            this.peak_table_cols = cols;
+            this.peak_table_rows = rows;
+        },
         importExcelTargets() {
             this.targets = {'cols': this.excel_clipboard_table_cols,
                             'rows': this.excel_clipboard_table_rows
@@ -450,48 +529,15 @@ export default {
         },
         figure_double_click: function() {
             this.peak_table_selected_row = null;
+            let mz_range = null; // TODO: Get actual range on zoom-out
+            this.updatePeakTableData(this.identified_ions, mz_range);
+        },
+        figure_ranges: function(new_value) {
+            let mz_range = new_value.mz_range;
+            this.updatePeakTableData(this.identified_ions, mz_range);
         },
         identified_ions: function(new_value) {
-            // Format data to sample table
-            let identified_ions = new_value;
-            let rows = [];
-            let cols = [];
-            for (const ion in identified_ions) {
-                const identified_ion_peaks = identified_ions[ion];
-                for (const peak_i in identified_ion_peaks) {
-                    let peak = identified_ion_peaks[peak_i];
-                    let row = {};
-                    // Unpack attributes
-                    let keys = Object.keys(peak);
-                    for (let k in keys) {
-                        let key = keys[k];
-                        let value = peak[key];
-                        if (Number(value) && value != 0) {
-                            value = Math.round((value + Number.EPSILON) * 10000) / 10000;
-                        }
-                        if (rows.length == 0) {
-                            let col = {
-                                'field': key.toLowerCase(),
-                                'label': key,
-                                };
-                            col.searchable = true;
-                            if (Number(value) != null) {
-                                col.sortable = true;
-                            }
-                            col.visible = true;
-                            cols.push(col);
-                        }
-                        row[key.toLowerCase()] = value;
-                    }
-                    rows.push(row);
-                    if (row['peak mz'] > -1) {
-                        console.log("push checked row");
-                        this.peak_table_checked_rows.push(row);
-                    }
-                }
-            }
-            this.peak_table_cols = cols;
-            this.peak_table_rows = rows;
+            this.updatePeakTableData(new_value);
         },
         identify_peaks: function(new_value, old_value) {
             if (_.isEqual(new_value, old_value)) {
