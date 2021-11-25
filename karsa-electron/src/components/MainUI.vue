@@ -23,7 +23,7 @@
                         :is-full-page="false">
                     </b-loading>
                     <!-- Left column -->
-                    <div class="column is-one-quarter" style="padding-left:2rem">
+                    <div class="column is-one-third" style="padding-left:2rem">
 
                         <!-- Data source selector -->
                         <div style="text-align:center;
@@ -65,7 +65,7 @@
                     </div>
                     <!-- End of left column -->
                     <!-- Right side content -->
-                    <div class="column is-three-quarters" style="padding-right:2rem">
+                    <div class="column is-two-thirds" style="padding-right:2rem">
                         <SampleView></SampleView>
                     </div>
                     <!-- End of Right side content -->
@@ -300,7 +300,7 @@ body {
     background: #7957d5;
     border-color: #7957d5;
 }
-.b-checkbox.checkbox[disabled] input[type=checkbox] + .check {
+.b-checkbox.checkbox[disabled] input[type=checkbox] {
     background: #7a7a7a;
     box-shadow: none;
 }
