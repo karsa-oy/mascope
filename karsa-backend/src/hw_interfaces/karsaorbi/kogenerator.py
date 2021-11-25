@@ -9,60 +9,19 @@ Created on Tue Apr 09 13:08:29 2019
 
 import os
 import numpy as np
-from threading import Thread
-from multiprocessing import Event, Queue
-from queue import Empty
+from threading import current_thread
 from time import sleep
-from ntpath import basename
-import inspect
-
 
 from .lib import Business as ThermoBusiness
 from .koutil import net2np_array
+from common.base_generator import BaseFileStreamer, PROGRESS_SHIFT
 
 
-def strip_filepath(filepath):
-    """Strip path and file extension
-
-    Parameters
-    ----------
-    filepath : str
-        Full file path
-
-    Returns
-    -------
-    str
-        Base filename
-    """
-    return os.path.splitext(basename(filepath))[0]
-
-
-class RawStreamer(Thread):
+class RawStreamer(BaseFileStreamer):
     def __init__(self, client, mz_precision=4):
-        self.log("initializing")
-        Thread.__init__(self)
-        # Parameters
-        self.client = client
         self._mz_precision = mz_precision
-        # Thermo Fischer RawFileReaderFactory
-        self.raw = None
-        self.requests = client.requests     # Queue for files to stream
-        self.request_in_progress = client.request_in_progress
-        self.cancel_event = Event()         # Set to cancel current stream
-        self.shutdown_event = client.shutdown_event     # Set to break out from main loop
-        # Common with TofDaqStreamer
-        self.active = Event()               # RawStreamer active event
-        self.spec_queue = Queue()           # Signal output queue
-        # Per acquisition attributes
-        self.filename = None                # Filename base from TW h5 file
-        self.interval = None                # RawStreamer interval [s]
-        self.length = None                  # RawStreamer length [s]
-        self.progress = 0                   # RawStreamer progress [%]
-        self.speci = -1                     # Index of last received spectrum,
-                                            # -1 when there is no active acquisition
-
-    def log(self, *arg, **kwarg):
-        print(f"[{self.__class__.__name__}.{inspect.stack()[1].function}]", *arg, **kwarg)
+        self.raw = None         # Thermo Fischer RawFileReaderFactory
+        BaseFileStreamer.__init__(self, client)
 
     @property
     def mz(self):
@@ -71,6 +30,33 @@ class RawStreamer(Thread):
                              self.raw.RunHeaderEx.HighMass],
                             dtype=np.float32
                             )
+
+    def finalize(self):
+        self.raw.Dispose()
+        super().finalize()
+
+    def _set_mz_precision(self, mz, spec):
+        # Round the mz values based on the mz precision
+        mz = np.asarray(np.round(mz, self._mz_precision), dtype=np.float32)
+        # Contiguous mz values might now be equivalent. Combine their intensity values by taking the sum.
+        unique_mz = np.unique(mz)
+        unique_mz_intensities = np.zeros(unique_mz.shape, dtype=np.float32)
+        # Note: This assumes that mz and unique_mz are sorted
+        if len(mz) != len(unique_mz):
+            acc = 0
+            current_unique_mz_idx = 0
+            current_unique_mz = unique_mz[0]
+            for i, mz in enumerate(mz):
+                if mz != current_unique_mz:
+                    unique_mz_intensities[current_unique_mz_idx] = acc  # Flush the accumulator
+                    acc = 0  # Reset the accumulator
+                    current_unique_mz_idx += 1  # Go to the next unique mz value
+                    current_unique_mz = unique_mz[current_unique_mz_idx]  # Get the unique mz value
+                acc += spec[i]  # Increment the accumulator
+            unique_mz_intensities[current_unique_mz_idx] = acc  # Flush the accumulator
+        else:
+            unique_mz_intensities = spec
+        return unique_mz, unique_mz_intensities
 
     def _get_and_feed_data(self):
         """Read data from the RAW file and put to queues
@@ -97,186 +83,70 @@ class RawStreamer(Thread):
                 'spec': spec.tobytes()      # Serialized spectrum [float32]
                 }
         # Feed
-        self.spec_queue.put(spec_data)
-
-    def _finalize(self):
-        """Finalize acquisition
-        """
-        self.raw.Dispose()
-        # Reset self
-        self._reset()
-        # Feed poison pill
-        self.spec_queue.put(None)
-
-    def _reset(self):
-        """Reset per acquisition attributes
-        """
-        self.filename = None
-        self.progress = 0
-        self.speci = -1
-
-    def _set_mz_precision(self, mz, spec):
-        # Round the mz values based on the mz precision
-        mz = np.asarray(np.round(mz, self._mz_precision), dtype=np.float32)
-
-        # Contiguous mz values might now be equivalent. Combine their intensity values by taking the sum.
-        unique_mz = np.unique(mz)
-        unique_mz_intensities = np.zeros(unique_mz.shape, dtype=np.float32)
-
-        # Note: This assumes that mz and unique_mz are sorted
-        if len(mz) != len(unique_mz):
-            acc = 0
-            current_unique_mz_idx = 0
-            current_unique_mz = unique_mz[0]
-            for i, mz in enumerate(mz):
-                if mz != current_unique_mz:
-                    unique_mz_intensities[current_unique_mz_idx] = acc  # Flush the accumulator
-                    acc = 0  # Reset the accumulator
-                    current_unique_mz_idx += 1  # Go to the next unique mz value
-                    current_unique_mz = unique_mz[current_unique_mz_idx]  # Get the unique mz value
-                acc += spec[i]  # Increment the accumulator
-            unique_mz_intensities[current_unique_mz_idx] = acc  # Flush the accumulator
-        else:
-            unique_mz_intensities = spec
-
-        return unique_mz, unique_mz_intensities
+        self.feed_spec_data(spec_data)
 
     def _update(self, scan=None):
         """Update per acquisition attributes. If new data is available, feed into queues.
         """
-        # Update
         if scan is None:
-            # New file, update attributes
-            raw_filepath = self.raw.FileName # TF RAW file full path
-            self.filename = strip_filepath(raw_filepath)            
+            # New file
             self.length = self.raw.RunHeaderEx.EndTime * 60. # [s]
             self.interval = self.length / self.raw.RunHeaderEx.LastSpectrum # [s]
-            self.log("started. %s" %self.filename)
+            self.feed_initial_data()
+            if not self.wait_for_ack():     # wait for acq data initialization
+                raise TimeoutError
         else:
             # New data
             self.speci = scan - 1
             self.log(self.speci)
-            self._get_and_feed_data()
             # RawStreamer progress
-            self.progress = (scan / self.raw.RunHeaderEx.LastSpectrum) * 100. # [%]
-
-    def _wait_for_queues(self):
-        """Wait for tick event to be set before continuing streaming
-
-        Returns
-        -------
-        bool
-            True if ticked, False if cancel or shutdown
-        """
-        while not (self.cancel_event.is_set() or self.shutdown_event.is_set()):
-            if self.spec_queue.qsize():
-                # Still something in queue
-                sleep(.1)
-            else:
-                # Queues empty
-                return True
-        # Cancel or shutdown
-        return False
-
-    def _get_next_file_to_stream(self):
-        # get next request to process
-        rdata = self.requests.cache_get()
-        if not rdata or not rdata['files']:
-            return None, None
-        fdata = rdata['files'].pop(0)
-        client_room = rdata['client_room']
-        if rdata['files']:
-            # not all requested files are processed - put request back to queue
-            self.requests.cache_put(rdata)
-        return client_room, fdata
-
-    def _update_request_in_progress(self, client_room, fdata):
-        with self.client.lock:
-            if client_room not in self.request_in_progress:
-                self.request_in_progress[client_room] = {}
-            fname = fdata['filename']
-            self.request_in_progress[client_room][fname] = {
-                **fdata,
-                'progress': round(self.progress, 2),
-                'streamer': self,
-            }
-
-    def _remove_request_in_progress(self, client_room, fname):
-        with self.client.lock:
-            del self.request_in_progress[client_room][fname]
-            if not self.request_in_progress[client_room]:
-                del self.request_in_progress[client_room]
+            self.progress = round((scan / self.raw.RunHeaderEx.LastSpectrum) * 100., 2) # [%]
+            self._get_and_feed_data()
+            # allow PROGRESS_SHIFT to make it quicker
+            if not self.wait_for_ack(progress_shift=PROGRESS_SHIFT):
+                raise TimeoutError
 
     def run(self):
-        self.log("started")
         # Main loop
+        self.log(f"started {current_thread().name}")
         while not self.shutdown_event.is_set():
-            client_room, fdata = self._get_next_file_to_stream()
-            if not fdata:
+            self.rcontext, self.fdata = self.get_next_file_to_stream()
+            if not self.fdata:
                 sleep(.5)
                 continue
-            fname = fdata['filename']
+            self.initialize()
 
             # Initialize Raw file reader
+            full_fname = os.path.join(self.fdata['path'], self.filename)
             try:
-                self.raw = ThermoBusiness.RawFileReaderFactory.ReadFile(fname)
+                self.raw = ThermoBusiness.RawFileReaderFactory.ReadFile(full_fname)
                 self.raw.SelectInstrument(0, 1)
             except Exception as e:
-                self.log("Error reading file %s: %s" %(fname, e))
+                self.log("Error reading file %s: %s" %(full_fname, e))
                 continue
 
             # Start streaming
-            self.log(f"started streaming {fname}")
-            # Update self and feed data into queue
-            self._update()
-            self._update_request_in_progress(client_room, fdata)
-            # Set active flag 
-            self.active.set()
-            # Loop through the file and feed to queues
-            scans = range(self.raw.RunHeaderEx.FirstSpectrum,
-                          self.raw.RunHeaderEx.LastSpectrum + 1
-                          )
-            for scan in scans:
-                # Update self and feed data into queue
-                self._update(scan)
-                self._update_request_in_progress(client_room, fdata)
-                # Wait for queues to be empty
-                if self._wait_for_queues():
-                    # Empty
-                    continue
-                else:
-                    # Shutdown
-                    break
-            # Out of stream loop
-            self.active.clear()
-            self.cancel_event.clear()
-            self._finalize()
-            self._remove_request_in_progress(client_room, fname)
-            self.log(f"finished streaming {fname}")
-        # Out of main loop
-        self.log("stopped")
-        self.shutdown()
-
-    def shutdown(self):
-        """Shutdown procedure
-        """
-        self.shutdown_event.set()
-        # Clear all left-over data from queue
-        while True:
+            self.log(f"started streaming {self.filename}")
             try:
-                self.spec_queue.get_nowait()
-            except Empty:
-                break
-            except ValueError:
-                break
-            except KeyboardInterrupt:
-                break
-            sleep(.1)
-        # Close queues
-        self.spec_queue.close()
-        self.spec_queue.join_thread()
-
-    def stop_stream(self):
-        """Stop stream before complete
-        """
-        self.cancel_event.set()
+                # Update self and feed data into queue
+                self._update()
+                # Loop through the file and feed to worker thread(s)
+                scans = range(self.raw.RunHeaderEx.FirstSpectrum,
+                            self.raw.RunHeaderEx.LastSpectrum + 1
+                            )
+                for scan in scans:
+                    # Update self and feed data into queue
+                    self._update(scan)
+                    if self.cancel_event.is_set() or self.shutdown_event.is_set():
+                        break
+                # Out of stream loop
+            except TimeoutError:
+                self.log(f"Streaming {self.filename} interrupted due to timeout")
+            except FileExistsError:     # only in import mode
+                self.log(f"Importing {self.filename} cancelled: target exists")
+            self.log(f"finished streaming {self.filename}")
+            self.finalize()
+            self.cancel_event.clear()
+        # Out of main loop
+        self.log(f"stopped {current_thread().name}")
+        self.shutdown()

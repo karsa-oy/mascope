@@ -12,35 +12,17 @@ import numpy as np
 from threading import Thread, current_thread
 from multiprocessing import (Event, Queue)
 from queue import Empty
-from time import time, sleep
+from time import sleep
 from ctypes import create_string_buffer
-from ntpath import basename
 import inspect
-from datetime import datetime
 
-from karsalib.util import copy_dict
-from numpy.lib.index_tricks import RClass
 from services.FileIoService import zarr_sdk
 from .kinstrument import KInstrument
+from common.base_generator import BaseFileStreamer, strip_filepath, PROGRESS_SHIFT
 
 
-def strip_filepath(filepath):
-    """Strip path and file extension
 
-    Parameters
-    ----------
-    filepath : str
-        Full file path
-
-    Returns
-    -------
-    str
-        Base filename
-    """
-    return os.path.splitext(basename(filepath))[0]
-
-
-class BaseStreamer(Thread):
+class BaseTofDaqStreamer(Thread):
     """Base class for TofDaqStreamer and H5Streamer to inherit common methods from.
     """
     def __init__(self):
@@ -79,16 +61,16 @@ class BaseStreamer(Thread):
         # Nothing new
         return 0 
     
-    def _finalize(self):
+    def finalize(self):
         """Finalize acquisition
         """
         # Reset self
-        self._reset()
+        self.reset()
         # Feed poison pill
         self.spec_queue.put(None)
         self.tps_queue.put(None)
 
-    def _reset(self):
+    def reset(self):
         """Reset per acquisition attributes
         """
         self.filename = None
@@ -155,7 +137,7 @@ class BaseStreamer(Thread):
         self.tps_queue.close()
         self.tps_queue.join_thread()
 
-class TofDaqStreamer(BaseStreamer):
+class TofDaqStreamer(BaseTofDaqStreamer):
     from .lib.TofDaq import (
             TwRetVal,
             TSharedMemoryDesc,
@@ -188,7 +170,7 @@ class TofDaqStreamer(BaseStreamer):
             fetching 'TwSharedMemoryDesc' fails for another reason.
         """
         self.log("initializing")
-        BaseStreamer.__init__(self)
+        BaseTofDaqStreamer.__init__(self)
         self.active = Event()           # Streamer active event
         self.spec_queue = Queue()       # Signal output queue
         self.tps_queue = Queue()        # TPS output queue
@@ -367,7 +349,7 @@ class TofDaqStreamer(BaseStreamer):
                     # Clear active flag
                     self.active.clear()
                     # Reset self
-                    self._finalize()
+                    self.finalize()
                     self.log("finished streaming")
             # New data
             elif ret == 4:
@@ -403,10 +385,7 @@ class TofDaqStreamer(BaseStreamer):
 
 
 
-MAX_RESPONSE_TIME = 5       # secs to wait for notification acknowledgement
-PROGRESS_SHIFT = 10         # shift with acknowledged progress
-
-class H5Streamer(BaseStreamer, KInstrument):
+class H5Streamer(BaseFileStreamer, KInstrument):
     from .lib.TwH5 import (
             TwGetBufTimeFromH5,
             TwGetH5Descriptor,
@@ -427,23 +406,8 @@ class H5Streamer(BaseStreamer, KInstrument):
         Exception
             Exception is raised if fetching 'TwH5Desc' fails for some reason.
         """
-        self.log("initializing")
-        BaseStreamer.__init__(self)
-        self.filename = None
-        self.target_filename = None
-        self.item = None                                # data item to stream/store
-        self.ack_progress = -1
-        self.rcontext = {}
-        self.fdata = {}
-        self.client = client
-        self.requests = client.requests                 # Queue for files to stream
-        self.responses = client.responses               # Queue for streamers notifications
-        self.shutdown_event = client.shutdown_event     # Set to break out from main loop
-        self.cancel_event = Event()                     # Set to cancel current stream
-        Thread.__init__(self)
-
-        # Initialize with empty TW h5 descriptor
-        self.desc = H5Streamer.TwH5Desc()
+        BaseFileStreamer.__init__(self, client)
+        self.desc = H5Streamer.TwH5Desc()           # Initialize with empty TW h5 descriptor
         KInstrument.__init__(self, self.desc)
 
     @property
@@ -459,24 +423,11 @@ class H5Streamer(BaseStreamer, KInstrument):
                                         )
         return mz.astype(np.float32)
 
-    def _check(self):
-        """Check for state change
-
-        Returns
-        -------
-        int
-            State change: 2 new file, 1 new data, 0 nothing new
+    @property
+    def tps_info(self):
+        """List of TPS  names
         """
-        if self.progress == 0 and self.ack_progress == -1:
-            # New file
-            return 2
-        curr_speci = (self.desc.iWrite * self.desc.nbrBufs) + self.desc.iBuf
-        if self.speci < curr_speci:
-            # New data
-            return 1
-        # Nothing new
-        return 0
-
+        return self._get_tps_info()
 
     def _get_tps_info(self):
         """Get TPS parameter descriptions from TW h5
@@ -521,278 +472,23 @@ class H5Streamer(BaseStreamer, KInstrument):
         info = [ i.decode('unicode_escape') for i in info ] # bytes to str
         return info
 
+    def _check(self):
+        """Check for state change
 
-    #======== The service communication protocol implementation ===============
-    def _feed_notifications(self, gen_notifications, streamer_notifications):
-        # gen_notifications are sent always, and streamer_notifications
-        # are sent in streamer mode, when target_data_pool_path is None
-        if self.client.target_data_pool_path:
-            notifications = gen_notifications
-        else:
-            notifications = [*gen_notifications, *streamer_notifications]
-        for n in notifications:
-            job_id_data = {'client_room':self.client_room, 'filename':self.filename}
-            n.update(job_id_data)   # job_id_data needed for CacheQ indexing of self.responses
-            self.responses.cache_put(n)
-
-    def _feed_initial_data(self):
-        progress_data = {
-            'client_room': self.client_room,
-            'source_filename': self.filename,
-            'target_filename': self.target_filename,
-            'progress': self.progress,
-            'ack_progress': self.ack_progress,
-        }
-        sn_data = {
-            'name': 'acquisition_coordinates',
-            'value': {
-                'filename': self.target_filename,
-                'mz': self.mz.tobytes(),
-                't_range': [0, self.length]
-            },
-        }
-        gen_notifications = [
-            {   # TODO: remove acquisition_status for acquisition_started
-                'name': 'acquisition_status',
-                'value': 'running',
-                'context': {
-                    **self.rcontext,
-                    'room': None,
-                },
-            },
-            {
-                'name': 'acquisition_started',
-                'value': {
-                    'filename': self.target_filename,
-                    'mz_range': [float(self.mz[0]), float(self.mz[-1])],
-                    't_range': [0, self.length],
-                    'project': self.project,
-                    'experiment': self.experiment,
-                },
-                'context': {
-                    **self.rcontext,
-                    'room': None,
-                },
-            },
-            {
-                'name': 'acquisition_progress',
-                'value': progress_data,
-                'context': {
-                    **self.rcontext,
-                    'room': None,
-                },
-            },
-        ]
-        streamer_notifications = [
-            {
-                **sn_data,
-                'context': {
-                    **self.rcontext,
-                    'room': None,
-                    'callback': 'cb_progress',
-                    'callback_data': progress_data,
-                },
-            },
-            {  # TODO: remove this public notification after moving DataViz to private_ns
-                **sn_data,
-                'context': {
-                    **self.rcontext,
-                    'namespace': '/',
-                    'room': None,
-                },
-            },
-        ]
-        self._feed_notifications(gen_notifications, streamer_notifications)
-        if self.client.target_data_pool_path:
-            self.item = zarr_sdk.init_signal_dataset(sn_data, self.client.target_data_pool_path)
-            self.ack_progress = self.progress
-
-    def _feed_tps_parameter_info(self):
-        sn_data = {
-            'name': 'tps_parameter_info',
-            'value': {
-                'filename': self.target_filename,
-                'tps_info': self.tps_info,
-            },
-        }
-        gen_notifications = []
-        streamer_notifications = [
-            {
-                **sn_data,
-                'context': {
-                    **self.rcontext,
-                    'room': None,
-                },
-            },
-        ]
-        self._feed_notifications(gen_notifications, streamer_notifications)
-        if self.client.target_data_pool_path:
-            zarr_sdk.init_tps_dataset(sn_data, self.item)
-
-    def _feed_spec_data(self, spec_data):
-        progress_data = {
-            'client_room': self.client_room,
-            'source_filename': self.filename,
-            'target_filename': self.target_filename,
-            'progress': self.progress,
-            'ack_progress': self.ack_progress,
-        }
-        sn_data = {
-            'name': 'acquired_spectrum',
-            'value': {
-                **spec_data,
-                'filename': self.target_filename,
-            },
-        }
-        gen_notifications = [
-            {
-                'name': 'acquisition_progress',
-                'value': progress_data,
-                'context': {
-                    **self.rcontext,
-                    'room': None,
-                },
-            },
-        ]
-        streamer_notifications = [
-            {
-                **sn_data,
-                'context': {
-                    **self.rcontext,
-                    'room': None,
-                    'callback': 'cb_progress',
-                    'callback_data': progress_data,
-                },
-            },
-            {  # TODO: remove this public notification after moving DataViz to private_ns
-                **sn_data,
-                'context': {
-                    **self.rcontext,
-                    'namespace': '/',
-                    'room': None,
-                },
-            },
-        ]
-        if self.client.target_data_pool_path:
-            # target_data_pool_path specified - store data locally
-            zarr_sdk.update_signal_dataset(sn_data, self.item)
-            if self.item['signal'].delayed_write is None:
-                # updates to signal mfzarrs are committed - notify
-                dataset_updated = {
-                    # TODO: switch to private notification after moving DataViz to private_ns
-                    'name': 'dataset_updated',
-                    'value': {
-                        'data_type': 'signal',
-                        **self.item['props'],
-                    },
-                    'context': {
-                        **self.rcontext,
-                        'namespace': '/',
-                        'room': None,
-                    },
-                }
-                gen_notifications.append(dataset_updated)
-            # if data is stored locally, ack_progress is set locally,
-            # otherwise by acquired_spectrum callback
-            self.ack_progress = self.progress
-        self._feed_notifications(gen_notifications, streamer_notifications)
-
-    def _feed_tps_data(self, tps_data):
-        sn_data = {
-            'name': 'acquired_tps_data',
-            'value': {
-                **tps_data,
-                'filename': self.target_filename,
-            },
-        }
-        gen_notifications = []
-        streamer_notifications = [
-            {
-                **sn_data,
-                'context': {
-                    **self.rcontext,
-                    'room': None,
-                },
-            },
-        ]
-        self._feed_notifications(gen_notifications, streamer_notifications)
-        if self.client.target_data_pool_path:
-            zarr_sdk.update_tps_dataset(sn_data, self.item)
-
-    def _feed_final_data(self):
-        sn_data = {
-            'name': 'acquisition_finished',
-            'value': {
-                'filename': self.target_filename,
-            },
-        }
-        gen_notifications = [
-            {   # TODO: remove acquisition_status for acquisition_finished
-                'name': 'acquisition_status',
-                'value': 'not_running',
-                'context': {
-                    **self.rcontext,
-                    'room': None,
-                },
-            },
-            {   # acquisition_finished for progress bar
-                **sn_data,
-                'context': {
-                    **self.rcontext,
-                    'room': None,
-                },
-            },
-        ]
-        streamer_notifications = [
-            {  # TODO: remove this public notification after moving DataViz to private_ns
-                **sn_data,
-                'context': {
-                    **self.rcontext,
-                    'namespace': '/',
-                    'room': None,
-                },
-            },
-        ]
-        if self.client.target_data_pool_path and self.item:
-            zarr_sdk.finalize_dataset(sn_data, self.item)
-            # updates to signal mfzarrs are finalized - notify
-            dataset_updated = {
-                # TODO: switch to private notification after moving DataViz to private_ns
-                'name': 'dataset_updated',
-                'value': {
-                    'data_type': 'signal',
-                    **self.item['props'],
-                },
-                'context': {
-                    **self.rcontext,
-                    'namespace': '/',
-                    'room': None,
-                },
-            }
-            gen_notifications.append(dataset_updated)
-        if all([self.project, self.experiment]):
-            # save sample data to experiment, if project/experiment defined in request
-            sample_data = {
-                'filename': self.target_filename,
-                'experiment': self.experiment,
-                'project': self.project,
-                'attributes': [{'label': k, 'value': v} for (k,v) in self.attrs.items()],
-                'method': None,
-            }
-            sample_to_save = {
-                'name': 'save_sample',
-                'value': sample_data,
-                'context': {
-                    **self.rcontext,
-                    'namespace': '/',
-                    'room': None,
-                },
-            }
-            gen_notifications.append(sample_to_save)
-        self._feed_notifications(gen_notifications, streamer_notifications)
-
-# ==========================================================================
-
+        Returns
+        -------
+        int
+            State change: 2 new file, 1 new data, 0 nothing new
+        """
+        if self.progress == 0 and self.ack_progress == -1:
+            # New file
+            return 2
+        curr_speci = (self.desc.iWrite * self.desc.nbrBufs) + self.desc.iBuf
+        if self.speci < curr_speci:
+            # New data
+            return 1
+        # Nothing new
+        return 0
 
     def _get_and_feed_data(self):
         """Read data from the h5 and put to queues
@@ -829,7 +525,7 @@ class H5Streamer(BaseStreamer, KInstrument):
                     'spec': spec.tobytes()      # Serialized spectrum [float32]
                     }
             # Feed
-            self._feed_spec_data(spec_data)
+            self.feed_spec_data(spec_data)
 
         # == Get and feed TPS data ==
         # Query data size
@@ -866,7 +562,7 @@ class H5Streamer(BaseStreamer, KInstrument):
                                 ).tobytes(      # serialize
                                 )                   # Serialized TPS data [float32]
                 }
-            self._feed_tps_data(tps_data)
+            self.feed_tps_data(tps_data)
 
 
     def _update(self):
@@ -884,10 +580,10 @@ class H5Streamer(BaseStreamer, KInstrument):
                 tof_period_s *= 1e-9 
             self.interval = tof_period_s * self.desc.nbrWaveforms # [s]
             self.length = (self.desc.nbrWrites * self.desc.nbrBufs) * self.interval # [s]
-            self._feed_initial_data()
+            self.feed_initial_data()
             if not self.wait_for_ack():     # wait for acq data initialization
                 raise TimeoutError
-            self._feed_tps_parameter_info()
+            self.feed_tps_parameter_info()
             # Check again for new data
             state = self._check()
         if state == 1:      # New data
@@ -905,91 +601,15 @@ class H5Streamer(BaseStreamer, KInstrument):
                 raise TimeoutError
 
 
-    def _initialize(self):
-        """Initialize acquisition attributes
-        """
-        def init_sample_data():
-            self.filename = self.fdata['filename']
-            self.target_filename = '_'.join([self.client.instrument_name, self.filename]).replace(' ', '_')
-            self.attrs = self.fdata.pop('attrs')    # attrs normally contain sci data coming along with the sample
-            self.project = self.attrs.pop('project', None)
-            self.experiment = self.project and self.attrs.pop('experiment', None)
-            if 'title' not in self.attrs:
-                self.attrs['title'] = self.filename
-            if 'description' not in self.attrs:
-                self.attrs['description'] = ''
-        init_sample_data()
-        self.client_room = self.rcontext['client_room']
-        self.job_id = (self.client_room, self.filename)
-        with self.client.lock:
-            self.client.in_progress[self.job_id] = self
-
-    def _reset(self):
-        """Reset per acquisition attributes
-        """
-        def reset_sample_data():
-            self.filename = None
-            self.target_filename = None
-            self.project = None
-            self.experiment = None
-        with self.client.lock:
-            self.client.in_progress.pop(self.job_id, None)
-        self.job_id = None
-        reset_sample_data()
-        self.item = None
-        self.rcontext = {}
-        self.fdata = {}
-        self.progress = 0
-        self.ack_progress = -1
-        self.speci = -1
-
-    def wait_for_ack(self, progress_shift=0, timeout=MAX_RESPONSE_TIME):
-        res = True
-        t0 = time()
-        while self.progress - self.ack_progress > progress_shift:
-            if time() - t0 > timeout:
-                self.log(f"Warning: {self.filename} - no progress acknowledgement for {timeout} sec.")
-                res = False
-                break
-            sleep(.3)
-        return res
-
-    def _finalize(self):
-        """Finalize acquisition
-        """
-        self._feed_final_data()
-        if self.item and not self.cancel_event.is_set() and not self.shutdown_event.is_set():
-            self.wait_for_ack()     # wait till all packages are processed
-        self._reset()
-
-    def _get_next_file_to_stream(self):
-        # get next request to process
-        with self.client.lock:
-            rdata = self.requests.cache_get()
-        if not rdata or not rdata['files']:
-            return None, None
-        fdata = rdata['files'].pop(0)
-        rcontext = copy_dict(rdata, ignore_keys=['files',])
-        if rdata['files']:
-            # not all requested files are processed - put request back to queue
-            self.requests.cache_put(rdata)
-        return rcontext, fdata
-
-
     def run(self):
-        """Main loop
-
-        Poll TW API for new data at interval set by 'self.timeout'. 
-        Loop until 'self.shutdown_event' is set.
-        """
-        self.log(f"started {current_thread().name}")
         # Main loop
+        self.log(f"started {current_thread().name}")
         while not self.shutdown_event.is_set():
-            self.rcontext, self.fdata = self._get_next_file_to_stream()
+            self.rcontext, self.fdata = self.get_next_file_to_stream()
             if not self.fdata:
                 sleep(.5)
                 continue
-            self._initialize()
+            self.initialize()
 
             # Update TW h5 descriptor
             full_fname = os.path.join(self.fdata['path'], self.filename)
@@ -1035,22 +655,55 @@ class H5Streamer(BaseStreamer, KInstrument):
             res = H5Streamer.TwCloseH5(full_fname.encode())
             if res != 4:
                 self.log(f"Warning: error closing {self.filename} ({res})")
-            self._finalize()
+            self.finalize()
             self.cancel_event.clear()
         # Out of main loop
         self.log(f"stopped {current_thread().name}")
         self.shutdown()
 
 
-    def run_as_daemon(self):
-        Thread(target=self.run).start()
+    #======== H5 extension of a streamer service communication protocol ===============
+    def feed_tps_parameter_info(self):
+        sn_data = {
+            'name': 'tps_parameter_info',
+            'value': {
+                'filename': self.target_filename,
+                'tps_info': self.tps_info,
+            },
+        }
+        gen_notifications = []
+        streamer_notifications = [
+            {
+                **sn_data,
+                'context': {
+                    **self.rcontext,
+                    'room': None,
+                },
+            },
+        ]
+        self.feed_notifications(gen_notifications, streamer_notifications)
+        if self.client.target_data_pool_path:
+            zarr_sdk.init_tps_dataset(sn_data, self.item)
 
-    def shutdown(self):
-        """Shutdown procedure
-        """
-        self.client.shutdown_event.set()
-
-    def stop_stream(self):
-        """Stop stream before complete
-        """
-        self.cancel_event.set()
+    def feed_tps_data(self, tps_data):
+        sn_data = {
+            'name': 'acquired_tps_data',
+            'value': {
+                **tps_data,
+                'filename': self.target_filename,
+            },
+        }
+        gen_notifications = []
+        streamer_notifications = [
+            {
+                **sn_data,
+                'context': {
+                    **self.rcontext,
+                    'room': None,
+                },
+            },
+        ]
+        self.feed_notifications(gen_notifications, streamer_notifications)
+        if self.client.target_data_pool_path:
+            zarr_sdk.update_tps_dataset(sn_data, self.item)
+    # ===The service communication protocol implementation end=========================
