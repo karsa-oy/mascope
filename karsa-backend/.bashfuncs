@@ -1,0 +1,10 @@
+
+
+function name {
+    printf "\033]2;%s\033\\" "$1";
+};
+function prep_dataviz {
+  sleep 10;
+  rm -rf DataViz_*.db;
+};
+export -f name prep_dataviz;
