@@ -13,3 +13,8 @@ For a quick development setup with docker:
  3. *Run* with `docker-compose up`;
 
 The build script wraps `docker-compose build` with an extra optimization step. For additonal reference, check out the [docker-compose docs](https://docs.docker.com/compose/).
+
+### Lockfile
+
+To update the lockfile without populating `/node_modules` locally, run:
+    `npm install --package-lock-only; yarn import`
