@@ -1,7 +1,6 @@
 # node module directory
 node_modules
 dist_electron
-*.lock
 *.log
 .vagrant
 cert

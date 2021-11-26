@@ -5,6 +5,8 @@ services:
       context: ./karsa-backend
     volumes:
       - ./karsa-backend/src:/karse-backend/src
+      - ./karsa-backend/Data/Projects:/karsa-backend/Projects
+      - ./karsa-backend/Data/TofDaq:/karsa-backend/TofDaq
     stdin_open: true  
     tty: true
     network_mode: "host"

@@ -1,0 +1,33 @@
+--- AppUpdater.js	2021-11-26 14:36:21.841712408 +0200
++++ AppUpdater-patch.js	2021-11-26 14:41:16.641103130 +0200
+@@ -5,7 +5,7 @@
+ const crypto_1 = require("crypto");
+ const events_1 = require("events");
+ const fs_extra_1 = require("fs-extra");
+-const promises_1 = require("fs/promises");
++const promises_1 = require("fs").promises;
+ const js_yaml_1 = require("js-yaml");
+ const lazy_val_1 = require("lazy-val");
+ const path = require("path");
+@@ -188,14 +188,14 @@
+         this._logger.info("Checking for update");
+         checkForUpdatesPromise = this.doCheckForUpdates()
+             .then(it => {
+-            nullizePromise();
+-            return it;
+-        })
++                nullizePromise();
++                return it;
++            })
+             .catch(e => {
+-            nullizePromise();
+-            this.emit("error", e, `Cannot check for updates: ${(e.stack || e).toString()}`);
+-            throw e;
+-        });
++                nullizePromise();
++                this.emit("error", e, `Cannot check for updates: ${(e.stack || e).toString()}`);
++                throw e;
++            });
+         this.checkForUpdatesPromise = checkForUpdatesPromise;
+         return checkForUpdatesPromise;
+     }
