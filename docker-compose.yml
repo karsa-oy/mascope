@@ -5,6 +5,8 @@ services:
       context: ./karsa-backend
     volumes:
       - ./karsa-backend/src:/karse-backend/src
+    stdin_open: true  
+    tty: true
     network_mode: "host"
   electron:
     build:

@@ -1,0 +1,11 @@
+session_name: karsa-services
+windows:
+  - window_name: karsa services
+    layout: tiled
+    panes:
+      - name 'router' && karsa-router-service --url 0.0.0.0
+      - name 'fileio' && karsa-fileio-service --ns TofDaq
+      - name 'sample' && karsa-sample-service
+      - name 'signal' && karsa-signal-service
+      - name 'target' && karsa-target-service
+      - name 'dataviz' && prep_dataviz && karsa-dataviz-service
