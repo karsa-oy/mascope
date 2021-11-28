@@ -51,67 +51,54 @@
     <!--- End of add annotation modal-->
     <!-- End of modals -->
 
+    <div style="text-align: right">
+      <h1 style="color: #b7b7b7; font-size: 18px; padding: 0.3em 1em">
+        {{ experiment_selected.title }} - {{ sample_selected.title }}
+      </h1>
+    </div>
     <!-- Main content  area-->
-    <section>
-      <div style="text-align: center">
-        <h1 style="color: white; font-size: 24px">
-          {{ sample_selected.title }}
-        </h1>
+    <div class="columns">
+      <!-- Left side -->
+      <div class="column is-half">
+        <!-- Heatmap section -->
+        <section class="heatmap-section">
+          <ViewPortSpectrogram id="spectrogram"> </ViewPortSpectrogram>
+        </section>
+        <!-- End of heatmap section-->
+        <!-- Multiselect section -->
+        <section class="multiselect-section">
+          <div hidden>
+            <div class="column tps-multiselect">
+              <h2 class="multiselect-title">Select parameter to display</h2>
+              <multiselect
+                v-model="tps_parameters_selected_ui"
+                tag-placeholder="Add this as new tag"
+                placeholder="Search or add a tag"
+                label="label"
+                track-by="value"
+                :options="tps_parameters"
+                :multiple="true"
+                :taggable="true"
+              >
+              </multiselect>
+            </div>
+          </div>
+        </section>
+        <!-- End of multiselect section -->
+        <!-- Timeseries section -->
+        <section>
+          <ViewPortTimeseries id="timeseries"> </ViewPortTimeseries>
+        </section>
+        <!-- End of timeseries -->
       </div>
-      <div class="columns">
-        <!-- Left side -->
-        <div class="column is-half">
-          <!-- Heatmap section -->
-          <section class="heatmap-section">
-            <div class="column datashader-heatmap">
-              <ViewPortSpectrogram id="spectrogram"> </ViewPortSpectrogram>
-            </div>
-          </section>
-          <!-- End of heatmap section-->
-          <!-- Multiselect section -->
-          <section class="multiselect-section">
-            <div>
-              <br />
-            </div>
-            <div hidden>
-              <div class="column tps-multiselect">
-                <h2 class="multiselect-title">Select parameter to display</h2>
-                <multiselect
-                  v-model="tps_parameters_selected_ui"
-                  tag-placeholder="Add this as new tag"
-                  placeholder="Search or add a tag"
-                  label="label"
-                  track-by="value"
-                  :options="tps_parameters"
-                  :multiple="true"
-                  :taggable="true"
-                >
-                </multiselect>
-              </div>
-            </div>
-          </section>
-          <!-- End of multiselect section -->
-          <!-- Timeseries section -->
-          <section class="timeseries-section">
-            <div class="column tps-chart">
-              <ViewPortTimeseries id="timeseries"> </ViewPortTimeseries>
-            </div>
-          </section>
-          <!-- End of timeseries -->
-        </div>
 
-        <!-- Right side -->
-        <div class="column is-half">
-          <!-- Spec stack section -->
-          <section class="spect-stack-section">
-            <div class="column spec-stack-holder">
-              <ViewPortWaterfall id="waterfall"> </ViewPortWaterfall>
-            </div>
-          </section>
-          <!-- End of spec stack -->
-        </div>
+      <!-- Right side -->
+      <div class="column is-half">
+        <!-- Spec stack section -->
+        <ViewPortWaterfall id="waterfall"> </ViewPortWaterfall>
+        <!-- End of spec stack -->
       </div>
-    </section>
+    </div>
   </div>
 </template>
 

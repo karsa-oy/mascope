@@ -384,9 +384,7 @@
 li>span{
     color:#000; 
 }
-.label:not(:last-child){
-    color: #000; 
-}
+
 fieldset[disabled] .multiselect{
     pointer-events:none
 }

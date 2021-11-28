@@ -631,246 +631,222 @@
       </b-notification>
       <!-- Samples datatable collapsable -->
       <section>
-        <b-collapse class="card" animation="slide" aria-id="contentIdForA11y3">
-          <div
-            slot="trigger"
-            slot-scope="props"
-            class="card-header"
-            role="button"
-            aria-controls="contentIdForA11y3"
-          >
-            <p class="card-header-title">Samples</p>
-            <a class="card-header-icon">
-              <b-icon :icon="props.open ? 'menu-down' : 'menu-up'"> </b-icon>
-            </a>
-          </div>
-          <div class="card-content">
-            <div class="content">
-              <div class="left-panel-collapsable">
-                <!-- Sample browser tree -->
-                <b-menu>
-                  <!-- Projects -->
-                  <b-menu-list label="Projects">
-                    <!-- Project item -->
-                    <b-menu-item
-                      v-for="p in projects"
-                      :key="p.title"
-                      :active.sync="p.active"
-                      :expanded.sync="p.active"
-                      @click="selectProject(p.title)"
-                      :disabled="autosave_on"
+        <div style="min-height: 100%; overflow: scroll">
+          <!-- Sample browser tree -->
+          <b-menu>
+            <!-- Projects -->
+            <b-menu-list label="Projects">
+              <!-- Project item -->
+              <b-menu-item
+                v-for="p in projects"
+                :key="p.title"
+                :active.sync="p.active"
+                :expanded.sync="p.active"
+                @click="selectProject(p.title)"
+                :disabled="autosave_on"
+              >
+                <template #label>
+                  <b-tooltip
+                    :delay="500"
+                    position="is-right"
+                    type="is-light"
+                    multilined
+                    append-to-body
+                  >
+                    <!-- Menu item content -->
+                    <div
+                      :id="p.title"
+                      @contextmenu.prevent="rightClickProject($event)"
                     >
-                      <template #label>
-                        <b-tooltip
-                          :delay="500"
-                          position="is-right"
-                          type="is-light"
-                          multilined
-                          append-to-body
-                        >
-                          <!-- Menu item content -->
-                          <div
-                            :id="p.title"
-                            @contextmenu.prevent="rightClickProject($event)"
-                          >
-                            {{ p.title }}
-                          </div>
-                          <template v-slot:content>
-                            <!-- Tooltip html content -->
-                            <div
-                              v-html="prettyPrintAttributes(p.attributes)"
-                              style="text-align: center"
-                            ></div>
-                          </template>
-                        </b-tooltip>
-                      </template>
-                      <!-- Experiments -->
-                      <b-menu-list
-                        label="Experiments"
-                        v-if="p.title === project_selected.title"
+                      {{ p.title }}
+                    </div>
+                    <template v-slot:content>
+                      <!-- Tooltip html content -->
+                      <div
+                        v-html="prettyPrintAttributes(p.attributes)"
+                        style="text-align: center"
+                      ></div>
+                    </template>
+                  </b-tooltip>
+                </template>
+                <!-- Experiments -->
+                <b-menu-list
+                  label="Experiments"
+                  v-if="p.title === project_selected.title"
+                >
+                  <!-- Experiment item -->
+                  <b-menu-item
+                    v-for="e in experiments"
+                    :key="e.title"
+                    :active.sync="e.active"
+                    :expanded.sync="e.active"
+                    @click="selectExperiment(e.title)"
+                    :disabled="autosave_on"
+                  >
+                    <template #label>
+                      <b-tooltip
+                        :delay="500"
+                        position="is-right"
+                        type="is-light"
+                        multilined
+                        append-to-body
                       >
-                        <!-- Experiment item -->
-                        <b-menu-item
-                          v-for="e in experiments"
-                          :key="e.title"
-                          :active.sync="e.active"
-                          :expanded.sync="e.active"
-                          @click="selectExperiment(e.title)"
-                          :disabled="autosave_on"
+                        <!-- Menu item content -->
+                        <div
+                          :id="e.title"
+                          @contextmenu.prevent="rightClickExperiment($event)"
                         >
-                          <template #label>
-                            <b-tooltip
-                              :delay="500"
-                              position="is-right"
-                              type="is-light"
-                              multilined
-                              append-to-body
-                            >
-                              <!-- Menu item content -->
-                              <div
-                                :id="e.title"
-                                @contextmenu.prevent="
-                                  rightClickExperiment($event)
-                                "
-                              >
-                                {{ e.title }}
-                                <!-- <b-icon
+                          {{ e.title }}
+                          <!-- <b-icon
                                                                     class="is-pulled-right"
                                                                     icon="fullscreen"
                                                                     @click.native="is_modal_sample_table_active=true">
                                                                 </b-icon> -->
-                              </div>
-                              <template v-slot:content>
-                                <!-- Tooltip html content -->
-                                <div
-                                  v-html="prettyPrintAttributes(e.attributes)"
-                                  style="text-align: center"
-                                ></div>
-                              </template>
-                            </b-tooltip>
-                          </template>
-                          <p class="menu-label">Samples</p>
-                          <!-- Sample table -->
-                          <!-- Buttons above table -->
-                          <div class="columns">
-                            <div class="column" style="text-align: left">
-                              <b-button
-                                disabled
-                                icon-left="plus"
-                                class="tag is-dark"
-                                outlined
-                                @click="launchSampleImport()"
-                              >
-                              </b-button>
-                            </div>
-                            <div class="column" style="text-align: right">
-                              <b-button
-                                icon-left="fullscreen"
-                                class="tag is-dark"
-                                outlined
-                                @click="is_modal_sample_table_active = true"
-                              >
-                              </b-button>
-                              <b-dropdown
-                                aria-role="menu"
-                                type="is-dark"
-                                position="is-bottom-right"
-                                style="top: 0px"
-                                trap-focus
-                                multiple
-                                append-to-body
-                              >
-                                <b-button
-                                  icon-left="menu"
-                                  class="tag is-dark"
-                                  slot="trigger"
-                                  outlined
-                                >
-                                </b-button>
-                                <div>
-                                  <div
-                                    v-for="(col, i) in sample_table_cols"
-                                    :key="i"
-                                    class="control"
-                                  >
-                                    <b-checkbox
-                                      v-model="col.visible"
-                                      size="is-small"
-                                    >
-                                      {{ col.label }}
-                                    </b-checkbox>
-                                  </div>
-                                </div>
-                              </b-dropdown>
-                            </div>
-                          </div>
-                          <!-- End of buttons above table -->
-                          <!-- Sample table -->
-                          <b-table
-                            id="samples-datatable"
-                            style="height: 100%; width: 100%"
-                            :data="sample_table_rows"
-                            :sticky-header="true"
-                            :checkable="true"
-                            :is-row-checkable="
-                              (row) =>
-                                row.filename &&
-                                row.filename.indexOf('placeholder') == -1
-                            "
-                            :header-checkable="false"
-                            :checked-rows.sync="sample_table_checked_rows"
-                            :selected="sample_table_selected_row"
-                            v-if="e.title === experiment_selected.title"
+                        </div>
+                        <template v-slot:content>
+                          <!-- Tooltip html content -->
+                          <div
+                            v-html="prettyPrintAttributes(e.attributes)"
+                            style="text-align: center"
+                          ></div>
+                        </template>
+                      </b-tooltip>
+                    </template>
+                    <p class="menu-label">Samples</p>
+                    <!-- Sample table -->
+                    <!-- Buttons above table -->
+                    <div class="columns">
+                      <div class="column" style="text-align: left">
+                        <b-button
+                          disabled
+                          icon-left="plus"
+                          class="tag is-dark"
+                          outlined
+                          @click="launchSampleImport()"
+                        >
+                        </b-button>
+                      </div>
+                      <div class="column" style="text-align: right">
+                        <b-button
+                          icon-left="fullscreen"
+                          class="tag is-dark"
+                          outlined
+                          @click="is_modal_sample_table_active = true"
+                        >
+                        </b-button>
+                        <b-dropdown
+                          aria-role="menu"
+                          type="is-dark"
+                          position="is-bottom-right"
+                          style="top: 0px"
+                          trap-focus
+                          multiple
+                          append-to-body
+                        >
+                          <b-button
+                            icon-left="menu"
+                            class="tag is-dark"
+                            slot="trigger"
+                            outlined
                           >
-                            <!-- Columns -->
-                            <b-table-column
+                          </b-button>
+                          <div>
+                            <div
                               v-for="(col, i) in sample_table_cols"
                               :key="i"
-                              :field="col.field"
-                              :label="col.label"
-                              :visible="col.visible || false"
-                              v-slot="props"
+                              class="control"
                             >
-                              <a @click="rightClickSample(props.row.filename)">
-                                <b-tooltip
-                                  :delay="500"
-                                  position="is-right"
-                                  type="is-light"
-                                  multilined
-                                  append-to-body
-                                >
-                                  {{ props.row[col.field] }}
-                                  <template v-slot:content>
-                                    <!-- Tooltip html content -->
-                                    <div
-                                      v-html="
-                                        prettyPrintAttributes(
-                                          getSample(props.row.filename)
-                                            .attributes
-                                        )
-                                      "
-                                      style="text-align: center"
-                                    ></div>
-                                  </template>
-                                </b-tooltip>
-                              </a>
-                            </b-table-column>
-                            <!-- End of columns -->
-                          </b-table>
-                          <!-- End of sample table -->
-                          <!-- End of import sample item -->
-                        </b-menu-item>
-                        <!-- End of experiment item -->
-                        <!-- New experiment item -->
-                        <b-menu-item
-                          icon="plus"
-                          :active="is_modal_new_experiment_active"
-                          @click="launchNewExperimentModal()"
-                          :disabled="autosave_on"
-                        >
-                        </b-menu-item>
-                        <!-- End of new experiment item -->
-                      </b-menu-list>
-                      <!-- End of experiments -->
-                    </b-menu-item>
-                    <!-- End of project item -->
-                    <!-- New project item -->
-                    <b-menu-item
-                      icon="plus"
-                      :active="is_modal_project_attributes_active"
-                      @click="launchProjectAttributesModal('new')"
-                      :disabled="autosave_on"
+                              <b-checkbox v-model="col.visible" size="is-small">
+                                {{ col.label }}
+                              </b-checkbox>
+                            </div>
+                          </div>
+                        </b-dropdown>
+                      </div>
+                    </div>
+                    <!-- End of buttons above table -->
+                    <!-- Sample table -->
+                    <b-table
+                      id="samples-datatable"
+                      style="height: 100%; width: 100%"
+                      :data="sample_table_rows"
+                      :sticky-header="true"
+                      :checkable="true"
+                      :is-row-checkable="
+                        (row) =>
+                          row.filename &&
+                          row.filename.indexOf('placeholder') == -1
+                      "
+                      :header-checkable="false"
+                      :checked-rows.sync="sample_table_checked_rows"
+                      :selected="sample_table_selected_row"
+                      v-if="e.title === experiment_selected.title"
                     >
-                    </b-menu-item>
-                    <!-- End of new project item -->
-                  </b-menu-list>
-                  <!-- End of projects -->
-                </b-menu>
-                <!-- End of sample browser tree -->
-              </div>
-            </div>
-          </div>
-        </b-collapse>
+                      <!-- Columns -->
+                      <b-table-column
+                        v-for="(col, i) in sample_table_cols"
+                        :key="i"
+                        :field="col.field"
+                        :label="col.label"
+                        :visible="col.visible || false"
+                        v-slot="props"
+                      >
+                        <a @click="rightClickSample(props.row.filename)">
+                          <b-tooltip
+                            :delay="500"
+                            position="is-right"
+                            type="is-light"
+                            multilined
+                            append-to-body
+                          >
+                            {{ props.row[col.field] }}
+                            <template v-slot:content>
+                              <!-- Tooltip html content -->
+                              <div
+                                v-html="
+                                  prettyPrintAttributes(
+                                    getSample(props.row.filename).attributes
+                                  )
+                                "
+                                style="text-align: center"
+                              ></div>
+                            </template>
+                          </b-tooltip>
+                        </a>
+                      </b-table-column>
+                      <!-- End of columns -->
+                    </b-table>
+                    <!-- End of sample table -->
+                    <!-- End of import sample item -->
+                  </b-menu-item>
+                  <!-- End of experiment item -->
+                  <!-- New experiment item -->
+                  <b-menu-item
+                    icon="plus"
+                    :active="is_modal_new_experiment_active"
+                    @click="launchNewExperimentModal()"
+                    :disabled="autosave_on"
+                  >
+                  </b-menu-item>
+                  <!-- End of new experiment item -->
+                </b-menu-list>
+                <!-- End of experiments -->
+              </b-menu-item>
+              <!-- End of project item -->
+              <!-- New project item -->
+              <b-menu-item
+                icon="plus"
+                :active="is_modal_project_attributes_active"
+                @click="launchProjectAttributesModal('new')"
+                :disabled="autosave_on"
+              >
+              </b-menu-item>
+              <!-- End of new project item -->
+            </b-menu-list>
+            <!-- End of projects -->
+          </b-menu>
+          <!-- End of sample browser tree -->
+        </div>
       </section>
       <!-- End of Sample datatable collapable -->
     </section>

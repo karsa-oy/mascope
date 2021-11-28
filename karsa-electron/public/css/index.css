@@ -33,13 +33,6 @@ body {
         }
 
 /* Style the tab content */
-.tabcontent {
-    display: none;
-    padding: 6px 12px;
-    border: 1px solid #ccc;
-    border-top: none;
-    height: 93vh; 
-}
 #spacer{
     margin-right:10px;
 }
@@ -69,18 +62,12 @@ body {
 #filters_parameters{
     padding-bottom:20px; 
 }
-.columns:not(:last-child){
-    margin-bottom: 0px; 
-}
 .b-tabs .tab-content {
     padding-bottom: 5px;
     padding-left: 5px; 
     /* border-bottom: 1px solid #ccc; */
     padding-top: 10px;
     padding-right:0px;
-}
-.column{
-    padding-bottom: 0px; 
 }
 #logo{
     padding-left:20px;
