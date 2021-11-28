@@ -1,40 +1,24 @@
 <template>
-  <div>
-    <b-tabs
-      class="tabs-main"
-      v-model="active_tab"
-      :animated="false"
-      type="is-boxed main-tab"
+  <div class="columns">
+    <b-loading
+      v-model="is_disconnected"
+      :can-cancel="false"
+      :is-full-page="false"
     >
-      <!-- Tabs -->
-      <!-- Config tab -->
-      <b-tab-item icon="settings" label="">
-        <ConfigVue></ConfigVue>
-      </b-tab-item>
-      <!-- Main tab -->
-      <b-tab-item
-        icon=""
-        :label="
-          this.project_selected.title + '/' + this.experiment_selected.title
-        "
-      >
-        <div class="columns">
-          <b-loading
-            v-model="is_disconnected"
-            :can-cancel="false"
-            :is-full-page="false"
-          >
-          </b-loading>
-          <!-- Left column -->
-          <div class="column is-one-third" style="padding-left: 2rem">
+    </b-loading>
+    <!-- Left column -->
+    <div class="column is-one-third">
+      <b-tabs class="tabs-main" v-model="active_tab" :animated="true">
+        <b-tab-item icon="flask" label="Samples">
+          <SampleBrowser></SampleBrowser>
+        </b-tab-item>
+        <b-tab-item icon="crosshairs" label="Targets">
+          <TargetBrowser></TargetBrowser>
+        </b-tab-item>
+        <b-tab-item icon="cogs" label="Settings">
+          <div>
             <!-- Data source selector -->
-            <div
-              style="
-                text-align: center;
-                margin-top: 0.4rem;
-                margin-bottom: 1rem;
-              "
-            >
+            <div>
               <b-field label="Data source" grouped>
                 <b-select
                   v-model="data_source_name_selected"
@@ -60,6 +44,7 @@
               </b-field>
             </div>
             <!-- End of data source selector -->
+            <ConfigVue></ConfigVue>
             <RAWimport
               v-if="
                 data_source_selected.type &&
@@ -81,30 +66,28 @@
               "
             >
             </TOFControl>
-            <SampleBrowser></SampleBrowser>
-            <TargetBrowser></TargetBrowser>
           </div>
-          <!-- End of left column -->
-          <!-- Right side content -->
-          <div class="column is-two-thirds" style="padding-right: 2rem">
-            <SampleView></SampleView>
-          </div>
-          <!-- End of Right side content -->
-        </div>
-      </b-tab-item>
+        </b-tab-item>
+      </b-tabs>
       <!-- End of tabs -->
-    </b-tabs>
+    </div>
+    <!-- End of left column -->
+    <!-- Right side content -->
+    <div class="column is-two-thirds">
+      <SampleView></SampleView>
+    </div>
+    <!-- End of Right side content -->
   </div>
 </template>
 
 <script type="text/javascript">
 import { mapState } from "vuex";
-import ConfigVue from "./ConfigVue";
-import RAWimport from "./RAWimport";
+import ConfigVue from "./ConfigVue.vue";
+import RAWimport from "./RAWimport.vue";
+import TOFControl from "./TOFControl.vue";
 import SampleView from "./SampleView.vue";
 import SampleBrowser from "./SampleBrowser.vue";
 import TargetBrowser from "./TargetBrowser.vue";
-import TOFControl from "./TOFControl.vue";
 import store from "../store";
 import { BECom, read_dotenv, write_dotenv } from "../karsalib.js";
 
@@ -116,10 +99,10 @@ export default {
   components: {
     ConfigVue,
     RAWimport,
+    TOFControl,
     SampleBrowser,
     SampleView,
     TargetBrowser,
-    TOFControl,
   },
   data() {
     return {
@@ -257,15 +240,24 @@ export default {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-align: left;
+  position: absolute;
+  margin: 0;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
 }
 </style>
 
 <style src = "../assets/css/MascopeStyle.css"></style>
+<style src = "../assets/css/Layout.css"></style>
+<style src = "../assets/css/Tabs.css"></style>
+<style src = "../assets/css/Charts.css"></style>
 
 <style src = "vue-multiselect/dist/vue-multiselect.min.css"></style>
 <style src = "../assets/css/Multiselect.css"></style>
 
-<style src = "../assets/css/Deprecated.css"></style>
+<!-- <style src = "../assets/css/Deprecated.css"></style>  -->
 
 <style>
 /* MAIN */
@@ -273,18 +265,22 @@ export default {
 html {
   background-color: #1f1f22 !important;
   color: #dfdfdf;
+  margin: 0;
+  min-height: 100%;
 }
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
     Arial, sans-serif;
-  margin: auto;
   font-size: 0.8rem;
-  height: 90vh;
   -webkit-user-select: none; /* Safari */
   -moz-user-select: none; /* Firefox */
   -ms-user-select: none; /* IE10+/Edge */
   user-select: none; /* Standard */
+  height: 100vh;
+  margin: 0;
+  bottom: 0;
+  padding: 0;
 }
 
 .head {

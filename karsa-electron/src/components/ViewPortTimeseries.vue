@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="chart">
     <!-- Main content  area-->
     <section>
       <div :id="id"></div>
