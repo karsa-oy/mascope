@@ -21,13 +21,6 @@
                 <b-input v-model="excel_clipboard_text" type="textarea">
                 </b-input>
               </b-field>
-              <b-field label="Use first row as a header">
-                <b-checkbox
-                  v-model="excel_clipboard_use_header"
-                  size="is-medium"
-                >
-                </b-checkbox>
-              </b-field>
               <div><br /></div>
               <b-table
                 id="excel-clipboard-table"
@@ -100,57 +93,25 @@
 
     <!-- Main content area -->
     <section class="tab-content">
-      <!-- Targetlist datatable collapable -->
-      <b-button
-        type="is-dark"
-        @click="is_excel_clipboard_modal_active = true"
-        outlined
-        inverted
-        size="is-small"
-      >
-        Import targets
-      </b-button>
-      <div><br /></div>
+      <!-- Target tables -->
       <b-table
         id="targets-datatable"
         :columns="target_table_cols"
         :data="target_table_rows"
         :sticky-header="true"
         :selected.sync="target_table_selected_row"
-        focusable
-        sortable
+        detailed
+        :show-detail-icon="true"
+        detail-key="0"
       >
+        <template #detail="props">
+          {{ props.row }}
+        </template>
       </b-table>
-      <div><br /></div>
-      <!-- Column visibility dropdown -->
-      <b-dropdown
-        aria-role="menu"
-        type="is-dark"
-        position="is-bottom-right"
-        style="top: 0px"
-        trap-focus
-        multiple
-        append-to-body
-      >
-        <b-button
-          icon-left="menu"
-          slot="trigger"
-          size="is-small"
-          type="is-dark"
-          outlined
-        >
-        </b-button>
-        <div>
-          <div v-for="(col, i) in peak_table_cols" :key="i" class="control">
-            <b-checkbox v-model="col.visible" size="is-small">
-              {{ col.label }}
-            </b-checkbox>
-          </div>
-        </div>
-      </b-dropdown>
       <b-table
         @contextmenu="rightClickPeakTableRow"
         id="peaks-datatable"
+        style="margin-top: 1em"
         :columns="peak_table_cols"
         :data="peak_table_rows"
         :sticky-header="true"
@@ -163,10 +124,19 @@
         sortable
       >
       </b-table>
-      <div><br /></div>
-      <b-button @click="mzCalibrateButtonClicked" type="is-dark">
-        m/z calibrate
-      </b-button>
+      <!-- End of target tables -->
+      <section style="text-align: right; margin-top: 1em">
+        <b-button
+          type="is-dark"
+          @click="is_excel_clipboard_modal_active = true"
+          style="margin-right: 1em"
+        >
+          Import targets
+        </b-button>
+        <b-button type="is-dark" @click="mzCalibrateButtonClicked">
+          Calibrate m/z
+        </b-button>
+      </section>
     </section>
     <!-- End of main content area -->
   </div>
@@ -198,6 +168,7 @@ export default {
       "peak_data",
       "root_namespace",
       "sample_selected",
+      "ionization_mechanism",
     ]),
     identified_ions: {
       get() {
@@ -215,20 +186,20 @@ export default {
         this.$store.commit("identify_peaks", value);
       },
     },
-    integrate_target_ions: {
+    compute_target_ions: {
       get() {
-        return this.$store.state.integrate_target_ions;
+        return this.$store.state.compute_target_ions;
       },
       set(value) {
-        this.$store.commit("integrate_target_ions", value);
+        this.$store.commit("compute_target_ions", value);
       },
     },
-    target_ion_intensities: {
+    computed_target_ions: {
       get() {
-        return this.$store.state.target_ion_intensities;
+        return this.$store.state.computed_target_ions;
       },
       set(value) {
-        this.$store.commit("target_ion_intensities", value);
+        this.$store.commit("computed_target_ions", value);
       },
     },
     target_to_display: {
@@ -249,7 +220,6 @@ export default {
       excel_clipboard_text: "",
       excel_clipboard_table_cols: [],
       excel_clipboard_table_rows: [],
-      excel_clipboard_use_header: false,
       // Mass calibration
       is_mz_calib_modal_active: false,
       mz_calib_compound_table_checked_rows: [],
@@ -270,6 +240,8 @@ export default {
       target_table_rows: [],
       target_table_cols: [],
       target_table_selected_row: {},
+      target_name_col: null,
+      target_compound_col: null,
       //
       room_sid: null,
       endpoints: ["targets"],
@@ -313,30 +285,21 @@ export default {
       this.updateMzCalibPeaks();
       this.is_mz_calib_modal_active = true;
     },
-    requestTargetIntensities() {
-      // Find m/z column, assuming the first numeric column is m/z
-      let mz_field = null;
-      for (const i in this.target_table_cols) {
-        mz_field = this.target_table_cols[i].field;
-        let mz = Number(this.target_table_rows[0][mz_field]);
-        if (mz) {
-          break;
-        }
-      }
-      if (!mz_field) {
-        console.log("No mz field found from target table columns");
-        return;
-      }
-      // Collect m/z value of each row
-      let mzs = [];
+    recalculateTargets() {
+      this.requestTargetIons();
+      // this.requestTargetIsotopes();
+    },
+    requestTargetIons() {
+      console.log("Target ions requested");
+      // Collect compound formula from each row
+      let compounds = [];
       for (const j in this.target_table_rows) {
         const row = this.target_table_rows[j];
-        mzs.push(Number(row[mz_field]));
+        compounds.push(row[this.target_compound_col]);
       }
-      this.integrate_target_ions = {
-        filename: this.sample_selected.filename,
-        mz: mzs,
-        t_range: null,
+      this.compute_target_ions = {
+        ionization_mechanism: this.ionization_mechanism,
+        compounds: compounds,
       };
     },
     rightClickPeakTableRow(row) {
@@ -417,18 +380,26 @@ export default {
           if (i == 0) {
             // New column
             let field = j.toString();
-            let label = j.toString();
-            if (this.excel_clipboard_use_header) {
-              // Use first row as a header
-              label = clip_rows[i][j];
-            }
+            let label = clip_rows[i][j];
             cols.push({
               field: field,
               label: label,
             });
+            // Save key fields
+            switch (label.toLowerCase()) {
+              case "target name": {
+                this.target_name_col = j;
+                break;
+              }
+              case "target compound": {
+                this.target_compound_col = j;
+                break;
+              }
+            }
+          } else {
+            // Construct row
+            row[j] = clip_rows[i][j];
           }
-          // Construct row
-          row[j] = clip_rows[i][j];
         }
         // Add row
         if (!_.isEmpty(row)) {
@@ -514,9 +485,12 @@ export default {
       this.updatePeakTableData(new_value);
     },
     identify_peaks: function (new_value, old_value) {
-      if (_.isEqual(new_value, old_value)) {
+      let peaks_exist = new_value.peaks.mz;
+      let targets_exist = new_value.targets.length > 0;
+      if (_.isEqual(new_value, old_value) || !peaks_exist || !targets_exist) {
         return;
       }
+
       this.be.export_one_way_binding_prop(
         "identify_peaks",
         { ...new_value, room: this.room_sid, uid: Math.random() },
@@ -524,22 +498,31 @@ export default {
         this.room_sid
       );
     },
-    integrate_target_ions: function (new_value, old_value) {
+    compute_target_ions: function (new_value, old_value) {
       if (_.isEqual(new_value, old_value)) {
         return;
       }
       this.be.export_one_way_binding_prop(
-        "integrate_target_ions",
+        "compute_target_ions",
         { ...new_value, room: this.room_sid, uid: Math.random() },
         old_value,
         this.room_sid
       );
     },
+    computed_target_ions: function (new_value) {
+      this.identify_peaks = {
+        peaks: this.peak_data,
+        targets: new_value,
+      };
+    },
     mz_calib_compound_table_checked_rows: function () {
       this.updateMzCalibPeaks();
     },
     peak_data: function (new_value) {
-      this.identify_peaks = { peaks: new_value, targets: this.targets };
+      this.identify_peaks = {
+        peaks: new_value,
+        targets: this.computed_target_ions,
+      };
     },
     peak_table_checked_rows: function (new_value) {
       console.log(new_value);
@@ -577,7 +560,13 @@ export default {
       this.target_table_cols = new_data.cols;
       this.target_table_rows = new_data.rows;
       this.writeTargetsToFile();
-      this.requestTargetIntensities();
+      this.recalculateTargets();
+    },
+    ionization_mechanism: function (new_data, old_data) {
+      if (_.isEqual(new_data, old_data)) {
+        return false;
+      }
+      this.recalculateTargets();
     },
     "root_namespace.connected": function (new_value) {
       if (new_value === true) {
@@ -585,6 +574,12 @@ export default {
         // handlers for for external notifications:
         this.namespace.on("identified_ions", (value) =>
           this.be.import_one_way_binding_prop("identified_ions", value.value)
+        );
+        this.namespace.on("computed_target_ions", (value) =>
+          this.be.import_one_way_binding_prop(
+            "computed_target_ions",
+            value.value
+          )
         );
         this.namespace.on("target_ion_intensities", (value) =>
           this.be.import_one_way_binding_prop(

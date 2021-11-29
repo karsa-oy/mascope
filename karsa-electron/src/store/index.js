@@ -7,30 +7,32 @@ export default new Vuex.Store({
 	state: {
 		acquisition_status: "not_running",		// not_running/starting/running/stopping
 		autosave_on: false,
+		compute_target_ions: {},
+		computed_target_ions: {},
 		data_source_selected: {},
-		experiment_selected: {'title': "", 'project': "", 'attributes': []},
+		experiment_selected: { 'title': "", 'project': "", 'attributes': [] },
 		experiments: [],
 		figure_data: {},
 		figure_double_click: null,
 		figure_ranges: {},
 		identified_ions: {},
 		identify_peaks: {},
-		integrate_target_ions: {},
+		ionization_mechanism: "+H+",
 		new_file: "",
 		peak_data: {},
-		project_selected: {'title': "", 'attributes': []},
+		project_selected: { 'title': "", 'attributes': [] },
 		projects: [],
 		root_namespace: null,
 		sample_annotations: [],
 		sample_annotation_timestamp: null,
 		sample_selected: {
-				'filename': "",
-				'title': "",
-				'attributes': [],
-				'properties': {},
-				'project': "",
-				'experiment': "",
-				},
+			'filename': "",
+			'title': "",
+			'attributes': [],
+			'properties': {},
+			'project': "",
+			'experiment': "",
+		},
 		stop_visualize_range: {},
 		target_ion_intensities: [],
 		target_to_display: null,
@@ -44,6 +46,12 @@ export default new Vuex.Store({
 		},
 		autosave_on(state, payload) {
 			state.autosave_on = payload;
+		},
+		compute_target_ions(state, payload) {
+			state.compute_target_ions = payload;
+		},
+		computed_target_ions(state, payload) {
+			state.computed_target_ions = payload;
 		},
 		data_source_selected(state, payload) {
 			state.data_source_selected = payload;
@@ -71,6 +79,9 @@ export default new Vuex.Store({
 		},
 		integrate_target_ions(state, payload) {
 			state.integrate_target_ions = payload;
+		},
+		ionization_mechanism(state, payload) {
+			state.ionization_mechanism = payload;
 		},
 		new_file(state, payload) {
 			state.new_file = payload;
@@ -107,7 +118,7 @@ export default new Vuex.Store({
 		},
 		tofdaq_log_entry(state, payload) {
 			state.tofdaq_log_entry = payload;
-		},		
+		},
 		url(state, payload) {
 			state.url = payload;
 		},

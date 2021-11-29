@@ -42,4 +42,4 @@ RUN chown root /karsa-electron/node_modules/electron/dist/chrome-sandbox && \
     chmod 4755 /karsa-electron/node_modules/electron/dist/chrome-sandbox
 
 USER node
-ENTRYPOINT [ "yarn", "electron:serve", "--no-sandbox" ]
+ENTRYPOINT [ "yarn", "electron:serve", "--no-sandbox", "--disable-gpu" ]
