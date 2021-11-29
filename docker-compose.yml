@@ -17,5 +17,5 @@ services:
       - /tmp/.X11-unix:/temp/.X11-unix
       - ./karsa-electron/src:/karsa-electron/src
     environment:
-      - DISPLAY=:0
+      - DISPLAY
     network_mode: "host"
