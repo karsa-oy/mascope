@@ -188,6 +188,7 @@ class zarr_sdk:
         filename = data['value']['filename']
         final_length = float(item['signal'].time[-1] + item['signal_period'][-1])
         # Update properties
+        item['props'].update({'committed_length': final_length})
         item['props'].update({'length': final_length})
         # Write properties
         prop_path = os.path.join(item.get('data_root', ''),
