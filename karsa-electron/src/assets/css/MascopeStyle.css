@@ -32,10 +32,6 @@ a.dropdown-item.is-active, .dropdown .dropdown-menu .has-link a.is-active, butto
 
 /* tables */ 
 
-.table-wrapper{
-    overflow: scroll; 
-    overflow: auto !important; 
-}
 .table-wrapper:not(:last-child) {
     margin-bottom: 0.5rem;
 }
@@ -44,67 +40,27 @@ a.dropdown-item.is-active, .dropdown .dropdown-menu .has-link a.is-active, butto
     padding-bottom: 0rem;
 }
 
-.table {
-  background-color: transparent;
-  color: inherit;
+.table .thead {
+  background-color: inherit;
+  color: #fff;
   font-size: 15px;
 }
 
-.table:focus {
-  outline: none;
-}
-
-.table th {
-  background-color: transparent;
-}
-
-.b-table .table-wrapper.has-sticky-header tr:first-child th {
-  background-color: #29282e;
-}
 
 .table tr.is-selected {
   background-color: #7c5bd6;
   color: black;
 }
 
-.table thead {
-  background-color: inherit;
-}
-
-.table thead td:hover,
-.table thead th:hover {
-  color: #666;
-}
-
 .table tr:hover {
   color: black;
-  background-color: white;
+  background-color: #666;
 }
 
 th > input {
   color: #dfdfdf;
 }
 
-.table thead td,
-.table thead th {
-  color: inherit;
-}
-
-.b-table .table-wrapper.has-sticky-header tr:first-child th {
-  background-color: inherit;
-}
-
-#data-table,
-#target-table {
-  overflow: hidden;
-  border: 1px solid #a7a7a7;
-  margin-bottom: 10px;
-}
-
-.tr.is-dark {
-  background: #167df0;
-  color: #fff;
-}
 
 /* radio */
 
@@ -191,7 +147,6 @@ th > input {
     padding-left: 2%;
     padding-top: 10px;
 }
-
 
 /* disable user select */
 
