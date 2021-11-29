@@ -1,0 +1,15 @@
+
+.columns {
+  margin: 0px;
+  padding: 0em;
+}
+
+.column {
+  padding: 0em;
+  margin: 0em;
+}
+
+
+.columns:not(:last-child) {
+  margin-bottom: 0px;
+}

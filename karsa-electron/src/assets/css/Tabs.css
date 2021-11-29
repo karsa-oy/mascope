@@ -1,0 +1,37 @@
+
+/* tabs */
+
+.b-tabs .tabs {
+  background-color: #29282e;
+  padding: 0em 1em 0em 1em;
+}
+
+.tabs a {
+  color: #ffffff;
+  padding: 0.5em 1em;
+  font-weight: bold;
+}
+
+.tabs li.is-active a {
+  color: #ffffff;
+  background-color: #7957d5;
+}
+
+.b-tabs .tab-content {
+  padding: 5px;
+}
+
+.tabs-main {
+  display: flex;
+  flex-direction: column;
+  flex: auto;
+}
+
+.tab-item {
+  flex: auto auto;
+  padding: 0em 2em 0em 2em;
+}
+
+.tab-content {
+  display: flex;
+}

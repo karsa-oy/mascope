@@ -1,100 +1,92 @@
 <template>
-    <div>
-        <!-- Main content  area-->
-        <section>
-            <div :id="id"></div>
-        </section>
-        <!-- End of main content area -->
-    </div>
+  <div class="chart">
+    <!-- Main content  area-->
+    <section>
+      <div :id="id"></div>
+    </section>
+    <!-- End of main content area -->
+  </div>
 </template>
 
 
 <script type = "text/javascript" >
 "use strict";
+
 import Vue from "vue";
-// import { mapState } from 'vuex'
+
 import Buefy from "buefy";
 import "buefy/dist/buefy.css";
-import '@mdi/font/css/materialdesignicons.min.css';
-// import { BECom } from "../karsalib.js"
-import { viewPortMixin } from "../mixins/viewPortMixin"
+
+import "@mdi/font/css/materialdesignicons.min.css";
+import { viewPortMixin } from "../mixins/viewPortMixin";
 
 Vue.use([Buefy]);
 
-// var fs = require('fs');
-var Plotly = require('plotly.js-dist');
-// var _ = require('underscore');
-
+var Plotly = require("plotly.js-dist");
 
 export default {
-    // name: "ViewPort",
-    components: {
+  // name: "ViewPort",
+  components: {},
+  mixins: [viewPortMixin],
+  props: {
+    id: String,
+  },
+  computed: {
+    sample_annotation_timestamp: {
+      get() {
+        return this.$store.state.sample_annotation_timestamp;
+      },
+      set(value) {
+        this.$store.commit("sample_annotation_timestamp", value);
+      },
     },
-    mixins: [
-        viewPortMixin
-    ],
-    props: {
-        id: String,
-    },
-    computed: {
-        sample_annotation_timestamp: {
-            get() {
-                return this.$store.state.sample_annotation_timestamp;
-            },
-            set(value) {
-                this.$store.commit('sample_annotation_timestamp', value);
-            },
-        },
-    },
-    data: function() {
-        return {
-        }
-    },
+  },
+  data: function () {
+    return {};
+  },
 
-    created: function(){
-    },
+  created: function () {},
 
-    mounted: function() {
-    },
+  mounted: function () {},
 
-    methods: {
-        on_plotly_click(eventData) {
-            // Plotly click event handler
-            switch (eventData.event.button){
-                case 0:
-                    // Left click
-                    break
-                case 1:
-                    // Wheel click
-                    break
-                case 2:
-                    // Right click
-                    var timestamp = eventData.points[0].x;
-                    this.sample_annotation_timestamp = timestamp;
-                    return
-            }
-        },
+  methods: {
+    on_plotly_click(eventData) {
+      // Plotly click event handler
+      switch (eventData.event.button) {
+        case 0:
+          // Left click
+          break;
+        case 1:
+          // Wheel click
+          break;
+        case 2:
+          // Right click
+          var timestamp = eventData.points[0].x;
+          this.sample_annotation_timestamp = timestamp;
+          return;
+      }
     },
+  },
 
-    watch: {
-        sample_annotations: function(new_value) {
-            let annotations = [];
-            for (let i in new_value) {
-                let annotation = {
-                    'text': new_value[i].text,
-                    'xref': 'x',
-                    'x': new_value[i].timestamp,
-                    'yref': 'paper',
-                    'y': 0,
-                    'ayref': 'paper',
-                    'ay': .9,
-                    'ax': 0,
-                    };
-                annotations.push(annotation);
-            }
-            // Update figure
-            Plotly.relayout(this.id, {annotations: annotations})
-        },
+  watch: {
+    sample_annotations: function (new_value) {
+      let annotations = [];
+      for (let i in new_value) {
+        let annotation = {
+          text: new_value[i].text,
+          xref: "x",
+          x: new_value[i].timestamp,
+          yref: "paper",
+          y: 0,
+          ayref: "paper",
+          ay: 0.9,
+          ax: 0,
+        };
+        annotations.push(annotation);
+      }
+      // Update figure
+      Plotly.relayout(this.id, { annotations: annotations });
     },
+  },
 };
 </script>
