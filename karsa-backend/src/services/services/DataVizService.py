@@ -549,11 +549,16 @@ def process_visualization_request(filename,
     def feed_ready_images():
         nonlocal cache_item
         viz_type_period = viz_type + '_period'
+
         try:
             img_slice = cache_item[viz_type].sel(time=slice(t0, t1)).load()
+        except KeyError as e:
+            print("KeyError: %s , when slicing %s ; cache_items: %s" % (e, viz_type, list(cache_item.keys())) )
+            return False
+        try:
             period_slice = cache_item[viz_type_period].sel(time=slice(t0, t1)).load()
         except KeyError as e:
-            print("Requested data_type: %s not cached. cache_item.keys: %s" % (e, list(cache_item.keys())) )
+            print("KeyError: %s , when slicing %s ; cache_items: %s" % (e, viz_type_period, list(cache_item.keys())) )
             return False
 
         processed_until = False
