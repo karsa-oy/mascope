@@ -10,63 +10,62 @@
     <div class="column is-one-third">
       <b-tabs class="tabs-main" v-model="active_tab" :animated="true">
         <b-tab-item icon="flask" label="Samples">
+          <!-- Data source selector -->
+          <div>
+            <b-field label="Data source" grouped>
+              <b-select
+                v-model="data_source_name_selected"
+                placeholder="Select data source"
+                expanded
+              >
+                <option
+                  v-for="source in data_sources"
+                  :value="source.name"
+                  :key="source.name"
+                >
+                  {{ source.name }}
+                </option>
+              </b-select>
+
+              <b-switch
+                style="color: white"
+                v-model="autosave_on"
+                :disabled="!experiment_selected.title.length"
+              >
+                Auto-save
+              </b-switch>
+            </b-field>
+          </div>
+          <RAWimport
+            v-if="
+              data_source_selected.type &&
+              data_source_selected.type.indexOf('H5') != -1
+            "
+          >
+          </RAWimport>
+          <RAWimport
+            v-if="
+              data_source_selected.type &&
+              data_source_selected.type.indexOf('Raw') != -1
+            "
+          >
+          </RAWimport>
+          <TOFControl
+            v-if="
+              data_source_selected.type &&
+              data_source_selected.type.indexOf('TofDaq') != -1
+            "
+          >
+          </TOFControl>
+          <!-- End of data source selector -->
+          <div><br></div>
           <SampleBrowser></SampleBrowser>
         </b-tab-item>
         <b-tab-item icon="crosshairs" label="Targets">
           <TargetBrowser></TargetBrowser>
         </b-tab-item>
         <b-tab-item icon="cogs" label="Settings">
-          <div>
-            <!-- Data source selector -->
-            <div>
-              <b-field label="Data source" grouped>
-                <b-select
-                  v-model="data_source_name_selected"
-                  placeholder="Select data source"
-                  expanded
-                >
-                  <option
-                    v-for="source in data_sources"
-                    :value="source.name"
-                    :key="source.name"
-                  >
-                    {{ source.name }}
-                  </option>
-                </b-select>
-
-                <b-switch
-                  style="color: white"
-                  v-model="autosave_on"
-                  :disabled="!experiment_selected.title.length"
-                >
-                  Auto-save
-                </b-switch>
-              </b-field>
-            </div>
-            <!-- End of data source selector -->
-            <ConfigVue></ConfigVue>
-            <RAWimport
-              v-if="
-                data_source_selected.type &&
-                data_source_selected.type.indexOf('H5') != -1
-              "
-            >
-            </RAWimport>
-            <RAWimport
-              v-if="
-                data_source_selected.type &&
-                data_source_selected.type.indexOf('Raw') != -1
-              "
-            >
-            </RAWimport>
-            <TOFControl
-              v-if="
-                data_source_selected.type &&
-                data_source_selected.type.indexOf('TofDaq') != -1
-              "
-            >
-            </TOFControl>
-          </div>
+          <ConfigVue></ConfigVue>
         </b-tab-item>
       </b-tabs>
       <!-- End of tabs -->
@@ -106,7 +105,7 @@ export default {
   },
   data() {
     return {
-      active_tab: 2,
+      active_tab: 0,
       dotenv: {},
       be: null,
       room_sid: null,

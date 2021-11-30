@@ -697,11 +697,6 @@
                           @contextmenu.prevent="rightClickExperiment($event)"
                         >
                           {{ e.title }}
-                          <!-- <b-icon
-                                                                    class="is-pulled-right"
-                                                                    icon="fullscreen"
-                                                                    @click.native="is_modal_sample_table_active=true">
-                                                                </b-icon> -->
                         </div>
                         <template v-slot:content>
                           <!-- Tooltip html content -->
@@ -791,7 +786,7 @@
                         :visible="col.visible || false"
                         v-slot="props"
                       >
-                        <a @click="rightClickSample(props.row.filename)">
+                        <a @contextmenu.prevent="rightClickSample(props.row.filename)">
                           <b-tooltip
                             :delay="500"
                             position="is-right"
