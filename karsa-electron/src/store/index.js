@@ -8,7 +8,6 @@ export default new Vuex.Store({
 		acquisition_status: "not_running",		// not_running/starting/running/stopping
 		autosave_on: false,
 		compute_target_ions: {},
-		computed_target_ions: {},
 		data_source_selected: {},
 		experiment_selected: { 'title': "", 'project': "", 'attributes': [] },
 		experiments: [],
@@ -34,7 +33,7 @@ export default new Vuex.Store({
 			'experiment': "",
 		},
 		stop_visualize_range: {},
-		target_ion_intensities: [],
+		target_ions: [],
 		target_to_display: null,
 		tofdaq_log_entry: {},
 		url: "",
@@ -49,9 +48,6 @@ export default new Vuex.Store({
 		},
 		compute_target_ions(state, payload) {
 			state.compute_target_ions = payload;
-		},
-		computed_target_ions(state, payload) {
-			state.computed_target_ions = payload;
 		},
 		data_source_selected(state, payload) {
 			state.data_source_selected = payload;
@@ -110,8 +106,8 @@ export default new Vuex.Store({
 		stop_visualize_range(state, payload) {
 			state.stop_visualize_range = payload;
 		},
-		target_ion_intensities(state, payload) {
-			state.target_ion_intensities = payload;
+		target_ions(state, payload) {
+			state.target_ions = payload;
 		},
 		target_to_display(state, payload) {
 			state.target_to_display = payload;
