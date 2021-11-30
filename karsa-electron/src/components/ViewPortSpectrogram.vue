@@ -38,7 +38,7 @@ export default {
           mode: "lines",
           line: { color: "#ffffff", width: 1 },
           visible: "legendonly",
-          showlegend: false,
+          showlegend: true,
         },
       ],
     };

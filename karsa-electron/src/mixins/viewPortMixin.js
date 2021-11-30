@@ -208,9 +208,10 @@ export const viewPortMixin = {
                         [time_axis]: this.figure_cache.t_maxrange,
                         [mz_axis]: [mz, mz],
                         'mode': 'lines',
+                        // 'legendgroup': "Target peaks",
                         'line': {'color': '#8c67ef'},
                         'name': mz.toFixed(this.mz_precision),
-                        'showlegend': true,
+                        'showlegend': false,
                         }];
                     return target_traces
                 }
@@ -325,7 +326,8 @@ export const viewPortMixin = {
 
         on_plotly_click(eventData) {
             // Plotly click event handler, override in ViewPort component
-            switch (eventData.button){
+            // this.log(eventData);
+            switch (eventData.event.button){
                 case 0:
                     this.log('left click')
                     break
@@ -350,7 +352,7 @@ export const viewPortMixin = {
                     //  Choose appropriate action based on legendgroup property
                     switch (trace.legendgroup) {
                         case "Found peaks": {
-                            // Reverse visibility logic due to delay in eventData update (bacause of double-click handling)
+                            // Reverse visibility logic due to delay in eventData update (because of double-click handling)
                             self.peak_traces_visible = trace.visible == 'legendonly' ? true : false;
                             if (self.peak_traces_visible) {
                                 let mz_range = self.zoom_stack.slice(-1)[0].mz_range;
@@ -784,12 +786,10 @@ export const viewPortMixin = {
             );
         },
         peak_data: async function() {
-            const MAX_NO_PEAKS = 5000;
+            const MAX_NO_PEAKS = 5000; // Plot only if less peaks than this
             if (this.peak_data.mz.length < MAX_NO_PEAKS) {
                 let mz_axis = this.figure_axes.mz;
                 if (mz_axis) {
-                    // let zoom_stack_item = this.zoom_stack.slice(-1)[0]
-                    // let figure_cache_item = this.figure_cache_get(zoom_stack_item.id);
                     let time_axis = this.figure_axes.time;
                     let peak_traces = [];
                     for (let i in this.peak_data.mz) {
@@ -810,9 +810,6 @@ export const viewPortMixin = {
                         peak_traces.push(peak_trace);
                     }    
                     this.peak_traces = peak_traces;
-                    // Update figures
-                    // this.updateFoundPeakTraces();
-                    // this.update_figure(this.zoom_stack.slice(-1)[0]);
                 }
             }
         },

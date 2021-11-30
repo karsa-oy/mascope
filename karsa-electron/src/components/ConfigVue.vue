@@ -1,8 +1,5 @@
 <template>
   <section>
-    <b-field label="Ionization mechanism" style="text-align: left">
-      <b-input v-model="ionization_mechanism" lazy> </b-input>
-    </b-field>
     <b-field label="URL" :type="url_connected ? 'is-success' : 'is-danger'">
       <b-input v-model="url" lazy> </b-input>
     </b-field>
@@ -32,14 +29,6 @@ export default {
       },
       set(value) {
         this.$store.commit("url", value);
-      },
-    },
-    ionization_mechanism: {
-      get() {
-        return this.$store.state.ionization_mechanism;
-      },
-      set(value) {
-        this.$store.commit("ionization_mechanism", value);
       },
     },
   },
