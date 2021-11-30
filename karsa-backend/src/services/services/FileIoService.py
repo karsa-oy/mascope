@@ -43,7 +43,7 @@ class zarr_sdk:
     def init_signal_dataset(data, data_root='', overwrite=False):
         # First filesystem operation in acquisition api sequence:
         #   init_signal_dataset - init_tps_dataset - init_viz_dataset -
-        #   update_signal_dataset - update_tps_dataset - finalize_dataset
+        #   update_signal_dataset - update_tps_dataset - finalize_signal_dataset
         # Returns acquisition item shared through the acquisiiton api
         value = data['value']
         filename = value.get('filename')
@@ -184,7 +184,7 @@ class zarr_sdk:
                                 )
 
     @staticmethod
-    def finalize_dataset(data, item):
+    def finalize_signal_dataset(data, item):
         filename = data['value']['filename']
         final_length = float(item['signal'].time[-1] + item['signal_period'][-1])
         # Update properties
@@ -314,7 +314,7 @@ class FileIoNamespace(BaseClientNamespace):
         if not cache_item:
             self.log(f"Warning: {filename} was skipped")
             return
-        zarr_sdk.finalize_dataset(data, cache_item)
+        zarr_sdk.finalize_signal_dataset(data, cache_item)
         await self.emit_client_notification(
                 'dataset_updated',
                 {'data_type': 'signal', **cache_item['props']},
@@ -434,13 +434,22 @@ def load_file(base_filename, vars=None, prev_dataset=None):
         prev_item = None if prev_dataset is None else prev_dataset.get(var)
         if prev_item is not None:
             prev_item.attrs['zarr_groups'] = prev_dataset.attrs.get('zarr_groups', {}).get(var, [])
-        try:
-            var_ds = load_array(base_filename, var, prev_item)
-            dss.append(var_ds)
-            zarr_groups[var] = var_ds.attrs['zarr_groups']
-        except Exception as e:
-            print(f"{this_func_name()}: Failed to load {base_filename}/{var} data: {str(e)}")
+        n_tries = 10
+        err_msg = None
+        while n_tries:
+            try:
+                var_ds = load_array(base_filename, var, prev_item)
+                break
+            except Exception as e:
+                err_msg = print(f"{this_func_name()}: Failed to load {base_filename}/{var} data: {str(e)}")
+                n_tries -= 1
+                sleep(.5)
+                continue
+        if n_tries == 0:
+            print(err_msg)
             continue
+        dss.append(var_ds)
+        zarr_groups[var] = var_ds.attrs['zarr_groups']
     # Merge arrays into xarray.Dataset
     dataset = xarray.merge(dss)
     # Load properties
