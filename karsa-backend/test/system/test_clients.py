@@ -41,7 +41,7 @@ class BaseTestClientCase(asynctest.TestCase):
             raise Exception(str(self.client.target_exception))
 
 
-# @unittest.skip("TMP")
+@unittest.skip("TMP")
 class TestValidateTesterCase(BaseTestClientCase):
     # Make sure test environment properly reacts to failures
     # BE CAREFUL: raised assertion kills main TestClient thread
@@ -49,7 +49,7 @@ class TestValidateTesterCase(BaseTestClientCase):
         fname = 'TofDaq_Data_2021.08.02_01h01m01s'
         max_exec_time = 3                                   # make it small for convenience
         t_range_max = samples[fname]['t_range_max'] + 1     # this limit will never be reached
-        rq_suffix = self.client.set_test_params(fname, t_range_max=t_range_max, max_exec_time=max_exec_time)
+        rq_suffix = self.client.set_viz_test_params(fname, t_range_max=t_range_max, max_exec_time=max_exec_time)
         asyncio.run(
             self.client.emit_visualize_range(fname, request_id=f'zoom_{rq_suffix}'))
         with self.assertRaises(Exception) as ctx:
@@ -57,11 +57,11 @@ class TestValidateTesterCase(BaseTestClientCase):
         self.assertTrue('exceeded max execution time' in str(ctx.exception))
 
 
-# @unittest.skip("TMP")
+@unittest.skip("TMP")
 class TestVisualizerCase(BaseTestClientCase):
     def test_visualize_full_range(self):
         fname = 'TofDaq_Data_2021.08.02_01h01m01s'
-        rq_suffix = self.client.set_test_params(fname)
+        rq_suffix = self.client.set_viz_test_params(fname)
         asyncio.run(self.client.emit_visualize_range(fname, request_id=f"fullrange_{rq_suffix}"))
         self.assert_requests_ok()
 
@@ -73,7 +73,7 @@ class TestVisualizerCase(BaseTestClientCase):
         t_range_01 = 21
         t_range=[5, t_range_01]
         mz_range=[100, 200]
-        rq_suffix = self.client.set_test_params(fname, t_range_max=t_range_01-1, max_exec_time=max_exec_time)
+        rq_suffix = self.client.set_viz_test_params(fname, t_range_max=t_range_01-1, max_exec_time=max_exec_time)
         asyncio.run(
             self.client.emit_visualize_range(fname,
                                     request_id=f'zoom_{rq_suffix}',
@@ -85,7 +85,7 @@ class TestVisualizerCase(BaseTestClientCase):
 
     def test_visualize_two_ranges_sequentially(self):
         fname = 'TofDaq_Data_2021.08.02_01h01m01s'
-        rq_suffix = self.client.set_test_params(fname)
+        rq_suffix = self.client.set_viz_test_params(fname)
         asyncio.run(self.client.emit_visualize_range(fname, request_id=f"fullrange_{rq_suffix}"))
 
         self.assert_requests_ok()     # wait for rq to complete and verify exceptions
@@ -94,7 +94,7 @@ class TestVisualizerCase(BaseTestClientCase):
         t_range_01 = 16     # sample batch size is 5.xx
         t_range=[5, t_range_01]
         mz_range=[100, 200]
-        rq_suffix = self.client.set_test_params(fname, t_range_max=t_range_01-1, max_exec_time=max_exec_time)
+        rq_suffix = self.client.set_viz_test_params(fname, t_range_max=t_range_01-1, max_exec_time=max_exec_time)
         asyncio.run(
             self.client.emit_visualize_range(fname,
                                     request_id=f'zoom_{rq_suffix}',
@@ -107,14 +107,14 @@ class TestVisualizerCase(BaseTestClientCase):
     def test_visualize_two_ranges_parallel(self):
         fname = 'TofDaq_Data_2021.08.02_01h01m01s'
         max_exec_time = 10
-        rq_suffix = self.client.set_test_params(fname, max_exec_time=max_exec_time)
+        rq_suffix = self.client.set_viz_test_params(fname, max_exec_time=max_exec_time)
         asyncio.run(self.client.emit_visualize_range(fname, request_id=f"fullrange_{rq_suffix}"))
 
         max_exec_time = 10
         t_range_01 = 16
         t_range=[5, t_range_01]
         mz_range=[100, 200]
-        rq_suffix = self.client.set_test_params(fname, t_range_max=t_range_01-1, max_exec_time=max_exec_time)
+        rq_suffix = self.client.set_viz_test_params(fname, t_range_max=t_range_01-1, max_exec_time=max_exec_time)
         asyncio.run(
             self.client.emit_visualize_range(fname,
                                     request_id=f'zoom_{rq_suffix}',
@@ -126,15 +126,15 @@ class TestVisualizerCase(BaseTestClientCase):
 
     def test_visualize_two_files_parallel(self):
         fname = 'TofDaq_Data_2021.08.02_01h01m01s'
-        rq_suffix = self.client.set_test_params(fname)
+        rq_suffix = self.client.set_viz_test_params(fname)
         asyncio.run(self.client.emit_visualize_range(fname, request_id=f"fullrange1_{rq_suffix}"))
         # fname = 'file_2'
-        rq_suffix = self.client.set_test_params(fname)
+        rq_suffix = self.client.set_viz_test_params(fname)
         asyncio.run(self.client.emit_visualize_range(fname, request_id=f"fullrange2_{rq_suffix}"))
         self.assert_requests_ok()
 
 
-# @unittest.skip("TMP")
+@unittest.skip("TMP")
 class TestSampleManagerCase(BaseTestClientCase):
     @classmethod
     def setUpClass(cls):
@@ -191,7 +191,7 @@ class TestSampleManagerCase(BaseTestClientCase):
         edir = os.path.join(self.client.projects_root, pname, ename)
         samples = [s for s in os.listdir(edir) if 
                     os.path.isdir(os.path.join(edir, s))]
-        self.assertTrue( sorted(self.client.projects[pname]['experiments'][ename]['samples'].keys()) == sorted(samples) )
+        self.assertEqual( sorted(self.client.projects[pname]['experiments'][ename]['samples'].keys()), sorted(samples) )
         for n, s in self.client.projects[pname]['experiments'][ename]['samples'].items():
             # validate attributes
             self.assert_attrs(
@@ -260,7 +260,21 @@ class TestSampleManagerCase(BaseTestClientCase):
 
 
 # @unittest.skip("TMP")
-class TestFileStreamerCase(BaseTestClientCase):
+class TestH5FileStreamerCase(BaseTestClientCase):
+    """
+    karsa-router-service --url=0.0.0.0
+    plus either
+        karsa-file-streamer --ns=H5Data --streamer_type=H5 --data_pool_path=<H5DataPool>
+        cd <TargetDataPool>
+        karsa-sample-service
+        karsa-dataviz-service
+        karsa-fileio-service --ns=H5Data
+    or
+        karsa-file-streamer --ns=H5Data --streamer_type=H5 --data_pool_path=<H5DataPool> --target_data_pool_path=<TargetDataPool>
+        cd <TargetDataPool>
+        karsa-sample-service
+        karsa-dataviz-service
+    """
     @classmethod
     def setUpClass(cls):
         cls.input_args = {
@@ -269,29 +283,32 @@ class TestFileStreamerCase(BaseTestClientCase):
             'ns': 'H5Data',
         }
         super().setUpClass()
-        # declarative input data: win tests can not read it from OS correctly
+        #======declarative input data==================
         cls.data_collection_time = '2021.08.02'
-        # datetime range with no samples
+        # datetime range with no samples:
         cls.dt_range_empty = {'dt0': datetime.datetime(2021, 8, 1).strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
                               'dt1': datetime.datetime(2021, 8, 2).strftime('%Y-%m-%dT%H:%M:%S.%fZ')}
-        # datetime range with samples;
+        # datetime range with samples:
         cls.dt_range_all = {'dt0': datetime.datetime(2021, 8, 1).strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
                            'dt1': datetime.datetime(2021, 8, 3).strftime('%Y-%m-%dT%H:%M:%S.%fZ')}
+        # <H5DataPool>/2021.08.02 contents:
         cls.raw_samples = ['1-DataFile_2021.08.02-01h01m00s.h5',
                            '2-DataFile_2021.08.02-01h01m00s.h5',
                            '3-DataFile_2021.08.02-01h01m00s.h5',
                            '4-DataFile_2021.08.02-01h01m00s.h5']
+        # <TargetDataPool>/H5Data
         cls.data_collection_path = os.path.abspath(os.path.join(os.curdir, cls.client.instrument_name))
-        # if os.path.isdir(cls.data_collection_path):
-        #     shutil.rmtree(cls.data_collection_path)
+        #=====declarative input data end======
+        if os.path.isdir(cls.data_collection_path):
+            shutil.rmtree(cls.data_collection_path)
 
     @classmethod
     def tearDownClass(cls):
         super().tearDownClass()
-        if os.path.isdir(cls.data_collection_path):
-            # the data_pool dir may be locked for some time
-            time.sleep(3)
-            shutil.rmtree(cls.data_collection_path)
+        # if os.path.isdir(cls.data_collection_path):
+        #     # the data_pool dir may be locked for some time
+        #     time.sleep(3)
+        #     shutil.rmtree(cls.data_collection_path)
 
     def test_01_import_raw_table_datetime_range_empty(self):
         asyncio.run(
@@ -302,7 +319,7 @@ class TestFileStreamerCase(BaseTestClientCase):
         self.assert_requests_ok()
         self.assertEqual(self.client.raw_samples, [])
 
-    def test_02_import_raw_table_datetime_range(self):
+    def test_02_import_raw_table_datetime_range_all(self):
         # pre-defined DataPool structure is the test pre-requisite, since
         # file system operations can not be used for verification until
         # FileStreamer and unittests are run on different platforms (win/linux)
@@ -346,7 +363,7 @@ class TestFileStreamerCase(BaseTestClientCase):
             self.client.emit_stop_raw_import()
         )
         # TODO: ugly workaround - so far no reliable way to trace stop_raw_import complete - just wait
-        asyncio.run(asyncio.sleep(3))   # let #1 to stop and #2 to be taken to import
+        asyncio.run(asyncio.sleep(4))   # let #1 to stop and #2 to be taken to import
         asyncio.run(
             self.client.emit_raw_import_status(
                 request_id='raw_import_status',
@@ -367,7 +384,7 @@ class TestFileStreamerCase(BaseTestClientCase):
             self.client.emit_stop_raw_import(self.client.raw_samples_data[1:])
         )
         # TODO: ugly workaround - so far no reliable way to trace stop_raw_import complete - just wait
-        asyncio.run(asyncio.sleep(3))   # #2 should be stopped and #3, #4 should remove from progress list
+        asyncio.run(asyncio.sleep(5))   # #2 should be stopped and #3, #4 should remove from progress list
         asyncio.run(
             self.client.emit_raw_import_status(
                 request_id='raw_import_status',
@@ -378,25 +395,41 @@ class TestFileStreamerCase(BaseTestClientCase):
         self.assertEqual(self.client.raw_import_status_data['queue'], {})
         # only 2 target files were created, other two were cancelled
         if os.path.isdir(self.data_collection_path):
-            # this check does not work, when running tests on windows
+            # not applicable, if the test and <TargetDataPool> (self.data_collection_path) are on different OSes
             names = os.listdir(os.path.join(self.data_collection_path, self.client.data_collection_date))
             names = sorted([n.replace(f'{self.client.instrument_name}_', '', 1) for n in names])
             self.assertEqual(names, self.raw_samples[0:2])
 
     # @unittest.skip("TMP")
-    def test_04_raw_import(self):
+    def test_04_continue_raw_import(self):
         asyncio.run(
             self.client.emit_raw_import(
                 self.client.raw_samples_data[2:],
+                request_id='continue_raw_import',
                 max_exec_time=60)
         )
-        self.assert_requests_ok()
+        self.assert_requests_ok(['continue_raw_import',])
         if os.path.isdir(self.data_collection_path):
-            # this check does not work, when running tests on windows
+            # not applicable, if the test and <TargetDataPool> (self.data_collection_path) are on different OSes
             names = os.listdir(os.path.join(self.data_collection_path, self.client.data_collection_date))
             names = sorted([n.replace(f'{self.client.instrument_name}_', '', 1) for n in names])
             self.assertEqual(names, self.raw_samples)
 
+        # # let DataViz complete full-size visualizations in <TargetDataPool>
+        # # !!! this notification (with callback) can not be processed in private namespace
+        # for i, (fname, _) in enumerate(self.client.acquired_samples):
+        #     rq_suffix = self.client.set_viz_test_params(fname)
+        #     request_id = f'{i}_{rq_suffix}'
+        #     asyncio.run(
+        #         self.client.emit_visualize_range(
+        #                     fname,
+        #                     request_id=request_id,
+        #                     namespace='/',
+        #         )
+        #     )
+        #     self.assert_requests_ok(request_ids=[request_id])
+        #     print('AAAAA', request_id)
+        # self.assert_requests_ok()
 
 
 if __name__ == '__main__':
