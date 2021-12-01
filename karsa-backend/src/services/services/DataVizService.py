@@ -842,6 +842,14 @@ class DataVizServiceNamespace(BaseClientNamespace):
                 item_to_update.props = dataset.attrs['props']
                 return item_to_update
 
+        def cache_is_missing_or_obsolete():
+            item = cache.get(filename)
+            if item is None:
+                return True
+            if item.props['length'] == item.props['committed_length'] != committed_length:
+                return True
+            return False
+
         value = data['value']
         if value['data_type'] != 'signal':
             raise ValueError(f"Expected data_type: signal - got {value['data_type']}")
@@ -849,9 +857,14 @@ class DataVizServiceNamespace(BaseClientNamespace):
         full_length = value['length']
         committed_length = value['committed_length']
         request_id = generate_unique_key()
+
+        if cache_is_missing_or_obsolete():
+            self.log('Reset cache for', filename)
+            cache[filename] = {}
+
         if committed_length == 0:  # sample just created, not updated yet
             self.log('Ready for visualizing', filename)
-            cache[filename] = {}
+            # cache[filename] = {}
         elif committed_length != full_length:  # sample is updated
             cache_item = cache.get(filename)
             if not cache_item:
@@ -891,8 +904,12 @@ class DataVizServiceNamespace(BaseClientNamespace):
             self.log(f"Finish visualizing {filename}: final length {committed_length}")
             viz_cache_process_requests(filename, flush=True)
             cache_item = cache.get(filename)
-            if cache_item and cache_item.get('crippled', False):
-                del cache[filename]   # don't leave crippled item in file cache
+            if cache_item:
+                if cache_item.get('crippled', False):
+                    del cache[filename]   # don't leave crippled item in file cache
+                else:
+                    cache[filename]['props']['length'] = full_length
+                    cache[filename]['props']['committed_length'] = committed_length
 
 
 class DataVizServiceClient(BaseServiceClient):

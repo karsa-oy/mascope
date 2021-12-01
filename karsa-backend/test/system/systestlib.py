@@ -11,12 +11,17 @@ from threading import Timer, Thread
 
 from karsalib.client import BaseClientNamespace, BaseServiceClient
 from karsalib.util import parse_cmd_args
+from socketio import namespace
 
 # service_q = None
 
 # samples table contains declarative criteria for successfull request
 # TODO: read the data from attr file
-samples = {'TofDaq_Data_2021.08.02_01h01m01s': {'t_range_max': 30, 'max_exec_time': 10}}
+samples = {
+    'TofDaq_Data_2021.08.02_01h01m01s': {'t_range_max': 30, 'max_exec_time': 10},
+    'H5Data_3-DataFile_2021.08.02-01h01m00s.h5': {'t_range_max': 30, 'max_exec_time': 10},
+    'H5Data_4-DataFile_2021.08.02-01h01m00s.h5': {'t_range_max': 30, 'max_exec_time': 10},
+}
 
 
 def get_namespace(filename):
@@ -231,11 +236,14 @@ class BaseTestClient(BaseServiceClient):
             print(f'Service stopped.')
         return
 
-    def set_test_params(self, fname: str=None, t_range_max: int=None, max_exec_time: int=None):
+    def set_viz_test_params(self, fname: str=None, t_range_max: int=None, max_exec_time: int=None):
+        # obsolete style used for 'visualize_range' requests; prefer direct use of
+        # t_range_max and max_exec_time from request context.
+        #
         # read test params from sample attributes file
         # encode test params into request_id via corresponding template
-        t_range_max = t_range_max or samples.get(fname, {}).get('t_range_max')
-        max_exec_time = max_exec_time or samples.get(fname, {}).get('max_exec_time')
+        t_range_max = t_range_max or samples[fname]['t_range_max']
+        max_exec_time = max_exec_time or samples[fname]['max_exec_time']
         res = f"{int(time.time())}_{t_range_max}_{max_exec_time}"
         return res
 
@@ -281,7 +289,7 @@ class BaseTestClient(BaseServiceClient):
 
     # decorators
     @decorator
-    def track_request_id_completed(func, self, *args, **kwargs):
+    def track_request_completed(func, self, *args, **kwargs):
         # If request_id is not None, then handler of decorated request
         # will use request_id kwarg to mark it done, when the request is
         # finished; self.join_requests() will join all the decorated requests
@@ -310,7 +318,7 @@ class BaseTestClient(BaseServiceClient):
 
 
     # test API
-    @track_request_id_completed
+    @track_request_completed
     @limit_exec_time
     async def emit_coordinate_request(self, fname, **kwargs):
         await self.ns_handler.emit_client_notification(
@@ -323,7 +331,7 @@ class BaseTestClient(BaseServiceClient):
                     namespace=get_namespace(fname),
         )
 
-    @track_request_id_completed
+    @track_request_completed
     @limit_exec_time
     async def emit_visualize_range(self, fname, **kwargs):
         await self.ns_handler.emit_client_notification(
@@ -336,9 +344,10 @@ class BaseTestClient(BaseServiceClient):
                     'viz_types': kwargs.get('viz_types', ["spectrogram"]),
                     },
                     client_room=self.ns_handler.room_sid,
+                    namespace=kwargs.get('namespace', self.ns_handler.namespace),
         )
 
-    @track_request_id_completed
+    @track_request_completed
     @limit_exec_time
     async def emit_service_state(self, *args, **kwargs):
         await self.ns_handler.emit_client_notification(
@@ -348,7 +357,7 @@ class BaseTestClient(BaseServiceClient):
                 max_exec_time=kwargs.get('max_exec_time'),
                 )
 
-    @track_request_id_completed
+    @track_request_completed
     @limit_exec_time
     async def emit_project_selected(self, pname, *args, **kwargs):
         await self.ns_handler.emit_client_notification(
@@ -359,7 +368,7 @@ class BaseTestClient(BaseServiceClient):
                 max_exec_time=kwargs.get('max_exec_time'),
             )
 
-    @track_request_id_completed
+    @track_request_completed
     @limit_exec_time
     async def emit_experiment_selected(self, pname, ename, *args, **kwargs):
         await self.ns_handler.emit_client_notification(
@@ -373,7 +382,7 @@ class BaseTestClient(BaseServiceClient):
                 max_exec_time=kwargs.get('max_exec_time'),
             )
 
-    @track_request_id_completed
+    @track_request_completed
     @limit_exec_time
     async def emit_save_project(self, pname, attrs, *args, **kwargs):
         await self.ns_handler.emit_client_notification(
@@ -386,7 +395,7 @@ class BaseTestClient(BaseServiceClient):
                 max_exec_time=kwargs.get('max_exec_time'),
             )
 
-    @track_request_id_completed
+    @track_request_completed
     @limit_exec_time
     async def emit_save_experiment(self, pname, ename, attrs, template, *args, **kwargs):
         await self.ns_handler.emit_client_notification(
@@ -401,7 +410,7 @@ class BaseTestClient(BaseServiceClient):
                 max_exec_time=kwargs.get('max_exec_time'),
             )
 
-    @track_request_id_completed
+    @track_request_completed
     @limit_exec_time
     async def emit_delete_experiment(self, pname, ename, *args, **kwargs):
         await self.ns_handler.emit_client_notification(
@@ -414,7 +423,7 @@ class BaseTestClient(BaseServiceClient):
                 max_exec_time=kwargs.get('max_exec_time'),
             )
 
-    @track_request_id_completed
+    @track_request_completed
     @limit_exec_time
     async def emit_delete_project(self, pname, *args, **kwargs):
         await self.ns_handler.emit_client_notification(
@@ -426,7 +435,7 @@ class BaseTestClient(BaseServiceClient):
                 max_exec_time=kwargs.get('max_exec_time'),
             )
 
-    @track_request_id_completed
+    @track_request_completed
     @limit_exec_time
     async def emit_import_raw_table_datetime_range(self, dt_range, *args, **kwargs):
         await self.ns_handler.emit_client_notification(
@@ -438,7 +447,7 @@ class BaseTestClient(BaseServiceClient):
                 max_exec_time=kwargs.get('max_exec_time'),
             )
 
-    @track_request_id_completed
+    @track_request_completed
     @limit_exec_time
     async def emit_raw_import(self, raw_samples_data, *args, **kwargs):
         self.raw_samples = [s['filename'] for s in raw_samples_data]
@@ -453,7 +462,7 @@ class BaseTestClient(BaseServiceClient):
                 max_exec_time=kwargs.get('max_exec_time'),
             )
 
-    @track_request_id_completed
+    @track_request_completed
     @limit_exec_time
     async def emit_raw_import_status(self, *args, **kwargs):
         await self.ns_handler.emit_client_notification(
@@ -465,7 +474,7 @@ class BaseTestClient(BaseServiceClient):
             )
 
     # so far no reliable way to trace the request completed
-    # @track_request_id_completed
+    # @track_request_completed
     # @limit_exec_time
     async def emit_stop_raw_import(self, raw_samples_data=[], *args, **kwargs):
         await self.ns_handler.emit_client_notification(
@@ -517,13 +526,13 @@ def test_some_requests():
     # # TODO: check coordinates - smth wrong here - see handler
     # def coordinate_request():
     #     max_exec_time = 7
-    #     rq_suffix = client.set_test_params(fname, max_exec_time=max_exec_time)
+    #     rq_suffix = client.set_viz_test_params(fname, max_exec_time=max_exec_time)
     #     asyncio.run(client.emit_coordinate_request(fname, request_id=f'coordinates_{rq_suffix}'))
     # coordinate_request()
 
     print('-- Visualize full range')
     def visualize_full_range():
-        rq_suffix = client.set_test_params(fname)
+        rq_suffix = client.set_viz_test_params(fname)
         asyncio.run(client.emit_visualize_range(fname, request_id=f"fullrange_{rq_suffix}"))
     visualize_full_range()
 
@@ -534,7 +543,7 @@ def test_some_requests():
     #     t_range_max = 10
     #     t_range=[5, t_range_max]
     #     mz_range=[100, 200]
-    #     rq_suffix = client.set_test_params(fname, t_range_max=t_range_max, max_exec_time=max_exec_time)
+    #     rq_suffix = client.set_viz_test_params(fname, t_range_max=t_range_max, max_exec_time=max_exec_time)
     #     asyncio.run(client.emit_visualize_range(fname,
     #                                             request_id=f'zoom_{rq_suffix}',
     #                                             mz_range=mz_range,
