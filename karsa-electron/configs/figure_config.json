@@ -1,6 +1,5 @@
 {
 	"common_config": {
-		"responsive": true,
 		"displaylogo": false,
 		"modeBarButtonsToRemove": [
 			"autoScale2d",
@@ -16,7 +15,8 @@
 			"zoom2d",
 			"zoomIn2d",
 			"zoomOut2d"
-			]
+			],
+		"responsive": true
 	},
 
     "spectrogram": {
@@ -61,6 +61,13 @@
 				"color": "#fff"
 				},
 			"showlegend": true,
+			"legend": {
+				"orientation": "h",
+				"yanchor": "bottom",
+				"y": 1.02,
+				"xanchor": "right",
+				"x": 1
+				},
 			"dragmode": "zoom",
 			"autosize": true,
 			"hovermode": "closest",
@@ -133,7 +140,7 @@
 			},
 		"layout": {
 			"images": [],
-			"height": 970,
+			"height": 950,
 			"font": {
 				"color": "#fff"
 				},
@@ -156,6 +163,13 @@
 				"visible": true
 				},
 			"showlegend": true,
+			"legend": {
+				"orientation": "h",
+				"yanchor": "bottom",
+				"y": 1.02,
+				"xanchor": "right",
+				"x": 1
+				},
 			"dragmode": "zoom",
 			"autosize": true,
 			"hoverinfo": "name+y",

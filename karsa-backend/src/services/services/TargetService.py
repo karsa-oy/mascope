@@ -2,6 +2,7 @@ import asyncio
 import numpy as np
 import pandas as pd
 
+from karsalib.molmass import Formula
 from karsalib.chemistry import get_exact_isotope_mzs, match_mz
 from karsalib.client import BaseClientNamespace, BaseServiceClient
 from karsalib.util import parse_cmd_args
@@ -9,17 +10,53 @@ from karsalib.util import parse_cmd_args
 from services.FileIoService import filename_to_zarr_path, load_file
 
 
-
 # File cache
 cache = {}
-
 
 class TargetServiceNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to Router """
 
-    endpoints = ['identify_peaks',
-                 'integrate_target_ions',
-                 ]
+    endpoints = [
+        'compute_target_ions',
+        'identify_peaks',
+        ]
+
+    async def on_compute_target_ions(self, data):
+        value = data['value']
+        # self.log(data)
+        client_room = data.get('client_room') or data['cookies']['src_sid'][0]
+        
+        compounds = value['compounds']
+        ionization_mechanisms = value['ionization_mechanism'].split(',')
+
+        target_ions = []
+        for compound_id, compound in enumerate(compounds):
+            for ionization_mechanism in ionization_mechanisms:
+                ion_formula = Formula(compound + ionization_mechanism)
+                ion_charge = ion_formula.charge
+                if ion_charge == -1:
+                    charge_string = "-"
+                elif ion_charge == +1:
+                    charge_string = "+"
+                else:
+                    charge_string = ""
+                ion_string = ion_formula.formula + charge_string
+                target_ions.append((compound_id, ion_string))
+
+        # Compute isotopic ratios from target ion formulae
+        target_ion_data = [(compound_id, ion_id, ion_formula, *ion_spectrum)
+                           for ion_id, (compound_id, ion_formula) in enumerate(target_ions)
+                           for ion_spectrum in get_exact_isotope_mzs(ion_formula).values()
+                           ]
+        # Convert target ion data into DataFrame
+        target_df = pd.DataFrame(target_ion_data,
+                                 columns=['target id', 'ion id', 'ion composition', 'mz', 'rel abu']
+                                 )
+
+        await self.emit_client_notification('target_ions',
+                                            list( target_df.to_dict(orient='index').values() ),
+                                            room=client_room
+                                            )
 
     async def on_identify_peaks(self, data):
         client_room = data.get('client_room') or data['cookies']['src_sid'][0]
@@ -28,40 +65,15 @@ class TargetServiceNamespace(BaseClientNamespace):
         peak_mzs = np.frombuffer(value['peaks']['mz'], dtype=np.float32).astype(float)
         peak_heis = np.frombuffer(value['peaks']['height'], dtype=np.float32).astype(float)
         peak_tofs = np.frombuffer(value['peaks']['tof'], dtype=np.float32).astype(float)
-        targets = value['targets']
+        target_ion_data = value['target_ions']
+        target_df = pd.DataFrame.from_dict(target_ion_data)
+        print(target_df.head())
 
-        mz_tolerance = 10 # ppm
-        iso_abu_tolerance = 10 # %
+        # Parameters
+        mz_tolerance = 30 # ppm
+        iso_abu_tolerance = 30 # %
         min_iso_abu = 0.01 # %
 
-        # TODO: Placeholder list for testing, should get ion formulae from value['targets']
-        target_ion_formulae = [
-            "CHO2-",
-            "NO2-",
-            "C2H3O2-",
-            "NO3-",
-            "Br-",
-            "C3H5O3-",
-            "C7H5O2-",
-            "CH2O2Br-",
-            "C3H6O3Br-",
-            "C6H11O6-",
-            "CH2Br3-",
-            "C16H31O2-",
-            "C17H33O4-",
-            "C5H12N4O7Br-",
-            "C16H32O2Br-"
-            ]
-        # //
-        # Compute isotopic ratios from target ion formulae
-        target_ion_data = [(i, ion_formula, *ion_spectrum)
-                           for i, ion_formula in enumerate(target_ion_formulae)
-                           for ion_spectrum in get_exact_isotope_mzs(ion_formula).values()
-                           ]
-        # Convert target ion data into DataFrame
-        target_df = pd.DataFrame(target_ion_data,
-                                columns=['id', 'ion composition', 'mz', 'relabu']
-                                )
         # Find matching targets for found peaks
         match_df = match_peaks_to_targets(peak_mzs, peak_heis, target_df, mz_tolerance)
         id_peak_tofs = []
@@ -74,60 +86,13 @@ class TargetServiceNamespace(BaseClientNamespace):
         # Calculate isotope ratios and mz errors
         match_df = calculate_target_match_score(match_df)
         # Compare score with thresholds
-        identified_ion_ids = filter_target_matches(match_df, mz_tolerance, iso_abu_tolerance, min_iso_abu)
-        identified_ion_peaks = [match_df[match_df.id==match_df_id].fillna(value=-1).to_dict(orient='index')
-                                for match_df_id in identified_ion_ids
-                                ]
+        identified_isotopes_mask = filter_target_matches(match_df, mz_tolerance, iso_abu_tolerance, min_iso_abu)
+        identified_ion_peaks = match_df[identified_isotopes_mask]
 
         self.log(identified_ion_peaks)
 
         await self.emit_client_notification('identified_ions',
-                                            identified_ion_peaks, # TODO: Which data to return?
-                                            room=client_room
-                                            )
-
-    async def on_integrate_target_ions(self, data):
-        value = data['value']
-        self.log(data)
-        client_room = data.get('client_room') or data['cookies']['src_sid'][0]
-        
-        filename = value['filename']
-        mzs = value.get('mz')
-        t_range = value.get('t_range')
-        # t_resolution = value.get('t_resolution')
-        # request_id = value['request_id']
-
-        # Check if file is cached
-        cache_item = cache.get(filename, None)
-        if not cache_item:
-            # File not in cache, load
-            print("Loading file: %s" %filename)
-            cache_item = load_file(filename) # TODO: Load a subset of arrays from file
-            cache[filename] = cache_item
-            
-        if t_range is None:
-            # Full time range
-            t_range = [0, cache_item.attrs['length']]
-
-        if not hasattr(mzs, '__iter__'):
-            mzs = [mzs]
-
-        # Integrate requested mz range(s)
-        intensities = []
-        for mz in mzs:
-            dmz = 0.1 # TODO: Set window properly
-            if mz is not None:
-                mz_range = (mz-dmz, mz+dmz)
-            else:
-                mz_range = (None, None)
-            # TODO: Properly integrate instead of sum
-            sum_signal = cache_item.signal.sel(
-                            mz=slice(*mz_range)
-                            ).sum(dim='time').sum(dim='mz').compute().item()
-            intensities.append(sum_signal)
-
-        await self.emit_client_notification('target_ion_intensities',
-                                            intensities,
+                                            identified_ion_peaks.to_dict(orient='index'),
                                             room=client_room
                                             )
 
@@ -146,14 +111,17 @@ def calculate_target_match_score(match_df):
     pandas.DataFrame
         Input dataframe with added columns 'rel peak height', 'iso abu error', 'mz error'
     """
+    match_df['rel peak height'] = [np.nan]*len(match_df)
+    match_df['iso abu error'] = [np.nan]*len(match_df)
+    match_df['mz error'] = [np.nan]*len(match_df)
     # Calculate isotope ratios and mz errors
-    for target_id in np.unique(match_df.id):
-        target = match_df[match_df.id == target_id]
+    for target_id in np.unique(match_df['ion id']):
+        target = match_df[match_df['ion id'] == target_id]
         if not target['peak mz'].any():
             # No matching peaks for this target
             continue
         rel_abu = target['peak height'] / target['peak height'].sum()
-        iso_abu_err = (target['relabu'] - rel_abu) * target['relabu'] * 1e2
+        iso_abu_err = (target['rel abu'] - rel_abu) * target['rel abu'] * 1e2
         match_df.loc[target.index, 'rel peak height'] = rel_abu
         match_df.loc[target.index, 'iso abu error'] = iso_abu_err
         
@@ -164,7 +132,7 @@ def calculate_target_match_score(match_df):
 
 def filter_target_matches(match_df, mz_tolerance, iso_abu_tolerance, min_iso_abu):
     """Compare target identification score with thresholds given as input arguments,
-    Return 'id's of target ions with one or more peaks identified.
+    Return 'ion id's of target ions with one or more peaks identified.
 
     Parameters
     ----------
@@ -180,27 +148,21 @@ def filter_target_matches(match_df, mz_tolerance, iso_abu_tolerance, min_iso_abu
     Returns
     -------
     list
-        List of 'id' field values for identified targets
+        List of 'ion id' field values for identified targets
     """
-    target_ids = np.unique(match_df.id)
-    identified_ions_mask = [False] * len(target_ids)
-    for target_id in target_ids:
+    identified_peaks_mask = [False] * len(match_df)
+    for row_i, isotope in match_df.iterrows():
         # Test each target against thresholds
-        target = match_df[(match_df.id == target_id) &
-                            (match_df.relabu >= min_iso_abu) &
-                            (np.abs(match_df['mz error']) <= mz_tolerance) &
-                            (np.abs(match_df['iso abu error']) <= iso_abu_tolerance)
-                            ]
-        if len(target):
+        isotope_identified = ((isotope['rel abu'] >= min_iso_abu) and
+                            (np.abs(isotope['mz error']) <= mz_tolerance) and
+                            (np.abs(isotope['iso abu error']) <= iso_abu_tolerance)
+                            )
+                            
+        if isotope_identified:
             #  At least one peak identified for current target
-            identified_ions_mask[target_id] = True
-
-    identified_ion_ids = [match_df_ind
-                          for i, match_df_ind in enumerate(target_ids)
-                            if identified_ions_mask[i]
-                          ]
+            identified_peaks_mask[row_i] = True
     
-    return identified_ion_ids
+    return identified_peaks_mask
 
 
 def match_peaks_to_targets(peak_mzs, peak_heights, target_ion_df, mz_tolerance):
@@ -229,11 +191,13 @@ def match_peaks_to_targets(peak_mzs, peak_heights, target_ion_df, mz_tolerance):
         Case where more than one peak matches the same target not implemented yet.
     """
     # Find matching targets for found peaks
-    target_ion_df['peak mz'] = [None]*len(target_ion_df)
+    target_ion_df['peak id'] = [np.nan]*len(target_ion_df)
+    target_ion_df['peak mz'] = [np.nan]*len(target_ion_df)
+    target_ion_df['peak height'] = [np.nan]*len(target_ion_df)
     for peak_i, peak_mz in enumerate(peak_mzs):
         match_is, match_mzs = match_mz(peak_mz, target_ion_df.mz, tolerance=mz_tolerance)
         for match_i in match_is:
-            if target_ion_df.loc[match_i, 'peak mz'] is not None:
+            if not np.isnan(target_ion_df.loc[match_i, 'peak mz']):
                 raise NotImplementedError("Target already has a matching peak")
             target_ion_df.loc[match_i, 'peak id'] = peak_i
             target_ion_df.loc[match_i, 'peak mz'] = peak_mz

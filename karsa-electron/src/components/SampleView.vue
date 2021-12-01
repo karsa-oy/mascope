@@ -322,7 +322,8 @@ export default {
         return false;
       }
       let mz = new_value;
-      let target_mz_range = [mz - 0.1, mz + 0.1];
+      let dmz = 1000; // ppm
+      let target_mz_range = [(1-dmz*1e-6)*mz, (1+dmz*1e-6)*mz];
       let new_figure_ranges = {
         filename: this.filename,
         id: Math.random().toString(36).substring(2),
