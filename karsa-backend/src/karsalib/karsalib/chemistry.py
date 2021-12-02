@@ -20,7 +20,6 @@ def match_mz(mz, mz_list, tolerance=0):
         SORTED list of m/z values to find matches from.
     tolerance : float, optional
         Match tolerance [ppm], by default 0.
-    return_index : bool, optional
     
     Returns
     -------

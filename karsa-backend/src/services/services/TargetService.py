@@ -32,7 +32,12 @@ class TargetServiceNamespace(BaseClientNamespace):
         target_ions = []
         for compound_id, compound in enumerate(compounds):
             for ionization_mechanism in ionization_mechanisms:
-                ion_formula = Formula(compound + ionization_mechanism)
+                ion_formula = Formula('(' +
+                                      compound +
+                                      ionization_mechanism[:-1] +
+                                      ')' +
+                                      ionization_mechanism[-1]
+                                      )
                 ion_charge = ion_formula.charge
                 if ion_charge == -1:
                     charge_string = "-"
@@ -194,14 +199,21 @@ def match_peaks_to_targets(peak_mzs, peak_heights, target_ion_df, mz_tolerance):
     target_ion_df['peak id'] = [np.nan]*len(target_ion_df)
     target_ion_df['peak mz'] = [np.nan]*len(target_ion_df)
     target_ion_df['peak height'] = [np.nan]*len(target_ion_df)
+    target_ion_df = target_ion_df.sort_values('mz')
     for peak_i, peak_mz in enumerate(peak_mzs):
-        match_is, match_mzs = match_mz(peak_mz, target_ion_df.mz, tolerance=mz_tolerance)
+        match_is, match_mzs = match_mz(peak_mz, list(target_ion_df.mz), tolerance=mz_tolerance)
         for match_i in match_is:
-            if not np.isnan(target_ion_df.loc[match_i, 'peak mz']):
-                raise NotImplementedError("Target already has a matching peak")
-            target_ion_df.loc[match_i, 'peak id'] = peak_i
-            target_ion_df.loc[match_i, 'peak mz'] = peak_mz
-            target_ion_df.loc[match_i, 'peak height'] = peak_heights[peak_i]
+            target_ion_index = target_ion_df.index[match_i]
+            if not np.isnan(target_ion_df.loc[target_ion_index, 'peak mz']):
+                target_mz = target_ion_df.loc[target_ion_index, 'mz']
+                prev_peak_mz_err = np.abs(target_ion_df.loc[target_ion_index, 'peak mz'] - target_mz)
+                curr_peak_mz_err = np.abs(peak_mz - target_mz)
+                if prev_peak_mz_err < curr_peak_mz_err:
+                    # Closer match has been found already
+                    continue
+            target_ion_df.loc[target_ion_index, 'peak id'] = peak_i
+            target_ion_df.loc[target_ion_index, 'peak mz'] = peak_mz
+            target_ion_df.loc[target_ion_index, 'peak height'] = peak_heights[peak_i]
     return target_ion_df
 
 
