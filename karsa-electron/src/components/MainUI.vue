@@ -1,92 +1,135 @@
 <template>
-  <div class="columns">
-    <b-loading
-      v-model="is_disconnected"
-      :can-cancel="false"
-      :is-full-page="false"
+  <div>
+    <b-tabs
+      class="tabs-main"
+      v-model="active_tab"
+      :animated="false"
+      type="is-boxed main-tab"
     >
-    </b-loading>
-    <!-- Left column -->
-    <div class="column is-one-third">
-      <b-tabs class="tabs-main" v-model="active_tab" :animated="true">
-        <b-tab-item icon="flask" label="Samples">
-          <!-- Data source selector -->
-          <div>
-            <b-field label="Data source" grouped>
-              <b-select
-                v-model="data_source_name_selected"
-                placeholder="Select data source"
-                expanded
-              >
-                <option
-                  v-for="source in data_sources"
-                  :value="source.name"
-                  :key="source.name"
-                >
-                  {{ source.name }}
-                </option>
-              </b-select>
+      <!-- Tabs -->
+      <!-- Config tab -->
+      <b-tab-item icon="settings" label="">
+        <ConfigVue></ConfigVue>
+      </b-tab-item>
+      <!-- Main tab -->
+      <b-tab-item
+        icon=""
+        :label="
+          this.project_selected.title + '/' + this.experiment_selected.title
+        "
+      >
+        <div class="columns">
+          <b-loading
+            v-model="is_disconnected"
+            :can-cancel="false"
+            :is-full-page="false"
+          >
+          </b-loading>
+          <!-- Sidebar -->
+          <div class="sidebar-page">
+              <section class="sidebar-layout">
+                  <b-sidebar
+                      position="static"
+                      :expand-on-hover="true"
+                      :fullheight="true"
+                      :reduce="true"
+                      :delay="500"
+                      type="is-dark"
+                      open
+                  >
+                    <div>
+                      <!-- Data source selector -->
+                      <div
+                        style="
+                          text-align: center;
+                          margin-top: 0.4rem;
+                          margin-bottom: 1rem;
+                        "
+                      >
+                        <b-field label="Data source" grouped>
+                          <b-select
+                            v-model="data_source_name_selected"
+                            placeholder="Select data source"
+                            expanded
+                          >
+                            <option
+                              v-for="source in data_sources"
+                              :value="source.name"
+                              :key="source.name"
+                            >
+                              {{ source.name }}
+                            </option>
+                          </b-select>
 
-              <b-switch
-                style="color: white"
-                v-model="autosave_on"
-                :disabled="!experiment_selected.title.length"
-              >
-                Auto-save
-              </b-switch>
-            </b-field>
+                          <b-switch
+                            style="color: white"
+                            v-model="autosave_on"
+                            :disabled="!experiment_selected.title.length"
+                          >
+                            Auto-save
+                          </b-switch>
+                        </b-field>
+                      </div>
+                      <!-- End of data source selector -->
+                      <!-- Data source component -->
+                      <RAWimport
+                        v-if="
+                          data_source_selected.type &&
+                          data_source_selected.type.indexOf('H5') != -1
+                        "
+                      >
+                      </RAWimport>
+                      <RAWimport
+                        v-if="
+                          data_source_selected.type &&
+                          data_source_selected.type.indexOf('Raw') != -1
+                        "
+                      >
+                      </RAWimport>
+                      <TOFControl
+                        v-if="
+                          data_source_selected.type &&
+                          data_source_selected.type.indexOf('TofDaq') != -1
+                        "
+                      >
+                      </TOFControl>
+                      <!-- End of ata source component -->
+                    </div>
+                    <div>
+                      Samples
+                    </div>
+                    <div>
+                      <SampleBrowser></SampleBrowser>
+                    </div>
+                  </b-sidebar>
+              </section>
           </div>
-          <RAWimport
-            v-if="
-              data_source_selected.type &&
-              data_source_selected.type.indexOf('H5') != -1
-            "
-          >
-          </RAWimport>
-          <RAWimport
-            v-if="
-              data_source_selected.type &&
-              data_source_selected.type.indexOf('Raw') != -1
-            "
-          >
-          </RAWimport>
-          <TOFControl
-            v-if="
-              data_source_selected.type &&
-              data_source_selected.type.indexOf('TofDaq') != -1
-            "
-          >
-          </TOFControl>
-          <!-- End of data source selector -->
-          <div><br></div>
-          <SampleBrowser></SampleBrowser>
-        </b-tab-item>
-        <b-tab-item icon="crosshairs" label="Targets">
-          <TargetBrowser></TargetBrowser>
-        </b-tab-item>
-        <b-tab-item icon="cogs" label="Settings">
-          <ConfigVue></ConfigVue>
-        </b-tab-item>
-      </b-tabs>
+          <!-- End of sidebar -->
+          <!-- Left column -->
+          <div class="column is-one-third" style="padding-left: 1rem">
+            <TargetBrowser></TargetBrowser>
+          </div>
+          <!-- End of left column -->
+          <!-- Right side content -->
+          <div class="column is-two-thirds" style="padding-right: 2rem">
+            <SampleView></SampleView>
+          </div>
+          <!-- End of Right side content -->
+        </div>
+      </b-tab-item>
       <!-- End of tabs -->
-    </div>
-    <!-- End of left column -->
-    <!-- Right side content -->
-    <div class="column is-two-thirds">
-      <SampleView></SampleView>
-    </div>
-    <!-- End of Right side content -->
+    </b-tabs>
   </div>
 </template>
 
 <script type="text/javascript">
 import { mapState } from "vuex";
-import ConfigVue from "./ConfigVue.vue";
-import RAWimport from "./RAWimport.vue";
-import TOFControl from "./TOFControl.vue";
+import ConfigVue from "./ConfigVue";
+import RAWimport from "./RAWimport";
 import SampleView from "./SampleView.vue";
 import SampleBrowser from "./SampleBrowser.vue";
 import TargetBrowser from "./TargetBrowser.vue";
+import TOFControl from "./TOFControl.vue";
 import store from "../store";
 import { BECom, read_dotenv, write_dotenv } from "../karsalib.js";
 
@@ -98,14 +141,14 @@ export default {
   components: {
     ConfigVue,
     RAWimport,
-    TOFControl,
     SampleBrowser,
     SampleView,
     TargetBrowser,
+    TOFControl,
   },
   data() {
     return {
-      active_tab: 0,
+      active_tab: 2,
       dotenv: {},
       be: null,
       room_sid: null,
@@ -281,6 +324,15 @@ body {
   bottom: 0;
   padding: 0;
 }
+
+/* Sidebar */
+.b-sidebar .sidebar-content.is-mini.is-mini-expand:hover:not(.is-fullwidth) {
+    width: 400px;
+}
+.b-sidebar .sidebar-content.is-mini {
+    width: 80px;
+}
+/* End of sidebar */
 
 .head {
   background-color: #000;

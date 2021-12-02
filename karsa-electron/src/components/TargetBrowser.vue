@@ -93,10 +93,6 @@
 
     <!-- Main content area -->
     <section class="tab-content">
-        <!-- Ionization mechanism input -->
-        <b-field label="Ionization mechanism" style="text-align: left">
-            <b-input v-model="ionization_mechanism" lazy> </b-input>
-        </b-field>
         <!-- Target tables -->
         <b-table
             id="targets-datatable"
@@ -112,6 +108,10 @@
             {{ props.row }}
             </template>
         </b-table>
+        <!-- Ionization mechanism input -->
+        <b-field label="Ionization mechanism" style="text-align: left">
+            <b-input v-model="ionization_mechanism" lazy> </b-input>
+        </b-field>
         <b-table
             @contextmenu="rightClickPeakTableRow"
             id="isotope-datatable"
@@ -470,7 +470,10 @@ export default {
       }
       this.be.export_one_way_binding_prop(
         "compute_target_ions",
-        { ...new_value, room: this.room_sid, uid: Math.random() },
+        {...new_value,
+        room: this.room_sid,
+        uid: Math.random()
+        },
         old_value,
         this.room_sid
       );

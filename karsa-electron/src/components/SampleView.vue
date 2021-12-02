@@ -51,7 +51,7 @@
     <!--- End of add annotation modal-->
     <!-- End of modals -->
 
-    <div style="text-align: right">
+    <div style="text-align: center">
       <h1 style="color: #b7b7b7; font-size: 18px; padding: 0.3em 1em">
         {{ experiment_selected.title }} - {{ sample_selected.title }}
       </h1>

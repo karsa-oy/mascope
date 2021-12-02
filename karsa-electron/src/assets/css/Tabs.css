@@ -12,11 +12,6 @@
   font-weight: bold;
 }
 
-.tabs li.is-active a {
-  color: #ffffff;
-  background-color: #7957d5;
-}
-
 .b-tabs .tab-content {
   padding: 5px;
 }
