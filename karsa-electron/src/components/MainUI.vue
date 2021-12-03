@@ -32,12 +32,21 @@
                       position="static"
                       :expand-on-hover="true"
                       :fullheight="true"
-                      :reduce="true"
+                      :reduce="!sample_browser_pinned"
                       :delay="500"
                       type="is-dark"
                       open
                   >
                     <div>
+                    <b-button
+                      icon-left="menu"
+                      type="is-dark"
+                      size="is-large"
+                      outlined
+                      @click="sample_browser_pinned=!sample_browser_pinned"
+                    >
+                    Samples
+                    </b-button>
                       <!-- Data source selector -->
                       <div
                         style="
@@ -94,9 +103,6 @@
                       >
                       </TOFControl>
                       <!-- End of ata source component -->
-                    </div>
-                    <div>
-                      Samples
                     </div>
                     <div>
                       <SampleBrowser></SampleBrowser>
@@ -161,6 +167,7 @@ export default {
       data_source_name_selected: null,
       data_sources: [],
       room_data_sources: "room_data_sources",
+      sample_browser_pinned: false,
     };
   },
   computed: {
@@ -326,11 +333,17 @@ body {
 }
 
 /* Sidebar */
+.b-sidebar .sidebar-content {
+  height: 900px;
+	width: 400px;
+}
 .b-sidebar .sidebar-content.is-mini.is-mini-expand:hover:not(.is-fullwidth) {
+    height: 900px;
     width: 400px;
 }
 .b-sidebar .sidebar-content.is-mini {
-    width: 80px;
+    width: 60px;
+    overflow: hidden;
 }
 /* End of sidebar */
 
