@@ -98,18 +98,24 @@
             id="targets-datatable"
             :columns="target_table_cols"
             :data="target_table_rows"
+			:key="target_table_key"
             :sticky-header="true"
             :selected.sync="target_table_selected_row"
             detailed
+			custom-detailed-row
+			:opened-detailed="target_table_detailed_rows"
+			@details-open="(row, index) => setTargetTableDetails(row)"
             :show-detail-icon="true"
             detail-key="0"
         >
-            <template #detail="props">
-            {{ props.row }}
+            <template slot="detail" slot-scope="props">
+				<tr v-for="item in props.row.items" :key="item['target id']+'/'+item['ion id']">
+					<td>{{item['ion composition']}}</td>
+                </tr>
             </template>
         </b-table>
         <!-- Ionization mechanism input -->
-        <b-field label="Ionization mechanism" style="text-align: left">
+        <b-field label="Ionization mechanisms" style="text-align: left">
             <b-input v-model="ionization_mechanism" lazy> </b-input>
         </b-field>
         <b-table
@@ -131,6 +137,47 @@
         >
         </b-table>
         <!-- End of target tables -->
+		<!-- Identification parameters -->
+		<section>
+			<b-field label="m/z tolerance [ppm]">
+				<b-slider
+					type="is-primary"
+					v-model="parameter_mz_tolerance"
+					:min="0"
+					:max="100"
+					:tooltip="false"
+					lazy
+					indicator
+					>
+				</b-slider>
+			</b-field>
+			<b-field label="isotope ratio tolerance [%]">
+				<b-slider
+					type="is-primary"
+					v-model="parameter_iso_ratio_tolerance"
+					:min="0"
+					:max="100"
+					:tooltip="false"
+					lazy
+					indicator
+					>
+				</b-slider>
+			</b-field>
+			<b-field label="isotope abundance threshold [%]">
+				<b-slider
+					type="is-primary"
+					v-model="parameter_iso_abu_threshold"
+					:min="0"
+					:max="100"
+					:step="1"
+					:tooltip="false"
+					lazy
+					indicator
+					>
+				</b-slider>
+			</b-field>
+		</section>
+		<!-- End of identification parameters -->
         <section style="text-align: right; margin-top: 1em">
             <b-button
             type="is-dark"
@@ -226,134 +273,142 @@ export default {
   },
   data: function () {
     return {
-      be: null,
-      namespace: null,
-      // variables for excel clipboard import
-      is_excel_clipboard_modal_active: false,
-      excel_clipboard_text: "",
-      excel_clipboard_table_cols: [],
-      excel_clipboard_table_rows: [],
-      // Mass calibration
-      is_mz_calib_modal_active: false,
-      mz_calib_compound_table_checked_rows: [],
-      mz_calib_compound_table_cols: [],
-      mz_calib_compound_table_rows: [],
-      mz_calib_compound_table_selected_row: {},
-      mz_calib_isotope_table_cols: [],
-      mz_calib_isotope_table_rows: [],
-      //
-      // Peak table
-      isotope_table_checked_rows: [],
-      isotope_table_cols: [],
-      isotope_table_key: 0,
-      isotope_table_rows: [],
-      isotope_table_selected_row: {},
-      //
-      // Target table
-      targets: [],
-      target_table_rows: [],
-      target_table_cols: [],
-      target_table_selected_row: {},
-      target_name_col: null,
-      target_compound_col: null,
-      //
-      room_sid: null,
-      endpoints: [],
+		be: null,
+		namespace: null,
+		// variables for excel clipboard import
+		is_excel_clipboard_modal_active: false,
+		excel_clipboard_text: "",
+		excel_clipboard_table_cols: [],
+		excel_clipboard_table_rows: [],
+		// Mass calibration
+		is_mz_calib_modal_active: false,
+		mz_calib_compound_table_checked_rows: [],
+		mz_calib_compound_table_cols: [],
+		mz_calib_compound_table_rows: [],
+		mz_calib_compound_table_selected_row: {},
+		mz_calib_isotope_table_cols: [],
+		mz_calib_isotope_table_rows: [],
+		//
+		// Peak table
+		isotope_table_checked_rows: [],
+		isotope_table_cols: [],
+		isotope_table_key: Math.random(),
+		isotope_table_rows: [],
+		isotope_table_selected_row: {},
+		//
+		// Identification parameters
+		parameter_mz_tolerance: 10,
+		parameter_iso_ratio_tolerance: 10,
+		parameter_iso_abu_threshold: 1,
+		// 
+		// Target table
+		targets: [],
+		target_table_rows: [],
+		target_table_cols: [],
+		target_table_detailed_rows: [],
+		target_table_key: Math.random(),
+		target_table_selected_row: {},
+		target_name_col: null,
+		target_composition_col: null,
+		//
+		room_sid: null,
+		endpoints: [],
     };
   },
   created: function () {
-    this.be = new BECom(this);
+	this.be = new BECom(this);
   },
   mounted: function () {
   },
   methods: {
     fitMzCalibFunction() {
-      let peak_tofs = this.mz_calib_isotope_table_rows.map(
-        (row) => row["peak tof"]
-      );
-      let peak_mzs = this.mz_calib_isotope_table_rows.map((row) => row["peak mz"]);
-      let exact_mzs = this.mz_calib_isotope_table_rows.map((row) => row["mz"]);
-      let mz_calib_data = {
-        peak_tofs: peak_tofs,
-        peak_mzs: peak_mzs,
-        exact_mzs: exact_mzs,
-      };
-      this.be.export_one_way_binding_prop(
-        "fit_mz_calib_function",
-        { ...mz_calib_data, room: this.room_sid, uid: Math.random() },
-        null,
-        this.room_sid
-      );
+		let peak_tofs = this.mz_calib_isotope_table_rows.map(
+			(row) => row["peak tof"]
+		);
+		let peak_mzs = this.mz_calib_isotope_table_rows.map((row) => row["peak mz"]);
+		let exact_mzs = this.mz_calib_isotope_table_rows.map((row) => row["mz"]);
+		let mz_calib_data = {
+			peak_tofs: peak_tofs,
+			peak_mzs: peak_mzs,
+			exact_mzs: exact_mzs,
+		};
+		this.be.export_one_way_binding_prop(
+			"fit_mz_calib_function",
+			{ ...mz_calib_data, room: this.room_sid, uid: Math.random() },
+			null,
+			this.room_sid
+		);
     },
     importExcelTargets() {
-      this.targets = {
-        cols: this.excel_clipboard_table_cols,
-        rows: this.excel_clipboard_table_rows,
-      };
-      this.is_excel_clipboard_modal_active = false;
+		this.targets = {
+			cols: this.excel_clipboard_table_cols,
+			rows: this.excel_clipboard_table_rows,
+		};
+		this.is_excel_clipboard_modal_active = false;
     },
     mzCalibrateButtonClicked() {
-      // Set up compound table
-      this.mz_calib_compound_table_cols = this.isotope_table_cols;
-      this.mz_calib_compound_table_rows = this.isotope_table_rows.filter(function (
-        row
-      ) {
-        return row["peak id"] != -1;
-      });
-      this.mz_calib_compound_table_checked_rows =
-        this.mz_calib_compound_table_rows;
-      this.updateMzCalibPeaks();
-      this.is_mz_calib_modal_active = true;
+		// Set up compound table
+		this.mz_calib_compound_table_cols = this.isotope_table_cols;
+		this.mz_calib_compound_table_rows = this.isotope_table_rows.filter(function (
+			row
+		) {
+			return row["peak id"] != -1;
+		});
+		this.mz_calib_compound_table_checked_rows =
+			this.mz_calib_compound_table_rows;
+		this.updateMzCalibPeaks();
+		this.is_mz_calib_modal_active = true;
     },
     parseExcelClipboard: function (clipboard_text) {
-      // Split full text to rows
-      let clip_rows = clipboard_text.split(String.fromCharCode(10));
-      // Split each row to columns
-      for (let i = 0; i < clip_rows.length; i++) {
-        clip_rows[i] = clip_rows[i].split(String.fromCharCode(9));
-      }
-      let cols = [];
-      let rows = [];
-      // Parse into b-table format
-      // Loop through rows
-      for (let i = 0; i < clip_rows.length; i++) {
-        let row = {};
-        // Loop through row cells
-        for (let j = 0; j < clip_rows[i].length; j++) {
-          if (i == 0) {
-            // New column
-            let field = j.toString();
-            let label = clip_rows[i][j];
-            cols.push({
-              field: field,
-              label: label,
-            });
-            // Save key fields
-            switch (label.toLowerCase()) {
-              case "target name": {
-                this.target_name_col = j;
-                break;
-              }
-              case "target compound": {
-                this.target_compound_col = j;
-                break;
-              }
-            }
-          } else {
-            // Construct row
-            row[j] = clip_rows[i][j];
-          }
-        }
-        // Add row
-        if (!_.isEmpty(row)) {
-          if (i > 0 || !this.excel_clipboard_use_header) {
-            rows.push(row);
-          }
-        }
-      }
-      this.excel_clipboard_table_cols = cols;
-      this.excel_clipboard_table_rows = rows;
-      this.excel_clipboard_text = "";
+		// Split full text to rows
+		let clip_rows = clipboard_text.split(String.fromCharCode(10));
+		// Split each row to columns
+		for (let i = 0; i < clip_rows.length; i++) {
+			clip_rows[i] = clip_rows[i].split(String.fromCharCode(9));
+		}
+		let cols = [];
+		let rows = [];
+		// Parse into b-table format
+		// Loop through rows
+		for (let i = 0; i < clip_rows.length; i++) {
+			let row = {};
+			// Loop through row cells
+			for (let j = 0; j < clip_rows[i].length; j++) {
+				if (i == 0) {
+					// New column
+					let field = j.toString();
+					let label = clip_rows[i][j];
+					cols.push({
+						field: field,
+						label: label,
+						searchable: true
+					});
+					// Save key fields
+					switch (label.toLowerCase()) {
+						case "target name": {
+							this.target_name_col = j;
+							break;
+						}
+						case "target composition": {
+							this.target_composition_col = j;
+							break;
+						}
+					}
+				} else {
+					// Construct row
+					row[j] = clip_rows[i][j];
+				}
+			}
+			// Add row
+			if (!_.isEmpty(row)) {
+			if (i > 0 || !this.excel_clipboard_use_header) {
+				rows.push(row);
+			}
+			}
+		}
+		this.excel_clipboard_table_cols = cols;
+		this.excel_clipboard_table_rows = rows;
+		this.excel_clipboard_text = "";
     },
     readTargetsFromFile() {
         let target_table_data = JSON.parse(
@@ -369,29 +424,49 @@ export default {
                 this.target_name_col = j;
                 break;
                 }
-                case "target compound": {
-                this.target_compound_col = j;
+                case "target composition": {
+                this.target_composition_col = j;
                 break;
                 }
             }
         }
         this.target_table_rows = target_table_data.rows;
     },
+	requestPeakIdentification() {
+		let peaks_exist = this.peak_data.mz && this.peak_data.mz.length;
+		let targets_exist = this.target_ions.length > 0;
+		if (!peaks_exist || !targets_exist) {
+			return;
+		}
+		let parameters = {
+					'mz_tolerance': this.parameter_mz_tolerance,
+					'iso_abu_tolerance': this.parameter_iso_ratio_tolerance,
+					'min_iso_abu': this.parameter_iso_abu_threshold
+					};
+		this.identify_peaks = {
+            peaks: this.peak_data,
+            target_ions: this.target_ions,
+			parameters: parameters
+            };
+	},
     requestTargetIons() {
-      // Collect compound formula from each row
-      let compounds = [];
-      for (const j in this.target_table_rows) {
-        const row = this.target_table_rows[j];
-        compounds.push(row[this.target_compound_col]);
-      }
-      this.compute_target_ions = {
-        ionization_mechanism: this.ionization_mechanism,
-        compounds: compounds,
-      };
+		// Collect compound formula from each row
+		let compounds = [];
+		for (const j in this.target_table_rows) {
+			const row = this.target_table_rows[j];
+			compounds.push(row[this.target_composition_col]);
+		}
+		this.compute_target_ions = {
+			ionization_mechanism: this.ionization_mechanism,
+			compounds: compounds,
+		};
     },
     rightClickPeakTableRow(row) {
-      console.log(row);
+		console.log(row);
     },
+	setTargetTableDetails(row) {
+		this.target_table_detailed_rows = [row['0']];
+	},
     updateIsotopeTableData(data) {
         // Format data to isotope table
         let rows = [];
@@ -428,170 +503,209 @@ export default {
         this.isotope_table_rows = rows;
     },
     updateMzCalibPeaks() {
-      this.mz_calib_isotope_table_cols = [
-        { field: "ion composition", label: "Ion composition" },
-        { field: "mz", label: "Ion m/z" },
-        // {'field': 'peak id', 'label': "Peak ID"},
-        { field: "peak mz", label: "Peak m/z" },
-        { field: "peak tof", label: "Peak TOF", visible: false },
-      ];
-      this.mz_calib_isotope_table_rows = [];
-      for (let i in this.mz_calib_compound_table_rows) {
-        const compound_row = this.mz_calib_compound_table_rows[i];
-        if (
-          this.mz_calib_compound_table_checked_rows.indexOf(compound_row) == -1
-        ) {
-          continue;
-        }
-        let row = {};
-        for (let j in this.mz_calib_isotope_table_cols) {
-          let key = this.mz_calib_isotope_table_cols[j].field;
-          row[key] = compound_row[key];
-        }
-        this.mz_calib_isotope_table_rows.push(row);
-      }
+		this.mz_calib_isotope_table_cols = [
+			{ field: "ion composition", label: "Ion composition" },
+			{ field: "mz", label: "Ion m/z" },
+			// {'field': 'peak id', 'label': "Peak ID"},
+			{ field: "peak mz", label: "Peak m/z" },
+			{ field: "peak tof", label: "Peak TOF", visible: false },
+		];
+		this.mz_calib_isotope_table_rows = [];
+		for (let i in this.mz_calib_compound_table_rows) {
+			const compound_row = this.mz_calib_compound_table_rows[i];
+			if (
+			this.mz_calib_compound_table_checked_rows.indexOf(compound_row) == -1
+			) {
+			continue;
+			}
+			let row = {};
+			for (let j in this.mz_calib_isotope_table_cols) {
+			let key = this.mz_calib_isotope_table_cols[j].field;
+			row[key] = compound_row[key];
+			}
+			this.mz_calib_isotope_table_rows.push(row);
+		}
     },
     writeTargetsToFile() {
-      let target_table_data = {
-        cols: this.target_table_cols,
-        rows: this.target_table_rows,
-        ionization_mechanism: this.ionization_mechanism
-      };
-      fs.writeFileSync(
-        "configs/target_list.json",
-        JSON.stringify(target_table_data, null, 3)
-      );
+		let target_table_data = {
+			cols: this.target_table_cols,
+			rows: this.target_table_rows,
+			ionization_mechanism: this.ionization_mechanism
+		};
+		fs.writeFileSync(
+			"configs/target_list.json",
+			JSON.stringify(target_table_data, null, 3)
+		);
     },
   },
   watch: {
     compute_target_ions: function (new_value, old_value) {
-      if (_.isEqual(new_value, old_value)) {
-        return;
-      }
-      this.be.export_one_way_binding_prop(
-        "compute_target_ions",
-        {...new_value,
-        room: this.room_sid,
-        uid: Math.random()
-        },
-        old_value,
-        this.room_sid
-      );
+		if (_.isEqual(new_value, old_value)) {
+			return;
+		}
+		this.be.export_one_way_binding_prop(
+			"compute_target_ions",
+			{...new_value,
+			room: this.room_sid,
+			uid: Math.random()
+			},
+			old_value,
+			this.room_sid
+		);
     },
     excel_clipboard_text: function (new_value, old_value) {
-      if (new_value === old_value || !new_value.length) {
-        return;
-      }
-      this.parseExcelClipboard(new_value);
+		if (new_value === old_value || !new_value.length) {
+			return;
+		}
+		this.parseExcelClipboard(new_value);
     },
     excel_clipboard_use_header: function (new_value) {
-      if (new_value) {
-        let header = this.excel_clipboard_table_rows.slice(0, 1)[0];
-        for (let i = 0; i < this.excel_clipboard_table_cols.length; i++) {
-          let label = header[i];
-          this.excel_clipboard_table_cols[i]["label"] = label.slice(0);
-        }
-        this.excel_clipboard_table_rows =
-          this.excel_clipboard_table_rows.slice(1);
-      }
+		if (new_value) {
+			let header = this.excel_clipboard_table_rows.slice(0, 1)[0];
+			for (let i = 0; i < this.excel_clipboard_table_cols.length; i++) {
+			let label = header[i];
+			this.excel_clipboard_table_cols[i]["label"] = label.slice(0);
+			}
+			this.excel_clipboard_table_rows =
+			this.excel_clipboard_table_rows.slice(1);
+		}
     },
     figure_double_click: function() {
         this.target_to_display = null;
         this.isotope_table_selected_row = null;
     },
     identified_ions: function (new_value) {
-      let first_round = true;
-      for (let row_i in new_value) {
-          let row = new_value[row_i];
-          if (first_round) {
-              // Check if columns need to be extended
-              let cols_to_add = [];
-              for (let field in row) {
-                  let field_exists = false;
-                  for (let col_i in this.isotope_table_cols) {
-                    let col = this.isotope_table_cols[col_i];
-                      if (col.field == field) {
-                          field_exists = true;
-                          break;
-                      }
-                  }
-                  if (!field_exists) {
-                    cols_to_add.push({
-                        'field': field,
-                        'label': field
-                        });
-                  }
-              }
-              this.isotope_table_cols = [
-                  ...this.isotope_table_cols,
-                  ...cols_to_add
-                  ];
-              first_round = false;
-          }
-          // Fix precision of numeric fields to 4 decimals
-          for (let key in row) {
-            let value = row[key];
-            if (Number(value) && value != 0) {
-                value = Math.round((value + Number.EPSILON) * 10000) / 10000;
-                row[key] = value;
-            }
-          }
-          this.isotope_table_rows[row_i] = row;
-          // Add checkmark for identified isotopes
-          if (row["peak mz"] > -1) {
-            this.isotope_table_checked_rows.push(row);
-          }
-      }
-      // Redraw table
-      this.isotope_table_key = Math.random();
+		this.isotope_table_checked_rows = [];
+		let identified_targets = new Set();
+		let identified_ions = new Set();
+		let first_round = true;
+		for (let row_i in new_value) {
+			let row = new_value[row_i];
+			if (first_round) {
+				// Check if columns need to be extended
+				let cols_to_add = [];
+				for (let field in row) {
+					let field_exists = false;
+					for (let col_i in this.isotope_table_cols) {
+						let col = this.isotope_table_cols[col_i];
+						if (col.field == field) {
+							field_exists = true;
+							break;
+						}
+					}
+					if (!field_exists) {
+						cols_to_add.push({
+								'field': field,
+								'label': field
+								});
+					}
+				}
+				this.isotope_table_cols = [
+					...this.isotope_table_cols,
+					...cols_to_add
+					];
+				first_round = false;
+			}
+			// Fix precision of numeric fields to 4 decimals
+			for (let key in row) {
+				let value = row[key];
+				if (Number(value) && value != 0) {
+					value = Math.round((value + Number.EPSILON) * 10000) / 10000;
+					row[key] = value;
+				}
+			}
+			this.isotope_table_rows[row_i] = row;
+			// Add checkmark for identified isotopes
+			if (row["peak mz"] > -1) {
+				this.isotope_table_checked_rows.push(row);
+				identified_targets.add(row['target id']);
+				identified_ions.add(row['ion id']);
+			}
+		}
+		// Redraw table
+		this.isotope_table_key = Math.random();
+		// Add identification indicator to target table
+		if (this.target_table_cols.length == 2) {
+			this.target_table_cols.push({
+										'field': "2",
+										'label': "",
+										'searchable': true
+										});
+		}
+		for (let row_i in this.target_table_rows) {
+			this.target_table_rows[row_i]['2'] = "0";
+		}
+		for (let target_index of identified_targets) {
+			this.target_table_rows[target_index]['2'] = "1";
+		}
+		this.target_table_key = Math.random();
     },
     identify_peaks: function (new_value, old_value) {
-      let peaks_exist = new_value.peaks.mz;
-      let targets_exist = new_value.target_ions.length > 0;
-      if (_.isEqual(new_value, old_value) || !peaks_exist || !targets_exist) {
-        return;
-      }
-
-      this.be.export_one_way_binding_prop(
-        "identify_peaks",
-        { ...new_value, room: this.room_sid, uid: Math.random() },
-        old_value,
-        this.room_sid
-      );
+		if (_.isEqual(new_value, old_value)) {
+			return;
+		}
+		this.be.export_one_way_binding_prop(
+			"identify_peaks",
+			{...new_value,
+				room: this.room_sid,
+				uid: Math.random()
+				},
+			old_value,
+			this.room_sid
+		);
     },
     mz_calib_compound_table_checked_rows: function () {
-      this.updateMzCalibPeaks();
+		this.updateMzCalibPeaks();
     },
-    peak_data: function (new_value) {
-        this.identify_peaks = {
-            peaks: new_value,
-            target_ions: this.target_ions,
-            };
+	parameter_iso_abu_threshold: function() {
+		this.requestPeakIdentification();
+	},
+	parameter_iso_ratio_tolerance: function() {
+		this.requestPeakIdentification();
+	},
+	parameter_mz_tolerance: function() {
+		this.requestPeakIdentification();
+	},
+    peak_data: function () {
+        this.requestPeakIdentification();
     },
     isotope_table_checked_rows: function (new_value) {
-      console.log(new_value);
+		console.log(new_value);
     },
     isotope_table_selected_row: function (new_value, old_value) {
-      if (_.isEqual(new_value, old_value)) {
-        return false;
-      }
-      if (new_value != null) {
-        let mz = new_value["mz"];
-        if (mz) {
-          this.target_to_display = mz;
-          return;
-        }
-        // }
-      } else {
-        this.target_to_display = null;
-      }
+		if (_.isEqual(new_value, old_value)) {
+			return false;
+		}
+		if (new_value != null) {
+			let mz = new_value["mz"];
+			if (mz) {
+			this.target_to_display = mz;
+			return;
+			}
+			// }
+		} else {
+			this.target_to_display = null;
+		}
     },
     target_ions: function (new_value) {
-        this.updateIsotopeTableData(new_value);
-        this.identify_peaks = {
-            peaks: this.peak_data,
-            target_ions: new_value,
-        };
+		// Clear target ions from target table
+		for (let i in this.target_table_rows) {
+			this.target_table_rows[i].items = [];
+		}
+		// Collect ions per target
+		let prev_ion_id = -1;
+		for (let i in new_value) {
+			let isotope = new_value[i];
+			if (isotope['ion id'] == prev_ion_id) {
+				continue
+			}
+			const target_index = isotope['target id'];
+			this.target_table_rows[target_index].items.push(isotope);
+			prev_ion_id = isotope['ion id'];
+		}
+		console.log(this.target_table_rows);
+		this.updateIsotopeTableData(new_value);
+		this.requestPeakIdentification();
     },
     target_table_rows: function() {
         this.requestTargetIons();
@@ -602,42 +716,42 @@ export default {
         this.$set(this.$refs.isotope_table.filters, 'target id', String(target_id));
     },
     targets: function (new_data, old_data) {
-      if (_.isEqual(new_data, old_data)) {
-        return false;
-      }
-      this.target_table_cols = new_data.cols;
-      this.target_table_rows = new_data.rows;
-      this.writeTargetsToFile();
+		if (_.isEqual(new_data, old_data)) {
+			return false;
+		}
+		this.target_table_cols = new_data.cols;
+		this.target_table_rows = new_data.rows;
+		this.writeTargetsToFile();
     },
     ionization_mechanism: function (new_data, old_data) {
-      if (_.isEqual(new_data, old_data)) {
-        return false;
-      }
-      this.writeTargetsToFile();
-      this.requestTargetIons();
+		if (_.isEqual(new_data, old_data)) {
+			return false;
+		}
+		this.writeTargetsToFile();
+		this.requestTargetIons();
     },
     "root_namespace.connected": function (new_value) {
-      if (new_value === true) {
-        this.namespace = this.root_namespace;
-        // handlers for for external notifications:
-        this.namespace.on("identified_ions", (value) =>
-          this.be.import_one_way_binding_prop("identified_ions", value.value)
-        );
-        this.namespace.on("target_ions", (value) =>
-          this.be.import_one_way_binding_prop(
-            "target_ions",
-            value.value
-          )
-        );
-        this.namespace.on("targets", (value) =>
-          this.be.import_one_way_binding_prop("targets", value.value)
-        );
-        this.room_sid = this.root_namespace.id;
-        this.be.subscribe(this.endpoints, this.room_sid);
+		if (new_value === true) {
+			this.namespace = this.root_namespace;
+			// handlers for for external notifications:
+			this.namespace.on("identified_ions", (value) =>
+			this.be.import_one_way_binding_prop("identified_ions", value.value)
+			);
+			this.namespace.on("target_ions", (value) =>
+			this.be.import_one_way_binding_prop(
+				"target_ions",
+				value.value
+			)
+			);
+			this.namespace.on("targets", (value) =>
+			this.be.import_one_way_binding_prop("targets", value.value)
+			);
+			this.room_sid = this.root_namespace.id;
+			this.be.subscribe(this.endpoints, this.room_sid);
 
-        this.readTargetsFromFile();
-      }
-    },
+			this.readTargetsFromFile();
+		}
+	},
   },
 };
 </script>

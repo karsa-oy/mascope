@@ -75,9 +75,9 @@ class TargetServiceNamespace(BaseClientNamespace):
         print(target_df.head())
 
         # Parameters
-        mz_tolerance = 30 # ppm
-        iso_abu_tolerance = 30 # %
-        min_iso_abu = 0.01 # %
+        mz_tolerance = value.get('parameters', {}).get('mz_tolerance', 10) # ppm
+        iso_abu_tolerance = value.get('parameters', {}).get('iso_abu_tolerance', 10) # %
+        min_iso_abu = value.get('parameters', {}).get('min_iso_abu', 1) / 100.0 # frac
 
         # Find matching targets for found peaks
         match_df = match_peaks_to_targets(peak_mzs, peak_heis, target_df, mz_tolerance)
@@ -93,7 +93,7 @@ class TargetServiceNamespace(BaseClientNamespace):
         # Compare score with thresholds
         identified_isotopes_mask = filter_target_matches(match_df, mz_tolerance, iso_abu_tolerance, min_iso_abu)
         identified_ion_peaks = match_df[identified_isotopes_mask]
-
+        identified_ion_peaks = identified_ion_peaks.fillna(-1)
         self.log(identified_ion_peaks)
 
         await self.emit_client_notification('identified_ions',
