@@ -9,7 +9,7 @@ from decorator import decorator
 from multiprocessing import Event
 from threading import Timer, Thread
 
-from karsalib.client import BaseClientNamespace, BaseServiceClient
+from karsalib.client import BaseClientNamespace, BridgeServiceClient
 from karsalib.util import parse_cmd_args
 from socketio import namespace
 
@@ -39,7 +39,7 @@ def bug_workaround(func, *args, **kwargs):
 _ProactorBasePipeTransport.__del__ = bug_workaround(_ProactorBasePipeTransport.__del__)
 
 
-class BaseTestClientNamespace(BaseClientNamespace):
+class BaseTestClientPublicNamespace(BaseClientNamespace):
     room_data_sources = 'room_data_sources'
     endpoints = [
         'projects',
@@ -50,10 +50,6 @@ class BaseTestClientNamespace(BaseClientNamespace):
         'save_experiment',
         'delete_experiment',
         'delete_project',
-        'raw_samples',
-        'acquisition_started',
-        'acquisition_finished',
-        'raw_import_status_data',
         ]
     endpoints_room_sid = [
         # 'loaded_coordinates',   # response to coordinate_request
@@ -126,13 +122,18 @@ class BaseTestClientNamespace(BaseClientNamespace):
 
     async def on_samples(self, data):
         # experiment_selected emits samples
+        p_sel = None
+        e_sel = None
         for n, s in data['value'].items():
             if 'samples' not in self.parent.projects[s['project']]['experiments'][s['experiment']]:
                 self.parent.projects[s['project']]['experiments'][s['experiment']]['samples'] = {}
             self.parent.projects[s['project']]['experiments'][s['experiment']]['samples'][n] = s
             p_sel = s['project']
             e_sel = s['experiment']
-        self.log(p_sel, list(self.parent.projects[p_sel]['experiments'][e_sel].keys()))
+        if p_sel and e_sel:
+            self.log(p_sel, e_sel, self.parent.projects[p_sel]['experiments'][e_sel])
+        else:
+            self.log(f'project: {p_sel}, experiment: {e_sel}')
         request_id = data['request_id']
         self.parent.kill_exec_timer(request_id)
         self.parent.mark_request_done(request_id)
@@ -151,6 +152,17 @@ class BaseTestClientNamespace(BaseClientNamespace):
         request_id = data['request_id']
         self.parent.kill_exec_timer(request_id)
         self.parent.mark_request_done(request_id)
+
+
+class BaseTestClientPrivateNamespace(BaseClientNamespace):
+    endpoints = [
+        'raw_samples',
+        'acquisition_started',
+        'acquisition_finished',
+        'raw_import_status_data',
+        ]
+
+    # test validators
 
     async def on_raw_samples(self, data):
         # on_import_raw_table_datetime_range emits raw_samples
@@ -185,7 +197,7 @@ class BaseTestClientNamespace(BaseClientNamespace):
         self.parent.mark_request_done(request_id)
 
 
-class BaseTestClient(BaseServiceClient):
+class BaseTestClient(BridgeServiceClient):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.is_alive = False
@@ -219,7 +231,7 @@ class BaseTestClient(BaseServiceClient):
 
     @property
     def instrument_name(self):
-        return self.ns_handler.namespace.replace('/', '')
+        return self.private_ns.namespace.replace('/', '')
 
     # helpers
     def run_until_complete(self):
@@ -285,7 +297,7 @@ class BaseTestClient(BaseServiceClient):
             self.log(list(self.done.keys()))
 
     async def emit_client_notification(self, name, value, *args, **kwargs):
-        await self.ns_handler.emit_client_notification(name, value, *args, **kwargs)
+        await self.public_ns.emit_client_notification(name, value, *args, **kwargs)
 
     # decorators
     @decorator
@@ -321,7 +333,7 @@ class BaseTestClient(BaseServiceClient):
     @track_request_completed
     @limit_exec_time
     async def emit_coordinate_request(self, fname, **kwargs):
-        await self.ns_handler.emit_client_notification(
+        await self.public_ns.emit_client_notification(
                     'coordinate_request',
                     {'filename': fname,
                     'request_id': kwargs['request_id'],
@@ -334,7 +346,7 @@ class BaseTestClient(BaseServiceClient):
     @track_request_completed
     @limit_exec_time
     async def emit_visualize_range(self, fname, **kwargs):
-        await self.ns_handler.emit_client_notification(
+        await self.public_ns.emit_client_notification(
                     'visualize_range',
                     {'filename': fname,
                     'request_id': kwargs['request_id'],
@@ -343,14 +355,14 @@ class BaseTestClient(BaseServiceClient):
                     # 'viz_types': ["spectrogram", "timeseries", "waterfall"],
                     'viz_types': kwargs.get('viz_types', ["spectrogram"]),
                     },
-                    client_room=self.ns_handler.room_sid,
-                    namespace=kwargs.get('namespace', self.ns_handler.namespace),
+                    client_room=self.public_ns.room_sid,
+                    namespace=kwargs.get('namespace', self.public_ns.namespace),
         )
 
     @track_request_completed
     @limit_exec_time
     async def emit_service_state(self, *args, **kwargs):
-        await self.ns_handler.emit_client_notification(
+        await self.public_ns.emit_client_notification(
                 name='service_state',
                 value={},
                 request_id=kwargs.get('request_id', 'service_state'),
@@ -360,10 +372,10 @@ class BaseTestClient(BaseServiceClient):
     @track_request_completed
     @limit_exec_time
     async def emit_project_selected(self, pname, *args, **kwargs):
-        await self.ns_handler.emit_client_notification(
+        await self.public_ns.emit_client_notification(
                 name='project_selected',
                 value={'title': pname, },
-                client_room=self.ns_handler.room_sid,
+                client_room=self.public_ns.room_sid,
                 request_id=kwargs.get('request_id', 'project_selected'),
                 max_exec_time=kwargs.get('max_exec_time'),
             )
@@ -371,13 +383,13 @@ class BaseTestClient(BaseServiceClient):
     @track_request_completed
     @limit_exec_time
     async def emit_experiment_selected(self, pname, ename, *args, **kwargs):
-        await self.ns_handler.emit_client_notification(
+        await self.public_ns.emit_client_notification(
                 name='experiment_selected',
                 value={
                     'project': pname,
                     'title': ename,
                 },
-                client_room=self.ns_handler.room_sid,
+                client_room=self.public_ns.room_sid,
                 request_id=kwargs.get('request_id', 'experiment_selected'),
                 max_exec_time=kwargs.get('max_exec_time'),
             )
@@ -385,7 +397,7 @@ class BaseTestClient(BaseServiceClient):
     @track_request_completed
     @limit_exec_time
     async def emit_save_project(self, pname, attrs, *args, **kwargs):
-        await self.ns_handler.emit_client_notification(
+        await self.public_ns.emit_client_notification(
                 name='save_project',
                 value={
                     'title': pname,
@@ -398,7 +410,7 @@ class BaseTestClient(BaseServiceClient):
     @track_request_completed
     @limit_exec_time
     async def emit_save_experiment(self, pname, ename, attrs, template, *args, **kwargs):
-        await self.ns_handler.emit_client_notification(
+        await self.public_ns.emit_client_notification(
                 name='save_experiment',
                 value={
                     'project': pname,
@@ -413,7 +425,7 @@ class BaseTestClient(BaseServiceClient):
     @track_request_completed
     @limit_exec_time
     async def emit_delete_experiment(self, pname, ename, *args, **kwargs):
-        await self.ns_handler.emit_client_notification(
+        await self.public_ns.emit_client_notification(
                 name='delete_experiment',
                 value={
                     'project': pname,
@@ -426,7 +438,7 @@ class BaseTestClient(BaseServiceClient):
     @track_request_completed
     @limit_exec_time
     async def emit_delete_project(self, pname, *args, **kwargs):
-        await self.ns_handler.emit_client_notification(
+        await self.public_ns.emit_client_notification(
                 name='delete_project',
                 value={
                     'project': pname,
@@ -438,10 +450,10 @@ class BaseTestClient(BaseServiceClient):
     @track_request_completed
     @limit_exec_time
     async def emit_import_raw_table_datetime_range(self, dt_range, *args, **kwargs):
-        await self.ns_handler.emit_client_notification(
+        await self.private_ns.emit_client_notification(
                 name='import_raw_table_datetime_range',
                 value=dt_range,
-                client_room=self.ns_handler.room_sid,
+                client_room=self.private_ns.room_sid,
                 # these args are for testing
                 request_id=kwargs.get('request_id', 'import_raw_table_datetime_range'),
                 max_exec_time=kwargs.get('max_exec_time'),
@@ -454,10 +466,10 @@ class BaseTestClient(BaseServiceClient):
         self.raw_samples_data = raw_samples_data
         self.acquired_samples = []
         self.sample_in_progress = {}
-        await self.ns_handler.emit_client_notification(
+        await self.private_ns.emit_client_notification(
                 name='raw_import',
                 value=raw_samples_data,
-                client_room=self.ns_handler.room_sid,
+                client_room=self.private_ns.room_sid,
                 request_id=kwargs.get('request_id', 'raw_import'),
                 max_exec_time=kwargs.get('max_exec_time'),
             )
@@ -465,10 +477,10 @@ class BaseTestClient(BaseServiceClient):
     @track_request_completed
     @limit_exec_time
     async def emit_raw_import_status(self, *args, **kwargs):
-        await self.ns_handler.emit_client_notification(
+        await self.private_ns.emit_client_notification(
                 name='raw_import_status',
                 value={},
-                client_room=self.ns_handler.room_sid,
+                client_room=self.private_ns.room_sid,
                 request_id=kwargs.get('request_id', 'raw_import_status'),
                 max_exec_time=kwargs.get('max_exec_time'),
             )
@@ -477,10 +489,10 @@ class BaseTestClient(BaseServiceClient):
     # @track_request_completed
     # @limit_exec_time
     async def emit_stop_raw_import(self, raw_samples_data=[], *args, **kwargs):
-        await self.ns_handler.emit_client_notification(
+        await self.private_ns.emit_client_notification(
                 name='stop_raw_import',
                 value=raw_samples_data,
-                client_room=self.ns_handler.room_sid,
+                client_room=self.private_ns.room_sid,
                 # request_id=kwargs.get('request_id', 'stop_raw_import'),
                 # max_exec_time=kwargs.get('max_exec_time'),
             )
@@ -489,9 +501,11 @@ class BaseTestClient(BaseServiceClient):
 def run_client():
     # Use run_client, when running client service from the terminal
     args = parse_cmd_args()
+    priv_ns = args['ns'] if args['ns'] != '/' else '/dummy'
     client = BaseTestClient(args['url'],
                             args['port'],
-                            (args.get('ns', '/'), BaseTestClientNamespace)
+                            ('/', BaseTestClientPublicNamespace),
+                            (priv_ns, BaseTestClientPrivateNamespace)
                            )
     try:
         client.run_until_complete()
@@ -500,9 +514,11 @@ def run_client():
 
 
 def start_test_client_as_daemon(timeout=10, **kwargs):
+    priv_ns = kwargs['ns'] if kwargs['ns'] != '/' else '/dummy'
     client = BaseTestClient(kwargs['url'],
                             kwargs['port'],
-                            (kwargs.get('ns', '/'), BaseTestClientNamespace)
+                            ('/', BaseTestClientPublicNamespace),
+                            (priv_ns, BaseTestClientPrivateNamespace)
                            )
     client.daemon = Thread(target=client.run_until_complete)
     client.daemon.start()

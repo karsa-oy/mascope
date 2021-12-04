@@ -842,7 +842,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                 item_to_update.props = dataset.attrs['props']
                 return item_to_update
 
-        def cache_is_missing_or_obsolete():
+        def file_cache_is_missing_or_obsolete():
             item = cache.get(filename)
             if item is None:
                 return True
@@ -858,7 +858,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
         committed_length = value['committed_length']
         request_id = generate_unique_key()
 
-        if cache_is_missing_or_obsolete():
+        if file_cache_is_missing_or_obsolete():
             self.log('Reset cache for', filename)
             cache[filename] = {}
 
