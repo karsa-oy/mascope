@@ -547,19 +547,22 @@ def process_visualization_request(filename,
     """
 
     def feed_ready_images():
-        nonlocal cache_item
-        viz_type_period = viz_type + '_period'
-
-        try:
-            img_slice = cache_item[viz_type].sel(time=slice(t0, t1)).load()
-        except KeyError as e:
-            print("KeyError: %s , when slicing %s ; cache_items: %s" % (e, viz_type, list(cache_item.keys())) )
-            return False
-        try:
-            period_slice = cache_item[viz_type_period].sel(time=slice(t0, t1)).load()
-        except KeyError as e:
-            print("KeyError: %s , when slicing %s ; cache_items: %s" % (e, viz_type_period, list(cache_item.keys())) )
-            return False
+        error_msg = None
+        n_tries = 5
+        # TODO: check if retry really helps
+        while n_tries:
+            try:
+                viz = viz_type
+                img_slice = cache_item[viz].sel(time=slice(t0, t1)).load()
+                viz = viz_type + '_period'
+                period_slice = cache_item[viz].sel(time=slice(t0, t1)).load()
+                break
+            except Exception as e:
+                error_msg = f"[{this_func_name()}] {e.__class__.__name__}({str(e)}), when slicing {filename}/{viz} range [{t0}, {t1}]"
+                n_tries -= 1
+                sleep(.3)
+        if not n_tries:
+            raise Exception(error_msg)
 
         processed_until = False
         if len(img_slice) == 0:
@@ -604,12 +607,14 @@ def process_visualization_request(filename,
         return processed_until
 
     def feed_signal_to_visualize(t_range_to_process):
-        nonlocal cache_item
-        signal_slice = cache_item.signal.sel(time=slice(*t_range_to_process),
-                                                mz=slice(mz0, mz1)
-                                                )
-        period_slice = cache_item.signal_period.sel(time=slice(*t_range_to_process)
-                                                )
+        try:
+            var = 'signal'
+            signal_slice = cache_item[var].sel(time=slice(*t_range_to_process), mz=slice(mz0, mz1))
+            var = 'signal_period'
+            period_slice = cache_item[var].sel(time=slice(*t_range_to_process))
+        except Exception as e:
+            raise Exception(f"[{this_func_name()}] {e.__class__.__name__}({str(e)}), when slicing {filename}/{var} range {t_range_to_process}")
+
         processed_until = t_range_to_process[0]
 
         if 0 in signal_slice.shape:
@@ -683,17 +688,22 @@ def process_visualization_request(filename,
             # print("Feed signal to visualize until: %s" %processed_until)
         return processed_until
 
+    processed_until = False
     cache_item = cache.get(filename, None)
     if not cache_item:
         print("No such cache item: %s" %filename)
-        return False
-    if (mz0 == cache_item.props['range'][0] and
-        mz1 == cache_item.props['range'][1] and
-        not persist_in_cache
-        ):
-        processed_until = feed_ready_images()
-    else:
-        processed_until = feed_signal_to_visualize([t0, t1])
+        return processed_until
+    try:
+        if (mz0 == cache_item.props['range'][0] and
+            mz1 == cache_item.props['range'][1] and
+            not persist_in_cache
+            ):
+            processed_until = feed_ready_images()
+        else:
+            processed_until = feed_signal_to_visualize([t0, t1])
+    except Exception as e:
+        print(str(e))
+        # del cache[filename]     # don't leave crippled item in cache
     return processed_until
 
 def force_release_request(request_id):
@@ -844,11 +854,28 @@ class DataVizServiceNamespace(BaseClientNamespace):
 
         def file_cache_is_missing_or_obsolete():
             item = cache.get(filename)
-            if item is None:
+            if not item:
                 return True
             if item.props['length'] == item.props['committed_length'] != committed_length:
                 return True
             return False
+
+        def load_file_cache(viz_types=[], existing_cache_item=None):
+            ds = load_file(filename, vars=['signal', 'signal_period'], prev_dataset=existing_cache_item and existing_cache_item['dataset'])
+            new_item = update_cache_item(ds, existing_cache_item)
+            for viz_type in viz_types:
+                zarr_sdk.init_viz_dataset(filename, viz_type, new_item)
+                viz_cache_put_or_update_request(
+                    filename,
+                    viz_type,
+                    t_range=[0, full_length],
+                    mz_range=value['range'],
+                    t_resolution=None,
+                    client_room='',
+                    request_id=request_id,
+                    persist_in_cache=True
+                )
+            return new_item
 
         value = data['value']
         if value['data_type'] != 'signal':
@@ -864,52 +891,37 @@ class DataVizServiceNamespace(BaseClientNamespace):
 
         if committed_length == 0:  # sample just created, not updated yet
             self.log('Ready for visualizing', filename)
-            # cache[filename] = {}
-        elif committed_length != full_length:  # sample is updated
+            cache[filename] = {}
+        elif committed_length < full_length:  # sample is updated
             cache_item = cache.get(filename)
             if not cache_item:
                 self.log(f"Start visualizing {filename} up to {committed_length}")
                 try:
-                    ds = load_file(filename, vars=['signal', 'signal_period'])
+                    cache[filename] = load_file_cache(viz_types=VIZ_TYPES_SUPPORTED)
                 except Exception as e:
-                    self.log(f"Failed visualizing {filename} up to {committed_length}: {str(e)}")
-                    if cache_item:
-                        cache_item['crippled'] = True
+                    self.log(f"Error {e.__class__.__name__}({str(e)})")
                     return
-                cache_item = update_cache_item(ds)
-                for viz_type in VIZ_TYPES_SUPPORTED:
-                    zarr_sdk.init_viz_dataset(filename, viz_type, cache_item)
-                    viz_cache_put_or_update_request(
-                        filename,
-                        viz_type,
-                        t_range=[0, full_length],
-                        mz_range=value['range'],
-                        t_resolution=None,
-                        client_room='',
-                        request_id=request_id,
-                        persist_in_cache=True
-                    )
-                cache[filename] = cache_item
             else:
                 self.log(f"Continue visualizing {filename} up to {committed_length}")
                 try:
-                    ds = load_file(filename, vars=['signal', 'signal_period'], prev_dataset=cache_item['dataset'])
+                    cache[filename] = load_file_cache(existing_cache_item=cache_item)
                 except Exception as e:
-                    self.log(f"Failed visualizing {filename} up to {committed_length}: {str(e)}")
-                    cache_item['crippled'] = True
+                    self.log(f"Error {e.__class__.__name__}({str(e)})")
                     return
-                update_cache_item(ds, cache_item)
             viz_cache_process_requests(filename)
-        elif committed_length == full_length:  # sample is done
+        elif committed_length >= full_length:  # sample is done
             self.log(f"Finish visualizing {filename}: final length {committed_length}")
-            viz_cache_process_requests(filename, flush=True)
             cache_item = cache.get(filename)
-            if cache_item:
-                if cache_item.get('crippled', False):
-                    del cache[filename]   # don't leave crippled item in file cache
-                else:
-                    cache[filename]['props']['length'] = full_length
-                    cache[filename]['props']['committed_length'] = committed_length
+            if not cache_item:  # sample can be shorter than a single batch
+                try:
+                    cache[filename] = load_file_cache(viz_types=VIZ_TYPES_SUPPORTED)
+                except Exception as e:
+                    self.log(f"Error {e.__class__.__name__}({str(e)})")
+                    return
+            viz_cache_process_requests(filename, flush=True)
+            # TODO: validate cache_item and delete, if invalid
+            cache[filename]['props']['length'] = committed_length
+            cache[filename]['props']['committed_length'] = committed_length
 
 
 class DataVizServiceClient(BaseServiceClient):

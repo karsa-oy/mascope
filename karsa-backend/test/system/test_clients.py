@@ -1,6 +1,5 @@
 #!/bin/pyton3
 
-from asyncio.tasks import sleep
 import os
 import unittest
 import asyncio
@@ -143,7 +142,6 @@ class TestVisualizerCase(BaseTestClientCase):
         fname = 'TofDaq_Data_2021.08.02_01h01m01s'
         rq_suffix = self.client.set_viz_test_params(fname)
         asyncio.run(self.client.emit_visualize_range(fname, request_id=f"fullrange1_{rq_suffix}"))
-        time.sleep(1)
         # fname = 'file_2'
         rq_suffix = self.client.set_viz_test_params(fname)
         asyncio.run(self.client.emit_visualize_range(fname, request_id=f"fullrange2_{rq_suffix}"))
@@ -281,8 +279,182 @@ class TestSampleManagerCase(BaseTestClientCase):
         self.assertFalse(os.path.exists(pdir), pdir)
 
 
-# @unittest.skip("TMP")
-class TestH5FileStreamerCase(BaseTestClientCase):
+class BaseTestCases:
+    class BaseFileStreamerCase(BaseTestClientCase):
+        """
+        Setup:
+        <InstrDataPool> raw samples pool
+        karsa-router-service --url=0.0.0.0
+        plus either
+            karsa-file-streamer --ns=InstrNS --streamer_type=InstrType --data_pool_path=<InstrDataPool>
+            cd <TargetDataPool>
+            karsa-sample-service
+            karsa-dataviz-service
+            karsa-fileio-service --ns=InstrNS
+        or
+            cd <TargetDataPool>
+            karsa-file-streamer --ns=InstrNS --streamer_type=InstrType --data_pool_path=<InstrDataPool> --target_data_pool_path=<TargetDataPool>
+            karsa-sample-service
+            karsa-dataviz-service
+        """
+        @classmethod
+        def setUpClass(cls):
+            # cls.input_args = {
+            #     'url': 'localhost',
+            #     'port': 5010,
+            #     'ns': 'H5Data',
+            # }
+            # #======declarative input data==================
+            # cls.data_collection_time = '2021.08.02'
+            # # datetime range with no samples:
+            # cls.dt_range_empty = {'dt0': datetime.datetime(2021, 8, 1).strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+            #                       'dt1': datetime.datetime(2021, 8, 2).strftime('%Y-%m-%dT%H:%M:%S.%fZ')}
+            # # datetime range with samples:
+            # cls.dt_range_all = {'dt0': datetime.datetime(2021, 8, 1).strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+            #                     'dt1': datetime.datetime(2021, 8, 3).strftime('%Y-%m-%dT%H:%M:%S.%fZ')}
+            # # <H5DataPool>/2021.08.02 contents:
+            # cls.raw_samples = ['1-DataFile_2021.08.02-01h01m00s.h5',
+            #                    '2-DataFile_2021.08.02-01h01m00s.h5',
+            #                    '3-DataFile_2021.08.02-01h01m00s.h5',
+            #                    '4-DataFile_2021.08.02-01h01m00s.h5']
+            # # <TargetDataPool>/H5Data
+            # cls.data_collection_path = os.path.abspath(os.path.join(os.curdir, cls.client.instrument_name))
+            # #=====declarative input data end======
+            # if os.path.isdir(cls.data_collection_path):
+            #     shutil.rmtree(cls.data_collection_path)
+            super().setUpClass()
+
+        @classmethod
+        def tearDownClass(cls):
+            # commented out to check resulting cls.data_collection_path after tests
+            # if os.path.isdir(cls.data_collection_path):
+            #     # the data_pool dir may be locked for some time
+            #     time.sleep(3)
+            #     shutil.rmtree(cls.data_collection_path)
+            super().tearDownClass()
+
+        def test_01_import_raw_table_datetime_range_empty(self):
+            asyncio.run(
+                self.client.emit_import_raw_table_datetime_range(
+                    self.dt_range_empty,
+                    max_exec_time=3)
+            )
+            self.assert_requests_ok()
+            self.assertEqual(self.client.raw_samples, [])
+
+        def test_02_import_raw_table_datetime_range_all(self):
+            # pre-defined DataPool structure is the test pre-requisite, since
+            # file system operations can not be used for verification until
+            # FileStreamer and unittests are run on different platforms (win/linux)
+            # TODO: workaround - declarative sorted list of raw samples;
+            # file list from os?
+            asyncio.run(
+                self.client.emit_import_raw_table_datetime_range(
+                    self.dt_range_all,
+                    max_exec_time=3)
+            )
+            self.assert_requests_ok()
+            # self.raw_samples = os.listdir(self.client.raw_samples_dir)
+            self.assertEqual(self.client.raw_samples, self.raw_samples)
+
+        def test_03_raw_import_interrupted_with_status_checks(self):
+            ## send raw_import and check raw_import_status
+            asyncio.run(
+                self.client.emit_raw_import(
+                    self.client.raw_samples_data,
+                    request_id=None)    # don't track the request for completion
+            )
+            asyncio.run(asyncio.sleep(3))   # let sample #1 to start importing
+            asyncio.run(
+                self.client.emit_raw_import_status(
+                    request_id='raw_import_status',
+                    max_exec_time=3)
+            )
+            self.assert_requests_ok(['raw_import_status',])
+            self.assertEqual(
+                basename(self.client.raw_import_status_data['progress'][0]['filename']),
+                self.raw_samples[0]
+            )
+            self.assertEqual(
+                [basename(f['filename']) for f in self.client.raw_import_status_data['queue']['files']],
+                self.raw_samples[1:]
+            )
+
+            ## send stop_raw_import for sample in progress (sample #1 should be stopped) and
+            ## check raw_import_status - the rest of the samples should continue visualizing
+            asyncio.run(
+                self.client.emit_stop_raw_import()
+            )
+            # TODO: ugly workaround - so far no reliable way to trace stop_raw_import complete - just wait
+            time.sleep(3)   # let #1 to stop and #2 to be taken to import
+            asyncio.run(
+                self.client.emit_raw_import_status(
+                    request_id='raw_import_status',
+                    max_exec_time=3)
+            )
+            self.assert_requests_ok(['raw_import_status',])
+            self.assertEqual(
+                basename(self.client.raw_import_status_data['progress'][0]['filename']),
+                self.raw_samples[1]
+            )
+            self.assertEqual(
+                [basename(f['filename']) for f in self.client.raw_import_status_data['queue']['files']],
+                self.raw_samples[2:]
+            )
+
+            ## send stop_raw_import for the rest of samples and check raw_import_status
+            asyncio.run(
+                self.client.emit_stop_raw_import(self.client.raw_samples_data[1:])
+            )
+            # TODO: ugly workaround - so far no reliable way to trace stop_raw_import complete - just wait
+            time.sleep(6)   # #2 should be stopped and #3, #4 should remove from progress list
+            asyncio.run(
+                self.client.emit_raw_import_status(
+                    request_id='raw_import_status',
+                    max_exec_time=3)
+            )
+            self.assert_requests_ok(['raw_import_status',])
+            self.assertEqual(self.client.raw_import_status_data['progress'], [])
+            self.assertEqual(self.client.raw_import_status_data['queue'], {})
+            # only 2 target files were created, other two were cancelled
+            if os.path.isdir(self.data_collection_path):
+                # not applicable, if the test and <TargetDataPool> (self.data_collection_path) are on different OSes
+                names = os.listdir(os.path.join(self.data_collection_path, self.client.data_collection_date))
+                names = sorted([n.replace(f'{self.client.instrument_name}_', '', 1) for n in names])
+                self.assertEqual(names, self.raw_samples[0:2])
+
+        def test_04_continue_raw_import(self):
+            asyncio.run(
+                self.client.emit_raw_import(
+                    self.client.raw_samples_data[2:],
+                    request_id='continue_raw_import',
+                    max_exec_time=60)
+            )
+            self.assert_requests_ok(['continue_raw_import',])
+            if os.path.isdir(self.data_collection_path):
+                # not applicable, if the test and <TargetDataPool> (self.data_collection_path) are on different OSes
+                names = os.listdir(os.path.join(self.data_collection_path, self.client.data_collection_date))
+                names = sorted([n.replace(f'{self.client.instrument_name}_', '', 1) for n in names])
+                self.assertEqual(names, self.raw_samples)
+
+            # let DataViz complete full-size visualizations in <TargetDataPool>
+            for i, (fname, _) in enumerate(self.client.acquired_samples):
+                rq_suffix = self.client.set_viz_test_params(fname)
+                request_id = f'{i}_{rq_suffix}'
+                asyncio.run(
+                    self.client.emit_visualize_range(
+                                fname,
+                                request_id=request_id,
+                                viz_types=["spectrogram", "timeseries", "waterfall"],
+                    )
+                )
+                # self.assert_requests_ok(request_ids=[request_id])
+            self.assert_requests_ok()
+
+
+
+@unittest.skip("TMP")
+class TestH5FileStreamerCase(BaseTestCases.BaseFileStreamerCase):
     """
     Setup:
     <H5DataPool> h5 raw samples pool
@@ -326,134 +498,52 @@ class TestH5FileStreamerCase(BaseTestClientCase):
         if os.path.isdir(cls.data_collection_path):
             shutil.rmtree(cls.data_collection_path)
 
+
+# @unittest.skip("TMP")
+class TestRawFileStreamerCase(BaseTestCases.BaseFileStreamerCase):
+    """
+    Setup:
+    <OrbitrapDataPool> orbitrap raw samples pool
+    karsa-router-service --url=0.0.0.0
+    plus either
+        karsa-file-streamer --ns=OrbitrapData --streamer_type=Raw --data_pool_path=<OrbitrapDataPool>
+        cd <RawTargetDataPool>
+        karsa-sample-service
+        karsa-dataviz-service
+        karsa-fileio-service --ns=OrbitrapData
+    or
+        cd <TargetDataPool>
+        karsa-file-streamer --ns=OrbitrapData --streamer_type=H5 --data_pool_path=<OrbitrapDataPool> --target_data_pool_path=<RawTargetDataPool>
+        karsa-sample-service
+        karsa-dataviz-service
+    """
     @classmethod
-    def tearDownClass(cls):
-        super().tearDownClass()
-        # commented out to check resulting cls.data_collection_path after tests
-        # if os.path.isdir(cls.data_collection_path):
-        #     # the data_pool dir may be locked for some time
-        #     time.sleep(3)
-        #     shutil.rmtree(cls.data_collection_path)
+    def setUpClass(cls):
+        cls.input_args = {
+            'url': 'localhost',
+            'port': 5010,
+            'ns': 'OrbitrapData',
+        }
+        super().setUpClass()
+        #======declarative input data==================
+        cls.data_collection_time = '2021.01.22'
+        # datetime range with no samples:
+        cls.dt_range_empty = {'dt0': datetime.datetime(2021, 1, 21).strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+                              'dt1': datetime.datetime(2021, 1, 22).strftime('%Y-%m-%dT%H:%M:%S.%fZ')}
+        # datetime range with samples:
+        cls.dt_range_all = {'dt0': datetime.datetime(2021, 1, 22).strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+                            'dt1': datetime.datetime(2021, 1, 23).strftime('%Y-%m-%dT%H:%M:%S.%fZ')}
+        # <RawDataPool>/2021.01.22 contents:
+        cls.raw_samples = ['20210122_1028_SRCI_DBrMe__1TCM.raw',
+                           '20210122_1028_SRCI_DBrMe__2TCM.raw',
+                           '20210122_1028_SRCI_DBrMe__3TCM.raw',
+                           '20210122_1028_SRCI_DBrMe__4TCM.raw']
+        # <TargetDataPool>/OrbitrapData
+        cls.data_collection_path = os.path.abspath(os.path.join(os.curdir, cls.client.instrument_name))
+        #=====declarative input data end======
+        if os.path.isdir(cls.data_collection_path):
+            shutil.rmtree(cls.data_collection_path)
 
-    def test_01_import_raw_table_datetime_range_empty(self):
-        asyncio.run(
-            self.client.emit_import_raw_table_datetime_range(
-                self.dt_range_empty,
-                max_exec_time=3)
-        )
-        self.assert_requests_ok()
-        self.assertEqual(self.client.raw_samples, [])
-
-    def test_02_import_raw_table_datetime_range_all(self):
-        # pre-defined DataPool structure is the test pre-requisite, since
-        # file system operations can not be used for verification while
-        # FileStreamer and unittests are run on different platforms (win/linux)
-        # TODO: workaround - declarative sorted list of raw samples;
-        # file list from os?
-        asyncio.run(
-            self.client.emit_import_raw_table_datetime_range(
-                self.dt_range_all,
-                max_exec_time=3)
-        )
-        self.assert_requests_ok()
-        # self.raw_samples = os.listdir(self.client.raw_samples_dir)
-        self.assertEqual(self.client.raw_samples, self.raw_samples)
-
-    def test_03_raw_import_interrupted_with_status_checks(self):
-        ## send raw_import and check raw_import_status
-        asyncio.run(
-            self.client.emit_raw_import(
-                self.client.raw_samples_data,
-                request_id=None)    # don't track the request for completion
-        )
-        asyncio.run(asyncio.sleep(3))   # let sample #1 to start importing
-        asyncio.run(
-            self.client.emit_raw_import_status(
-                request_id='raw_import_status',
-                max_exec_time=3)
-        )
-        self.assert_requests_ok(['raw_import_status',])
-        self.assertEqual(
-            basename(self.client.raw_import_status_data['progress'][0]['filename']),
-            self.raw_samples[0]
-        )
-        self.assertEqual(
-            [basename(f['filename']) for f in self.client.raw_import_status_data['queue']['files']],
-            self.raw_samples[1:]
-        )
-
-        ## send stop_raw_import for sample in progress (sample #1 should be stopped) and
-        ## check raw_import_status - the rest of the samples should continue visualizing
-        asyncio.run(
-            self.client.emit_stop_raw_import()
-        )
-        # TODO: ugly workaround - so far no reliable way to trace stop_raw_import complete - just wait
-        time.sleep(3)   # let #1 to stop and #2 to be taken to import
-        asyncio.run(
-            self.client.emit_raw_import_status(
-                request_id='raw_import_status',
-                max_exec_time=3)
-        )
-        self.assert_requests_ok(['raw_import_status',])
-        self.assertEqual(
-            basename(self.client.raw_import_status_data['progress'][0]['filename']),
-            self.raw_samples[1]
-        )
-        self.assertEqual(
-            [basename(f['filename']) for f in self.client.raw_import_status_data['queue']['files']],
-            self.raw_samples[2:]
-        )
-
-        ## send stop_raw_import for the rest of samples and check raw_import_status
-        asyncio.run(
-            self.client.emit_stop_raw_import(self.client.raw_samples_data[1:])
-        )
-        # TODO: ugly workaround - so far no reliable way to trace stop_raw_import complete - just wait
-        time.sleep(6)   # #2 should be stopped and #3, #4 should remove from progress list
-        asyncio.run(
-            self.client.emit_raw_import_status(
-                request_id='raw_import_status',
-                max_exec_time=3)
-        )
-        self.assert_requests_ok(['raw_import_status',])
-        self.assertEqual(self.client.raw_import_status_data['progress'], [])
-        self.assertEqual(self.client.raw_import_status_data['queue'], {})
-        # only 2 target files were created, other two were cancelled
-        if os.path.isdir(self.data_collection_path):
-            # not applicable, if the test and <TargetDataPool> (self.data_collection_path) are on different OSes
-            names = os.listdir(os.path.join(self.data_collection_path, self.client.data_collection_date))
-            names = sorted([n.replace(f'{self.client.instrument_name}_', '', 1) for n in names])
-            self.assertEqual(names, self.raw_samples[0:2])
-
-
-    # @unittest.skip("TMP")
-    def test_04_continue_raw_import(self):
-        asyncio.run(
-            self.client.emit_raw_import(
-                self.client.raw_samples_data[2:],
-                request_id='continue_raw_import',
-                max_exec_time=60)
-        )
-        self.assert_requests_ok(['continue_raw_import',])
-        if os.path.isdir(self.data_collection_path):
-            # not applicable, if the test and <TargetDataPool> (self.data_collection_path) are on different OSes
-            names = os.listdir(os.path.join(self.data_collection_path, self.client.data_collection_date))
-            names = sorted([n.replace(f'{self.client.instrument_name}_', '', 1) for n in names])
-            self.assertEqual(names, self.raw_samples)
-
-        # let DataViz complete full-size visualizations in <TargetDataPool>
-        for i, (fname, _) in enumerate(self.client.acquired_samples):
-            rq_suffix = self.client.set_viz_test_params(fname)
-            request_id = f'{i}_{rq_suffix}'
-            asyncio.run(
-                self.client.emit_visualize_range(
-                            fname,
-                            request_id=request_id,
-                            viz_types=["spectrogram", "timeseries", "waterfall"],
-                )
-            )
-            # self.assert_requests_ok(request_ids=[request_id])
-        self.assert_requests_ok()
 
 
 if __name__ == '__main__':

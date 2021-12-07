@@ -186,7 +186,18 @@ class zarr_sdk:
     @staticmethod
     def finalize_signal_dataset(data, item):
         filename = data['value']['filename']
-        final_length = float(item['signal'].time[-1] + item['signal_period'][-1])
+        n_tries = 3
+        while n_tries:
+            try:
+                final_length = float(item['signal'].time[-1] + item['signal_period'][-1])
+            except Exception as e:
+                print(f"[{this_func_name}] Error: {e}.  Retry...")
+                n_tries -= 1
+                sleep(.5)
+                continue
+            break
+        if not n_tries:
+            final_length = item['props']['length']
         # Update properties
         item['props'].update({'committed_length': final_length})
         item['props'].update({'length': final_length})
