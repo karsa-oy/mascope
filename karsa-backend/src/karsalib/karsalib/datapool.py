@@ -290,8 +290,12 @@ class RawPool():
         filename = basename(full_file_path)
         path = dirname(full_file_path)
         # Try to parse time from filename
-        matcher = datetime_glob.Matcher(pattern='%Y%m%d %H%M *')
-        file_datetime_match = matcher.match(filename)
+        patterns = ['%Y%m%d %H%M *', '%Y%m%d_%H%M_*']
+        for pattern in patterns:
+            matcher = datetime_glob.Matcher(pattern=pattern)
+            file_datetime_match = matcher.match(filename)
+            if file_datetime_match:
+                break
         if not file_datetime_match:
             print("Skipped file: %s due to invalid datetime format" %filename)
             raise ValueError

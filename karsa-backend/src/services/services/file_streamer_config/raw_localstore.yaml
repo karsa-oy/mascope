@@ -1,0 +1,8 @@
+# Raw streamer configuration for Orbitrap; can be overridden from cmd line
+url: localhost
+port: 5010
+ns: OrbitrapData
+streamer_type: Raw
+data_pool_path: "Z:/Data/Orbitrap Data and Documents/Orbitrap Data 2020"
+data_pool_mask: "*.raw"
+target_data_pool_path: .

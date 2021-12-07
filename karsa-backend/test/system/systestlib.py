@@ -11,7 +11,6 @@ from threading import Timer, Thread
 
 from karsalib.client import BaseClientNamespace, BridgeServiceClient
 from karsalib.util import parse_cmd_args
-from socketio import namespace
 
 # service_q = None
 
@@ -21,6 +20,10 @@ samples = {
     'TofDaq_Data_2021.08.02_01h01m01s': {'t_range_max': 30, 'max_exec_time': 10},
     'H5Data_3-DataFile_2021.08.02-01h01m00s.h5': {'t_range_max': 30, 'max_exec_time': 10},
     'H5Data_4-DataFile_2021.08.02-01h01m00s.h5': {'t_range_max': 30, 'max_exec_time': 10},
+
+    # '20210122_1028_SRCI_DBrMe__1TCM.raw': {'t_range_max': 277, 'max_exec_time': 15},
+    'OrbitrapData_20210122_1028_SRCI_DBrMe__3TCM.raw': {'t_range_max': 277, 'max_exec_time': 25},
+    'OrbitrapData_20210122_1028_SRCI_DBrMe__4TCM.raw': {'t_range_max': 277, 'max_exec_time': 25},
 }
 
 
@@ -78,7 +81,7 @@ class BaseTestClientPublicNamespace(BaseClientNamespace):
             self.parent.mark_request_done(request_id)
 
 
-    # test validators
+    # notification handlers
     
     # # TODO: smth wrong with this notificaiton: we just need ranges, but it gives huge coords array
     # async def on_loaded_coordinates(self, data):
@@ -162,7 +165,7 @@ class BaseTestClientPrivateNamespace(BaseClientNamespace):
         'raw_import_status_data',
         ]
 
-    # test validators
+    # notification handlers
 
     async def on_raw_samples(self, data):
         # on_import_raw_table_datetime_range emits raw_samples
