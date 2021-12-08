@@ -38,8 +38,8 @@
                     <div>
                       <b-button
                         icon-left="menu"
-                        type="is-dark"
-                        size="is-large"
+                        :type="sample_browser_pinned ? 'is-primary' : 'is-dark'"
+                        size="is-medium"
                         @click="sample_browser_pinned=!sample_browser_pinned"
                       >
                       Samples
@@ -121,8 +121,8 @@
                     <div>
                       <b-button
                         icon-left="target"
-                        type="is-dark"
-                        size="is-large"
+                        :type="target_browser_pinned ? 'is-primary' : 'is-dark'"
+                        size="is-medium"
                         @click="target_browser_pinned=!target_browser_pinned"
                       >
                       Targets
@@ -135,7 +135,7 @@
           </div>
           <!-- End of left column -->
           <!-- Right column -->
-          <div class="column" style="padding-right: 2rem; max-width:50vw;">
+          <div class="column" style="padding-right: 2rem; max-width:75vw;">
             <SampleView></SampleView>
           </div>
           <!-- End of Right column -->

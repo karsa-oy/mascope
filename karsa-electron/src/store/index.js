@@ -16,7 +16,8 @@ export default new Vuex.Store({
 		figure_ranges: {},
 		identified_ions: {},
 		identify_peaks: {},
-		ionization_mechanism: "+H+",
+		ionization_mechanism: "",
+		mz_calibration: {},
 		new_file: "",
 		peak_data: {},
 		project_selected: { 'title': "", 'attributes': [] },
@@ -78,6 +79,9 @@ export default new Vuex.Store({
 		},
 		ionization_mechanism(state, payload) {
 			state.ionization_mechanism = payload;
+		},
+		mz_calibration(state, payload) {
+			state.mz_calibration = payload;
 		},
 		new_file(state, payload) {
 			state.new_file = payload;

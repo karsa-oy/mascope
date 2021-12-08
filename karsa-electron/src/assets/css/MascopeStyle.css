@@ -168,6 +168,10 @@ th > input {
   color: #fff;
 }
 
+.label .dark {
+  color: #363636;
+}
+
 .label:not(:last-child) {
   margin-bottom: 0px;
   margin-top: 1em;

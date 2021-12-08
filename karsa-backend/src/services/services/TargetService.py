@@ -72,7 +72,6 @@ class TargetServiceNamespace(BaseClientNamespace):
         peak_tofs = np.frombuffer(value['peaks']['tof'], dtype=np.float32).astype(float)
         target_ion_data = value['target_ions']
         target_df = pd.DataFrame.from_dict(target_ion_data)
-        print(target_df.head())
 
         # Parameters
         mz_tolerance = value.get('parameters', {}).get('mz_tolerance', 10) # ppm
@@ -88,12 +87,15 @@ class TargetServiceNamespace(BaseClientNamespace):
             else:
                 id_peak_tofs.append(None)
         match_df['peak tof'] = id_peak_tofs
-        # Calculate isotope ratios and mz errors
+        # # Calculate isotope ratios and mz errors
         match_df = calculate_target_match_score(match_df)
-        # Compare score with thresholds
-        identified_isotopes_mask = filter_target_matches(match_df, mz_tolerance, iso_abu_tolerance, min_iso_abu)
-        identified_ion_peaks = match_df[identified_isotopes_mask]
-        identified_ion_peaks = identified_ion_peaks.fillna(-1)
+        # # pd.set_option("display.max_rows", None, "display.max_columns", None)
+        # # self.log(match_df)
+        # # Compare score with thresholds
+        # identified_isotopes_mask = filter_target_matches(match_df, mz_tolerance, iso_abu_tolerance, min_iso_abu)
+        # identified_ion_peaks = match_df[identified_isotopes_mask]
+        identified_ion_peaks = match_df
+        identified_ion_peaks = identified_ion_peaks.dropna(subset=['peak mz'])
         self.log(identified_ion_peaks)
 
         await self.emit_client_notification('identified_ions',
@@ -200,20 +202,26 @@ def match_peaks_to_targets(peak_mzs, peak_heights, target_ion_df, mz_tolerance):
     target_ion_df['peak mz'] = [np.nan]*len(target_ion_df)
     target_ion_df['peak height'] = [np.nan]*len(target_ion_df)
     target_ion_df = target_ion_df.sort_values('mz')
+    print(target_ion_df)
     for peak_i, peak_mz in enumerate(peak_mzs):
         match_is, match_mzs = match_mz(peak_mz, list(target_ion_df.mz), tolerance=mz_tolerance)
         for match_i in match_is:
-            target_ion_index = target_ion_df.index[match_i]
-            if not np.isnan(target_ion_df.loc[target_ion_index, 'peak mz']):
-                target_mz = target_ion_df.loc[target_ion_index, 'mz']
-                prev_peak_mz_err = np.abs(target_ion_df.loc[target_ion_index, 'peak mz'] - target_mz)
+            target_mz = target_ion_df.iloc[match_i]['mz']
+            print("Found match for target mz %.4f: peak mz %.4f" %(target_mz, peak_mz))
+            if not np.isnan(target_ion_df.iloc[match_i]['peak mz']):
+                prev_peak_mz = target_ion_df.iloc[match_i]['peak mz']
+                prev_peak_mz_err = np.abs(prev_peak_mz - target_mz)
                 curr_peak_mz_err = np.abs(peak_mz - target_mz)
+                print("Found match for target mz %.4f: peak mz %.4f" %(target_mz, peak_mz))
                 if prev_peak_mz_err < curr_peak_mz_err:
+                    print("For target mz %.4f replacing peak %.4f with %.4f" %(target_mz, prev_peak_mz, peak_mz))
                     # Closer match has been found already
                     continue
+            target_ion_index = target_ion_df.index[match_i]
             target_ion_df.loc[target_ion_index, 'peak id'] = peak_i
             target_ion_df.loc[target_ion_index, 'peak mz'] = peak_mz
             target_ion_df.loc[target_ion_index, 'peak height'] = peak_heights[peak_i]
+            print(target_ion_df.loc[target_ion_index])
     return target_ion_df
 
 
