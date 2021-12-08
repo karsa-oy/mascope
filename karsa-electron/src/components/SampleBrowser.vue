@@ -284,9 +284,6 @@
               Cancel
             </b-button>
             <div style="position: absolute; right: 20px">
-              <b-button @click="launchPrefillSampleAttributesModal()">
-                Prefill
-              </b-button>
               <b-tooltip
                 label="Delete experiment"
                 position="is-left"
@@ -403,80 +400,6 @@
       </b-modal>
     </section>
     <!-- End of Modal for sample edit -->
-
-    <!-- Modal for prefilling sample attributes -->
-    <section class="sample-attribute-modal">
-      <b-modal
-        :active.sync="is_modal_prefill_sample_attributes_active"
-        has-modal-card
-        trap-focus
-        :can-cancel="true"
-        :destroy-on-hide="true"
-      >
-        <div class="columns">
-          <div class="modal-card" style="width: auto">
-            <header class="modal-card-head">
-              <p class="modal-card-title">Prefill sample information</p>
-            </header>
-            <section class="modal-card-body write_sample_attribute">
-              <MetaDataForm
-                form_title="Prefill sample attributes"
-                :initial_template="
-                  experiment_edit_form_props.sample_attributes_template
-                "
-                :template_path="
-                  experiment_edit_form_props.prefilled_templates_path
-                "
-              >
-              </MetaDataForm>
-
-              <div><br /></div>
-              <b-field label="Project">
-                <b-select
-                  placeholder="Select a project"
-                  v-model="project_selected.title"
-                  @input="selectProject($event)"
-                  disabled
-                  required
-                  expanded
-                >
-                  <option v-for="p in projects" :value="p.title" :key="p.title">
-                    {{ p.title }}
-                  </option>
-                </b-select>
-              </b-field>
-
-              <b-field label="Experiment">
-                <b-select
-                  placeholder="Select an experiment"
-                  v-model="experiment_selected.title"
-                  @input="selectExperiment($event)"
-                  disabled
-                  required
-                  expanded
-                >
-                  <option
-                    v-for="e in experiments"
-                    :value="e.title"
-                    :key="e.title"
-                  >
-                    {{ e.title }}
-                  </option>
-                </b-select>
-              </b-field>
-            </section>
-            <footer class="modal-card-foot">
-              <b-button
-                @click="is_modal_prefill_sample_attributes_active = false"
-              >
-                Close
-              </b-button>
-            </footer>
-          </div>
-        </div>
-      </b-modal>
-    </section>
-    <!-- End of modal for prefilling sample edit -->
 
     <!-- Sample table modal -->
     <section class="sample-table-modal">
@@ -631,7 +554,7 @@
       </b-notification>
       <!-- Samples datatable collapsable -->
       <section>
-        <div style="min-height: 100%; overflow: scroll">
+        <div style="min-height: 100%;">
           <!-- Sample browser tree -->
           <b-menu>
             <!-- Projects -->
@@ -863,7 +786,7 @@ import MetaDataForm from "./MetaDataForm.vue";
 Vue.use([Buefy]);
 
 const _ = require("underscore");
-const fs = require("fs");
+// const fs = require("fs");
 const { Parser } = require("json2csv");
 
 export default {
@@ -997,6 +920,7 @@ export default {
       sample_attributes_template_path: "./metadata_templates/sample_templates",
       sample_form_key: Math.random(),
       sample_form_props: {},
+      // 
     };
   },
   created: function () {
@@ -1077,23 +1001,6 @@ export default {
       }
       return { title: "", attributes: [] };
     },
-    getPrefilledTemplatePath(
-      project_title,
-      experiment_title,
-      make_if_missing = false
-    ) {
-      const template_path =
-        "./metadata_templates/prefilled_templates/" +
-        [project_title, experiment_title].join("_");
-      if (!fs.existsSync(template_path)) {
-        if (make_if_missing) {
-          fs.mkdirSync(template_path);
-        } else {
-          return null;
-        }
-      }
-      return template_path;
-    },
     getProject(project_title) {
       for (let i in this.projects) {
         if (this.projects[i].title === project_title) {
@@ -1138,13 +1045,6 @@ export default {
     },
     launchNewExperimentModal() {
       this.is_modal_new_experiment_active = true;
-    },
-    launchPrefillSampleAttributesModal() {
-      const experiment_title = this.experiment_edit_form_props.experiment;
-      const project = this.experiment_edit_form_props.project;
-      this.experiment_edit_form_props.prefilled_templates_path =
-        this.getPrefilledTemplatePath(project, experiment_title, true);
-      this.is_modal_prefill_sample_attributes_active = true;
     },
     launchProjectAttributesModal(mode, initial_template = null) {
       switch (mode) {
@@ -1661,4 +1561,5 @@ export default {
 .menu-list a {
   color: #ababab;
 }
+
 </style>
