@@ -9,6 +9,7 @@ via socket.io, and handles file i/o synchronization.
 Created on Thu May  7 12:43:13 2020
 """
 
+from ctypes import ArgumentError
 import ntpath
 import os
 import asyncio
@@ -385,6 +386,22 @@ def get_file_data_vars(filepath):
         zarrs.append(var.strip('.zarr'))
     return zarrs
 
+def get_zarr_var_shape(base_filename, var, concat_dim=1):
+    path = filename_to_zarr_path(base_filename, var)
+    if not os.path.exists(path):
+        raise FileNotFoundError("Zarr file %s does not exist" %path)
+    sync = zarr.ProcessSynchronizer(os.path.join(path, '.sync'))
+    z = zarr.open(path, mode='r', synchronizer=sync)
+    group_shapes = [ g[1][var].shape for g in z.groups() ]
+    dim0, dim1 = zip(*group_shapes)
+    if concat_dim == 0:
+        shape = (sum(dim0), max(dim1))
+    elif concat_dim == 1:
+        shape = (max(dim0), sum(dim1))
+    else:
+        raise ArgumentError("Error in 'get_zarr_var_shape()', 'concat_dim' must be 0 or 1")
+    return shape
+    
 def load_array(base_filename, var, prev_array=None):
     """Load a stored mfzarr variable from file into a xarray.Dataset object.
        If the variable receives another chunk of mfzarr data, then subsequent
@@ -473,7 +490,6 @@ def load_file(base_filename, vars=None, prev_dataset=None):
     dataset.attrs['props'] = props
     dataset.attrs['zarr_groups'] = zarr_groups
     return dataset
-
 
 def open_mfzarr(path, mode='r', concat_dim='time', prev_array=None):
     """Load data from a multi-file zarr into a xarray.Dataset

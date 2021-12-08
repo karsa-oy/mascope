@@ -57,33 +57,28 @@
               <p class="modal-card-title">Mass calibration</p>
             </header>
             <section class="modal-card-body" style="text-align: center">
+              <!-- Stats figure -->
+              <div id="mz-calib-stats-chart">
+              </div>
+              <!-- End of stats figure -->
+              <!-- Stats table -->
               <b-table
-                id="mz-calib-compound-table"
-                style="max-height: 400px"
-                :columns="mz_calib_compound_table_cols"
-                :data="mz_calib_compound_table_rows"
-                :sticky-header="true"
-                :selected.sync="mz_calib_compound_table_selected_row"
-                checkable
-                :checked-rows.sync="mz_calib_compound_table_checked_rows"
-                focusable
-                sortable
+                :data="mz_calib_stats_table_rows"
+                :columns="mz_calib_stats_table_cols"
               >
               </b-table>
-              <div><br /></div>
-              <b-table
-                id="mz-calib-peak-table"
-                style="max-height: 400px"
-                :columns="mz_calib_isotope_table_cols"
-                :data="mz_calib_isotope_table_rows"
-                :sticky-header="true"
-                focusable
-              >
-              </b-table>
-              <div><br /></div>
-              <b-button @click="fitMzCalibFunction"> Fit </b-button>
+              <!-- End of stats table -->
             </section>
-            <footer class="modal-card-foot"></footer>
+            <footer class="modal-card-foot">
+              <b-button
+                @click="is_mz_calib_modal_active=false;">
+                Save
+              </b-button>
+              <b-button
+                @click="is_mz_calib_modal_active=false;">
+                Cancel
+              </b-button>
+            </footer>
           </div>
         </div>
       </b-modal>
@@ -93,7 +88,15 @@
 
     <!-- Main content area -->
     <section class="tab-content">
-        <!-- Target tables -->
+        <b-button
+          type="is-dark"
+          @click="is_excel_clipboard_modal_active = true"
+          style="margin-right: 1em"
+          expanded
+          >
+          Import
+        </b-button>
+        <!-- Target compound table -->
         <b-table
             id="targets-datatable"
             :columns="target_table_cols"
@@ -114,10 +117,124 @@
                 </tr>
             </template>
         </b-table>
+		<!-- End of target table -->
         <!-- Ionization mechanism input -->
-        <b-field label="Ionization mechanisms" style="text-align: left">
+        <b-field label="Ionization mechanism(s)" style="text-align: left">
             <b-input v-model="ionization_mechanism" lazy> </b-input>
         </b-field>
+		<!-- Isotope table -->
+		<!-- Buttons above table -->
+		<div class="columns">
+			<div class="column" style="text-align: left">
+				<!-- Identification parameters -->
+				<b-dropdown
+					aria-role="menu"
+					type="is-dark"
+					position="is-top-right"
+					style="top: 0px;"
+					trap-focus
+					append-to-body
+					>
+					<b-button
+						icon-left="cogs"
+						class="tag is-dark"
+						slot="trigger"
+						outlined
+					>
+					</b-button>
+					<div style="background-color: #363636; width: 25vw;">
+						<section style="padding: 0em 1em 0 1em;">
+							<b-field label="m/z tolerance [ppm]">
+								<b-slider
+									type="is-primary"
+									v-model="parameter_mz_tolerance"
+									:min="0"
+									:max="100"
+									:tooltip="false"
+									lazy
+									indicator
+									>
+								</b-slider>
+							</b-field>
+							<b-field label="isotope ratio tolerance [%]">
+								<b-slider
+									type="is-primary"
+									v-model="parameter_iso_ratio_tolerance"
+									:min="0"
+									:max="100"
+									:tooltip="false"
+									lazy
+									indicator
+									>
+								</b-slider>
+							</b-field>
+							<b-field label="isotope abundance threshold [%]">
+								<b-slider
+									type="is-primary"
+									v-model="parameter_iso_abu_threshold"
+									:min="0"
+									:max="100"
+									:step="1"
+									:tooltip="false"
+									lazy
+									indicator
+									>
+								</b-slider>
+							</b-field>
+						</section>
+					</div>
+				</b-dropdown>
+				<!-- End of identification parameters -->
+				<b-button
+					icon-left="check"
+					class="tag"
+					:type="isotope_table_show_only_checked ? 'is-primary' : 'is-dark'"
+					outlined
+					@click="isotope_table_show_only_checked=!isotope_table_show_only_checked;"
+				>
+				</b-button>
+			</div>
+			<div class="column" style="text-align: right">
+				<b-button
+					icon-left="fullscreen"
+					class="tag is-dark"
+					outlined
+					@click="function() {return;}"
+				>
+				</b-button>
+				<!-- Isotope table column visibility control -->
+				<b-dropdown
+					aria-role="menu"
+					type="is-dark"
+					position="is-bottom-right"
+					style="top: 0px"
+					trap-focus
+					multiple
+					append-to-body
+				>
+					<b-button
+					icon-left="menu"
+					class="tag is-dark"
+					slot="trigger"
+					outlined
+					>
+					</b-button>
+					<div>
+						<div
+							v-for="(col, i) in isotope_table_cols"
+							:key="i"
+							class="control"
+						>
+							<b-checkbox v-model="col.visible" size="is-small">
+							{{ col.label }}
+							</b-checkbox>
+						</div>
+					</div>
+				</b-dropdown>
+				<!-- End of isotope table column visibility control -->
+			</div>
+		</div>
+		<!-- End of buttons above table -->
         <b-table
             @contextmenu="rightClickPeakTableRow"
             id="isotope-datatable"
@@ -136,60 +253,19 @@
             sortable
         >
         </b-table>
-        <!-- End of target tables -->
+        <!-- End of isotope table -->
 		<!-- Identification parameters -->
-		<section>
-			<b-field label="m/z tolerance [ppm]">
-				<b-slider
-					type="is-primary"
-					v-model="parameter_mz_tolerance"
-					:min="0"
-					:max="100"
-					:tooltip="false"
-					lazy
-					indicator
-					>
-				</b-slider>
-			</b-field>
-			<b-field label="isotope ratio tolerance [%]">
-				<b-slider
-					type="is-primary"
-					v-model="parameter_iso_ratio_tolerance"
-					:min="0"
-					:max="100"
-					:tooltip="false"
-					lazy
-					indicator
-					>
-				</b-slider>
-			</b-field>
-			<b-field label="isotope abundance threshold [%]">
-				<b-slider
-					type="is-primary"
-					v-model="parameter_iso_abu_threshold"
-					:min="0"
-					:max="100"
-					:step="1"
-					:tooltip="false"
-					lazy
-					indicator
-					>
-				</b-slider>
-			</b-field>
-		</section>
+		
 		<!-- End of identification parameters -->
-        <section style="text-align: right; margin-top: 1em">
-            <b-button
-            type="is-dark"
-            @click="is_excel_clipboard_modal_active = true"
-            style="margin-right: 1em"
-            >
-            Import targets
-            </b-button>
-            <b-button type="is-dark" @click="mzCalibrateButtonClicked">
-            Calibrate m/z
-            </b-button>
-        </section>
+		<section style="padding: 1em 0 0 0;">
+			<b-button
+				type="is-dark"
+				@click="mzCalibrateButtonClicked"
+        :disabled="isotope_table_checked_rows.length < 4"
+				expanded>
+				Calibrate m/z
+			</b-button>
+		</section>
     </section>
     <!-- End of main content area -->
   </div>
@@ -209,6 +285,7 @@ Vue.use([Buefy]);
 
 var _ = require("underscore");
 var fs = require("fs");
+var Plotly = require("plotly.js-dist");
 
 export default {
   name: "TargetBrowser",
@@ -222,6 +299,14 @@ export default {
       "root_namespace",
       "sample_selected",
     ]),
+	compute_target_ions: {
+      get() {
+        return this.$store.state.compute_target_ions;
+      },
+      set(value) {
+        this.$store.commit("compute_target_ions", value);
+      },
+    },
     identified_ions: {
       get() {
         return this.$store.state.identified_ions;
@@ -246,12 +331,12 @@ export default {
         this.$store.commit("ionization_mechanism", value);
       },
     },
-    compute_target_ions: {
+	mz_calibration: {
       get() {
-        return this.$store.state.compute_target_ions;
+        return this.$store.state.mz_calibration;
       },
       set(value) {
-        this.$store.commit("compute_target_ions", value);
+        this.$store.commit("mz_calibration", value);
       },
     },
     target_ions: {
@@ -274,27 +359,26 @@ export default {
   data: function () {
     return {
 		be: null,
+    figure_config: {},
 		namespace: null,
 		// variables for excel clipboard import
 		is_excel_clipboard_modal_active: false,
 		excel_clipboard_text: "",
 		excel_clipboard_table_cols: [],
 		excel_clipboard_table_rows: [],
-		// Mass calibration
-		is_mz_calib_modal_active: false,
-		mz_calib_compound_table_checked_rows: [],
-		mz_calib_compound_table_cols: [],
-		mz_calib_compound_table_rows: [],
-		mz_calib_compound_table_selected_row: {},
-		mz_calib_isotope_table_cols: [],
-		mz_calib_isotope_table_rows: [],
-		//
 		// Peak table
+		isotope_table_all_rows: [],
 		isotope_table_checked_rows: [],
 		isotope_table_cols: [],
 		isotope_table_key: Math.random(),
 		isotope_table_rows: [],
 		isotope_table_selected_row: {},
+		isotope_table_show_only_checked: false,
+		//
+		// Mass calibration
+		is_mz_calib_modal_active: false,
+		mz_calib_stats_table_cols: [],
+		mz_calib_stats_table_rows: [],
 		//
 		// Identification parameters
 		parameter_mz_tolerance: 10,
@@ -302,7 +386,6 @@ export default {
 		parameter_iso_abu_threshold: 1,
 		// 
 		// Target table
-		targets: [],
 		target_table_rows: [],
 		target_table_cols: [],
 		target_table_detailed_rows: [],
@@ -310,6 +393,7 @@ export default {
 		target_table_selected_row: {},
 		target_name_col: null,
 		target_composition_col: null,
+		targets_to_import: {},
 		//
 		room_sid: null,
 		endpoints: [],
@@ -317,47 +401,76 @@ export default {
   },
   created: function () {
 	this.be = new BECom(this);
+  var self = this;
+  // Read figure config
+  if (fs.existsSync('configs/figure_config.json')) {
+      const figure_configs = JSON.parse(fs.readFileSync('configs/figure_config.json', 'utf8'));
+      self.figure_config = figure_configs.common_config;
+  }
   },
   mounted: function () {
   },
   methods: {
+    drawMzCalibStatsFigure() {
+      let mz = this.mz_calibration.stats['mz'];
+      let pre_calib_dmz = this.mz_calibration.stats['pre_dmz'];
+      let post_calib_dmz = this.mz_calibration.stats['post_dmz'];
+
+      let ddmz = new Float32Array(mz.length);
+      for (var i=ddmz.length; i-->0;) {
+        ddmz[i] = Math.abs(pre_calib_dmz[i])-Math.abs(post_calib_dmz[i]);
+      }
+      let pre_trace = {x: mz,
+                      y: pre_calib_dmz,
+                      type: 'bar',
+                      name: "Pre"
+                      };
+      let post_trace = {x: mz,
+                        y: post_calib_dmz,
+                        type: 'bar',
+                        name: "Post"
+                        };
+      let d_trace = {x: mz,
+                    y: ddmz,
+                    type: 'line',
+                    name: "Diff"
+                    };
+      
+      Plotly.react(
+        "mz-calib-stats-chart",
+        [pre_trace, post_trace, d_trace],
+        {},
+        this.figure_config
+      );
+    },
     fitMzCalibFunction() {
-		let peak_tofs = this.mz_calib_isotope_table_rows.map(
-			(row) => row["peak tof"]
-		);
-		let peak_mzs = this.mz_calib_isotope_table_rows.map((row) => row["peak mz"]);
-		let exact_mzs = this.mz_calib_isotope_table_rows.map((row) => row["mz"]);
-		let mz_calib_data = {
-			peak_tofs: peak_tofs,
-			peak_mzs: peak_mzs,
-			exact_mzs: exact_mzs,
-		};
-		this.be.export_one_way_binding_prop(
-			"fit_mz_calib_function",
-			{ ...mz_calib_data, room: this.room_sid, uid: Math.random() },
-			null,
-			this.room_sid
-		);
+      let peak_tofs = this.isotope_table_checked_rows.map(
+        (row) => row["peak tof"]
+      );
+      let peak_mzs = this.isotope_table_checked_rows.map((row) => row["peak mz"]);
+      let exact_mzs = this.isotope_table_checked_rows.map((row) => row["mz"]);
+      let mz_calib_data = {
+        peak_tofs: peak_tofs,
+        peak_mzs: peak_mzs,
+        exact_mzs: exact_mzs,
+      };
+      this.be.export_one_way_binding_prop(
+        "fit_mz_calib_function",
+        { ...mz_calib_data, room: this.room_sid, uid: Math.random() },
+        null,
+        this.room_sid
+      );
     },
     importExcelTargets() {
-		this.targets = {
+		this.targets_to_import = {
 			cols: this.excel_clipboard_table_cols,
 			rows: this.excel_clipboard_table_rows,
 		};
 		this.is_excel_clipboard_modal_active = false;
     },
     mzCalibrateButtonClicked() {
-		// Set up compound table
-		this.mz_calib_compound_table_cols = this.isotope_table_cols;
-		this.mz_calib_compound_table_rows = this.isotope_table_rows.filter(function (
-			row
-		) {
-			return row["peak id"] != -1;
-		});
-		this.mz_calib_compound_table_checked_rows =
-			this.mz_calib_compound_table_rows;
-		this.updateMzCalibPeaks();
-		this.is_mz_calib_modal_active = true;
+      this.fitMzCalibFunction();
+      this.is_mz_calib_modal_active = true;
     },
     parseExcelClipboard: function (clipboard_text) {
 		// Split full text to rows
@@ -400,10 +513,10 @@ export default {
 				}
 			}
 			// Add row
-			if (!_.isEmpty(row)) {
-			if (i > 0 || !this.excel_clipboard_use_header) {
-				rows.push(row);
-			}
+			if (!_.isEmpty(row) && Object.keys(row).length == cols.length) {
+				if (i > 0 || !this.excel_clipboard_use_header) {
+					rows.push(row);
+				}
 			}
 		}
 		this.excel_clipboard_table_cols = cols;
@@ -432,7 +545,7 @@ export default {
         }
         this.target_table_rows = target_table_data.rows;
     },
-	requestPeakIdentification() {
+    requestPeakIdentification() {
 		let peaks_exist = this.peak_data.mz && this.peak_data.mz.length;
 		let targets_exist = this.target_ions.length > 0;
 		if (!peaks_exist || !targets_exist) {
@@ -448,7 +561,7 @@ export default {
             target_ions: this.target_ions,
 			parameters: parameters
             };
-	},
+    },
     requestTargetIons() {
 		// Collect compound formula from each row
 		let compounds = [];
@@ -464,9 +577,9 @@ export default {
     rightClickPeakTableRow(row) {
 		console.log(row);
     },
-	setTargetTableDetails(row) {
+    setTargetTableDetails(row) {
 		this.target_table_detailed_rows = [row['0']];
-	},
+    },
     updateIsotopeTableData(data) {
         // Format data to isotope table
         let rows = [];
@@ -500,31 +613,25 @@ export default {
             rows.push(row);
         }
         this.isotope_table_cols = cols;
-        this.isotope_table_rows = rows;
+        this.isotope_table_all_rows = rows;
     },
-    updateMzCalibPeaks() {
-		this.mz_calib_isotope_table_cols = [
-			{ field: "ion composition", label: "Ion composition" },
-			{ field: "mz", label: "Ion m/z" },
-			// {'field': 'peak id', 'label': "Peak ID"},
-			{ field: "peak mz", label: "Peak m/z" },
-			{ field: "peak tof", label: "Peak TOF", visible: false },
-		];
-		this.mz_calib_isotope_table_rows = [];
-		for (let i in this.mz_calib_compound_table_rows) {
-			const compound_row = this.mz_calib_compound_table_rows[i];
-			if (
-			this.mz_calib_compound_table_checked_rows.indexOf(compound_row) == -1
-			) {
-			continue;
-			}
-			let row = {};
-			for (let j in this.mz_calib_isotope_table_cols) {
-			let key = this.mz_calib_isotope_table_cols[j].field;
-			row[key] = compound_row[key];
-			}
-			this.mz_calib_isotope_table_rows.push(row);
-		}
+    updateMzCalibStatsTable() {
+      this.mz_calib_stats_table_cols = [
+        { field: "mz", label: "m/z" },
+        { field: "pre_dmz", label: "pre m/z error" },
+        { field: "post_dmz", label: "post m/z error" }
+      ];
+      this.mz_calib_stats_table_rows = [];
+      for (let i in this.mz_calibration.stats.mz) {
+        let row = {};
+        for (let j in this.mz_calib_stats_table_cols) {
+          let key = this.mz_calib_stats_table_cols[j].field;
+          let value = this.mz_calibration.stats[key][i]; 
+          row[key] = Math.round((value + Number.EPSILON) * 1000) / 1000;
+        }
+        this.mz_calib_stats_table_rows.push(row);
+      }
+      console.log("this.mz_calib_stats_table_rows: ", this.mz_calib_stats_table_rows);
     },
     writeTargetsToFile() {
 		let target_table_data = {
@@ -575,14 +682,15 @@ export default {
         this.isotope_table_selected_row = null;
     },
     identified_ions: function (new_value) {
+		this.updateIsotopeTableData(this.target_ions);
 		this.isotope_table_checked_rows = [];
 		let identified_targets = new Set();
 		let identified_ions = new Set();
 		let first_round = true;
 		for (let row_i in new_value) {
 			let row = new_value[row_i];
+			// Check if columns need to be extended
 			if (first_round) {
-				// Check if columns need to be extended
 				let cols_to_add = [];
 				for (let field in row) {
 					let field_exists = false;
@@ -596,7 +704,8 @@ export default {
 					if (!field_exists) {
 						cols_to_add.push({
 								'field': field,
-								'label': field
+								'label': field,
+								'visible': true
 								});
 					}
 				}
@@ -606,15 +715,17 @@ export default {
 					];
 				first_round = false;
 			}
-			// Fix precision of numeric fields to 4 decimals
+			// 
+			
 			for (let key in row) {
 				let value = row[key];
+				// Fix precision of numeric fields to 4 decimals
 				if (Number(value) && value != 0) {
 					value = Math.round((value + Number.EPSILON) * 10000) / 10000;
 					row[key] = value;
 				}
 			}
-			this.isotope_table_rows[row_i] = row;
+			this.isotope_table_all_rows[row_i] = row;
 			// Add checkmark for identified isotopes
 			if (row["peak mz"] > -1) {
 				this.isotope_table_checked_rows.push(row);
@@ -654,18 +765,29 @@ export default {
 			this.room_sid
 		);
     },
+    isotope_table_all_rows: function() {
+		if (this.isotope_table_show_only_checked) {
+			this.isotope_table_rows = this.isotope_table_checked_rows;
+			return;
+		}
+		this.isotope_table_rows = this.isotope_table_all_rows;
+    },
     mz_calib_compound_table_checked_rows: function () {
 		this.updateMzCalibPeaks();
     },
-	parameter_iso_abu_threshold: function() {
+    mz_calibration: function() {
+      this.updateMzCalibStatsTable();
+      this.drawMzCalibStatsFigure();
+    },
+    parameter_iso_abu_threshold: function() {
 		this.requestPeakIdentification();
-	},
-	parameter_iso_ratio_tolerance: function() {
+    },
+    parameter_iso_ratio_tolerance: function() {
 		this.requestPeakIdentification();
-	},
-	parameter_mz_tolerance: function() {
+    },
+    parameter_mz_tolerance: function() {
 		this.requestPeakIdentification();
-	},
+    },
     peak_data: function () {
         this.requestPeakIdentification();
     },
@@ -687,12 +809,19 @@ export default {
 			this.target_to_display = null;
 		}
     },
+    isotope_table_show_only_checked: function(new_value) {
+		if (new_value) {
+			this.isotope_table_rows = this.isotope_table_checked_rows;
+			return;
+		}
+		this.isotope_table_rows = this.isotope_table_all_rows;
+    },
     target_ions: function (new_value) {
-		// Clear target ions from target table
+		// Clear target ions from target table row details
 		for (let i in this.target_table_rows) {
 			this.target_table_rows[i].items = [];
 		}
-		// Collect ions per target
+		// Collect ion compositions per target for row details
 		let prev_ion_id = -1;
 		for (let i in new_value) {
 			let isotope = new_value[i];
@@ -703,7 +832,7 @@ export default {
 			this.target_table_rows[target_index].items.push(isotope);
 			prev_ion_id = isotope['ion id'];
 		}
-		console.log(this.target_table_rows);
+		// 
 		this.updateIsotopeTableData(new_value);
 		this.requestPeakIdentification();
     },
@@ -715,7 +844,7 @@ export default {
         let target_id = this.target_table_rows.indexOf(new_value);
         this.$set(this.$refs.isotope_table.filters, 'target id', String(target_id));
     },
-    targets: function (new_data, old_data) {
+    targets_to_import: function (new_data, old_data) {
 		if (_.isEqual(new_data, old_data)) {
 			return false;
 		}
@@ -735,23 +864,28 @@ export default {
 			this.namespace = this.root_namespace;
 			// handlers for for external notifications:
 			this.namespace.on("identified_ions", (value) =>
-			this.be.import_one_way_binding_prop("identified_ions", value.value)
+				this.be.import_one_way_binding_prop("identified_ions", value.value)
 			);
 			this.namespace.on("target_ions", (value) =>
-			this.be.import_one_way_binding_prop(
-				"target_ions",
-				value.value
-			)
+				this.be.import_one_way_binding_prop("target_ions", value.value)
 			);
-			this.namespace.on("targets", (value) =>
-			this.be.import_one_way_binding_prop("targets", value.value)
+			this.namespace.on("mz_calibration", (value) =>
+				this.be.import_one_way_binding_prop("mz_calibration",
+            {
+            'fit': value.value.fit,
+            'stats': {
+							mz: new Float32Array(value.value.stats.mz),
+							pre_dmz: new Float32Array(value.value.stats.pre_dmz),
+							post_dmz: new Float32Array(value.value.stats.post_dmz)
+              }
+            })
 			);
 			this.room_sid = this.root_namespace.id;
 			this.be.subscribe(this.endpoints, this.room_sid);
 
 			this.readTargetsFromFile();
 		}
-	},
+    },
   },
 };
 </script>
