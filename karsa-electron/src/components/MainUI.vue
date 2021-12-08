@@ -33,20 +33,17 @@
                       :expand-on-hover="true"
                       :fullheight="true"
                       :reduce="!sample_browser_pinned"
-                      :delay="500"
-                      type="is-dark"
                       open
                   >
                     <div>
-                    <b-button
-                      icon-left="menu"
-                      type="is-dark"
-                      size="is-large"
-                      outlined
-                      @click="sample_browser_pinned=!sample_browser_pinned"
-                    >
-                    Samples
-                    </b-button>
+                      <b-button
+                        icon-left="menu"
+                        type="is-dark"
+                        size="is-large"
+                        @click="sample_browser_pinned=!sample_browser_pinned"
+                      >
+                      Samples
+                      </b-button>
                       <!-- Data source selector -->
                       <div
                         style="
@@ -102,7 +99,7 @@
                         "
                       >
                       </TOFControl>
-                      <!-- End of ata source component -->
+                      <!-- End of data source component -->
                     </div>
                     <div>
                       <SampleBrowser></SampleBrowser>
@@ -112,15 +109,36 @@
           </div>
           <!-- End of sidebar -->
           <!-- Left column -->
-          <div class="column is-one-third" style="padding-left: 1rem">
-            <TargetBrowser></TargetBrowser>
+          <div class="sidebar-page">
+              <section class="sidebar-layout">
+                  <b-sidebar
+                      position="static"
+                      :expand-on-hover="true"
+                      :fullheight="true"
+                      :reduce="!target_browser_pinned"
+                      open
+                  >
+                    <div>
+                      <b-button
+                        icon-left="target"
+                        type="is-dark"
+                        size="is-large"
+                        @click="target_browser_pinned=!target_browser_pinned"
+                      >
+                      Targets
+                      </b-button>
+                    </div>
+                    <TargetBrowser></TargetBrowser>
+                  </b-sidebar>
+              </section>
+              
           </div>
           <!-- End of left column -->
-          <!-- Right side content -->
-          <div class="column is-two-thirds" style="padding-right: 2rem">
+          <!-- Right column -->
+          <div class="column" style="padding-right: 2rem; max-width:50vw;">
             <SampleView></SampleView>
           </div>
-          <!-- End of Right side content -->
+          <!-- End of Right column -->
         </div>
       </b-tab-item>
       <!-- End of tabs -->
@@ -167,7 +185,8 @@ export default {
       data_source_name_selected: null,
       data_sources: [],
       room_data_sources: "room_data_sources",
-      sample_browser_pinned: false,
+      sample_browser_pinned: true,
+      target_browser_pinned: true,
     };
   },
   computed: {
@@ -334,15 +353,17 @@ body {
 
 /* Sidebar */
 .b-sidebar .sidebar-content {
-  height: 900px;
-	width: 400px;
+  background-color: inherit;
+  padding-left: 2px;
+	width: 25vw;
 }
 .b-sidebar .sidebar-content.is-mini.is-mini-expand:hover:not(.is-fullwidth) {
-    height: 900px;
-    width: 400px;
+    height: auto;
+    width: 25vw;
 }
 .b-sidebar .sidebar-content.is-mini {
-    width: 60px;
+    height: 60px;
+    width: 160px;
     overflow: hidden;
 }
 /* End of sidebar */

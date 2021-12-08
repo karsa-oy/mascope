@@ -3,7 +3,6 @@
 
 .b-tabs .tabs {
   background-color: #29282e;
-  padding: 0em 1em 0em 1em;
 }
 
 .tabs a {
@@ -24,7 +23,7 @@
 
 .tab-item {
   flex: auto auto;
-  padding: 0em 2em 0em 2em;
+  padding: 0em 0em 0em 0em;
 }
 
 .tab-content {
