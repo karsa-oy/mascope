@@ -78,6 +78,9 @@ class TargetServiceNamespace(BaseClientNamespace):
         iso_abu_tolerance = value.get('parameters', {}).get('iso_abu_tolerance', 10) # %
         min_iso_abu = value.get('parameters', {}).get('min_iso_abu', 1) / 100.0 # frac
 
+        # Filter by minimum isotope abundance
+        target_df = target_df[(target_df['rel abu'] >= min_iso_abu)]
+
         # Find matching targets for found peaks
         match_df = match_peaks_to_targets(peak_mzs, peak_heis, target_df, mz_tolerance)
         id_peak_tofs = []
@@ -202,26 +205,26 @@ def match_peaks_to_targets(peak_mzs, peak_heights, target_ion_df, mz_tolerance):
     target_ion_df['peak mz'] = [np.nan]*len(target_ion_df)
     target_ion_df['peak height'] = [np.nan]*len(target_ion_df)
     target_ion_df = target_ion_df.sort_values('mz')
-    print(target_ion_df)
+
     for peak_i, peak_mz in enumerate(peak_mzs):
         match_is, match_mzs = match_mz(peak_mz, list(target_ion_df.mz), tolerance=mz_tolerance)
         for match_i in match_is:
             target_mz = target_ion_df.iloc[match_i]['mz']
-            print("Found match for target mz %.4f: peak mz %.4f" %(target_mz, peak_mz))
+            # print("Found match for target mz %.4f: peak mz %.4f" %(target_mz, peak_mz))
             if not np.isnan(target_ion_df.iloc[match_i]['peak mz']):
                 prev_peak_mz = target_ion_df.iloc[match_i]['peak mz']
                 prev_peak_mz_err = np.abs(prev_peak_mz - target_mz)
                 curr_peak_mz_err = np.abs(peak_mz - target_mz)
-                print("Found match for target mz %.4f: peak mz %.4f" %(target_mz, peak_mz))
+                # print("Found match for target mz %.4f: peak mz %.4f" %(target_mz, peak_mz))
                 if prev_peak_mz_err < curr_peak_mz_err:
-                    print("For target mz %.4f replacing peak %.4f with %.4f" %(target_mz, prev_peak_mz, peak_mz))
+                    # print("For target mz %.4f replacing peak %.4f with %.4f" %(target_mz, prev_peak_mz, peak_mz))
                     # Closer match has been found already
                     continue
             target_ion_index = target_ion_df.index[match_i]
             target_ion_df.loc[target_ion_index, 'peak id'] = peak_i
             target_ion_df.loc[target_ion_index, 'peak mz'] = peak_mz
             target_ion_df.loc[target_ion_index, 'peak height'] = peak_heights[peak_i]
-            print(target_ion_df.loc[target_ion_index])
+
     return target_ion_df
 
 
