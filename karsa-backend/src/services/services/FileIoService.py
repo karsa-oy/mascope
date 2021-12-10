@@ -428,6 +428,13 @@ def load_array(base_filename, var, prev_array=None):
     dataset = open_mfzarr(var_path, prev_array=prev_array)
     return dataset
 
+def load_coord(base_filename, var, coord_name):
+    path = filename_to_zarr_path(base_filename, var)
+    sync = zarr.ProcessSynchronizer(os.path.join(path, '.sync'))
+    z = zarr.open(path, mode='r', synchronizer=sync)
+    coord = z[coord_name]
+    return coord[:]
+
 def load_file(base_filename, vars=None, prev_dataset=None):
     """Load stored mfzarr variables into an xarray.Dataset object.
        If the variables receive another chunk of data, then subsequent
