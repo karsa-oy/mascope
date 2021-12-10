@@ -25,7 +25,7 @@ export default new Vuex.Store({
 		root_namespace: null,
 		sample_annotations: [],
 		sample_annotation_timestamp: null,
-		sample_selected: {
+		sample_in_focus: {
 			'filename': "",
 			'title': "",
 			'attributes': [],
@@ -33,6 +33,7 @@ export default new Vuex.Store({
 			'project': "",
 			'experiment': "",
 		},
+		samples_selected: [],
 		stop_visualize_range: {},
 		target_ions: [],
 		target_to_display: null,
@@ -104,8 +105,11 @@ export default new Vuex.Store({
 		sample_annotation_timestamp(state, payload) {
 			state.sample_annotation_timestamp = payload;
 		},
-		sample_selected(state, payload) {
-			state.sample_selected = payload;
+		sample_in_focus(state, payload) {
+			state.sample_in_focus = payload;
+		},
+		samples_selected(state, payload) {
+			state.samples_selected = payload;
 		},
 		stop_visualize_range(state, payload) {
 			state.stop_visualize_range = payload;
