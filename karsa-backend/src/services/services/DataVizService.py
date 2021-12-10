@@ -50,7 +50,7 @@ from karsaimg.image import (
                     ImageGenerator
                     )
 
-from services.FileIoService import filename_to_zarr_path, load_file, zarr_sdk
+from services.FileIoService import load_coord, load_file, zarr_sdk
 
 
 NO_DATA_LOGGING_DEAULT = False
@@ -739,6 +739,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to Router """
 
     endpoints = [
+            'dataset_coord_updated',
             'dataset_updated',
             'stop_visualize_range',
             'visualize_range',
@@ -828,7 +829,6 @@ class DataVizServiceNamespace(BaseClientNamespace):
 
     
     # ------Streamer/FileIo request---------------
-
     async def on_dataset_updated(self, data):
         # trigger full-size image with every commit of signal dataset
         def update_cache_item(dataset, item_to_update=None):
@@ -923,6 +923,17 @@ class DataVizServiceNamespace(BaseClientNamespace):
             cache[filename]['props']['length'] = committed_length
             cache[filename]['props']['committed_length'] = committed_length
 
+
+    async def on_dataset_coord_updated(self, data):
+        value = data['value']
+        filename = value['filename']
+        var = value['var']
+        coord_name = value['coord']
+        global cache
+        cache_item = cache.get(filename)
+        if cache_item:
+            new_coord = load_coord(filename, var, coord_name)
+            cache_item[coord_name] = new_coord
 
 class DataVizServiceClient(BaseServiceClient):
     def __init__(self, url, port, client_namespace_data, n_jobs):
