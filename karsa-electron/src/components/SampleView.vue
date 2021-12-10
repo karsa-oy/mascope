@@ -53,7 +53,7 @@
 
     <div style="text-align: center">
       <h1 style="color: #b7b7b7; font-size: 18px; padding: 0.3em 1em">
-        {{ experiment_selected.title }} - {{ sample_selected.title }}
+        {{ experiment_selected.title }} - {{ sample_in_focus.title }}
       </h1>
     </div>
     <!-- Main content  area-->
@@ -140,7 +140,7 @@ export default {
       "figure_double_click",
       "root_namespace",
       "sample_annotation_timestamp",
-      "sample_selected",
+      "sample_in_focus",
       "stop_visualize_range",
       "target_to_display",
       "visualize_range",
@@ -248,8 +248,8 @@ export default {
       // Format annotation for SampleManagerService
       const annotation_data = {
         filename: this.filename,
-        project: this.sample_selected.project,
-        experiment: this.sample_selected.experiment,
+        project: this.sample_in_focus.project,
+        experiment: this.sample_in_focus.experiment,
         annotation: {
           timestamp: this.sample_annotation_timestamp,
           entry: this.sample_annotation_fields,
@@ -289,10 +289,7 @@ export default {
     sample_annotation_timestamp: function () {
       this.is_modal_add_annotation_active = true;
     },
-    sample_selected: function (new_value, old_value) {
-      if (_.isEqual(new_value, old_value)) {
-        return false;
-      }
+    sample_in_focus: function (new_value) {
       this.filename = new_value.filename;
       this.figure_ranges = {
         filename: new_value.filename,

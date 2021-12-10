@@ -690,14 +690,8 @@
                       :data="sample_table_rows"
                       :sticky-header="true"
                       :checkable="true"
-                      :is-row-checkable="
-                        (row) =>
-                          row.filename &&
-                          row.filename.indexOf('placeholder') == -1
-                      "
-                      :header-checkable="false"
                       :checked-rows.sync="sample_table_checked_rows"
-                      :selected="sample_table_selected_row"
+                      :selected.sync="sample_table_selected_row"
                       v-if="e.title === experiment_selected.title"
                     >
                       <!-- Columns -->
@@ -838,12 +832,20 @@ export default {
         this.$store.commit("sample_annotations", value);
       },
     },
-    sample_selected: {
+    sample_in_focus: {
       get() {
-        return this.$store.state.sample_selected;
+        return this.$store.state.sample_in_focus;
       },
       set(value) {
-        this.$store.commit("sample_selected", value);
+        this.$store.commit("sample_in_focus", value);
+      },
+    },
+    samples_selected: {
+      get() {
+        return this.$store.state.samples_selected;
+      },
+      set(value) {
+        this.$store.commit("samples_selected", value);
       },
     },
   },
@@ -855,7 +857,7 @@ export default {
       room_experiment: null,
       room_project: null,
       room_sid: null,
-      endpoints: ["experiments", "importable_samples", "projects", "samples"],
+      endpoints: [],
       // acquisition_started: false,
       // Project / experiment title validation
       // Modal active variables
@@ -1240,6 +1242,25 @@ export default {
       }
       this.is_modal_project_attributes_active = false;
     },
+    selectSample(filename) {
+      // Sample selected
+      if (filename) {
+        const sample = this.getSample(filename);
+        let sample_title = this.sample_table_selected_row.title;
+        this.sample_in_focus = { title: sample_title, ...sample };
+      } else {
+        // Sample deselected
+        this.sample_in_focus = {
+          filename: "",
+          title: "",
+          properties: {
+            length: 0,
+            range: [0, 0],
+          },
+        };
+      }
+      this.sample_annotations = [];
+    },
   },
   watch: {
     experiment_selected: function (new_value, old_value) {
@@ -1484,49 +1505,30 @@ export default {
         }
         rows.push(row);
         // Avoid losing sample selection on an update to sample table
-        if (sample_id == this.sample_selected.filename) {
-          this.sample_table_checked_rows = [row];
-        }
-        // Highlight sample being (or last) acquired
-        if (sample_id == this.new_file.filename) {
+        if (sample_id == this.sample_in_focus.filename) {
           this.sample_table_selected_row = row;
         }
       }
       this.sample_table_cols = cols;
       this.sample_table_rows = rows;
     },
-    sample_table_checked_rows: function (new_value, old_value) {
-      if (_.isEqual(new_value, old_value)) {
-        return false;
-      }
-      var last_selection = [...new_value].pop();
-      // sample_table_checked_rows manipulates multi-row selection,
-      // but by design limitation, it should be a single row selection
-      if (this.sample_table_checked_rows.length > 1) {
-        this.sample_table_checked_rows = [last_selection];
-      }
-      if (last_selection) {
-        // Sample selected
-        let filename = last_selection.filename;
-        const sample = this.getSample(filename);
-        this.sample_selected = { title: last_selection.title, ...sample };
-      } else {
-        // Sample deselected
-        this.sample_selected = {
-          filename: "",
-          title: "",
-          properties: {
-            length: 0,
-            range: [0, 0],
-          },
-        };
-      }
-      this.sample_annotations = [];
+    sample_table_checked_rows: function (new_value) {
+         this.samples_selected = new_value.map((row) => {
+        return row.filename;
+        });
+    },
+    sample_table_selected_row: function(new_value) {
+      this.selectSample(new_value.filename);
     },
     "root_namespace.connected": function (new_value) {
       if (new_value === true) {
         this.namespace = this.root_namespace;
         // handlers for for external notifications:
+        this.be.subscribe(["dataset_coord_updated"], "dataset_coord_updated");
+        this.namespace.on("dataset_coord_updated", (value) => {
+          this.selectSample(value.value.filename);
+          }
+        );
         this.namespace.on("experiment_plan", (value) =>
           this.be.import_one_way_binding_prop("experiment_plan", value.value)
         );
