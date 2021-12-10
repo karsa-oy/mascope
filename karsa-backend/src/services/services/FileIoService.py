@@ -187,19 +187,14 @@ class zarr_sdk:
     @staticmethod
     def finalize_signal_dataset(data, item):
         filename = data['value']['filename']
-        n_tries = 3
-        while n_tries:
-            try:
-                final_length = float(item['signal'].time[-1] + item['signal_period'][-1])
-            except Exception as e:
-                print(f"[{this_func_name}] Error: {e}.  Retry...")
-                n_tries -= 1
-                sleep(.5)
-                continue
-            break
-        if not n_tries:
+        try:
+            final_length = float(item['signal'].time[-1] + item['signal_period'][-1])
+        except Exception as e:
+            print(f"[{this_func_name}] Error: {e} -- set approximate final_length")
             final_length = item['props']['length']
+
         # Update properties
+        final_length = min(final_length, item['props']['length'])
         item['props'].update({'committed_length': final_length})
         item['props'].update({'length': final_length})
         # Write properties
@@ -469,16 +464,16 @@ def load_file(base_filename, vars=None, prev_dataset=None):
         prev_item = None if prev_dataset is None else prev_dataset.get(var)
         if prev_item is not None:
             prev_item.attrs['zarr_groups'] = prev_dataset.attrs.get('zarr_groups', {}).get(var, [])
-        n_tries = 10
+        n_tries = 5
         err_msg = None
         while n_tries:
             try:
                 var_ds = load_array(base_filename, var, prev_item)
                 break
             except Exception as e:
-                err_msg = print(f"{this_func_name()}: Failed to load {base_filename}/{var} data: {str(e)}")
+                err_msg = print(f"{this_func_name()}: Error loading {base_filename}/{var} -- {e.__class__.__name__}({str(e)})")
                 n_tries -= 1
-                sleep(.5)
+                sleep(.2)
                 continue
         if n_tries == 0:
             print(err_msg)
@@ -488,9 +483,7 @@ def load_file(base_filename, vars=None, prev_dataset=None):
     # Merge arrays into xarray.Dataset
     dataset = xarray.merge(dss)
     # Load properties
-    prop_path = os.path.join(filepath,
-                            '.props'
-                            )
+    prop_path = os.path.join(filepath, '.props')
     with open(prop_path, 'r') as f:
         props = json.load(f)
     # Attach to dataset
