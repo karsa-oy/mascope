@@ -25,117 +25,120 @@
             :is-full-page="false"
           >
           </b-loading>
-          <!-- Sidebar -->
-          <div class="sidebar-page">
-              <section class="sidebar-layout">
-                  <b-sidebar
-                      position="static"
-                      :expand-on-hover="true"
-                      :fullheight="true"
-                      :reduce="!sample_browser_pinned"
-                      open
-                  >
-                    <div>
-                      <b-button
-                        icon-left="menu"
-                        :type="sample_browser_pinned ? 'is-primary' : 'is-dark'"
-                        size="is-medium"
-                        @click="sample_browser_pinned=!sample_browser_pinned"
-                      >
-                      Samples
-                      </b-button>
-                      <!-- Data source selector -->
-                      <div
-                        style="
-                          text-align: center;
-                          margin-top: 0.4rem;
-                          margin-bottom: 1rem;
-                        "
-                      >
-                        <b-field label="Data source" grouped>
-                          <b-select
-                            v-model="data_source_name_selected"
-                            placeholder="Select data source"
-                            expanded
-                          >
-                            <option
-                              v-for="source in data_sources"
-                              :value="source.name"
-                              :key="source.name"
+          <div>
+            <!-- Samples sidebar -->
+            <div class="sidebar-page">
+                <section class="sidebar-layout">
+                    <b-sidebar
+                        position="static"
+                        :expand-on-hover="true"
+                        :fullheight="true"
+                        :reduce="!sample_browser_pinned"
+                        open
+                    >
+                      <div>
+                        <b-button
+                          icon-left="menu"
+                          :type="sample_browser_pinned ? 'is-primary' : 'is-dark'"
+                          size="is-medium"
+                          @click="sample_browser_pinned=!sample_browser_pinned"
+                        >
+                        Samples
+                        </b-button>
+                        <!-- Data source selector -->
+                        <div
+                          style="
+                            text-align: center;
+                            margin-top: 0.4rem;
+                            margin-bottom: 1rem;
+                          "
+                        >
+                          <b-field label="Data source" grouped>
+                            <b-select
+                              v-model="data_source_name_selected"
+                              placeholder="Select data source"
+                              expanded
                             >
-                              {{ source.name }}
-                            </option>
-                          </b-select>
+                              <option
+                                v-for="source in data_sources"
+                                :value="source.name"
+                                :key="source.name"
+                              >
+                                {{ source.name }}
+                              </option>
+                            </b-select>
 
-                          <b-switch
-                            style="color: white"
-                            v-model="autosave_on"
-                            :disabled="!experiment_selected.title.length"
-                          >
-                            Auto-save
-                          </b-switch>
-                        </b-field>
+                            <b-switch
+                              style="color: white"
+                              v-model="autosave_on"
+                              :disabled="!experiment_selected.title.length"
+                            >
+                              Auto-save
+                            </b-switch>
+                          </b-field>
+                        </div>
+                        <!-- End of data source selector -->
+                        <!-- Data source component -->
+                        <RAWimport
+                          v-if="
+                            data_source_selected.type &&
+                            data_source_selected.type.indexOf('H5') != -1
+                          "
+                        >
+                        </RAWimport>
+                        <RAWimport
+                          v-if="
+                            data_source_selected.type &&
+                            data_source_selected.type.indexOf('Raw') != -1
+                          "
+                        >
+                        </RAWimport>
+                        <TOFControl
+                          v-if="
+                            data_source_selected.type &&
+                            data_source_selected.type.indexOf('TofDaq') != -1
+                          "
+                        >
+                        </TOFControl>
+                        <!-- End of data source component -->
                       </div>
-                      <!-- End of data source selector -->
-                      <!-- Data source component -->
-                      <RAWimport
-                        v-if="
-                          data_source_selected.type &&
-                          data_source_selected.type.indexOf('H5') != -1
-                        "
-                      >
-                      </RAWimport>
-                      <RAWimport
-                        v-if="
-                          data_source_selected.type &&
-                          data_source_selected.type.indexOf('Raw') != -1
-                        "
-                      >
-                      </RAWimport>
-                      <TOFControl
-                        v-if="
-                          data_source_selected.type &&
-                          data_source_selected.type.indexOf('TofDaq') != -1
-                        "
-                      >
-                      </TOFControl>
-                      <!-- End of data source component -->
-                    </div>
-                    <div>
-                      <SampleBrowser></SampleBrowser>
-                    </div>
-                  </b-sidebar>
-              </section>
+                      <div>
+                        <SampleBrowser></SampleBrowser>
+                      </div>
+                    </b-sidebar>
+                </section>
+            </div>
+            <!-- End of samples sidebar -->
           </div>
-          <!-- End of sidebar -->
-          <!-- Left column -->
-          <div class="sidebar-page">
-              <section class="sidebar-layout">
-                  <b-sidebar
-                      position="static"
-                      :expand-on-hover="true"
-                      :fullheight="true"
-                      :reduce="!target_browser_pinned"
-                      open
-                  >
-                    <div>
-                      <b-button
-                        icon-left="target"
-                        :type="target_browser_pinned ? 'is-primary' : 'is-dark'"
-                        size="is-medium"
-                        @click="target_browser_pinned=!target_browser_pinned"
-                      >
-                      Targets
-                      </b-button>
-                    </div>
-                    <TargetBrowser></TargetBrowser>
-                  </b-sidebar>
-              </section>
-              
+          <div>
+            <!-- Targets sidebar -->
+            <div class="sidebar-page">
+                <section class="sidebar-layout">
+                    <b-sidebar
+                        position="static"
+                        :expand-on-hover="true"
+                        :fullheight="true"
+                        :reduce="!target_browser_pinned"
+                        open
+                    >
+                      <div>
+                        <b-button
+                          icon-left="target"
+                          :type="target_browser_pinned ? 'is-primary' : 'is-dark'"
+                          size="is-medium"
+                          @click="target_browser_pinned=!target_browser_pinned"
+                        >
+                        Targets
+                        </b-button>
+                      </div>
+                      <TargetBrowser></TargetBrowser>
+                    </b-sidebar>
+                </section>
+            </div>
+            <!-- End of targets sidebar -->
           </div>
-          <!-- End of left column -->
           <!-- Right column -->
-          <div class="column" style="padding-right: 2rem; max-width:75vw;">
+          <div class="column" style="padding-right: 2rem; max-width: 50vw;">
             <SampleView></SampleView>
           </div>
           <!-- End of Right column -->
@@ -362,7 +365,7 @@ body {
     width: 25vw;
 }
 .b-sidebar .sidebar-content.is-mini {
-    height: 60px;
+    height: 50px;
     width: 160px;
     overflow: hidden;
 }
