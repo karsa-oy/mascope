@@ -72,12 +72,15 @@
             <footer class="modal-card-foot">
               <b-button
                 @click="is_mz_calib_modal_active=false;">
-                Save
-              </b-button>
-              <b-button
-                @click="is_mz_calib_modal_active=false;">
                 Cancel
               </b-button>
+              <div style="text-align: right;">
+                <b-button
+                  :disabled="!samples_selected.length"
+                  @click="calibrateSelectedSamples()">
+                  Apply to selected samples
+                </b-button>
+              </div>
             </footer>
           </div>
         </div>
@@ -165,6 +168,7 @@
 									:tooltip="false"
 									lazy
 									indicator
+                  disabled
 									>
 								</b-slider>
 							</b-field>
@@ -185,7 +189,9 @@
 					</div>
 				</b-dropdown>
 				<!-- End of identification parameters -->
-				<b-button
+			</div>
+			<div class="column" style="text-align: right">
+        <b-button
 					icon-left="check"
 					class="tag"
 					:type="isotope_table_show_only_checked ? 'is-primary' : 'is-dark'"
@@ -193,13 +199,12 @@
 					@click="isotope_table_show_only_checked=!isotope_table_show_only_checked;"
 				>
 				</b-button>
-			</div>
-			<div class="column" style="text-align: right">
 				<b-button
 					icon-left="fullscreen"
 					class="tag is-dark"
 					outlined
 					@click="function() {return;}"
+          disabled
 				>
 				</b-button>
 				<!-- Isotope table column visibility control -->
@@ -297,7 +302,7 @@ export default {
       "figure_ranges",
       "peak_data",
       "root_namespace",
-      "sample_selected",
+      "samples_selected",
     ]),
 	compute_target_ions: {
       get() {
@@ -382,7 +387,7 @@ export default {
 		//
 		// Identification parameters
 		parameter_mz_tolerance: 10,
-		parameter_iso_ratio_tolerance: 10,
+		parameter_iso_ratio_tolerance: 100,
 		parameter_iso_abu_threshold: 1,
 		// 
 		// Target table
@@ -411,6 +416,18 @@ export default {
   mounted: function () {
   },
   methods: {
+    calibrateSelectedSamples() {
+      this.be.export_one_way_binding_prop(
+          "mz_calibrate_samples",
+          {
+            filenames: this.samples_selected,
+            fit: this.mz_calibration.fit
+          },
+          null,
+          this.room_sid
+        );
+      this.is_mz_calib_modal_active = false;
+    },
     drawMzCalibStatsFigure() {
       let mz = this.mz_calibration.stats['mz'];
       let pre_calib_dmz = this.mz_calibration.stats['pre_dmz'];
@@ -682,74 +699,74 @@ export default {
         this.isotope_table_selected_row = null;
     },
     identified_ions: function (new_value) {
-		this.updateIsotopeTableData(this.target_ions);
-		this.isotope_table_checked_rows = [];
-		let identified_targets = new Set();
-		let identified_ions = new Set();
-		let first_round = true;
-		for (let row_i in new_value) {
-			let row = new_value[row_i];
-			// Check if columns need to be extended
-			if (first_round) {
-				let cols_to_add = [];
-				for (let field in row) {
-					let field_exists = false;
-					for (let col_i in this.isotope_table_cols) {
-						let col = this.isotope_table_cols[col_i];
-						if (col.field == field) {
-							field_exists = true;
-							break;
-						}
-					}
-					if (!field_exists) {
-						cols_to_add.push({
-								'field': field,
-								'label': field,
-								'visible': true
-								});
-					}
-				}
-				this.isotope_table_cols = [
-					...this.isotope_table_cols,
-					...cols_to_add
-					];
-				first_round = false;
-			}
-			// 
-			
-			for (let key in row) {
-				let value = row[key];
-				// Fix precision of numeric fields to 4 decimals
-				if (Number(value) && value != 0) {
-					value = Math.round((value + Number.EPSILON) * 10000) / 10000;
-					row[key] = value;
-				}
-			}
-			this.isotope_table_all_rows[row_i] = row;
-			// Add checkmark for identified isotopes
-			if (row["peak mz"] > -1) {
-				this.isotope_table_checked_rows.push(row);
-				identified_targets.add(row['target id']);
-				identified_ions.add(row['ion id']);
-			}
-		}
-		// Redraw table
-		this.isotope_table_key = Math.random();
-		// Add identification indicator to target table
-		if (this.target_table_cols.length == 2) {
-			this.target_table_cols.push({
-										'field': "2",
-										'label': "",
-										'searchable': true
-										});
-		}
-		for (let row_i in this.target_table_rows) {
-			this.target_table_rows[row_i]['2'] = "0";
-		}
-		for (let target_index of identified_targets) {
-			this.target_table_rows[target_index]['2'] = "1";
-		}
-		this.target_table_key = Math.random();
+      this.updateIsotopeTableData(this.target_ions);
+      this.isotope_table_checked_rows = [];
+      let identified_targets = new Set();
+      let identified_ions = new Set();
+      let first_round = true;
+      for (let row_i in new_value) {
+        let row = new_value[row_i];
+        // Check if columns need to be extended
+        if (first_round) {
+          let cols_to_add = [];
+          for (let field in row) {
+            let field_exists = false;
+            for (let col_i in this.isotope_table_cols) {
+              let col = this.isotope_table_cols[col_i];
+              if (col.field == field) {
+                field_exists = true;
+                break;
+              }
+            }
+            if (!field_exists) {
+              cols_to_add.push({
+                  'field': field,
+                  'label': field,
+                  'visible': true
+                  });
+            }
+          }
+          this.isotope_table_cols = [
+            ...this.isotope_table_cols,
+            ...cols_to_add
+            ];
+          first_round = false;
+        }
+        // 
+        
+        for (let key in row) {
+          let value = row[key];
+          // Fix precision of numeric fields to 4 decimals
+          if (Number(value) && value != 0) {
+            value = Math.round((value + Number.EPSILON) * 10000) / 10000;
+            row[key] = value;
+          }
+        }
+        this.isotope_table_all_rows[row_i] = row;
+        // Add checkmark for identified isotopes
+        if (row["peak mz"] > -1) {
+          this.isotope_table_checked_rows.push(row);
+          identified_targets.add(row['target id']);
+          identified_ions.add(row['ion id']);
+        }
+      }
+      // Redraw table
+      this.isotope_table_key = Math.random();
+      // Add identification indicator to target table
+      if (this.target_table_cols.length == 2) {
+        this.target_table_cols.push({
+                      'field': "2",
+                      'label': "",
+                      'searchable': true
+                      });
+      }
+      for (let row_i in this.target_table_rows) {
+        this.target_table_rows[row_i]['2'] = "0";
+      }
+      for (let target_index of identified_targets) {
+        this.target_table_rows[target_index]['2'] = "1";
+      }
+      this.target_table_key = Math.random();
     },
     identify_peaks: function (new_value, old_value) {
 		if (_.isEqual(new_value, old_value)) {
