@@ -38,7 +38,7 @@
                     >
                       <div>
                         <b-button
-                          icon-left="menu"
+                          icon-left="file-tree"
                           :type="sample_browser_pinned ? 'is-primary' : 'is-dark'"
                           size="is-medium"
                           @click="sample_browser_pinned=!sample_browser_pinned"
