@@ -64,22 +64,36 @@ class SignalProcessorNamespace(BaseClientNamespace):
                                             )
         
     async def on_mz_calibrate_samples(self, data):
+        global cache
+
         self.log(data)
         value = data['value']
-        mode = value['mode']
-        par = value['par']
+        mode = value['fit']['mode']
+        par = value['fit']['par']
         filenames = value['filenames']
 
         nbr_samples = get_zarr_var_shape(filenames[0], 'signal')[0]
 
+        par = np.array(par, dtype=np.double)
         new_mz = np.array([TwTof2Mass(tof, mode, par)
                            for tof in range(nbr_samples)
                            ])
 
         for filename in filenames:
+            self.log("Calibrating file: %s" %filename)
+            if nbr_samples != get_zarr_var_shape(filename, 'signal')[0]:
+                raise Exception("Number of TOF samples does not match")
             # Write new mz coordinates to file
             update_zarr_array_coord(filename, 'signal', 'mz', new_mz)
-            await asyncio.sleep(0)
+            cache_item = cache.get(filename)
+            if cache_item:
+                cache_item['mz'] = new_mz
+            await self.emit_client_notification('dataset_coord_updated',
+                                                {'filename': filename,
+                                                 'coord': 'mz',
+                                                 'var': 'signal'
+                                                 }
+                                                )
 
     async def on_peak_data_request(self, data):
         self.log(data)
