@@ -252,7 +252,7 @@ def viz_cache_process_requests(filename, flush=False, **kwargs):
                     **kwargs
                     )
     for row in rows:
-        # print("[viz_cache_process_requests]: processing row: %s" %str(row))
+        # print("f[{this_func_name()}]: processing row: {str(row)}")
         (request_id,
          filename,
          viz_type,
@@ -317,9 +317,7 @@ def viz_cache_put(filename,
                   persist_in_cache=False
                   ):
     global con
-
     cur = con.cursor()
-    
     values = (filename,
               viz_type,
               t_range[0],
@@ -331,7 +329,6 @@ def viz_cache_put(filename,
               request_id,
               persist_in_cache
               )
-    
     cur.execute('''INSERT INTO {} VALUES ({})
                 '''.format('requests', ','.join( ['?']*len(values) )),
                 values
@@ -547,30 +544,23 @@ def process_visualization_request(filename,
     """
 
     def feed_ready_images():
-        error_msg = None
-        n_tries = 5
-        # TODO: check if retry really helps
-        while n_tries:
-            try:
-                viz = viz_type
-                img_slice = cache_item[viz].sel(time=slice(t0, t1)).load()
-                viz = viz_type + '_period'
-                period_slice = cache_item[viz].sel(time=slice(t0, t1)).load()
-                break
-            except Exception as e:
-                error_msg = f"[{this_func_name()}] {e.__class__.__name__}({str(e)}), when slicing {filename}/{viz} range [{t0}, {t1}]"
-                n_tries -= 1
-                sleep(.3)
-        if not n_tries:
-            raise Exception(error_msg)
+        processed_until = t0
+        try:
+            viz = viz_type
+            img_slice = cache_item[viz].sel(time=slice(t0, t1)).load()
+            viz = viz_type + '_period'
+            period_slice = cache_item[viz].sel(time=slice(t0, t1)).load()
+        except Exception as e:
+            print(f"[{this_func_name()}] Error: {e.__class__.__name__}({str(e)}), when slicing {filename}/{viz} range [{t0}, {t1}]")
+            return processed_until
 
-        processed_until = False
         if len(img_slice) == 0:
             return processed_until
 
         if t_resolution:
             # TODO: resample
-            raise NotImplementedError
+            print(f"[{this_func_name()}] Error: NotImplemented(t_resolution)")
+            return processed_until
         
         # Filter nans
         not_nan = np.logical_not( img_slice.isnull() )
@@ -607,18 +597,18 @@ def process_visualization_request(filename,
         return processed_until
 
     def feed_signal_to_visualize(t_range_to_process):
+        processed_until = t_range_to_process[0]
         try:
             var = 'signal'
             signal_slice = cache_item[var].sel(time=slice(*t_range_to_process), mz=slice(mz0, mz1))
             var = 'signal_period'
             period_slice = cache_item[var].sel(time=slice(*t_range_to_process))
         except Exception as e:
-            raise Exception(f"[{this_func_name()}] {e.__class__.__name__}({str(e)}), when slicing {filename}/{var} range {t_range_to_process}")
-
-        processed_until = t_range_to_process[0]
+            print(f"[{this_func_name()}] Error: {e.__class__.__name__}({str(e)}), when slicing {filename}/{var} range {t_range_to_process}")
+            return processed_until
 
         if 0 in signal_slice.shape:
-            print("empty slice")
+            # print("empty slice")
             return processed_until
             
         BATCH_SIZE = 10 # Number of spectra to process at once (TODO: make parameter)
@@ -628,11 +618,13 @@ def process_visualization_request(filename,
             no_batches = int( np.ceil(no_spectra / BATCH_SIZE) )
 
         if not no_batches:
+            # print("no batches")
             return processed_until
 
         if t_resolution:
             # TODO: resample
-            raise NotImplementedError
+            print(f"[{this_func_name()}] Error: NotImplemented(t_resolution)")
+            return processed_until
         
         # signal_slice.load()
         # period_slice.load()
@@ -688,7 +680,7 @@ def process_visualization_request(filename,
             # print("Feed signal to visualize until: %s" %processed_until)
         return processed_until
 
-    processed_until = False
+    processed_until = t0
     cache_item = cache.get(filename, None)
     if not cache_item:
         print("No such cache item: %s" %filename)
@@ -785,7 +777,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
             # Full mz range
             mz_range = cache_item.props['range']
             
-        if t_range is None:
+        if t_range is None or t_range == [None, None]:
             # Full time range
             t_range = [0, cache_item.props['length']]
             
@@ -797,10 +789,11 @@ class DataVizServiceNamespace(BaseClientNamespace):
                           mz_range,
                           t_resolution,
                           client_room,
-                          request_id
+                          request_id,
+                          False
                           )
         # Process request
-        viz_cache_process_requests(filename, request_id=request_id)
+        viz_cache_process_requests(filename, flush=True, request_id=request_id)
         t_mark(t_data)
 
 
@@ -877,6 +870,11 @@ class DataVizServiceNamespace(BaseClientNamespace):
                 )
             return new_item
 
+        def adjust_caches_for_final_length(final_length):
+            cache[filename]['props']['length'] = final_length
+            cache[filename]['props']['committed_length'] = final_length
+            viz_cache_update('requests', ['t1'], [final_length], filename=filename)
+
         value = data['value']
         if value['data_type'] != 'signal':
             raise ValueError(f"Expected data_type: signal - got {value['data_type']}")
@@ -918,10 +916,11 @@ class DataVizServiceNamespace(BaseClientNamespace):
                 except Exception as e:
                     self.log(f"Error {e.__class__.__name__}({str(e)})")
                     return
-            viz_cache_process_requests(filename, flush=True)
             # TODO: validate cache_item and delete, if invalid
-            cache[filename]['props']['length'] = committed_length
-            cache[filename]['props']['committed_length'] = committed_length
+            # final sample length may change a bit after last batch committed -
+            # update file cache and requests cache correspondingly
+            adjust_caches_for_final_length(committed_length)
+            viz_cache_process_requests(filename, flush=True)
 
 
     async def on_dataset_coord_updated(self, data):
