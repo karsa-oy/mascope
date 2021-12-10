@@ -41,6 +41,96 @@
       </b-modal>
     </section>
     <!-- End of Excel import modal -->
+    <!-- Isotope table modal -->
+    <section class="isotope-table-modal">
+      <b-modal
+        :active.sync="is_modal_isotope_table_active"
+        full-screen
+        has-modal-card
+        trap-focus
+        :can-cancel="true"
+        :destroy-on-hide="false"
+        aria-role="dialog"
+        aria-modal
+      >
+        <div class="modal-card">
+          <header class="modal-card-head">
+            <p class="modal-card-title">
+            </p>
+            <b-button
+              icon-left="check"
+              :type="isotope_table_show_only_checked ? 'is-primary' : 'is-dark'"
+              @click="isotope_table_show_only_checked=!isotope_table_show_only_checked;"
+            >
+            </b-button>
+            <!-- Column visibility dropdown -->
+            <b-dropdown
+              aria-role="menu"
+              position="is-bottom-right"
+              style="top: 0px"
+              trap-focus
+              multiple
+              append-to-body
+            >
+              <b-button
+                icon-left="menu"
+                type="is-dark"
+                slot="trigger">
+              </b-button>
+              <div>
+                <div
+                  v-for="(col, i) in isotope_table_cols"
+                  :key="i"
+                  class="control"
+                >
+                  <b-checkbox v-model="col.visible" size="is-small">
+                    {{ col.label }}
+                  </b-checkbox>
+                </div>
+              </div>
+            </b-dropdown>
+            <!-- Close button -->
+            <b-button
+              icon-left="close"
+              type="is-dark"
+              @click="is_modal_isotope_table_active = false"
+            >
+            </b-button>
+          </header>
+
+          <section class="modal-card-body">
+            <!-- Sample table -->
+            <b-table
+              id="samples-datatable"
+              :height="760"
+              :data="isotope_table_rows"
+              :sticky-header="true"
+              striped
+            >
+              <!-- Columns -->
+              <b-table-column
+                v-for="(col, i) in isotope_table_cols"
+                :key="i"
+                :field="col.field"
+                :label="col.label"
+                searchable
+                sortable
+                :visible="col.visible === null ? true : col.visible"
+                v-slot="props"
+              >
+                {{ props.row[col.field] }}
+              </b-table-column>
+              <!-- End of columns -->
+            </b-table>
+            <!-- End of sample table -->
+          </section>
+          <footer class="modal-card-foot">
+            <b-button @click="exportIsotopeTable()"> Export CSV </b-button>
+          </footer>
+        </div>
+      </b-modal>
+    </section>
+    <!-- End of isotope table modal -->
     <!-- Mass calibration modal -->
     <section class="mzcalib-modal">
       <b-modal
@@ -203,8 +293,7 @@
 					icon-left="fullscreen"
 					class="tag is-dark"
 					outlined
-					@click="function() {return;}"
-          disabled
+					@click="is_modal_isotope_table_active=true;"
 				>
 				</b-button>
 				<!-- Isotope table column visibility control -->
@@ -372,6 +461,7 @@ export default {
 		excel_clipboard_table_cols: [],
 		excel_clipboard_table_rows: [],
 		// Peak table
+    is_modal_isotope_table_active: false,
 		isotope_table_all_rows: [],
 		isotope_table_checked_rows: [],
 		isotope_table_cols: [],
@@ -459,6 +549,40 @@ export default {
         {},
         this.figure_config
       );
+    },
+    exportIsotopeTable() {
+      return;
+      // const fields = this.isotope_table_cols.map((a) => {
+      //   return { label: a.label, value: a.field };
+      // });
+      // const opts = {
+      //   fields: fields,
+      // };
+
+      // try {
+      //   // Parse CSV
+      //   const parser = new Parser(opts);
+      //   const csv = parser.parse(this.isotope_table_rows);
+      //   const csv_filename =
+      //     this.project_selected.title +
+      //     "_" +
+      //     this.experiment_selected.title +
+      //     ".csv";
+      //   // Make blob
+      //   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      //   // Create a temporary download link for the blob and "click" it
+      //   var link = document.createElement("a");
+      //   var url = URL.createObjectURL(blob);
+      //   link.setAttribute("href", url);
+      //   link.setAttribute("download", csv_filename);
+      //   link.style.visibility = "hidden";
+      //   document.body.appendChild(link);
+      //   link.click();
+      //   // Remove the link
+      //   document.body.removeChild(link);
+      // } catch (err) {
+      //   console.error(err);
+      // }
     },
     fitMzCalibFunction() {
       let peak_tofs = this.isotope_table_checked_rows.map(
