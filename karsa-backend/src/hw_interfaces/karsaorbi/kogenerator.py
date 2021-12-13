@@ -73,7 +73,7 @@ class RawStreamer(BaseFileStreamer):
         spec = net2np_array(scan.Intensities).astype(np.float32)
         # Round mz values based on the mz precision
         mz, spec = self._set_mz_precision(mz, spec)
-        # Combine data for output
+        # Combine data for output and feed
         spec_data = {
                 'filename': self.filename,  # Current file basename
                 'i': self.speci,            # Current spectrum integer index
@@ -82,7 +82,6 @@ class RawStreamer(BaseFileStreamer):
                 'mz': mz.tobytes(),         # Serialized mass axis [float32]
                 'spec': spec.tobytes()      # Serialized spectrum [float32]
                 }
-        # Feed
         self.feed_spec_data(spec_data)
 
     def _update(self, scan=None):

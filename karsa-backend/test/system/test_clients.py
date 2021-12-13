@@ -437,6 +437,7 @@ class BaseTestCases:
                 names = sorted([n.replace(f'{self.client.instrument_name}_', '', 1) for n in names])
                 self.assertEqual(names, self.raw_samples)
 
+            time.sleep(2)
             # let DataViz complete full-size visualizations in <TargetDataPool>
             for i, (fname, _) in enumerate(self.client.acquired_samples):
                 rq_suffix = self.client.set_viz_test_params(fname)
