@@ -138,6 +138,7 @@ export default {
     ...mapState([
       "experiment_selected",
       "figure_double_click",
+      "parameter_peak_intensity_threshold",
       "root_namespace",
       "sample_annotation_timestamp",
       "sample_in_focus",
@@ -268,7 +269,12 @@ export default {
       if (this.filename) {
         this.be.export_one_way_binding_prop(
           "peak_data_request",
-          { filename: this.filename },
+          {
+            filename: this.filename,
+            parameters: {
+              peak_threshold: 10**this.parameter_peak_intensity_threshold
+            }
+          },
           null,
           this.room_sid
         );
@@ -279,6 +285,9 @@ export default {
   watch: {
     figure_double_click: function () {
       return;
+    },
+    parameter_peak_intensity_threshold: function() {
+      this.requestPeakData();
     },
     sample_annotation_fields: {
       handler() {

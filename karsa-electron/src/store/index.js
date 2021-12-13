@@ -19,6 +19,7 @@ export default new Vuex.Store({
 		ionization_mechanism: "",
 		mz_calibration: {},
 		new_file: "",
+		parameter_peak_intensity_threshold: -3,
 		peak_data: {},
 		project_selected: { 'title': "", 'attributes': [] },
 		projects: [],
@@ -86,6 +87,9 @@ export default new Vuex.Store({
 		},
 		new_file(state, payload) {
 			state.new_file = payload;
+		},
+		parameter_peak_intensity_threshold(state, payload) {
+			state.parameter_peak_intensity_threshold = payload;
 		},
 		peak_data(state, payload) {
 			state.peak_data = payload;

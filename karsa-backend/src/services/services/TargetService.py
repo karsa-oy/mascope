@@ -90,13 +90,11 @@ class TargetServiceNamespace(BaseClientNamespace):
             else:
                 id_peak_tofs.append(None)
         match_df['peak tof'] = id_peak_tofs
-        # # Calculate isotope ratios and mz errors
+        # Calculate isotope ratios and mz errors
         match_df = calculate_target_match_score(match_df)
-        # # pd.set_option("display.max_rows", None, "display.max_columns", None)
-        # # self.log(match_df)
-        # # Compare score with thresholds
-        # identified_isotopes_mask = filter_target_matches(match_df, mz_tolerance, iso_abu_tolerance, min_iso_abu)
-        # identified_ion_peaks = match_df[identified_isotopes_mask]
+        # Filter by isotope abundance error tolerance
+        match_df = match_df[(np.abs(match_df['iso abu error']) <= iso_abu_tolerance)]
+
         identified_ion_peaks = match_df
         identified_ion_peaks = identified_ion_peaks.dropna(subset=['peak mz'])
         self.log(identified_ion_peaks)
@@ -131,49 +129,13 @@ def calculate_target_match_score(match_df):
             # No matching peaks for this target
             continue
         rel_abu = target['peak height'] / target['peak height'].sum()
-        iso_abu_err = (target['rel abu'] - rel_abu) * target['rel abu'] * 1e2
+        iso_abu_err = (rel_abu - target['rel abu']) * target['rel abu'] * 1e2
         match_df.loc[target.index, 'rel peak height'] = rel_abu
         match_df.loc[target.index, 'iso abu error'] = iso_abu_err
         
         mz_err_ppm = (target['peak mz'] - target['mz']) / target['peak mz'] * 1e6
         match_df.loc[target.index, 'mz error'] = mz_err_ppm
     return match_df
-
-
-def filter_target_matches(match_df, mz_tolerance, iso_abu_tolerance, min_iso_abu):
-    """Compare target identification score with thresholds given as input arguments,
-    Return 'ion id's of target ions with one or more peaks identified.
-
-    Parameters
-    ----------
-    match_df : pandas.DataFrame
-        Target ion dataframe with columns for calculated 'mz error' and 'iso abu error'
-    mz_tolerance : float
-        m/z error tolerance in ppm
-    iso_abu_tolerance : float
-        Isotope relative abundance error tolerance in %
-    min_iso_abu : float
-        Minimum relative abundance of an isotope to be considered
-
-    Returns
-    -------
-    list
-        List of 'ion id' field values for identified targets
-    """
-    identified_peaks_mask = [False] * len(match_df)
-    for row_i, isotope in match_df.iterrows():
-        # Test each target against thresholds
-        isotope_identified = ((isotope['rel abu'] >= min_iso_abu) and
-                            (np.abs(isotope['mz error']) <= mz_tolerance) and
-                            (np.abs(isotope['iso abu error']) <= iso_abu_tolerance)
-                            )
-                            
-        if isotope_identified:
-            #  At least one peak identified for current target
-            identified_peaks_mask[row_i] = True
-    
-    return identified_peaks_mask
-
 
 def match_peaks_to_targets(peak_mzs, peak_heights, target_ion_df, mz_tolerance):
     """Find matching targets for found peaks
