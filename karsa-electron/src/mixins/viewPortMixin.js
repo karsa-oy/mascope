@@ -170,6 +170,8 @@ export const viewPortMixin = {
         },
 
         getPeakTraces(mz_range=null) {
+            const MAX_NO_PEAKS = 100; // Plot only if less peaks than this
+
             // this.log("getPeakTraces, mz_range: ", mz_range);
             if (!this.peak_traces_visible) {
                 // this.log("getPeakTraces return 0 traces");
@@ -177,6 +179,14 @@ export const viewPortMixin = {
             }
             if (!mz_range) {
                 // this.log("getPeakTraces return all ", this.peak_traces.length," traces");
+                if (this.peak_traces.length > MAX_NO_PEAKS) {
+                    this.$buefy.toast.open({
+                        duration: 5000,
+                        message: "Too many peaks to draw: " + this.peak_traces.length,
+                        type: "is-danger",
+                      });
+                    return []
+                }
                 return this.peak_traces
             }
             let peak_traces = [];
@@ -192,7 +202,14 @@ export const viewPortMixin = {
                     }
                 }
             }
-            // this.log("getPeakTraces return ", peak_traces.length, " traces");
+            if (peak_traces.length > MAX_NO_PEAKS) {
+                this.$buefy.toast.open({
+                    duration: 5000,
+                    message: "Too many peaks to draw: " + peak_traces.length,
+                    type: "is-danger",
+                  });
+                return []
+            }
             return peak_traces
         },
 
@@ -786,31 +803,28 @@ export const viewPortMixin = {
             );
         },
         peak_data: async function() {
-            const MAX_NO_PEAKS = 5000; // Plot only if less peaks than this
-            if (this.peak_data.mz.length < MAX_NO_PEAKS) {
-                let mz_axis = this.figure_axes.mz;
-                if (mz_axis) {
-                    let time_axis = this.figure_axes.time;
-                    let peak_traces = [];
-                    for (let i in this.peak_data.mz) {
-                        let m = this.peak_data.mz[i];
-                        // let y = this.peak_data.height[i];
-                        let peak_trace = {
-                                [time_axis]: this.figure_cache.t_maxrange,
-                                [mz_axis]: [m, m],
-                                'mode': 'lines',
-                                'line': {'color': '#ffffff',
-                                        'width': 1
-                                        },
-                                'visible': true,
-                                'name': m.toFixed(this.mz_precision),
-                                'legendgroup': "Found peaks",
-                                'showlegend': false,
-                                };
-                        peak_traces.push(peak_trace);
-                    }    
-                    this.peak_traces = peak_traces;
-                }
+            let mz_axis = this.figure_axes.mz;
+            if (mz_axis) {
+                let time_axis = this.figure_axes.time;
+                let peak_traces = [];
+                for (let i in this.peak_data.mz) {
+                    let m = this.peak_data.mz[i];
+                    // let y = this.peak_data.height[i];
+                    let peak_trace = {
+                            [time_axis]: this.figure_cache.t_maxrange,
+                            [mz_axis]: [m, m],
+                            'mode': 'lines',
+                            'line': {'color': '#ffffff',
+                                    'width': 1
+                                    },
+                            'visible': true,
+                            'name': m.toFixed(this.mz_precision),
+                            'legendgroup': "Found peaks",
+                            'showlegend': false,
+                            };
+                    peak_traces.push(peak_trace);
+                }    
+                this.peak_traces = peak_traces;
             }
         },
     },
