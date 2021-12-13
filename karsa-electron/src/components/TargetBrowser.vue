@@ -237,6 +237,18 @@
 					</b-button>
 					<div style="background-color: #363636; width: 25vw;">
 						<section style="padding: 0em 1em 0 1em;">
+              <b-field label="peak intensity threshold">
+								<b-slider
+									type="is-primary"
+									v-model="parameter_peak_intensity_threshold"
+									:min="-5"
+									:max="5"
+									:tooltip="false"
+									lazy
+									indicator
+									>
+								</b-slider>
+							</b-field>
 							<b-field label="m/z tolerance [ppm]">
 								<b-slider
 									type="is-primary"
@@ -258,7 +270,6 @@
 									:tooltip="false"
 									lazy
 									indicator
-                  disabled
 									>
 								</b-slider>
 							</b-field>
@@ -329,28 +340,30 @@
 			</div>
 		</div>
 		<!-- End of buttons above table -->
-        <b-table
-            @contextmenu="rightClickPeakTableRow"
-            id="isotope-datatable"
-            ref="isotope_table"
-            style="margin-top: 1em"
-            :columns="isotope_table_cols"
-            :data="isotope_table_rows"
-            :key="isotope_table_key"
-            :sticky-header="true"
-            :selected.sync="isotope_table_selected_row"
-            :header-checkable="false"
-            checkable
-            :checked-rows.sync="isotope_table_checked_rows"
-            :is-row-checkable="(row) => row == isotope_table_selected_row"
-            focusable
-            sortable
-        >
-        </b-table>
-        <!-- End of isotope table -->
-		<!-- Identification parameters -->
-		
-		<!-- End of identification parameters -->
+    <b-table
+        @contextmenu="rightClickPeakTableRow"
+        id="isotope-datatable"
+        ref="isotope_table"
+        style="margin-top: 1em"
+        :columns="isotope_table_cols"
+        :data="isotope_table_rows"
+        :key="isotope_table_key"
+        :sticky-header="true"
+        :selected.sync="isotope_table_selected_row"
+        :header-checkable="false"
+        checkable
+        :checked-rows.sync="isotope_table_checked_rows"
+        :is-row-checkable="(row) => row == isotope_table_selected_row"
+        focusable
+        sortable
+    >
+    </b-table>
+    <div style="text-align: right;">
+      <b-field
+        :label="'# identified peaks: ' + isotope_table_checked_rows.length">
+      </b-field>
+    </div>
+    <!-- End of isotope table -->
 		<section style="padding: 1em 0 0 0;">
 			<b-button
 				type="is-dark"
@@ -425,12 +438,20 @@ export default {
         this.$store.commit("ionization_mechanism", value);
       },
     },
-	mz_calibration: {
+    mz_calibration: {
       get() {
         return this.$store.state.mz_calibration;
       },
       set(value) {
         this.$store.commit("mz_calibration", value);
+      },
+    },
+    parameter_peak_intensity_threshold: {
+      get() {
+        return this.$store.state.parameter_peak_intensity_threshold;
+      },
+      set(value) {
+        this.$store.commit("parameter_peak_intensity_threshold", value);
       },
     },
     target_ions: {
@@ -477,7 +498,7 @@ export default {
 		//
 		// Identification parameters
 		parameter_mz_tolerance: 10,
-		parameter_iso_ratio_tolerance: 100,
+		parameter_iso_ratio_tolerance: 10,
 		parameter_iso_abu_threshold: 1,
 		// 
 		// Target table

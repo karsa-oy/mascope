@@ -104,9 +104,9 @@ class SignalProcessorNamespace(BaseClientNamespace):
         mz_range = value.get('mz_range')
         t_range = value.get('t_range')
 
-        min_peak_height = value.get('peak_threshold', 1e-3)
-        min_peak_distance = value.get('peak_separation', 3)
-        min_peak_width = value.get('peak_width', 3)
+        min_peak_height = value.get('parameters', {}).get('peak_threshold', 1e-3)
+        min_peak_distance = value.get('parameters', {}).get('peak_separation', 3)
+        min_peak_width = value.get('parameters', {}).get('peak_width', 3)
 
         # Check if file is cached
         cache_item = cache.get(filename, None)
