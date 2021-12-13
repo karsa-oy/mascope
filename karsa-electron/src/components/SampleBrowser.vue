@@ -428,7 +428,11 @@
               multiple
               append-to-body
             >
-              <b-button icon-left="menu" slot="trigger" outlined> </b-button>
+              <b-button
+                icon-left="menu"
+                slot="trigger"
+                type="is-dark">
+              </b-button>
               <div>
                 <div
                   v-for="(col, i) in sample_table_cols"
@@ -445,7 +449,7 @@
             <b-button
               icon-left="close"
               @click="is_modal_sample_table_active = false"
-              is-dark
+              type="is-dark"
             >
             </b-button>
           </header>
@@ -1282,11 +1286,6 @@ export default {
         if (this.is_modal_sample_attributes_active) {
           // Update sample form props
           this.sample_form_props = shallow_copy(this.sample_form_props);
-          this.sample_form_props.load_template_path =
-            this.getPrefilledTemplatePath(
-              this.project_selected.title,
-              this.experiment_selected.title
-            );
           this.sample_form_props.project = this.project_selected.title;
           this.sample_form_props.experiment = this.experiment_selected.title;
           let sample_attributes = shallow_copy(
@@ -1363,24 +1362,12 @@ export default {
         type: "is-success",
       });
 
-      if (
-        _.isEmpty(this.experiment_selected) ||
-        _.isEmpty(this.experiment_selected.title)
-      ) {
-        return;
-      }
-
       this.sample_table_selected_row = {};
 
       // project/experiment not in args - the UI takes care of saving the sample to experiment
       if (_.isEmpty(new_value.project) || _.isEmpty(new_value.experiment)) {
         this.sample_form_props = {};
         this.sample_form_props.title = "New sample attributes";
-        this.sample_form_props.load_template_path =
-          this.getPrefilledTemplatePath(
-            this.project_selected.title,
-            this.experiment_selected.title
-          );
         this.sample_form_props.filename = new_value.filename;
         this.sample_form_props.method = new_value.method;
         this.sample_form_props.project = this.project_selected.title;
@@ -1554,7 +1541,7 @@ export default {
 };
 </script>
 
-<style scoped>
+<style>
 /* menu */
 .menu-label {
   color: white;
@@ -1562,6 +1549,12 @@ export default {
 
 .menu-list a {
   color: #ababab;
+}
+
+.menu-list li ul {
+    border-left: 1px solid #7957d5;
+    margin: 0em;
+    padding-left: 0.25em;
 }
 
 </style>
