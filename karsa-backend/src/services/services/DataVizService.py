@@ -235,7 +235,6 @@ def viz_cache_process_requests(filename, flush=False, **kwargs):
     global REQUEST_PROCESSORS
     global cache
 
-    # requests_to_release = []
     rows = viz_cache_pop(
                     'requests',
                     '''
@@ -281,7 +280,6 @@ def viz_cache_process_requests(filename, flush=False, **kwargs):
                                     )
 
         # some error/no data yet/no full data -- put (updated) request back
-        # if processed_until is False or processed_until<t1:
         if processed_until != t1 and not flush:
             # print("Request holds or updated:", client_room, [t0, t1])
             viz_cache_put(filename,
@@ -657,8 +655,6 @@ def process_visualization_request(filename,
             t0_i = float( spec_array.time[0] )
             t1_i = float( spec_array.time[-1] ) + float( period_array[-1] )
 
-            print(f"Processing {filename}/{viz_type} range: {[t0_i, t1_i]}")
-
             t_data = {'request_id': request_id,}
             t_mark(t_data)
             # Put batch to queue to be visualized
@@ -677,7 +673,7 @@ def process_visualization_request(filename,
                             })
 
             processed_until = t1_i
-            # print("Feed signal to visualize until: %s" %processed_until)
+            print(f"[{this_func_name()}] {filename}/{viz_type} range: {[t0_i, t1_i]}")
         return processed_until
 
     processed_until = t0
@@ -824,7 +820,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
     # ------Streamer/FileIo request---------------
     async def on_dataset_updated(self, data):
         # trigger full-size image with every commit of signal dataset
-        def update_cache_item(dataset, item_to_update=None):
+        def update_file_cache_item(dataset, item_to_update=None):
             if not item_to_update:
                 return AttrDict({
                     'dataset': dataset,
@@ -853,9 +849,9 @@ class DataVizServiceNamespace(BaseClientNamespace):
                 return True
             return False
 
-        def load_file_cache(viz_types=[], existing_cache_item=None):
-            ds = load_file(filename, vars=['signal', 'signal_period'], prev_dataset=existing_cache_item and existing_cache_item['dataset'])
-            new_item = update_cache_item(ds, existing_cache_item)
+        def load_caches(viz_types=[], existing_file_cache_item=None):
+            ds = load_file(filename, vars=['signal', 'signal_period'], prev_dataset=existing_file_cache_item and existing_file_cache_item['dataset'])
+            new_item = update_file_cache_item(ds, existing_file_cache_item)
             for viz_type in viz_types:
                 zarr_sdk.init_viz_dataset(filename, viz_type, new_item)
                 viz_cache_put_or_update_request(
@@ -895,14 +891,14 @@ class DataVizServiceNamespace(BaseClientNamespace):
             if not cache_item:
                 self.log(f"Start visualizing {filename} up to {committed_length}")
                 try:
-                    cache[filename] = load_file_cache(viz_types=VIZ_TYPES_SUPPORTED)
+                    cache[filename] = load_caches(viz_types=VIZ_TYPES_SUPPORTED)
                 except Exception as e:
                     self.log(f"Error {e.__class__.__name__}({str(e)})")
                     return
             else:
                 self.log(f"Continue visualizing {filename} up to {committed_length}")
                 try:
-                    cache[filename] = load_file_cache(existing_cache_item=cache_item)
+                    cache[filename] = load_caches(existing_file_cache_item=cache_item)
                 except Exception as e:
                     self.log(f"Error {e.__class__.__name__}({str(e)})")
                     return
@@ -910,17 +906,21 @@ class DataVizServiceNamespace(BaseClientNamespace):
         elif committed_length >= full_length:  # sample is done
             self.log(f"Finish visualizing {filename}: final length {committed_length}")
             cache_item = cache.get(filename)
-            if not cache_item:  # sample can be shorter than a single batch
-                try:
-                    cache[filename] = load_file_cache(viz_types=VIZ_TYPES_SUPPORTED)
-                except Exception as e:
-                    self.log(f"Error {e.__class__.__name__}({str(e)})")
-                    return
-            # TODO: validate cache_item and delete, if invalid
+            cache_item_crippled = False
+            try:
+                if not cache_item:  # sample can be shorter than a single batch
+                    cache[filename] = load_caches(viz_types=VIZ_TYPES_SUPPORTED)
+                else:
+                    cache[filename] = load_caches(existing_file_cache_item=cache_item)
+            except Exception as e:
+                self.log(f"Error {e.__class__.__name__}({str(e)})")
+                cache_item_crippled = True
             # final sample length may change a bit after last batch committed -
             # update file cache and requests cache correspondingly
             adjust_caches_for_final_length(committed_length)
             viz_cache_process_requests(filename, flush=True)
+            if cache_item_crippled:
+                del cache[filename]
 
 
     async def on_dataset_coord_updated(self, data):

@@ -22,8 +22,8 @@ samples = {
     'H5Data_4-DataFile_2021.08.02-01h01m00s.h5': {'t_range_max': 30, 'max_exec_time': 10},
 
     # '20210122_1028_SRCI_DBrMe__1TCM.raw': {'t_range_max': 277, 'max_exec_time': 15},
-    'OrbitrapData_20210122_1028_SRCI_DBrMe__3TCM.raw': {'t_range_max': 277, 'max_exec_time': 25},
-    'OrbitrapData_20210122_1028_SRCI_DBrMe__4TCM.raw': {'t_range_max': 277, 'max_exec_time': 25},
+    'OrbitrapData_20210122_1028_SRCI_DBrMe__3TCM.raw': {'t_range_max': 274, 'max_exec_time': 25},
+    'OrbitrapData_20210122_1028_SRCI_DBrMe__4TCM.raw': {'t_range_max': 274, 'max_exec_time': 25},
 }
 
 
