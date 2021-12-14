@@ -100,10 +100,28 @@ class FileStreamerPrivateNamespace(BaseClientNamespace):
                                                }
                                             )
 
-    def get_src_data(self, fname):
+    def get_src_data(self, path, fname):
+        def get_h5_datetime():
+            # returns ('YYYY.mm.dd', 'HH:MM:SS') for TOF h5 samples
+            dt_regex = r'.*(\d{4}).(\d{2}).(\d{2}).(\d{2}).(\d{2}).(\d{2}).*\.h5'
+            dt = re.findall(dt_regex, fname)[0]
+            return '.'.join(dt[:3]), ':'.join(dt[3:])
+
+        def get_raw_datetime():
+            # returns ('YYYY.mm.dd', 'HH:MM') for Orbi raw samples
+            dt_regex = r'^(\d{8}).(\d{4}).*\.raw'
+            d, t = re.findall(dt_regex, fname)[0]
+            return '.'.join([d[:4], d[4:6], d[6:]]), ':'.join([t[:2], t[2:]])
+
         data_root = self.parent.data_pool.pool_attrs.get('path', '.')
-        fdate, ftime = re.split('-|_', os.path.splitext(fname)[0])[-2:]
-        path = os.path.join(data_root, fdate)
+        try:
+            fdate, ftime = get_h5_datetime()
+        except IndexError:
+            fdate, ftime = get_raw_datetime()
+        if not path:    # path normally does not come with batch import
+            path = os.path.join(data_root, fdate)
+        if not os.path.isdir(path):
+            path = data_root
         full_fname = os.path.join(path, fname)
         size = round((os.path.getsize(full_fname)) / 2**20, 2)  # in MB
         return {'filename': fname, 'path': path, 'filesize': size, 'datetime': f'{fdate} {ftime}'}
@@ -112,9 +130,10 @@ class FileStreamerPrivateNamespace(BaseClientNamespace):
         kwargs = get_client_notification_context(data)
         rdata = {**kwargs, 'files': []}
         for v in data['value']:
-            filename = v.pop('filename')
+            path = v.pop('path', None)    # path normally does not come with batch import
+            fname = v.pop('filename')
             try:
-                fprops = self.get_src_data(filename)
+                fprops = self.get_src_data(path, fname)
             except Exception as e:
                 await self.parent.push_alert(str(e))
                 raise

@@ -912,12 +912,12 @@ class DataVizServiceNamespace(BaseClientNamespace):
                     cache[filename] = load_caches(viz_types=VIZ_TYPES_SUPPORTED)
                 else:
                     cache[filename] = load_caches(existing_file_cache_item=cache_item)
+                # final sample length may change a bit after last batch committed -
+                # update file cache and requests cache correspondingly
+                adjust_caches_for_final_length(committed_length)
             except Exception as e:
                 self.log(f"Error {e.__class__.__name__}({str(e)})")
                 cache_item_crippled = True
-            # final sample length may change a bit after last batch committed -
-            # update file cache and requests cache correspondingly
-            adjust_caches_for_final_length(committed_length)
             viz_cache_process_requests(filename, flush=True)
             if cache_item_crippled:
                 del cache[filename]

@@ -811,6 +811,13 @@ class FSWatcher:
             except AttributeError:
                 pass
 
+        def on_moved(self, event):
+            try:
+                self.client.on_filesystem_object_created(event.dest_path)
+                self.client.on_filesystem_object_deleted(event.src_path)
+            except AttributeError:
+                pass
+
     def log(self, *arg, **kwarg):
         print(f"[{self.__class__.__name__}.{inspect.stack()[1].function}]", *arg, **kwarg)
 
