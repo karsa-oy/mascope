@@ -41,6 +41,20 @@ cache = LRUDict(10)
 from shutil import rmtree
 class zarr_sdk:
     @staticmethod
+    def init_centroid_dataset(data, item):
+        value = data['value']
+        filename = filename_to_zarr_path(value['filename'], 'centroids')
+        filename = os.path.join(item.get('data_root', ''), filename)
+        centroid_array = ExtendableDataArray(path=filename,
+                                             array_module=da
+                                             )
+        centroid_array.init_array(dims=('mz', 'time'),
+                                  coords=[[], []],
+                                  name='centroids'
+                                  )
+        item.update({'centroids': centroid_array})
+
+    @staticmethod
     def init_signal_dataset(data, data_root='', overwrite=False):
         # First filesystem operation in acquisition api sequence:
         #   init_signal_dataset - init_tps_dataset - init_viz_dataset -
@@ -141,6 +155,27 @@ class zarr_sdk:
         item.update( {viz_type: viz_array, viz_period: viz_period_array} )
 
     @staticmethod
+    def update_centroid_dataset(data, item):
+        value = data['value']
+        ti = np.array( [value['t']], dtype=np.float32 )
+        period = np.array( [value['period']], dtype=np.float32 )
+        # print(ti.item())
+        c_y = np.frombuffer(value['peak_intensity'], dtype=np.float32)
+        c_y = c_y.reshape(-1, 1)
+        c_mz = np.frombuffer(value['peak_mz'], dtype=np.float32)
+        c_mz = c_mz.reshape(-1,)
+
+        # Extend data arrays (write to file)
+        item['centroids'].extend_array(c_y,
+                                      [c_mz, ti],
+                                      'time'
+                                      )
+        # item['centroid_period'].extend_array(period,
+        #                                     [ti],
+        #                                     'time'
+        #                                     )
+
+    @staticmethod
     def update_signal_dataset(data, item):
         value = data['value']
         ti = np.array( [value['t']], dtype=np.float32 )
@@ -223,6 +258,7 @@ class FileIoNamespace(BaseClientNamespace):
         'acquired_spectrum',
         'acquired_tps_data',
         'acquisition_finished',
+        'centroid_info',
         'tps_parameter_info',
         # //
         # Router
