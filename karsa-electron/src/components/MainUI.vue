@@ -180,14 +180,20 @@ export default {
       be: null,
       room_sid: null,
       // endpoints - list of notifications the MainUI wants to receive
-      endpoints: ["instrument_data", "room_mate_gone"],
+      endpoints: [
+        "instrument_data",
+        "room_mate_gone",
+        "service_error",
+        ],
+
+      data_source_name_selected: null,
+      data_sources: [],
       instrument_data: {},
       instrument_data_queue: Promise.resolve(),
       is_disconnected: true,
       room_mate_gone: null,
-      data_source_name_selected: null,
-      data_sources: [],
       room_data_sources: "room_data_sources",
+      service_error: "",
       sample_browser_pinned: true,
       target_browser_pinned: true,
     };
@@ -285,6 +291,22 @@ export default {
         this.room_data_sources
       );
     },
+    service_error: function (new_value) {
+      if (_.isEmpty(new_value)) {
+        return false;
+      }
+      this.$buefy.dialog.alert({
+        title: "Error",
+        message: new_value,
+        type: "is-danger",
+        hasIcon: true,
+        icon: "times-circle",
+        iconPack: "fa",
+        ariaRole: "alertdialog",
+        ariaModal: true,
+      });
+      this.service_error = "";
+    },
     "root_namespace.connected": function (new_value) {
       this.is_disconnected = !new_value;
       if (new_value === true) {
@@ -297,6 +319,9 @@ export default {
             ...value.value,
             uid: Math.random(),
           })
+        );
+        this.namespace.on("service_error", (value) =>
+          this.be.import_two_way_binding_prop("service_error", value.value)
         );
         this.be.subscribe(this.endpoints, this.room_data_sources);
       }
