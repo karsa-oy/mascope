@@ -12,6 +12,8 @@ import fnmatch
 import json
 import subprocess
 import re
+import time
+from karsalib.logging import this_func_name
 
 import numpy as np
 import pandas as pd
@@ -19,9 +21,6 @@ import pandas as pd
 import datetime_glob
 from datetime import datetime, timedelta
 from shutil import rmtree
-
-# from watchdog.observers import Observer
-# from watchdog.events import FileSystemEventHandler
 
 
 
@@ -267,7 +266,7 @@ class RawPool():
                                           ]
                                  )
 
-        # Get list of all files
+        # Get list of all raw files in path folder
         try:
             files = next( os.walk(path) )[2]
         except StopIteration:
@@ -283,6 +282,33 @@ class RawPool():
                 print(full_file_path)
             except ValueError:
                 continue
+
+        # Get YYYY.mm.dd directories in path and get raw files from there
+        try:
+            dirnames = next( os.walk(path) )[1]
+        except StopIteration:
+            print("Done")
+            return
+        # Loop through directories in root, assumed to be named by date
+        for dirname in dirnames:
+            await asyncio.sleep(0)
+            try:
+                dir_date = datetime.strptime(dirname, '%Y.%m.%d')
+            except ValueError:
+                print("Skipped directory: %s due to invalid datetime format" %dirname)
+                continue
+            dir_path = os.path.join(path, dirname)
+            # Loop through files inside
+            dir_files = next( os.walk(dir_path) )[2]
+            for filename in fnmatch.filter(dir_files, fname_filter):
+                await asyncio.sleep(0)
+                try:
+                    full_file_path = os.path.join(dir_path, filename)
+                    self.add_file(full_file_path)
+                    print(full_file_path)
+                except ValueError:
+                    continue
+
         print("Done")
 
 
@@ -525,9 +551,6 @@ class SamplePool():
 
     def _read_attributes(self, path, prefix='', ext='.attrs'):
         attr_path = os.path.join(path, prefix + ext)
-        if not os.path.exists(attr_path):
-            print("SamplePool._read_attributes: File not found: %s" %attr_path)
-            return {}
         with open(attr_path, 'r') as f:
             attributes = json.load(f)
         return attributes
@@ -651,30 +674,28 @@ class SamplePool():
 
     def get_sample_metadata(self, project, experiment, sample):
         sample_link = os.path.join(self.projects_root, project, experiment, sample)
-        # Read attributes
-        sample_exp_attrs = self._read_attributes(sample_link,
-                                                 ext='.attrs'
-                                                 )
-        # Read sample properties from sample directory
-        sample_props = self._read_attributes(sample_link,
-                                             ext='.props'
-                                             )
-        # Read method
-        sample_method = self._read_attributes(sample_link,
-                                              ext='.meth'
-                                              )
-        # Read annotations
-        sample_annotations = self._read_attributes(sample_link,
-                                                   ext='.annts'
-                                                   )
+        error_msg = None
+        sample_ext = {}
+        n_tries = 5
+        while n_tries:
+            try:
+                for ext in ['.attrs', '.props', '.meth', '.annts']:
+                    sample_ext[ext] = self._read_attributes(sample_link, ext=ext)
+                break
+            except Exception as e:
+                error_msg = f"{[this_func_name()]} Error reading {sample}/{ext}: {e.__class__.__name__}({str(e)})"
+                n_tries -= 1
+                time.sleep(1)
+        if not n_tries:
+            raise Exception(error_msg)
         return {
-                # 'filename': sample,
-                # 'project': project,
-                # 'experiment': experiment,
-                'properties': sample_props,
-                'attributes': sample_exp_attrs,
-                'method': sample_method,
-                'annotations': sample_annotations,
+                    # 'filename': sample,
+                    # 'project': project,
+                    # 'experiment': experiment,
+                    'properties': sample_ext['.props'],
+                    'attributes': sample_ext['.attrs'],
+                    'method': sample_ext['.meth'],
+                    'annotations': sample_ext['.annts'],
                 }
 
     def get_samples(self, project=None, experiment=None):
@@ -759,11 +780,19 @@ class SamplePool():
             # Make link from experiment directory to data file
             self._make_link(sample_data_path, sample_experiment_path, overwrite=True)
         # Write attributes
-        self._write_attributes(sample_data_path, attributes, ext='.attrs', overwrite=True)
-        # Write method
-        self._write_attributes(sample_data_path, method, ext='.meth', overwrite=True)
-        # Write annotations
-        self._write_attributes(sample_data_path, annotations, ext='.annts', overwrite=True)
+        error_msg = None
+        n_tries = 5
+        while n_tries:
+            try:
+                for spec, ext in [(attributes, '.attrs'), (method, '.meth'), (annotations, '.annts')]:
+                    self._write_attributes(sample_data_path, spec, ext=ext, overwrite=True)
+                break
+            except Exception as e:
+                error_msg = f"{[this_func_name()]} Error writing {sample}/{ext}: {e.__class__.__name__}({str(e)})"
+                n_tries -= 1
+                time.sleep(1)
+        if not n_tries:
+            raise Exception(error_msg)
         # Update self.pool
         self.pool[project][experiment].append(sample)
         
