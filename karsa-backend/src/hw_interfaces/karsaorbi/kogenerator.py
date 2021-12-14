@@ -12,6 +12,7 @@ import numpy as np
 from threading import current_thread
 from time import sleep
 
+from services.FileIoService import zarr_sdk
 from .lib import Business as ThermoBusiness
 from .koutil import net2np_array
 from common.base_generator import BaseFileStreamer, PROGRESS_SHIFT
@@ -84,6 +85,24 @@ class RawStreamer(BaseFileStreamer):
                 }
         self.feed_spec_data(spec_data)
 
+        # Centroid data
+        centroid_stream = self.raw.GetCentroidStream(scan_no, None)
+        # Map .NET arrays into numpy arrays
+        c_mz = net2np_array(centroid_stream.Masses).astype(np.float32)
+        c_y = net2np_array(centroid_stream.Intensities).astype(np.float32)
+        # Round mz values based on the mz precision
+        c_mz, c_y = self._set_mz_precision(c_mz, c_y)
+        # Combine data for output
+        centroid_data = {
+                'filename': self.filename,          # Current file basename
+                'i': self.speci,                    # Current spectrum integer index
+                't': float(ti),                     # Timestamp [s]
+                'period': self.interval,            # Collection period [s]
+                'peak_mz': c_mz.tobytes(),          # Serialized peak mass [float32]
+                'peak_intensity': c_y.tobytes()     # Serialized peak intensity [float32]
+                }
+        self.feed_centroid_data(centroid_data)
+
     def _update(self, scan=None):
         """Update per acquisition attributes. If new data is available, feed into queues.
         """
@@ -94,6 +113,7 @@ class RawStreamer(BaseFileStreamer):
             self.feed_initial_data()
             if not self.wait_for_ack():     # wait for acq data initialization
                 raise TimeoutError
+            self.feed_centroid_info()
         else:
             # New data
             self.speci = scan - 1
@@ -149,3 +169,48 @@ class RawStreamer(BaseFileStreamer):
         # Out of main loop
         self.log(f"stopped {current_thread().name}")
         self.shutdown()
+
+    #======== Orbitrap extension of a streamer service communication protocol ===============    
+    def feed_centroid_info(self):
+        sn_data = {
+            'name': 'centroid_info',
+            'value': {
+                'filename': self.target_filename
+            },
+        }
+        gen_notifications = []
+        streamer_notifications = [
+            {
+                **sn_data,
+                'context': {
+                    **self.rcontext,
+                    'room': None,
+                },
+            },
+        ]
+        self.feed_notifications(gen_notifications, streamer_notifications)
+        if self.client.target_data_pool_path:
+            zarr_sdk.init_centroid_dataset(sn_data, self.item)   
+
+    def feed_centroid_data(self, centroid_data):
+        sn_data = {
+            'name': 'acquired_centroid_data',
+            'value': {
+                **centroid_data,
+                'filename': self.target_filename,
+            },
+        }
+        gen_notifications = []
+        streamer_notifications = [
+            {
+                **sn_data,
+                'context': {
+                    **self.rcontext,
+                    'room': None,
+                },
+            },
+        ]
+        self.feed_notifications(gen_notifications, streamer_notifications)
+        if self.client.target_data_pool_path:
+            zarr_sdk.update_centroid_dataset(sn_data, self.item)
+    # ===The service communication protocol implementation end=========================

@@ -15,7 +15,7 @@ from scipy.signal import find_peaks
 from karsatof.lib.TwTool import TwMassCalibrate, TwTof2Mass
 from karsalib.chemistry import match_mz
 from karsalib.client import BaseClientNamespace, BaseServiceClient
-from karsalib.struct import AttrDict, ExtendableDataArray
+from karsalib.logging import Logger
 from karsalib.util import parse_cmd_args
 from scenthound.karsavlm.msAlign import find_vlm
 from scenthound.kfeeder import KFeeder, FeederProcessor
@@ -96,7 +96,6 @@ class SignalProcessorNamespace(BaseClientNamespace):
                                                 )
 
     async def on_peak_data_request(self, data):
-        self.log(data)
         value = data['value']
         client_room = data.get('client_room') or data['cookies']['src_sid'][0]
         
@@ -113,7 +112,7 @@ class SignalProcessorNamespace(BaseClientNamespace):
         if not cache_item:
             # File not in cache, load
             print("Loading file: %s" %filename)
-            cache_item = load_file(filename, vars=['signal'])
+            cache_item = load_file(filename, vars=['centroids', 'signal'])
             cache[filename] = cache_item
 
         if mz_range is None:
@@ -124,18 +123,42 @@ class SignalProcessorNamespace(BaseClientNamespace):
             # Full time range
             t_range = [0, cache_item.attrs['props']['length']]
 
-        sum_spectrum = cache_item.signal.sel(
-                            mz=slice(*mz_range)
-                            ).mean(dim='time').compute()
+        # If centroid data saved, use it
+        if 'centroids' in cache_item:
+            sum_centroids = cache_item.centroids.sel(
+                                mz=slice(*mz_range),
+                                time=slice(*t_range)
+                                ).mean(dim='time').compute()
+            ind = (sum_centroids > min_peak_height).compute()
+            peak_mz = sum_centroids.mz[ind].load()
+            peak_hei = sum_centroids[ind].load()
+            peak_mz = peak_mz.values.astype(np.float32)
+            peak_hei = peak_hei.values.astype(np.float32)
+            peak_ind = np.array(range(len(peak_mz))).astype(np.float32)
+        # Find peaks
+        else:
+            sum_spectrum = cache_item.signal.sel(
+                                mz=slice(*mz_range),
+                                time=slice(*t_range)
+                                ).mean(dim='time').compute()
 
-        peak_ind, peak_props = find_peaks(sum_spectrum,
-                                          height=min_peak_height,
-                                          distance=min_peak_distance,
-                                          width=min_peak_width
-                                          )
-        peak_mz = sum_spectrum.mz[peak_ind].values.astype(np.float32)
-        peak_hei = peak_props['peak_heights'].astype(np.float32)
-        peak_ind = peak_ind.astype(np.float32)
+            peak_ind, peak_props = find_peaks(sum_spectrum,
+                                            height=min_peak_height,
+                                            distance=min_peak_distance,
+                                            width=min_peak_width
+                                            )
+            peak_mz = sum_spectrum.mz[peak_ind].values.astype(np.float32)
+            peak_hei = peak_props['peak_heights'].astype(np.float32)
+            peak_ind = peak_ind.astype(np.float32)
+
+        MAX_NO_PEAKS = 10000
+        if len(peak_mz) > MAX_NO_PEAKS:
+            await self.parent.push_log.error(
+                        "Warning! Max number of peaks exceeded: %s. Peak data omitted." %len(peak_mz),
+                        room=client_room,
+                        namespace='/'
+                        )
+            return
 
         peak_data = {
                 'mz': peak_mz.tobytes(),
@@ -291,7 +314,9 @@ def mz_calibrate_tof(peak_tof, peak_mz, exact_mz, nbr_tof_samples):
 
 
 class SignalProcessorClient(BaseServiceClient):
-    pass
+    async def init_service(self):
+        self.push_log = Logger(self.__class__.__name__, f_log_level=None)
+        self.push_log.configure_notifications(sender=self.ns_handler)
     # async def init_service(self):
     #     u_list = []
     #     u_list = range(200, 220)
