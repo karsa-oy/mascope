@@ -116,8 +116,7 @@ def gen_heatmap_image(data_xarray,
 
     # Ignore RuntimeWarning: "invalid value encountered in double_scalars
     # xres = (xcoords[-1] - xcoords[0]) / (w - 1)"
-    warnings.filterwarnings("ignore", category=RuntimeWarning)
-
+    # warnings.filterwarnings("ignore", category=RuntimeWarning)
     if data_xarray.time.dtype == '<m8[ns]':
         # Convert timedelta to float
         data_xarray = data_xarray.assign_coords(
@@ -152,7 +151,6 @@ def gen_heatmap_image(data_xarray,
 
     # Replace values < 0 with nan (not to be visualized, not to blow up the scale)
     data_xarray = data_xarray.where(data_xarray >= 0)
-    
     # Check if only zeros in the range
     sig_max = data_xarray.sel(time=slice(*t_range),
                               mz=slice(*mz_range)
@@ -284,6 +282,7 @@ def gen_spec_stack_image(data_xarray,
     return img
         
 def gen_spec_image(data_xarray,
+                   mz_range=None,
                    y_range=None,
                    img_width=600,
                    img_height=200,
@@ -321,6 +320,11 @@ def gen_spec_image(data_xarray,
     else:
         y = data_xarray.values
 
+    if mz_range is None:
+        mz0 = data_xarray.mz[0].item()
+        mz1 = data_xarray.mz[-1].item()
+        mz_range = (mz0, mz1)
+
     if y_range is None:
         # Set y_range[1] to max of signal
         y_max = float( y.max() )
@@ -332,7 +336,7 @@ def gen_spec_image(data_xarray,
     # mz axis
     mz = data_xarray.mz.data
     # Generate image for single trace
-    cvs = ds.Canvas(x_range=(mz[0], mz[-1]),
+    cvs = ds.Canvas(x_range=mz_range,
                     y_range=y_range,
                     plot_height=img_height,
                     plot_width=img_width
@@ -595,9 +599,11 @@ class ImageGenerator(Process):
                     print("Requested visualization type '%s' not available!" %viz_type)
                     continue
                 data_array = data.pop('data')
+                mz_range = data.get('mz_range', None)
                 y_range = data.get('y_range', None)
                 try:
                     viz = viz_gen_func(data_array,
+                                       mz_range=mz_range,
                                        y_range=y_range
                                        )
                 except ZeroDivisionError:
