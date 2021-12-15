@@ -103,7 +103,7 @@ class SignalProcessorNamespace(BaseClientNamespace):
         mz_range = value.get('mz_range')
         t_range = value.get('t_range')
 
-        min_peak_height = value.get('parameters', {}).get('peak_threshold', 1e-3)
+        peak_threshold = value.get('parameters', {}).get('peak_threshold', 5) # [%]
         min_peak_distance = value.get('parameters', {}).get('peak_separation', 3)
         min_peak_width = value.get('parameters', {}).get('peak_width', 3)
 
@@ -129,6 +129,7 @@ class SignalProcessorNamespace(BaseClientNamespace):
                                 mz=slice(*mz_range),
                                 time=slice(*t_range)
                                 ).mean(dim='time').compute()
+            min_peak_height = peak_threshold*1e-2 * sum_centroids.max().compute().item()
             ind = (sum_centroids > min_peak_height).compute()
             peak_mz = sum_centroids.mz[ind].load()
             peak_hei = sum_centroids[ind].load()
@@ -141,7 +142,7 @@ class SignalProcessorNamespace(BaseClientNamespace):
                                 mz=slice(*mz_range),
                                 time=slice(*t_range)
                                 ).mean(dim='time').compute()
-
+            min_peak_height = peak_threshold*1e-2 * sum_spectrum.max().compute().item()
             peak_ind, peak_props = find_peaks(sum_spectrum,
                                             height=min_peak_height,
                                             distance=min_peak_distance,
@@ -151,7 +152,7 @@ class SignalProcessorNamespace(BaseClientNamespace):
             peak_hei = peak_props['peak_heights'].astype(np.float32)
             peak_ind = peak_ind.astype(np.float32)
 
-        MAX_NO_PEAKS = 10000
+        MAX_NO_PEAKS = 20000
         if len(peak_mz) > MAX_NO_PEAKS:
             await self.parent.push_log.error(
                         "Warning! Max number of peaks exceeded: %s. Peak data omitted." %len(peak_mz),

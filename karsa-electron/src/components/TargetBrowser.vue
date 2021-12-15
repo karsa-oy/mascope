@@ -244,12 +244,13 @@
             </b-button>
             <div style="background-color: #363636; width: 25vw">
               <section style="padding: 0em 1em 0 1em">
-                <b-field label="peak intensity threshold">
+                <b-field label="peak intensity threshold [%]">
                   <b-slider
                     type="is-primary"
                     v-model="parameter_peak_intensity_threshold"
-                    :min="-5"
-                    :max="5"
+                    :min="0"
+                    :max="1"
+                    :step="0.01"
                     :tooltip="false"
                     lazy
                     indicator

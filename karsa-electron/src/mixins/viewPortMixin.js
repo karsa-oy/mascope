@@ -170,7 +170,7 @@ export const viewPortMixin = {
         },
 
         getPeakTraces(mz_range=null) {
-            const MAX_NO_PEAKS = 100; // Plot only if less peaks than this
+            const MAX_NO_PEAKS = 200; // Plot only if less peaks than this
 
             // this.log("getPeakTraces, mz_range: ", mz_range);
             if (!this.peak_traces_visible) {
