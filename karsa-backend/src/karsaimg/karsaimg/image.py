@@ -151,6 +151,8 @@ def gen_heatmap_image(data_xarray,
 
     # Replace values < 0 with nan (not to be visualized, not to blow up the scale)
     data_xarray = data_xarray.where(data_xarray >= 0)
+    # Drop rows with all nan to avoid gaps
+    data_xarray = data_xarray.dropna(dim='mz', how='all')
     # Check if only zeros in the range
     sig_max = data_xarray.sel(time=slice(*t_range),
                               mz=slice(*mz_range)
@@ -342,6 +344,8 @@ def gen_spec_image(data_xarray,
                     plot_width=img_width
                     )
     data_df = pd.DataFrame({'mz': mz, 'y': y})
+    # Drop rows with all nan to avoid gaps
+    data_df.dropna(axis=0, how='all', subset=['y'], inplace=True)
     agg = cvs.line(data_df, 'mz', 'y')
     img = tf.shade(agg, cmap=cmap)
     return img.to_pil()
