@@ -38,6 +38,8 @@ export default new Vuex.Store({
 		stop_visualize_range: {},
 		target_ions: [],
 		target_to_display: null,
+		target_compound_selected: {},
+		target_ion_selected: null,
 		tofdaq_log_entry: {},
 		url: "",
 		visualize_range: {},
@@ -123,6 +125,12 @@ export default new Vuex.Store({
 		},
 		target_to_display(state, payload) {
 			state.target_to_display = payload;
+		},
+		target_compound_selected(state, payload) {
+			state.target_compound_selected = payload;
+		},
+		target_ion_selected(state, payload) {
+			state.target_ion_selected = payload;
 		},
 		tofdaq_log_entry(state, payload) {
 			state.tofdaq_log_entry = payload;
