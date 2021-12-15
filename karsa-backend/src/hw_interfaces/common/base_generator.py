@@ -5,7 +5,7 @@ from ntpath import basename
 from threading import Thread
 from multiprocessing import Event
 
-from karsalib.util import copy_dict
+from karsalib.util import copy_dict, generate_unique_key
 from services.FileIoService import zarr_sdk
 
 MAX_RESPONSE_TIME = 5       # secs to wait for notification acknowledgement
@@ -56,6 +56,7 @@ class BaseFileStreamer(Thread):
             if 'description' not in self.attrs:
                 self.attrs['description'] = ''
         init_sample_data()
+        self.request_id = generate_unique_key()
         self.client_room = self.rcontext['client_room']
         self.job_id = (self.client_room, self.filename)
         with self.client.lock:
@@ -138,6 +139,7 @@ class BaseFileStreamer(Thread):
         else:
             notifications = [*gen_notifications, *streamer_notifications]
         for n in notifications:
+            n['context']['request_id'] = self.request_id
             job_id_data = {'client_room':self.client_room, 'filename':self.filename}
             n.update(job_id_data)   # job_id_data needed for CacheQ indexing of self.responses
             self.responses.cache_put(n)
