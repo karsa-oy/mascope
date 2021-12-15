@@ -272,7 +272,7 @@ export default {
           {
             filename: this.filename,
             parameters: {
-              peak_threshold: 10**this.parameter_peak_intensity_threshold
+              peak_threshold: this.parameter_peak_intensity_threshold
             }
           },
           null,

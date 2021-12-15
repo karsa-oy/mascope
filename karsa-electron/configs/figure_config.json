@@ -97,7 +97,7 @@
 				"visible": true
 				},
 			"yaxis": {
-				"title": "Signal intensity [mV/ext]",
+				"title": "Signal intensity [a.u.]",
 				"autorange": true,
 				"visible": true,
 				"linecolor": "#999",
