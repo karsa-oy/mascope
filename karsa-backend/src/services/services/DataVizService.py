@@ -827,6 +827,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                     'signal': dataset.signal,
                     'signal_period': dataset.signal_period,
                     'props': dataset.attrs['props'],
+                    'acq_request_id': request_id,
                 })
             else:
                 item_to_update.dataset = dataset
@@ -843,9 +844,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
 
         def file_cache_is_missing_or_obsolete():
             item = cache.get(filename)
-            if not item:
-                return True
-            if item.props['length'] == item.props['committed_length'] != committed_length:
+            if not item or item.get('acq_request_id', None) != request_id:
                 return True
             return False
 
@@ -877,7 +876,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
         filename = value['filename']
         full_length = value['length']
         committed_length = value['committed_length']
-        request_id = generate_unique_key()
+        request_id = data['request_id']
 
         if file_cache_is_missing_or_obsolete():
             self.log('Reset cache for', filename)
@@ -912,12 +911,12 @@ class DataVizServiceNamespace(BaseClientNamespace):
                     cache[filename] = load_caches(viz_types=VIZ_TYPES_SUPPORTED)
                 else:
                     cache[filename] = load_caches(existing_file_cache_item=cache_item)
-                # final sample length may change a bit after last batch committed -
-                # update file cache and requests cache correspondingly
-                adjust_caches_for_final_length(committed_length)
             except Exception as e:
                 self.log(f"Error {e.__class__.__name__}({str(e)})")
                 cache_item_crippled = True
+            # final sample length may change a bit after last batch committed -
+            # update file cache and requests cache correspondingly
+            adjust_caches_for_final_length(committed_length)
             viz_cache_process_requests(filename, flush=True)
             if cache_item_crippled:
                 del cache[filename]
