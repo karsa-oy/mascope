@@ -687,15 +687,15 @@ class SamplePool():
                 n_tries -= 1
                 time.sleep(1)
         if not n_tries:
-            raise Exception(error_msg)
+            print(error_msg)
         return {
                     # 'filename': sample,
                     # 'project': project,
                     # 'experiment': experiment,
-                    'properties': sample_ext['.props'],
-                    'attributes': sample_ext['.attrs'],
-                    'method': sample_ext['.meth'],
-                    'annotations': sample_ext['.annts'],
+                    'properties': sample_ext.get('.props', {}),
+                    'attributes': sample_ext.get('.attrs', {}),
+                    'method': sample_ext.get('.meth', {}),
+                    'annotations': sample_ext.get('.annts', {}),
                 }
 
     def get_samples(self, project=None, experiment=None):
