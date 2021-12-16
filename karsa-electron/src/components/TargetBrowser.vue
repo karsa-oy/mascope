@@ -31,8 +31,21 @@
               <div><br /></div>
             </section>
             <footer class="modal-card-foot">
-              <b-button @click="importExcelTargets()"> Import </b-button>
-              <b-button @click="is_excel_clipboard_modal_active = false">
+              <!-- Ionization mechanism input -->
+              <b-field
+                label="Ionization mechanism(s)"
+                style="text-align: left; margin-right: 1em"
+                custom-class="dark"
+              >
+                <b-input v-model="ionization_mechanism" lazy> </b-input>
+              </b-field>
+              <b-button style="margin-top: 1.1em" @click="importExcelTargets()">
+                Import
+              </b-button>
+              <b-button
+                style="margin-top: 1.1em"
+                @click="is_excel_clipboard_modal_active = false"
+              >
                 Cancel
               </b-button>
             </footer>
@@ -179,14 +192,6 @@
 
     <!-- Main content area -->
     <section class="tab-content">
-      <b-button
-        type="is-dark"
-        @click="is_excel_clipboard_modal_active = true"
-        style="margin-right: 1em"
-        expanded
-      >
-        Import
-      </b-button>
       <!-- Target compound table -->
       <b-table
         id="targets-datatable"
@@ -218,10 +223,6 @@
         </template>
       </b-table>
       <!-- End of target table -->
-      <!-- Ionization mechanism input -->
-      <b-field label="Ionization mechanism(s)" style="text-align: left">
-        <b-input v-model="ionization_mechanism" lazy> </b-input>
-      </b-field>
       <!-- Isotope table -->
       <!-- Buttons above table -->
       <div class="columns">
@@ -378,9 +379,15 @@
       <section style="padding: 1em 0 0 0">
         <b-button
           type="is-dark"
+          @click="is_excel_clipboard_modal_active = true"
+          style="margin-right: 1em"
+        >
+          Import targets
+        </b-button>
+        <b-button
+          type="is-dark"
           @click="mzCalibrateButtonClicked"
           :disabled="isotope_table_checked_rows.length < 4"
-          expanded
         >
           Calibrate m/z
         </b-button>
