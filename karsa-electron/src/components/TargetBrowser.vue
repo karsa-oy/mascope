@@ -190,8 +190,8 @@
       <!-- Target compound table -->
       <b-table
         id="targets-datatable"
-        :columns="target_table_cols"
-        :data="target_table_rows"
+        :columns="target_table_all_cols"
+        :data="target_table_all_rows"
         :key="target_table_key"
         :sticky-header="true"
         :selected.sync="target_compound_selected"
@@ -498,6 +498,14 @@ export default {
         this.$store.commit("target_ion_selected", value);
       },
     },
+    target_table_all_rows: function () {
+      return this.target_table_rows.map((row, index) => {
+        return { ...row, ...this.target_identified_rows[index] };
+      });
+    },
+    target_table_all_cols: function () {
+      return this.target_table_cols.concat(this.target_identified_cols);
+    },
   },
   data: function () {
     return {
@@ -538,6 +546,14 @@ export default {
       target_name_col: null,
       target_composition_col: null,
       targets_to_import: {},
+      target_identified_rows: [],
+      target_identified_cols: [
+        {
+          field: "2",
+          label: "Identified",
+          searchable: true,
+        },
+      ],
       // Target ion table
       target_ion_cols: ["ion composition", "mz"],
       //
@@ -927,19 +943,13 @@ export default {
       }
       // Redraw table
       this.isotope_table_key = Math.random();
-      // Add identification indicator to target table
-      if (this.target_table_cols.length == 2) {
-        this.target_table_cols.push({
-          field: "2",
-          label: "",
-          searchable: true,
-        });
-      }
-      for (let row_i in this.target_table_rows) {
-        this.target_table_rows[row_i]["2"] = "0";
+      // save identification data
+      this.target_identified_rows = new Array(this.target_table_rows.length);
+      for (var i = 0; i < this.target_table_rows.length; i++) {
+        this.target_identified_rows[i] = { 2: "0" };
       }
       for (let target_index of identified_targets) {
-        this.target_table_rows[target_index]["2"] = "1";
+        this.target_identified_rows[target_index]["2"] = "1";
       }
       this.target_table_key = Math.random();
     },
@@ -1032,7 +1042,7 @@ export default {
       // clear any existing ion selectors
       this.$set(this.$refs.isotope_table.filters, "ion id", "");
       // Filter isotope table by selected target
-      let target_id = this.target_table_rows.indexOf(new_value);
+      let target_id = this.target_table_all_rows.indexOf(new_value);
       this.$set(
         this.$refs.isotope_table.filters,
         "target id",
