@@ -168,7 +168,7 @@ th > input {
   color: #fff;
 }
 
-.label .dark {
+.dark {
   color: #363636;
 }
 
@@ -189,10 +189,6 @@ th > input {
 
 .icon:hover > span {
   color: rgb(94, 94, 94);
-}
-
-.button:hover {
-  color: #fff;
 }
 
 /* id params */
