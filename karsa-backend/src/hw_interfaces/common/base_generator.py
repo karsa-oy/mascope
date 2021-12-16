@@ -56,7 +56,7 @@ class BaseFileStreamer(Thread):
             if 'description' not in self.attrs:
                 self.attrs['description'] = ''
         init_sample_data()
-        self.streamer_request_id = generate_unique_key()
+        self.request_id = self.rcontext['request_id']
         self.client_room = self.rcontext['client_room']
         self.job_id = (self.client_room, self.filename)
         with self.client.lock:
@@ -72,7 +72,7 @@ class BaseFileStreamer(Thread):
             self.experiment = None
         with self.client.lock:
             self.client.in_progress.pop(self.job_id, None)
-        self.streamer_request_id = None
+        self.request_id = None
         self.job_id = None
         reset_sample_data()
         self.item = None
@@ -140,7 +140,7 @@ class BaseFileStreamer(Thread):
         else:
             notifications = [*gen_notifications, *streamer_notifications]
         for n in notifications:
-            n['context']['streamer_request_id'] = self.streamer_request_id
+            n['context']['request_id'] = self.request_id
             job_id_data = {'client_room':self.client_room, 'filename':self.filename}
             n.update(job_id_data)   # job_id_data needed for CacheQ indexing of self.responses
             self.responses.cache_put(n)

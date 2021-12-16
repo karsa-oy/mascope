@@ -827,7 +827,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                     'signal': dataset.signal,
                     'signal_period': dataset.signal_period,
                     'props': dataset.attrs['props'],
-                    'streamer_request_id': streamer_request_id,
+                    'request_id': request_id,
                 })
             else:
                 item_to_update.dataset = dataset
@@ -844,7 +844,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
 
         def file_cache_is_missing_or_obsolete():
             item = cache.get(filename)
-            if not item or item.get('streamer_request_id', None) != streamer_request_id:
+            if not item or item.get('request_id', None) != request_id:
                 return True
             return False
 
@@ -860,7 +860,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                     mz_range=value['range'],
                     t_resolution=None,
                     client_room='',
-                    request_id=streamer_request_id,
+                    request_id=request_id,
                     persist_in_cache=True
                 )
             return new_item
@@ -876,7 +876,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
         filename = value['filename']
         full_length = value['length']
         committed_length = value['committed_length']
-        streamer_request_id = data['streamer_request_id']
+        request_id = data['request_id']
 
         if file_cache_is_missing_or_obsolete():
             self.log('Reset cache for', filename)
