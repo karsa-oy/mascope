@@ -16,6 +16,7 @@ services:
     volumes:
       - /tmp/.X11-unix:/temp/.X11-unix
       - ./karsa-electron/src:/karsa-electron/src
+      - ./karsa-electron/configs:/karsa-electron/configs
     environment:
       - DISPLAY
     network_mode: "host"
