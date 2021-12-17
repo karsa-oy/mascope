@@ -216,9 +216,9 @@
               target_ion_selected == item['ion id'] ? 'is-selected' : '',
             ]"
           >
-            <td>{{ item["ion id"] }}</td>
+            <td><br /></td>
             <td>{{ item["ion composition"] }}</td>
-            <td>[identified]</td>
+            <td>{{ item["match score"] }}</td>
           </tr>
         </template>
       </b-table>
@@ -506,13 +506,74 @@ export default {
       },
     },
     target_table_all_rows: function () {
-      return this.target_table_rows.map((row, index) => {
-        return { ...row, ...this.target_identified_rows[index] };
-      });
+      if (Object.entries(this.target_match_scores).length > 0) {
+        let new_rows = [];
+        for (let target_id in this.target_table_rows) {
+          let row = this.target_table_rows[target_id];
+          let ions = row["items"];
+          let updated_ions = [];
+          for (let index in ions) {
+            let ion = ions[index];
+            let ion_id = ion["ion id"];
+            updated_ions.push({
+              ...ion,
+              "match score": this.target_match_scores[target_id][ion_id],
+            });
+          }
+          row["items"] = updated_ions;
+          new_rows.push({
+            ...row,
+            2: this.target_match_scores[target_id]["total"],
+          });
+        }
+        return new_rows;
+      } else {
+        return this.target_table_rows;
+      }
     },
     target_table_all_cols: function () {
-      return this.target_table_cols.concat(this.target_identified_cols);
+      if (Object.entries(this.target_match_scores).length > 0) {
+        return this.target_table_cols.concat([
+          {
+            field: "2",
+            label: "Match score",
+            searchable: true,
+          },
+        ]);
+      } else {
+        return this.target_table_cols;
+      }
     },
+    /**
+    target_table_match: function () {
+      let match = {};
+      for (let isotope_row of this.isotope_table_all_rows) {
+        let target_id = isotope_row["target id"];
+        let ion_id = isotope_row["ion id"];
+        // instantiate values if they don't exist
+        if (!(target_id in match)) {
+          match[target_id] = {};
+        } else {
+          if (!("total" in match[target_id])) {
+            match[target_id]["total"] = 0.0;
+          }
+          if (!(ion_id in match[target_id])) {
+            match[target_id][ion_id] = 0.0;
+          }
+        }
+      }
+      for (let isotope_row of this.isotope_table_checked_rows) {
+        let target_id = isotope_row["target id"];
+        let ion_id = isotope_row["ion id"];
+        // add isotopes to match count
+        let abundance = isotope_row["rel abu"];
+        console.log(isotope_row);
+        match[target_id][ion_id] += abundance;
+        match[target_id]["total"] += abundance;
+      }
+      console.log(match);
+      return match;
+    }, */
   },
   data: function () {
     return {
@@ -554,13 +615,7 @@ export default {
       target_composition_col: null,
       targets_to_import: {},
       target_identified_rows: [],
-      target_identified_cols: [
-        {
-          field: "2",
-          label: "Identified",
-          searchable: true,
-        },
-      ],
+      target_match_scores: {},
       // Target ion table
       target_ion_cols: ["ion composition", "mz"],
       //
@@ -950,14 +1005,37 @@ export default {
       }
       // Redraw table
       this.isotope_table_key = Math.random();
+      // Calculate match scores
+      let match_score = {};
+      for (let isotope_row of this.isotope_table_all_rows) {
+        let target_id = isotope_row["target id"];
+        let ion_id = isotope_row["ion id"];
+        // instantiate values if they don't exist
+        if (!(target_id in match_score)) {
+          match_score[target_id] = {};
+        } else {
+          if (!("total" in match_score[target_id])) {
+            match_score[target_id]["total"] = 0.0;
+          }
+          if (!(ion_id in match_score[target_id])) {
+            match_score[target_id][ion_id] = 0.0;
+          }
+        }
+      }
+      for (let isotope_row of this.isotope_table_checked_rows) {
+        let target_id = isotope_row["target id"];
+        let ion_id = isotope_row["ion id"];
+        // add isotopes to match_score count
+        let abundance = isotope_row["rel abu"];
+        match_score[target_id][ion_id] += abundance;
+        match_score[target_id]["total"] += abundance;
+      }
       // save identification data
       this.target_identified_rows = new Array(this.target_table_rows.length);
       for (var i = 0; i < this.target_table_rows.length; i++) {
-        this.target_identified_rows[i] = { 2: "0" };
+        this.target_identified_rows[i] = { 2: match_score[i]["total"] };
       }
-      for (let target_index of identified_targets) {
-        this.target_identified_rows[target_index]["2"] = "1";
-      }
+      this.target_match_scores = match_score;
       this.target_table_key = Math.random();
     },
     identify_peaks: function (new_value, old_value) {
