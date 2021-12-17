@@ -506,35 +506,43 @@ export default {
       },
     },
     target_table_all_rows: function () {
-      let new_rows = [];
-      for (let target_id in this.target_table_rows) {
-        let row = this.target_table_rows[target_id];
-        let ions = row["items"];
-        let updated_ions = [];
-        for (let index in ions) {
-          let ion = ions[index];
-          let ion_id = ion["ion id"];
-          updated_ions.push({
-            ...ion,
-            "match score": this.target_match_scores[target_id][ion_id],
+      if (Object.entries(this.target_match_scores).length > 0) {
+        let new_rows = [];
+        for (let target_id in this.target_table_rows) {
+          let row = this.target_table_rows[target_id];
+          let ions = row["items"];
+          let updated_ions = [];
+          for (let index in ions) {
+            let ion = ions[index];
+            let ion_id = ion["ion id"];
+            updated_ions.push({
+              ...ion,
+              "match score": this.target_match_scores[target_id][ion_id],
+            });
+          }
+          row["items"] = updated_ions;
+          new_rows.push({
+            ...row,
+            2: this.target_match_scores[target_id]["total"],
           });
         }
-        row["items"] = updated_ions;
-        new_rows.push({
-          ...row,
-          2: this.target_match_scores[target_id]["total"],
-        });
+        return new_rows;
+      } else {
+        return this.target_table_rows;
       }
-      return new_rows;
     },
     target_table_all_cols: function () {
-      return this.target_table_cols.concat([
-        {
-          field: "2",
-          label: "Match score",
-          searchable: true,
-        },
-      ]);
+      if (Object.entries(this.target_match_scores).length > 0) {
+        return this.target_table_cols.concat([
+          {
+            field: "2",
+            label: "Match score",
+            searchable: true,
+          },
+        ]);
+      } else {
+        return this.target_table_cols;
+      }
     },
     /**
     target_table_match: function () {
