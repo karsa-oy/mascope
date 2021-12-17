@@ -544,36 +544,6 @@ export default {
         return this.target_table_cols;
       }
     },
-    /**
-    target_table_match: function () {
-      let match = {};
-      for (let isotope_row of this.isotope_table_all_rows) {
-        let target_id = isotope_row["target id"];
-        let ion_id = isotope_row["ion id"];
-        // instantiate values if they don't exist
-        if (!(target_id in match)) {
-          match[target_id] = {};
-        } else {
-          if (!("total" in match[target_id])) {
-            match[target_id]["total"] = 0.0;
-          }
-          if (!(ion_id in match[target_id])) {
-            match[target_id][ion_id] = 0.0;
-          }
-        }
-      }
-      for (let isotope_row of this.isotope_table_checked_rows) {
-        let target_id = isotope_row["target id"];
-        let ion_id = isotope_row["ion id"];
-        // add isotopes to match count
-        let abundance = isotope_row["rel abu"];
-        console.log(isotope_row);
-        match[target_id][ion_id] += abundance;
-        match[target_id]["total"] += abundance;
-      }
-      console.log(match);
-      return match;
-    }, */
   },
   data: function () {
     return {
