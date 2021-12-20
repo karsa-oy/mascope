@@ -20,3 +20,5 @@ services:
     environment:
       - DISPLAY
     network_mode: "host"
+    ipc: host
+    mem_limit: 4g
