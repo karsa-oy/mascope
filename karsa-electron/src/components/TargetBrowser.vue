@@ -372,7 +372,6 @@
         sortable
         @filters-event-input="updateIsotopeFilterState"
         filters-event="input"
-        @dblclick="clearIsotopeFilters"
       >
       </b-table>
       <div style="text-align: right">
@@ -903,11 +902,13 @@ export default {
     },
     clearTargetFilters() {
       this.target_table_filters = {};
-      this.$nextTick(this.refreshTargetFilters);
-    },
-    clearIsotopeFilters() {
       this.isotope_table_filters = {};
+      this.$nextTick(this.refreshTargetFilters);
       this.$nextTick(this.refreshIsotopeFilters);
+      this.$nextTick(() => {
+        this.target_compound_selected = {};
+        this.target_ion_selected = null;
+      });
     },
     updateTargetFilterState(event) {
       console.log("Target compound filters changed");
@@ -1163,14 +1164,16 @@ export default {
       this.$set(this.$refs.isotope_table.filters, "ion id", "");
       // Filter isotope table by selected target
       let target_id = this.target_table_all_rows.indexOf(new_value);
-      this.$set(
-        this.$refs.isotope_table.filters,
-        "target id",
-        String(target_id)
-      );
-      this.updateIsotopeFilterState({
-        filters: this.$refs.isotope_table.filters,
-      });
+      if (target_id >= 0) {
+        this.$set(
+          this.$refs.isotope_table.filters,
+          "target id",
+          String(target_id)
+        );
+        this.updateIsotopeFilterState({
+          filters: this.$refs.isotope_table.filters,
+        });
+      }
     },
     targets_to_import: function (new_data, old_data) {
       if (_.isEqual(new_data, old_data)) {
