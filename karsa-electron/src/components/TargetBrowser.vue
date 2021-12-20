@@ -195,6 +195,7 @@
       <!-- Target compound table -->
       <b-table
         id="targets-datatable"
+        ref="target_table"
         :columns="target_table_all_cols"
         :data="target_table_all_rows"
         :key="target_table_key"
@@ -206,6 +207,9 @@
         @details-open="(row, index) => setTargetTableDetails(row)"
         :show-detail-icon="true"
         detail-key="0"
+        @filters-event-input="updateTargetFilterState"
+        filters-event="input"
+        @dblclick="clearTargetFilters"
       >
         <template slot="detail" slot-scope="props">
           <tr
@@ -352,7 +356,6 @@
       </div>
       <!-- End of buttons above table -->
       <b-table
-        @contextmenu="rightClickPeakTableRow"
         id="isotope-datatable"
         ref="isotope_table"
         style="margin-top: 1em"
@@ -367,6 +370,8 @@
         :is-row-checkable="(row) => row == isotope_table_selected_row"
         focusable
         sortable
+        @filters-event-input="updateIsotopeFilterState"
+        filters-event="input"
       >
       </b-table>
       <div style="text-align: right">
@@ -555,16 +560,6 @@ export default {
       excel_clipboard_text: "",
       excel_clipboard_table_cols: [],
       excel_clipboard_table_rows: [],
-      // Peak table
-      is_modal_isotope_table_active: false,
-      isotope_table_all_rows: [],
-      isotope_table_checked_rows: [],
-      isotope_table_cols: [],
-      isotope_table_key: Math.random(),
-      isotope_table_rows: [],
-      isotope_table_selected_row: {},
-      isotope_table_show_only_checked: false,
-      //
       // Mass calibration
       is_mz_calib_modal_active: false,
       mz_calib_stats_table_cols: [],
@@ -586,8 +581,20 @@ export default {
       targets_to_import: {},
       target_identified_rows: [],
       target_match_scores: {},
+      target_table_filters: {},
       // Target ion table
       target_ion_cols: ["ion composition", "mz"],
+      //
+      // Isotope table
+      is_modal_isotope_table_active: false,
+      isotope_table_all_rows: [],
+      isotope_table_checked_rows: [],
+      isotope_table_cols: [],
+      isotope_table_key: Math.random(),
+      isotope_table_rows: [],
+      isotope_table_selected_row: {},
+      isotope_table_show_only_checked: false,
+      isotope_table_filters: {},
       //
       room_sid: null,
       endpoints: [],
@@ -813,6 +820,9 @@ export default {
       );
       this.$set(this.$refs.isotope_table.filters, "ion id", String(ion_id));
       this.target_ion_selected = ion_id;
+      this.updateIsotopeFilterState({
+        filters: this.$refs.isotope_table.filters,
+      });
     },
     rightClickPeakTableRow(row) {
       console.log(row);
@@ -821,6 +831,7 @@ export default {
       this.target_table_detailed_rows = [row["0"]];
     },
     updateIsotopeTableData(data) {
+      console.log("Updating isotope table data");
       // Format data to isotope table
       let rows = [];
       let cols = [];
@@ -854,6 +865,60 @@ export default {
       }
       this.isotope_table_cols = cols;
       this.isotope_table_all_rows = rows;
+    },
+    refreshTargetFilters() {
+      console.log("Updating target table filters");
+      console.log(this.target_table_filters);
+      for (let col of this.target_table_all_cols) {
+        let field = col.field;
+        let filter = "";
+        if (field in this.target_table_filters) {
+          filter = this.target_table_filters[field];
+          console.log(
+            `Updating target table filter for column '${field}' with filter '${filter}'`
+          );
+        } else {
+          console.log(`Clearing target table filter for column '${field}'`);
+        }
+        this.$set(this.$refs.target_table.filters, field, String(filter));
+      }
+    },
+    refreshIsotopeFilters() {
+      console.log("Updating isotope table filters");
+      console.log(this.isotope_table_filters);
+      for (let col of this.isotope_table_cols) {
+        let field = col.field;
+        let filter = "";
+        if (field in this.isotope_table_filters) {
+          filter = this.isotope_table_filters[field];
+          console.log(
+            `Updating isotope table filter for column '${field}' with filter '${filter}'`
+          );
+        } else {
+          console.log(`Clearing isotope table filter for column '${field}'`);
+        }
+        this.$set(this.$refs.isotope_table.filters, field, String(filter));
+      }
+    },
+    clearTargetFilters() {
+      this.target_table_filters = {};
+      this.isotope_table_filters = {};
+      this.$nextTick(this.refreshTargetFilters);
+      this.$nextTick(this.refreshIsotopeFilters);
+      this.$nextTick(() => {
+        this.target_compound_selected = {};
+        this.target_ion_selected = null;
+      });
+    },
+    updateTargetFilterState(event) {
+      console.log("Target compound filters changed");
+      console.log(event.filters);
+      this.target_table_filters = event.filters;
+    },
+    updateIsotopeFilterState(event) {
+      console.log("Target isotope filters changed");
+      console.log(event.filters);
+      this.isotope_table_filters = event.filters;
     },
     updateMzCalibStatsTable() {
       this.mz_calib_stats_table_cols = [
@@ -1025,6 +1090,8 @@ export default {
         return;
       }
       this.isotope_table_rows = this.isotope_table_all_rows;
+      this.$nextTick(this.refreshIsotopeFilters);
+      this.$nextTick(this.refreshTargetFilters);
     },
     mz_calib_compound_table_checked_rows: function () {
       this.updateMzCalibPeaks();
@@ -1058,7 +1125,6 @@ export default {
           this.target_to_display = mz;
           return;
         }
-        // }
       } else {
         this.target_to_display = null;
       }
@@ -1098,11 +1164,16 @@ export default {
       this.$set(this.$refs.isotope_table.filters, "ion id", "");
       // Filter isotope table by selected target
       let target_id = this.target_table_all_rows.indexOf(new_value);
-      this.$set(
-        this.$refs.isotope_table.filters,
-        "target id",
-        String(target_id)
-      );
+      if (target_id >= 0) {
+        this.$set(
+          this.$refs.isotope_table.filters,
+          "target id",
+          String(target_id)
+        );
+        this.updateIsotopeFilterState({
+          filters: this.$refs.isotope_table.filters,
+        });
+      }
     },
     targets_to_import: function (new_data, old_data) {
       if (_.isEqual(new_data, old_data)) {
@@ -1111,6 +1182,8 @@ export default {
       this.target_table_cols = new_data.cols;
       this.target_table_rows = new_data.rows;
       this.writeTargetsToFile();
+      this.clearTargetFilters();
+      this.clearIsotopeFilters();
     },
     ionization_mechanism: function (new_data, old_data) {
       if (_.isEqual(new_data, old_data)) {
