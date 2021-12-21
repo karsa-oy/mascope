@@ -35,11 +35,6 @@ class BaseTestClientCase(asynctest.TestCase):
         self.client.reset()
         return super().tearDown()
 
-    def assert_requests_ok(self, request_ids=None):
-        asyncio.run(self.client.join_requests(request_ids))
-        if self.client.target_exception:
-            raise Exception(str(self.client.target_exception))
-
 
 @unittest.skip("TMP")
 class TestValidateTesterCase(BaseTestClientCase):
@@ -59,7 +54,7 @@ class TestValidateTesterCase(BaseTestClientCase):
         asyncio.run(
             self.client.emit_visualize_range(fname, request_id=f'zoom_{rq_suffix}'))
         with self.assertRaises(Exception) as ctx:
-            self.assert_requests_ok()
+            self.client.assert_requests_ok()
         self.assertTrue('exceeded max execution time' in str(ctx.exception))
 
 
@@ -74,7 +69,7 @@ class TestVisualizerCase(BaseTestClientCase):
         fname = 'TofDaq_Data_2021.08.02_01h01m01s'
         rq_suffix = self.client.set_viz_test_params(fname)
         asyncio.run(self.client.emit_visualize_range(fname, request_id=f"fullrange_{rq_suffix}"))
-        self.assert_requests_ok()
+        self.client.assert_requests_ok()
 
 
     def test_visualize_zoomed_range(self):
@@ -94,7 +89,7 @@ class TestVisualizerCase(BaseTestClientCase):
                                     # t_range=t_range
                                     )
         )
-        self.assert_requests_ok()
+        self.client.assert_requests_ok()
 
 
     def test_visualize_two_ranges_sequentially(self):
@@ -102,7 +97,7 @@ class TestVisualizerCase(BaseTestClientCase):
         rq_suffix = self.client.set_viz_test_params(fname)
         asyncio.run(self.client.emit_visualize_range(fname, request_id=f"fullrange_{rq_suffix}"))
 
-        self.assert_requests_ok()     # wait for rq to complete and verify exceptions
+        self.client.assert_requests_ok()     # wait for rq to complete and verify exceptions
 
         max_exec_time = 10
         t_range_01 = 16     # sample batch size is 5.xx
@@ -115,7 +110,7 @@ class TestVisualizerCase(BaseTestClientCase):
                                     mz_range=mz_range,
                                     t_range=t_range)
         )
-        self.assert_requests_ok()
+        self.client.assert_requests_ok()
 
 
     def test_visualize_two_ranges_parallel(self):
@@ -135,7 +130,7 @@ class TestVisualizerCase(BaseTestClientCase):
                                     mz_range=mz_range,
                                     t_range=t_range)
         )
-        self.assert_requests_ok()
+        self.client.assert_requests_ok()
 
 
     def test_visualize_two_files_parallel(self):
@@ -145,7 +140,7 @@ class TestVisualizerCase(BaseTestClientCase):
         # fname = 'file_2'
         rq_suffix = self.client.set_viz_test_params(fname)
         asyncio.run(self.client.emit_visualize_range(fname, request_id=f"fullrange2_{rq_suffix}"))
-        self.assert_requests_ok()
+        self.client.assert_requests_ok()
 
 
 @unittest.skip("TMP")
@@ -163,7 +158,7 @@ class TestSampleManagerCase(BaseTestClientCase):
         asyncio.run(
             cls.client.emit_service_state()
         )
-        cls.assert_requests_ok(cls)   # wait for service_state to be processed
+        cls.client.assert_requests_ok(cls)   # wait for service_state to be processed
 
     def assert_attrs(self, fname, attrs):
         with open(fname) as f:
@@ -186,7 +181,7 @@ class TestSampleManagerCase(BaseTestClientCase):
         asyncio.run(
             self.client.emit_project_selected(pname)
         )
-        self.assert_requests_ok()
+        self.client.assert_requests_ok()
         # validate experiments of selected project
         pdir = os.path.join(self.client.projects_root, pname)
         dirs = [d for d in os.listdir(pdir) if 
@@ -206,7 +201,7 @@ class TestSampleManagerCase(BaseTestClientCase):
         asyncio.run(
             self.client.emit_experiment_selected(pname, ename)
         )
-        self.assert_requests_ok()
+        self.client.assert_requests_ok()
         # validate samples of selected experiment
         edir = os.path.join(self.client.projects_root, pname, ename)
         samples = [s for s in os.listdir(edir) if 
@@ -231,7 +226,7 @@ class TestSampleManagerCase(BaseTestClientCase):
         asyncio.run(
             self.client.emit_save_project(pname, attrs)
         )
-        self.assert_requests_ok()
+        self.client.assert_requests_ok()
         # validate project dir
         self.assertTrue(os.path.isdir(pdir))
         # validate attributes
@@ -249,7 +244,7 @@ class TestSampleManagerCase(BaseTestClientCase):
         asyncio.run(
             self.client.emit_save_experiment(pname, ename, attrs, template)
         )
-        self.assert_requests_ok()
+        self.client.assert_requests_ok()
         self.assertTrue(os.path.isdir(edir))
         # validate attrs and template
         p = os.path.join(edir, '.attrs')
@@ -265,7 +260,7 @@ class TestSampleManagerCase(BaseTestClientCase):
         asyncio.run(
             self.client.emit_delete_experiment(pname, ename)
         )
-        self.assert_requests_ok()
+        self.client.assert_requests_ok()
         self.assertFalse(os.path.exists(edir), edir)
 
     def test_06_delete_project(self):
@@ -275,7 +270,7 @@ class TestSampleManagerCase(BaseTestClientCase):
         asyncio.run(
             self.client.emit_delete_project(pname)
         )
-        self.assert_requests_ok()
+        self.client.assert_requests_ok()
         self.assertFalse(os.path.exists(pdir), pdir)
 
 
@@ -339,7 +334,7 @@ class BaseTestCases:
                     self.dt_range_empty,
                     max_exec_time=3)
             )
-            self.assert_requests_ok()
+            self.client.assert_requests_ok()
             self.assertEqual(self.client.raw_samples, [])
 
         def test_02_import_raw_table_datetime_range_all(self):
@@ -353,7 +348,7 @@ class BaseTestCases:
                     self.dt_range_all,
                     max_exec_time=3)
             )
-            self.assert_requests_ok()
+            self.client.assert_requests_ok()
             # self.raw_samples = os.listdir(self.client.raw_samples_dir)
             self.assertEqual(self.client.raw_samples, self.raw_samples)
 
@@ -370,7 +365,7 @@ class BaseTestCases:
                     request_id='raw_import_status',
                     max_exec_time=3)
             )
-            self.assert_requests_ok(['raw_import_status',])
+            self.client.assert_requests_ok(['raw_import_status',])
             self.assertEqual(
                 basename(self.client.raw_import_status_data['progress'][0]['filename']),
                 self.raw_samples[0]
@@ -392,7 +387,7 @@ class BaseTestCases:
                     request_id='raw_import_status',
                     max_exec_time=3)
             )
-            self.assert_requests_ok(['raw_import_status',])
+            self.client.assert_requests_ok(['raw_import_status',])
             self.assertEqual(
                 basename(self.client.raw_import_status_data['progress'][0]['filename']),
                 self.raw_samples[1]
@@ -413,7 +408,7 @@ class BaseTestCases:
                     request_id='raw_import_status',
                     max_exec_time=3)
             )
-            self.assert_requests_ok(['raw_import_status',])
+            self.client.assert_requests_ok(['raw_import_status',])
             self.assertEqual(self.client.raw_import_status_data['progress'], [])
             self.assertEqual(self.client.raw_import_status_data['queue'], {})
             # only 2 target files were created, other two were cancelled
@@ -430,7 +425,7 @@ class BaseTestCases:
                     request_id='continue_raw_import',
                     max_exec_time=60)
             )
-            self.assert_requests_ok(['continue_raw_import',])
+            self.client.assert_requests_ok(['continue_raw_import',])
             if os.path.isdir(self.data_collection_path):
                 # not applicable, if the test and <TargetDataPool> (self.data_collection_path) are on different OSes
                 names = os.listdir(os.path.join(self.data_collection_path, self.client.data_collection_date))
@@ -449,8 +444,8 @@ class BaseTestCases:
                                 viz_types=["spectrogram", "timeseries", "waterfall"],
                     )
                 )
-                # self.assert_requests_ok(request_ids=[request_id])
-            self.assert_requests_ok()
+                # self.client.assert_requests_ok(request_ids=[request_id])
+            self.client.assert_requests_ok()
 
 
 

@@ -34,13 +34,9 @@ from time import time, sleep
 
 from karsalib.client import BaseClientNamespace, BaseServiceClient
 from karsalib.struct import AttrDict, CacheQ, LRUDict
-from karsalib.util import (generate_unique_key,
-                           get_client_notification_context,
-                           parse_cmd_args
-                           )
+from karsalib.util import parse_cmd_args
 from karsalib.logging import this_func_name, t_mark
 
-from karsalib.struct import ExtendableDataArray
 from karsaimg import VIZ_TYPES_SUPPORTED
 from karsaimg.image import (
                     convert_base64_to_img,
