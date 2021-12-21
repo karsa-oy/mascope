@@ -196,7 +196,6 @@
       <b-table
         id="targets-datatable"
         ref="target_table"
-        :columns="target_table_all_cols"
         :data="target_table_all_rows"
         :key="target_table_key"
         :sticky-header="true"
@@ -205,12 +204,42 @@
         custom-detailed-row
         :opened-detailed="target_table_detailed_rows"
         @details-open="(row, index) => setTargetTableDetails(row)"
-        :show-detail-icon="true"
         detail-key="0"
         @filters-event-input="updateTargetFilterState"
         filters-event="input"
         @dblclick="clearTargetFilters"
+        default-sort="['2', 'desc']"
+        default-sort-direction="desc"
       >
+        <b-table-column field="0" label="Name" sortable searchable>
+          <template v-slot="props"> {{ props.row["0"] }} </template>
+        </b-table-column>
+        <b-table-column field="1" label="Compound" sortable searchable>
+          <template v-slot="props"> {{ props.row["1"] }} </template>
+        </b-table-column>
+        <b-table-column
+          field="2"
+          label="Match score"
+          ref="targetMatchScoreColumn"
+          centered
+          sortable
+          searchable
+          :visible="Object.entries(this.target_match_scores).length > 0"
+        >
+          <template v-slot="props">
+            <span
+              :class="[
+                'tag',
+                {
+                  'is-warning': props.row['2'] >= 50 && props.row['2'] < 90,
+                },
+                { 'is-success': props.row['2'] >= 90 },
+              ]"
+            >
+              {{ props.row["2"] }}%
+            </span>
+          </template>
+        </b-table-column>
         <template slot="detail" slot-scope="props">
           <tr
             v-for="item in props.row.items"
@@ -220,9 +249,26 @@
               target_ion_selected == item['ion id'] ? 'is-selected' : '',
             ]"
           >
-            <td><br /></td>
-            <td>{{ item["ion composition"] }}</td>
-            <td>{{ item["match score"] }}</td>
+            <td colspan="1"></td>
+            <td colspan="1"></td>
+            <td colspan="1">{{ item["ion composition"] }}</td>
+            <td
+              v-if="Object.entries(target_match_scores).length > 0"
+              colspan="1"
+            >
+              <span
+                :class="[
+                  'tag',
+                  {
+                    'is-warning':
+                      item['match score'] >= 50 && item['match score'] < 90,
+                  },
+                  { 'is-success': item['match score'] >= 90 },
+                ]"
+              >
+                {{ item["match score"] }}%
+              </span>
+            </td>
           </tr>
         </template>
       </b-table>
@@ -579,7 +625,6 @@ export default {
       target_name_col: null,
       target_composition_col: null,
       targets_to_import: {},
-      target_identified_rows: [],
       target_match_scores: {},
       target_table_filters: {},
       // Target ion table
@@ -824,6 +869,11 @@ export default {
         filters: this.$refs.isotope_table.filters,
       });
     },
+    sortTargets() {
+      this.$nextTick(() => {
+        this.$refs.target_table.sort(this.$refs.targetMatchScoreColumn);
+      });
+    },
     rightClickPeakTableRow(row) {
       console.log(row);
     },
@@ -1049,29 +1099,34 @@ export default {
         if (!(target_id in match_score)) {
           match_score[target_id] = {};
         } else {
-          if (!("total" in match_score[target_id])) {
-            match_score[target_id]["total"] = 0.0;
-          }
           if (!(ion_id in match_score[target_id])) {
             match_score[target_id][ion_id] = 0.0;
           }
         }
       }
+      // sum up isotope abundance by ion
       for (let isotope_row of this.isotope_table_checked_rows) {
         let target_id = isotope_row["target id"];
         let ion_id = isotope_row["ion id"];
         // add isotopes to match_score count
         let abundance = isotope_row["rel abu"];
-        match_score[target_id][ion_id] += abundance;
-        match_score[target_id]["total"] += abundance;
+        match_score[target_id][ion_id] += abundance * 100;
       }
-      // save identification data
-      this.target_identified_rows = new Array(this.target_table_rows.length);
-      for (var i = 0; i < this.target_table_rows.length; i++) {
-        this.target_identified_rows[i] = { 2: match_score[i]["total"] };
+      // calculate ion specific match score as percentage
+      for (let target_id in match_score) {
+        for (let item in match_score[target_id]) {
+          match_score[target_id][item] =
+            Math.round((match_score[target_id][item] + Number.EPSILON) * 100) /
+            100;
+        }
+        match_score[target_id]["total"] = Math.max(
+          ...Object.values(match_score[target_id])
+        );
       }
+
       this.target_match_scores = match_score;
       this.target_table_key = Math.random();
+      this.sortTargets();
     },
     identify_peaks: function (new_value, old_value) {
       if (_.isEqual(new_value, old_value)) {
@@ -1183,7 +1238,6 @@ export default {
       this.target_table_rows = new_data.rows;
       this.writeTargetsToFile();
       this.clearTargetFilters();
-      this.clearIsotopeFilters();
     },
     ionization_mechanism: function (new_data, old_data) {
       if (_.isEqual(new_data, old_data)) {
@@ -1211,6 +1265,12 @@ export default {
         this.namespace.on("target_compound_selected", (value) =>
           this.be.import_one_way_binding_prop(
             "target_compound_selected",
+            value.value
+          )
+        );
+        this.namespace.on("target_match_scores", (value) =>
+          this.be.import_one_way_binding_prop(
+            "target_match_scores",
             value.value
           )
         );
