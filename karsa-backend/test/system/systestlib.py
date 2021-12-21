@@ -79,6 +79,11 @@ class BaseTestClientPublicNamespace(BaseClientNamespace):
         if done:
             self.parent.kill_exec_timer(request_id)
             self.parent.mark_request_done(request_id)
+            fname = data['value']['filename']
+            self.parent.viewed_samples.append(
+                [fname, round(time.time() - float(t_start), 1)]
+            )
+            self.log(self.parent.viewed_samples)
 
 
     # notification handlers
@@ -179,13 +184,13 @@ class BaseTestClientPrivateNamespace(BaseClientNamespace):
         self.parent.mark_request_done(request_id)
 
     async def on_acquisition_started(self, data):
-        self.parent.sample_in_progress[data['value']['filename']] = time.time()
+        self.parent.acquisition_start_time[data['value']['filename']] = time.time()
 
     async def on_acquisition_finished(self, data):
         # on_raw_import envokes acquisition_started/acquisition_finished
         fname = data['value']['filename']
         self.parent.acquired_samples.append(
-            [fname, round(time.time() - self.parent.sample_in_progress.pop(fname))]
+            [fname, round(time.time() - self.parent.acquisition_start_time.pop(fname))]
         )
         self.log(self.parent.acquired_samples)
         if len(self.parent.acquired_samples) == len(self.parent.raw_samples):
@@ -210,6 +215,8 @@ class BaseTestClient(BridgeServiceClient):
         self.stop_event = Event()
         self.cancel_event = Event()
         self.DEFAULT_MAX_EXEC_TIME = 5
+        self.viewed_samples = []
+        self.acquired_samples = []
 
     def reset(self):
         self.done.clear()
@@ -301,6 +308,11 @@ class BaseTestClient(BridgeServiceClient):
 
     async def emit_client_notification(self, name, value, *args, **kwargs):
         await self.public_ns.emit_client_notification(name, value, *args, **kwargs)
+
+    def assert_requests_ok(self, request_ids=None):
+        asyncio.run(self.join_requests(request_ids))
+        if self.target_exception:
+            raise Exception(str(self.target_exception))
 
     # decorators
     @decorator
@@ -468,7 +480,7 @@ class BaseTestClient(BridgeServiceClient):
         self.raw_samples = [s['filename'] for s in raw_samples_data]
         self.raw_samples_data = raw_samples_data
         self.acquired_samples = []
-        self.sample_in_progress = {}
+        self.acquisition_start_time = {}
         await self.private_ns.emit_client_notification(
                 name='raw_import',
                 value=raw_samples_data,
@@ -504,7 +516,7 @@ class BaseTestClient(BridgeServiceClient):
 def run_client():
     # Use run_client, when running client service from the terminal
     args = parse_cmd_args()
-    priv_ns = args['ns'] if args['ns'] != '/' else '/dummy'
+    priv_ns = args['ns'] if args.get('ns', '/') != '/' else '/dummy'
     client = BaseTestClient(args['url'],
                             args['port'],
                             ('/', BaseTestClientPublicNamespace),
@@ -517,7 +529,7 @@ def run_client():
 
 
 def start_test_client_as_daemon(timeout=10, **kwargs):
-    priv_ns = kwargs['ns'] if kwargs['ns'] != '/' else '/dummy'
+    priv_ns = kwargs['ns'] if kwargs.get('ns', '/') != '/' else '/dummy'
     client = BaseTestClient(kwargs['url'],
                             kwargs['port'],
                             ('/', BaseTestClientPublicNamespace),
