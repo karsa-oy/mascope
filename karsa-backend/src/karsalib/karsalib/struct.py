@@ -791,7 +791,9 @@ class FSWatcher:
     class FSEventHandler(PatternMatchingEventHandler):
         def __init__(self, client, mask):
             self.client = client
-            super().__init__(patterns=[mask,])
+            if not hasattr(mask, '__iter__'):
+                mask = [mask]
+            super().__init__(patterns=mask)
 
         def on_created(self, event):
             try:
