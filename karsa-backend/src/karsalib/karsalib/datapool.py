@@ -144,7 +144,6 @@ class H5Pool():
                     continue
         print("Done")
 
-
     def add_file(self, full_file_path):
         # Try to parse time from filename
         filename = basename(full_file_path)
@@ -180,7 +179,6 @@ class H5Pool():
                             ]
                         )
         self.pool = self.pool.append(df_row).sort_index()
-
 
     def remove_file(self, full_file_path):
         filename = basename(full_file_path)
@@ -549,7 +547,8 @@ class SamplePool():
         except Exception as e:
             print(e)
 
-    def _read_attributes(self, path, prefix='', ext='.attrs'):
+    @staticmethod
+    def _read_attributes(path, prefix='', ext='.attrs'):
         attr_path = os.path.join(path, prefix + ext)
         with open(attr_path, 'r') as f:
             attributes = json.load(f)
@@ -810,3 +809,119 @@ class SamplePool():
                                     (flat_df['sample'].notna())
                                     ]
         self.df = flat_df_clean.set_index(self.df.index.names)
+
+
+class ZarrPool(H5Pool):
+    async def scan_dir(self,
+                       path=None,
+                       ):
+        """Scan directory for samples
+        
+        This function walks through the given path, trying to find data files
+        matching the given filter.
+        
+        path : str
+            Root path
+        fname_filter : datetime.datetime
+            String to match the filename with. The default is 'Data*.h5'.
+        recursive : bool, optional
+            Scan recursively. The default is False.
+
+        """
+        
+        path = path or self.pool_attrs.get('path', '.')
+
+        print("Scanning: %s" % str(path))
+
+        self.pool = pd.DataFrame(index=[],
+                                 data=[],
+                                 columns=['filename',
+                                          'properties',
+                                          'attributes',
+                                          'method',
+                                          'annotations',
+                                          'datetime',
+                                          'path',
+                                          ]
+                                 )
+        # Get directories in path
+        try:
+            dirnames = next( os.walk(path) )[1]
+        except StopIteration:
+            print("Done")
+            return
+        # Loop through directories in root, assumed to be named by date
+        for dirname in dirnames:
+            await asyncio.sleep(0)
+            try:
+                dir_date = datetime.strptime(dirname, '%Y.%m.%d')
+            except ValueError:
+                print("Skipped directory: %s due to invalid datetime format" %dirname)
+                continue
+            dir_path = os.path.join(path, dirname)
+            # Loop through sample directories inside
+            dir_samples = next( os.walk(dir_path) )[1]
+            for sample_dir in dir_samples:
+                await asyncio.sleep(0)
+                try:
+                    full_file_path = os.path.join(dir_path, sample_dir)
+                    self.add_file(full_file_path)
+                    print(full_file_path)
+                except ValueError:
+                    continue
+        print("Done")
+
+    def add_file(self, full_file_path):
+        filename = basename(full_file_path)
+        path = dirname(full_file_path)
+        # Try to parse time from filename
+        patterns = ['*_%Y%m%d %H%M *',
+                    '*_%Y%m%d_%H%M_*',
+                    '*_%Y.%m.%d*%Hh%Mm%Ss*'
+                    ]
+        for pattern in patterns:
+            matcher = datetime_glob.Matcher(pattern=pattern)
+            file_datetime_match = matcher.match(filename)
+            if file_datetime_match:
+                break
+        if not file_datetime_match:
+            print("Skipped file: %s due to invalid datetime format" %filename)
+            raise ValueError
+        # Append to pool
+        file_datetime = file_datetime_match.as_datetime()
+        sample_metadata = self.get_sample_metadata(full_file_path)
+        df_row = pd.DataFrame(
+                        index=[filename],
+                        data=[[
+                            filename,
+                            sample_metadata.get('properties', {}),
+                            sample_metadata.get('attributes', {}),
+                            sample_metadata.get('method', {}),
+                            sample_metadata.get('annotations', {}),
+                            file_datetime,
+                            path
+                            ]],
+                            columns=['filename',
+                                    'properties',
+                                    'attributes',
+                                    'method',
+                                    'annotations',
+                                    'datetime',
+                                    'path',
+                                    ]
+                        )
+        self.pool = self.pool.append(df_row).sort_index()
+
+    def get_sample_metadata(self, filepath):
+        sample_ext = {}
+        try:
+            for ext in ['.attrs', '.props', '.meth', '.annts']:
+                sample_ext[ext] = SamplePool._read_attributes(filepath, ext=ext)
+        except Exception as e:
+            print(e)
+        return {
+                    'properties': sample_ext.get('.props', {}),
+                    'attributes': sample_ext.get('.attrs', {}),
+                    'method': sample_ext.get('.meth', {}),
+                    'annotations': sample_ext.get('.annts', {}),
+                }
