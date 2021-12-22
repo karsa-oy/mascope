@@ -59,6 +59,9 @@ export default new Vuex.Store({
 		data_source_selected(state, payload) {
 			state.data_source_selected = payload;
 		},
+		data_sources(state, payload) {
+			state.data_sources = payload;
+		},
 		experiment_selected(state, payload) {
 			state.experiment_selected = payload;
 		},
