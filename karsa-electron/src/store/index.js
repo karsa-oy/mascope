@@ -9,6 +9,7 @@ export default new Vuex.Store({
 		autosave_on: false,
 		compute_target_ions: {},
 		data_source_selected: {},
+		data_sources: [],
 		experiment_selected: { 'title': "", 'project': "", 'attributes': [] },
 		experiments: [],
 		figure_data: {},
@@ -34,6 +35,7 @@ export default new Vuex.Store({
 			'project': "",
 			'experiment': "",
 		},
+		sample_to_link: {},
 		samples_selected: [],
 		stop_visualize_range: {},
 		target_ions: [],
@@ -113,6 +115,9 @@ export default new Vuex.Store({
 		},
 		sample_in_focus(state, payload) {
 			state.sample_in_focus = payload;
+		},
+		sample_to_link(state, payload) {
+			state.sample_to_link = payload;
 		},
 		samples_selected(state, payload) {
 			state.samples_selected = payload;
