@@ -24,7 +24,7 @@
             <div
                 v-for="item in form_fields" :key="item.label">
                 <template>
-                        <b-field :label="item.label">
+                        <b-field :label="item.label" custom-class="dark">
                             <b-input
                                 v-model="item.value"
                                 :placeholder="show_edit_functions ? 'default value' : ''"
@@ -47,7 +47,7 @@
                 </template>
             </div>
             <div v-if="show_edit_functions">
-                <b-field label="New field">
+                <b-field label="New field" custom-class="dark">
                     <b-button
                         @click="addField()"
                         expanded>
@@ -56,7 +56,7 @@
                 </b-field>
             </div>
             <div><br></div>
-            <b-field label="Reuse template" v-if="Boolean(load_template_path) || Boolean(save_template_path)">
+            <b-field label="Reuse template" v-if="Boolean(load_template_path) || Boolean(save_template_path)" custom-class="dark">
                 <div class="container">
                     <div class="row">
                         <div class="columns">

@@ -18,7 +18,7 @@
               <p class="modal-card-title">Select project and experiment</p>
             </header>
             <section class="modal-card-body">
-              <b-field label="Project">
+              <b-field label="Project" custom-class="dark">
                 <b-select
                   placeholder="Select a project"
                   @input="selectProject($event)"
@@ -37,7 +37,7 @@
 
               <div><br /></div>
 
-              <b-field label="Experiment">
+              <b-field label="Experiment" custom-class="dark">
                 <b-select
                   placeholder="Select an experiment"
                   @input="selectExperiment($event)"
@@ -171,42 +171,7 @@
                 </MetaDataForm>
                 <!-- End of experiment attributes form -->
                 <div><br /></div>
-                <!-- Upload experiment plan -->
-                <b-field label="Upload experiment plan">
-                  <b-field
-                    class="file is-primary"
-                    :class="{ 'has-name': !!experiment_plan_file }"
-                  >
-                    <b-upload
-                      v-model="experiment_plan_file"
-                      class="file-label"
-                      rounded
-                    >
-                      <span class="file-cta">
-                        <b-icon class="file-icon" icon="upload"></b-icon>
-                        <span class="file-label">Click to upload</span>
-                      </span>
-                      <span class="file-name" v-if="experiment_plan_file">
-                        {{ experiment_plan_file.name }}
-                      </span>
-                    </b-upload>
-                  </b-field>
-                </b-field>
-                <b-field label="Planned experiment" v-if="experiment_plan">
-                  <b-field>
-                    # samples:
-                    {{ experiment_plan.sample_placeholders.length.toString() }}
-                  </b-field>
-                  <b-field>
-                    <b-button
-                      type="is-primary"
-                      @click="is_modal_sample_table_active = true"
-                    >
-                      <b-icon icon="fullscreen"> </b-icon>
-                    </b-button>
-                  </b-field>
-                </b-field>
-                <!-- End of upload experiment plan -->
+<div hidden>
                 <div><br /></div>
                 <!-- Sample attributes form -->
                 <MetaDataForm
@@ -225,6 +190,7 @@
                 >
                 </MetaDataForm>
                 <!-- End of sample attributes form -->
+</div>
               </section>
             </div>
           </div>
@@ -335,7 +301,7 @@
               </MetaDataForm>
 
               <div><br /></div>
-              <b-field label="Project">
+              <b-field label="Project" custom-class="dark">
                 <b-select
                   placeholder="Select a project"
                   v-model="project_selected.title"
@@ -350,7 +316,7 @@
                 </b-select>
               </b-field>
 
-              <b-field label="Experiment">
+              <b-field label="Experiment" custom-class="dark">
                 <b-select
                   placeholder="Select an experiment"
                   v-model="experiment_selected.title"
@@ -498,21 +464,13 @@
         aria-role="dialog"
         aria-modal
       >
-        <div class="columns">
+        <div>
           <div class="modal-card" style="width: 500px; height: 700px">
             <header class="modal-card-head">
               <p class="modal-card-title">Import samples</p>
             </header>
             <section class="modal-card-body">
-              <b-table
-                id="import-sample-table"
-                :columns="import_sample_table_cols"
-                :data="import_sample_table_rows"
-                :checkable="true"
-                :header-checkable="false"
-                :checked-rows.sync="import_sample_table_checked_rows"
-              >
-              </b-table>
+              <SampleImport></SampleImport>
               <div><br /></div>
             </section>
             <footer class="modal-card-foot">
@@ -521,7 +479,7 @@
                 type="button"
                 @click="importSamples()"
                 is-dark
-                :disabled="!import_sample_table_checked_rows.length"
+                :disabled="false"
               >
                 Import
               </button>
@@ -536,8 +494,6 @@
             </footer>
           </div>
         </div>
-        <b-loading :is-full-page="false" v-model="import_sample_table_loading">
-        </b-loading>
       </b-modal>
     </section>
     <!-- End of sample import modal -->
@@ -640,11 +596,10 @@
                     <div class="columns">
                       <div class="column" style="text-align: left">
                         <b-button
-                          disabled
                           icon-left="plus"
                           class="tag is-dark"
                           outlined
-                          @click="launchSampleImport()"
+                          @click="is_modal_sample_import_active = true"
                         >
                         </b-button>
                       </div>
@@ -780,6 +735,7 @@ import "buefy/dist/buefy.css";
 import "@mdi/font/css/materialdesignicons.min.css";
 import { BECom, isValidFilename, shallow_copy } from "../karsalib.js";
 import MetaDataForm from "./MetaDataForm.vue";
+import SampleImport from "./SampleImport.vue";
 
 Vue.use([Buefy]);
 
@@ -791,10 +747,16 @@ export default {
   name: "SampleBrowser",
   components: {
     MetaDataForm,
+    SampleImport,
   },
   props: {},
   computed: {
-    ...mapState(["autosave_on", "new_file", "root_namespace"]),
+    ...mapState([
+          "autosave_on",
+          "new_file",
+          "root_namespace",
+          "sample_to_link",
+          ]),
 
     experiments: {
       get() {
@@ -867,24 +829,11 @@ export default {
       // Modal active variables
       is_modal_landing_active: true,
       is_modal_experiment_attributes_active: false,
-      is_modal_prefill_sample_attributes_active: false,
       is_modal_project_attributes_active: false,
       is_modal_new_experiment_active: false,
-      is_modal_sample_import_active: false,
       is_modal_sample_attributes_active: false,
+      is_modal_sample_import_active: false,
       is_modal_sample_table_active: false,
-      // variables for import modals
-      import_start_time: null,
-      import_end_time: null,
-      import_min_datetime: null,
-      import_max_datetime: new Date(),
-      // variables for sample import modal
-      importable_samples: {},
-      import_sample_table_loading: true,
-      import_sample_table_rows: [],
-      import_sample_table_cols: [],
-      import_sample_table_checked_rows: [],
-      import_sample_table_datetime_range: {},
       // Project metadata
       project_attributes_default_template: [
         { label: "Title", value: "", required: true },
@@ -894,7 +843,6 @@ export default {
       project_attributes_template_path:
         "./metadata_templates/project_templates",
       project_form_props: {},
-
       // Experiment metadata
       experiment_attributes_default_template: [
         { label: "Title", value: "", required: true },
@@ -904,9 +852,6 @@ export default {
       experiment_attributes_template_path:
         "./metadata_templates/experiment_templates",
       experiment_edit_form_props: {},
-      experiment_plan: null,
-      experiment_plan_blob: "",
-      experiment_plan_file: {},
       // Sample metadata for selected sample
       samples: [],
       // variables for sample table
@@ -937,16 +882,7 @@ export default {
     log: function (...args) {
       console.log("[" + this.name + "]", ...args);
     },
-    addSampleTableCol() {
-      // TODO: add column when target is added
-      return;
-    },
-    addSampleTableRow() {
-      // TODO: On new sample, add row instead of full table update
-      return;
-    },
     cancelNewExperiment() {
-      this.resetExperimentPlan();
       this.is_modal_new_experiment_active = false;
     },
     cancelNewProject() {
@@ -1021,25 +957,6 @@ export default {
         ...this.samples[sample_filename],
       });
     },
-    importSamples() {
-      // TODO: Needs an update
-
-      let to_import = this.import_sample_table_checked_rows[0];
-      // Preserve sample id, title and description
-      // Set project and experiment to the selected ones
-      let sample = {
-        title: to_import.title,
-        experiment: this.experiment_selected.title,
-        project: this.project_selected.title,
-        attributes: {
-          title: to_import.title,
-          description: to_import.description,
-        },
-      };
-      // Export sample attributes to link into current experiment
-      this.sample_attributes = sample;
-      this.is_modal_sample_import_active = false;
-    },
     launchExperimentAttributesModal(experiment) {
       this.experiment_edit_form_props = {};
       this.experiment_edit_form_props.project = experiment.project;
@@ -1078,14 +995,6 @@ export default {
     launchSampleAttributeModal() {
       this.is_modal_sample_attributes_active = true;
     },
-    launchSampleImport() {
-      // Request list of samples from FileService
-      this.import_sample_table_datetime_range = Math.random();
-      // Set loading state
-      this.import_sample_table_loading = true;
-      // Launch modal
-      this.is_modal_sample_import_active = true;
-    },
     prettyPrintAttributes(form_fields) {
       let pretty_text = "";
       for (let i in form_fields) {
@@ -1101,15 +1010,6 @@ export default {
       return this.be.export_one_way_binding_prop(
         "delete_sample",
         sample_to_remove
-      );
-    },
-    resetExperimentPlan() {
-      this.experiment_plan = null;
-      this.experiment_plan_blob = "";
-      this.experiment_plan_file = {};
-      this.samples = [];
-      this.sample_attributes_template = shallow_copy(
-        this.sample_attributes_default_template
       );
     },
     rightClickExperiment(event) {
@@ -1148,14 +1048,10 @@ export default {
         project: this.project_selected.title,
         attributes: this.experiment_attributes_fields,
         sample_attributes_template: this.sample_attributes_fields,
-        sample_placeholders: this.experiment_plan
-          ? this.experiment_plan.sample_placeholders
-          : [],
       };
 
       this.be.export_one_way_binding_prop("save_experiment", new_experiment);
       this.experiment_selected = new_experiment;
-      this.resetExperimentPlan();
       this.is_modal_new_experiment_active = false;
     },
     saveProject() {
@@ -1302,58 +1198,10 @@ export default {
         }
       }
     },
-    experiment_plan: function (new_value) {
-      if (new_value) {
-        this.sample_attributes_template = new_value.sample_attributes_template;
-        this.sample_attributes_key = Math.random();
-        this.samples = new_value.sample_placeholders;
-      }
-    },
-    experiment_plan_blob: function (new_value) {
-      if (new_value) {
-        return this.be.export_one_way_binding_prop(
-          "parse_experiment_plan_blob",
-          new_value
-        );
-      }
-    },
-    experiment_plan_file: async function (new_value) {
-      if (!new_value.text) {
-        return;
-      }
-      let file_content = await new_value.text();
-      this.experiment_plan_blob = file_content;
-    },
     experiments: function () {
       if (this.experiment_selected.title) {
         this.selectExperiment(this.experiment_selected.title);
       }
-    },
-    import_sample_table_datetime_range: function (new_value, old_value) {
-      return this.be.export_one_way_binding_prop(
-        "import_sample_table_datetime_range",
-        new_value,
-        old_value,
-        this.room_experiment
-      );
-    },
-    import_sample_table_checked_rows: function (new_value, old_value) {
-      if (_.isEqual(new_value, old_value)) {
-        return false;
-      }
-      var last_selection = [...new_value].pop();
-      // force single row selection
-      if (this.import_sample_table_checked_rows.length > 1) {
-        this.import_sample_table_checked_rows = [last_selection];
-      }
-    },
-    importable_samples: function (new_data) {
-      for (let i = 0; i < new_data.cols.length; i++) {
-        new_data.cols[i]["searchable"] = true;
-      }
-      this.import_sample_table_cols = new_data.cols;
-      this.import_sample_table_rows = new_data.rows;
-      this.import_sample_table_loading = false;
     },
     new_file: function (new_value) {
       this.$buefy.toast.open({
@@ -1426,6 +1274,10 @@ export default {
         if (experiment_selected_title)
           this.selectExperiment(experiment_selected_title);
       }
+    },
+    sample_to_link: function() {
+      // Export sample attributes to link into current experiment
+      return this.be.export_one_way_binding_prop("save_sample", this.sample_to_link);
     },
     samples: function (new_value) {
       // Format data to sample table
@@ -1516,14 +1368,8 @@ export default {
           this.selectSample(value.value.filename);
           }
         );
-        this.namespace.on("experiment_plan", (value) =>
-          this.be.import_one_way_binding_prop("experiment_plan", value.value)
-        );
         this.namespace.on("experiments", (value) =>
           this.be.import_two_way_binding_prop("experiments", value.value)
-        );
-        this.namespace.on("importable_samples", (value) =>
-          this.be.import_one_way_binding_prop("importable_samples", value.value)
         );
         this.namespace.on("projects", (value) =>
           this.be.import_two_way_binding_prop("projects", value.value)
@@ -1542,6 +1388,7 @@ export default {
 </script>
 
 <style>
+
 /* menu */
 .menu-label {
   color: white;
