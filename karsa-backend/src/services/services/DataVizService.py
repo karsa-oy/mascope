@@ -800,13 +800,13 @@ class DataVizServiceNamespace(BaseClientNamespace):
         """
         global cache
         value = data['value']
-        filename = value['filename']
+        filename = value.get('filename')
         request_ids = value['request_ids']
-        if not filename:
-            return
         t_mark(value)
         for request_id in request_ids:
             force_release_request(request_id)
+        if not filename:
+            return
         # acquired samples are cached under filename key - check to release
         cur = viz_cache_get('requests', 'request_id', filename=filename)
         if not cur.fetchone() and filename in cache:
