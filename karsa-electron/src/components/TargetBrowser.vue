@@ -293,9 +293,9 @@
               outlined
             >
             </b-button>
-            <div style="background-color: #363636; width: 25vw">
+            <div style="width: 25vw">
               <section style="padding: 0em 1em 0 1em">
-                <b-field label="peak intensity threshold [%]">
+                <b-field label="peak intensity threshold [%]" custom-class="dark">
                   <b-slider
                     type="is-primary"
                     v-model="parameter_peak_intensity_threshold"
@@ -308,7 +308,7 @@
                   >
                   </b-slider>
                 </b-field>
-                <b-field label="m/z tolerance [ppm]">
+                <b-field label="m/z tolerance [ppm]" custom-class="dark">
                   <b-slider
                     type="is-primary"
                     v-model="parameter_mz_tolerance"
@@ -320,7 +320,7 @@
                   >
                   </b-slider>
                 </b-field>
-                <b-field label="isotope ratio tolerance [%]">
+                <b-field label="isotope ratio tolerance [%]" custom-class="dark">
                   <b-slider
                     type="is-primary"
                     v-model="parameter_iso_ratio_tolerance"
@@ -332,7 +332,7 @@
                   >
                   </b-slider>
                 </b-field>
-                <b-field label="isotope abundance threshold [%]">
+                <b-field label="isotope abundance threshold [%]" custom-class="dark">
                   <b-slider
                     type="is-primary"
                     v-model="parameter_iso_abu_threshold"
@@ -421,10 +421,13 @@
       >
       </b-table>
       <div style="text-align: right">
-        <b-field
-          :label="'# identified peaks: ' + isotope_table_checked_rows.length"
-        >
-        </b-field>
+        <div style="color:white;">
+          # identified peaks: {{isotope_table_checked_rows.length}}
+        
+        </div>
+        <div style="color:white;">
+          # found peaks:  {{(peak_data.mz ? peak_data.mz.length : 0)}}
+        </div>
       </div>
       <!-- End of isotope table -->
       <section style="padding: 1em 0 0 0">
@@ -463,6 +466,7 @@ Vue.use([Buefy]);
 var _ = require("underscore");
 var fs = require("fs");
 var Plotly = require("plotly.js-dist");
+const { Parser } = require("json2csv");
 
 export default {
   name: "TargetBrowser",
@@ -470,10 +474,13 @@ export default {
   props: {},
   computed: {
     ...mapState([
+      "experiment_selected",
       "figure_double_click",
       "figure_ranges",
       "peak_data",
+      "project_selected",
       "root_namespace",
+      "sample_in_focus",
       "samples_selected",
     ]),
     compute_target_ions: {
@@ -691,38 +698,39 @@ export default {
       );
     },
     exportIsotopeTable() {
-      return;
-      // const fields = this.isotope_table_cols.map((a) => {
-      //   return { label: a.label, value: a.field };
-      // });
-      // const opts = {
-      //   fields: fields,
-      // };
+      const fields = this.isotope_table_cols.map((a) => {
+        return { label: a.label, value: a.field };
+      });
+      const opts = {
+        fields: fields,
+      };
 
-      // try {
-      //   // Parse CSV
-      //   const parser = new Parser(opts);
-      //   const csv = parser.parse(this.isotope_table_rows);
-      //   const csv_filename =
-      //     this.project_selected.title +
-      //     "_" +
-      //     this.experiment_selected.title +
-      //     ".csv";
-      //   // Make blob
-      //   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-      //   // Create a temporary download link for the blob and "click" it
-      //   var link = document.createElement("a");
-      //   var url = URL.createObjectURL(blob);
-      //   link.setAttribute("href", url);
-      //   link.setAttribute("download", csv_filename);
-      //   link.style.visibility = "hidden";
-      //   document.body.appendChild(link);
-      //   link.click();
-      //   // Remove the link
-      //   document.body.removeChild(link);
-      // } catch (err) {
-      //   console.error(err);
-      // }
+      try {
+        // Parse CSV
+        const parser = new Parser(opts);
+        const csv = parser.parse(this.isotope_table_rows);
+        const csv_filename =
+          this.project_selected.title +
+          "_" +
+          this.experiment_selected.title +
+          "_" +
+          this.sample_in_focus.title +
+          ".csv";
+        // Make blob
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        // Create a temporary download link for the blob and "click" it
+        var link = document.createElement("a");
+        var url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", csv_filename);
+        link.style.visibility = "hidden";
+        document.body.appendChild(link);
+        link.click();
+        // Remove the link
+        document.body.removeChild(link);
+      } catch (err) {
+        console.error(err);
+      }
     },
     fitMzCalibFunction() {
       let peak_tofs = this.isotope_table_checked_rows.map(
