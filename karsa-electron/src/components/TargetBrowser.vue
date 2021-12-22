@@ -295,7 +295,10 @@
             </b-button>
             <div style="width: 25vw">
               <section style="padding: 0em 1em 0 1em">
-                <b-field label="peak intensity threshold [%]" custom-class="dark">
+                <b-field
+                  label="peak intensity threshold [%]"
+                  custom-class="dark"
+                >
                   <b-slider
                     type="is-primary"
                     v-model="parameter_peak_intensity_threshold"
@@ -320,7 +323,10 @@
                   >
                   </b-slider>
                 </b-field>
-                <b-field label="isotope ratio tolerance [%]" custom-class="dark">
+                <b-field
+                  label="isotope ratio tolerance [%]"
+                  custom-class="dark"
+                >
                   <b-slider
                     type="is-primary"
                     v-model="parameter_iso_ratio_tolerance"
@@ -332,7 +338,10 @@
                   >
                   </b-slider>
                 </b-field>
-                <b-field label="isotope abundance threshold [%]" custom-class="dark">
+                <b-field
+                  label="isotope abundance threshold [%]"
+                  custom-class="dark"
+                >
                   <b-slider
                     type="is-primary"
                     v-model="parameter_iso_abu_threshold"
@@ -421,12 +430,11 @@
       >
       </b-table>
       <div style="text-align: right">
-        <div style="color:white;">
-          # identified peaks: {{isotope_table_checked_rows.length}}
-        
+        <div style="color: white">
+          # identified peaks: {{ isotope_table_checked_rows.length }}
         </div>
-        <div style="color:white;">
-          # found peaks:  {{(peak_data.mz ? peak_data.mz.length : 0)}}
+        <div style="color: white">
+          # found peaks: {{ peak_data.mz ? peak_data.mz.length : 0 }}
         </div>
       </div>
       <!-- End of isotope table -->
@@ -892,7 +900,7 @@ export default {
       console.log("Updating isotope table data");
       // Format data to isotope table
       let rows = [];
-      let cols = [];
+      let cols_to_add = [];
       for (let i in data) {
         let isotope = data[i];
         let row = {};
@@ -906,22 +914,25 @@ export default {
             value = Math.round((value + Number.EPSILON) * 10000) / 10000;
           }
           if (rows.length == 0) {
-            let col = {
-              field: key.toLowerCase(),
-              label: key,
-            };
-            col.searchable = true;
-            if (Number(value) != null) {
-              col.sortable = true;
+            let field = key.toLowerCase();
+            let field_exists = this.isotope_table_cols
+              .map((col) => col.field)
+              .includes(field);
+            if (!field_exists) {
+              cols_to_add.push({
+                field,
+                label: key,
+                visible: field.endsWith("id") ? false : true,
+                searchable: true,
+                sortable: true,
+              });
             }
-            col.visible = true;
-            cols.push(col);
           }
           row[key.toLowerCase()] = value;
         }
         rows.push(row);
       }
-      this.isotope_table_cols = cols;
+      this.isotope_table_cols = [...this.isotope_table_cols, ...cols_to_add];
       this.isotope_table_all_rows = rows;
     },
     refreshTargetFilters() {
@@ -1056,19 +1067,16 @@ export default {
         if (first_round) {
           let cols_to_add = [];
           for (let field in row) {
-            let field_exists = false;
-            for (let col_i in this.isotope_table_cols) {
-              let col = this.isotope_table_cols[col_i];
-              if (col.field == field) {
-                field_exists = true;
-                break;
-              }
-            }
+            let field_exists = this.isotope_table_cols
+              .map((col) => col.field)
+              .includes(field);
             if (!field_exists) {
               cols_to_add.push({
-                field: field,
+                field,
                 label: field,
-                visible: true,
+                visible: field.endsWith("id") ? false : true,
+                searchable: true,
+                sortable: true,
               });
             }
           }
@@ -1079,7 +1087,6 @@ export default {
           first_round = false;
         }
         //
-
         for (let key in row) {
           let value = row[key];
           // Fix precision of numeric fields to 4 decimals
