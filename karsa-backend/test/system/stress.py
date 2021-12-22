@@ -117,7 +117,7 @@ def get_t_range_max_from_zarr_name(fname):
 
 def viewer_proc(mz_range=None):
     global viz_request_ids
-    zoom_token = {'zooming' if mz_range else ''}
+    zoom_token = 'zooming' if mz_range else ''
     print(f"started {zoom_token} viewer {current_thread().name}")
     request_ids = []
     for i, fname in enumerate(viz_samples):
