@@ -512,6 +512,16 @@ class BaseTestClient(BridgeServiceClient):
                 # max_exec_time=kwargs.get('max_exec_time'),
             )
 
+    # so far no reliable way to trace the request completed
+    # @track_request_completed
+    # @limit_exec_time
+    async def emit_stop_visualize_range(self, request_ids=[], filename=None, *args, **kwargs):
+        await self.private_ns.emit_client_notification(
+                name='stop_visualize_range',
+                value= {'request_ids': request_ids, 'filename': filename},
+                client_room=self.private_ns.room_sid,
+            )
+
 
 def run_client():
     # Use run_client, when running client service from the terminal
