@@ -183,7 +183,6 @@ export default {
       endpoints: ["instrument_data", "room_mate_gone", "service_error"],
 
       data_source_name_selected: null,
-      data_sources: [],
       instrument_data: {},
       instrument_data_queue: Promise.resolve(),
       is_disconnected: true,
@@ -210,6 +209,14 @@ export default {
       },
       set(value) {
         this.$store.commit("data_source_selected", value);
+      },
+    },
+    data_sources: {
+      get() {
+        return this.$store.state.data_sources;
+      },
+      set(value) {
+        this.$store.commit("data_sources", value);
       },
     },
     root_namespace: {
