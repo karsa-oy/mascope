@@ -18,6 +18,7 @@ logging.basicConfig(filename=f'{os.path.splitext(os.path.basename(__file__))[0]}
 
 MAX_STREAM_TIME_DEFAULT = 40
 MAX_VIZ_TIME_DEFAULT = 30
+ZOOM_RANGE_DEFAULT = 1
 
 args = None
 client = None
@@ -37,6 +38,7 @@ def parse_args():
     parser.add_argument("-td", "--target_data_pool_path", help="target data pool path (before date dirs)", type=str, required=True)
     parser.add_argument("-mv", "--max_viz_time", help="max visualization time", type=int, default=MAX_VIZ_TIME_DEFAULT)
     parser.add_argument("-ms", "--max_stream_time", help="max streaming time", type=int, default=MAX_STREAM_TIME_DEFAULT)
+    parser.add_argument("-z", "--zoom_range", help="zooming range for zoomed viz stress", type=int, default=ZOOM_RANGE_DEFAULT)
     args = parser.parse_args()
     backend_args = {
         'url': args.url,
@@ -93,7 +95,7 @@ def streaming_proc():
                 max_exec_time=args.max_stream_time)
             )
             client.assert_requests_ok(['raw_import',])
-            logging.info(f'Acquired sample: {client.acquired_samples}')
+            logging.info(f'Acquired sample: {client.acquired_samples} - {current_thread().name}')
             time.sleep(2)
             # clean up the target zarr
             shutil.rmtree(target_fname, ignore_errors=True)
@@ -129,6 +131,7 @@ def viewer_proc(mz_range=None):
         request_ids.append(request_id)          # sync inside the thread
         # TODO: lock viz_request_ids for multi-thread sync?
         viz_request_ids.append(request_id)      # sync inside main if Ctrl+C
+        t_start = time.time()
         asyncio.run(
             client.emit_visualize_range(
                         fname,
@@ -138,8 +141,11 @@ def viewer_proc(mz_range=None):
                         viz_types=["spectrogram"],
             )
         )
-        # client.assert_requests_ok(request_ids=[request_id])
-    client.assert_requests_ok(request_ids=request_ids)
+        # alt: this sync is for sequential viewing
+        client.assert_requests_ok(request_ids=[request_id])
+        logging.info(f"   {fname} : {round(time.time()-t_start, 1)}")
+    # # alt: this sync is for paraller viewing
+    # client.assert_requests_ok(request_ids=request_ids)
     print(f"stopped {zoom_token} viewer {current_thread().name}")
 
 
@@ -153,8 +159,10 @@ def run_visualizations(mz_range=None):
         run_viewers(n_viewers=i+1, mz_range=mz_range)
         time.sleep(1)
         client.assert_requests_ok(request_ids=viz_request_ids)
-        delim = '\n '
-        logging.info(f"Visualized samples:{delim}{delim.join([str(s) for s in client.viewed_samples])}")
+        # # alt: logging for parallel viewing
+        # delim = '\n '
+        # logging.info(f"Visualized samples:{delim}{delim.join([str(s) for s in client.viewed_samples])}")
+        time.sleep(2)
         logging.info(f"Running {i+1} {zoom_token} viewers: end " + 10*'>')
 
 
@@ -162,7 +170,8 @@ def run_full_size_visualizations():
     run_visualizations()
 
 def run_zoomed_visualizations():
-    run_visualizations(mz_range=[200, 250])
+    zoom_base = 200
+    run_visualizations(mz_range=[zoom_base, zoom_base + args.zoom_range])
 
 
 def run_until_complete():
