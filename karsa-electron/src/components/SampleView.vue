@@ -186,6 +186,14 @@ export default {
         this.$store.commit("tofdaq_log_entry", value);
       },
     },
+    target_clear_isotope_table: {
+      get() {
+        return this.$store.state.target_clear_isotope_table;
+      },
+      set(value) {
+        this.$store.commit("target_clear_isotope_table", value);
+      },
+    },
   },
   data: function () {
     return {
@@ -272,8 +280,8 @@ export default {
           {
             filename: this.filename,
             parameters: {
-              peak_threshold: this.parameter_peak_intensity_threshold
-            }
+              peak_threshold: this.parameter_peak_intensity_threshold,
+            },
           },
           null,
           this.room_sid
@@ -286,7 +294,7 @@ export default {
     figure_double_click: function () {
       return;
     },
-    parameter_peak_intensity_threshold: function() {
+    parameter_peak_intensity_threshold: function () {
       this.requestPeakData();
     },
     sample_annotation_fields: {
@@ -306,6 +314,7 @@ export default {
         mz_range: new_value.properties.range,
         id: Math.random().toString(36).substring(2),
       };
+      this.target_clear_isotope_table = Math.random().toString(36).substring(2);
       this.requestPeakData();
     },
     stop_visualize_range: function (new_value, old_value) {
@@ -329,7 +338,7 @@ export default {
       }
       let mz = new_value;
       let dmz = 1000; // ppm
-      let target_mz_range = [(1-dmz*1e-6)*mz, (1+dmz*1e-6)*mz];
+      let target_mz_range = [(1 - dmz * 1e-6) * mz, (1 + dmz * 1e-6) * mz];
       let new_figure_ranges = {
         filename: this.filename,
         id: Math.random().toString(36).substring(2),
