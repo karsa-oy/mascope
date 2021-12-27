@@ -942,37 +942,57 @@ export default {
       this.isotope_table_all_rows = rows;
     },
     refreshTargetFilters() {
-      console.log("Updating target table filters");
+      console.log("Refreshing target table filters...");
       console.log(this.target_table_filters);
+      let updatedFilters = [];
+      let clearedFilters = [];
       for (let col of this.target_table_all_cols) {
         let field = col.field;
         let filter = "";
         if (field in this.target_table_filters) {
           filter = this.target_table_filters[field];
-          console.log(
-            `Updating target table filter for column '${field}' with filter '${filter}'`
-          );
+          updatedFilters.push(`${field} (${filter})`);
         } else {
-          console.log(`Clearing target table filter for column '${field}'`);
+          clearedFilters.push(field);
         }
         this.$set(this.$refs.target_table.filters, field, String(filter));
       }
+      if (updatedFilters.length > 0) {
+        console.log(
+          `Updated target table filters: ${updatedFilters.join(", ")}`
+        );
+      }
+      if (clearedFilters.length > 0) {
+        console.log(
+          `Cleared target table filters: ${clearedFilters.join(", ")}`
+        );
+      }
     },
     refreshIsotopeFilters() {
-      console.log("Updating isotope table filters");
+      console.log("Refreshing isotope table filters...");
       console.log(this.isotope_table_filters);
+      let updatedFilters = [];
+      let clearedFilters = [];
       for (let col of this.isotope_table_cols) {
         let field = col.field;
         let filter = "";
         if (field in this.isotope_table_filters) {
           filter = this.isotope_table_filters[field];
-          console.log(
-            `Updating isotope table filter for column '${field}' with filter '${filter}'`
-          );
+          updatedFilters.push(`${field} (${filter})`);
         } else {
-          console.log(`Clearing isotope table filter for column '${field}'`);
+          clearedFilters.push(field);
         }
         this.$set(this.$refs.isotope_table.filters, field, String(filter));
+      }
+      if (updatedFilters.length > 0) {
+        console.log(
+          `Updated target table filters: ${updatedFilters.join(", ")}`
+        );
+      }
+      if (clearedFilters.length > 0) {
+        console.log(
+          `Cleared target table filters: ${clearedFilters.join(", ")}`
+        );
       }
     },
     clearTargetFilters() {
