@@ -693,6 +693,7 @@ def run():
     except Exception as e:
         print(f"Exception '{str(e)}' for {client.__class__.__name__}")
     finally:
+        client.shutdown_event.set()
         print(f'Service stopped.')
 
 
