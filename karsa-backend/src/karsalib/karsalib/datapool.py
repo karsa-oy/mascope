@@ -675,7 +675,7 @@ class SamplePool():
         sample_link = os.path.join(self.projects_root, project, experiment, sample)
         error_msg = None
         sample_ext = {}
-        n_tries = 5
+        n_tries = 3
         while n_tries:
             try:
                 for ext in ['.attrs', '.props', '.meth', '.annts']:
@@ -684,7 +684,7 @@ class SamplePool():
             except Exception as e:
                 error_msg = f"{[this_func_name()]} Error reading {sample}/{ext}: {e.__class__.__name__}({str(e)})"
                 n_tries -= 1
-                time.sleep(1)
+                time.sleep(.1)
         if not n_tries:
             print(error_msg)
         return {
@@ -780,7 +780,7 @@ class SamplePool():
             self._make_link(sample_data_path, sample_experiment_path, overwrite=True)
         # Write attributes
         error_msg = None
-        n_tries = 5
+        n_tries = 3
         while n_tries:
             try:
                 for spec, ext in [(attributes, '.attrs'), (method, '.meth'), (annotations, '.annts')]:
@@ -789,7 +789,7 @@ class SamplePool():
             except Exception as e:
                 error_msg = f"{[this_func_name()]} Error writing {sample}/{ext}: {e.__class__.__name__}({str(e)})"
                 n_tries -= 1
-                time.sleep(1)
+                time.sleep(.1)
         if not n_tries:
             raise Exception(error_msg)
         # Update self.pool

@@ -228,7 +228,7 @@ class zarr_sdk:
         try:
             final_length = float(item['signal'].time[-1] + item['signal_period'][-1])
         except Exception as e:
-            print(f"[{this_func_name}] Error: {e} -- set approximate final_length")
+            print(f"[{this_func_name}] Warning: {e.__class__.__name__}({str(e)})")
             final_length = item['props']['length']
 
         # Update properties
@@ -363,7 +363,10 @@ class FileIoNamespace(BaseClientNamespace):
         if not cache_item:
             self.log(f"Warning: {filename} was skipped")
             return
-        zarr_sdk.finalize_signal_dataset(data, cache_item)
+        try:
+            zarr_sdk.finalize_signal_dataset(data, cache_item)
+        except:
+            pass    # let client services finalize the request anyway
         await self.emit_client_notification(
                 'dataset_updated',
                 {'data_type': 'signal', **cache_item['props']},
@@ -532,16 +535,16 @@ def load_file(base_filename, vars=None, prev_dataset=None):
         prev_item = None if prev_dataset is None else prev_dataset.get(var)
         if prev_item is not None:
             prev_item.attrs['zarr_groups'] = prev_dataset.attrs.get('zarr_groups', {}).get(var, [])
-        n_tries = 5
+        n_tries = 3
         err_msg = None
         while n_tries:
             try:
                 var_ds = load_array(base_filename, var, prev_item)
                 break
             except Exception as e:
-                err_msg = print(f"{this_func_name()}: Error loading {base_filename}/{var} -- {e.__class__.__name__}({str(e)})")
+                err_msg = print(f"[{this_func_name()}] Error {base_filename}/{var}: {e.__class__.__name__}({str(e)})")
                 n_tries -= 1
-                sleep(.2)
+                sleep(.1)
                 continue
         if n_tries == 0:
             print(err_msg)
