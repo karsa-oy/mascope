@@ -42,6 +42,7 @@ export default new Vuex.Store({
 		target_to_display: null,
 		target_compound_selected: {},
 		target_ion_selected: null,
+		target_clear_isotope_table: null,
 		tofdaq_log_entry: {},
 		url: "",
 		visualize_range: {},
@@ -133,6 +134,9 @@ export default new Vuex.Store({
 		},
 		target_to_display(state, payload) {
 			state.target_to_display = payload;
+		},
+		target_clear_isotope_table(state, payload) {
+			state.target_clear_isotope_table = payload;
 		},
 		target_compound_selected(state, payload) {
 			state.target_compound_selected = payload;
