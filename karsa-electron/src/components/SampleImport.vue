@@ -63,15 +63,6 @@
                 >
                 </b-table>
                 <div><br /></div>
-                <button
-                    class="button"
-                    type="button"
-                    @click="importSamples()"
-                    is-dark
-                    :disabled="false"
-                >
-                Import
-              </button>
             </section>
         </div>
     </section>
@@ -178,6 +169,9 @@ export default {
     },
     importSamples() {
       let to_import = this.import_sample_table_checked_rows[0];
+      if (!to_import) {
+        return
+      }
       // Preserve sample metadata
       // Set project and experiment to the selected ones
       to_import.project = this.project_selected.title;
