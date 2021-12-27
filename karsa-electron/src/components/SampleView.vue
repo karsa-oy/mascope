@@ -186,6 +186,14 @@ export default {
         this.$store.commit("tofdaq_log_entry", value);
       },
     },
+    target_clear_isotope_table: {
+      get() {
+        return this.$store.state.target_clear_isotope_table;
+      },
+      set(value) {
+        this.$store.commit("target_clear_isotope_table", value);
+      },
+    },
   },
   data: function () {
     return {
@@ -306,6 +314,7 @@ export default {
         mz_range: new_value.properties.range,
         id: Math.random().toString(36).substring(2),
       };
+      this.target_clear_isotope_table = Math.random().toString(36).substring(2);
       this.requestPeakData();
     },
     stop_visualize_range: function (new_value, old_value) {

@@ -490,6 +490,7 @@ export default {
       "root_namespace",
       "sample_in_focus",
       "samples_selected",
+      "target_clear_isotope_table",
     ]),
     compute_target_ions: {
       get() {
@@ -684,6 +685,11 @@ export default {
         this.room_sid
       );
       this.is_mz_calib_modal_active = false;
+    },
+    clearIsotopeTableData() {
+      console.log("clearing isotope table data");
+      this.isotope_table_cols = [];
+      this.isotope_table_all_rows = [];
     },
     drawMzCalibStatsFigure() {
       let mz = this.mz_calibration.stats["mz"];
@@ -1228,6 +1234,9 @@ export default {
     },
     target_table_rows: function () {
       this.requestTargetIons();
+    },
+    target_clear_isotope_table: function () {
+      this.clearIsotopeTableData();
     },
     target_compound_selected: function (new_value) {
       // clear any existing ion selectors
