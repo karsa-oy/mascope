@@ -280,8 +280,8 @@ export default {
           {
             filename: this.filename,
             parameters: {
-              peak_threshold: this.parameter_peak_intensity_threshold
-            }
+              peak_threshold: this.parameter_peak_intensity_threshold,
+            },
           },
           null,
           this.room_sid
@@ -294,7 +294,7 @@ export default {
     figure_double_click: function () {
       return;
     },
-    parameter_peak_intensity_threshold: function() {
+    parameter_peak_intensity_threshold: function () {
       this.requestPeakData();
     },
     sample_annotation_fields: {
@@ -338,7 +338,7 @@ export default {
       }
       let mz = new_value;
       let dmz = 1000; // ppm
-      let target_mz_range = [(1-dmz*1e-6)*mz, (1+dmz*1e-6)*mz];
+      let target_mz_range = [(1 - dmz * 1e-6) * mz, (1 + dmz * 1e-6) * mz];
       let new_figure_ranges = {
         filename: this.filename,
         id: Math.random().toString(36).substring(2),
