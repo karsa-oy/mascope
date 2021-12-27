@@ -318,7 +318,7 @@ class BaseTestClient(BridgeServiceClient):
     @decorator
     def track_request_completed(func, self, *args, **kwargs):
         # If request_id is not None, then handler of decorated request
-        # will use request_id kwarg to mark it done, when the request is
+        # will use kwarg[request_id]  to mark it done, when the request is
         # finished; self.join_requests() will join all the decorated requests
         request_id = kwargs.get('request_id', func.__name__.replace('emit_', '', 1))
         if not request_id is None:

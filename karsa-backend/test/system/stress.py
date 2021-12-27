@@ -79,8 +79,10 @@ def streaming_proc():
     while not shutdown_event.is_set():
         i += 1
         logging.info(f"({i}) Acquiring list of {len(stream_samples)} samples: begin " + 5*'<')
+        j = 0
         for fname in stream_samples:
             # target zarr is constantly overwritten - remove prev.remnants of it
+            j += 1
             target_fname = args.namespace + '_' + fname
             target_fname = os.path.join(args.target_data_pool_path, get_date_from_sample_name(fname), target_fname)
             shutil.rmtree(target_fname, ignore_errors=True)
@@ -99,8 +101,9 @@ def streaming_proc():
             time.sleep(2)
             # clean up the target zarr
             shutil.rmtree(target_fname, ignore_errors=True)
-        logging.info(f"({i}) Acquiring list of {len(stream_samples)} samples: end " + 5*'>')
-    asyncio.run( client.emit_stop_raw_import() )
+            if shutdown_event.is_set():
+                break
+        logging.info(f"({i}) Acquired list {j} of {len(stream_samples)} samples: end " + 5*'>')
     print(f"stopped streamer {current_thread().name}")
 
 
@@ -119,8 +122,8 @@ def get_t_range_max_from_zarr_name(fname):
 
 def viewer_proc(mz_range=None):
     global viz_request_ids
-    zoom_token = 'zooming' if mz_range else ''
-    print(f"started {zoom_token} viewer {current_thread().name}")
+    zooming = 'zooming' if mz_range else ''
+    print(f"started {zooming} viewer {current_thread().name}")
     request_ids = []
     for i, fname in enumerate(viz_samples):
         if shutdown_event.is_set():
@@ -146,14 +149,14 @@ def viewer_proc(mz_range=None):
         logging.info(f"   {fname} : {round(time.time()-t_start, 1)}")
     # # alt: this sync is for paraller viewing
     # client.assert_requests_ok(request_ids=request_ids)
-    print(f"stopped {zoom_token} viewer {current_thread().name}")
+    print(f"stopped {zooming} viewer {current_thread().name}")
 
 
 def run_visualizations(mz_range=None):
     global viz_request_ids
-    zoom_token = 'zooming' if mz_range else ''
+    zooming = 'zooming' if mz_range else ''
     for i in range(args.n_viewers):
-        logging.info(f"Running {i+1} {zoom_token} viewers: begin " + 10*'<')
+        logging.info(f"Running {i+1} {zooming} viewers: begin " + 10*'<')
         viz_request_ids = []
         client.viewed_samples = []
         run_viewers(n_viewers=i+1, mz_range=mz_range)
@@ -163,7 +166,7 @@ def run_visualizations(mz_range=None):
         # delim = '\n '
         # logging.info(f"Visualized samples:{delim}{delim.join([str(s) for s in client.viewed_samples])}")
         time.sleep(2)
-        logging.info(f"Running {i+1} {zoom_token} viewers: end " + 10*'>')
+        logging.info(f"Running {i+1} {zooming} viewers: end " + 10*'>')
 
 
 def run_full_size_visualizations():
@@ -197,6 +200,8 @@ def run_until_complete():
     client.shutdown_event.set()
     asyncio.run( client.emit_stop_raw_import() )
     asyncio.run( client.emit_stop_visualize_range(viz_request_ids) )
+    client.assert_requests_ok(['raw_import',])
+    client.assert_requests_ok(request_ids=viz_request_ids)
     print('main stopped')
     client.stop_client(f'TestClient finished')
 
@@ -206,10 +211,10 @@ def run():
     global args, client, shutdown_event, viz_samples, stream_samples
     args, backend_args = parse_args()
 
-    if args.viz_list:
+    if not viz_samples and args.viz_list:
         with open(args.viz_list) as f:
             viz_samples = f.readlines()
-    if args.stream_list:
+    if not stream_samples and args.stream_list:
         with open(args.stream_list) as f:
             stream_samples = f.readlines()
 

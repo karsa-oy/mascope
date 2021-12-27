@@ -320,7 +320,10 @@ class BaseFileStreamer(Thread):
             },
         ]
         if self.client.target_data_pool_path and self.item:
-            zarr_sdk.finalize_signal_dataset(sn_data, self.item)
+            try:
+                zarr_sdk.finalize_signal_dataset(sn_data, self.item)
+            except:
+                pass    # let client services finalize the request anyway
             # updates to signal mfzarrs are finalized - notify
             dataset_updated = {
                 # TODO: switch to private notification after moving DataViz to private_ns
