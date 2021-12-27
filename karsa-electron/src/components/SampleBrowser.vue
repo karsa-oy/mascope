@@ -470,14 +470,14 @@
               <p class="modal-card-title">Import samples</p>
             </header>
             <section class="modal-card-body">
-              <SampleImport></SampleImport>
+              <SampleImport ref="sample_import"></SampleImport>
               <div><br /></div>
             </section>
             <footer class="modal-card-foot">
               <button
                 class="button"
                 type="button"
-                @click="importSamples()"
+                @click="$refs.sample_import.importSamples();"
                 is-dark
                 :disabled="false"
               >
