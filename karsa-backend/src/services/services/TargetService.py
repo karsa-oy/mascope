@@ -166,29 +166,36 @@ def match_peaks_to_targets(peak_mzs, peak_heights, target_ion_df, mz_tolerance):
     target_ion_df['peak id'] = [np.nan]*len(target_ion_df)
     target_ion_df['peak mz'] = [np.nan]*len(target_ion_df)
     target_ion_df['peak height'] = [np.nan]*len(target_ion_df)
-    target_ion_df = target_ion_df.sort_values('mz')
 
-    for peak_i, peak_mz in enumerate(peak_mzs):
-        match_is, match_mzs = match_mz(peak_mz, list(target_ion_df.mz), tolerance=mz_tolerance)
-        for match_i in match_is:
-            target_mz = target_ion_df.iloc[match_i]['mz']
-            # print("Found match for target mz %.4f: peak mz %.4f" %(target_mz, peak_mz))
-            if not np.isnan(target_ion_df.iloc[match_i]['peak mz']):
-                prev_peak_mz = target_ion_df.iloc[match_i]['peak mz']
-                prev_peak_mz_err = np.abs(prev_peak_mz - target_mz)
-                curr_peak_mz_err = np.abs(peak_mz - target_mz)
-                # print("Found match for target mz %.4f: peak mz %.4f" %(target_mz, peak_mz))
-                if prev_peak_mz_err < curr_peak_mz_err:
-                    # print("For target mz %.4f replacing peak %.4f with %.4f" %(target_mz, prev_peak_mz, peak_mz))
-                    # Closer match has been found already
-                    continue
-            target_ion_index = target_ion_df.index[match_i]
-            target_ion_df.loc[target_ion_index, 'peak id'] = peak_i
-            target_ion_df.loc[target_ion_index, 'peak mz'] = peak_mz
-            target_ion_df.loc[target_ion_index, 'peak height'] = peak_heights[peak_i]
+    sind = np.argsort(peak_mzs)
+
+
+    for target_ion_index, target_ion_df_row in target_ion_df.iterrows():
+        target_mz = target_ion_df_row.mz
+        match_is, match_mzs = match_mz(target_mz,
+                                       peak_mzs[sind],
+                                       tolerance=mz_tolerance
+                                       )
+        if not len(match_is):
+            continue
+        elif len(match_is) == 1:
+            peak_i = sind[match_is[0]]
+            peak_mz = peak_mzs[peak_i]
+            peak_height = peak_heights[peak_i]
+        elif len(match_is) > 1:
+            # Matching peak indices
+            peak_is = sind[np.array(match_is).astype(int)]
+            peak_i = -1
+            # Sum of matching peak heights
+            peak_height = peak_heights[peak_is].sum()
+            # Weighted average peak mz
+            peak_mz = (peak_heights[peak_is] * peak_mzs[peak_is]).sum() / peak_heights[peak_is].sum()
+        
+        target_ion_df.loc[target_ion_index, 'peak id'] = peak_i
+        target_ion_df.loc[target_ion_index, 'peak mz'] = peak_mz
+        target_ion_df.loc[target_ion_index, 'peak height'] = peak_height
 
     return target_ion_df
-
 
 class TargetServiceClient(BaseServiceClient):
     pass
