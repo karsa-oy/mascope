@@ -53,8 +53,6 @@ class BaseFileStreamer(Thread):
             self.experiment = self.project and self.attrs.pop('experiment', None)
             if 'title' not in self.attrs:
                 self.attrs['title'] = self.filename
-            if 'description' not in self.attrs:
-                self.attrs['description'] = ''
         init_sample_data()
         self.request_id = self.rcontext['request_id']
         self.client_room = self.rcontext['client_room']
