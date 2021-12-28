@@ -145,18 +145,20 @@ class H5Pool():
         print("Done")
 
     def add_file(self, full_file_path):
-        # Try to parse time from filename
+        # parse datetime from h5 sample filename
+        def get_h5_date_time(fname):
+            dt_regex = r'.*(\d{4}).(\d{2}).(\d{2}).(\d{2}).(\d{2}).(\d{2}).*'
+            dt = re.findall(dt_regex, fname)[0]
+            return  datetime.strptime('.'.join(dt[:3]), '%Y.%m.%d'), \
+                    datetime.strptime('.'.join(dt[3:]), '%H.%M.%S')
+
         filename = basename(full_file_path)
-        file_no_ext = os.path.splitext(filename)[0]
         try:
-            delims = '[-_]'
-            [*_, date_str, time_str] = re.split(delims, file_no_ext)
-            file_time = datetime.strptime(time_str, '%Hh%Mm%Ss')
-            dir_date = datetime.strptime(date_str, '%Y.%m.%d')
-        except ValueError:
+            file_date, file_time = get_h5_date_time(filename)
+        except IndexError:
             print("Skipped file: %s due to invalid datetime format" %filename)
-            raise
-        file_datetime = dir_date + timedelta(hours=file_time.hour,
+            raise ValueError
+        file_datetime = file_date + timedelta(hours=file_time.hour,
                                             minutes=file_time.minute,
                                             seconds=file_time.second
                                             )
