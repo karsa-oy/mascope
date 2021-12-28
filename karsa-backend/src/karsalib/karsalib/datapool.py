@@ -108,6 +108,8 @@ class H5Pool():
         fname_filter = fname_filter or self.pool_attrs.get('mask', '*.h5')
 
         print("Scanning: %s" % str(path))
+        if not os.path.isdir(path):
+            raise Exception(f"{path} missing of invalid")
 
         self.pool = pd.DataFrame(index=[],
                                  data=[],
@@ -256,6 +258,8 @@ class RawPool():
         fname_filter = fname_filter or self.pool_attrs.get('mask', '*.raw')
 
         print("Scanning: %s" % str(path))
+        if not os.path.isdir(path):
+            raise Exception(f"{path} missing of invalid")
 
         self.pool = pd.DataFrame(index=[],
                                  data=[],
@@ -834,6 +838,8 @@ class ZarrPool(H5Pool):
         path = path or self.pool_attrs.get('path', '.')
 
         print("Scanning: %s" % str(path))
+        if not os.path.isdir(path):
+            raise Exception(f"{path} missing of invalid")
 
         self.pool = pd.DataFrame(index=[],
                                  data=[],

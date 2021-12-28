@@ -20,7 +20,7 @@ import numpy as np
 import dask.array as da
 from datetime import datetime
 from multiprocessing import Event
-from time import sleep
+from time import sleep, time
 
 from karsalib.client import BaseClientNamespace, BaseServiceClient
 from karsalib.logging import t_mark, this_func_name
@@ -535,19 +535,10 @@ def load_file(base_filename, vars=None, prev_dataset=None):
         prev_item = None if prev_dataset is None else prev_dataset.get(var)
         if prev_item is not None:
             prev_item.attrs['zarr_groups'] = prev_dataset.attrs.get('zarr_groups', {}).get(var, [])
-        n_tries = 3
-        err_msg = None
-        while n_tries:
-            try:
-                var_ds = load_array(base_filename, var, prev_item)
-                break
-            except Exception as e:
-                err_msg = print(f"[{this_func_name()}] Error {base_filename}/{var}: {e.__class__.__name__}({str(e)})")
-                n_tries -= 1
-                sleep(.1)
-                continue
-        if n_tries == 0:
-            print(err_msg)
+        try:
+            var_ds = load_array(base_filename, var, prev_item)
+        except Exception as e:
+            print(f"[{this_func_name()}] Error {base_filename}/{var}: {e.__class__.__name__}({str(e)})")
             continue
         dss.append(var_ds)
         zarr_groups[var] = var_ds.attrs['zarr_groups']
@@ -590,11 +581,20 @@ def open_mfzarr(path, mode='r', concat_dim='time', prev_array=None):
     """
 
     if not os.path.exists(path):
-        raise FileNotFoundError("Zarr file %s does not exist" %path)
+        raise FileNotFoundError(path)
     sync = zarr.ProcessSynchronizer(os.path.join(path, '.sync'))
-    z = zarr.open(path, mode=mode, synchronizer=sync)
-    groups = [ g[0] for g in z.groups() ]
-    zarr_groups = list(groups)
+    zarr_groups = []
+    t_start = time()
+    ZARR_OPEN_TIMEOUT = 3
+    while time()-t_start < ZARR_OPEN_TIMEOUT:
+        z = zarr.open(path, mode=mode, synchronizer=sync)
+        groups = [ g[0] for g in z.groups() ]
+        zarr_groups = list(groups)
+        if zarr_groups:
+            break
+        sleep(.3)
+    if not zarr_groups:
+        raise Exception(f"No zarr groups in {path}")
     if prev_array is not None:
         prev_groups = prev_array.attrs.get('zarr_groups', [])
         for g in prev_groups:
