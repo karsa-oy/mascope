@@ -21,7 +21,7 @@ from karsalib.client import (
 from karsalib.util import parse_cmd_args, get_client_notification_context
 
 from karsalib.datapool import SamplePool
-from karsaHT3000A.ht3000a import parse_csv_report
+from karsaHT3000A.ht3000a import parse_csv_report, dup_cycles
 
 
 NO_DATA_LOGGING_DEFAULT = True
@@ -151,6 +151,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
                 tmp.seek(0)
                 if autosampler_report:
                     sequence_steps = parse_csv_report(tmp)
+                    sequence_steps = dup_cycles(sequence_steps)
                 else:
                     sequence_steps = [row for row in csv.DictReader(tmp)]
         finally:
