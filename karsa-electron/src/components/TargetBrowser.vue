@@ -18,8 +18,15 @@
             </header>
             <section class="modal-card-body" style="text-align: center">
               <b-field label="Paste clipboard">
-                <b-input v-model="excel_clipboard_text" type="textarea">
-                </b-input>
+                <b-tooltip 
+                  label="Must have columns 'target name' and 'target composition'"
+                  >
+                  <b-input
+                    v-model="excel_clipboard_text"
+                    type="textarea"
+                    placeholder="Paste here">
+                  </b-input>
+                </b-tooltip>
               </b-field>
               <div><br /></div>
               <b-table
