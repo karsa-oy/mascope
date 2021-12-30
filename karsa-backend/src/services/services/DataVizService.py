@@ -903,19 +903,22 @@ class DataVizServiceNamespace(BaseClientNamespace):
             cache_item = cache.get(filename)
             cache_item_crippled = False
             try:
-                if not cache_item:  # sample can be shorter than a single batch
+                if not cache_item:  # sample is shorter than a batch, or re-load sample
                     cache[filename] = load_caches(viz_types=VIZ_TYPES_SUPPORTED)
+                    cache_item = cache.get(filename)
                 else:
                     cache[filename] = load_caches(existing_file_cache_item=cache_item)
+                    cache_item = cache.get(filename)
             except Exception as e:
                 self.log(f"Error {e.__class__.__name__}({str(e)})")
                 cache_item_crippled = True
             # final sample length may change a bit after last batch committed -
             # update file cache and requests cache correspondingly
-            adjust_caches_for_final_length(committed_length)
-            viz_cache_process_requests(filename, flush=True)
-            if cache_item_crippled:
-                del cache[filename]
+            if cache_item:
+                adjust_caches_for_final_length(committed_length)
+                viz_cache_process_requests(filename, flush=True)
+                if cache_item_crippled:
+                    del cache[filename]
 
 
     async def on_dataset_coord_updated(self, data):

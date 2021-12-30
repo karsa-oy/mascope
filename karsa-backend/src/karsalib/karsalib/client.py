@@ -231,10 +231,10 @@ class BaseServiceClient:
         try:
             while not self.shutdown_event.is_set():
                 await self.sio.sleep(1)
-        except KeyboardInterrupt:
-            self.log('KeyboardInterrupt')
+        except KeyboardInterrupt as e:
+            self.log(f"{e.__class__.__name__}({str(e)})")
         except Exception as e:
-            self.log(str(e))
+            self.log(f"{e.__class__.__name__}({str(e)})")
         finally:
             self.shutdown_event.set()
 

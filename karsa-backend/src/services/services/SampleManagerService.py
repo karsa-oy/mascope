@@ -407,11 +407,12 @@ def run():
     loop = asyncio.get_event_loop()
     try:
         loop.run_until_complete(client.run())
-    except KeyboardInterrupt:
-        print(f"KeyboardInterrupt for {client.__class__.__name__}")
+    except KeyboardInterrupt as e:
+        print(f"{client.__class__.__name__} : {e.__class__.__name__}({str(e)})")
     except Exception as e:
-        print(f"Exception '{str(e)}' for {client.__class__.__name__}")
+        print(f"{client.__class__.__name__} : {e.__class__.__name__}({str(e)})")
     finally:
+        client.shutdown_event.set()
         print(f'Service stopped.')
 
 
