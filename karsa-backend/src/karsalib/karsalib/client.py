@@ -598,6 +598,13 @@ class BaseStreamerClient(BridgeServiceClient):
     def instrument_name(self):
         return self.instrument_data.get('name')
 
+    def is_sample_in_progress(self, filename):
+        with self.lock:
+            for s in self.streamers:
+                if s.filename == filename:
+                    return True
+        return False
+
     async def initialize_streamers(self):
         """
         Instantuate streamer instance.

@@ -124,21 +124,35 @@ class FileStreamerPrivateNamespace(BaseClientNamespace):
             path = data_root
         full_fname = os.path.join(path, fname)
         size = round((os.path.getsize(full_fname)) / 2**20, 2)  # in MB
-        return {'filename': fname, 'path': path, 'filesize': size, 'datetime': f'{fdate} {ftime}'}
+        return {'filename': fname,
+                'path': path,
+                'props': {'filesize': size, 'datetime': f'{fdate} {ftime}'},
+               }
+
 
     async def _create_generator_request(self, data):
+        def is_reimport_request(fdata):
+            return all([fdata.get('props'), fdata.get('attrs')])
+
         kwargs = get_client_notification_context(data)
         rdata = {**kwargs, 'files': []}
         for v in data['value']:
-            path = v.pop('path', None)    # path normally does not come with batch import
-            fname = v.pop('filename')
-            try:
-                fprops = self.get_src_data(path, fname)
-            except Exception as e:
-                await self.parent.push_alert(str(e))
-                raise
-            # attrs normally contain sci data coming along with the sample
-            rdata['files'].append({**fprops, 'attrs': v})
+            fname = v['filename']
+            if self.parent.is_sample_in_progress(fname):
+                self.log(f"Skip {fname}: the sample is already being imported")
+                continue
+            if is_reimport_request(v):
+                rdata['files'].append(v)
+            else:
+                fname = v.pop('filename')
+                path = v.pop('path', None)    # path normally does not come with batch import
+                try:
+                    fprops = self.get_src_data(path, fname)
+                except Exception as e:
+                    await self.parent.push_alert(str(e))
+                    raise
+                # attrs normally contain sci data coming along with the sample
+                rdata['files'].append({**fprops, 'attrs': v})
         return rdata
 
     async def on_raw_import(self, data):

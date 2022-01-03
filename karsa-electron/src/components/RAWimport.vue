@@ -157,6 +157,7 @@
                   class="button"
                   type="button"
                   @click="
+                    StopImportSamples();
                     import_raw_table_checked_rows = raw_import_status_rows;
                     is_raw_import_status_modal_active = false;
                     ImportSamples();
@@ -343,6 +344,7 @@ export default {
       instrument_status: "not_ready", // not_ready/ready
       service_error: "",
       raw_import: [],
+      stop_raw_import: [],
       // variables for import modal
       import_start_time: null,
       import_end_time: null,
@@ -404,11 +406,13 @@ export default {
       this.is_raw_import_modal_active = false;
       this.import_raw_table_checked_rows = [];
     },
-    on_button_acquisition_control() {
-      if (this.acquisition_in_progress) {
-        // Interrupt import
+    StopImportSamples() {
         this.acquisition_control_label = "Stopping...";
         this.be.emit_client_notification("stop_raw_import", this.raw_import);
+    },
+    on_button_acquisition_control() {
+      if (this.acquisition_in_progress) {
+        this.StopImportSamples();
       } else {
         // pop up FetchSamples dialog
         this.is_raw_import_modal_active = true;
