@@ -1365,6 +1365,7 @@ export default {
         // handlers for for external notifications:
         this.be.subscribe(["dataset_coord_updated"], "dataset_coord_updated");
         this.namespace.on("dataset_coord_updated", (value) => {
+          if (value.value.filename && value.value.filename == this.sample_in_focus.filename)
           this.selectSample(value.value.filename);
           }
         );
