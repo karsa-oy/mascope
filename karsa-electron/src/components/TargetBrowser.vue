@@ -306,29 +306,28 @@
                   label="peak intensity threshold [%]"
                   custom-class="dark"
                 >
-                  <b-slider
+                  <b-numberinput
                     type="is-primary"
                     v-model="parameter_peak_intensity_threshold"
                     :min="0"
-                    :max="1"
                     :step="0.01"
                     :tooltip="false"
                     lazy
                     indicator
                   >
-                  </b-slider>
+                  </b-numberinput>
                 </b-field>
                 <b-field label="m/z tolerance [ppm]" custom-class="dark">
-                  <b-slider
+                  <b-numberinput
                     type="is-primary"
                     v-model="parameter_mz_tolerance"
                     :min="0"
-                    :max="100"
+                    :step="1"
                     :tooltip="false"
                     lazy
                     indicator
                   >
-                  </b-slider>
+                  </b-numberinput>
                 </b-field>
                 <b-field
                   label="isotope ratio tolerance [%]"
