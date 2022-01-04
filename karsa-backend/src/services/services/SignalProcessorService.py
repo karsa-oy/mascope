@@ -140,8 +140,8 @@ class SignalProcessorNamespace(BaseClientNamespace):
         # Find peaks
         else:
             sum_spectrum = cache_item.signal.sel(
-                                mz=slice(*mz_range),
-                                time=slice(*t_range)
+                                # mz=slice(*mz_range),
+                                # time=slice(*t_range)
                                 ).mean(dim='time').compute()
             min_peak_height = peak_threshold * sum_spectrum.max().compute().item()
             peak_ind, peak_props = find_peaks(sum_spectrum,
