@@ -176,24 +176,18 @@ def match_peaks_to_targets(peak_mzs, peak_heights, target_ion_df, mz_tolerance):
                                        peak_mzs[sind],
                                        tolerance=mz_tolerance
                                        )
-        if not len(match_is):
-            continue
-        elif len(match_is) == 1:
-            peak_i = sind[match_is[0]]
+        for match_i in match_is:
+            peak_i = sind[match_i]
             peak_mz = peak_mzs[peak_i]
             peak_height = peak_heights[peak_i]
-        elif len(match_is) > 1:
-            # Matching peak indices
-            peak_is = sind[np.array(match_is).astype(int)]
-            peak_i = -1
-            # Sum of matching peak heights
-            peak_height = peak_heights[peak_is].sum()
-            # Weighted average peak mz
-            peak_mz = (peak_heights[peak_is] * peak_mzs[peak_is]).sum() / peak_heights[peak_is].sum()
-        
-        target_ion_df.loc[target_ion_index, 'peak id'] = peak_i
-        target_ion_df.loc[target_ion_index, 'peak mz'] = peak_mz
-        target_ion_df.loc[target_ion_index, 'peak height'] = peak_height
+            if not np.isnan(target_ion_df.loc[target_ion_index, 'peak id']):
+                prev_mz_err = np.abs(target_ion_df.loc[target_ion_index, 'peak mz'] - target_mz)
+                new_mz_err = np.abs(peak_mz - target_mz)
+                if new_mz_err > prev_mz_err:
+                    continue
+            target_ion_df.loc[target_ion_index, 'peak id'] = peak_i
+            target_ion_df.loc[target_ion_index, 'peak mz'] = peak_mz
+            target_ion_df.loc[target_ion_index, 'peak height'] = peak_height
 
     return target_ion_df
 

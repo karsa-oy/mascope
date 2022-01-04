@@ -88,6 +88,7 @@ class SignalProcessorNamespace(BaseClientNamespace):
             cache_item = cache.get(filename)
             if cache_item:
                 cache_item['mz'] = new_mz
+                cache[filename] = cache_item
             await self.emit_client_notification('dataset_coord_updated',
                                                 {'filename': filename,
                                                  'coord': 'mz',
@@ -103,7 +104,7 @@ class SignalProcessorNamespace(BaseClientNamespace):
         mz_range = value.get('mz_range')
         t_range = value.get('t_range')
 
-        peak_threshold = value.get('parameters', {}).get('peak_threshold', 5) # [%]
+        peak_threshold = value.get('parameters', {}).get('peak_threshold', 5)*1e-2 # [%]
         min_peak_distance = value.get('parameters', {}).get('peak_separation', 3)
         min_peak_width = value.get('parameters', {}).get('peak_width', 3)
 
@@ -112,7 +113,7 @@ class SignalProcessorNamespace(BaseClientNamespace):
         if not cache_item:
             # File not in cache, load
             print("Loading file: %s" %filename)
-            cache_item = load_file(filename, vars=['centroids', 'signal'])
+            cache_item = load_file(filename, vars=['signal']) #vars=['centroids', 'signal'])
             cache[filename] = cache_item
 
         if mz_range is None:
@@ -124,12 +125,12 @@ class SignalProcessorNamespace(BaseClientNamespace):
             t_range = [0, cache_item.attrs['props']['length']]
 
         # If centroid data saved, use it
-        if 'centroids' in cache_item:
+        if False:#'centroids' in cache_item:
             sum_centroids = cache_item.centroids.sel(
                                 mz=slice(*mz_range),
                                 time=slice(*t_range)
                                 ).mean(dim='time').compute()
-            min_peak_height = peak_threshold*1e-2 * sum_centroids.max().compute().item()
+            min_peak_height = peak_threshold * sum_centroids.max().compute().item()
             ind = (sum_centroids > min_peak_height).compute()
             peak_mz = sum_centroids.mz[ind].load()
             peak_hei = sum_centroids[ind].load()
@@ -142,7 +143,7 @@ class SignalProcessorNamespace(BaseClientNamespace):
                                 mz=slice(*mz_range),
                                 time=slice(*t_range)
                                 ).mean(dim='time').compute()
-            min_peak_height = peak_threshold*1e-2 * sum_spectrum.max().compute().item()
+            min_peak_height = peak_threshold * sum_spectrum.max().compute().item()
             peak_ind, peak_props = find_peaks(sum_spectrum,
                                             height=min_peak_height,
                                             distance=min_peak_distance,
