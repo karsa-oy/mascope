@@ -68,6 +68,7 @@ class FileStreamerPrivateNamespace(BaseClientNamespace):
             'stop_raw_import',
             # 'raw_stream_request',
             'import_raw_table_datetime_range',
+            'import_sample_table_datetime_range',
             'service_state'
             ]
 
@@ -100,60 +101,30 @@ class FileStreamerPrivateNamespace(BaseClientNamespace):
                                                }
                                             )
 
-    def get_src_data(self, path, fname):
-        def get_h5_datetime():
-            # returns ('YYYY.mm.dd', 'HH:MM:SS') for TOF h5 samples
-            dt_regex = r'.*(\d{4}).(\d{2}).(\d{2}).(\d{2}).(\d{2}).(\d{2}).*\.h5'
-            dt = re.findall(dt_regex, fname)[0]
-            return '.'.join(dt[:3]), ':'.join(dt[3:])
-
-        def get_raw_datetime():
-            # returns ('YYYY.mm.dd', 'HH:MM') for Orbi raw samples
-            dt_regex = r'^(\d{8}).(\d{4}).*\.raw'
-            d, t = re.findall(dt_regex, fname)[0]
-            return '.'.join([d[:4], d[4:6], d[6:]]), ':'.join([t[:2], t[2:]])
-
-        data_root = self.parent.data_pool.pool_attrs.get('path', '.')
-        try:
-            fdate, ftime = get_h5_datetime()
-        except IndexError:
-            fdate, ftime = get_raw_datetime()
-        if not path:    # path normally does not come with batch import
-            path = os.path.join(data_root, fdate)
-        if not os.path.isdir(path):
-            path = data_root
-        full_fname = os.path.join(path, fname)
-        size = round((os.path.getsize(full_fname)) / 2**20, 2)  # in MB
-        return {'filename': fname,
-                'path': path,
-                'props': {'filesize': size, 'datetime': f'{fdate} {ftime}'},
-               }
-
-
-    async def _create_generator_request(self, data):
-        def is_reimport_request(fdata):
-            return all([fdata.get('props'), fdata.get('attrs')])
-
+    async def on_import_sample_table_datetime_range(self, data):
         kwargs = get_client_notification_context(data)
-        rdata = {**kwargs, 'files': []}
-        for v in data['value']:
-            fname = v['filename']
-            if self.parent.is_sample_in_progress(fname):
-                self.log(f"Skip {fname}: the sample is already being imported")
-                continue
-            if is_reimport_request(v):
-                rdata['files'].append(v)
-            else:
-                fname = v.pop('filename')
-                path = v.pop('path', None)    # path normally does not come with batch import
-                try:
-                    fprops = self.get_src_data(path, fname)
-                except Exception as e:
-                    await self.parent.push_alert(str(e))
-                    raise
-                # attrs normally contain sci data coming along with the sample
-                rdata['files'].append({**fprops, 'attrs': v})
-        return rdata
+        dt0_json = data['value'].get('dt0', '')
+        dt1_json = data['value'].get('dt1', '')
+        if dt0_json == '' or dt1_json == '':
+            print("Either start or end datetime not given")
+            return
+        try:
+            dt0 = datetime.strptime(dt0_json, '%Y-%m-%dT%H:%M:%S.%fZ')
+        except ValueError:
+            print("dt0 not valid JSON datetime")
+            return
+        try:
+            dt1 = datetime.strptime(dt1_json, '%Y-%m-%dT%H:%M:%S.%fZ')
+        except ValueError:
+            print("dt1 not valid JSON datetime")
+            return
+        sample_table = await self.parent.target_data_pool.get_datetime_range(dt0, dt1)
+        await self.emit_client_notification('imported_samples',
+                                            sample_table,
+                                            **{**kwargs,
+                                               'room': data['client_room'],
+                                               }
+                                            )
 
     async def on_raw_import(self, data):
         rdata = await self._create_generator_request(data)
@@ -231,6 +202,62 @@ class FileStreamerPrivateNamespace(BaseClientNamespace):
                 if rdata and not rdata[0].get('files'):
                     self.parent.requests.cache_delete_key(client_room)
 
+
+
+    def get_src_data(self, path, fname):
+        def get_h5_datetime():
+            # returns ('YYYY.mm.dd', 'HH:MM:SS') for TOF h5 samples
+            dt_regex = r'.*(\d{4}).(\d{2}).(\d{2}).(\d{2}).(\d{2}).(\d{2}).*\.h5'
+            dt = re.findall(dt_regex, fname)[0]
+            return '.'.join(dt[:3]), ':'.join(dt[3:])
+
+        def get_raw_datetime():
+            # returns ('YYYY.mm.dd', 'HH:MM') for Orbi raw samples
+            dt_regex = r'^(\d{8}).(\d{4}).*\.raw'
+            d, t = re.findall(dt_regex, fname)[0]
+            return '.'.join([d[:4], d[4:6], d[6:]]), ':'.join([t[:2], t[2:]])
+
+        data_root = self.parent.data_pool.pool_attrs.get('path', '.')
+        try:
+            fdate, ftime = get_h5_datetime()
+        except IndexError:
+            fdate, ftime = get_raw_datetime()
+        if not path:    # path normally does not come with batch import
+            path = os.path.join(data_root, fdate)
+        if not os.path.isdir(path):
+            path = data_root
+        full_fname = os.path.join(path, fname)
+        size = round((os.path.getsize(full_fname)) / 2**20, 2)  # in MB
+        return {'filename': fname,
+                'path': path,
+                'props': {'filesize': size, 'datetime': f'{fdate} {ftime}'},
+               }
+
+    async def _create_generator_request(self, data):
+        def is_reimport_request(fdata):
+            return all([fdata.get('props'), fdata.get('attrs')])
+
+        kwargs = get_client_notification_context(data)
+        rdata = {**kwargs, 'files': []}
+        for v in data['value']:
+            fname = v['filename']
+            if self.parent.is_sample_in_progress(fname):
+                self.log(f"Skip {fname}: the sample is already being imported")
+                continue
+            if is_reimport_request(v):
+                rdata['files'].append(v)
+            else:
+                fname = v.pop('filename')
+                path = v.pop('path', None)    # path normally does not come with batch import
+                try:
+                    fprops = self.get_src_data(path, fname)
+                except Exception as e:
+                    await self.parent.push_alert(str(e))
+                    raise
+                # attrs normally contain sci data coming along with the sample
+                rdata['files'].append({**fprops, 'attrs': v})
+        return rdata
+
     def cb_progress(self, data):
         if not data:
             return
@@ -250,6 +277,8 @@ class FileStreamerServiceClient(BaseStreamerClient):
         await super().init_service()
         assert self.data_pool, 'Missing data_pool argument'
         await self.data_pool.scan_dir()
+        if self.target_data_pool:
+            await self.target_data_pool.scan_dir()
 
     def on_filesystem_object_created(self, path):
         try:

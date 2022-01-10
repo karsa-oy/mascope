@@ -1,7 +1,8 @@
 import asyncio
-import inspect
-import time
 import importlib
+import inspect
+import os
+import time
 
 from queue import Empty
 from karsalib.struct import CacheQ, FSWatcher
@@ -36,7 +37,10 @@ def run_streamer_service(StreamerClient,
         n_jobs = int(args.get('n_jobs', 1))
         # existing target_data_pool_path switches from mode.stream to mode.store
         target_data_pool_path = args.get('target_data_pool_path')
-        streamer_opts = {'type': streamer_type, 'n_jobs': n_jobs, 'target_data_pool_path': target_data_pool_path}
+        streamer_opts = {'type': streamer_type,
+                         'n_jobs': n_jobs,
+                         'target_data_pool_path': target_data_pool_path
+                         }
         data_pool_path = args.get('data_pool_path')
         data_pool_mask = args.get('data_pool_mask')
         data_pool_opts = None if not data_pool_path else \
@@ -593,6 +597,16 @@ class BaseStreamerClient(BridgeServiceClient):
             m = importlib.import_module('.datapool', 'karsalib')
             self.data_pool = getattr(m, f'{streamer_type}Pool')(pool_attrs=data_pool_opts)
             self.watcher = FSWatcher(client=self, target_attrs=data_pool_opts, recursive=True)
+        
+        self.target_data_pool = None
+        if self.target_data_pool_path:
+            if not os.path.exists(priv_ns_name):
+                os.mkdir(priv_ns_name)
+            m = importlib.import_module('.datapool', 'karsalib')
+            self.target_data_pool = getattr(m, f'ZarrPool')(pool_attrs={
+                                        'path': priv_ns_name,
+                                        'mask': ['*.h5', '*.raw']
+                                        })
 
     @property
     def instrument_name(self):

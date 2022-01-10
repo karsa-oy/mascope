@@ -18,15 +18,13 @@ import xarray
 import zarr
 import numpy as np
 import dask.array as da
-from datetime import datetime
-from multiprocessing import Event
 from time import sleep, time
 
 from karsalib.client import BaseClientNamespace, BaseServiceClient
-from karsalib.logging import t_mark, this_func_name
-from karsalib.struct import AttrDict, ExtendableDataArray, FSWatcher, LRUDict
+from karsalib.logging import this_func_name
+from karsalib.struct import AttrDict, ExtendableDataArray, LRUDict
 from karsalib.util import get_client_notification_context, parse_cmd_args
-from karsalib.datapool import parse_path_from_sample_name, ZarrPool
+from karsalib.datapool import parse_path_from_sample_name
 
 
 from karsalib.datapool import METADATA_VERSION_NUMBER
@@ -37,8 +35,6 @@ client = None
 
 # Cache for data arrays
 cache = LRUDict(10)
-
-DATA_ROOT = '.'
 
 
 from shutil import rmtree
@@ -254,9 +250,6 @@ class FileIoNamespace(BaseClientNamespace):
         'centroid_info',
         'tps_parameter_info',
         # //
-        # UI
-        'import_sample_table_datetime_range',
-        # //
         # Router
         'service_state',
         # //
@@ -379,32 +372,6 @@ class FileIoNamespace(BaseClientNamespace):
         zarr_sdk.init_tps_dataset(data, cache_item)
     # -----------------------------------------
 
-    # ========== SampleImport requests ==========
-    async def on_import_sample_table_datetime_range(self, data):
-        kwargs = get_client_notification_context(data)
-        dt0_json = data['value'].get('dt0', '')
-        dt1_json = data['value'].get('dt1', '')
-        if dt0_json == '' or dt1_json == '':
-            print("Either start or end datetime not given")
-            return
-        try:
-            dt0 = datetime.strptime(dt0_json, '%Y-%m-%dT%H:%M:%S.%fZ')
-        except ValueError:
-            print("dt0 not valid JSON datetime")
-            return
-        try:
-            dt1 = datetime.strptime(dt1_json, '%Y-%m-%dT%H:%M:%S.%fZ')
-        except ValueError:
-            print("dt1 not valid JSON datetime")
-            return
-        sample_table = await self.parent.data_pool.get_datetime_range(dt0, dt1)
-        await self.emit_client_notification('imported_samples',
-                                            sample_table,
-                                            **{**kwargs,
-                                               'room': data['client_room'],
-                                               }
-                                            )
-    # -----------------------------------------
 
 # ========= File I/O functions =========
 def append_instrument_log(log_path, new_entry):
@@ -640,23 +607,10 @@ def write_zarr_attributes(filepath, attributes):
 
 
 class FileIoClient(BaseServiceClient):
-    
     async def init_service(self):
-        global DATA_ROOT
-        self.data_pool = ZarrPool()
-        self.shutdown_event = Event()
-        self.watcher = FSWatcher(client=self,
-                                 target_attrs={
-                                    'path': DATA_ROOT,
-                                    'mask': ['*.h5', '*.raw']
-                                    },
-                                 recursive=True
-                                 )
-        await self.data_pool.scan_dir(path=DATA_ROOT)
-
+        return
+         
     async def service_main(self):
-        if self.watcher:
-            self.watcher.run_as_daemon()
         while True:
             try:
                 await self.sio.sleep(.5)
@@ -665,19 +619,6 @@ class FileIoClient(BaseServiceClient):
             # End of main loop
         await self.sio.disconnect()
 
-    def on_filesystem_object_created(self, path):
-        try:
-            self.data_pool.add_file(path)
-            self.log(path)
-        except ValueError:
-            pass
-
-    def on_filesystem_object_deleted(self, path):
-        try:
-            self.data_pool.remove_file(path)
-            self.log(path)
-        except Exception as e:
-            self.log(str(e))
 
 
 def run():
@@ -693,8 +634,7 @@ def run():
                           args['port'],
                           (args['ns'], FileIoNamespace)
                           )
-    global DATA_ROOT
-    DATA_ROOT = args['ns']
+
     loop = asyncio.get_event_loop()
     try:
         loop.run_until_complete(client.run())
