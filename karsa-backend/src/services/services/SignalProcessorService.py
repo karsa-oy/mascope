@@ -133,7 +133,7 @@ class SignalProcessorNamespace(BaseClientNamespace):
             sum_centroids = cache_item.centroids.sel(
                                 mz=slice(*mz_range),
                                 time=slice(*t_range)
-                                ).mean(dim='time').compute()
+                                ).sum(dim='time').compute()
             min_peak_height = peak_threshold * sum_centroids.max().compute().item()
             ind = (sum_centroids > min_peak_height).compute()
             peak_mz = sum_centroids.mz[ind].load()
@@ -146,7 +146,7 @@ class SignalProcessorNamespace(BaseClientNamespace):
             sum_spectrum = cache_item.signal.sel(
                                 mz=slice(*mz_range),
                                 time=slice(*t_range)
-                                ).mean(dim='time').compute()
+                                ).sum(dim='time').compute()
             min_peak_height = peak_threshold * sum_spectrum.max().compute().item()
             peak_ind, peak_props = find_peaks(sum_spectrum,
                                             height=min_peak_height,
