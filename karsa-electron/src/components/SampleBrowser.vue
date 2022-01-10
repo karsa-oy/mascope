@@ -1280,6 +1280,7 @@ export default {
       return this.be.export_one_way_binding_prop("save_sample", this.sample_to_link);
     },
     samples: function (new_value) {
+      this.sample_table_checked_rows = [];
       // Format data to sample table
       let samples = new_value;
       let rows = [];
