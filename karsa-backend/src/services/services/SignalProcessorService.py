@@ -25,6 +25,7 @@ from scenthound.kcollector import KCollector
 
 from services.FileIoService import (get_zarr_var_shape,
                                     load_file,
+                                    update_props,
                                     update_zarr_array_coord
                                     )
 
@@ -78,6 +79,7 @@ class SignalProcessorNamespace(BaseClientNamespace):
         new_mz = np.array([TwTof2Mass(tof, mode, par)
                            for tof in range(nbr_samples)
                            ])
+        new_range = [new_mz[0], new_mz[-1]]
 
         for filename in filenames:
             self.log("Calibrating file: %s" %filename)
@@ -85,9 +87,11 @@ class SignalProcessorNamespace(BaseClientNamespace):
                 raise Exception("Number of TOF samples does not match")
             # Write new mz coordinates to file
             update_zarr_array_coord(filename, 'signal', 'mz', new_mz)
+            update_props(filename, {'range': new_range})
             cache_item = cache.get(filename)
             if cache_item:
                 cache_item['mz'] = new_mz
+                cache_item.attrs['props'].update({'range': new_range})
                 cache[filename] = cache_item
             await self.emit_client_notification('dataset_coord_updated',
                                                 {'filename': filename,
@@ -140,8 +144,8 @@ class SignalProcessorNamespace(BaseClientNamespace):
         # Find peaks
         else:
             sum_spectrum = cache_item.signal.sel(
-                                # mz=slice(*mz_range),
-                                # time=slice(*t_range)
+                                mz=slice(*mz_range),
+                                time=slice(*t_range)
                                 ).mean(dim='time').compute()
             min_peak_height = peak_threshold * sum_spectrum.max().compute().item()
             peak_ind, peak_props = find_peaks(sum_spectrum,

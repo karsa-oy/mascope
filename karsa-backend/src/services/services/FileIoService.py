@@ -100,13 +100,7 @@ class zarr_sdk:
                         'data_version': DATA_VERSION_NUMBER,
                         'metadata_version': METADATA_VERSION_NUMBER,
                     }
-        prop_path = os.path.join(
-                        data_root,
-                        parse_path_from_sample_name(filename),
-                        '.props'
-                        )
-        with open(prop_path, 'w') as f:
-            json.dump(properties, f, indent=4)
+        write_props(filename, properties)
 
         return {'data_root': data_root,
                 'signal': signal_array,
@@ -236,11 +230,7 @@ class zarr_sdk:
         item['props'].update({'committed_length': final_length})
         item['props'].update({'length': final_length})
         # Write properties
-        prop_path = os.path.join(item.get('data_root', ''),
-                                parse_path_from_sample_name(filename),
-                                '.props')
-        with open(prop_path, 'w') as f:
-            json.dump(item['props'], f, indent=4)
+        update_props(filename, item['props'])
         # flush arrays
         arrays = [item['signal'], item['signal_period']]
         for a in arrays:
@@ -614,6 +604,23 @@ def read_zarr_attributes(filepath):
     z = zarr.open(filepath, mode='r', synchronizer=sync)
     attributes = z.attrs.asdict()
     return attributes
+
+def update_props(base_filename, props_to_update):
+    sample_data_path = parse_path_from_sample_name(base_filename)
+    # Update properties
+    prop_path = os.path.join(sample_data_path, '.props')
+    with open(prop_path, 'r') as f:
+        props = json.load(f)
+    props.update(props_to_update)
+    with open(prop_path, 'w') as f:
+        json.dump(props, f, indent=4)
+
+def write_props(base_filename, props):
+    sample_data_path = parse_path_from_sample_name(base_filename)
+    # Write properties
+    prop_path = os.path.join(sample_data_path, '.props')
+    with open(prop_path, 'w') as f:
+        json.dump(props, f, indent=4)
 
 def update_zarr_array_coord(base_filename, var, dim, coord):
     array_path = filename_to_zarr_path(base_filename, var)
