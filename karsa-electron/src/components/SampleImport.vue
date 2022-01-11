@@ -176,6 +176,9 @@ export default {
       // Set project and experiment to the selected ones
       to_import.project = this.project_selected.title;
       to_import.experiment = this.experiment_selected.title;
+      if (!to_import.attributes.length) {
+        to_import.attributes = this.experiment_selected.sample_attributes_template;
+      }
       this.sample_to_link = to_import;
 
     },

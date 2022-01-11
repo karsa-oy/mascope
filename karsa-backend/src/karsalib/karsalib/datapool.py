@@ -849,7 +849,6 @@ class ZarrPool(H5Pool):
                                           'method',
                                           'annotations',
                                           'datetime',
-                                          'path',
                                           ]
                                  )
         # Get directories in path
@@ -872,16 +871,14 @@ class ZarrPool(H5Pool):
             for sample_dir in dir_samples:
                 await asyncio.sleep(0)
                 try:
-                    full_file_path = os.path.join(dir_path, sample_dir)
-                    self.add_file(full_file_path)
-                    print(full_file_path)
+                    self.add_file(sample_dir)
+                    print(sample_dir)
                 except ValueError:
                     continue
         print("Done")
 
-    def add_file(self, full_file_path):
-        filename = basename(full_file_path)
-        path = dirname(full_file_path)
+    def add_file(self, filename):
+        full_file_path = parse_path_from_sample_name(filename)
         # Try to parse time from filename
         patterns = ['*_%Y%m%d %H%M *',
                     '*_%Y%m%d_%H%M_*',
@@ -907,7 +904,6 @@ class ZarrPool(H5Pool):
                             sample_metadata.get('method', {}),
                             sample_metadata.get('annotations', {}),
                             file_datetime,
-                            path
                             ]],
                             columns=['filename',
                                     'properties',
@@ -915,21 +911,21 @@ class ZarrPool(H5Pool):
                                     'method',
                                     'annotations',
                                     'datetime',
-                                    'path',
                                     ]
                         )
         self.pool = self.pool.append(df_row).sort_index()
 
     def get_sample_metadata(self, filepath):
         sample_ext = {}
-        try:
-            for ext in ['.attrs', '.props', '.meth', '.annts']:
+        
+        for ext in ['.attrs', '.props', '.meth', '.annts']:
+            try:
                 sample_ext[ext] = SamplePool._read_attributes(filepath, ext=ext)
-        except Exception as e:
-            print(e)
+            except Exception as e:
+                print(e)
         return {
                     'properties': sample_ext.get('.props', {}),
-                    'attributes': sample_ext.get('.attrs', {}),
-                    'method': sample_ext.get('.meth', {}),
-                    'annotations': sample_ext.get('.annts', {}),
+                    'attributes': sample_ext.get('.attrs', []),
+                    'method': sample_ext.get('.meth', []),
+                    'annotations': sample_ext.get('.annts', []),
                 }
