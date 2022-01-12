@@ -237,24 +237,6 @@ class zarr_sdk:
 class FileIoNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to MainService """
 
-    endpoints = [
-        # TOFControl
-        'instrument_log_entry',
-        'instrument_log_request',
-        # //
-        # TOFService
-        'acquisition_coordinates',
-        'acquired_spectrum',
-        'acquired_tps_data',
-        'acquisition_finished',
-        'centroid_info',
-        'tps_parameter_info',
-        # //
-        # Router
-        'service_state',
-        # //
-        ]
-
     service_state = dict()
 
     # ========== TOFControl requests ==========

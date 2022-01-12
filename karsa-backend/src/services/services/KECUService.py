@@ -141,8 +141,7 @@ async def initialize_kecu(kecu):
 
 class KECUServiceNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to Router """
-
-    endpoints = []
+    pass
 
 
 class KECUServiceClient(BaseServiceClient):

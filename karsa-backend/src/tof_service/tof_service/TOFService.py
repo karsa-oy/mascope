@@ -17,31 +17,16 @@ NO_DATA_LOGGING_DEFAULT = True
 class TOFServicePublicNamespace(BaseClientNamespace):
     # TOF service public (root) interfaces
     # the public namespace is primarily exposed to the root namespace
-    # via a room_instrument = private_namespace_name (set by BaseStreamClient init)
-    room_instrument = None
-    room_data_sources = 'room_data_sources'
-    endpoints = []
-    endpoints_room_sid = []
-    endpoints_room_data_sources = [
-            'instrument_data_request',
-            'service_state',
-            ]
-    endpoints_room_instrument = [
-            'instrument_data_request',
-            ]
+    # as room_instrument = private_namespace_name (set by BaseStreamClient init)
+
     service_state = dict(
         instrument_data = dict(),
         )
 
-    async def subscribe(self):
-        if self.endpoints:
-            await super().subscribe(self.endpoints)
-        if self.endpoints_room_sid:
-            await super().subscribe(self.endpoints_room_sid, self.room_sid)
-        if self.endpoints_room_data_sources:
-            await super().subscribe(self.endpoints_room_data_sources, self.room_data_sources)
-        if self.endpoints_room_instrument:
-            await super().subscribe(self.endpoints_room_instrument, self.room_instrument)
+    async def on_connect(self):
+        await super().on_connect()
+        await self.enter_room(self.room_instrument)
+        await self.enter_room('room_data_sources')
 
     async def on_instrument_data_request(self, data):
         await self.emit_client_notification(
@@ -54,16 +39,7 @@ class TOFServicePublicNamespace(BaseClientNamespace):
 
 class TOFServicePrivateNamespace(BaseClientNamespace):
     # TOF service private interfaces
-    endpoints = [
-            # 
-            'service_state',
-            #
-            # TOFControl
-            'tofdaq_log_entry',
-            'start_acquisition',
-            'stop_acquisition',
-            #
-            ]
+
     service_state = dict(
         acquisition_status = 'not_running',
         instrument_status = 'not_ready',

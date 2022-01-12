@@ -39,11 +39,6 @@ u_list = []
 class SignalProcessorNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to Router """
 
-    endpoints = ['fit_mz_calib_function',
-                 'mz_calibrate_samples',
-                 'peak_data_request',
-                 ]
-    
     async def on_fit_mz_calib_function(self, data):
         value = data['value']
         client_room = data.get('client_room') or data['cookies']['src_sid'][0]

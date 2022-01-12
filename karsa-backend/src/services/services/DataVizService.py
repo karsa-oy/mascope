@@ -722,13 +722,6 @@ def get_namespace(filename):
 class DataVizServiceNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to Router """
 
-    endpoints = [
-            'dataset_coord_updated',
-            'dataset_updated',
-            'stop_visualize_range',
-            'visualize_range',
-            ]
-
     # ========== UI requests ==========
     async def on_visualize_range(self, data):
         """Visualization request

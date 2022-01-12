@@ -17,40 +17,17 @@ from karsalib.logging import Logger, parent_func_name
 
 class FileStreamerPublicNamespace(BaseClientNamespace):
     # raw service public (root) interfaces
-    # the public namespace is primarily exposed to the root namespace
-    # via a room_instrument = private_namespace_name.
-    room_instrument = None
-    room_data_sources = 'room_data_sources'
-
-    endpoints = []
-    endpoints_room_sid = []
-    endpoints_room_data_sources = [
-        'instrument_data_request',
-        ]
-    endpoints_room_instrument = [
-        'instrument_data_request',
-        ]
+    # the private namespace name is primarily exposed to the root namespace
+    # as room_instrument = private_namespace_name.
 
     service_state = dict(
         instrument_data = dict(),
         )
 
-    async def subscribe(self):
-        if self.endpoints:
-            await super().subscribe(self.endpoints
-                                    )
-        if self.endpoints_room_sid:
-            await super().subscribe(self.endpoints_room_sid,
-                                    self.room_sid
-                                    )
-        if self.endpoints_room_data_sources:
-            await super().subscribe(self.endpoints_room_data_sources,
-                                    self.room_data_sources
-                                    )
-        if self.endpoints_room_instrument:
-            await super().subscribe(self.endpoints_room_instrument,
-                                    self.room_instrument
-                                    )
+    async def on_connect(self):
+        await super().on_connect()
+        await self.enter_room(self.room_instrument)
+        await self.enter_room('room_data_sources')
 
     async def on_instrument_data_request(self, data):
         await self.emit_client_notification(
@@ -62,15 +39,6 @@ class FileStreamerPublicNamespace(BaseClientNamespace):
 
 class FileStreamerPrivateNamespace(BaseClientNamespace):
     # raw service private interfaces
-    endpoints = [
-            'raw_import',
-            'raw_import_status',
-            'stop_raw_import',
-            # 'raw_stream_request',
-            'import_raw_table_datetime_range',
-            'import_sample_table_datetime_range',
-            'service_state'
-            ]
 
     service_state = dict(
         instrument_status = 'not_ready',

@@ -23,43 +23,38 @@ class BaseServerNamespace(AsyncNamespace):
         for r in self.rooms(sid):
             await self.emit('room_mate_gone', {}, room=r)
 
-    def on_subscribe(self, sid, data):
+    def on_declare_endpoints(self, sid, data):
         """
-        Initialize client subscriptions. Subscriptions contain notif names
-        the client subscribes for and a room to subscribe into.
-        data: dict(app_name=client_name, endpoints, room)
+        Declare API from a client service by creating a room for each API function.
+        API requests are sent thru Router via client_notifications:
+        Client->Router->Service
+        The API room is used to send this request to only those services,
+        which declare corresponding API.
+        data: list(app_name=client_name, endpoints)
         """
         app_name = data['app_name']
         endpoints = data['endpoints']
-        room = data.get('room')
-        if room:
-            self.log(f"{app_name}:{sid} joins room {room}")
-            self.enter_room(sid, room)
-        else:
-            self.log(f"{app_name}:{sid} joins rooms {endpoints}")
-            for e in endpoints:
-                self.enter_room(sid, e)
-        self.log(f"{app_name}:{sid} stays in rooms: {self.rooms(sid)}")
+        for e in endpoints:
+            self.enter_room(sid, e)
+        self.log(f"{app_name}:{sid} declares endpoints {endpoints}")
+        # self.log(f"{app_name}:{sid} stays in rooms: {self.rooms(sid)}")
 
-    async def on_unsubscribe(self, sid, data):
+    def on_enter_room(self, sid, data):
         app_name = data['app_name']
-        endpoints = data['endpoints']
-        room = data.get('room')
-        if room:
-            self.log(f"{app_name}:{sid} leaves room {room}")
-            self.leave_room(sid, room)
-            await self.emit('service_state', {}, room=room)
-        else:
-            self.log(f"{app_name}:{sid} leaves rooms {endpoints}")
-            for e in endpoints:
-                self.leave_room(sid, e)
-        self.log(f"{app_name}:{sid} stays in rooms: {self.rooms(sid)}")
+        room = data['room']
+        self.enter_room(sid, room)
+        self.log(f"{app_name}:{sid} enters room {room}")
 
+    def on_leave_room(self, sid, data):
+        app_name = data['app_name']
+        room = data['room']
+        self.leave_room(sid, room)
+        self.log(f"{app_name}:{sid} leaves room {room}")
 
     async def on_client_notification(self, sid, data):
         """
-        client_notifications on corresponding API endpoints are forwarded by Router from providers
-        to subscribers via corresponding endpoints, where name = endpoint is a property name.
+        client_notifications on corresponding API endpoints are forwarded by Router from requesters
+        to providers via corresponding endpoints, where name = endpoint is a property name.
         data: dict(name=endpoint_name, value=endpoint_value, ...)
               other named args are free form, e.g. 
               room, cookies, no_logging, no_data_logging...

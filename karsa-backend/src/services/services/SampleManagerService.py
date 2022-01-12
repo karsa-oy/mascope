@@ -32,25 +32,6 @@ datapool = SamplePool(projects_path)
 class MetadataServiceNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to MainService """
 
-    endpoints = [
-        # UI
-        'experiment_selected',
-        'experiment_from_plan',
-        'delete_experiment',
-        'delete_project',
-        'delete_sample',
-        'import_sample_table_datetime_range', # TODO: Should be routed to FileIoService
-        'parse_experiment_plan_blob',
-        'project_selected',
-        'projects',
-        'save_experiment',
-        'save_project',
-        'save_sample',
-        'save_sample_annotation',
-        # Router
-        'service_state',
-        ]
-
     service_state = dict(
         projects = datapool.get_projects(),
     )
@@ -388,8 +369,6 @@ class MetadataServiceNamespace(BaseClientNamespace):
 
         datapool.annotate_sample(project, experiment, filename, annotation)
     # ---------------------------------
-
-
 
 
 class SampleManagerClient(BaseServiceClient):
