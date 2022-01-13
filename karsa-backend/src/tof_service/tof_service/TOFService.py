@@ -20,13 +20,12 @@ class TOFServicePublicNamespace(BaseClientNamespace):
     # as room_instrument = private_namespace_name (set by BaseStreamClient init)
 
     service_state = dict(
-        instrument_data = dict(),
+        instrument_data = {'value': dict(), 'room': 'room_data_sources'},
         )
 
     async def on_connect(self):
-        await super().on_connect()
         await self.enter_room(self.room_instrument)
-        await self.enter_room('room_data_sources')
+        await super().on_connect()
 
     async def on_instrument_data_request(self, data):
         await self.emit_client_notification(
@@ -41,8 +40,8 @@ class TOFServicePrivateNamespace(BaseClientNamespace):
     # TOF service private interfaces
 
     service_state = dict(
-        acquisition_status = 'not_running',
-        instrument_status = 'not_ready',
+        acquisition_status = {'value': 'not_running', 'room': None},
+        instrument_status = {'value': 'not_ready', 'room': None},
         )
 
     async def on_tofdaq_log_entry(self, data):

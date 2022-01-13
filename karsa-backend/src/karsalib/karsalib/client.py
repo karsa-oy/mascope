@@ -94,9 +94,7 @@ class BaseClientNamespace(AsyncClientNamespace):
             endpoints = endpoints,
         )
         await self.emit('declare_endpoints', data)
-        await self.on_service_state(dict(value={},
-                                         room=None,
-                                         no_data_logging=NO_DATA_LOGGING_DEFAULT, ))
+        await self.on_service_state({})
         return endpoints
 
     async def enter_room(self, room):
@@ -105,9 +103,6 @@ class BaseClientNamespace(AsyncClientNamespace):
             room = room,
         )
         await self.emit('enter_room', data)
-        await self.on_service_state(dict(value={},
-                                         room=room,
-                                         no_data_logging=NO_DATA_LOGGING_DEFAULT, ))
 
     async def leave_room(self, room):
         data = dict(
@@ -126,8 +121,8 @@ class BaseClientNamespace(AsyncClientNamespace):
             for ns in nss:
                 await self.emit('register_namespace', ns)
                 self.log(f"namespace {ns} registered")
-        await self.declare_endpoints()
         await self.enter_room(self.room_sid)
+        await self.declare_endpoints()
 
     def on_disconnect(self):
         self.log(f"disconnected from namespace {self.namespace}")
@@ -136,15 +131,18 @@ class BaseClientNamespace(AsyncClientNamespace):
         no_logging = data.get('no_logging', NO_LOGGING_DEFAULT)
         # no_data_logging = data.get('no_data_logging', NO_DATA_LOGGING_DEFAULT)
         no_data_logging = False
-        for k, v in self.service_state.items():
+        for n, d in self.service_state.items():
+            name = n
+            value = d['value']
+            room = d.get('room')
             if no_logging:
                 pass
             elif no_data_logging:
-                self.log(f"{k}: ...")
+                self.log(f"{name}: ... to {room}")
             else:
-                self.log(f"{k}: {v}")
+                self.log(f"{name}: {value} to {room}")
             await self.emit('client_notification',
-                            {**data, 'name': k, 'value': v})
+                            {**data, 'name': name, 'value': value, 'room': room})
 
     def on_client_notification_callback(self, data):
         endpoint = data['endpoint']
@@ -179,14 +177,14 @@ class BaseClientNamespace(AsyncClientNamespace):
         if no_logging:
             pass
         elif no_data_logging:
-            self.log(f"{name}: ...")
+            self.log(f"{name}: ... > {kwarg.get('room', name)}")
         else:
             self.log(f"{name}: {value} > {kwarg.get('room', name)}")
         await self.emit('client_notification',
                         {'name': name, 'value': value, **kwarg},
                         )
         if name in self.service_state:
-            self.service_state[name] = value
+            self.service_state[name] = {'value': value, 'room': kwarg.get('room')}
 
     @property
     def room_sid(self):

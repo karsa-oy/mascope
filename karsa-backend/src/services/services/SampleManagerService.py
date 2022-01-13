@@ -33,7 +33,7 @@ class MetadataServiceNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to MainService """
 
     service_state = dict(
-        projects = datapool.get_projects(),
+        projects = {'value': datapool.get_projects(), 'room': 'projects'},
     )
 
     # ========== UI requests ==========

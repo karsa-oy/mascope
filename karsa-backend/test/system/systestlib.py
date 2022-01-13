@@ -44,9 +44,9 @@ _ProactorBasePipeTransport.__del__ = bug_workaround(_ProactorBasePipeTransport._
 
 class BaseTestClientPublicNamespace(BaseClientNamespace):
     async def on_connect(self):
-        await super().on_connect()
         await self.enter_room(self.room_instrument)
         await self.enter_room('room_data_sources')
+        await super().on_connect()
 
     # helpers
 

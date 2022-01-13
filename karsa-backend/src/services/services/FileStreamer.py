@@ -21,13 +21,12 @@ class FileStreamerPublicNamespace(BaseClientNamespace):
     # as room_instrument = private_namespace_name.
 
     service_state = dict(
-        instrument_data = dict(),
+        instrument_data = {'value': dict(), 'room': 'room_data_sources'},
         )
 
     async def on_connect(self):
-        await super().on_connect()
         await self.enter_room(self.room_instrument)
-        await self.enter_room('room_data_sources')
+        await super().on_connect()
 
     async def on_instrument_data_request(self, data):
         await self.emit_client_notification(
@@ -41,7 +40,7 @@ class FileStreamerPrivateNamespace(BaseClientNamespace):
     # raw service private interfaces
 
     service_state = dict(
-        instrument_status = 'not_ready',
+        instrument_status = {'value': 'not_ready', 'room': None},
     )
 
     async def on_import_raw_table_datetime_range(self, data):

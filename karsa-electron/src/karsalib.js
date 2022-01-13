@@ -41,25 +41,36 @@ export class BECom {
         let the_namespace = namespace || this.ctx.namespace;
         this.log(room, 'subscribed for', endpoints);
 
-        the_namespace.emit('subscribe',
+        // the_namespace.emit('subscribe',
+        //                  {'app_name': this.app_name,
+        //                   'endpoints': endpoints,
+        //                   'client_room': room,
+        //                   'room': room});
+        // the_namespace.emit('client_notification',
+        //                     {'name': 'service_state',
+        //                      'value': {},
+        //                      'client_room': room,
+        //                      'room': room,
+        //                      });
+
+        the_namespace.emit('enter_room',
                          {'app_name': this.app_name,
-                          'endpoints': endpoints,
-                          'client_room': room,
                           'room': room});
-        the_namespace.emit('client_notification',
-                            {'name': 'service_state',
-                             'value': {},
-                             'client_room': room,
-                             'room': room,
-                             });
+        the_namespace.emit('declare_endpoints',
+                         {'app_name': this.app_name,
+                          'endpoints': endpoints});
+
     }
     
     unsubscribe(endpoints, room, namespace=null) {
         let the_namespace = namespace || this.ctx.namespace;
         this.log(room, 'unsubscribed from', endpoints);
-        the_namespace.emit('unsubscribe',
+        // the_namespace.emit('unsubscribe',
+        //                  {'app_name': this.app_name,
+        //                   'endpoints': endpoints,
+        //                   'room': room});
+        the_namespace.emit('leave_room',
                          {'app_name': this.app_name,
-                          'endpoints': endpoints,
                           'room': room});
     }
     
