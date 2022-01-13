@@ -346,8 +346,18 @@ export default {
       raw_import: [],
       stop_raw_import: [],
       // variables for import modal
-      import_start_time: null,
-      import_end_time: null,
+      import_start_time: new Date(new Date().getFullYear(),
+                                  new Date().getMonth(),
+                                  new Date().getDate(),
+                                  0,
+                                  0
+                                  ),
+      import_end_time: new Date(new Date().getFullYear(),
+                                new Date().getMonth(),
+                                new Date().getDate(),
+                                23,
+                                59
+                                ),
       import_min_datetime: null,
       import_max_datetime: new Date(),
       import_raw_table_rows: [],
@@ -398,6 +408,7 @@ export default {
       let fetch_request = {
         dt0: dt0.toJSON(),
         dt1: dt1.toJSON(),
+        uid: Math.random(),
       };
       this.import_raw_table_datetime_range = fetch_request;
     },
@@ -416,6 +427,7 @@ export default {
       } else {
         // pop up FetchSamples dialog
         this.is_raw_import_modal_active = true;
+        this.FetchSamples();
       }
     },
     on_button_acquisition_status() {
