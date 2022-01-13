@@ -129,8 +129,7 @@ class BaseClientNamespace(AsyncClientNamespace):
 
     async def on_service_state(self, data):
         no_logging = data.get('no_logging', NO_LOGGING_DEFAULT)
-        # no_data_logging = data.get('no_data_logging', NO_DATA_LOGGING_DEFAULT)
-        no_data_logging = False
+        no_data_logging = data.get('no_data_logging', NO_DATA_LOGGING_DEFAULT)
         for n, d in self.service_state.items():
             name = n
             value = d['value']

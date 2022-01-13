@@ -813,7 +813,6 @@ export default {
   watch: {
     data_source_selected: function (new_value, old_value) {
       if (_.isEqual(new_value, old_value)) return false;
-      // this.be.unsubscribe(this.endpoints, null);   //TODO: is it needed?
       this.be.disconnect(this.namespace);
       this.be.connect(this.url + "/" + this.data_source_selected.name);
     },
@@ -963,11 +962,7 @@ export default {
         this.namespace.on("instrument_status", (value) =>
           this.be.import_one_way_binding_prop("instrument_status", value.value)
         );
-
-        this.be.subscribe(
-          this.endpoints,
-          null // room set to null to subscribe to endpoints directly
-        );
+        this.be.declare_endpoints(this.endpoints);
       } else {
         // on disconnect
         this.control_mode_active = false;

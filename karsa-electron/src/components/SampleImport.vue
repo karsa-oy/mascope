@@ -242,7 +242,7 @@ export default {
         );
 
         this.room_sid = this.namespace.id;
-        this.be.subscribe(this.endpoints, null);
+        this.be.declare_endpoints(this.endpoints);
       }
     },
   },

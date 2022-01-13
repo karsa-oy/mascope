@@ -349,7 +349,8 @@ export default {
         this.namespace.on("service_error", (value) =>
           this.be.import_two_way_binding_prop("service_error", value.value)
         );
-        this.be.subscribe(this.endpoints, this.room_data_sources);
+        this.be.enter_room(this.room_data_sources);
+        this.be.declare_endpoints(this.endpoints);
       }
     },
   },

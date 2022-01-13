@@ -73,20 +73,20 @@ class BaseServerNamespace(AsyncNamespace):
         for e in endpoints:
             self.enter_room(sid, e)
         # self.log(f"{app_name}:{sid} declares endpoints {endpoints}")
-        self.log(f"{app_name}:{sid} stays in rooms: {self.rooms(sid)}")
+        self.log(f"{app_name} stays in rooms: {self.rooms(sid)}")
         await self.emit('service_state', {})
 
     async def on_enter_room(self, sid, data):
         app_name = data['app_name']
         room = data['room']
         self.enter_room(sid, room)
-        self.log(f"{app_name}:{sid} enters room {room}")
+        self.log(f"{app_name} : {room}")
 
     def on_leave_room(self, sid, data):
         app_name = data['app_name']
         room = data['room']
         self.leave_room(sid, room)
-        self.log(f"{app_name}:{sid} leaves room {room}")
+        self.log(f"{app_name} : {room}")
 
     async def on_client_notification(self, sid, data):
         """
