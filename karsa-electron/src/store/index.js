@@ -20,7 +20,7 @@ export default new Vuex.Store({
 		ionization_mechanism: "",
 		mz_calibration: {},
 		new_file: "",
-		parameter_peak_intensity_threshold: 0.01,
+		parameter_peak_intensity_threshold: 0.005,
 		peak_data: {},
 		project_selected: { 'title': "", 'attributes': [] },
 		projects: [],

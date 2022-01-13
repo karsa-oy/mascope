@@ -646,6 +646,8 @@
                     <b-table
                       id="samples-datatable"
                       style="height: 100%; width: 100%"
+                      height="500px"
+                      narrowed
                       :data="sample_table_rows"
                       :sticky-header="true"
                       :checkable="true"
@@ -1209,8 +1211,6 @@ export default {
         message: "Acquisition started: " + new_value.filename,
         type: "is-success",
       });
-
-      this.sample_table_selected_row = {};
 
       // project/experiment not in args - the UI takes care of saving the sample to experiment
       if (_.isEmpty(new_value.project) || _.isEmpty(new_value.experiment)) {

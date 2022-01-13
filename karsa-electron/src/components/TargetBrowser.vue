@@ -203,6 +203,7 @@
       <b-table
         id="targets-datatable"
         ref="target_table"
+        height="500px"
         :data="target_table_all_rows"
         :key="target_table_key"
         :sticky-header="true"
@@ -634,7 +635,7 @@ export default {
       mz_calib_stats_table_rows: [],
       //
       // Identification parameters
-      parameter_mz_tolerance: 10,
+      parameter_mz_tolerance: 20,
       parameter_iso_ratio_tolerance: 100,
       parameter_iso_abu_threshold: 1,
       //
