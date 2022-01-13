@@ -158,7 +158,7 @@ class TestSampleManagerCase(BaseTestClientCase):
         asyncio.run(
             cls.client.emit_service_state()
         )
-        cls.client.assert_requests_ok(cls)   # wait for service_state to be processed
+        cls.client.assert_requests_ok()   # wait for service_state to be processed
 
     def assert_attrs(self, fname, attrs):
         with open(fname) as f:

@@ -1333,8 +1333,8 @@ export default {
           })
         );
         this.room_sid = this.root_namespace.id;
-        this.be.subscribe(this.endpoints, this.room_sid);
-
+        this.be.enter_room(this.room_sid);
+        this.be.declare_endpoints(this.endpoints);
         this.readTargetsFromFile();
       }
     },

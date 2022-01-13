@@ -1171,10 +1171,10 @@ export default {
       }
       if (!_.isEmpty(new_value.title)) {
         if (!_.isEmpty(this.room_experiment))
-          this.be.unsubscribe(["samples"], this.room_experiment);
+          this.be.leave_room(this.room_experiment);
         this.room_experiment =
           this.project_selected.title + "_" + new_value.title;
-        this.be.subscribe(["samples"], this.room_experiment);
+        this.be.enter_room(this.room_experiment);
         this.be.export_one_way_binding_prop(
           "experiment_selected",
           new_value,
@@ -1254,10 +1254,10 @@ export default {
       }
       if (!_.isEmpty(new_value.title)) {
         if (!_.isEmpty(this.room_project)) {
-          this.be.unsubscribe(["experiments"], this.room_project);
+          this.be.leave_room(this.room_project);
         }
         this.room_project = new_value.title;
-        this.be.subscribe(["experiments"], this.room_project);
+        this.be.enter_room(this.room_project);
         // push new_value of project_selected to corresponding room
         this.be.export_one_way_binding_prop(
           "project_selected",
@@ -1364,7 +1364,7 @@ export default {
       if (new_value === true) {
         this.namespace = this.root_namespace;
         // handlers for for external notifications:
-        this.be.subscribe(["dataset_coord_updated"], "dataset_coord_updated");
+        this.be.enter_room("dataset_coord_updated");
         this.namespace.on("dataset_coord_updated", (value) => {
           if (value.value.filename && value.value.filename == this.sample_in_focus.filename)
           this.selectSample(value.value.filename);
@@ -1381,8 +1381,9 @@ export default {
         );
 
         this.room_sid = this.root_namespace.id;
-        this.be.subscribe(this.endpoints, this.room_sid);
-        this.be.subscribe(["projects"], "projects");
+        this.be.enter_room("projects");
+        this.be.declare_endpoints(this.endpoints);
+
       }
     },
   },

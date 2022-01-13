@@ -16,11 +16,6 @@ cache = {}
 class TargetServiceNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to Router """
 
-    endpoints = [
-        'compute_target_ions',
-        'identify_peaks',
-        ]
-
     async def on_compute_target_ions(self, data):
         value = data['value']
         # self.log(data)

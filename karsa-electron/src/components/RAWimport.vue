@@ -382,7 +382,6 @@ export default {
     this.namespace = this.be.connect(
       this.url + "/" + this.data_source_selected.name
     );
-    // this.be.subscribe(null, this.namespace); // TODO: subscribe or not to
   },
   methods: {
     FetchSamples() {
@@ -661,10 +660,7 @@ export default {
         );
         this.acquisition_control_label =
           "Import " + this.data_source_selected.name;
-        this.be.subscribe(
-          this.endpoints,
-          null // room set to null to subscribe to endpoints directly
-        );
+        this.be.declare_endpoints(this.endpoints);
       }
     },
   },
