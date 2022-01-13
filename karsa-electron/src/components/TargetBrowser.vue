@@ -635,7 +635,7 @@ export default {
       //
       // Identification parameters
       parameter_mz_tolerance: 10,
-      parameter_iso_ratio_tolerance: 10,
+      parameter_iso_ratio_tolerance: 100,
       parameter_iso_abu_threshold: 1,
       //
       // Target table
@@ -1217,10 +1217,7 @@ export default {
     isotope_table_checked_rows: function (new_value) {
       console.log(new_value);
     },
-    isotope_table_selected_row: function (new_value, old_value) {
-      if (_.isEqual(new_value, old_value)) {
-        return false;
-      }
+    isotope_table_selected_row: function (new_value) {
       if (new_value != null) {
         let mz = new_value["mz"];
         if (mz) {
