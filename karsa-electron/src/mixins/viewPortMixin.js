@@ -305,7 +305,7 @@ export const viewPortMixin = {
                         _.isUndefined(mz0) && _.isUndefined(mz1) &&
                         _.isUndefined(t0) && _.isUndefined(t1)
                         ) {
-                        self.beep();
+                        // self.beep();
                         self.log("Do we ever end up here?");
                     }
                     let ranges = {'filename': self.filename,
@@ -436,7 +436,7 @@ export const viewPortMixin = {
 
             let cache_item = self.figure_cache_get(zoom_stack_item_id);
             if (!cache_item) {
-                self.beep();
+                // self.beep();
                 self.log('Received figure_data for non-existing zoom stack item!', self.figure_cache);
                 return;
             }
@@ -626,7 +626,7 @@ export const viewPortMixin = {
             }
             if (!mz_range_updated && !t_range_updated) {
                 // No need to zoom, reset to original ranges
-                self.beep();
+                // self.beep();
                 self.update_figure(prev_ranges);
                 return
             }
@@ -701,7 +701,7 @@ export const viewPortMixin = {
             let self = this;
             if ( self.zoom_stack.length <= 1 ) {
                 // self.log("Zoom stack is empty.");
-                self.beep();
+                // self.beep();
                 return
             }
             // reset traces
