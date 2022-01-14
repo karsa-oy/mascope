@@ -50,6 +50,11 @@ class LRUDict(dict):
                 k = self.lru_keys.pop(0)
                 super().__delitem__(k)
 
+    def __delitem__(self, key):
+        with self.lock:
+            self.lru_keys.remove(key)
+            return super().__delitem__(key)
+
 class ExtendableDataArray():
     """Class to collect data incrementally into a xarray.DataArray
     
