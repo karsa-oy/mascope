@@ -1,0 +1,83 @@
+{
+  "name": "karsa-mascope",
+  "author": {
+    "name": "www.karsa.fi",
+    "email": "support@karsa.fi"
+  },
+  "description": "Karsa UI applicaiton",
+  "homepage": "https://www.karsa.fi",
+  "license": "To be added; check the list https://spdx.org/licenses/",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "serve": "vue-cli-service serve",
+    "build": "vue-cli-service build",
+    "lint": "vue-cli-service lint",
+    "electron:build": "vue-cli-service electron:build",
+    "electron:publish": "vue-cli-service electron:build -p always",
+    "electron:serve": "vue-cli-service electron:serve",
+    "postinstall": "electron-builder install-app-deps",
+    "postuninstall": "electron-builder install-app-deps"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/karsa-dev/frontend.git"
+  },
+  "autoDownload": true,
+  "main": "electron.js",
+  "dependencies": {
+    "@mdi/font": "^6.5.95",
+    "@mdi/js": "^6.5.95",
+    "alasql": "^1.7.3",
+    "buefy": "^0.9.4",
+    "cleave.js": "^1.6.0",
+    "electron": "^6.1.12",
+    "electron-updater": "^4.6.1",
+    "envfile": "^6.14.0",
+    "jquery-csv": "^1.0.21",
+    "json2csv": "^5.0.6",
+    "lodash.clonedeep": "^4.5.0",
+    "nanoid": "^3.2.0",
+    "plotly.js-dist": "^1.51.2",
+    "socket.io-client": "^3.0.5",
+    "underscore": "^1.11.0",
+    "vue": "^2.6.10",
+    "vue-material-design-icons": "^4.4.0",
+    "vue-multiselect": "^2.1.6",
+    "vue-plotly": "^1.1.0",
+    "vue-router": "^3.1.5",
+    "vuex": "^2.5.0"
+  },
+  "devDependencies": {
+    "@types/jquery": "^3.5.8",
+    "@vue/cli-plugin-babel": "^4.1.0",
+    "@vue/cli-plugin-eslint": "^4.1.0",
+    "@vue/cli-service": "^4.1.0",
+    "babel-eslint": "^10.0.3",
+    "eslint": "^5.16.0",
+    "eslint-plugin-vue": "^5.0.0",
+    "vue-cli-plugin-electron-builder": "^1.4.3",
+    "vue-template-compiler": "^2.6.10"
+  },
+  "eslintConfig": {
+    "root": true,
+    "env": {
+      "node": true
+    },
+    "extends": [
+      "plugin:vue/essential",
+      "eslint:recommended"
+    ],
+    "rules": {
+      "no-console": 0,
+      "no-debugger": 0
+    },
+    "parserOptions": {
+      "parser": "babel-eslint"
+    }
+  },
+  "browserslist": [
+    "> 1%",
+    "last 2 versions"
+  ]
+}

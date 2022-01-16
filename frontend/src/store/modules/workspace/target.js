@@ -1,0 +1,285 @@
+import table from "$lib/table";
+import selection from "$lib/selection";
+
+export default {
+    namespaced: true,
+    state: () => ({
+        // meta
+        levels: ["compound", "ion", "isotope"],
+        cols: [
+            { field: "id", label: "ID" },
+            { field: "name", label: "Name" },
+            { field: "formula", label: "Formula" },
+            { field: "ionMech", label: "Ion. Mech." },
+            { field: "mz", label: "m/z" },
+            { field: "matchScore", label: "Match score" },
+            { field: "checked", label: "Checked" }
+        ],
+        // data
+        compoundRows: [],
+        ionRows: [],
+        isotopeRows: [],
+        // parameters
+        paramMinIsoAbu: 1,
+        // API
+        $compoundMatchScoreRequest: {},
+        $compoundMatchScoreResponse: {},
+        $ionCalculationRequest: {},
+        $ionCalculationResponse: {},
+        // client
+        ionMechs: [],
+        defaultIonMechs: ["-H-", "+Br-"],
+        targetsToImport: {},
+
+    }),
+    mutations: {
+        addRows(state, { level, rows }) {
+            let levelRows = level + 'Rows';
+            let _selected = 'none';
+            for (let row of rows) {
+                let id = table.genId();
+                state[levelRows].push({ id, _selected, ...row });
+            }
+        },
+        removeRows(state, { level, ids }) {
+            let levelRows = level + 'Rows';
+            for (let id of ids) {
+                let row = table.get(state[levelRows], { id });
+                state[levelRows].splice(row);
+            }
+        },
+        // ion calculation
+        requestIonCalculation(state) {
+            state.$ionCalculationRequest = {
+                requestId: table.genId(),
+                minIsoAbu: state.paramMinIsoAbu,
+                ionizationMechanisms: state.ionMechs,
+                compounds: state.compoundRows
+            };
+        },
+        handleIonCalculationResponse(state) {
+            let response = state.$ionCalculationResponse;
+            if (response) {
+                let _selected = 'none';
+                state.ionRows = response.ions
+                    .map(ion => ({ ...ion, _selected }));
+                state.isotopeRows = response.isotopes
+                    .map(isotope => ({ ...isotope, _selected }));
+                response = null;
+            }
+        },
+        // selection
+        setSelection(state, { level, ids, selected }) {
+            let levelRows = level + 'Rows';
+            for (let id of ids) {
+                table.update(state[levelRows],
+                    { id, _selected: selected },
+                    { partial: true }
+                );
+            }
+        },
+    },
+    actions: {
+        add({ commit }, { compounds }) {
+            commit('addRows', { level: 'compound', rows: compounds });
+            commit('requestIonCalculation');
+        },
+        // selection
+        compoundToggleSelection({ state, commit }, compound) {
+            let nextSelection = selection.propegateDown(compound);
+            // toggle compound selection
+            commit('setSelection', {
+                level: 'compound',
+                ids: [compound.id],
+                selected: nextSelection
+            });
+            // toggle child ion selection
+            let childIons = table.select(state.ionRows, { compoundId: compound.id });
+            let nextChildSelection = nextSelection;
+            commit('setSelection', {
+                level: 'ion',
+                ids: childIons.map(row => row.id),
+                selected: nextChildSelection,
+            });
+            // toggle child isotope selection
+            let childIsotopes = childIons.map(ionRow => {
+                return table.select(state.isotopeRows, { ionId: ionRow.id });
+            }).flat();
+            commit('setSelection', {
+                level: 'isotope',
+                ids: childIsotopes.map(row => row.id),
+                selected: nextChildSelection
+            })
+        },
+        ionToggleSelection({ state, commit }, ion) {
+            let nextSelection = selection.propegateDown(ion);
+            // toggle ion selection
+            commit('setSelection', {
+                level: 'ion',
+                ids: [ion.id],
+                selected: nextSelection,
+            });
+            // toggle child isotope selection
+            let childIsotopes = table.select(state.isotopeRows, { ionId: ion.id });
+            let nextChildSelection = nextSelection;
+            commit('setSelection', {
+                level: 'isotope',
+                ids: childIsotopes.map(row => row.id),
+                selected: nextChildSelection,
+            });
+            // toggle parent compound selection
+            let syblingIonRows = table.select(state.ionRows,
+                { compoundId: ion.compoundId }
+            );
+            let nextParentSelection = selection.propegateUp(syblingIonRows);
+            commit('setSelection', {
+                level: 'compound',
+                ids: [ion.compoundId],
+                selected: nextParentSelection,
+            })
+        },
+        isotopeToggleSelection({ state, commit }, isotope) {
+            let nextSelection = selection.propegateDown(isotope);
+            // toggle isotope selection
+            commit('setSelection', {
+                level: 'isotope',
+                ids: [isotope.id],
+                selected: nextSelection
+            })
+            // toggle parent ion selection
+            let syblingIsotopeRows = table.select(state.isotopeRows,
+                { ionId: isotope.ionId }
+            );
+            let nextParentIonSelection = selection.propegateUp(syblingIsotopeRows);
+            commit('setSelection', {
+                level: 'ion',
+                ids: [isotope.ionId],
+                selected: nextParentIonSelection,
+            });
+            // toggle parent compound selection
+            let ionRow = table.get(state.ionRows,
+                { id: isotope.ionId }
+            );
+            let syblingIonRows = table.select(state.ionRows,
+                { compoundId: ionRow.compoundId }
+            );
+            let nextParentCompoundSelection = selection.propegateUp(syblingIonRows);
+            commit('setSelection', {
+                level: 'compound',
+                ids: [ionRow.compoundId],
+                selected: nextParentCompoundSelection
+            })
+        },
+    },
+    getters: {
+        // selected
+        selected: (state, getters) =>
+            ({ level }) => {
+                return getters[level + 'Selected'];
+            },
+        compoundsSelected: function (state) {
+            let selected = (row) => ['all', 'some'].includes(row._selected)
+            let compoundsSelected = state.compoundRows.filter(selected);
+            return compoundsSelected.length > 0 ? compoundsSelected : state.compoundRows;
+        },
+        ionsSelected: function (state) {
+            let selected = (row) => ['all', 'some'].includes(row._selected)
+            let ionsSelected = state.ionRows.filter(selected);
+            return ionsSelected.length > 0 ? ionsSelected : state.ionRows;
+        },
+        isotopesSelected: function (state) {
+            let selected = (row) => ['all', 'some'].includes(row._selected)
+            let isotopesSelected = state.isotopeRows.filter(selected);
+            return isotopesSelected.length > 0 ? isotopesSelected : state.isotopeRows;
+        },
+        // stats
+        stats: (state, getters) =>
+            ({ level = 'compound', selected = true, extraGroupings = '' }) => {
+                return getters[level + 'Stats']({ selected, extraGroupings });
+            },
+        compoundStats: (state, getters, rootState, rootGetters) =>
+            ({ selected = true, extraGroupings = '' }) => {
+                let matchesExist = rootState.workspace.match.compoundRows.length > 0;
+                if (matchesExist) {
+                    let matches = rootGetters['workspace/match/ratings']({
+                        level: 'compound', selected
+                    });
+                    return table.query(
+                        `
+                            select
+                                m.targetCompoundId as id
+                                ,m.rating
+                                ,first(m.targetName) as name
+                                ,first(m.targetFormula) as formula
+                                ,first(m.targetSelected) as _selected
+                                ,coalesce(max(m.matchScore),0) as matchScore
+                                ,max(m.samplePeakHeight) as peakHeight
+                                ,count(*) as matchCount
+                                ,count(distinct m.sampleItemId) as sampleItemCount
+                            from matches m
+                            group by m.targetCompoundId ${extraGroupings}
+                        `,
+                        { matches }
+                    );
+                } else {
+                    return state.compoundRows;
+                }
+            },
+        ionStats: (state, getters, rootState, rootGetters) =>
+            ({ selected = true, extraGroupings = '' }) => {
+                let matchesExist = rootState.workspace.match.ionRows.length > 0;
+                if (matchesExist) {
+                    let matches = rootGetters['workspace/match/ratings']({
+                        level: 'ion', selected
+                    });
+                    return table.query(
+                        `
+                            select
+                                m.targetIonId as id
+                                ,first(m.targetCompoundId) as compoundId
+                                ,first(m.targetIonMech) as ionMech
+                                ,first(m.targetFormula) as formula
+                                ,first(m.targetSelected) as _selected
+                                ,coalesce(max(m.matchScore),0) as matchScore
+                                ,max(m.samplePeakHeight) as peakHeight
+                                ,count(*) as matchCount
+                                ,count(distinct m.sampleItemId) as sampleItemCount
+                            from matches m
+                            group by m.targetIonId ${extraGroupings}
+                        `,
+                        { matches }
+                    );
+                } else {
+                    return state.ionRows;
+                }
+            },
+        isotopeStats: (state, getters, rootState, rootGetters) =>
+            ({ selected = true, extraGroupings = '' }) => {
+                let matchesExist = rootState.workspace.match.isotopeRows.length > 0;
+                if (matchesExist) {
+                    let matches = rootGetters['workspace/match/ratings']({
+                        level: 'isotope', selected
+                    });
+                    return table.query(
+                        `
+                            select
+                                m.targetIsotopeId as id
+                                ,first(m.targetIonId) as ionId
+                                ,first(m.targetRelAbu) as relAbu
+                                ,first(m.targetMz) as mz
+                                ,first(m.targetSelected) as _selected
+                                ,coalesce(max(m.matchScore),0) as matchScore
+                                ,max(m.samplePeakHeight) as peakHeight
+                                ,count(*) as matchCount
+                                ,count(distinct m.sampleItemId) as sampleItemCount
+                            from matches m
+                            group by m.targetIsotopeId ${extraGroupings}
+                        `,
+                        { matches }
+                    );
+                } else {
+                    return state.isotopeRows;
+                }
+            },
+    }
+}

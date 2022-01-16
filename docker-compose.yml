@@ -2,21 +2,21 @@ version: "3.9"
 services:
   backend:
     build:
-      context: ./karsa-backend
+      context: ./backend
     volumes:
-      - ./karsa-backend/src:/karse-backend/src
-      - ./karsa-backend/Data/Projects:/karsa-backend/Projects
-      - ./karsa-backend/Data/TofDaq:/karsa-backend/TofDaq
+      - ./backend/data/workspaces:/backend/workspaces
+      - ./backend/data/TofDaq:/backend/TofDaq
     stdin_open: true  
     tty: true
     network_mode: "host"
-  electron:
+    environment:
+      - MASCOPE_ENV=docker
+  frontend:
     build:
-      context: ./karsa-electron
+      context: ./frontend
     volumes:
       - /tmp/.X11-unix:/temp/.X11-unix
-      - ./karsa-electron/src:/karsa-electron/src
-      - ./karsa-electron/configs:/karsa-electron/configs
+      - ./frontend/src:/frontend/src
     environment:
       - DISPLAY
     network_mode: "host"
