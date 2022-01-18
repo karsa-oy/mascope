@@ -608,15 +608,39 @@ export default {
       if (!new_value.text) {
         return;
       }
-      this.is_raw_import_modal_active = false;
+      const requiredFields = ['title', 'project', 'experiment', 'filename'];
+
+      let data = await new_value.text();
+      data = csv.toObjects(data);
+      // Validate
+      for (let d of data) {
+        for (let field of requiredFields) {
+          if (Object.keys(d).indexOf(field) == -1 ||
+              _.isEmpty(d[field])
+              ){
+                this.$buefy.dialog.alert({
+                    title: "Parsing error",
+                    message: "Please check csv format. It must contain fields: " + requiredFields,
+                    type: "is-danger",
+                    hasIcon: true,
+                    icon: "times-circle",
+                    iconPack: "fa",
+                    ariaRole: "alertdialog",
+                    ariaModal: true,
+                  });
+              return false;
+          }
+        }
+      }
+
+      this.raw_import = data;
+
       this.import_raw_table_checked_rows = [];
       this.import_raw_table_rows = [];
       this.import_raw_table_cols = [];
       this.import_start_time = null;
       this.import_end_time = null;
-      let data = await new_value.text();
-      data = csv.toObjects(data);
-      this.raw_import = data;
+      this.is_raw_import_modal_active = false;
     },
     "namespace.connected": function (new_value) {
       if (new_value === true) {
