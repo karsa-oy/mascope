@@ -23,42 +23,6 @@ class BaseServerNamespace(AsyncNamespace):
         for r in self.rooms(sid):
             await self.emit('room_mate_gone', {}, room=r)
 
-
-    # async def on_subscribe(self, sid, data):
-    #     """
-    #     Initialize client subscriptions. Subscriptions contain notif names
-    #     the client subscribes for and a room to subscribe into.
-    #     data: dict(app_name=client_name, endpoints, room)
-    #     """
-    #     app_name = data['app_name']
-    #     endpoints = data['endpoints']
-    #     room = data.get('room')
-    #     if room:
-    #         self.log(f"{app_name}:{sid} joins room {room}")
-    #         self.enter_room(sid, room)
-    #     else:
-    #         self.log(f"{app_name}:{sid} joins rooms {endpoints}")
-    #         for e in endpoints:
-    #             self.enter_room(sid, e)
-    #     self.log(f"{app_name}:{sid} stays in rooms: {self.rooms(sid)}")
-    #     await self.emit('service_state', {})
-
-    # async def on_unsubscribe(self, sid, data):
-    #     app_name = data['app_name']
-    #     endpoints = data['endpoints']
-    #     room = data.get('room')
-    #     if room:
-    #         self.log(f"{app_name}:{sid} leaves room {room}")
-    #         self.leave_room(sid, room)
-    #         await self.emit('service_state', {}, room=room)
-    #     else:
-    #         self.log(f"{app_name}:{sid} leaves rooms {endpoints}")
-    #         for e in endpoints:
-    #             self.leave_room(sid, e)
-    #     self.log(f"{app_name}:{sid} stays in rooms: {self.rooms(sid)}")
-
-
-
     async def on_declare_endpoints(self, sid, data):
         """
         Declare API from a client service by creating a room for each API function.
@@ -134,6 +98,3 @@ class BaseServerNamespace(AsyncNamespace):
         sent_to = len(src_sids) * '>'
         self.log(f"{endpoint} {sent_to} {namespace}:{target_room}")
         await self.emit(endpoint, data, room=target_room, namespace=namespace, callback=cb and srv_callback)
-
-
-
