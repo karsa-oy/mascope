@@ -85,9 +85,12 @@ class BaseTestClientPublicNamespace(BaseClientNamespace):
         self.parent.projects = {d['title']:d for d in data['value']}
         self.parent.projects_root = os.path.dirname(data['value'][0]['path'])
         self.log(self.parent.projects_root, list(self.parent.projects.keys()))
-        request_id = data['request_id']
-        self.parent.kill_exec_timer(request_id)
-        self.parent.mark_request_done(request_id)
+        # the TestClient normally does not send 'projects' notification (in order
+        # to add request_id); it's rather generated in return to service_state notif.
+        request_id = data.get('request_id')
+        if request_id:
+            self.parent.kill_exec_timer(request_id)
+            self.parent.mark_request_done(request_id)
 
     async def on_project_selected(self, data):
         self.log(data['value']['title'])
