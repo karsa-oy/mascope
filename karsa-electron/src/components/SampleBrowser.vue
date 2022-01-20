@@ -662,6 +662,7 @@
                         :field="col.field"
                         :label="col.label"
                         :visible="col.visible || false"
+                        :sortable="true"
                         v-slot="props"
                       >
                         <a @contextmenu.prevent="rightClickSample(props.row.filename)">
