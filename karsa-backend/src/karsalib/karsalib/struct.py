@@ -5,6 +5,7 @@ import xarray
 import sparse
 import time
 import inspect
+import fnmatch
 from multiprocessing import Event, Lock, cpu_count
 from queue import Empty, Full
 from scipy.sparse import coo_matrix
