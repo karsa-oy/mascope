@@ -137,11 +137,33 @@
             </div>
             <!-- End of targets sidebar -->
           </div>
-          <!-- Right column -->
-          <div class="column" style="padding-right: 2rem; max-width: 50vw">
-            <SampleView></SampleView>
+          <div>
+            <!-- Sample view sidebar -->
+            <div class="sidebar-page">
+              <section class="sidebar-layout">
+                <b-sidebar
+                  position="static"
+                  :expand-on-hover="true"
+                  :fullheight="true"
+                  :reduce="!sample_view_pinned"
+                  open
+                >
+                  <div style="overflow:hidden;">
+                    <b-button
+                      icon-left="magnify"
+                      :type="sample_view_pinned ? 'is-primary' : 'is-dark'"
+                      size="is-medium"
+                      @click="sample_view_pinned = !sample_view_pinned"
+                    >
+                      View
+                    </b-button>
+                    <SampleView></SampleView>
+                  </div>
+                </b-sidebar>
+              </section>
+            </div>
+            <!-- End of sample view sidebar -->
           </div>
-          <!-- End of Right column -->
         </div>
       </b-tab-item>
       <!-- End of tabs -->
@@ -190,6 +212,7 @@ export default {
       room_data_sources: "room_data_sources",
       service_error: "",
       sample_browser_pinned: true,
+      sample_view_pinned: true,
       target_browser_pinned: true,
     };
   },
@@ -326,7 +349,8 @@ export default {
         this.namespace.on("service_error", (value) =>
           this.be.import_two_way_binding_prop("service_error", value.value)
         );
-        this.be.subscribe(this.endpoints, this.room_data_sources);
+        this.be.enter_room(this.room_data_sources);
+        this.be.declare_endpoints(this.endpoints);
       }
     },
   },
@@ -386,11 +410,11 @@ body {
 .b-sidebar .sidebar-content {
   background-color: inherit;
   padding-left: 2px;
-  width: 25vw;
+  width: 33vw;
 }
 .b-sidebar .sidebar-content.is-mini.is-mini-expand:hover:not(.is-fullwidth) {
   height: auto;
-  width: 25vw;
+  width: 33vw;
 }
 .b-sidebar .sidebar-content.is-mini {
   height: 50px;

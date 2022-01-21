@@ -532,9 +532,8 @@ def process_visualization_request(filename,
 
     Returns
     -------
-    float or bool
-        Returns the time point until which the request was served,
-        or False if no (enough) data was available.
+    float
+        Returns the time point until which the request was served.
     """
 
     def feed_ready_images():
@@ -721,13 +720,6 @@ def get_namespace(filename):
 
 class DataVizServiceNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to Router """
-
-    endpoints = [
-            'dataset_coord_updated',
-            'dataset_updated',
-            'stop_visualize_range',
-            'visualize_range',
-            ]
 
     # ========== UI requests ==========
     async def on_visualize_range(self, data):
@@ -1008,9 +1000,9 @@ class DataVizServiceClient(BaseServiceClient):
                                                 [ti],
                                                 'time'
                                                 )
-                        viz_cache_process_requests(filename=filename,
-                                                persist_in_cache=False
-                                                )
+                        # viz_cache_process_requests(filename=filename,
+                        #                         persist_in_cache=False
+                        #                         )
                     except KeyError as e:
                         self.log("Key error:", str(e))
             # Emit figure data

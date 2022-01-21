@@ -43,31 +43,10 @@ _ProactorBasePipeTransport.__del__ = bug_workaround(_ProactorBasePipeTransport._
 
 
 class BaseTestClientPublicNamespace(BaseClientNamespace):
-    room_data_sources = 'room_data_sources'
-    endpoints = [
-        'projects',
-        'project_selected',
-        'experiments',
-        'experiment_selected',
-        'samples',
-        'save_experiment',
-        'delete_experiment',
-        'delete_project',
-        ]
-    endpoints_room_sid = [
-        # 'loaded_coordinates',   # response to coordinate_request
-        'figure_data',
-        ]
-    endpoints_room_instrument = []
-
-    async def subscribe(self):
-        if self.endpoints:
-            await super().subscribe(self.endpoints)
-        if self.endpoints_room_sid:
-            await super().subscribe(self.endpoints_room_sid, self.room_sid)
-        if self.endpoints_room_instrument:
-            await super().subscribe(self.endpoints_room_instrument, self.room_instrument)
-
+    async def on_connect(self):
+        await self.enter_room(self.room_instrument)
+        await self.enter_room('room_data_sources')
+        await super().on_connect()
 
     # helpers
 
@@ -106,9 +85,12 @@ class BaseTestClientPublicNamespace(BaseClientNamespace):
         self.parent.projects = {d['title']:d for d in data['value']}
         self.parent.projects_root = os.path.dirname(data['value'][0]['path'])
         self.log(self.parent.projects_root, list(self.parent.projects.keys()))
-        request_id = data['request_id']
-        self.parent.kill_exec_timer(request_id)
-        self.parent.mark_request_done(request_id)
+        # the TestClient normally does not send 'projects' notification (in order
+        # to add request_id); it's rather generated in return to service_state notif.
+        request_id = data.get('request_id')
+        if request_id:
+            self.parent.kill_exec_timer(request_id)
+            self.parent.mark_request_done(request_id)
 
     async def on_project_selected(self, data):
         self.log(data['value']['title'])
@@ -163,14 +145,6 @@ class BaseTestClientPublicNamespace(BaseClientNamespace):
 
 
 class BaseTestClientPrivateNamespace(BaseClientNamespace):
-    endpoints = [
-        'raw_samples',
-        'acquisition_started',
-        'acquisition_finished',
-        'raw_import_status_data',
-        ]
-
-    # notification handlers
 
     async def on_raw_samples(self, data):
         # on_import_raw_table_datetime_range emits raw_samples

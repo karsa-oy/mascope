@@ -16,11 +16,6 @@ cache = {}
 class TargetServiceNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to Router """
 
-    endpoints = [
-        'compute_target_ions',
-        'identify_peaks',
-        ]
-
     async def on_compute_target_ions(self, data):
         value = data['value']
         # self.log(data)
@@ -28,6 +23,7 @@ class TargetServiceNamespace(BaseClientNamespace):
         
         compounds = value['compounds']
         ionization_mechanisms = value['ionization_mechanism'].split(',')
+        min_iso_abu = value.get('min_iso_abu', 1) / 100.0 # frac
 
         target_ions = []
         for compound_id, compound in enumerate(compounds):
@@ -57,6 +53,8 @@ class TargetServiceNamespace(BaseClientNamespace):
         target_df = pd.DataFrame(target_ion_data,
                                  columns=['target id', 'ion id', 'ion composition', 'mz', 'rel abu']
                                  )
+        # Filter by minimum isotope abundance
+        target_df = target_df[(target_df['rel abu'] >= min_iso_abu)]          
 
         await self.emit_client_notification('target_ions',
                                             list( target_df.to_dict(orient='index').values() ),
@@ -79,7 +77,7 @@ class TargetServiceNamespace(BaseClientNamespace):
         min_iso_abu = value.get('parameters', {}).get('min_iso_abu', 1) / 100.0 # frac
 
         # Filter by minimum isotope abundance
-        target_df = target_df[(target_df['rel abu'] >= min_iso_abu)]
+        # target_df = target_df[(target_df['rel abu'] >= min_iso_abu)]
 
         # Find matching targets for found peaks
         match_df = match_peaks_to_targets(peak_mzs, peak_heis, target_df, mz_tolerance)
@@ -97,7 +95,7 @@ class TargetServiceNamespace(BaseClientNamespace):
 
         identified_ion_peaks = match_df
         identified_ion_peaks = identified_ion_peaks.dropna(subset=['peak mz'])
-        self.log(identified_ion_peaks)
+        # self.log(identified_ion_peaks)
 
         await self.emit_client_notification('identified_ions',
                                             identified_ion_peaks.to_dict(orient='index'),

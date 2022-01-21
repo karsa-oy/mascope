@@ -6,6 +6,7 @@ import time
 
 from queue import Empty
 from karsalib.struct import CacheQ, FSWatcher
+from karsalib.logging import parent_func_name
 from socketio import AsyncClientNamespace, AsyncClient
 from socketio.exceptions import BadNamespaceError
 from multiprocessing import Event, Lock
@@ -76,46 +77,52 @@ class BaseClientNamespace(AsyncClientNamespace):
     """ python-socket.io client namespace for connecting to Router """
     # ref to service client
     parent = None
-    # endpoints - list of notifications the client wants to receive from socket server
-    endpoints = []
-    # service_state - state vars to report to (re)starting subscribers
+    # service_state - state vars to report to (re)starting clients
     service_state = {}
     app_name = __file__
 
-    def log(self, *arg, **kwarg):
+    def log(self, *arg):
         if not NO_LOGGING_DEFAULT:
-            print(f"[{self.__class__.__name__}.{inspect.stack()[1].function}]", *arg, **kwarg)
+            print(f"[{self.__class__.__name__}.{parent_func_name()}]", *arg)
 
-    async def subscribe(self, endpoints=None, room=None):
+    async def declare_endpoints(self):
+        # endpoints - API providing Router-managed client functionality
+        not_endpoints = ['on_connect', 'on_disconnect', 'on_client_notification_callback', ]
+        endpoints = [e[3:] for e in dir(self) if e.startswith('on_') and e not in not_endpoints]
         data = dict(
             app_name = self.app_name,
-            endpoints = endpoints or self.endpoints,
-            room = room,
+            endpoints = endpoints,
         )
-        await self.emit('subscribe', data)
-        await self.on_service_state(dict(value={},
-                                         room=room,
-                                         no_data_logging=NO_DATA_LOGGING_DEFAULT, ))
+        await self.emit('declare_endpoints', data)
+        await self.on_service_state({})
+        return endpoints
 
-    async def unsubscribe(self, endpoints=None, room=None):
+    async def enter_room(self, room):
         data = dict(
             app_name = self.app_name,
-            endpoints = endpoints or self.endpoints,
             room = room,
         )
-        await self.emit('unsubscribe', data)
+        await self.emit('enter_room', data)
+
+    async def leave_room(self, room):
+        data = dict(
+            app_name = self.app_name,
+            room = room,
+        )
+        await self.emit('leave_room', data)
 
     async def on_connect(self):
         self.app_name = self.__class__.__name__
         self.log(f"connected to {self.namespace}")
-        await self.subscribe()
         # (re)register all private namespaces after root ns is connected
         if self.namespace == '/':
-            nss = list(self.client.namespace_handlers.keys())
+            nss = list(self.parent.sio.namespace_handlers.keys())
             nss.remove(self.namespace)
             for ns in nss:
                 await self.emit('register_namespace', ns)
                 self.log(f"namespace {ns} registered")
+        await self.enter_room(self.room_sid)
+        await self.declare_endpoints()
 
     def on_disconnect(self):
         self.log(f"disconnected from namespace {self.namespace}")
@@ -123,15 +130,18 @@ class BaseClientNamespace(AsyncClientNamespace):
     async def on_service_state(self, data):
         no_logging = data.get('no_logging', NO_LOGGING_DEFAULT)
         no_data_logging = data.get('no_data_logging', NO_DATA_LOGGING_DEFAULT)
-        for k, v in self.service_state.items():
+        for n, d in self.service_state.items():
+            name = n
+            value = d['value']
+            room = d.get('room')
             if no_logging:
                 pass
             elif no_data_logging:
-                self.log(f"{k}: ...")
+                self.log(f"{name}: ... to {room}")
             else:
-                self.log(f"{k}: {v}")
+                self.log(f"{name}: {value} to {room}")
             await self.emit('client_notification',
-                            {**data, 'name': k, 'value': v})
+                            {**data, 'name': name, 'value': value, 'room': room})
 
     def on_client_notification_callback(self, data):
         endpoint = data['endpoint']
@@ -155,10 +165,10 @@ class BaseClientNamespace(AsyncClientNamespace):
 
     async def emit_client_notification(self, name, value, **kwarg):
         """
-        client_notification is sent to subscribers via Router,
-        name:  a property name;
-        value: property value;
-        other key arguments are optional and forwarded to subscriber as such,
+        client_notification is sent to API provider via Router,
+        name:  a property/API name;
+        value: property/API value/argument;
+        other key arguments are optional and forwarded along as such,
         e.g. no_logging/no_data_logging=True - skip logging/data_logging; default: False,
         """
         no_logging = kwarg.get('no_logging', NO_LOGGING_DEFAULT)
@@ -166,14 +176,14 @@ class BaseClientNamespace(AsyncClientNamespace):
         if no_logging:
             pass
         elif no_data_logging:
-            self.log(f"{name}: ...")
+            self.log(f"{name}: ... > {kwarg.get('room', name)}")
         else:
             self.log(f"{name}: {value} > {kwarg.get('room', name)}")
         await self.emit('client_notification',
                         {'name': name, 'value': value, **kwarg},
                         )
         if name in self.service_state:
-            self.service_state[name] = value
+            self.service_state[name] = {'value': value, 'room': kwarg.get('room')}
 
     @property
     def room_sid(self):
@@ -195,10 +205,11 @@ class BaseServiceClient:
         self.log('Register handler for namespace', ns_name)
         self.sio.register_namespace( ns_class(ns_name) )
         self.ns_handler = self.sio.namespace_handlers.get(ns_name)
-        self.ns_handler.parent = self
         # root ns handler is needed to communicate with router at re-connect
         if '/' not in self.sio.namespace_handlers:
             self.sio.register_namespace( BaseClientNamespace('/') )
+        for ns_handler in self.sio.namespace_handlers.values():
+            ns_handler.parent = self
         # for shutdown sync with threads
         self.shutdown_event = Event()
 
@@ -268,6 +279,8 @@ class BridgeServiceClient(BaseServiceClient):
         self.log('Register handler for namespace', ns_name)
         self.sio.register_namespace( ns_class(ns_name) )
         self.private_ns = self.sio.namespace_handlers.get(ns_name)
+        # set room_instrument in public namespace by private ns_name
+        self.public_ns.room_instrument = ns_name
         # cross-references
         self.public_ns.parent = self
         self.private_ns.parent = self
@@ -291,7 +304,6 @@ class TOFStreamerClient(BridgeServiceClient):
         self.instrument_data = {'name': priv_ns_name,
                                 'type': streamer_type,
                                }
-        self.public_ns.room_instrument = priv_ns_name
         self.acknowledge_acquisition = True
         self.requests = CacheQ('client_room')
         self.request_in_progress = dict()
@@ -354,7 +366,7 @@ class TOFStreamerClient(BridgeServiceClient):
         await self.emit_public_notification(
                                     'instrument_data',
                                     self.instrument_data,
-                                    room=self.public_ns.room_data_sources,
+                                    room='room_data_sources',
                                     no_data_logging=False
                                     )
 
@@ -575,7 +587,6 @@ class BaseStreamerClient(BridgeServiceClient):
         self.instrument_data = {'name': priv_ns_name,
                                 'type': streamer_type,
                                }
-        self.public_ns.room_instrument = priv_ns_name
         self.requests = CacheQ('client_room')
         self.in_progress = dict()
         self.responses = CacheQ('client_room/filename')
@@ -658,7 +669,7 @@ class BaseStreamerClient(BridgeServiceClient):
         await self.emit_public_notification(
                                     'instrument_data',
                                     self.instrument_data,
-                                    room=self.public_ns.room_data_sources,
+                                    room='room_data_sources',
                                     no_data_logging=False
                                     )
 

@@ -328,10 +328,9 @@ export default {
         this.room_sid
       );
     },
-    target_to_display: function (new_value, old_value) {
+    target_to_display: function (new_value) {
       if (
         !new_value ||
-        _.isEqual(new_value, old_value) ||
         _.isEmpty(this.filename)
       ) {
         return false;

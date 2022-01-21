@@ -203,6 +203,8 @@
       <b-table
         id="targets-datatable"
         ref="target_table"
+        height="500px"
+        narrowed
         :data="target_table_all_rows"
         :key="target_table_key"
         :sticky-header="true"
@@ -218,6 +220,9 @@
         default-sort="['2', 'desc']"
         default-sort-direction="desc"
       >
+        <b-table-column field="id" label="ID" sortable searchable>
+          <template v-slot="props"> {{ props.row['id'] }} </template>
+        </b-table-column>
         <b-table-column field="0" label="Name" sortable searchable>
           <template v-slot="props"> {{ props.row["0"] }} </template>
         </b-table-column>
@@ -279,6 +284,17 @@
           </tr>
         </template>
       </b-table>
+      <div style="text-align: right">
+        <div style="color: white">
+          # targets: {{ target_table_all_rows.length }}
+        </div>
+        <div style="color: white">
+          # matches: {{
+            Object.entries(target_match_scores).filter(([key, value]) => 
+                            value.total >= 90).length
+            }}
+        </div>
+      </div>
       <!-- End of target table -->
       <!-- Isotope table -->
       <!-- Buttons above table -->
@@ -420,6 +436,7 @@
         id="isotope-datatable"
         ref="isotope_table"
         style="margin-top: 1em"
+        narrowed
         :columns="isotope_table_cols"
         :data="isotope_table_rows"
         :key="isotope_table_key"
@@ -634,8 +651,8 @@ export default {
       mz_calib_stats_table_rows: [],
       //
       // Identification parameters
-      parameter_mz_tolerance: 10,
-      parameter_iso_ratio_tolerance: 10,
+      parameter_mz_tolerance: 20,
+      parameter_iso_ratio_tolerance: 100,
       parameter_iso_abu_threshold: 1,
       //
       // Target table
@@ -883,6 +900,7 @@ export default {
       this.compute_target_ions = {
         ionization_mechanism: this.ionization_mechanism,
         compounds: compounds,
+        min_iso_abu: this.parameter_iso_abu_threshold
       };
     },
     selectIon(target_id, ion_id) {
@@ -1154,7 +1172,7 @@ export default {
       // sum up isotope abundance by ion
       for (let isotope_row of this.isotope_table_checked_rows) {
         let target_id = isotope_row["target id"];
-        let ion_id = isotope_row["ion id"];
+        let ion_id = isotope_row["ion id"];''
         // add isotopes to match_score count
         let abundance = isotope_row["rel abu"];
         match_score[target_id][ion_id] += abundance * 100;
@@ -1203,7 +1221,7 @@ export default {
       this.drawMzCalibStatsFigure();
     },
     parameter_iso_abu_threshold: function () {
-      this.requestPeakIdentification();
+      this.requestTargetIons();
     },
     parameter_iso_ratio_tolerance: function () {
       this.requestPeakIdentification();
@@ -1217,10 +1235,7 @@ export default {
     isotope_table_checked_rows: function (new_value) {
       console.log(new_value);
     },
-    isotope_table_selected_row: function (new_value, old_value) {
-      if (_.isEqual(new_value, old_value)) {
-        return false;
-      }
+    isotope_table_selected_row: function (new_value) {
       if (new_value != null) {
         let mz = new_value["mz"];
         if (mz) {
@@ -1284,6 +1299,10 @@ export default {
       if (_.isEqual(new_data, old_data)) {
         return false;
       }
+      // Add row number
+      for (let rowi in new_data.rows) {
+        new_data.rows[rowi].id = rowi;
+      }
       this.target_table_cols = new_data.cols;
       this.target_table_rows = new_data.rows;
       this.writeTargetsToFile();
@@ -1335,8 +1354,8 @@ export default {
           })
         );
         this.room_sid = this.root_namespace.id;
-        this.be.subscribe(this.endpoints, this.room_sid);
-
+        this.be.enter_room(this.room_sid);
+        this.be.declare_endpoints(this.endpoints);
         this.readTargetsFromFile();
       }
     },

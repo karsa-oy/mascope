@@ -346,8 +346,18 @@ export default {
       raw_import: [],
       stop_raw_import: [],
       // variables for import modal
-      import_start_time: null,
-      import_end_time: null,
+      import_start_time: new Date(new Date().getFullYear(),
+                                  new Date().getMonth(),
+                                  new Date().getDate(),
+                                  0,
+                                  0
+                                  ),
+      import_end_time: new Date(new Date().getFullYear(),
+                                new Date().getMonth(),
+                                new Date().getDate(),
+                                23,
+                                59
+                                ),
       import_min_datetime: null,
       import_max_datetime: new Date(),
       import_raw_table_rows: [],
@@ -372,7 +382,6 @@ export default {
     this.namespace = this.be.connect(
       this.url + "/" + this.data_source_selected.name
     );
-    // this.be.subscribe(null, this.namespace); // TODO: subscribe or not to
   },
   methods: {
     FetchSamples() {
@@ -398,6 +407,7 @@ export default {
       let fetch_request = {
         dt0: dt0.toJSON(),
         dt1: dt1.toJSON(),
+        uid: Math.random(),
       };
       this.import_raw_table_datetime_range = fetch_request;
     },
@@ -416,6 +426,7 @@ export default {
       } else {
         // pop up FetchSamples dialog
         this.is_raw_import_modal_active = true;
+        this.FetchSamples();
       }
     },
     on_button_acquisition_status() {
@@ -597,15 +608,39 @@ export default {
       if (!new_value.text) {
         return;
       }
-      this.is_raw_import_modal_active = false;
+      const requiredFields = ['title', 'project', 'experiment', 'filename'];
+
+      let data = await new_value.text();
+      data = csv.toObjects(data);
+      // Validate
+      for (let d of data) {
+        for (let field of requiredFields) {
+          if (Object.keys(d).indexOf(field) == -1 ||
+              _.isEmpty(d[field])
+              ){
+                this.$buefy.dialog.alert({
+                    title: "Parsing error",
+                    message: "Please check csv format. It must contain fields: " + requiredFields,
+                    type: "is-danger",
+                    hasIcon: true,
+                    icon: "times-circle",
+                    iconPack: "fa",
+                    ariaRole: "alertdialog",
+                    ariaModal: true,
+                  });
+              return false;
+          }
+        }
+      }
+
+      this.raw_import = data;
+
       this.import_raw_table_checked_rows = [];
       this.import_raw_table_rows = [];
       this.import_raw_table_cols = [];
       this.import_start_time = null;
       this.import_end_time = null;
-      let data = await new_value.text();
-      data = csv.toObjects(data);
-      this.raw_import = data;
+      this.is_raw_import_modal_active = false;
     },
     "namespace.connected": function (new_value) {
       if (new_value === true) {
@@ -649,10 +684,7 @@ export default {
         );
         this.acquisition_control_label =
           "Import " + this.data_source_selected.name;
-        this.be.subscribe(
-          this.endpoints,
-          null // room set to null to subscribe to endpoints directly
-        );
+        this.be.declare_endpoints(this.endpoints);
       }
     },
   },

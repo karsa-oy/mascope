@@ -23,7 +23,6 @@ export class BECom {
             // handlers for for external notifications (endpoint imports), if any:
             this.ctx['room_sid'] = namespace.id;
         });
-        // no need to unsubscribe on disconnect - client is unsubscribed by framework
         namespace.on("disconnect", () => {
             this.log("socket disconnected");
         });
@@ -37,32 +36,30 @@ export class BECom {
         }
     }
 
-    subscribe(endpoints, room, namespace=null) {
+    declare_endpoints(endpoints, namespace=null) {
         let the_namespace = namespace || this.ctx.namespace;
-        this.log(room, 'subscribed for', endpoints);
+        this.log('declare endpoints', endpoints);
+        the_namespace.emit('declare_endpoints',
+                         {'app_name': this.app_name,
+                          'endpoints': endpoints});
+    }
 
-        the_namespace.emit('subscribe',
-                         {'app_name': this.app_name,
-                          'endpoints': endpoints,
-                          'client_room': room,
-                          'room': room});
-        the_namespace.emit('client_notification',
-                            {'name': 'service_state',
-                             'value': {},
-                             'client_room': room,
-                             'room': room,
-                             });
-    }
-    
-    unsubscribe(endpoints, room, namespace=null) {
+    enter_room(room, namespace=null) {
         let the_namespace = namespace || this.ctx.namespace;
-        this.log(room, 'unsubscribed from', endpoints);
-        the_namespace.emit('unsubscribe',
+        this.log('enter', room);
+        the_namespace.emit('enter_room',
                          {'app_name': this.app_name,
-                          'endpoints': endpoints,
                           'room': room});
     }
-    
+
+    leave_room(room, namespace=null) {
+        let the_namespace = namespace || this.ctx.namespace;
+        this.log('leave', room);
+        the_namespace.emit('leave_room',
+                         {'app_name': this.app_name,
+                          'room': room});
+    }
+
     export_one_way_binding_prop(name,
                                 new_value,
                                 old_value=null,

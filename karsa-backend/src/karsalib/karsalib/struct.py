@@ -5,6 +5,7 @@ import xarray
 import sparse
 import time
 import inspect
+import fnmatch
 from multiprocessing import Event, Lock, cpu_count
 from queue import Empty, Full
 from scipy.sparse import coo_matrix
@@ -49,6 +50,11 @@ class LRUDict(dict):
             if len(self.lru_keys) > self.capacity:
                 k = self.lru_keys.pop(0)
                 super().__delitem__(k)
+
+    def __delitem__(self, key):
+        with self.lock:
+            self.lru_keys.remove(key)
+            return super().__delitem__(key)
 
 class ExtendableDataArray():
     """Class to collect data incrementally into a xarray.DataArray
@@ -791,8 +797,8 @@ class FSWatcher:
     class FSEventHandler(PatternMatchingEventHandler):
         def __init__(self, client, mask):
             self.client = client
-            if not hasattr(mask, '__iter__'):
-                mask = [mask]
+            if not isinstance(mask, list):
+                mask = [mask, ]
             super().__init__(patterns=mask)
 
         def on_created(self, event):
@@ -800,11 +806,17 @@ class FSWatcher:
                 self.client.on_filesystem_object_created(event.src_path)
             except AttributeError:
                 pass
+            except Exception as e:
+                self.log(f"Exception {e.__class__.__name__}({str(e)})")
+                pass
 
         def on_modified(self, event):
             try:
                 self.client.on_filesystem_object_modified(event.src_path)
             except AttributeError:
+                pass
+            except Exception as e:
+                self.log(f"Exception {e.__class__.__name__}({str(e)})")
                 pass
 
         def on_deleted(self, event):
@@ -812,12 +824,24 @@ class FSWatcher:
                 self.client.on_filesystem_object_deleted(event.src_path)
             except AttributeError:
                 pass
+            except Exception as e:
+                self.log(f"Exception {e.__class__.__name__}({str(e)})")
+                pass
 
         def on_moved(self, event):
             try:
                 self.client.on_filesystem_object_created(event.dest_path)
+            except AttributeError:
+                pass
+            except Exception as e:
+                self.log(f"Exception {e.__class__.__name__}({str(e)})")
+                pass
+            try:
                 self.client.on_filesystem_object_deleted(event.src_path)
             except AttributeError:
+                pass
+            except Exception as e:
+                self.log(f"Exception {e.__class__.__name__}({str(e)})")
                 pass
 
     def log(self, *arg, **kwarg):
@@ -842,15 +866,15 @@ class FSWatcher:
 
     def run(self):
         self.start()
-        try:
-            while not self.client.shutdown_event.is_set():
+        while not self.client.shutdown_event.is_set():
+            try:
                 time.sleep(1)
-        except KeyboardInterrupt:
-            self.log('KeyboardInterrupt')
-            self.client.shutdown_event.set()
-        except Exception as e:
-            self.log(str(e))
-            self.client.shutdown_event.set()
+            except KeyboardInterrupt:
+                self.log('KeyboardInterrupt')
+                self.client.shutdown_event.set()
+            except Exception as e:
+                self.log(f"Exception {e.__class__.__name__}({str(e)})")
+                pass
         self.stop()
 
     def run_as_daemon(self):

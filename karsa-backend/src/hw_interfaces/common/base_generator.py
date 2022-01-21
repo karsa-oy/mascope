@@ -320,6 +320,7 @@ class BaseFileStreamer(Thread):
         if self.client.target_data_pool_path and self.item:
             try:
                 zarr_sdk.finalize_signal_dataset(sn_data, self.item)
+                self.client.target_data_pool.add_file(self.target_filename)
             except:
                 pass    # let client services finalize the request anyway
             # updates to signal mfzarrs are finalized - notify

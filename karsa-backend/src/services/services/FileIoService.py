@@ -237,24 +237,6 @@ class zarr_sdk:
 class FileIoNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to MainService """
 
-    endpoints = [
-        # TOFControl
-        'instrument_log_entry',
-        'instrument_log_request',
-        # //
-        # TOFService
-        'acquisition_coordinates',
-        'acquired_spectrum',
-        'acquired_tps_data',
-        'acquisition_finished',
-        'centroid_info',
-        'tps_parameter_info',
-        # //
-        # Router
-        'service_state',
-        # //
-        ]
-
     service_state = dict()
 
     # ========== TOFControl requests ==========
@@ -556,7 +538,9 @@ def open_mfzarr(path, mode='r', concat_dim='time', prev_array=None):
         prev_groups = prev_array.attrs.get('zarr_groups', [])
         for g in prev_groups:
             groups.remove(g)
-    # print(f"{ntpath.basename(path)} {'loading' if prev_array is None else 'updating'} from group {groups}")
+    # print(f"{os.path.basename(path)} {'loading' if prev_array is None else 'updating'} from group {groups}")
+    if not groups:
+        return prev_array
     x = xarray.concat([xarray.open_zarr(path, g, consolidated=False) for g in groups], concat_dim)
     if prev_array is not None:
         x = xarray.concat([prev_array.to_dataset(), x], concat_dim)
