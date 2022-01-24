@@ -710,7 +710,6 @@ export default {
       this.is_mz_calib_modal_active = false;
     },
     clearIsotopeTableData() {
-      console.log("clearing isotope table data");
       this.isotope_table_cols = [];
       this.isotope_table_all_rows = [];
     },
@@ -920,14 +919,10 @@ export default {
         this.$refs.target_table.sort(this.$refs.targetMatchScoreColumn);
       });
     },
-    rightClickPeakTableRow(row) {
-      console.log(row);
-    },
     setTargetTableDetails(row) {
       this.target_table_detailed_rows = [row["0"]];
     },
     updateIsotopeTableData(data) {
-      console.log("Updating isotope table data");
       // Format data to isotope table
       let rows = [];
       let cols_to_add = [];
@@ -966,8 +961,6 @@ export default {
       this.isotope_table_all_rows = rows;
     },
     refreshTargetFilters() {
-      console.log("Refreshing target table filters...");
-      console.log(this.target_table_filters);
       let updatedFilters = [];
       let clearedFilters = [];
       for (let col of this.target_table_all_cols) {
@@ -981,20 +974,8 @@ export default {
         }
         this.$set(this.$refs.target_table.filters, field, String(filter));
       }
-      if (updatedFilters.length > 0) {
-        console.log(
-          `Updated target table filters: ${updatedFilters.join(", ")}`
-        );
-      }
-      if (clearedFilters.length > 0) {
-        console.log(
-          `Cleared target table filters: ${clearedFilters.join(", ")}`
-        );
-      }
     },
     refreshIsotopeFilters() {
-      console.log("Refreshing isotope table filters...");
-      console.log(this.isotope_table_filters);
       let updatedFilters = [];
       let clearedFilters = [];
       for (let col of this.isotope_table_cols) {
@@ -1008,16 +989,6 @@ export default {
         }
         this.$set(this.$refs.isotope_table.filters, field, String(filter));
       }
-      if (updatedFilters.length > 0) {
-        console.log(
-          `Updated target table filters: ${updatedFilters.join(", ")}`
-        );
-      }
-      if (clearedFilters.length > 0) {
-        console.log(
-          `Cleared target table filters: ${clearedFilters.join(", ")}`
-        );
-      }
     },
     clearTargetFilters() {
       this.target_table_filters = {};
@@ -1030,13 +1001,9 @@ export default {
       });
     },
     updateTargetFilterState(event) {
-      console.log("Target compound filters changed");
-      console.log(event.filters);
       this.target_table_filters = event.filters;
     },
     updateIsotopeFilterState(event) {
-      console.log("Target isotope filters changed");
-      console.log(event.filters);
       this.isotope_table_filters = event.filters;
     },
     updateMzCalibStatsTable() {
@@ -1055,10 +1022,6 @@ export default {
         }
         this.mz_calib_stats_table_rows.push(row);
       }
-      console.log(
-        "this.mz_calib_stats_table_rows: ",
-        this.mz_calib_stats_table_rows
-      );
     },
     writeTargetsToFile() {
       let target_table_data = {
@@ -1231,9 +1194,6 @@ export default {
     },
     peak_data: function () {
       this.requestPeakIdentification();
-    },
-    isotope_table_checked_rows: function (new_value) {
-      console.log(new_value);
     },
     isotope_table_selected_row: function (new_value) {
       if (new_value != null) {
