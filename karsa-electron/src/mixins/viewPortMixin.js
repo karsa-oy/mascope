@@ -826,6 +826,9 @@ export const viewPortMixin = {
                 }    
                 this.peak_traces = peak_traces;
             }
+            if (this.peak_traces_visible) {
+                await this.update_figure(shallow_copy(this.zoom_stack.slice(-1)[0]));
+            }
         },
     },
 }
