@@ -204,7 +204,7 @@ export function makeValidFilename(string) {
 
 export function read_dotenv() {
         let dotenv = {};
-        let env_string = fs.readFileSync('.env');
+        let env_string = fs.readFileSync('./configs/.env');
         let env_parsed = envfile.parse(env_string);
         for (var key in env_parsed){
             var key_val = {}
@@ -216,5 +216,5 @@ export function read_dotenv() {
 
 export function write_dotenv(dotenv) {
         let env_string = envfile.stringify(dotenv);
-        fs.writeFileSync('.env', env_string);
+        fs.writeFileSync('./configs/.env', env_string);
 }
