@@ -635,14 +635,12 @@ def process_visualization_request(filename,
             period_array = period_slice[i0:i1].load()
             # print(spec_array)
 
-            # is_nanrow = spec_array.isnull().all(axis=0).any()
-            # is_nanrow = np.isnan( np.sum(spec_array.values, axis=1) ).any()
-            # if is_nanrow:
-                # Some mz-channel full of nan => spectra not yet loaded
-                # print("spec_array.isnull.all(axis=1).any()")
-                # print("is nan row")
-                # print("took %.2f sec" %(time()-t0))
-                # break
+            # Interpolate NaNs for smoothing
+            spec_array = spec_array.interpolate_na(dim='mz',
+                                                   method='linear',
+                                                   limit=None,
+                                                   max_gap=2,
+                                                   )
 
             # y_range = [0, spec_array.max().compute().item()] # TODO: better scaling
             y_range = [0, signal_slice.attrs.get('y_max', spec_array.max().compute().item())]
