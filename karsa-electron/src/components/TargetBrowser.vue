@@ -851,8 +851,14 @@ export default {
       this.excel_clipboard_text = "";
     },
     readTargetsFromFile() {
+      let default_path = "configs/target_list.json";
+      let user_path = "configs/user/target_list.json";
+      let path = default_path;
+      if (fs.existsSync(user_path)) {
+        path = user_path;
+      }
       let target_table_data = JSON.parse(
-        fs.readFileSync("configs/target_list.json")
+        fs.readFileSync(path)
       );
       this.ionization_mechanism = target_table_data.ionization_mechanism;
       this.target_table_cols = target_table_data.cols;
@@ -1030,7 +1036,7 @@ export default {
         ionization_mechanism: this.ionization_mechanism,
       };
       fs.writeFileSync(
-        "configs/target_list.json",
+        "configs/user/target_list.json",
         JSON.stringify(target_table_data, null, 3)
       );
     },
