@@ -5,7 +5,6 @@ import xarray
 import sparse
 import time
 import inspect
-import fnmatch
 from multiprocessing import Event, Lock, cpu_count
 from queue import Empty, Full
 from scipy.sparse import coo_matrix
@@ -857,7 +856,7 @@ class FSWatcher:
     def start(self):
         self.observer.schedule(self.handler, self.target_attrs['path'], recursive=self.recursive)
         self.observer.start()
-        self.log('started')
+        self.log('started watching', self.target_attrs)
 
     def stop(self):
         self.observer.stop()
