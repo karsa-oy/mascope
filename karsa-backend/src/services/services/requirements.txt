@@ -1,4 +1,5 @@
 asyncio
+bottleneck
 dask[array]
 environs
 numpy
