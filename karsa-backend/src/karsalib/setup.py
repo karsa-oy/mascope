@@ -1,5 +1,4 @@
 import setuptools
-import os
 
 
 with open("README.md") as f:
