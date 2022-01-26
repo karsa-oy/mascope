@@ -40,6 +40,7 @@ export default new Vuex.Store({
 		stop_visualize_range: {},
 		target_ions: [],
 		target_to_display: null,
+		target_compound_intensities: {},
 		target_compound_selected: {},
 		target_ion_selected: null,
 		target_clear_isotope_table: null,
@@ -137,6 +138,9 @@ export default new Vuex.Store({
 		},
 		target_clear_isotope_table(state, payload) {
 			state.target_clear_isotope_table = payload;
+		},
+		target_compound_intensities(state, payload) {
+			state.target_compound_intensities = payload;
 		},
 		target_compound_selected(state, payload) {
 			state.target_compound_selected = payload;
