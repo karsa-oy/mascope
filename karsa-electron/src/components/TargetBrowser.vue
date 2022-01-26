@@ -252,6 +252,9 @@
             </span>
           </template>
         </b-table-column>
+        <b-table-column field="3" label="Intensity" sortable searchable>
+          <template v-slot="props"> {{ props.row["3"] }} </template>
+        </b-table-column>
         <template slot="detail" slot-scope="props">
           <tr
             v-for="item in props.row.items"
@@ -579,6 +582,14 @@ export default {
         this.$store.commit("target_to_display", value);
       },
     },
+    target_compound_intensities: {
+      get() {
+        return this.$store.state.target_compound_intensities;
+      },
+      set(value) {
+        this.$store.commit("target_compound_intensities", value);
+      },
+    },
     target_compound_selected: {
       get() {
         return this.$store.state.target_compound_selected;
@@ -614,6 +625,7 @@ export default {
           new_rows.push({
             ...row,
             2: this.target_match_scores[target_id]["total"],
+            3: this.target_compound_intensities[target_id] ? Math.round(this.target_compound_intensities[target_id]) : null,
           });
         }
         return new_rows;
@@ -629,7 +641,12 @@ export default {
             label: "Match score",
             searchable: true,
           },
-        ]);
+          {
+            field: "3",
+            label: "Intensity",
+            searchable: true,
+          },
+          ]);
       } else {
         return this.target_table_cols;
       }
@@ -1294,6 +1311,12 @@ export default {
         this.namespace.on("target_ion_selected", (value) =>
           this.be.import_one_way_binding_prop(
             "target_ion_selected",
+            value.value
+          )
+        );
+        this.namespace.on("target_compound_intensities", (value) =>
+          this.be.import_one_way_binding_prop(
+            "target_compound_intensities",
             value.value
           )
         );
