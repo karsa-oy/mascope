@@ -5,6 +5,7 @@ FileStreamer Service
 import os
 import re
 from datetime import datetime
+from copy import deepcopy
 
 from karsalib.client import (
                         BaseClientNamespace,
@@ -101,7 +102,6 @@ class FileStreamerPrivateNamespace(BaseClientNamespace):
             self.parent.requests.cache_put(rdata)
 
     async def on_raw_import_status(self, data):
-        import time
         with self.parent.lock:
             kwargs = get_client_notification_context(data)
             client_room = data['client_room']

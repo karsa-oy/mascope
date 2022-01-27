@@ -539,22 +539,49 @@ export default {
       // // data left for debugging:
       // new_data = {
       //     progress: [
-      //         {filename: '1-DataFile_2021.08.02-01h01m00s.h5', target_filename: 'H5Data_1-DataFile_2021.08.02-01h01m00s.h5',
-      //          datetime: '2021.08.02 01h01m00s', filesize: 2.96, path: 'test\\system\\TestData\\DataPool\\H5\\2021.08.02', progress: 30.0, ack_progress: 16.67},
+      //         {filename: '1-DataFile_2021.08.02-01h01m00s.h5', path: 'test\\system\\TestData\\DataPool\\H5\\2021.08.02',
+      //          props: {datetime: '2021.08.02 01h01m00s', filesize: 2.96}, attrs: {project, experiment ...}, progress: 30.0, ack_progress: 16.67},
       //     ],
       //     queue: {
       //         context: { client_room: 'ZbRWlHlHocoMPKrwAABP', room: null, no_logging: false, no_data_logging: true, cookies: {src_sid: ['ZbRWlHlHocoMPKrwAABP']} },
       //         files: [
-      //             {filename: '2-DataFile_2021.08.02-01h01m00s.h5', datetime: '2021.08.02 01h01m00s', filesize: 2.96, path: 'test\\system\\TestData\\DataPool\\H5\\2021.08.02'},
-      //             {filename: '3-DataFile_2021.08.02-01h01m00s.h5', datetime: '2021.08.02 01h01m00s', filesize: 2.96, path: 'test\\system\\TestData\\DataPool\\H5\\2021.08.02'},
-      //             {filename: '4-DataFile_2021.08.02-01h01m00s.h5', datetime: '2021.08.02 01h01m00s', filesize: 2.96, path: 'test\\system\\TestData\\DataPool\\H5\\2021.08.02'},
+      //            {filename: '2-DataFile_2021.08.02-01h01m00s.h5', path: 'test\\system\\TestData\\DataPool\\H5\\2021.08.02', props: {datetime: '2021.08.02 01h01m00s', filesize: 2.96}, attrs: {project, experiment ...}},
+      //            {filename: '3-DataFile_2021.08.02-01h01m00s.h5', path: 'test\\system\\TestData\\DataPool\\H5\\2021.08.02', props: {datetime: '2021.08.02 01h01m00s', filesize: 2.96}, attrs: {project, experiment ...}},
+      //            {filename: '4-DataFile_2021.08.02-01h01m00s.h5', path: 'test\\system\\TestData\\DataPool\\H5\\2021.08.02', props: {datetime: '2021.08.02 01h01m00s', filesize: 2.96}, attrs: {project, experiment ...}},
       //         ]
       //     }
       // };
 
-      this.raw_import_status_rows = new_data.progress.concat(
-        new_data.queue.files || []
-      );
+      // this.raw_import_status_rows = new_data.progress.concat(
+      //   new_data.queue.files || []
+      // );
+
+      const straight_filter = (obj) => {
+        var res = new Object;
+        for (let k in obj) {
+          if ( typeof obj[k] === "object" )
+            res = {...res, ...obj[k]};
+          else
+            res[k] = obj[k];
+        }
+        return res;
+      };
+
+      this.raw_import_status_rows = []
+
+      if ( !_.isEmpty(new_data.progress) )
+        new_data.progress.forEach(
+          (pdata) => {
+            this.raw_import_status_rows = this.raw_import_status_rows.concat(straight_filter(pdata));
+          }
+        );
+      if ( !_.isEmpty(new_data.queue.files) )
+        new_data.queue.files.forEach(
+          (fdata) => {
+            this.raw_import_status_rows = this.raw_import_status_rows.concat(straight_filter(fdata));
+          }
+        );
+
       let titles = new Set([]);
       this.raw_import_status_rows.forEach(
         (r) => (titles = new Set([...titles, ...Object.keys(r)]))

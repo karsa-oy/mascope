@@ -48,9 +48,9 @@ class BaseFileStreamer(Thread):
         def init_sample_data():
             self.filename = self.fdata['filename']
             self.target_filename = '_'.join([self.client.instrument_name, self.filename]).replace(' ', '_')
-            self.attrs = self.fdata.pop('attrs')    # attrs normally contain sci data coming along with the sample
-            self.project = self.attrs.pop('project', None)
-            self.experiment = self.project and self.attrs.pop('experiment', None)
+            self.attrs = self.fdata['attrs']    # attrs normally contain sci data coming along with the sample
+            self.project = self.attrs.get('project', None)
+            self.experiment = self.attrs.get('experiment', None)
             if 'title' not in self.attrs:
                 self.attrs['title'] = self.filename
         init_sample_data()
