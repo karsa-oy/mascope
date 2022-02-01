@@ -15,6 +15,7 @@ export default new Vuex.Store({
 		figure_data: {},
 		figure_double_click: null,
 		figure_ranges: {},
+		file_cache: {},
 		identified_ions: {},
 		identify_peaks: {},
 		ionization_mechanism: "",
@@ -78,6 +79,9 @@ export default new Vuex.Store({
 		},
 		figure_ranges(state, payload) {
 			state.figure_ranges = payload;
+		},
+		file_cache(state, payload) {
+			state.file_cache = payload;
 		},
 		identified_ions(state, payload) {
 			state.identified_ions = payload;

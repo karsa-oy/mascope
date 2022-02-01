@@ -162,14 +162,6 @@ export default {
         this.$store.commit("figure_ranges", value);
       },
     },
-    peak_data: {
-      get() {
-        return this.$store.state.peak_data;
-      },
-      set(value) {
-        this.$store.commit("peak_data", value);
-      },
-    },
     sample_annotations: {
       get() {
         return this.$store.state.sample_annotations;
@@ -272,30 +264,11 @@ export default {
         this.room_sid
       );
     },
-
-    requestPeakData() {
-      if (this.filename) {
-        this.be.export_one_way_binding_prop(
-          "peak_data_request",
-          {
-            filename: this.filename,
-            parameters: {
-              peak_threshold: this.parameter_peak_intensity_threshold,
-            },
-          },
-          null,
-          this.room_sid
-        );
-      }
-    },
   },
 
   watch: {
     figure_double_click: function () {
       return;
-    },
-    parameter_peak_intensity_threshold: function () {
-      this.requestPeakData();
     },
     sample_annotation_fields: {
       handler() {
@@ -315,7 +288,6 @@ export default {
         id: Math.random().toString(36).substring(2),
       };
       this.target_clear_isotope_table = Math.random().toString(36).substring(2);
-      this.requestPeakData();
     },
     stop_visualize_range: function (new_value, old_value) {
       if (_.isEqual(new_value.request_ids, old_value.request_ids)) {
@@ -390,14 +362,6 @@ export default {
         this.namespace.on("figure_data", (value) =>
           this.be.import_one_way_binding_prop("figure_data", value)
         );
-        this.namespace.on("peak_data", (value) =>
-          this.be.import_one_way_binding_prop("peak_data", {
-            mz: new Float32Array(value.value.mz),
-            height: new Float32Array(value.value.height),
-            tof: new Float32Array(value.value.tof),
-          })
-        );
-
         this.room_sid = this.root_namespace.id;
       }
     },

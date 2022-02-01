@@ -460,7 +460,7 @@
           # identified peaks: {{ isotope_table_checked_rows.length }}
         </div>
         <div style="color: white">
-          # found peaks: {{ peak_data.mz ? peak_data.mz.length : 0 }}
+          # found peaks: {{ peak_data[sample_in_focus.filename] && peak_data[sample_in_focus.filename].mz ? peak_data[sample_in_focus.filename].mz.length : 0 }}
         </div>
       </div>
       <!-- End of isotope table -->
@@ -622,10 +622,11 @@ export default {
             });
           }
           row["items"] = updated_ions;
+          let filename = this.sample_in_focus.filename;
           new_rows.push({
             ...row,
             2: this.target_match_scores[target_id]["total"],
-            3: this.target_compound_intensities[target_id] ? Math.round(this.target_compound_intensities[target_id]) : null,
+            3: this.target_compound_intensities[filename] && this.target_compound_intensities[filename][target_id] ? Math.round(this.target_compound_intensities[filename][target_id]) : null,
           });
         }
         return new_rows;
@@ -697,6 +698,9 @@ export default {
       isotope_table_show_only_checked: false,
       isotope_table_filters: {},
       //
+      // Experiment table
+
+      // 
       room_sid: null,
       endpoints: [],
     };
@@ -896,7 +900,10 @@ export default {
       this.target_table_rows = target_table_data.rows;
     },
     requestPeakIdentification() {
-      let peaks_exist = this.peak_data.mz && this.peak_data.mz.length;
+      let filename = this.sample_in_focus.filename;
+      let peaks_exist = this.peak_data[filename] &&
+                        this.peak_data[filename].mz &&
+                        this.peak_data[filename].mz.length;
       let targets_exist = this.target_ions.length > 0;
       if (!peaks_exist || !targets_exist) {
         return;
@@ -907,7 +914,8 @@ export default {
         min_iso_abu: this.parameter_iso_abu_threshold,
       };
       this.identify_peaks = {
-        peaks: this.peak_data,
+        filename: filename,
+        peaks: this.peak_data[filename],
         target_ions: this.target_ions,
         parameters: parameters,
       };
@@ -1199,25 +1207,6 @@ export default {
       this.$nextTick(this.refreshIsotopeFilters);
       this.$nextTick(this.refreshTargetFilters);
     },
-    mz_calib_compound_table_checked_rows: function () {
-      this.updateMzCalibPeaks();
-    },
-    mz_calibration: function () {
-      this.updateMzCalibStatsTable();
-      this.drawMzCalibStatsFigure();
-    },
-    parameter_iso_abu_threshold: function () {
-      this.requestTargetIons();
-    },
-    parameter_iso_ratio_tolerance: function () {
-      this.requestPeakIdentification();
-    },
-    parameter_mz_tolerance: function () {
-      this.requestPeakIdentification();
-    },
-    peak_data: function () {
-      this.requestPeakIdentification();
-    },
     isotope_table_selected_row: function (new_value) {
       if (new_value != null) {
         let mz = new_value["mz"];
@@ -1235,6 +1224,34 @@ export default {
         return;
       }
       this.isotope_table_rows = this.isotope_table_all_rows;
+    },
+    mz_calib_compound_table_checked_rows: function () {
+      this.updateMzCalibPeaks();
+    },
+    mz_calibration: function () {
+      this.updateMzCalibStatsTable();
+      this.drawMzCalibStatsFigure();
+    },
+    parameter_iso_abu_threshold: function () {
+      this.requestTargetIons();
+    },
+    parameter_iso_ratio_tolerance: function () {
+      this.requestPeakIdentification();
+    },
+    parameter_mz_tolerance: function () {
+      this.requestPeakIdentification();
+    },
+    peak_data: {
+      handler(new_value, old_value) {
+        if (new_value[this.sample_in_focus.filename] !=
+            old_value[this.sample_in_focus.filename]) {
+          this.requestPeakIdentification();
+          }
+      },
+      deep: true
+    },
+    sample_in_focus: function() {
+      this.requestPeakIdentification();
     },
     target_ions: function (new_value) {
       // Clear target ions from target table row details
@@ -1303,29 +1320,17 @@ export default {
         this.namespace = this.root_namespace;
         // handlers for for external notifications:
         this.namespace.on("identified_ions", (value) =>
-          this.be.import_one_way_binding_prop("identified_ions", value.value)
+          this.be.import_one_way_binding_prop("identified_ions", value.value.data)
         );
         this.namespace.on("target_ions", (value) =>
           this.be.import_one_way_binding_prop("target_ions", value.value)
         );
-        this.namespace.on("target_ion_selected", (value) =>
-          this.be.import_one_way_binding_prop(
-            "target_ion_selected",
-            value.value
-          )
-        );
-        this.namespace.on("target_compound_intensities", (value) =>
-          this.be.import_one_way_binding_prop(
-            "target_compound_intensities",
-            value.value
-          )
-        );
-        this.namespace.on("target_compound_selected", (value) =>
-          this.be.import_one_way_binding_prop(
-            "target_compound_selected",
-            value.value
-          )
-        );
+        this.namespace.on("target_compound_intensities", (value) => {
+          console.log("receive target_compound_intensities", value.value);
+          this.target_compound_intensities = {...this.target_compound_intensities,
+                                              [value.value.filename]: value.value.data
+                                              };
+        });
         this.namespace.on("target_match_scores", (value) =>
           this.be.import_one_way_binding_prop(
             "target_match_scores",

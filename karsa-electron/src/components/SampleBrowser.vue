@@ -777,6 +777,14 @@ export default {
         this.$store.commit("experiment_selected", value);
       },
     },
+    peak_data: {
+      get() {
+        return this.$store.state.peak_data;
+      },
+      set(value) {
+        this.$store.commit("peak_data", value);
+      },
+    },
     projects: {
       get() {
         return this.$store.state.projects;
@@ -1015,6 +1023,19 @@ export default {
         sample_to_remove
       );
     },
+    requestPeakData(filename) {
+      this.be.export_one_way_binding_prop(
+        "peak_data_request",
+        {
+          filename: filename,
+          parameters: {
+            peak_threshold: this.parameter_peak_intensity_threshold,
+          },
+        },
+        null,
+        this.room_sid
+      );
+    },
     rightClickExperiment(event) {
       const title = event.path[0].id;
       let experiment = this.getExperiment(title);
@@ -1151,6 +1172,9 @@ export default {
         const sample = this.getSample(filename);
         let sample_title = this.sample_table_selected_row.title;
         this.sample_in_focus = { title: sample_title, ...sample };
+        if (Object.keys(this.peak_data).indexOf(filename) == -1) {
+          this.requestPeakData(filename);
+        }
       } else {
         // Sample deselected
         this.sample_in_focus = {
@@ -1248,6 +1272,9 @@ export default {
           this.launchSampleAttributeModal();
         }
       }
+    },
+    parameter_peak_intensity_threshold: function () {
+      this.requestPeakData(this.sample_in_focus.filename);
     },
     project_selected: function (new_value, old_value) {
       if (_.isEqual(new_value.title, old_value.title)) {
@@ -1361,6 +1388,13 @@ export default {
     sample_table_selected_row: function(new_value) {
       this.selectSample(new_value.filename);
     },
+    samples_selected: function(new_value) {
+      for (let filename of new_value) {
+        if (Object.keys(this.peak_data).indexOf(filename) == -1) {
+          this.requestPeakData(filename);
+        }
+      }
+    },
     "root_namespace.connected": function (new_value) {
       if (new_value === true) {
         this.namespace = this.root_namespace;
@@ -1380,6 +1414,18 @@ export default {
         this.namespace.on("samples", (value) =>
           this.be.import_one_way_binding_prop("samples", value.value)
         );
+        this.namespace.on("peak_data", (value) => {
+          console.log("receive peak_data", value.value);
+          let peaks = {
+            mz: new Float32Array(value.value.mz),
+            height: new Float32Array(value.value.height),
+            tof: new Float32Array(value.value.tof),
+            };
+          let filename = value.value.filename;
+          this.peak_data = {...this.peak_data,
+                            [filename]: peaks
+                            };
+        });
 
         this.room_sid = this.root_namespace.id;
         this.be.enter_room("projects");
