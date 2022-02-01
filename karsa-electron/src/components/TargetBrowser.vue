@@ -1095,6 +1095,9 @@ export default {
           this.excel_clipboard_table_rows.slice(1);
       }
     },
+    experiment_selected: function() {
+      this.target_compound_intensities = {};
+    },
     figure_double_click: function () {
       this.target_to_display = null;
       this.isotope_table_selected_row = null;
@@ -1326,7 +1329,6 @@ export default {
           this.be.import_one_way_binding_prop("target_ions", value.value)
         );
         this.namespace.on("target_compound_intensities", (value) => {
-          console.log("receive target_compound_intensities", value.value);
           this.target_compound_intensities = {...this.target_compound_intensities,
                                               [value.value.filename]: value.value.data
                                               };

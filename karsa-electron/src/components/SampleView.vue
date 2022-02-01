@@ -57,46 +57,56 @@
       </h1>
     </div>
     <!-- Main content  area-->
-    <div class="columns">
-      <!-- Left side -->
-      <div class="column is-half">
-        <!-- Heatmap section -->
-        <section class="heatmap-section">
-          <ViewPortSpectrogram id="spectrogram"> </ViewPortSpectrogram>
-        </section>
-        <!-- End of heatmap section-->
-        <!-- Multiselect section -->
-        <section class="multiselect-section">
-          <div hidden>
-            <div class="column tps-multiselect">
-              <h2 class="multiselect-title">Select parameter to display</h2>
-              <multiselect
-                v-model="tps_parameters_selected_ui"
-                tag-placeholder="Add this as new tag"
-                placeholder="Search or add a tag"
-                label="label"
-                track-by="value"
-                :options="tps_parameters"
-                :multiple="true"
-                :taggable="true"
-              >
-              </multiselect>
-            </div>
-          </div>
-        </section>
-        <!-- End of multiselect section -->
-        <!-- Timeseries section -->
-        <section>
-          <ViewPortTimeseries id="timeseries"> </ViewPortTimeseries>
-        </section>
-        <!-- End of timeseries -->
+    <!--  -->
+    <div class="rows">
+      <div class="row">
+        <div>
+          <ExperimentView></ExperimentView>
+        </div>
+        <!--  -->
       </div>
-
-      <!-- Right side -->
-      <div class="column is-half">
-        <!-- Spec stack section -->
-        <ViewPortWaterfall id="waterfall"> </ViewPortWaterfall>
-        <!-- End of spec stack -->
+      <div class="row">
+        <div class="columns">
+          <!-- Left side -->
+          <div class="column is-half">
+            <!-- Heatmap section -->
+            <section class="heatmap-section">
+              <ViewPortSpectrogram id="spectrogram"> </ViewPortSpectrogram>
+            </section>
+            <!-- End of heatmap section-->
+            <!-- Multiselect section -->
+            <section class="multiselect-section">
+              <div hidden>
+                <div class="column tps-multiselect">
+                  <h2 class="multiselect-title">Select parameter to display</h2>
+                  <multiselect
+                    v-model="tps_parameters_selected_ui"
+                    tag-placeholder="Add this as new tag"
+                    placeholder="Search or add a tag"
+                    label="label"
+                    track-by="value"
+                    :options="tps_parameters"
+                    :multiple="true"
+                    :taggable="true"
+                  >
+                  </multiselect>
+                </div>
+              </div>
+            </section>
+            <!-- End of multiselect section -->
+            <!-- Timeseries section -->
+            <section>
+              <ViewPortTimeseries id="timeseries"> </ViewPortTimeseries>
+            </section>
+            <!-- End of timeseries -->
+          </div>
+          <!-- Right side -->
+          <div class="column is-half">
+            <!-- Spec stack section -->
+            <ViewPortWaterfall id="waterfall"> </ViewPortWaterfall>
+            <!-- End of spec stack -->
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -109,6 +119,7 @@ import Vue from "vue";
 import { mapState } from "vuex";
 import Buefy from "buefy";
 import Multiselect from "vue-multiselect";
+import ExperimentView from "./ExperimentView.vue";
 import MetaDataForm from "./MetaDataForm.vue";
 import ViewPortSpectrogram from "./ViewPortSpectrogram.vue";
 import ViewPortTimeseries from "./ViewPortTimeseries.vue";
@@ -124,6 +135,7 @@ var _ = require("underscore");
 export default {
   name: "SampleView",
   components: {
+    ExperimentView,
     MetaDataForm,
     // using third party multiselect component
     Multiselect,

@@ -757,6 +757,7 @@ export default {
     ...mapState([
           "autosave_on",
           "new_file",
+          "parameter_peak_intensity_threshold",
           "root_namespace",
           "sample_to_link",
           ]),
@@ -817,6 +818,22 @@ export default {
         this.$store.commit("sample_in_focus", value);
       },
     },
+    sample_table_selected_row: {
+      get() {
+        return this.$store.state.sample_table_selected_row;
+      },
+      set(value) {
+        this.$store.commit("sample_table_selected_row", value);
+      },
+    },
+    samples: {
+      get() {
+        return this.$store.state.samples;
+      },
+      set(value) {
+        this.$store.commit("samples", value);
+      },
+    },
     samples_selected: {
       get() {
         return this.$store.state.samples_selected;
@@ -838,7 +855,7 @@ export default {
       // acquisition_started: false,
       // Project / experiment title validation
       // Modal active variables
-      is_modal_landing_active: true,
+      is_modal_landing_active: false,
       is_modal_experiment_attributes_active: false,
       is_modal_project_attributes_active: false,
       is_modal_new_experiment_active: false,
@@ -864,12 +881,11 @@ export default {
         "./metadata_templates/experiment_templates",
       experiment_edit_form_props: {},
       // Sample metadata for selected sample
-      samples: [],
       // variables for sample table
       sample_table_rows: [],
       sample_table_cols: [],
       sample_table_checked_rows: [],
-      sample_table_selected_row: {},
+      // sample_table_selected_row: {}, // put to store
       sample_attributes: {},
       sample_attributes_default_template: [
         { label: "Title", value: "", required: true },
@@ -1167,10 +1183,11 @@ export default {
       this.is_modal_project_attributes_active = false;
     },
     selectSample(filename) {
+      console.log("selectSample:", filename);
       // Sample selected
       if (filename) {
         const sample = this.getSample(filename);
-        let sample_title = this.sample_table_selected_row.title;
+        let sample_title = sample.attributes[0].value;
         this.sample_in_focus = { title: sample_title, ...sample };
         if (Object.keys(this.peak_data).indexOf(filename) == -1) {
           this.requestPeakData(filename);
@@ -1194,6 +1211,7 @@ export default {
       if (_.isEqual(new_value, old_value)) {
         return false;
       }
+      this.samples = {};
       if (!_.isEmpty(new_value.title)) {
         if (!_.isEmpty(this.room_experiment))
           this.be.leave_room(this.room_experiment);

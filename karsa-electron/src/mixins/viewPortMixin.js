@@ -803,12 +803,16 @@ export const viewPortMixin = {
             );
         },
         peak_data: async function() {
+            let peak_data = this.peak_data[this.figure_ranges.filename];
+            if (!peak_data.mz) {
+                return
+            }
             let mz_axis = this.figure_axes.mz;
             if (mz_axis) {
                 let time_axis = this.figure_axes.time;
                 let peak_traces = [];
-                for (let i in this.peak_data.mz) {
-                    let m = this.peak_data.mz[i];
+                for (let i in peak_data.mz) {
+                    let m = peak_data.mz[i];
                     // let y = this.peak_data.height[i];
                     let peak_trace = {
                             [time_axis]: this.figure_cache.t_maxrange,
@@ -823,7 +827,7 @@ export const viewPortMixin = {
                             'showlegend': false,
                             };
                     peak_traces.push(peak_trace);
-                }    
+                }
                 this.peak_traces = peak_traces;
             }
             if (this.peak_traces_visible) {

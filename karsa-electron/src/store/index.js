@@ -36,7 +36,9 @@ export default new Vuex.Store({
 			'project': "",
 			'experiment': "",
 		},
+		sample_table_selected_row: {},
 		sample_to_link: {},
+		samples: {},
 		samples_selected: [],
 		stop_visualize_range: {},
 		target_ions: [],
@@ -125,8 +127,14 @@ export default new Vuex.Store({
 		sample_in_focus(state, payload) {
 			state.sample_in_focus = payload;
 		},
+		sample_table_selected_row(state, payload) {
+			state.sample_table_selected_row = payload;
+		},
 		sample_to_link(state, payload) {
 			state.sample_to_link = payload;
+		},
+		samples(state, payload) {
+			state.samples = payload;
 		},
 		samples_selected(state, payload) {
 			state.samples_selected = payload;
