@@ -54,6 +54,7 @@ def run_streamer_service(StreamerClient,
                                     ('/', StreamerPublicNamespace),
                                     (args['ns'], StreamerPrivateNamespace)
                                 )
+            client.args = args
             break
         except ModuleNotFoundError as e:
             print(str(e))
