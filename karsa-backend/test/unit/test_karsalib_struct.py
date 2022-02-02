@@ -436,7 +436,7 @@ class TestLRUDict(unittest.TestCase):
    def test_LRUDict_operations(self):
       with self.assertRaises(KeyError):
          v = self.d['a']
-      with self.assertRaises(KeyError):
+      with self.assertRaises(ValueError):
          del self.d['a']
       self.assertEqual(self.d.get('a', 'nothing'), 'nothing')
       self.assertEqual(list(self.d.keys()), [])
