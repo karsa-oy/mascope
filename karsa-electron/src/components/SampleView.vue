@@ -151,6 +151,7 @@ export default {
       "experiment_selected",
       "figure_double_click",
       "parameter_peak_intensity_threshold",
+      "parameter_display_target_dmz",
       "root_namespace",
       "sample_annotation_timestamp",
       "sample_in_focus",
@@ -311,7 +312,7 @@ export default {
         return false;
       }
       let mz = new_value;
-      let dmz = 1000; // ppm
+      let dmz = this.parameter_display_target_dmz; // ppm
       let target_mz_range = [(1 - dmz * 1e-6) * mz, (1 + dmz * 1e-6) * mz];
       let new_figure_ranges = {
         filename: this.filename,

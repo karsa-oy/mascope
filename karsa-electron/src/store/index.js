@@ -22,6 +22,7 @@ export default new Vuex.Store({
 		mz_calibration: {},
 		new_file: "",
 		parameter_peak_intensity_threshold: 0.005,
+		parameter_display_target_dmz: 10,
 		peak_data: {},
 		project_selected: { 'title': "", 'attributes': [] },
 		projects: [],
@@ -104,6 +105,9 @@ export default new Vuex.Store({
 		},
 		parameter_peak_intensity_threshold(state, payload) {
 			state.parameter_peak_intensity_threshold = payload;
+		},
+		parameter_display_target_dmz(state, payload) {
+			state.parameter_display_target_dmz = payload;
 		},
 		peak_data(state, payload) {
 			state.peak_data = payload;

@@ -321,64 +321,97 @@
             </b-button>
             <div style="width: 25vw">
               <section style="padding: 0em 1em 0 1em">
-                <b-field
+                <section style="padding: 0em 1em 0 1em">
+                  <b-field label="Peak detection parameters" custom-class="dark">
+                  </b-field>
+                  <b-field
                   label="peak intensity threshold [%]"
                   custom-class="dark"
-                >
-                  <b-numberinput
-                    type="is-primary"
-                    v-model="parameter_peak_intensity_threshold"
-                    :min="0"
-                    :step="0.01"
-                    :tooltip="false"
-                    lazy
-                    indicator
                   >
-                  </b-numberinput>
-                </b-field>
-                <b-field label="m/z tolerance [ppm]" custom-class="dark">
-                  <b-numberinput
-                    type="is-primary"
-                    v-model="parameter_mz_tolerance"
-                    :min="0"
-                    :step="1"
-                    :tooltip="false"
-                    lazy
-                    indicator
+                    <b-numberinput
+                      type="is-primary"
+                      v-model="parameter_peak_intensity_threshold"
+                      :min="0"
+                      :step="0.01"
+                      :tooltip="false"
+                      lazy
+                      indicator
+                    >
+                    </b-numberinput>
+                  </b-field>
+                </section>
+                <div><br></div>
+                <div><br></div>
+                <section style="padding: 0em 1em 0 1em">
+                  <b-field label="Target identification parameters" custom-class="dark">
+                  </b-field>
+                  <b-field label="m/z tolerance [ppm]" custom-class="dark">
+                    <b-numberinput
+                      type="is-primary"
+                      v-model="parameter_mz_tolerance"
+                      :min="0"
+                      :step="1"
+                      :tooltip="false"
+                      lazy
+                      indicator
+                    >
+                    </b-numberinput>
+                  </b-field>
+                  <b-field
+                    label="isotope ratio tolerance [%]"
+                    custom-class="dark"
+                    grouped
                   >
-                  </b-numberinput>
-                </b-field>
-                <b-field
-                  label="isotope ratio tolerance [%]"
-                  custom-class="dark"
-                >
-                  <b-slider
-                    type="is-primary"
-                    v-model="parameter_iso_ratio_tolerance"
-                    :min="0"
-                    :max="100"
-                    :tooltip="false"
-                    lazy
-                    indicator
+                    <b-slider
+                      type="is-primary"
+                      v-model="parameter_iso_ratio_tolerance"
+                      :min="0"
+                      :max="100"
+                      :tooltip="false"
+                      lazy
+                      indicator
+                    >
+                    </b-slider>
+                  </b-field>
+                  <b-field
+                    label="isotope abundance threshold [%]"
+                    custom-class="dark"
+                    grouped
                   >
-                  </b-slider>
-                </b-field>
-                <b-field
-                  label="isotope abundance threshold [%]"
-                  custom-class="dark"
-                >
-                  <b-slider
-                    type="is-primary"
-                    v-model="parameter_iso_abu_threshold"
-                    :min="0"
-                    :max="100"
-                    :step="1"
-                    :tooltip="false"
-                    lazy
-                    indicator
+                    <b-slider
+                      type="is-primary"
+                      v-model="parameter_iso_abu_threshold"
+                      :min="0"
+                      :max="100"
+                      :step="1"
+                      :tooltip="false"
+                      lazy
+                      indicator
+                    >
+                    </b-slider>
+                  </b-field>
+                </section>
+                <div><br></div>
+                <div><br></div>
+                <section style="padding: 0em 1em 0 1em">
+                  <b-field label="Display parameters" custom-class="dark">
+                  </b-field>
+                  <b-field
+                    label="Zoom-in window width [ppm]"
+                    custom-class="dark"
                   >
-                  </b-slider>
-                </b-field>
+                    <b-numberinput
+                      type="is-primary"
+                      v-model="parameter_display_target_dmz"
+                      :min="1"
+                      :step="1"
+                      :tooltip="false"
+                      lazy
+                      indicator
+                    >
+                    </b-numberinput>
+                  </b-field>
+                </section>
               </section>
             </div>
           </b-dropdown>
@@ -563,6 +596,14 @@ export default {
       },
       set(value) {
         this.$store.commit("parameter_peak_intensity_threshold", value);
+      },
+    },
+    parameter_display_target_dmz: {
+      get() {
+        return this.$store.state.parameter_display_target_dmz;
+      },
+      set(value) {
+        this.$store.commit("parameter_display_target_dmz", value);
       },
     },
     target_ions: {
