@@ -14,6 +14,7 @@ import subprocess
 import re
 import time
 from karsalib.logging import this_func_name
+from karsalib.util import recursive_walk, recursive_dir_walk
 
 import numpy as np
 import pandas as pd
@@ -119,31 +120,14 @@ class H5Pool():
                                           'path',
                                           ]
                                  )
-        # Get directories in path
+        samples = []
         try:
-            dirnames = next( os.walk(path) )[1]
+            samples = recursive_walk(path, fname_filter)
         except StopIteration:
-            print("Done")
-            return
-        # Loop through directories in root, assumed to be named by date
-        for dirname in dirnames:
-            await asyncio.sleep(0)
-            try:
-                dir_date = datetime.strptime(dirname, '%Y.%m.%d')
-            except ValueError:
-                print("Skipped directory: %s due to invalid datetime format" %dirname)
-                continue
-            dir_path = os.path.join(path, dirname)
-            # Loop through files inside
-            dir_files = next( os.walk(dir_path) )[2]
-            for filename in fnmatch.filter(dir_files, fname_filter):
-                await asyncio.sleep(0)
-                try:
-                    full_file_path = os.path.join(dir_path, filename)
-                    self.add_file(full_file_path)
-                    print(full_file_path)
-                except ValueError:
-                    continue
+            pass
+        for s in samples:
+            self.add_file(s)
+            print(' ', s)
         print("Done")
 
     def add_file(self, full_file_path):
@@ -269,50 +253,14 @@ class RawPool():
                                           'path',
                                           ]
                                  )
-
-        # Get list of all raw files in path folder
+        samples = []
         try:
-            files = next( os.walk(path) )[2]
+            samples = recursive_walk(path, fname_filter)
         except StopIteration:
-            # No files
-            print("Done")
-            return
-        # Loop through files in root, assumed to be named by date
-        for filename in fnmatch.filter(files, fname_filter):
-            await asyncio.sleep(0)
-            try:
-                full_file_path = os.path.join(path, filename)
-                self.add_file(full_file_path)
-                print(full_file_path)
-            except ValueError:
-                continue
-
-        # Get YYYY.mm.dd directories in path and get raw files from there
-        try:
-            dirnames = next( os.walk(path) )[1]
-        except StopIteration:
-            print("Done")
-            return
-        # Loop through directories in root, assumed to be named by date
-        for dirname in dirnames:
-            await asyncio.sleep(0)
-            try:
-                dir_date = datetime.strptime(dirname, '%Y.%m.%d')
-            except ValueError:
-                print("Skipped directory: %s due to invalid datetime format" %dirname)
-                continue
-            dir_path = os.path.join(path, dirname)
-            # Loop through files inside
-            dir_files = next( os.walk(dir_path) )[2]
-            for filename in fnmatch.filter(dir_files, fname_filter):
-                await asyncio.sleep(0)
-                try:
-                    full_file_path = os.path.join(dir_path, filename)
-                    self.add_file(full_file_path)
-                    print(full_file_path)
-                except ValueError:
-                    continue
-
+            pass
+        for s in samples:
+            self.add_file(s)
+            print(' ', s)
         print("Done")
 
 
@@ -836,6 +784,7 @@ class ZarrPool(H5Pool):
         """
         
         path = path or self.pool_attrs.get('path', '.')
+        dir_filters = ['*.raw', '*.h5']
 
         print("Scanning: %s" % str(path))
         if not os.path.isdir(path):
@@ -851,30 +800,14 @@ class ZarrPool(H5Pool):
                                           'datetime',
                                           ]
                                  )
-        # Get directories in path
+        samples = []
         try:
-            dirnames = next( os.walk(path) )[1]
+            samples = recursive_dir_walk(path, *dir_filters)
         except StopIteration:
-            print("Done")
-            return
-        # Loop through directories in root, assumed to be named by date
-        for dirname in dirnames:
-            await asyncio.sleep(0)
-            try:
-                dir_date = datetime.strptime(dirname, '%Y.%m.%d')
-            except ValueError:
-                print("Skipped directory: %s due to invalid datetime format" %dirname)
-                continue
-            dir_path = os.path.join(path, dirname)
-            # Loop through sample directories inside
-            dir_samples = next( os.walk(dir_path) )[1]
-            for sample_dir in dir_samples:
-                await asyncio.sleep(0)
-                try:
-                    self.add_file(sample_dir)
-                    print(sample_dir)
-                except ValueError:
-                    continue
+            pass
+        for s in samples:
+            self.add_file(s)
+            print(' ', s)
         print("Done")
 
     def add_file(self, filename):
