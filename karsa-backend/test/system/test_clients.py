@@ -25,6 +25,7 @@ class BaseTestClientCase(asynctest.TestCase):
     @classmethod
     def tearDownClass(cls):
         asyncio.run(cls.client.join_requests())
+        asyncio.run(cls.client.emit_stop_raw_import())
         cls.client.stop_client(f'{cls.__name__} tearDownClass')
 
     def setUp(self) -> None:
@@ -58,7 +59,7 @@ class TestValidateTesterCase(BaseTestClientCase):
         self.assertTrue('exceeded max execution time' in str(ctx.exception))
 
 
-@unittest.skip("TMP")
+# @unittest.skip("TMP")
 class TestVisualizerCase(BaseTestClientCase):
     # Setup:
     # ./<TofDaq> sample repo exists
@@ -143,7 +144,7 @@ class TestVisualizerCase(BaseTestClientCase):
         self.client.assert_requests_ok()
 
 
-@unittest.skip("TMP")
+# @unittest.skip("TMP")
 class TestSampleManagerCase(BaseTestClientCase):
     # Setup:
     # ./<TofDaq> sample repo exists
@@ -371,57 +372,63 @@ class BaseTestCases:
                 self.raw_samples[0]
             )
             self.assertEqual(
-                [basename(f['filename']) for f in self.client.raw_import_status_data['queue']['files']],
+                [basename(f['filename']) for f in self.client.raw_import_status_data['queue'][0]['files']],
                 self.raw_samples[1:]
             )
 
-            ## send stop_raw_import for sample in progress (sample #1 should be stopped) and
-            ## check raw_import_status - the rest of the samples should continue visualizing
+            ## send stop_raw_import for samples [#1, #2], then check raw_import_status
             asyncio.run(
-                self.client.emit_stop_raw_import()
+                self.client.emit_stop_raw_import(self.client.raw_samples_data[:2])
             )
             # TODO: ugly workaround - so far no reliable way to trace stop_raw_import complete - just wait
-            time.sleep(3)   # let #1 to stop and #2 to be taken to import
+            time.sleep(5)
+
             asyncio.run(
                 self.client.emit_raw_import_status(
                     request_id='raw_import_status',
                     max_exec_time=3)
             )
             self.client.assert_requests_ok(['raw_import_status',])
+
+            # #1 stopped; #2 withdrawn from queue, then
+            # #3 taken in_progress; #4 taken to queue
             self.assertEqual(
                 basename(self.client.raw_import_status_data['progress'][0]['filename']),
-                self.raw_samples[1]
+                self.raw_samples[2]
             )
+            self.assertEqual(len(self.client.raw_import_status_data['queue'][0]['files']), 1)
             self.assertEqual(
-                [basename(f['filename']) for f in self.client.raw_import_status_data['queue']['files']],
-                self.raw_samples[2:]
+                basename(self.client.raw_import_status_data['queue'][0]['files'][0]['filename']),
+                self.raw_samples[3]
             )
 
-            ## send stop_raw_import for the rest of samples and check raw_import_status
+            ## send stop_raw_import rest of the samples
             asyncio.run(
-                self.client.emit_stop_raw_import(self.client.raw_samples_data[1:])
+                self.client.emit_stop_raw_import([])
             )
             # TODO: ugly workaround - so far no reliable way to trace stop_raw_import complete - just wait
-            time.sleep(6)   # #2 should be stopped and #3, #4 should remove from progress list
+            time.sleep(3)
+
             asyncio.run(
                 self.client.emit_raw_import_status(
                     request_id='raw_import_status',
                     max_exec_time=3)
             )
             self.client.assert_requests_ok(['raw_import_status',])
+
             self.assertEqual(self.client.raw_import_status_data['progress'], [])
-            self.assertEqual(self.client.raw_import_status_data['queue'], {})
-            # only 2 target files were created, other two were cancelled
+            self.assertEqual(self.client.raw_import_status_data['queue'], [])
+            # only #1 and #3 target files were created, other two were cancelled
             if os.path.isdir(self.data_collection_path):
                 # not applicable, if the test and <TargetDataPool> (self.data_collection_path) are on different OSes
                 names = os.listdir(os.path.join(self.data_collection_path, self.client.data_collection_date))
                 names = sorted([n.replace(f'{self.client.instrument_name}_', '', 1) for n in names])
-                self.assertEqual(names, self.raw_samples[0:2])
+                self.assertEqual(names, [self.raw_samples[0], self.raw_samples[2]])
 
         def test_04_continue_raw_import(self):
             asyncio.run(
                 self.client.emit_raw_import(
-                    self.client.raw_samples_data[2:],
+                    [self.client.raw_samples_data[i] for i in [1, 3]],
                     request_id='continue_raw_import',
                     max_exec_time=60)
             )
@@ -432,7 +439,6 @@ class BaseTestCases:
                 names = sorted([n.replace(f'{self.client.instrument_name}_', '', 1) for n in names])
                 self.assertEqual(names, self.raw_samples)
 
-            time.sleep(2)
             # let DataViz complete full-size visualizations in <TargetDataPool>
             for i, (fname, _) in enumerate(self.client.acquired_samples):
                 rq_suffix = self.client.set_viz_test_params(fname)
