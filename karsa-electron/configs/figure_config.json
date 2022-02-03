@@ -76,6 +76,51 @@
 			}
     },
     
+	"target_intensity_chart": {
+		"axes": {
+			"sample": "x",
+			"intensity": "y"
+			},
+		"layout": {
+			"height": 440,
+			"font": {
+				"color": "#fff"
+				},
+			"xaxis": {
+				"title": "Sample",
+				"autorange": true,
+				"range": [],
+				"showgrid": true,
+				"tickmode": "array",
+				"tickvals": [],
+				"ticktext": [],
+				"visible": true
+				},
+			"yaxis": {
+				"title": "Integrated signal [a.u.]",
+				"autorange": true,
+				"visible": true,
+				"linecolor": "#999",
+				"showgrid": false,
+				"range": [],
+				"rangemode": "tozero"
+				},
+			"showlegend": true,
+			"dragmode": "select",
+			"autosize": true,
+			"hoverinfo": "name+y",
+			"plot_bgcolor": "transparent",
+			"paper_bgcolor": "transparent",
+			"margin": {
+				"l": 50,
+				"r": 10,
+				"b": 25,
+				"t": 20,
+				"pad": 0
+				}
+			}
+    },
+
 	"timeseries": {
 		"axes": {
 			"time": "x"

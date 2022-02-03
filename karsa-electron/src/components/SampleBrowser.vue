@@ -757,6 +757,7 @@ export default {
     ...mapState([
           "autosave_on",
           "new_file",
+          "parameter_peak_intensity_threshold",
           "root_namespace",
           "sample_to_link",
           ]),
@@ -775,6 +776,14 @@ export default {
       },
       set(value) {
         this.$store.commit("experiment_selected", value);
+      },
+    },
+    peak_data: {
+      get() {
+        return this.$store.state.peak_data;
+      },
+      set(value) {
+        this.$store.commit("peak_data", value);
       },
     },
     projects: {
@@ -807,6 +816,22 @@ export default {
       },
       set(value) {
         this.$store.commit("sample_in_focus", value);
+      },
+    },
+    sample_table_selected_row: {
+      get() {
+        return this.$store.state.sample_table_selected_row;
+      },
+      set(value) {
+        this.$store.commit("sample_table_selected_row", value);
+      },
+    },
+    samples: {
+      get() {
+        return this.$store.state.samples;
+      },
+      set(value) {
+        this.$store.commit("samples", value);
       },
     },
     samples_selected: {
@@ -856,12 +881,11 @@ export default {
         "./metadata_templates/experiment_templates",
       experiment_edit_form_props: {},
       // Sample metadata for selected sample
-      samples: [],
       // variables for sample table
       sample_table_rows: [],
       sample_table_cols: [],
       sample_table_checked_rows: [],
-      sample_table_selected_row: {},
+      // sample_table_selected_row: {}, // put to store
       sample_attributes: {},
       sample_attributes_default_template: [
         { label: "Title", value: "", required: true },
@@ -1015,6 +1039,19 @@ export default {
         sample_to_remove
       );
     },
+    requestPeakData(filename) {
+      this.be.export_one_way_binding_prop(
+        "peak_data_request",
+        {
+          filename: filename,
+          parameters: {
+            peak_threshold: this.parameter_peak_intensity_threshold,
+          },
+        },
+        null,
+        this.room_sid
+      );
+    },
     rightClickExperiment(event) {
       const title = event.path[0].id;
       let experiment = this.getExperiment(title);
@@ -1114,12 +1151,14 @@ export default {
           this.experiments[i].active = false;
         }
       }
+      this.peak_data = {};
       if (this.experiment_selected.title != experiment_title) {
         this.experiment_selected = this.getExperiment(experiment_title);
       }
       this.is_modal_new_experiment_active = false;
       this.is_modal_experiment_attributes_active = false;
       this.is_modal_landing_active = false;
+      this.selectSample(); // Reset selection
     },
     selectProject(project_title) {
       // if (project_title === this.project_selected.title) {
@@ -1133,6 +1172,7 @@ export default {
           this.projects[i].active = false;
         }
       }
+      this.peak_data = {};
       this.project_selected = shallow_copy(this.getProject(project_title));
       if (this.project_selected.title !== this.experiment_selected.project) {
         // Reset experiment
@@ -1144,13 +1184,17 @@ export default {
         };
       }
       this.is_modal_project_attributes_active = false;
+      this.selectSample(); // Reset selection
     },
-    selectSample(filename) {
+    selectSample(filename=null) {
       // Sample selected
       if (filename) {
         const sample = this.getSample(filename);
-        let sample_title = this.sample_table_selected_row.title;
+        let sample_title = sample.attributes[0].value;
         this.sample_in_focus = { title: sample_title, ...sample };
+        if (Object.keys(this.peak_data).indexOf(filename) == -1) {
+          this.requestPeakData(filename);
+        }
       } else {
         // Sample deselected
         this.sample_in_focus = {
@@ -1170,6 +1214,7 @@ export default {
       if (_.isEqual(new_value, old_value)) {
         return false;
       }
+      this.samples = {};
       if (!_.isEmpty(new_value.title)) {
         if (!_.isEmpty(this.room_experiment))
           this.be.leave_room(this.room_experiment);
@@ -1247,6 +1292,11 @@ export default {
           this.sample_attributes_fields = sample_attributes;
           this.launchSampleAttributeModal();
         }
+      }
+    },
+    parameter_peak_intensity_threshold: function () {
+      for (let filename in this.peak_data) {
+        this.requestPeakData(filename);
       }
     },
     project_selected: function (new_value, old_value) {
@@ -1359,7 +1409,25 @@ export default {
         });
     },
     sample_table_selected_row: function(new_value) {
+      // Hacky way of dealing with sample selection by ExperimentView click on a data point
+      if (this.sample_table_rows.indexOf(new_value) == -1) {
+        // Find sample table row for the clicked sample
+        for (let row of this.sample_table_rows) {
+          if (row.filename == new_value.filename) {
+            // Set selected row to the correct row
+            this.sample_table_selected_row = row;
+            return
+          }
+        }
+      }
       this.selectSample(new_value.filename);
+    },
+    samples_selected: function(new_value) {
+      for (let filename of new_value) {
+        if (Object.keys(this.peak_data).indexOf(filename) == -1) {
+          this.requestPeakData(filename);
+        }
+      }
     },
     "root_namespace.connected": function (new_value) {
       if (new_value === true) {
@@ -1380,6 +1448,18 @@ export default {
         this.namespace.on("samples", (value) =>
           this.be.import_one_way_binding_prop("samples", value.value)
         );
+        this.namespace.on("peak_data", (value) => {
+          console.log("receive peak_data", value.value);
+          let peaks = {
+            mz: new Float32Array(value.value.mz),
+            height: new Float32Array(value.value.height),
+            tof: new Float32Array(value.value.tof),
+            };
+          let filename = value.value.filename;
+          this.peak_data = {...this.peak_data,
+                            [filename]: peaks
+                            };
+        });
 
         this.room_sid = this.root_namespace.id;
         this.be.enter_room("projects");

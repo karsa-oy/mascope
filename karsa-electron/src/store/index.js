@@ -15,12 +15,14 @@ export default new Vuex.Store({
 		figure_data: {},
 		figure_double_click: null,
 		figure_ranges: {},
+		file_cache: {},
 		identified_ions: {},
 		identify_peaks: {},
 		ionization_mechanism: "",
 		mz_calibration: {},
 		new_file: "",
 		parameter_peak_intensity_threshold: 0.005,
+		parameter_display_target_dmz: 10,
 		peak_data: {},
 		project_selected: { 'title': "", 'attributes': [] },
 		projects: [],
@@ -35,7 +37,9 @@ export default new Vuex.Store({
 			'project': "",
 			'experiment': "",
 		},
+		sample_table_selected_row: {},
 		sample_to_link: {},
+		samples: {},
 		samples_selected: [],
 		stop_visualize_range: {},
 		target_ions: [],
@@ -43,7 +47,6 @@ export default new Vuex.Store({
 		target_compound_intensities: {},
 		target_compound_selected: {},
 		target_ion_selected: null,
-		target_clear_isotope_table: null,
 		tofdaq_log_entry: {},
 		url: "",
 		visualize_range: {},
@@ -79,6 +82,9 @@ export default new Vuex.Store({
 		figure_ranges(state, payload) {
 			state.figure_ranges = payload;
 		},
+		file_cache(state, payload) {
+			state.file_cache = payload;
+		},
 		identified_ions(state, payload) {
 			state.identified_ions = payload;
 		},
@@ -99,6 +105,9 @@ export default new Vuex.Store({
 		},
 		parameter_peak_intensity_threshold(state, payload) {
 			state.parameter_peak_intensity_threshold = payload;
+		},
+		parameter_display_target_dmz(state, payload) {
+			state.parameter_display_target_dmz = payload;
 		},
 		peak_data(state, payload) {
 			state.peak_data = payload;
@@ -121,8 +130,14 @@ export default new Vuex.Store({
 		sample_in_focus(state, payload) {
 			state.sample_in_focus = payload;
 		},
+		sample_table_selected_row(state, payload) {
+			state.sample_table_selected_row = payload;
+		},
 		sample_to_link(state, payload) {
 			state.sample_to_link = payload;
+		},
+		samples(state, payload) {
+			state.samples = payload;
 		},
 		samples_selected(state, payload) {
 			state.samples_selected = payload;
@@ -135,9 +150,6 @@ export default new Vuex.Store({
 		},
 		target_to_display(state, payload) {
 			state.target_to_display = payload;
-		},
-		target_clear_isotope_table(state, payload) {
-			state.target_clear_isotope_table = payload;
 		},
 		target_compound_intensities(state, payload) {
 			state.target_compound_intensities = payload;

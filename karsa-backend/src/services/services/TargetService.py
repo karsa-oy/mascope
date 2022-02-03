@@ -65,6 +65,7 @@ class TargetServiceNamespace(BaseClientNamespace):
         client_room = data.get('client_room') or data['cookies']['src_sid'][0]
         value = data['value']
         
+        filename = value['filename']
         peak_mzs = np.frombuffer(value['peaks']['mz'], dtype=np.float32).astype(float)
         peak_heis = np.frombuffer(value['peaks']['height'], dtype=np.float32).astype(float)
         peak_tofs = np.frombuffer(value['peaks']['tof'], dtype=np.float32).astype(float)
@@ -103,12 +104,18 @@ class TargetServiceNamespace(BaseClientNamespace):
             target_intensity = target['peak height'].sum()
             target_compound_intensities[int(target_id)] = target_intensity
 
+
+
         await self.emit_client_notification('identified_ions',
-                                            identified_ion_peaks.to_dict(orient='index'),
+                                            {'filename': filename,
+                                             'data': identified_ion_peaks.to_dict(orient='index'),
+                                             },
                                             room=client_room
                                             )
         await self.emit_client_notification('target_compound_intensities',
-                                            target_compound_intensities,
+                                            {'filename': filename,
+                                             'data': target_compound_intensities,
+                                             },
                                             room=client_room
                                             )
 

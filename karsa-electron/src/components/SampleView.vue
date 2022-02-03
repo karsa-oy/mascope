@@ -57,46 +57,56 @@
       </h1>
     </div>
     <!-- Main content  area-->
-    <div class="columns">
-      <!-- Left side -->
-      <div class="column is-half">
-        <!-- Heatmap section -->
-        <section class="heatmap-section">
-          <ViewPortSpectrogram id="spectrogram"> </ViewPortSpectrogram>
-        </section>
-        <!-- End of heatmap section-->
-        <!-- Multiselect section -->
-        <section class="multiselect-section">
-          <div hidden>
-            <div class="column tps-multiselect">
-              <h2 class="multiselect-title">Select parameter to display</h2>
-              <multiselect
-                v-model="tps_parameters_selected_ui"
-                tag-placeholder="Add this as new tag"
-                placeholder="Search or add a tag"
-                label="label"
-                track-by="value"
-                :options="tps_parameters"
-                :multiple="true"
-                :taggable="true"
-              >
-              </multiselect>
-            </div>
-          </div>
-        </section>
-        <!-- End of multiselect section -->
-        <!-- Timeseries section -->
-        <section>
-          <ViewPortTimeseries id="timeseries"> </ViewPortTimeseries>
-        </section>
-        <!-- End of timeseries -->
+    <!--  -->
+    <div class="rows">
+      <div class="row">
+        <div>
+          <ExperimentView></ExperimentView>
+        </div>
+        <!--  -->
       </div>
-
-      <!-- Right side -->
-      <div class="column is-half">
-        <!-- Spec stack section -->
-        <ViewPortWaterfall id="waterfall"> </ViewPortWaterfall>
-        <!-- End of spec stack -->
+      <div class="row">
+        <div class="columns">
+          <!-- Left side -->
+          <div class="column is-half">
+            <!-- Heatmap section -->
+            <section class="heatmap-section">
+              <ViewPortSpectrogram id="spectrogram"> </ViewPortSpectrogram>
+            </section>
+            <!-- End of heatmap section-->
+            <!-- Multiselect section -->
+            <section class="multiselect-section">
+              <div hidden>
+                <div class="column tps-multiselect">
+                  <h2 class="multiselect-title">Select parameter to display</h2>
+                  <multiselect
+                    v-model="tps_parameters_selected_ui"
+                    tag-placeholder="Add this as new tag"
+                    placeholder="Search or add a tag"
+                    label="label"
+                    track-by="value"
+                    :options="tps_parameters"
+                    :multiple="true"
+                    :taggable="true"
+                  >
+                  </multiselect>
+                </div>
+              </div>
+            </section>
+            <!-- End of multiselect section -->
+            <!-- Timeseries section -->
+            <section>
+              <ViewPortTimeseries id="timeseries"> </ViewPortTimeseries>
+            </section>
+            <!-- End of timeseries -->
+          </div>
+          <!-- Right side -->
+          <div class="column is-half">
+            <!-- Spec stack section -->
+            <ViewPortWaterfall id="waterfall"> </ViewPortWaterfall>
+            <!-- End of spec stack -->
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -109,6 +119,7 @@ import Vue from "vue";
 import { mapState } from "vuex";
 import Buefy from "buefy";
 import Multiselect from "vue-multiselect";
+import ExperimentView from "./ExperimentView.vue";
 import MetaDataForm from "./MetaDataForm.vue";
 import ViewPortSpectrogram from "./ViewPortSpectrogram.vue";
 import ViewPortTimeseries from "./ViewPortTimeseries.vue";
@@ -124,6 +135,7 @@ var _ = require("underscore");
 export default {
   name: "SampleView",
   components: {
+    ExperimentView,
     MetaDataForm,
     // using third party multiselect component
     Multiselect,
@@ -139,6 +151,7 @@ export default {
       "experiment_selected",
       "figure_double_click",
       "parameter_peak_intensity_threshold",
+      "parameter_display_target_dmz",
       "root_namespace",
       "sample_annotation_timestamp",
       "sample_in_focus",
@@ -162,14 +175,6 @@ export default {
         this.$store.commit("figure_ranges", value);
       },
     },
-    peak_data: {
-      get() {
-        return this.$store.state.peak_data;
-      },
-      set(value) {
-        this.$store.commit("peak_data", value);
-      },
-    },
     sample_annotations: {
       get() {
         return this.$store.state.sample_annotations;
@@ -184,14 +189,6 @@ export default {
       },
       set(value) {
         this.$store.commit("tofdaq_log_entry", value);
-      },
-    },
-    target_clear_isotope_table: {
-      get() {
-        return this.$store.state.target_clear_isotope_table;
-      },
-      set(value) {
-        this.$store.commit("target_clear_isotope_table", value);
       },
     },
   },
@@ -272,30 +269,11 @@ export default {
         this.room_sid
       );
     },
-
-    requestPeakData() {
-      if (this.filename) {
-        this.be.export_one_way_binding_prop(
-          "peak_data_request",
-          {
-            filename: this.filename,
-            parameters: {
-              peak_threshold: this.parameter_peak_intensity_threshold,
-            },
-          },
-          null,
-          this.room_sid
-        );
-      }
-    },
   },
 
   watch: {
     figure_double_click: function () {
       return;
-    },
-    parameter_peak_intensity_threshold: function () {
-      this.requestPeakData();
     },
     sample_annotation_fields: {
       handler() {
@@ -314,8 +292,6 @@ export default {
         mz_range: new_value.properties.range,
         id: Math.random().toString(36).substring(2),
       };
-      this.target_clear_isotope_table = Math.random().toString(36).substring(2);
-      this.requestPeakData();
     },
     stop_visualize_range: function (new_value, old_value) {
       if (_.isEqual(new_value.request_ids, old_value.request_ids)) {
@@ -336,7 +312,7 @@ export default {
         return false;
       }
       let mz = new_value;
-      let dmz = 1000; // ppm
+      let dmz = this.parameter_display_target_dmz; // ppm
       let target_mz_range = [(1 - dmz * 1e-6) * mz, (1 + dmz * 1e-6) * mz];
       let new_figure_ranges = {
         filename: this.filename,
@@ -390,14 +366,6 @@ export default {
         this.namespace.on("figure_data", (value) =>
           this.be.import_one_way_binding_prop("figure_data", value)
         );
-        this.namespace.on("peak_data", (value) =>
-          this.be.import_one_way_binding_prop("peak_data", {
-            mz: new Float32Array(value.value.mz),
-            height: new Float32Array(value.value.height),
-            tof: new Float32Array(value.value.tof),
-          })
-        );
-
         this.room_sid = this.root_namespace.id;
       }
     },

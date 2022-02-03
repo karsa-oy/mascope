@@ -168,6 +168,7 @@ class SignalProcessorNamespace(BaseClientNamespace):
             return
 
         peak_data = {
+                'filename': filename,
                 'mz': peak_mz.tobytes(),
                 'height': peak_hei.tobytes(),
                 'tof': peak_ind.tobytes()

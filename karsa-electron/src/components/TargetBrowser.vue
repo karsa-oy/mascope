@@ -321,64 +321,97 @@
             </b-button>
             <div style="width: 25vw">
               <section style="padding: 0em 1em 0 1em">
-                <b-field
+                <section style="padding: 0em 1em 0 1em">
+                  <b-field label="Peak detection parameters" custom-class="dark">
+                  </b-field>
+                  <b-field
                   label="peak intensity threshold [%]"
                   custom-class="dark"
-                >
-                  <b-numberinput
-                    type="is-primary"
-                    v-model="parameter_peak_intensity_threshold"
-                    :min="0"
-                    :step="0.01"
-                    :tooltip="false"
-                    lazy
-                    indicator
                   >
-                  </b-numberinput>
-                </b-field>
-                <b-field label="m/z tolerance [ppm]" custom-class="dark">
-                  <b-numberinput
-                    type="is-primary"
-                    v-model="parameter_mz_tolerance"
-                    :min="0"
-                    :step="1"
-                    :tooltip="false"
-                    lazy
-                    indicator
+                    <b-numberinput
+                      type="is-primary"
+                      v-model="parameter_peak_intensity_threshold"
+                      :min="0"
+                      :step="0.01"
+                      :tooltip="false"
+                      lazy
+                      indicator
+                    >
+                    </b-numberinput>
+                  </b-field>
+                </section>
+                <div><br></div>
+                <div><br></div>
+                <section style="padding: 0em 1em 0 1em">
+                  <b-field label="Target identification parameters" custom-class="dark">
+                  </b-field>
+                  <b-field label="m/z tolerance [ppm]" custom-class="dark">
+                    <b-numberinput
+                      type="is-primary"
+                      v-model="parameter_mz_tolerance"
+                      :min="0"
+                      :step="1"
+                      :tooltip="false"
+                      lazy
+                      indicator
+                    >
+                    </b-numberinput>
+                  </b-field>
+                  <b-field
+                    label="isotope ratio tolerance [%]"
+                    custom-class="dark"
+                    grouped
                   >
-                  </b-numberinput>
-                </b-field>
-                <b-field
-                  label="isotope ratio tolerance [%]"
-                  custom-class="dark"
-                >
-                  <b-slider
-                    type="is-primary"
-                    v-model="parameter_iso_ratio_tolerance"
-                    :min="0"
-                    :max="100"
-                    :tooltip="false"
-                    lazy
-                    indicator
+                    <b-slider
+                      type="is-primary"
+                      v-model="parameter_iso_ratio_tolerance"
+                      :min="0"
+                      :max="100"
+                      :tooltip="false"
+                      lazy
+                      indicator
+                    >
+                    </b-slider>
+                  </b-field>
+                  <b-field
+                    label="isotope abundance threshold [%]"
+                    custom-class="dark"
+                    grouped
                   >
-                  </b-slider>
-                </b-field>
-                <b-field
-                  label="isotope abundance threshold [%]"
-                  custom-class="dark"
-                >
-                  <b-slider
-                    type="is-primary"
-                    v-model="parameter_iso_abu_threshold"
-                    :min="0"
-                    :max="100"
-                    :step="1"
-                    :tooltip="false"
-                    lazy
-                    indicator
+                    <b-slider
+                      type="is-primary"
+                      v-model="parameter_iso_abu_threshold"
+                      :min="0"
+                      :max="100"
+                      :step="1"
+                      :tooltip="false"
+                      lazy
+                      indicator
+                    >
+                    </b-slider>
+                  </b-field>
+                </section>
+                <div><br></div>
+                <div><br></div>
+                <section style="padding: 0em 1em 0 1em">
+                  <b-field label="Display parameters" custom-class="dark">
+                  </b-field>
+                  <b-field
+                    label="Zoom-in window width [ppm]"
+                    custom-class="dark"
                   >
-                  </b-slider>
-                </b-field>
+                    <b-numberinput
+                      type="is-primary"
+                      v-model="parameter_display_target_dmz"
+                      :min="1"
+                      :step="1"
+                      :tooltip="false"
+                      lazy
+                      indicator
+                    >
+                    </b-numberinput>
+                  </b-field>
+                </section>
               </section>
             </div>
           </b-dropdown>
@@ -460,7 +493,7 @@
           # identified peaks: {{ isotope_table_checked_rows.length }}
         </div>
         <div style="color: white">
-          # found peaks: {{ peak_data.mz ? peak_data.mz.length : 0 }}
+          # found peaks: {{ peak_data[sample_in_focus.filename] && peak_data[sample_in_focus.filename].mz ? peak_data[sample_in_focus.filename].mz.length : 0 }}
         </div>
       </div>
       <!-- End of isotope table -->
@@ -516,7 +549,6 @@ export default {
       "root_namespace",
       "sample_in_focus",
       "samples_selected",
-      "target_clear_isotope_table",
     ]),
     compute_target_ions: {
       get() {
@@ -564,6 +596,14 @@ export default {
       },
       set(value) {
         this.$store.commit("parameter_peak_intensity_threshold", value);
+      },
+    },
+    parameter_display_target_dmz: {
+      get() {
+        return this.$store.state.parameter_display_target_dmz;
+      },
+      set(value) {
+        this.$store.commit("parameter_display_target_dmz", value);
       },
     },
     target_ions: {
@@ -622,10 +662,11 @@ export default {
             });
           }
           row["items"] = updated_ions;
+          let filename = this.sample_in_focus.filename;
           new_rows.push({
             ...row,
             2: this.target_match_scores[target_id]["total"],
-            3: this.target_compound_intensities[target_id] ? Math.round(this.target_compound_intensities[target_id]) : null,
+            3: this.target_compound_intensities[filename] && this.target_compound_intensities[filename][target_id] ? Math.round(this.target_compound_intensities[filename][target_id]) : null,
           });
         }
         return new_rows;
@@ -697,6 +738,9 @@ export default {
       isotope_table_show_only_checked: false,
       isotope_table_filters: {},
       //
+      // Experiment table
+
+      // 
       room_sid: null,
       endpoints: [],
     };
@@ -729,6 +773,16 @@ export default {
     clearIsotopeTableData() {
       this.isotope_table_cols = [];
       this.isotope_table_all_rows = [];
+    },
+    clearTargetFilters() {
+      this.target_table_filters = {};
+      this.isotope_table_filters = {};
+      this.$nextTick(this.refreshTargetFilters);
+      this.$nextTick(this.refreshIsotopeFilters);
+      this.$nextTick(() => {
+        this.target_compound_selected = {};
+        this.target_ion_selected = null;
+      });
     },
     drawMzCalibStatsFigure() {
       let mz = this.mz_calibration.stats["mz"];
@@ -895,8 +949,41 @@ export default {
       }
       this.target_table_rows = target_table_data.rows;
     },
-    requestPeakIdentification() {
-      let peaks_exist = this.peak_data.mz && this.peak_data.mz.length;
+    refreshTargetFilters() {
+      let updatedFilters = [];
+      let clearedFilters = [];
+      for (let col of this.target_table_all_cols) {
+        let field = col.field;
+        let filter = "";
+        if (field in this.target_table_filters) {
+          filter = this.target_table_filters[field];
+          updatedFilters.push(`${field} (${filter})`);
+        } else {
+          clearedFilters.push(field);
+        }
+        this.$set(this.$refs.target_table.filters, field, String(filter));
+      }
+    },
+    refreshIsotopeFilters() {
+      let updatedFilters = [];
+      let clearedFilters = [];
+      for (let col of this.isotope_table_cols) {
+        let field = col.field;
+        let filter = "";
+        if (field in this.isotope_table_filters) {
+          filter = this.isotope_table_filters[field];
+          updatedFilters.push(`${field} (${filter})`);
+        } else {
+          clearedFilters.push(field);
+        }
+        this.$set(this.$refs.isotope_table.filters, field, String(filter));
+      }
+    },
+    requestPeakIdentification(filename) {
+      // let filename = this.sample_in_focus.filename;
+      let peaks_exist = this.peak_data[filename] &&
+                        this.peak_data[filename].mz &&
+                        this.peak_data[filename].mz.length;
       let targets_exist = this.target_ions.length > 0;
       if (!peaks_exist || !targets_exist) {
         return;
@@ -907,7 +994,8 @@ export default {
         min_iso_abu: this.parameter_iso_abu_threshold,
       };
       this.identify_peaks = {
-        peaks: this.peak_data,
+        filename: filename,
+        peaks: this.peak_data[filename],
         target_ions: this.target_ions,
         parameters: parameters,
       };
@@ -937,13 +1025,13 @@ export default {
         filters: this.$refs.isotope_table.filters,
       });
     },
+    setTargetTableDetails(row) {
+      this.target_table_detailed_rows = [row["0"]];
+    },
     sortTargets() {
       this.$nextTick(() => {
         this.$refs.target_table.sort(this.$refs.targetMatchScoreColumn);
       });
-    },
-    setTargetTableDetails(row) {
-      this.target_table_detailed_rows = [row["0"]];
     },
     updateIsotopeTableData(data) {
       // Format data to isotope table
@@ -983,46 +1071,6 @@ export default {
       this.isotope_table_cols = [...this.isotope_table_cols, ...cols_to_add];
       this.isotope_table_all_rows = rows;
     },
-    refreshTargetFilters() {
-      let updatedFilters = [];
-      let clearedFilters = [];
-      for (let col of this.target_table_all_cols) {
-        let field = col.field;
-        let filter = "";
-        if (field in this.target_table_filters) {
-          filter = this.target_table_filters[field];
-          updatedFilters.push(`${field} (${filter})`);
-        } else {
-          clearedFilters.push(field);
-        }
-        this.$set(this.$refs.target_table.filters, field, String(filter));
-      }
-    },
-    refreshIsotopeFilters() {
-      let updatedFilters = [];
-      let clearedFilters = [];
-      for (let col of this.isotope_table_cols) {
-        let field = col.field;
-        let filter = "";
-        if (field in this.isotope_table_filters) {
-          filter = this.isotope_table_filters[field];
-          updatedFilters.push(`${field} (${filter})`);
-        } else {
-          clearedFilters.push(field);
-        }
-        this.$set(this.$refs.isotope_table.filters, field, String(filter));
-      }
-    },
-    clearTargetFilters() {
-      this.target_table_filters = {};
-      this.isotope_table_filters = {};
-      this.$nextTick(this.refreshTargetFilters);
-      this.$nextTick(this.refreshIsotopeFilters);
-      this.$nextTick(() => {
-        this.target_compound_selected = {};
-        this.target_ion_selected = null;
-      });
-    },
     updateTargetFilterState(event) {
       this.target_table_filters = event.filters;
     },
@@ -1046,59 +1094,15 @@ export default {
         this.mz_calib_stats_table_rows.push(row);
       }
     },
-    writeTargetsToFile() {
-      let target_table_data = {
-        cols: this.target_table_cols,
-        rows: this.target_table_rows,
-        ionization_mechanism: this.ionization_mechanism,
-      };
-      fs.writeFileSync(
-        "configs/user/target_list.json",
-        JSON.stringify(target_table_data, null, 3)
-      );
-    },
-  },
-  watch: {
-    compute_target_ions: function (new_value, old_value) {
-      if (_.isEqual(new_value, old_value)) {
-        return;
-      }
-      this.be.export_one_way_binding_prop(
-        "compute_target_ions",
-        { ...new_value, room: this.room_sid, uid: Math.random() },
-        old_value,
-        this.room_sid
-      );
-    },
-    excel_clipboard_text: function (new_value, old_value) {
-      if (new_value === old_value || !new_value.length) {
-        return;
-      }
-      this.parseExcelClipboard(new_value);
-    },
-    excel_clipboard_use_header: function (new_value) {
-      if (new_value) {
-        let header = this.excel_clipboard_table_rows.slice(0, 1)[0];
-        for (let i = 0; i < this.excel_clipboard_table_cols.length; i++) {
-          let label = header[i];
-          this.excel_clipboard_table_cols[i]["label"] = label.slice(0);
-        }
-        this.excel_clipboard_table_rows =
-          this.excel_clipboard_table_rows.slice(1);
-      }
-    },
-    figure_double_click: function () {
-      this.target_to_display = null;
-      this.isotope_table_selected_row = null;
-    },
-    identified_ions: function (new_value) {
+    updateTablesOnSampleSelected() {
+      let sample_identified_ions = this.identified_ions[this.sample_in_focus.filename];
       this.updateIsotopeTableData(this.target_ions);
       this.isotope_table_checked_rows = [];
       let identified_targets = new Set();
       let identified_ions = new Set();
       let first_round = true;
-      for (let row_i in new_value) {
-        let row = new_value[row_i];
+      for (let row_i in sample_identified_ions) {
+        let row = sample_identified_ions[row_i];
         // Check if columns need to be extended
         if (first_round) {
           let cols_to_add = [];
@@ -1179,6 +1183,56 @@ export default {
       this.target_table_key = Math.random();
       this.sortTargets();
     },
+    writeTargetsToFile() {
+      let target_table_data = {
+        cols: this.target_table_cols,
+        rows: this.target_table_rows,
+        ionization_mechanism: this.ionization_mechanism,
+      };
+      fs.writeFileSync(
+        "configs/user/target_list.json",
+        JSON.stringify(target_table_data, null, 3)
+      );
+    },
+  },
+  watch: {
+    compute_target_ions: function (new_value, old_value) {
+      if (_.isEqual(new_value, old_value)) {
+        return;
+      }
+      this.be.export_one_way_binding_prop(
+        "compute_target_ions",
+        { ...new_value, room: this.room_sid, uid: Math.random() },
+        old_value,
+        this.room_sid
+      );
+    },
+    excel_clipboard_text: function (new_value, old_value) {
+      if (new_value === old_value || !new_value.length) {
+        return;
+      }
+      this.parseExcelClipboard(new_value);
+    },
+    excel_clipboard_use_header: function (new_value) {
+      if (new_value) {
+        let header = this.excel_clipboard_table_rows.slice(0, 1)[0];
+        for (let i = 0; i < this.excel_clipboard_table_cols.length; i++) {
+          let label = header[i];
+          this.excel_clipboard_table_cols[i]["label"] = label.slice(0);
+        }
+        this.excel_clipboard_table_rows =
+          this.excel_clipboard_table_rows.slice(1);
+      }
+    },
+    experiment_selected: function() {
+      this.target_compound_intensities = {};
+    },
+    identified_ions: function (new_value, old_value) {
+      if (new_value[this.sample_in_focus.filename] !=
+          old_value[this.sample_in_focus.filename]) {
+        this.updateTablesOnSampleSelected();
+      }
+    },
     identify_peaks: function (new_value, old_value) {
       if (_.isEqual(new_value, old_value)) {
         return;
@@ -1199,25 +1253,6 @@ export default {
       this.$nextTick(this.refreshIsotopeFilters);
       this.$nextTick(this.refreshTargetFilters);
     },
-    mz_calib_compound_table_checked_rows: function () {
-      this.updateMzCalibPeaks();
-    },
-    mz_calibration: function () {
-      this.updateMzCalibStatsTable();
-      this.drawMzCalibStatsFigure();
-    },
-    parameter_iso_abu_threshold: function () {
-      this.requestTargetIons();
-    },
-    parameter_iso_ratio_tolerance: function () {
-      this.requestPeakIdentification();
-    },
-    parameter_mz_tolerance: function () {
-      this.requestPeakIdentification();
-    },
-    peak_data: function () {
-      this.requestPeakIdentification();
-    },
     isotope_table_selected_row: function (new_value) {
       if (new_value != null) {
         let mz = new_value["mz"];
@@ -1235,6 +1270,44 @@ export default {
         return;
       }
       this.isotope_table_rows = this.isotope_table_all_rows;
+    },
+    mz_calib_compound_table_checked_rows: function () {
+      this.updateMzCalibPeaks();
+    },
+    mz_calibration: function () {
+      this.updateMzCalibStatsTable();
+      this.drawMzCalibStatsFigure();
+    },
+    parameter_iso_abu_threshold: function () {
+      this.requestTargetIons();
+    },
+    parameter_iso_ratio_tolerance: function () {
+      for (let filename in this.peak_data) {
+        this.requestPeakIdentification(filename);
+      }
+    },
+    parameter_mz_tolerance: function () {
+      for (let filename in this.peak_data) {
+        this.requestPeakIdentification(filename);
+      }
+    },
+    peak_data: {
+      handler(new_value, old_value) {
+        if (!new_value) {
+          this.identified_ions = {};
+          this.target_compound_intensities = {};
+        }
+        for (let filename in new_value) {
+          if (new_value[filename] !=
+              old_value[filename]) {
+            this.requestPeakIdentification(filename);
+            }
+        }
+      },
+      deep: true
+    },
+    sample_in_focus: function() {
+      this.updateTablesOnSampleSelected();
     },
     target_ions: function (new_value) {
       // Clear target ions from target table row details
@@ -1254,13 +1327,13 @@ export default {
       }
       //
       this.updateIsotopeTableData(new_value);
-      this.requestPeakIdentification();
+      this.identified_ions = {};
+      for (let filename in this.peak_data) {
+        this.requestPeakIdentification(filename);
+      }
     },
     target_table_rows: function () {
       this.requestTargetIons();
-    },
-    target_clear_isotope_table: function () {
-      this.clearIsotopeTableData();
     },
     target_compound_selected: function (new_value) {
       // clear any existing ion selectors
@@ -1302,30 +1375,20 @@ export default {
       if (new_value === true) {
         this.namespace = this.root_namespace;
         // handlers for for external notifications:
-        this.namespace.on("identified_ions", (value) =>
-          this.be.import_one_way_binding_prop("identified_ions", value.value)
-        );
+        this.namespace.on("identified_ions", (value) => {
+          console.log("receive identified_ions", value.value);
+          this.identified_ions = {...this.identified_ions,
+                                  [value.value.filename]: value.value.data
+                                  };
+        });
         this.namespace.on("target_ions", (value) =>
           this.be.import_one_way_binding_prop("target_ions", value.value)
         );
-        this.namespace.on("target_ion_selected", (value) =>
-          this.be.import_one_way_binding_prop(
-            "target_ion_selected",
-            value.value
-          )
-        );
-        this.namespace.on("target_compound_intensities", (value) =>
-          this.be.import_one_way_binding_prop(
-            "target_compound_intensities",
-            value.value
-          )
-        );
-        this.namespace.on("target_compound_selected", (value) =>
-          this.be.import_one_way_binding_prop(
-            "target_compound_selected",
-            value.value
-          )
-        );
+        this.namespace.on("target_compound_intensities", (value) => {
+          this.target_compound_intensities = {...this.target_compound_intensities,
+                                              [value.value.filename]: value.value.data
+                                              };
+        });
         this.namespace.on("target_match_scores", (value) =>
           this.be.import_one_way_binding_prop(
             "target_match_scores",
