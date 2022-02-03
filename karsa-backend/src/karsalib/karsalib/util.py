@@ -1,7 +1,10 @@
+import argparse
+import fnmatch
+import os
 import random
 import string
 import yaml
-import argparse
+
 from datetime import datetime, timedelta
 from karsalib.struct import AttrDict
 
@@ -73,6 +76,32 @@ def get_client_notification_context(data):
     ignoring 'name' and 'value' fields.
     """
     return copy_dict(data, ignore_keys=['name', 'value'])
+
+def recursive_walk(dir_path, *file_masks):
+    print('walking', dir_path)
+    res = []
+    cur_dir, dirs, files = next(os.walk(dir_path))
+    for file_mask in file_masks:
+        fs = fnmatch.filter(files, file_mask)
+        fs = map(lambda fname: os.path.join(cur_dir, fname), fs)
+        res.extend(fs)
+    for d in dirs:
+        fs = recursive_walk(os.path.join(cur_dir, d), *file_masks)
+        res.extend(fs)
+    return res
+
+def recursive_dir_walk(dir_path, *dir_masks):
+    print('walking', dir_path)
+    res = []
+    cur_dir, dirs, files = next(os.walk(dir_path))
+    for dir_mask in dir_masks:
+        ds = fnmatch.filter(dirs, dir_mask)
+        fs = map(lambda dname: os.path.join(cur_dir, dname), ds)
+        res.extend(ds)
+    for d in dirs:
+        ds = recursive_walk(os.path.join(cur_dir, d), *dir_masks)
+        res.extend(ds)
+    return res
 
 def parse_cmd_args():
     """

@@ -205,7 +205,7 @@ export function makeValidFilename(string) {
 export function read_dotenv() {
         let dotenv = {};
         let default_path = './configs/.env';
-        let user_path = './configs/.env';
+        let user_path = './configs/user/.env';
         let path = default_path;
         if (fs.existsSync(user_path)) {
             path = user_path;
