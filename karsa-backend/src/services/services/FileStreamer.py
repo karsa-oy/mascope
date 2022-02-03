@@ -267,7 +267,7 @@ class FileStreamerServiceClient(BaseStreamerClient):
         try:
             self.log(path)
             self.data_pool.add_file(path)
-            if self.args.transit:
+            if self.transit:
                 filename = basename(path)
                 self.log('transit', filename)
                 raw_sample_data = {
@@ -279,7 +279,7 @@ class FileStreamerServiceClient(BaseStreamerClient):
                     # unique client_room - for a new transit request not to replace prev.one
                     'client_room': generate_unique_key(),
                 }
-                sleep(3)   # let file object to be createe properly
+                sleep(3)   # let file object to be created properly
                 asyncio.run(self.private_ns.on_raw_import(raw_sample_data))
         except ValueError:
             pass
