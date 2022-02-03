@@ -114,7 +114,7 @@ def parse_cmd_args():
     parser.add_argument("-u", "--url", help="backend url", type=str, required=False)
     parser.add_argument("-p", "--port", help="backend port", type=int, required=False)
     parser.add_argument("-n", "--ns", help="instrument namespace to connect", type=str, required=False)
-    parser.add_argument("-c", "--config", help="path to yaml config file", type=str, default=None)
+    parser.add_argument("-c", "--config", help="path to yaml config file", type=str, required=False)
     parser.add_argument("-nj", "--n_jobs", help="number of job processors", type=int, required=False)
     parser.add_argument("-st", "--streamer_type", help="streamer type (H5/Raw)", type=str, required=False)
     parser.add_argument("-m", "--data_pool_mask", help="file mask to watch", type=str, required=False)
@@ -122,7 +122,7 @@ def parse_cmd_args():
     parser.add_argument("-t", "--target_data_pool_path", help="target data pool path for streaming (before date dirs)", type=str, required=False)
     parser.add_argument("-tr", "--transit", help="transit mode for streaming", action='store_true', required=False)
 
-    default_args = dict(url='localhost', port=5010, ns='/', n_jobs=1, transit=False)
+    default_args = dict(url='localhost', port=5010, ns='/')
 
     all_args = parser.parse_args()
     cmdline_args = {}
@@ -136,8 +136,7 @@ def parse_cmd_args():
         with open(all_args.config, 'r') as f:
             file_args = yaml.safe_load(f)
     return AttrDict(
-        **{ **vars(all_args),
-            **default_args,
+        **{ **default_args,
             **file_args,
             **cmdline_args})
 

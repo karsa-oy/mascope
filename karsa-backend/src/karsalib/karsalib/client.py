@@ -36,10 +36,12 @@ def run_streamer_service(StreamerClient,
     while True:
         streamer_type = args.get('streamer_type')
         n_jobs = int(args.get('n_jobs', 1))
+        transit = args.get('transit', False)
         # existing target_data_pool_path switches from mode.stream to mode.store
         target_data_pool_path = args.get('target_data_pool_path')
         streamer_opts = {'type': streamer_type,
                          'n_jobs': n_jobs,
+                         'transit': transit,
                          'target_data_pool_path': target_data_pool_path
                          }
         data_pool_path = args.get('data_pool_path')
@@ -54,7 +56,6 @@ def run_streamer_service(StreamerClient,
                                     ('/', StreamerPublicNamespace),
                                     (args['ns'], StreamerPrivateNamespace)
                                 )
-            client.args = args
             break
         except ModuleNotFoundError as e:
             print(str(e))
@@ -580,7 +581,8 @@ class BaseStreamerClient(BridgeServiceClient):
                  url, port, public_namespace_data, private_namespace_data):
         super().__init__(url, port, public_namespace_data, private_namespace_data)
         streamer_type = streamer_opts['type']
-        n_jobs = streamer_opts['n_jobs']
+        self.n_jobs = streamer_opts['n_jobs']
+        self.transit = streamer_opts['transit']
         # target_data_pool_path switches bw stream/store modes
         self.target_data_pool_path = streamer_opts['target_data_pool_path']
         self.streamers = []
@@ -601,7 +603,7 @@ class BaseStreamerClient(BridgeServiceClient):
         }
         m = importlib.import_module(streamer_info[streamer_type]['module'],
                                     streamer_info[streamer_type]['package'])
-        for _ in range(n_jobs):
+        for _ in range(self.n_jobs):
             self.streamers.append( getattr(m, f'{streamer_type}Streamer')(client=self) )
 
         self.data_pool = None
