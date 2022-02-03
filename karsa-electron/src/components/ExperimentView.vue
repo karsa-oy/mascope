@@ -102,12 +102,11 @@ mounted: function() {
         // this.log(eventData);
         switch (eventData.event.button){
             case 0: {
-                this.log('left click', eventData);
+                // this.log('left click', eventData);
                 // Get filename from eventData
                 let p0 = eventData.points[0];
                 let point_ind = p0.pointIndex;
                 let clicked_sample_id = p0.data.sample_id[point_ind]; // get custom item 'sample_id'
-                this.log("clicked sample: ", this.samples[clicked_sample_id]);
                 this.sample_table_selected_row = {filename: clicked_sample_id};
                 break
             }

@@ -1151,12 +1151,14 @@ export default {
           this.experiments[i].active = false;
         }
       }
+      this.peak_data = {};
       if (this.experiment_selected.title != experiment_title) {
         this.experiment_selected = this.getExperiment(experiment_title);
       }
       this.is_modal_new_experiment_active = false;
       this.is_modal_experiment_attributes_active = false;
       this.is_modal_landing_active = false;
+      this.selectSample(); // Reset selection
     },
     selectProject(project_title) {
       // if (project_title === this.project_selected.title) {
@@ -1170,6 +1172,7 @@ export default {
           this.projects[i].active = false;
         }
       }
+      this.peak_data = {};
       this.project_selected = shallow_copy(this.getProject(project_title));
       if (this.project_selected.title !== this.experiment_selected.project) {
         // Reset experiment
@@ -1181,9 +1184,9 @@ export default {
         };
       }
       this.is_modal_project_attributes_active = false;
+      this.selectSample(); // Reset selection
     },
-    selectSample(filename) {
-      console.log("selectSample:", filename);
+    selectSample(filename=null) {
       // Sample selected
       if (filename) {
         const sample = this.getSample(filename);
@@ -1292,7 +1295,9 @@ export default {
       }
     },
     parameter_peak_intensity_threshold: function () {
-      this.requestPeakData(this.sample_in_focus.filename);
+      for (let filename in this.peak_data) {
+        this.requestPeakData(filename);
+      }
     },
     project_selected: function (new_value, old_value) {
       if (_.isEqual(new_value.title, old_value.title)) {
@@ -1404,6 +1409,17 @@ export default {
         });
     },
     sample_table_selected_row: function(new_value) {
+      // Hacky way of dealing with sample selection by ExperimentView click on a data point
+      if (this.sample_table_rows.indexOf(new_value) == -1) {
+        // Find sample table row for the clicked sample
+        for (let row of this.sample_table_rows) {
+          if (row.filename == new_value.filename) {
+            // Set selected row to the correct row
+            this.sample_table_selected_row = row;
+            return
+          }
+        }
+      }
       this.selectSample(new_value.filename);
     },
     samples_selected: function(new_value) {

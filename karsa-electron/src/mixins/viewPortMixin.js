@@ -804,7 +804,7 @@ export const viewPortMixin = {
         },
         peak_data: async function() {
             let peak_data = this.peak_data[this.figure_ranges.filename];
-            if (!peak_data.mz) {
+            if (!peak_data || !peak_data.mz) {
                 return
             }
             let mz_axis = this.figure_axes.mz;
