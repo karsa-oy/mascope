@@ -97,7 +97,7 @@ function createWindow() {
         webPreferences: {
             nodeIntegration: true,
         },
-        frame: isDevelopment,
+        // frame: isDevelopment,
         // fullscreen: false,
     });
 

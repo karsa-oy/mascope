@@ -541,14 +541,16 @@ class CacheQ(QConnect):
         self.lock.release()
         return data
 
-    def cache_delete_key(self, key):
+    def cache_delete_key(self, *subkeys):
+        # subkeys: a list or a string of subkeys devided by separator
         with self.lock:
+            key = self.cache_key_separator.join(subkeys)
+            level_keys = key.split(self.cache_key_separator)
             if self.in_q:
                 # set ignore-marker for data, which is pending in in_q
                 self.in_q_filters.append(key)
                 self.in_q.put({'name': '__stop_fits_filter', 'key': key})
             # delete cache hierarchy for the key
-            level_keys = key.split(self.cache_key_separator)
             cache_level = self.cache
             key_to_delete = level_keys.pop(0)
             while level_keys:
@@ -556,6 +558,10 @@ class CacheQ(QConnect):
                 key_to_delete = level_keys.pop(0)
             if key_to_delete in cache_level:
                 del cache_level[key_to_delete]
+
+    def cache_clear(self):
+        with self.lock:
+            self.cache.clear()
 
     def fits_filter(self, data):
         with self.lock:
@@ -801,6 +807,9 @@ class FSWatcher:
                 mask = [mask, ]
             super().__init__(patterns=mask)
 
+        def log(self, *arg):
+            print(f"[{self.__class__.__name__}.{inspect.stack()[1].function}]", *arg)
+
         def on_created(self, event):
             try:
                 self.client.on_filesystem_object_created(event.src_path)
@@ -844,8 +853,8 @@ class FSWatcher:
                 self.log(f"Exception {e.__class__.__name__}({str(e)})")
                 pass
 
-    def log(self, *arg, **kwarg):
-        print(f"[{self.__class__.__name__}.{inspect.stack()[1].function}]", *arg, **kwarg)
+    def log(self, *arg):
+        print(f"[{self.__class__.__name__}.{inspect.stack()[1].function}]", *arg)
 
     def __init__(self, client, target_attrs, recursive=False):
         self.client = client
@@ -857,7 +866,7 @@ class FSWatcher:
     def start(self):
         self.observer.schedule(self.handler, self.target_attrs['path'], recursive=self.recursive)
         self.observer.start()
-        self.log('started')
+        self.log('started watching', self.target_attrs)
 
     def stop(self):
         self.observer.stop()

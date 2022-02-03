@@ -4,14 +4,17 @@ FileStreamer Service
 
 import os
 import re
+from time import sleep
+import asyncio
 from datetime import datetime
+from ntpath import basename, dirname
 
 from karsalib.client import (
                         BaseClientNamespace,
                         BaseStreamerClient,
                         run_streamer_service
                         )
-from karsalib.util import get_client_notification_context
+from karsalib.util import get_client_notification_context, generate_unique_key
 from karsalib.logging import Logger, parent_func_name
 
 
@@ -101,75 +104,88 @@ class FileStreamerPrivateNamespace(BaseClientNamespace):
             self.parent.requests.cache_put(rdata)
 
     async def on_raw_import_status(self, data):
-        import time
         with self.parent.lock:
             kwargs = get_client_notification_context(data)
             client_room = data['client_room']
             progress_data = []
             for (c_room, f_name), streamer in self.parent.in_progress.items():
-                if c_room != client_room:
-                    continue
+                # if c_room != client_room:
+                #     continue
                 progress_data.append({
                     **streamer.fdata,
                     'progress': streamer.progress,
                     'ack_progress': streamer.ack_progress,
+                    'client_room': c_room,
                 })
+            queue_data = []
+            for c_room in self.parent.requests.cache:
+                queue_data.append(self.parent.requests.cache[c_room][0])
             raw_import_data = {
                 'progress': progress_data,
-                'queue': self.parent.requests.cache.get(client_room, [{}])[0],
+                'queue': queue_data,
             }
         await self.emit_client_notification('raw_import_status_data',
                                             raw_import_data,
                                             **{**kwargs,
-                                               'room': data['client_room'],
+                                               'room': client_room,
                                                }
                                            )
 
     async def on_stop_raw_import(self, data):
-        # Without data.value, stop streaming files in progress,
-        # otherwise stop files or remove files from import list by filenames
-        client_room = data['client_room']
+        # Without data.value, stop streaming all files,
+        # otherwise stop streaming by filenames
+        def stop_import_in_progress(streamer=None):
+            if not streamer:
+                # stop all streamers
+                for streamer in self.parent.in_progress.values():
+                    stop_import_in_progress(streamer)
+                return
+            # stop the streamer
+            self.log(streamer.client_room, streamer.filename)
+            streamer.stop_stream()
+            # clean up filename from already queued responses, if any
+            try:
+                self.parent.responses.cache_delete_key(streamer.client_room, streamer.filename)
+            except KeyError:
+                pass
+
+        def clear_import_list(c_room=None, filename=None):
+            if not c_room:
+                self.parent.requests.cache_clear()
+                self.log('clear all import list')
+                return
+            r_data = self.parent.requests.cache[c_room][0]
+            i = 0
+            while i < len(r_data.get('files', [])):
+                fdata = r_data['files'][i]
+                if fdata['filename'] == filename:
+                    r_data['files'].pop(i)
+                    self.log(r_data['client_room'], filename)
+                else:
+                    i += 1
+
         value = data['value']
         with self.parent.lock:
-            if not value:   # stop all running imports by client_room
-                for (c_room, f_name), streamer in self.parent.in_progress.items():
-                    if c_room != client_room:
-                        continue
-                    self.log(c_room, f_name)
-                    streamer.stop_stream()
-                    self.parent.responses.cache_delete_key(client_room)
-            else:   # stop all running imports by filenames
-                for v in value:
-                    # remove fname from import lists if there
-                    filename = v['filename']
-                    #TODO: possible sync problem - modify CacheQ for get(key) operation
-                    # clean up the fname from requests[client_room]
-                    rdata = self.parent.requests.cache.get(client_room, [{}])[0]
-                    i = 0
-                    while i < len(rdata.get('files', [])):
-                        fdata = rdata['files'][i]
-                        if fdata['filename'] == filename:
-                            rdata['files'].pop(i)
-                            self.log(filename)
-                        else:
-                            i += 1
-                    # stop importing fname, if in_progress
-                    in_progress_key = (client_room, filename)
-                    streamer = self.parent.in_progress.get(in_progress_key, {})
-                    if streamer:
-                        streamer.stop_stream()
-                        self.log(filename)
-                    # clean up fname from already queued responses, if any
-                    try:
-                        self.parent.responses.cache_delete_key(self.parent.responses.cache_key_separator.join([client_room, filename]))
-                    except KeyError:
-                        pass
-                rdata = self.parent.requests.cache.get(client_room)
+            if not value:   # stop all imports
+                clear_import_list()
+                stop_import_in_progress()
+            else:   # stop all running imports by filenames from both in_progress and queue lists
+                keys_to_remove = []
+                for fdata in value:
+                    filename = fdata['filename']
+                    for c_room in self.parent.requests.cache:
+                        # remove filename from scheduled import list
+                        clear_import_list(c_room, filename)
+                        if not self.parent.requests.cache[c_room][0]['files']:  # all files deleted from the request
+                            keys_to_remove.append(c_room)
+                        # stop importing filename, if in_progress
+                        in_progress_key = (c_room, filename)
+                        streamer = self.parent.in_progress.get(in_progress_key)
+                        if streamer:
+                            stop_import_in_progress(streamer)
                 # delete request altogether, if no files left to handle
-                if rdata and not rdata[0].get('files'):
-                    self.parent.requests.cache_delete_key(client_room)
-
-
+                for c_room in keys_to_remove:
+                    self.parent.requests.cache_delete_key(c_room)
 
     def get_src_data(self, path, fname):
         def get_h5_datetime():
@@ -249,8 +265,22 @@ class FileStreamerServiceClient(BaseStreamerClient):
 
     def on_filesystem_object_created(self, path):
         try:
-            self.data_pool.add_file(path)
             self.log(path)
+            self.data_pool.add_file(path)
+            if self.args.transit:
+                filename = basename(path)
+                self.log('transit', filename)
+                raw_sample_data = {
+                    'name': 'raw_import',
+                    'value': [
+                        {'filename': filename, 'path': dirname(path), },
+                    ],
+                    'request_id': generate_unique_key(),
+                    # unique client_room - for a new transit request not to replace prev.one
+                    'client_room': generate_unique_key(),
+                }
+                sleep(3)   # let file object to be createe properly
+                asyncio.run(self.private_ns.on_raw_import(raw_sample_data))
         except ValueError:
             pass
 

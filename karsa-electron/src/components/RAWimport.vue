@@ -344,7 +344,6 @@ export default {
       instrument_status: "not_ready", // not_ready/ready
       service_error: "",
       raw_import: [],
-      stop_raw_import: [],
       // variables for import modal
       import_start_time: new Date(new Date().getFullYear(),
                                   new Date().getMonth(),
@@ -417,8 +416,8 @@ export default {
       this.import_raw_table_checked_rows = [];
     },
     StopImportSamples() {
-        this.acquisition_control_label = "Stopping...";
-        this.be.emit_client_notification("stop_raw_import", this.raw_import);
+        this.be.emit_client_notification("stop_raw_import", []);
+        this.raw_import = []
     },
     on_button_acquisition_control() {
       if (this.acquisition_in_progress) {
@@ -498,9 +497,12 @@ export default {
       // if (new_value === old_value) {
       //     return false;
       // }
-      this.acquisition_control_label =
-        "Import " + this.data_source_selected.name;
-      this.acquisition_in_progress = false;
+      // when series of imports, acq started/finished may ovelap?
+      if ( _.isEmpty(this.raw_import) ) {
+        this.acquisition_control_label =
+          "Import " + this.data_source_selected.name;
+        this.acquisition_in_progress = false;
+      }
     },
     service_error: function (new_value) {
       if (_.isEmpty(new_value)) {
@@ -539,22 +541,67 @@ export default {
       // // data left for debugging:
       // new_data = {
       //     progress: [
-      //         {filename: '1-DataFile_2021.08.02-01h01m00s.h5', target_filename: 'H5Data_1-DataFile_2021.08.02-01h01m00s.h5',
-      //          datetime: '2021.08.02 01h01m00s', filesize: 2.96, path: 'test\\system\\TestData\\DataPool\\H5\\2021.08.02', progress: 30.0, ack_progress: 16.67},
+      //       {filename: '1-DataFile_2021.08.02-01h01m00s.h5', path: 'test\\system\\TestData\\DataPool\\H5\\2021.08.02',
+      //        props: {datetime: '2021.08.02 01h01m00s', filesize: 2.96}, attrs: {project, experiment ...}, progress: 30.0, ack_progress: 16.67, client_room: A},
+      //       {filename: '2-DataFile_2021.08.02-01h01m00s.h5', path: 'test\\system\\TestData\\DataPool\\H5\\2021.08.02',
+      //        props: {datetime: '2021.08.02 01h01m00s', filesize: 2.96}, attrs: {project, experiment ...}, progress: 12.0, ack_progress: 3.0, client_room: B},
       //     ],
-      //     queue: {
-      //         context: { client_room: 'ZbRWlHlHocoMPKrwAABP', room: null, no_logging: false, no_data_logging: true, cookies: {src_sid: ['ZbRWlHlHocoMPKrwAABP']} },
+      //     queue: [
+      //       {
+      //         context: { client_room: A, room: null, no_logging: false, no_data_logging: true, cookies: {src_sid: ['ZbRWlHlHocoMPKrwAABP']} },
       //         files: [
-      //             {filename: '2-DataFile_2021.08.02-01h01m00s.h5', datetime: '2021.08.02 01h01m00s', filesize: 2.96, path: 'test\\system\\TestData\\DataPool\\H5\\2021.08.02'},
-      //             {filename: '3-DataFile_2021.08.02-01h01m00s.h5', datetime: '2021.08.02 01h01m00s', filesize: 2.96, path: 'test\\system\\TestData\\DataPool\\H5\\2021.08.02'},
-      //             {filename: '4-DataFile_2021.08.02-01h01m00s.h5', datetime: '2021.08.02 01h01m00s', filesize: 2.96, path: 'test\\system\\TestData\\DataPool\\H5\\2021.08.02'},
-      //         ]
-      //     }
+      //            {filename: '2-DataFile_2021.08.02-01h01m00s.h5', path: 'test\\system\\TestData\\DataPool\\H5\\2021.08.02', props: {datetime: '2021.08.02 01h01m00s', filesize: 2.96}, attrs: {project, experiment ...}, },
+      //            {filename: '3-DataFile_2021.08.02-01h01m00s.h5', path: 'test\\system\\TestData\\DataPool\\H5\\2021.08.02', props: {datetime: '2021.08.02 01h01m00s', filesize: 2.96}, attrs: {project, experiment ...}, },
+      //            {filename: '4-DataFile_2021.08.02-01h01m00s.h5', path: 'test\\system\\TestData\\DataPool\\H5\\2021.08.02', props: {datetime: '2021.08.02 01h01m00s', filesize: 2.96}, attrs: {project, experiment ...}, },
+      //         ],
+      //       },
+      //       { queue data {context: ..., files: ...} for client_room B},
+      //     ]
       // };
 
-      this.raw_import_status_rows = new_data.progress.concat(
-        new_data.queue.files || []
+      // this.raw_import_status_rows = new_data.progress.concat(
+      //   new_data.queue.files || []
+      // );
+
+      const flat_copy = (obj) => {
+        var res = new Object;
+        for (let k in obj) {
+          if ( typeof obj[k] === "object" )
+            res = {...res, ...obj[k]};
+          else
+            res[k] = obj[k];
+        }
+        return res;
+      };
+
+      this.raw_import_status_rows = []
+
+      if ( !_.isEmpty(new_data.progress) )
+        new_data.progress.forEach(
+          (pdata) => {
+            this.raw_import_status_rows = this.raw_import_status_rows.concat(flat_copy(pdata));
+          }
+        );
+      new_data.queue.forEach(
+        (qdata) => {
+          if ( !_.isEmpty(qdata.files) ) {
+            qdata.files.forEach(
+              (fdata) => {
+                this.raw_import_status_rows = this.raw_import_status_rows.concat(
+                  {...flat_copy(fdata), client_room: qdata.client_room}
+                );
+              }
+            );
+          }
+        }
       );
+      if ( !_.isEmpty(new_data.queue.files) )
+        new_data.queue.files.forEach(
+          (fdata) => {
+            this.raw_import_status_rows = this.raw_import_status_rows.concat(flat_copy(fdata));
+          }
+        );
+
       let titles = new Set([]);
       this.raw_import_status_rows.forEach(
         (r) => (titles = new Set([...titles, ...Object.keys(r)]))

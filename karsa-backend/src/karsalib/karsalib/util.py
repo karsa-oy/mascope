@@ -1,11 +1,11 @@
-import getopt
 import random
 import string
-import sys
 import yaml
-
+import argparse
+import os
+import fnmatch
 from datetime import datetime, timedelta
-
+from karsalib.struct import AttrDict
 
 def copy_dict(d, ignore_keys=[]):
     return {k: v for k, v in d.items() if k not in ignore_keys}
@@ -76,39 +76,109 @@ def get_client_notification_context(data):
     """
     return copy_dict(data, ignore_keys=['name', 'value'])
 
+def recursive_walk(dir_path, *file_masks):
+    print('walking', dir_path)
+    res = []
+    cur_dir, dirs, files = next(os.walk(dir_path))
+    for file_mask in file_masks:
+        fs = fnmatch.filter(files, file_mask)
+        fs = map(lambda fname: os.path.join(cur_dir, fname), fs)
+        res.extend(fs)
+    for d in dirs:
+        fs = recursive_walk(os.path.join(cur_dir, d), *file_masks)
+        res.extend(fs)
+    return res
+
+def recursive_dir_walk(dir_path, *dir_masks):
+    print('walking', dir_path)
+    res = []
+    cur_dir, dirs, files = next(os.walk(dir_path))
+    for dir_mask in dir_masks:
+        ds = fnmatch.filter(dirs, dir_mask)
+        fs = map(lambda dname: os.path.join(cur_dir, dname), ds)
+        res.extend(ds)
+    for d in dirs:
+        ds = recursive_walk(os.path.join(cur_dir, d), *dir_masks)
+        res.extend(ds)
+    return res
+
 def parse_cmd_args():
     """
     Parse command line arguments for the service application:
     ------------------------------
-    --url : string
-        Karsa Router url/ip  (default: localhost)
-    --port : int
-        Karsa Router port (default: 5010)
+    Return AttrDict.
+    Default argument values: see default_args.
     """
-    # Set defaults
-    args_cmd = dict()
-    args_file = dict()
-    args_default = dict(url='localhost', port=5010, ns='/')
-    # Parse cmd arguments
-    opts, _ = getopt.getopt(sys.argv[1:], 'o:v',
-                ['config=',
-                 'n_jobs=',
-                 'ns=',
-                 'port=',
-                 'data_pool_path=',
-                 'data_pool_mask=',
-                 'streamer_type=',
-                 'target_data_pool_path=',
-                 'url=',
-                 ])
-    for opt, arg in opts:
-        assert opt[:2]=='--', f"Invalid argument {opt}"
-        key = opt[2:]
-        if key.lower() == 'config':
-            # service config may be defined in yaml file
-            with open(arg, 'r') as f:
-                args_file = yaml.safe_load(f)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-u", "--url", help="backend url", type=str, required=False)
+    parser.add_argument("-p", "--port", help="backend port", type=int, required=False)
+    parser.add_argument("-n", "--ns", help="instrument namespace to connect", type=str, required=False)
+    parser.add_argument("-c", "--config", help="path to yaml config file", type=str, default=None)
+    parser.add_argument("-nj", "--n_jobs", help="number of job processors", type=int, required=False)
+    parser.add_argument("-st", "--streamer_type", help="streamer type (H5/Raw)", type=str, required=False)
+    parser.add_argument("-m", "--data_pool_mask", help="file mask to watch", type=str, required=False)
+    parser.add_argument("-s", "--data_pool_path", help="source data pool path for streaming (before date dirs)", type=str, required=False)
+    parser.add_argument("-t", "--target_data_pool_path", help="target data pool path for streaming (before date dirs)", type=str, required=False)
+    parser.add_argument("-tr", "--transit", help="transit mode for streaming", action='store_true', required=False)
+
+    default_args = dict(url='localhost', port=5010, ns='/', n_jobs=1, transit=False)
+
+    all_args = parser.parse_args()
+    cmdline_args = {}
+    for arg in vars(all_args):
+        if vars(all_args)[arg] is None:
             continue
-        args_cmd[key] = arg
-    # command line options override the ones from the config file
-    return {**args_default, **args_file, **args_cmd}
+        cmdline_args[arg] = vars(all_args)[arg]
+    file_args = {}
+    if all_args.config:
+        # service config may be defined in yaml file
+        with open(all_args.config, 'r') as f:
+            file_args = yaml.safe_load(f)
+    return AttrDict(
+        **{ **vars(all_args),
+            **default_args,
+            **file_args,
+            **cmdline_args})
+
+
+# # TODO: UGLY WORKAROUND -- The old parse_cmd_args is left here for system testing,
+# # since new implementation somehow conflicts with unittest framework in handling args.
+# #
+# import getopt, sys
+# def parse_cmd_args():
+#     """
+#     Parse command line arguments for the service application:
+#     ------------------------------
+#     --url : string
+#         Karsa Router url/ip  (default: localhost)
+#     --port : int
+#         Karsa Router port (default: 5010)
+#     """
+#     # Set defaults
+#     args_cmd = dict()
+#     args_file = dict()
+#     args_default = dict(url='localhost', port=5010, ns='/')
+#     # Parse cmd arguments
+#     opts, _ = getopt.getopt(sys.argv[1:], 'o:v',
+#                 ['config=',
+#                  'n_jobs=',
+#                  'ns=',
+#                  'port=',
+#                  'data_pool_path=',
+#                  'data_pool_mask=',
+#                  'streamer_type=',
+#                  'target_data_pool_path=',
+#                  'url=',
+#                  ])
+#     for opt, arg in opts:
+#         assert opt[:2]=='--', f"Invalid argument {opt}"
+#         key = opt[2:]
+#         if key.lower() == 'config':
+#             # service config may be defined in yaml file
+#             with open(arg, 'r') as f:
+#                 args_file = yaml.safe_load(f)
+#             continue
+#         args_cmd[key] = arg
+#     # command line options override the ones from the config file
+#     return {**args_default, **args_file, **args_cmd}
+

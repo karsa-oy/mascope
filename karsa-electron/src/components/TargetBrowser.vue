@@ -252,6 +252,9 @@
             </span>
           </template>
         </b-table-column>
+        <b-table-column field="3" label="Intensity" sortable searchable>
+          <template v-slot="props"> {{ props.row["3"] }} </template>
+        </b-table-column>
         <template slot="detail" slot-scope="props">
           <tr
             v-for="item in props.row.items"
@@ -579,6 +582,14 @@ export default {
         this.$store.commit("target_to_display", value);
       },
     },
+    target_compound_intensities: {
+      get() {
+        return this.$store.state.target_compound_intensities;
+      },
+      set(value) {
+        this.$store.commit("target_compound_intensities", value);
+      },
+    },
     target_compound_selected: {
       get() {
         return this.$store.state.target_compound_selected;
@@ -614,6 +625,7 @@ export default {
           new_rows.push({
             ...row,
             2: this.target_match_scores[target_id]["total"],
+            3: this.target_compound_intensities[target_id] ? Math.round(this.target_compound_intensities[target_id]) : null,
           });
         }
         return new_rows;
@@ -629,7 +641,12 @@ export default {
             label: "Match score",
             searchable: true,
           },
-        ]);
+          {
+            field: "3",
+            label: "Intensity",
+            searchable: true,
+          },
+          ]);
       } else {
         return this.target_table_cols;
       }
@@ -710,7 +727,6 @@ export default {
       this.is_mz_calib_modal_active = false;
     },
     clearIsotopeTableData() {
-      console.log("clearing isotope table data");
       this.isotope_table_cols = [];
       this.isotope_table_all_rows = [];
     },
@@ -852,8 +868,14 @@ export default {
       this.excel_clipboard_text = "";
     },
     readTargetsFromFile() {
+      let default_path = "configs/target_list.json";
+      let user_path = "configs/user/target_list.json";
+      let path = default_path;
+      if (fs.existsSync(user_path)) {
+        path = user_path;
+      }
       let target_table_data = JSON.parse(
-        fs.readFileSync("configs/target_list.json")
+        fs.readFileSync(path)
       );
       this.ionization_mechanism = target_table_data.ionization_mechanism;
       this.target_table_cols = target_table_data.cols;
@@ -920,14 +942,10 @@ export default {
         this.$refs.target_table.sort(this.$refs.targetMatchScoreColumn);
       });
     },
-    rightClickPeakTableRow(row) {
-      console.log(row);
-    },
     setTargetTableDetails(row) {
       this.target_table_detailed_rows = [row["0"]];
     },
     updateIsotopeTableData(data) {
-      console.log("Updating isotope table data");
       // Format data to isotope table
       let rows = [];
       let cols_to_add = [];
@@ -966,8 +984,6 @@ export default {
       this.isotope_table_all_rows = rows;
     },
     refreshTargetFilters() {
-      console.log("Refreshing target table filters...");
-      console.log(this.target_table_filters);
       let updatedFilters = [];
       let clearedFilters = [];
       for (let col of this.target_table_all_cols) {
@@ -981,20 +997,8 @@ export default {
         }
         this.$set(this.$refs.target_table.filters, field, String(filter));
       }
-      if (updatedFilters.length > 0) {
-        console.log(
-          `Updated target table filters: ${updatedFilters.join(", ")}`
-        );
-      }
-      if (clearedFilters.length > 0) {
-        console.log(
-          `Cleared target table filters: ${clearedFilters.join(", ")}`
-        );
-      }
     },
     refreshIsotopeFilters() {
-      console.log("Refreshing isotope table filters...");
-      console.log(this.isotope_table_filters);
       let updatedFilters = [];
       let clearedFilters = [];
       for (let col of this.isotope_table_cols) {
@@ -1008,16 +1012,6 @@ export default {
         }
         this.$set(this.$refs.isotope_table.filters, field, String(filter));
       }
-      if (updatedFilters.length > 0) {
-        console.log(
-          `Updated target table filters: ${updatedFilters.join(", ")}`
-        );
-      }
-      if (clearedFilters.length > 0) {
-        console.log(
-          `Cleared target table filters: ${clearedFilters.join(", ")}`
-        );
-      }
     },
     clearTargetFilters() {
       this.target_table_filters = {};
@@ -1030,13 +1024,9 @@ export default {
       });
     },
     updateTargetFilterState(event) {
-      console.log("Target compound filters changed");
-      console.log(event.filters);
       this.target_table_filters = event.filters;
     },
     updateIsotopeFilterState(event) {
-      console.log("Target isotope filters changed");
-      console.log(event.filters);
       this.isotope_table_filters = event.filters;
     },
     updateMzCalibStatsTable() {
@@ -1055,10 +1045,6 @@ export default {
         }
         this.mz_calib_stats_table_rows.push(row);
       }
-      console.log(
-        "this.mz_calib_stats_table_rows: ",
-        this.mz_calib_stats_table_rows
-      );
     },
     writeTargetsToFile() {
       let target_table_data = {
@@ -1067,7 +1053,7 @@ export default {
         ionization_mechanism: this.ionization_mechanism,
       };
       fs.writeFileSync(
-        "configs/target_list.json",
+        "configs/user/target_list.json",
         JSON.stringify(target_table_data, null, 3)
       );
     },
@@ -1232,9 +1218,6 @@ export default {
     peak_data: function () {
       this.requestPeakIdentification();
     },
-    isotope_table_checked_rows: function (new_value) {
-      console.log(new_value);
-    },
     isotope_table_selected_row: function (new_value) {
       if (new_value != null) {
         let mz = new_value["mz"];
@@ -1328,6 +1311,12 @@ export default {
         this.namespace.on("target_ion_selected", (value) =>
           this.be.import_one_way_binding_prop(
             "target_ion_selected",
+            value.value
+          )
+        );
+        this.namespace.on("target_compound_intensities", (value) =>
+          this.be.import_one_way_binding_prop(
+            "target_compound_intensities",
             value.value
           )
         );

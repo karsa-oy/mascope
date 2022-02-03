@@ -830,7 +830,7 @@ export default {
       // acquisition_started: false,
       // Project / experiment title validation
       // Modal active variables
-      is_modal_landing_active: true,
+      is_modal_landing_active: false,
       is_modal_experiment_attributes_active: false,
       is_modal_project_attributes_active: false,
       is_modal_new_experiment_active: false,

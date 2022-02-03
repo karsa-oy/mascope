@@ -142,6 +142,12 @@ class SignalProcessorNamespace(BaseClientNamespace):
                                 mz=slice(*mz_range),
                                 time=slice(*t_range)
                                 ).sum(dim='time').compute()
+            # Interpolate NaNs for smoothing
+            sum_spectrum = sum_spectrum.interpolate_na(dim='mz',
+                                                       method='linear',
+                                                       limit=None,
+                                                       max_gap=2,
+                                                       )
             min_peak_height = peak_threshold * sum_spectrum.max().compute().item()
             peak_ind, peak_props = find_peaks(sum_spectrum,
                                             height=min_peak_height,

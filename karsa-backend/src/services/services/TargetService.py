@@ -95,13 +95,22 @@ class TargetServiceNamespace(BaseClientNamespace):
 
         identified_ion_peaks = match_df
         identified_ion_peaks = identified_ion_peaks.dropna(subset=['peak mz'])
-        # self.log(identified_ion_peaks)
+
+        # Compute target compound aggregate
+        target_compound_intensities = {}
+        for target_id in np.unique(identified_ion_peaks['target id']):
+            target = identified_ion_peaks[identified_ion_peaks['target id'] == target_id]
+            target_intensity = target['peak height'].sum()
+            target_compound_intensities[int(target_id)] = target_intensity
 
         await self.emit_client_notification('identified_ions',
                                             identified_ion_peaks.to_dict(orient='index'),
                                             room=client_room
                                             )
-
+        await self.emit_client_notification('target_compound_intensities',
+                                            target_compound_intensities,
+                                            room=client_room
+                                            )
 
 
 def calculate_target_match_score(match_df):
