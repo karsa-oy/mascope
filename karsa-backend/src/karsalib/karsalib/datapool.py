@@ -143,7 +143,7 @@ class H5Pool():
             file_date, file_time = get_h5_date_time(filename)
         except IndexError:
             print("Skipped file: %s due to invalid datetime format" %filename)
-            raise ValueError
+            return
         file_datetime = file_date + timedelta(hours=file_time.hour,
                                             minutes=file_time.minute,
                                             seconds=file_time.second
@@ -276,7 +276,7 @@ class RawPool():
                 break
         if not file_datetime_match:
             print("Skipped file: %s due to invalid datetime format" %filename)
-            raise ValueError
+            return
         # Append to pool
         file_datetime = file_datetime_match.as_datetime()
         size_bytes = os.stat(full_file_path).st_size
@@ -824,7 +824,7 @@ class ZarrPool(H5Pool):
                 break
         if not file_datetime_match:
             print("Skipped file: %s due to invalid datetime format" %filename)
-            raise ValueError
+            return
         # Append to pool
         file_datetime = file_datetime_match.as_datetime()
         sample_metadata = self.get_sample_metadata(full_file_path)
