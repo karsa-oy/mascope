@@ -1,9 +1,10 @@
+import argparse
+import fnmatch
+import os
 import random
 import string
 import yaml
-import argparse
-import os
-import fnmatch
+
 from datetime import datetime, timedelta
 from karsalib.struct import AttrDict
 
