@@ -13,8 +13,13 @@ import json
 import subprocess
 import re
 import time
-from karsalib.logging import this_func_name
 from karsalib.util import recursive_walk, recursive_dir_walk
+from karsalib.logging import (
+                NO_DATA_LOGGING_DEFAULT,
+                NO_LOGGING_DEFAULT,
+                this_func_name,
+                parent_func_name
+                )
 
 import numpy as np
 import pandas as pd
@@ -73,15 +78,18 @@ def parse_path_from_sample_name(sample_name):
     return os.path.join(instrument, date_dir, sample_name)
 
 
+class SamplePool():
+    def log(self, *arg):
+        if not NO_LOGGING_DEFAULT:
+            print(f"[{self.__class__.__name__}.{parent_func_name()}]", *arg)
 
-class H5Pool():
     def __init__(self, pool_attrs={}):
         """Initialize self
 
         Parameters
         ----------
-        data_path : str
-            Root data path
+        pool_attrs : dict
+            Root data path, file masks to watch...
         """
 
         self.pool_attrs = pool_attrs
@@ -91,7 +99,7 @@ class H5Pool():
                        path=None,
                        fname_filter=None
                        ):
-        """Scan directory for h5 files
+        """Scan directory for samples
         
         This function walks through the given path, trying to find data files
         matching the given filter.
@@ -102,13 +110,12 @@ class H5Pool():
             String to match the filename with. The default is 'Data*.h5'.
         recursive : bool, optional
             Scan recursively. The default is False.
-
         """
         
         path = path or self.pool_attrs.get('path', '.')
-        fname_filter = fname_filter or self.pool_attrs.get('mask', '*.h5')
+        fname_filter = fname_filter or self.pool_attrs['mask']
 
-        print("Scanning: %s" % str(path))
+        self.log("Scanning: %s" % str(path))
         if not os.path.isdir(path):
             raise Exception(f"{path} missing of invalid")
 
@@ -127,28 +134,22 @@ class H5Pool():
             pass
         for s in samples:
             self.add_file(s)
-            print(' ', s)
         print("Done")
 
-    def add_file(self, full_file_path):
-        # parse datetime from h5 sample filename
-        def get_h5_date_time(fname):
-            dt_regex = r'.*(\d{4}).(\d{2}).(\d{2}).(\d{2}).(\d{2}).(\d{2}).*'
-            dt = re.findall(dt_regex, fname)[0]
-            return  datetime.strptime('.'.join(dt[:3]), '%Y.%m.%d'), \
-                    datetime.strptime('.'.join(dt[3:]), '%H.%M.%S')
+    def datetime_from_filename(self, filename):
+        pass
 
+    def add_file(self, full_file_path):
         filename = basename(full_file_path)
-        try:
-            file_date, file_time = get_h5_date_time(filename)
-        except IndexError:
-            print("Skipped file: %s due to invalid datetime format" %filename)
+        path = dirname(full_file_path)
+        if filename in self.pool.filename:
+            self.log('skip existing', full_file_path)
             return
-        file_datetime = file_date + timedelta(hours=file_time.hour,
-                                            minutes=file_time.minute,
-                                            seconds=file_time.second
-                                            )
-        # Append to pool
+        try:
+            file_datetime = self.datetime_from_filename(filename)
+        except Exception as e:
+            self.log(f"skip {filename} : {str(e)}")
+            return
         size_bytes = os.stat(full_file_path).st_size
         size_mb = round(2**-20 * size_bytes, 2)
         df_row = pd.DataFrame(
@@ -157,7 +158,7 @@ class H5Pool():
                             filename,
                             file_datetime,
                             size_mb,
-                            dirname(full_file_path),
+                            path,
                             ]],
                         columns=[
                             'filename',
@@ -167,6 +168,7 @@ class H5Pool():
                             ]
                         )
         self.pool = self.pool.append(df_row).sort_index()
+        self.log(filename)
 
     def remove_file(self, full_file_path):
         filename = basename(full_file_path)
@@ -207,139 +209,41 @@ class H5Pool():
         return sample_table
 
 
-class RawPool():
-    def __init__(self, pool_attrs={}):
-        """Initialize self
-
-        Parameters
-        ----------
-        data_path : str
-            Root data path
-        """
-
-        self.pool_attrs = pool_attrs
-        self.pool = pd.DataFrame()
-
-    async def scan_dir(self,
-                       path=None,
-                       fname_filter=None
-                       ):
-        """Scan directory for raw files
-        
-        This function walks through the given path, trying to find data files
-        matching the given filter.
-        
-        path : str
-            Root path
-        fname_filter : datetime.datetime
-            String to match the filename with. The default is '*.raw'.
-        recursive : bool, optional
-            Scan recursively. The default is False.
-
-        """
-        
-        path = path or self.pool_attrs.get('path', '.')
-        fname_filter = fname_filter or self.pool_attrs.get('mask', '*.raw')
-
-        print("Scanning: %s" % str(path))
-        if not os.path.isdir(path):
-            raise Exception(f"{path} missing of invalid")
-
-        self.pool = pd.DataFrame(index=[],
-                                 data=[],
-                                 columns=['filename',
-                                          'datetime',
-                                          'filesize',
-                                          'path',
-                                          ]
-                                 )
-        samples = []
+class H5Pool(SamplePool):
+    def datetime_from_filename(self, filename):
+        def get_h5_date_time(fname):
+            dt_regex = r'.*(\d{4}).(\d{2}).(\d{2}).(\d{2}).(\d{2}).(\d{2}).*'
+            dt = re.findall(dt_regex, fname)[0]
+            return  datetime.strptime('.'.join(dt[:3]), '%Y.%m.%d'), \
+                    datetime.strptime('.'.join(dt[3:]), '%H.%M.%S')
         try:
-            samples = recursive_walk(path, fname_filter)
-        except StopIteration:
-            pass
-        for s in samples:
-            self.add_file(s)
-            print(' ', s)
-        print("Done")
+            file_date, file_time = get_h5_date_time(filename)
+        except IndexError:
+            raise Exception("invalid datetime format")
+        return file_date + timedelta(hours=file_time.hour,
+                                    minutes=file_time.minute,
+                                    seconds=file_time.second
+                                    )
 
 
-    def add_file(self, full_file_path):
-        filename = basename(full_file_path)
-        path = dirname(full_file_path)
-        # Try to parse time from filename
+class RawPool(SamplePool):
+    def datetime_from_filename(self, filename):
         patterns = ['%Y%m%d %H%M *', '%Y%m%d_%H%M_*']
+        file_datetime_match = None
         for pattern in patterns:
             matcher = datetime_glob.Matcher(pattern=pattern)
             file_datetime_match = matcher.match(filename)
             if file_datetime_match:
                 break
         if not file_datetime_match:
-            print("Skipped file: %s due to invalid datetime format" %filename)
-            return
-        # Append to pool
-        file_datetime = file_datetime_match.as_datetime()
-        size_bytes = os.stat(full_file_path).st_size
-        size_mb = round(2**-20 * size_bytes, 2)
-        df_row = pd.DataFrame(
-                        index=[filename],
-                        data=[[
-                            filename,
-                            file_datetime,
-                            size_mb,
-                            path
-                            ]],
-                        columns=[
-                            'filename',
-                            'datetime',
-                            'filesize',
-                            'path'
-                            ]
-                        )
-        self.pool = self.pool.append(df_row).sort_index()
+            raise Exception("invalid datetime format")
+        try:
+            return file_datetime_match.as_datetime()
+        except Exception as e:
+            raise Exception(f"{e.__class__.__name__}({str(e)})")
 
 
-    def remove_file(self, full_file_path):
-        filename = basename(full_file_path)
-        self.pool = self.pool.drop(filename)
-
-
-    async def get_datetime_range(self,
-                                 start_datetime=datetime(1970, 1, 1),
-                                 end_datetime=datetime.now()
-                                 ):
-        """[summary]
-
-        Parameters
-        ----------
-        start_date : datetime.datetime
-            Start date
-        end_date : datetime.datetime
-            End date
-
-        Returns
-        -------
-        [type]
-            [description]
-        """
-
-        sub_pool = self.pool[(self.pool['datetime'] >= start_datetime) &
-                             (self.pool['datetime'] <= end_datetime)
-                             ].copy()
-
-        sub_pool['datetime'] = sub_pool['datetime'].astype(str)
-
-        sample_table = {'rows': list( sub_pool.to_dict('index').values() ),
-                        'cols': [ {'field': col.lower(),
-                                   'label': col.capitalize(),
-                                   }
-                                  for col in sub_pool.columns ]
-                        }
-        
-        return sample_table
-
-
-class SamplePool():
+class SampleCatalog():
     """Sample hierarchy: Projects/Experiments/Samples
 
     Assuming folder structure as follows:
@@ -381,6 +285,7 @@ class SamplePool():
 
         self._init_pool_dict()
         self._init_pool_dataframe()
+
 
     def _get_sample_df(self, project=None, experiment=None, sample=None):
         if project is None:
@@ -501,14 +406,28 @@ class SamplePool():
         except Exception as e:
             print(e)
 
+
     @staticmethod
-    def _read_attributes(path, prefix='', ext='.attrs'):
+    def _wait_for_dir(path, timeout=None):
+        # sometimes it takes longer for sample directory to be created:
+        CREATE_NEW_SAMPLE_TIMEOUT = 10.
+        timeout = timeout or CREATE_NEW_SAMPLE_TIMEOUT
+        t_start = time.time()
+        while time.time() - t_start < CREATE_NEW_SAMPLE_TIMEOUT:
+            if os.path.isdir(path):
+                break
+            time.sleep(.1)
+
+    @classmethod
+    def _read_attributes(cls, path, prefix='', ext='.attrs'):
+        cls._wait_for_dir(path)
         attr_path = os.path.join(path, prefix + ext)
         with open(attr_path, 'r') as f:
             attributes = json.load(f)
         return attributes
 
     def _write_sample_annotation(self, path, annotation, prefix='', ext='.annts'):
+        self._wait_for_dir(path)
         file_path = os.path.join(path, prefix + ext)
         if not os.path.exists(file_path):
             # Annotations file does not yet exist, create
@@ -523,6 +442,7 @@ class SamplePool():
                 json.dump(annotations, f, indent=4)
 
     def _write_attributes(self, path, attributes, prefix='', ext='.attrs', overwrite=False):
+        self._wait_for_dir(path)
         attr_path = os.path.join(path, prefix + ext)
         if os.path.exists(attr_path) and not overwrite:
             raise ValueError("Attribute file %s exists already!" % attr_path)
@@ -627,6 +547,7 @@ class SamplePool():
 
     def get_sample_metadata(self, project, experiment, sample):
         sample_link = os.path.join(self.projects_root, project, experiment, sample)
+        self._wait_for_dir(sample_link)
         error_msg = None
         sample_ext = {}
         n_tries = 3
@@ -733,13 +654,8 @@ class SamplePool():
             # Make link from experiment directory to data file -
             # the link can be made even to non-existing yet source dir
             self._make_link(sample_data_path, sample_experiment_path, overwrite=True)
-        # sometimes it takes longer for sample_data_path directory to be created:
-        CREATE_NEW_SAMPLE_TIMEOUT = 7.
-        t_start = time.time()
-        while time.time() - t_start < CREATE_NEW_SAMPLE_TIMEOUT:
-            if os.path.isdir(sample_data_path):
-                break
-            time.sleep(.1)
+
+        self._wait_for_dir(sample_data_path)
         # Write attributes
         try:
             for spec, ext in [(attributes, '.attrs'), (method, '.meth'), (annotations, '.annts')]:
@@ -765,100 +681,100 @@ class SamplePool():
         self.df = flat_df_clean.set_index(self.df.index.names)
 
 
-class ZarrPool(H5Pool):
-    async def scan_dir(self,
-                       path=None,
-                       ):
-        """Scan directory for samples
+# class ZarrPool(H5Pool):
+#     async def scan_dir(self,
+#                        path=None,
+#                        ):
+#         """Scan directory for samples
         
-        This function walks through the given path, trying to find data files
-        matching the given filter.
+#         This function walks through the given path, trying to find data files
+#         matching the given filter.
         
-        path : str
-            Root path
-        fname_filter : datetime.datetime
-            String to match the filename with. The default is 'Data*.h5'.
-        recursive : bool, optional
-            Scan recursively. The default is False.
+#         path : str
+#             Root path
+#         fname_filter : datetime.datetime
+#             String to match the filename with. The default is 'Data*.h5'.
+#         recursive : bool, optional
+#             Scan recursively. The default is False.
 
-        """
+#         """
         
-        path = path or self.pool_attrs.get('path', '.')
-        dir_filters = ['*.raw', '*.h5']
+#         path = path or self.pool_attrs.get('path', '.')
+#         dir_filters = ['*.raw', '*.h5']
 
-        print("Scanning: %s" % str(path))
-        if not os.path.isdir(path):
-            raise Exception(f"{path} missing of invalid")
+#         print("Scanning: %s" % str(path))
+#         if not os.path.isdir(path):
+#             raise Exception(f"{path} missing of invalid")
 
-        self.pool = pd.DataFrame(index=[],
-                                 data=[],
-                                 columns=['filename',
-                                          'properties',
-                                          'attributes',
-                                          'method',
-                                          'annotations',
-                                          'datetime',
-                                          ]
-                                 )
-        samples = []
-        try:
-            samples = recursive_dir_walk(path, *dir_filters)
-        except StopIteration:
-            pass
-        for s in samples:
-            self.add_file(s)
-            print(' ', s)
-        print("Done")
+#         self.pool = pd.DataFrame(index=[],
+#                                  data=[],
+#                                  columns=['filename',
+#                                           'properties',
+#                                           'attributes',
+#                                           'method',
+#                                           'annotations',
+#                                           'datetime',
+#                                           ]
+#                                  )
+#         samples = []
+#         try:
+#             samples = recursive_dir_walk(path, *dir_filters)
+#         except StopIteration:
+#             pass
+#         for s in samples:
+#             self.add_file(s)
+#             print(' ', s)
+#         print("Done")
 
-    def add_file(self, filename):
-        full_file_path = parse_path_from_sample_name(filename)
-        # Try to parse time from filename
-        patterns = ['*_%Y%m%d %H%M *',
-                    '*_%Y%m%d_%H%M_*',
-                    '*_%Y.%m.%d*%Hh%Mm%Ss*'
-                    ]
-        for pattern in patterns:
-            matcher = datetime_glob.Matcher(pattern=pattern)
-            file_datetime_match = matcher.match(filename)
-            if file_datetime_match:
-                break
-        if not file_datetime_match:
-            print("Skipped file: %s due to invalid datetime format" %filename)
-            return
-        # Append to pool
-        file_datetime = file_datetime_match.as_datetime()
-        sample_metadata = self.get_sample_metadata(full_file_path)
-        df_row = pd.DataFrame(
-                        index=[filename],
-                        data=[[
-                            filename,
-                            sample_metadata.get('properties', {}),
-                            sample_metadata.get('attributes', {}),
-                            sample_metadata.get('method', {}),
-                            sample_metadata.get('annotations', {}),
-                            file_datetime,
-                            ]],
-                            columns=['filename',
-                                    'properties',
-                                    'attributes',
-                                    'method',
-                                    'annotations',
-                                    'datetime',
-                                    ]
-                        )
-        self.pool = self.pool.append(df_row).sort_index()
+#     def add_file(self, filename):
+#         full_file_path = parse_path_from_sample_name(filename)
+#         # Try to parse time from filename
+#         patterns = ['*_%Y%m%d %H%M *',
+#                     '*_%Y%m%d_%H%M_*',
+#                     '*_%Y.%m.%d*%Hh%Mm%Ss*'
+#                     ]
+#         for pattern in patterns:
+#             matcher = datetime_glob.Matcher(pattern=pattern)
+#             file_datetime_match = matcher.match(filename)
+#             if file_datetime_match:
+#                 break
+#         if not file_datetime_match:
+#             print("Skipped file: %s due to invalid datetime format" %filename)
+#             return
+#         # Append to pool
+#         file_datetime = file_datetime_match.as_datetime()
+#         sample_metadata = self.get_sample_metadata(full_file_path)
+#         df_row = pd.DataFrame(
+#                         index=[filename],
+#                         data=[[
+#                             filename,
+#                             sample_metadata.get('properties', {}),
+#                             sample_metadata.get('attributes', {}),
+#                             sample_metadata.get('method', {}),
+#                             sample_metadata.get('annotations', {}),
+#                             file_datetime,
+#                             ]],
+#                             columns=['filename',
+#                                     'properties',
+#                                     'attributes',
+#                                     'method',
+#                                     'annotations',
+#                                     'datetime',
+#                                     ]
+#                         )
+#         self.pool = self.pool.append(df_row).sort_index()
 
-    def get_sample_metadata(self, filepath):
-        sample_ext = {}
+#     def get_sample_metadata(self, filepath):
+#         sample_ext = {}
         
-        for ext in ['.attrs', '.props', '.meth', '.annts']:
-            try:
-                sample_ext[ext] = SamplePool._read_attributes(filepath, ext=ext)
-            except Exception as e:
-                print(e)
-        return {
-                    'properties': sample_ext.get('.props', {}),
-                    'attributes': sample_ext.get('.attrs', []),
-                    'method': sample_ext.get('.meth', []),
-                    'annotations': sample_ext.get('.annts', []),
-                }
+#         for ext in ['.attrs', '.props', '.meth', '.annts']:
+#             try:
+#                 sample_ext[ext] = SampleCatalog._read_attributes(filepath, ext=ext)
+#             except Exception as e:
+#                 print(e)
+#         return {
+#                     'properties': sample_ext.get('.props', {}),
+#                     'attributes': sample_ext.get('.attrs', []),
+#                     'method': sample_ext.get('.meth', []),
+#                     'annotations': sample_ext.get('.annts', []),
+#                 }

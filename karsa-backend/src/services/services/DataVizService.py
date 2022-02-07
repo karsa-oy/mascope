@@ -59,10 +59,10 @@ generator_input_q = None
 generator_input_cache = None
 
 # Cache for requests and visualizations
-# in_memory_db = ':memory:'
 # For debugging, write db into a file
-test_db = datetime.now().strftime("DataViz_%Y%m%d_%Hh%Mm%Ss") + '.db'
-con = sqlite3.connect(test_db) 
+# test_db = datetime.now().strftime("DataViz_%Y%m%d_%Hh%Mm%Ss") + '.db'
+# con = sqlite3.connect(test_db)
+con = sqlite3.connect(':memory:')
 cur = con.cursor()
 
 # Create requests table

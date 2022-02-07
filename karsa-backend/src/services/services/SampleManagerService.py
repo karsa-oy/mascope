@@ -20,14 +20,14 @@ from karsalib.client import (
                         )
 from karsalib.util import parse_cmd_args, get_client_notification_context
 
-from karsalib.datapool import SamplePool
+from karsalib.datapool import SampleCatalog
 from karsaHT3000A.ht3000a import parse_csv_report, dup_cycles
 
 
 NO_DATA_LOGGING_DEFAULT = True
 
 projects_path = 'Projects' # TODO: make configurable
-datapool = SamplePool(projects_path)
+datapool = SampleCatalog(projects_path)
 
 class MetadataServiceNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to MainService """
