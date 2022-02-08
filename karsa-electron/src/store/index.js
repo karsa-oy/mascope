@@ -22,7 +22,9 @@ export default new Vuex.Store({
 		mz_calibration: {},
 		new_file: "",
 		parameter_peak_intensity_threshold: 0.005,
-		parameter_display_target_dmz: 10,
+		parameter_peak_min_distance: 10,
+		parameter_peak_min_width: 3,
+		parameter_display_target_dmz: 50,
 		peak_data: {},
 		project_selected: { 'title': "", 'attributes': [] },
 		projects: [],
@@ -105,6 +107,12 @@ export default new Vuex.Store({
 		},
 		parameter_peak_intensity_threshold(state, payload) {
 			state.parameter_peak_intensity_threshold = payload;
+		},
+		parameter_peak_min_distance(state, payload) {
+			state.parameter_peak_min_distance = payload;
+		},
+		parameter_peak_min_width(state, payload) {
+			state.parameter_peak_min_width = payload;
 		},
 		parameter_display_target_dmz(state, payload) {
 			state.parameter_display_target_dmz = payload;

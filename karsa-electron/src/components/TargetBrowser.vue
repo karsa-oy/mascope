@@ -328,16 +328,54 @@
                   label="peak intensity threshold [%]"
                   custom-class="dark"
                   >
-                    <b-numberinput
-                      type="is-primary"
-                      v-model="parameter_peak_intensity_threshold"
-                      :min="0"
-                      :step="0.01"
-                      :tooltip="false"
-                      lazy
-                      indicator
+                    <b-tooltip label="Required height of peaks">
+                      <b-numberinput
+                        type="is-primary"
+                        v-model="parameter_peak_intensity_threshold"
+                        :min="0"
+                        :step="0.01"
+                        :tooltip="false"
+                        lazy
+                        indicator
+                      >
+                      </b-numberinput>
+                    </b-tooltip>
+                  </b-field>
+                  <b-tooltip label="Required minimal horizontal distance (>= 1) in samples between neighbouring peaks.
+                                    Smaller peaks are removed first until the condition is fulfilled for all remaining peaks."
+                  >
+                    <b-field
+                    label="minimum peak separation [samples]"
+                    custom-class="dark"
                     >
-                    </b-numberinput>
+                      <b-numberinput
+                        type="is-primary"
+                        v-model="parameter_peak_min_distance"
+                        :min="0"
+                        :step="1"
+                        :tooltip="false"
+                        lazy
+                        indicator
+                      >
+                      </b-numberinput>
+                    </b-field>
+                  </b-tooltip>
+                  <b-field
+                  label="minimum peak width [samples]"
+                  custom-class="dark"
+                  >
+                    <b-tooltip label="Required width of peaks in samples.">
+                      <b-numberinput
+                        type="is-primary"
+                        v-model="parameter_peak_min_width"
+                        :min="0"
+                        :step="1"
+                        :tooltip="false"
+                        lazy
+                        indicator
+                      >
+                      </b-numberinput>
+                    </b-tooltip>
                   </b-field>
                 </section>
                 <div><br></div>
@@ -598,6 +636,22 @@ export default {
         this.$store.commit("parameter_peak_intensity_threshold", value);
       },
     },
+    parameter_peak_min_distance: {
+      get() {
+        return this.$store.state.parameter_peak_min_distance;
+      },
+      set(value) {
+        this.$store.commit("parameter_peak_min_distance", value);
+      },
+    },
+    parameter_peak_min_width: {
+      get() {
+        return this.$store.state.parameter_peak_min_width;
+      },
+      set(value) {
+        this.$store.commit("parameter_peak_min_width", value);
+      },
+    },
     parameter_display_target_dmz: {
       get() {
         return this.$store.state.parameter_display_target_dmz;
@@ -665,7 +719,7 @@ export default {
           let filename = this.sample_in_focus.filename;
           new_rows.push({
             ...row,
-            2: this.target_match_scores[target_id]["total"],
+            2: this.target_match_scores[target_id] ? this.target_match_scores[target_id]["total"] : null,
             3: this.target_compound_intensities[filename] && this.target_compound_intensities[filename][target_id] ? Math.round(this.target_compound_intensities[filename][target_id]) : null,
           });
         }
@@ -709,7 +763,7 @@ export default {
       mz_calib_stats_table_rows: [],
       //
       // Identification parameters
-      parameter_mz_tolerance: 20,
+      parameter_mz_tolerance: 5,
       parameter_iso_ratio_tolerance: 100,
       parameter_iso_abu_threshold: 1,
       //
