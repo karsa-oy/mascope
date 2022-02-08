@@ -758,6 +758,8 @@ export default {
           "autosave_on",
           "new_file",
           "parameter_peak_intensity_threshold",
+          "parameter_peak_min_distance",
+          "parameter_peak_min_width",
           "root_namespace",
           "sample_to_link",
           ]),
@@ -1046,6 +1048,8 @@ export default {
           filename: filename,
           parameters: {
             peak_threshold: this.parameter_peak_intensity_threshold,
+            peak_separation: this.parameter_peak_min_distance,
+            peak_width: this.parameter_peak_min_width,
           },
         },
         null,
@@ -1295,6 +1299,16 @@ export default {
       }
     },
     parameter_peak_intensity_threshold: function () {
+      for (let filename in this.peak_data) {
+        this.requestPeakData(filename);
+      }
+    },
+    parameter_peak_min_distance: function () {
+      for (let filename in this.peak_data) {
+        this.requestPeakData(filename);
+      }
+    },
+    parameter_peak_min_width: function () {
       for (let filename in this.peak_data) {
         this.requestPeakData(filename);
       }
