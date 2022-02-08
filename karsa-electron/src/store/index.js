@@ -23,7 +23,7 @@ export default new Vuex.Store({
 		new_file: "",
 		parameter_peak_intensity_threshold: 0.005,
 		parameter_peak_min_distance: 10,
-		parameter_peak_min_width: 3,
+		parameter_peak_min_width: 1,
 		parameter_display_target_dmz: 50,
 		peak_data: {},
 		project_selected: { 'title': "", 'attributes': [] },
