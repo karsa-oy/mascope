@@ -2,21 +2,13 @@
   <div>
     <section class="sample-import">
         <div>
-            <b-field label="Data source" custom-class="dark">
-                <b-select
-                v-model="data_source_name_selected"
-                placeholder="Select data source"
-                expanded
-                >
-                <option
-                    v-for="source in data_sources"
-                    :value="source.name"
-                    :key="source.name"
-                >
-                    {{ source.name }}
-                </option>
-                </b-select>
-            </b-field>
+
+            <header class="modal-card-head">
+              <p class="modal-card-title">
+                Add samples to {{this.project_selected.title}}/{{this.experiment_selected.title}}
+              </p>
+            </header>
+
             <section class="modal-card-body">
                 <b-field label="Start" custom-class="dark">
                 <b-datetimepicker
@@ -58,7 +50,6 @@
                 :columns="import_sample_table_cols"
                 :data="import_sample_table_rows"
                 :checkable="true"
-                :header-checkable="false"
                 :checked-rows.sync="import_sample_table_checked_rows"
                 >
                 </b-table>
@@ -96,12 +87,12 @@ export default {
           "project_selected",
           "url",
           ]),
-    sample_to_link: {
+    samples_to_link: {
       get() {
-        return this.$store.state.sample_to_link;
+        return this.$store.state.samples_to_link;
       },
       set(value) {
-        this.$store.commit("sample_to_link", value);
+        this.$store.commit("samples_to_link", value);
       },
     },
   },
@@ -111,16 +102,14 @@ export default {
       be: null,
       namespace: null,
       room_sid: null,
-      endpoints: ["imported_samples"],
+      endpoints: ["importable_samples"],
       // variables for import modals
       import_start_time: null,
       import_end_time: null,
       import_min_datetime: null,
       import_max_datetime: new Date(),
       // variables for sample import modal
-      data_source_name_selected: null,
-      data_source_selected: null,
-      imported_samples: {},
+      importable_samples: {},
       import_sample_table_rows: [],
       import_sample_table_cols: [],
       import_sample_table_checked_rows: [],
@@ -130,6 +119,9 @@ export default {
   },
   created: function () {
     this.be = new BECom(this);
+    this.namespace = this.be.connect(
+      this.url + "/"
+    );
   },
   mounted: function () {},
   methods: {
@@ -168,19 +160,20 @@ export default {
       });
     },
     importSamples() {
-      let to_import = this.import_sample_table_checked_rows[0];
+      let to_import = this.import_sample_table_checked_rows;
       if (!to_import) {
         return
       }
-      // Preserve sample metadata
-      // Set project and experiment to the selected ones
-      to_import.project = this.project_selected.title;
-      to_import.experiment = this.experiment_selected.title;
-      if (!to_import.attributes.length) {
-        to_import.attributes = this.experiment_selected.sample_attributes_template;
-      }
-      this.sample_to_link = to_import;
-
+      to_import.forEach(
+        (row) => {
+          row.project = this.project_selected.title;
+          row.experiment = this.experiment_selected.title;
+          if (!row.attributes || !row.attributes.length) {
+            row.attributes = this.experiment_selected.sample_attributes_template;
+          }
+        }
+      )
+      this.samples_to_link = to_import;
     },
     launchSampleImport() {
       // Request list of samples from FileService
@@ -188,28 +181,6 @@ export default {
     },
   },
   watch: {
-    data_source_name_selected: function (new_value, old_value) {
-      if (new_value === old_value) return false;
-      this.data_source_selected = this.filter_data_sources_prop(
-        "name",
-        new_value
-      )[0];
-      this.log(this.data_source_selected);
-    },
-    data_source_selected: function (new_value, old_value) {
-      if (_.isEqual(new_value, old_value)) {
-        return false;
-      }
-      // TODO: this is to refresh the datetimepicker, but it doesn't re-render it: why?
-      // this.import_start_time = null;
-      // this.import_end_time = null;
-      this.import_sample_table_cols = [];
-      this.import_sample_table_rows = [];
-      this.be.disconnect(this.namespace);
-      this.namespace = this.be.connect(
-        this.url + "/" + this.data_source_selected.name
-      );
-    },
     import_sample_table_datetime_range: function (new_value, old_value) {
       return this.be.export_one_way_binding_prop(
         "import_sample_table_datetime_range",
@@ -221,13 +192,8 @@ export default {
       if (_.isEqual(new_value, old_value)) {
         return false;
       }
-      var last_selection = [...new_value].pop();
-      // force single row selection
-      if (this.import_sample_table_checked_rows.length > 1) {
-        this.import_sample_table_checked_rows = [last_selection];
-      }
     },
-    imported_samples: function (new_data) {
+    importable_samples: function (new_data) {
       for (let i = 0; i < new_data.cols.length; i++) {
         new_data.cols[i]["searchable"] = true;
       }
@@ -237,8 +203,8 @@ export default {
     "namespace.connected": function (new_value) {
       if (new_value === true) {
         // handlers for for external notifications:
-        this.namespace.on("imported_samples", (value) =>
-          this.be.import_one_way_binding_prop("imported_samples", value.value)
+        this.namespace.on("importable_samples", (value) =>
+          this.be.import_one_way_binding_prop("importable_samples", value.value)
         );
 
         this.room_sid = this.namespace.id;

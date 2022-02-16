@@ -13,18 +13,22 @@ import asyncio
 import csv
 import os
 import tempfile
+import dateutil.parser
+import json
 
 from karsalib.client import (
                         BaseClientNamespace,
                         BaseServiceClient
                         )
-from karsalib.util import parse_cmd_args, get_client_notification_context
-
+from karsalib.util import (
+                        parse_cmd_args,
+                        get_client_notification_context,
+                        get_date_time_from_sample_name
+                        )
+from karsalib.db import SampleManagerDB
 from karsalib.datapool import SampleCatalog
 from karsaHT3000A.ht3000a import parse_csv_report, dup_cycles
 
-
-NO_DATA_LOGGING_DEFAULT = True
 
 projects_path = 'Projects' # TODO: make configurable
 datapool = SampleCatalog(projects_path)
@@ -111,9 +115,25 @@ class MetadataServiceNamespace(BaseClientNamespace):
         global datapool
         kwargs = get_client_notification_context(data)
         # Update sample table data
+        # await self.emit_client_notification(
+        #                     'importable_samples',
+        #                     datapool.get_samples().to_dict(orient='index'),
+        #                     **{**kwargs,
+        #                        'room': data['client_room']
+        #                       }
+        #                     )
+        dt_min = dateutil.parser.isoparse(data['value']['dt0'])
+        dt_max = dateutil.parser.isoparse(data['value']['dt1'])
+        samples = self.parent.store.between('date',
+                                            f"{dt_min.year}.{dt_min.month}.{dt_min.day}",
+                                            f"{dt_max.year}.{dt_max.month}.{dt_max.day}")
+        self.log(samples)
+        if not samples:
+            return
+        cols = [{'field':k, 'label':k} for k in samples[0]]
         await self.emit_client_notification(
                             'importable_samples',
-                            datapool.get_samples().to_dict(orient='index'),
+                            {'cols': cols, 'rows': samples},
                             **{**kwargs,
                                'room': data['client_room']
                               }
@@ -198,9 +218,13 @@ class MetadataServiceNamespace(BaseClientNamespace):
         experiment = value['experiment']
         project = value['project']
         kwargs = get_client_notification_context(data)
-
         datapool.delete_experiment(project, experiment)
-        
+
+        # == new sm db style =======
+        self.parent.db.catalog_remove('/'.join(['', project, experiment]))
+        project_experiments = self.parent.db.catalog.get(parent_id='/'.join(['', project]))
+        # ==========================
+
         project_experiments = datapool.get_experiments(project)
         await self.emit_client_notification(
                         'experiments',
@@ -215,8 +239,12 @@ class MetadataServiceNamespace(BaseClientNamespace):
         value = data['value']
         project = value['project']
         kwargs = get_client_notification_context(data)
-
         datapool.delete_project(project)
+
+        # == new sm db style =======
+        self.parent.db.catalog_remove('/'.join(['', project]))
+        projects = self.parent.db.catalog.get(parent_id='/')
+        # ==========================
 
         projects = datapool.get_projects()
         await self.emit_client_notification(
@@ -273,6 +301,11 @@ class MetadataServiceNamespace(BaseClientNamespace):
                                      attributes,
                                      )
 
+        # == new sm db style; TODO: edit, parse input attrs =======
+        self.parent.db.catalog_mkdir('/'.join(['', project, experiment]))
+        project_experiments = self.parent.db.catalog.get(parent_id='/'.join(['', project]))
+        # ==========================
+
         # Create placeholders for each sample
         for i, sample_placeholder in enumerate(sample_placeholders):
             filename = '%03d_placeholder' %(i+1)
@@ -299,20 +332,25 @@ class MetadataServiceNamespace(BaseClientNamespace):
         project = value.get('title')
         attributes = value.get('attributes')
         kwargs = get_client_notification_context(data)
-
         if project not in datapool.pool.keys():
             # New project
             datapool.new_project(project, attributes)
         else:
             # Edit existing project
             datapool.edit_project(project, attributes)
-        
+
+        # == new sm db style; TODO: edit project, parse input attrs =======
+        self.parent.db.catalog_mkdir('/'.join(['', project]))
+        projects = self.parent.db.catalog.get(parent_id='/')
+        # ==========================
+
         projects = datapool.get_projects()
         await self.emit_client_notification(
                                     'projects',
                                     projects,
                                     **kwargs,
                                     )
+
 
     async def on_save_sample(self, data):
         """Write attributes of a sample to disk. Make a symbolic link from
@@ -328,56 +366,99 @@ class MetadataServiceNamespace(BaseClientNamespace):
             [description]
         """
         global datapool
-
         value = data['value']
-        self.log(value)
-        filename = value['filename']
-        experiment = value['experiment']
-        project = value['project']
-        attributes = value.get('attributes')
-        method = value.get('method')
-        annotations = value.get('annotations', [])
         kwargs = get_client_notification_context(data)
 
-        try:
-            samples = datapool.pool.get(project).get(experiment)
-        except KeyError:
-            raise ValueError("Requested project or experiment does not exist!")
-        if filename not in samples:
-            # New sample attributes
-            datapool.new_sample(project, experiment, filename, attributes, method, annotations)
-        else:
-            # Edit sample attributes
-            datapool.edit_sample(project, experiment, filename, attributes, method)
+        async def save_single_sample(sample_data):
+            self.log(sample_data)
+            filename = sample_data['filename']
+            experiment = sample_data['experiment']
+            project = sample_data['project']
+            attributes = sample_data.get('attributes')
+            method = sample_data.get('method')
+            annotations = sample_data.get('annotations', [])
+            # TODO: TMP ugly workaround: if sample comes from SampleManagerDB.store,
+            # then mock up attrs, which should come from parent's db item.
+            attributes = attributes or [
+                {'label':'title', 'value': filename},
+                {'label':'description', 'value': ''},
+                {'label':'project', 'value': project},
+                {'label':'experiment', 'value': experiment},
+            ]
+            try:
+                samples = datapool.pool.get(project).get(experiment)
+            except KeyError:
+                raise ValueError("Requested project or experiment does not exist!")
+            if filename not in samples:
+                # New sample attributes
+                datapool.new_sample(project, experiment, filename, attributes, method, annotations)
+            else:
+                # Edit sample attributes
+                datapool.edit_sample(project, experiment, filename, attributes, method)
 
-        # Update sample table data in UIs
-        await self.emit_client_notification(
-                            'samples',
-                            datapool.get_samples(project, experiment).to_dict(orient='index'),
-                            **{**kwargs,
-                                'room': '_'.join([project, experiment])}
-                            )
-    
+
+            # == new sm db style; TODO: edit, parse input attrs =======
+            self.parent.db.catalog_add('/'.join(['', project, experiment, filename]), filename)
+            experiment_samples = self.parent.db.catalog.get(parent_id='/'.join(['', project, experiment]))
+            # ==========================
+
+
+            # Update sample table data in UIs
+            await self.emit_client_notification(
+                                'samples',
+                                datapool.get_samples(project, experiment).to_dict(orient='index'),
+                                **{**kwargs,
+                                    'room': '_'.join([project, experiment])}
+                                )
+
+        if isinstance(value, list):
+            for sample_data in value:
+                await save_single_sample(sample_data)
+        else:
+            await save_single_sample(value)
+
+
     async def on_save_sample_annotation(self, data):
         global datapool
-
         value = data['value']
         filename = value['filename']
         project = value['project']
         experiment = value['experiment']
         annotation = value['annotation']
-
         datapool.annotate_sample(project, experiment, filename, annotation)
+
+    async def on_dataset_updated(self, data):
+        value = data['value']
+        if value['data_type'] != 'signal':
+            raise ValueError(f"Expected data_type: signal - got {value['data_type']}")
+        filename = value['filename']
+        full_length = value['length']
+        committed_length = value['committed_length']
+        if committed_length >= full_length:
+            # update sample store
+            datetime, date, time = get_date_time_from_sample_name(filename)
+            sample_store_data = {
+                'filename': filename,
+                'instrument': filename.split('_')[0],
+                'date': date,
+                'time': time,
+                'length': committed_length,
+            }
+            self.parent.db.store_add(**sample_store_data)
+
     # ---------------------------------
 
 
 class SampleManagerClient(BaseServiceClient):
-    pass
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.db = SampleManagerDB(':memory:')
+        self.store = self.db.store
+        self.catalog = self.db.catalog
 
 
 def run():
-    global projects_path
-
     args = parse_cmd_args()
     client = SampleManagerClient(args['url'],
                                  args['port'],

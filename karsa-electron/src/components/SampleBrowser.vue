@@ -477,7 +477,7 @@
               <button
                 class="button"
                 type="button"
-                @click="$refs.sample_import.importSamples();"
+                @click="$refs.sample_import.importSamples(); is_modal_sample_import_active=false;"
                 is-dark
                 :disabled="false"
               >
@@ -761,7 +761,7 @@ export default {
           "parameter_peak_min_distance",
           "parameter_peak_min_width",
           "root_namespace",
-          "sample_to_link",
+          "samples_to_link",
           ]),
 
     experiments: {
@@ -1340,9 +1340,9 @@ export default {
           this.selectExperiment(experiment_selected_title);
       }
     },
-    sample_to_link: function() {
+    samples_to_link: function() {
       // Export sample attributes to link into current experiment
-      return this.be.export_one_way_binding_prop("save_sample", this.sample_to_link);
+      return this.be.export_one_way_binding_prop("save_sample", this.samples_to_link);
     },
     samples: function (new_value) {
       this.sample_table_checked_rows = [];

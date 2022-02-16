@@ -4,7 +4,7 @@ import os
 import random
 import string
 import yaml
-
+import datetime_glob
 from datetime import datetime, timedelta
 from karsalib.struct import AttrDict
 
@@ -102,6 +102,22 @@ def recursive_dir_walk(dir_path, *dir_masks):
         ds = recursive_walk(os.path.join(cur_dir, d), *dir_masks)
         res.extend(ds)
     return res
+
+def get_date_time_from_sample_name(fname):
+    ptns = [
+            '*%Y.%m.%d*%Hh%Mm%Ss*',
+            '*%Y%m%d_%H%M_*',
+            '*%Y%m%d_*',
+           ]
+    for ptn in ptns:
+        matcher = datetime_glob.Matcher(pattern=ptn)
+        dt = matcher.match(fname)
+        if dt:
+            break
+    if dt is None:
+        raise Exception(f"Error parsing sample name for date: {fname}")
+    dt = dt.as_datetime()
+    return dt, '%.4d.%.2d.%.2d'%(dt.year, dt.month, dt.day), '%.2d:%.2d:%.2d'%(dt.hour, dt.minute, dt.second)
 
 def parse_cmd_args():
     """

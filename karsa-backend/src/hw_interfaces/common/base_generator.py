@@ -5,7 +5,7 @@ from ntpath import basename
 from threading import Thread
 from multiprocessing import Event
 
-from karsalib.util import copy_dict, generate_unique_key
+from karsalib.util import copy_dict
 from services.FileIoService import zarr_sdk
 
 MAX_RESPONSE_TIME = 5       # secs to wait for notification acknowledgement
@@ -317,6 +317,7 @@ class BaseFileStreamer(Thread):
                 },
             },
         ]
+        # in store mode, save the zarr to target_data_pool
         if self.client.target_data_pool_path and self.item:
             try:
                 zarr_sdk.finalize_signal_dataset(sn_data, self.item)
@@ -338,6 +339,7 @@ class BaseFileStreamer(Thread):
                 },
             }
             gen_notifications.append(dataset_updated)
+        # update sample_catalog, if project/experiment specified
         if all([self.project, self.experiment]):
             # save sample data to experiment, if project/experiment defined in request
             sample_data = {

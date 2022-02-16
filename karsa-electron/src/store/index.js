@@ -40,7 +40,7 @@ export default new Vuex.Store({
 			'experiment': "",
 		},
 		sample_table_selected_row: {},
-		sample_to_link: {},
+		samples_to_link: {},
 		samples: {},
 		samples_selected: [],
 		stop_visualize_range: {},
@@ -141,8 +141,8 @@ export default new Vuex.Store({
 		sample_table_selected_row(state, payload) {
 			state.sample_table_selected_row = payload;
 		},
-		sample_to_link(state, payload) {
-			state.sample_to_link = payload;
+		samples_to_link(state, payload) {
+			state.samples_to_link = payload;
 		},
 		samples(state, payload) {
 			state.samples = payload;

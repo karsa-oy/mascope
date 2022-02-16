@@ -89,7 +89,7 @@ class FileStreamerPrivateNamespace(BaseClientNamespace):
             print("dt1 not valid JSON datetime")
             return
         sample_table = await self.parent.target_data_pool.get_datetime_range(dt0, dt1)
-        await self.emit_client_notification('imported_samples',
+        await self.emit_client_notification('importable_samples',
                                             sample_table,
                                             **{**kwargs,
                                                'room': data['client_room'],
@@ -207,9 +207,12 @@ class FileStreamerPrivateNamespace(BaseClientNamespace):
             fdate, ftime = get_raw_datetime()
         if not path:    # path normally does not come with batch import
             path = os.path.join(data_root, fdate)
-        if not os.path.isdir(path):
+            full_fname = os.path.join(path, fname)
+        else:
+            full_fname = os.path.join(path, fdate, fname)
+        if not os.path.exists(full_fname):
             path = data_root
-        full_fname = os.path.join(path, fname)
+            full_fname = os.path.join(path, fname)
         size = round((os.path.getsize(full_fname)) / 2**20, 2)  # in MB
         return {'filename': fname,
                 'path': path,

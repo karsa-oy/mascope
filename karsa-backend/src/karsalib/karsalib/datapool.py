@@ -557,7 +557,7 @@ class SampleCatalog():
                     sample_ext[ext] = self._read_attributes(sample_link, ext=ext)
                 break
             except Exception as e:
-                error_msg = f"{[this_func_name()]} Error reading {sample}/{ext}: {e.__class__.__name__}({str(e)})"
+                error_msg = f"[{this_func_name()}] Error reading {sample}/{ext}: {e.__class__.__name__}({str(e)})"
                 n_tries -= 1
                 time.sleep(.1)
         if not n_tries:
@@ -661,7 +661,7 @@ class SampleCatalog():
             for spec, ext in [(attributes, '.attrs'), (method, '.meth'), (annotations, '.annts')]:
                 self._write_attributes(sample_data_path, spec, ext=ext, overwrite=True)
         except Exception as e:
-            raise Exception(f"{[this_func_name()]} Error writing {sample}/{ext}: {e.__class__.__name__}({str(e)})")
+            raise Exception(f"[{this_func_name()}] Error writing {sample}/{ext}: {e.__class__.__name__}({str(e)})")
         # add new sample to target pool
         self.pool[project][experiment].append(sample)
         
