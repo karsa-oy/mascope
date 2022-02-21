@@ -1,11 +1,14 @@
-import dask.array as da
-import numpy as np
 import array
-import xarray
+import inspect
+import os
 import sparse
 import time
-import inspect
-import fnmatch
+import xarray
+import zarr
+
+import dask.array as da
+import numpy as np
+
 from multiprocessing import Event, Lock, cpu_count
 from queue import Empty, Full
 from scipy.sparse import coo_matrix
@@ -75,6 +78,13 @@ class ExtendableDataArray():
 
     """
     
+    @staticmethod
+    def get_zarr_synchronizer(zarr_path):
+        parent_dir = os.path.dirname(zarr_path)
+        sync_name = zarr_path.split(os.path.sep)[-1].replace('.zarr', '.sync')
+        sync_path = os.path.sep.join([parent_dir, sync_name])
+        return zarr.ProcessSynchronizer(sync_path)
+
     def __init__(self,
                  path=None,
                  array_module=da,
@@ -99,6 +109,8 @@ class ExtendableDataArray():
         """
 
         self.path = path
+        if path is not None:
+            self.sync = self.get_zarr_synchronizer(self.path)
         self.array_module = array_module
         self.dtype = dtype
         self.sparse = sparse
@@ -256,6 +268,8 @@ class ExtendableDataArray():
                 self.delayed_write.to_dataset().to_zarr(self.path,
                                                         group=group_name,
                                                         mode='a',
+                                                        synchronizer=self.sync,
+                                                        consolidated=False,
                                                         compute=True
                                                         )
                 self.delayed_write = None
@@ -276,6 +290,8 @@ class ExtendableDataArray():
             self.delayed_write.to_dataset().to_zarr(self.path,
                                                     group=group_name,
                                                     mode='a',
+                                                    synchronizer=self.sync,
+                                                    consolidated=False,
                                                     compute=True
                                                     )
             self.delayed_write = None
@@ -303,6 +319,7 @@ class ExtendableDataArray():
             raise NotImplementedError("Column assignment not implemented " + 
                                       "for array module %s" %str(self.array_module)
                                       )
+
 
 class IncrementalCOO():
     """Sparse matrix structure optimized for incremental construction.

@@ -395,7 +395,7 @@ def get_zarr_var_shape(base_filename, var, concat_dim=1):
     path = filename_to_zarr_path(base_filename, var)
     if not os.path.exists(path):
         raise FileNotFoundError("Zarr file %s does not exist" %path)
-    sync = zarr.ProcessSynchronizer(os.path.join(path, '.sync'))
+    sync = ExtendableDataArray.get_zarr_synchronizer(path)
     z = zarr.open(path, mode='r', synchronizer=sync)
     group_shapes = [ g[1][var].shape for g in z.groups() ]
     dim0, dim1 = zip(*group_shapes)
@@ -429,13 +429,27 @@ def load_array(base_filename, var, prev_array=None):
     """
     # print("Loading array %s : %s" %(base_filename, var))
     var_path = filename_to_zarr_path(base_filename, var)
+    if not os.path.exists(var_path):
+        raise FileNotFoundError(var_path)
     # Load data from file
-    dataset = open_mfzarr(var_path, prev_array=prev_array)
+    def is_multifile():    
+        z = zarr.open(var_path, mode='r', synchronizer=sync)
+        groups = list(z.group_keys())
+        return bool(len(groups))
+
+    sync = ExtendableDataArray.get_zarr_synchronizer(var_path)
+    if is_multifile():
+        # Multi-file (grouped)
+        dataset = open_mfzarr(var_path, prev_array=prev_array, sync=sync)
+    else:
+        # Single file
+        dataset = open_zarr(var_path, sync=sync)
+
     return dataset
 
 def load_coord(base_filename, var, coord_name):
     path = filename_to_zarr_path(base_filename, var)
-    sync = zarr.ProcessSynchronizer(os.path.join(path, '.sync'))
+    sync = ExtendableDataArray.get_zarr_synchronizer(path)
     z = zarr.open(path, mode='r', synchronizer=sync)
     coord = z[coord_name]
     return coord[:]
@@ -462,6 +476,8 @@ def load_file(base_filename, vars=None, prev_dataset=None):
         Loaded data
     """
     filepath = parse_path_from_sample_name(base_filename)
+    if not os.path.exists(filepath):
+        raise FileNotFoundError(filepath)
     if vars is None:
         # Get all saved variable names
         zarrs = get_file_data_vars(filepath)
@@ -474,13 +490,13 @@ def load_file(base_filename, vars=None, prev_dataset=None):
         prev_item = None if prev_dataset is None else prev_dataset.get(var)
         if prev_item is not None:
             prev_item.attrs['zarr_groups'] = prev_dataset.attrs.get('zarr_groups', {}).get(var, [])
-        try:
-            var_ds = load_array(base_filename, var, prev_item)
-        except Exception as e:
-            print(f"[{this_func_name()}] Error {base_filename}/{var}: {e.__class__.__name__}({str(e)})")
-            continue
+        # try:
+        var_ds = load_array(base_filename, var, prev_item)
+        # except Exception as e:
+            # print(f"[{this_func_name()}] Error {base_filename}/{var}: {e.__class__.__name__}({str(e)})")
+            # continue
         dss.append(var_ds)
-        zarr_groups[var] = var_ds.attrs['zarr_groups']
+        zarr_groups[var] = var_ds.attrs.get('zarr_groups', [])
     # Merge arrays into xarray.Dataset
     dataset = xarray.merge(dss)
     # Load properties
@@ -492,7 +508,7 @@ def load_file(base_filename, vars=None, prev_dataset=None):
     dataset.attrs['zarr_groups'] = zarr_groups
     return dataset
 
-def open_mfzarr(path, mode='r', concat_dim='time', prev_array=None):
+def open_mfzarr(path, sync=None, mode='r', concat_dim='time', prev_array=None):
     """Load data from a multi-file zarr into a xarray.Dataset
 
     Parameters
@@ -518,40 +534,44 @@ def open_mfzarr(path, mode='r', concat_dim='time', prev_array=None):
     ValueError
         In case requested file does not exist
     """
+    z = zarr.open(path, mode=mode, synchronizer=sync)
+    groups = list(z.group_keys())
 
-    if not os.path.exists(path):
-        raise FileNotFoundError(path)
-    sync = zarr.ProcessSynchronizer(os.path.join(path, '.sync'))
-    zarr_groups = []
-    t_start = time()
-    ZARR_OPEN_TIMEOUT = 3
-    while time()-t_start < ZARR_OPEN_TIMEOUT:
-        z = zarr.open(path, mode=mode, synchronizer=sync)
-        groups = [ g[0] for g in z.groups() ]
-        zarr_groups = list(groups)
-        if zarr_groups:
-            break
-        sleep(.3)
-    if not zarr_groups:
-        raise Exception(f"No zarr groups in {path}")
     if prev_array is not None:
         prev_groups = prev_array.attrs.get('zarr_groups', [])
         for g in prev_groups:
+            # print('group %s already loaded' %g)
             groups.remove(g)
     # print(f"{os.path.basename(path)} {'loading' if prev_array is None else 'updating'} from group {groups}")
     if not groups:
+        # print('no new groups')
         return prev_array
-    x = xarray.concat([xarray.open_zarr(path, g, consolidated=False) for g in groups], concat_dim)
+    # print("loading groups: %s" %groups)
+    x = xarray.concat([xarray.open_zarr(path,
+                                        g,
+                                        consolidated=False,
+                                        synchronizer=sync
+                                        )
+                       for g in groups
+                       ],
+                      concat_dim
+                      )
     if prev_array is not None:
         x = xarray.concat([prev_array.to_dataset(), x], concat_dim)
     x.attrs = z.attrs.asdict()
-    x.attrs['zarr_groups'] = zarr_groups
+    x.attrs['zarr_groups'] = groups
     return x
     
+def open_zarr(path, sync=None):
+    if not os.path.exists(path):
+        raise FileNotFoundError(path)
+    ds = xarray.open_zarr(path, consolidated=False, synchronizer=sync)
+    return ds
+
 def read_zarr_attributes(filepath):
     if not os.path.exists(filepath):
         raise ValueError("Zarr file %s does not exist" %filepath)
-    sync = zarr.ProcessSynchronizer(os.path.join(filepath, '.sync'))
+    sync = ExtendableDataArray.get_zarr_synchronizer(filepath)
     z = zarr.open(filepath, mode='r', synchronizer=sync)
     attributes = z.attrs.asdict()
     return attributes
@@ -575,7 +595,7 @@ def write_props(base_filename, props):
 
 def update_zarr_array_coord(base_filename, var, dim, coord):
     array_path = filename_to_zarr_path(base_filename, var)
-    sync = zarr.ProcessSynchronizer(os.path.join(array_path, '.sync'))
+    sync = ExtendableDataArray.get_zarr_synchronizer(array_path)
     zarr_array = zarr.open(array_path, mode='a', synchronizer=sync)
     zarr_array[dim][:] = coord
     for group_name, group in zarr_array.groups():
@@ -584,7 +604,7 @@ def update_zarr_array_coord(base_filename, var, dim, coord):
 def write_zarr_attributes(filepath, attributes):
     if not os.path.exists(filepath):
         raise ValueError("Zarr file %s does not exist" %filepath)
-    sync = zarr.ProcessSynchronizer(os.path.join(filepath, '.sync'))
+    sync = ExtendableDataArray.get_zarr_synchronizer(filepath)
     z = zarr.open(filepath, mode='a', synchronizer=sync)
     z.attrs.update(attributes)
 # ---------------------------------------
