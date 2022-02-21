@@ -8,6 +8,7 @@ import datetime_glob
 from datetime import datetime, timedelta
 from karsalib.struct import AttrDict
 
+
 def copy_dict(d, ignore_keys=[]):
     return {k: v for k, v in d.items() if k not in ignore_keys}
 
@@ -77,6 +78,22 @@ def get_client_notification_context(data):
     """
     return copy_dict(data, ignore_keys=['name', 'value'])
 
+def get_date_time_from_sample_name(fname):
+    ptns = [
+            '*%Y.%m.%d*%Hh%Mm%Ss*',
+            '*%Y%m%d_%H%M_*',
+            '*%Y%m%d_*',
+           ]
+    for ptn in ptns:
+        matcher = datetime_glob.Matcher(pattern=ptn)
+        dt = matcher.match(fname)
+        if dt:
+            break
+    if dt is None:
+        raise Exception(f"Error parsing sample name for date: {fname}")
+    dt = dt.as_datetime()
+    return dt, '%.4d.%.2d.%.2d'%(dt.year, dt.month, dt.day), '%.2d:%.2d:%.2d'%(dt.hour, dt.minute, dt.second)
+
 def recursive_walk(dir_path, *file_masks):
     print('walking', dir_path)
     res = []
@@ -102,22 +119,6 @@ def recursive_dir_walk(dir_path, *dir_masks):
         ds = recursive_walk(os.path.join(cur_dir, d), *dir_masks)
         res.extend(ds)
     return res
-
-def get_date_time_from_sample_name(fname):
-    ptns = [
-            '*%Y.%m.%d*%Hh%Mm%Ss*',
-            '*%Y%m%d_%H%M_*',
-            '*%Y%m%d_*',
-           ]
-    for ptn in ptns:
-        matcher = datetime_glob.Matcher(pattern=ptn)
-        dt = matcher.match(fname)
-        if dt:
-            break
-    if dt is None:
-        raise Exception(f"Error parsing sample name for date: {fname}")
-    dt = dt.as_datetime()
-    return dt, '%.4d.%.2d.%.2d'%(dt.year, dt.month, dt.day), '%.2d:%.2d:%.2d'%(dt.hour, dt.minute, dt.second)
 
 def parse_cmd_args():
     """
