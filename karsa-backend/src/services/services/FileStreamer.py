@@ -71,31 +71,6 @@ class FileStreamerPrivateNamespace(BaseClientNamespace):
                                                }
                                             )
 
-    async def on_import_sample_table_datetime_range(self, data):
-        kwargs = get_client_notification_context(data)
-        dt0_json = data['value'].get('dt0', '')
-        dt1_json = data['value'].get('dt1', '')
-        if dt0_json == '' or dt1_json == '':
-            print("Either start or end datetime not given")
-            return
-        try:
-            dt0 = datetime.strptime(dt0_json, '%Y-%m-%dT%H:%M:%S.%fZ')
-        except ValueError:
-            print("dt0 not valid JSON datetime")
-            return
-        try:
-            dt1 = datetime.strptime(dt1_json, '%Y-%m-%dT%H:%M:%S.%fZ')
-        except ValueError:
-            print("dt1 not valid JSON datetime")
-            return
-        sample_table = await self.parent.target_data_pool.get_datetime_range(dt0, dt1)
-        await self.emit_client_notification('importable_samples',
-                                            sample_table,
-                                            **{**kwargs,
-                                               'room': data['client_room'],
-                                               }
-                                            )
-
     async def on_raw_import(self, data):
         rdata = await self._create_generator_request(data)
         with self.parent.lock:
@@ -209,7 +184,7 @@ class FileStreamerPrivateNamespace(BaseClientNamespace):
             path = os.path.join(data_root, fdate)
             full_fname = os.path.join(path, fname)
         else:
-            full_fname = os.path.join(path, fdate, fname)
+            full_fname = os.path.join(path, fname)
         if not os.path.exists(full_fname):
             path = data_root
             full_fname = os.path.join(path, fname)
@@ -263,8 +238,6 @@ class FileStreamerServiceClient(BaseStreamerClient):
         await super().init_service()
         assert self.data_pool, 'Missing data_pool argument'
         await self.data_pool.scan_dir()
-        if self.target_data_pool:
-            await self.target_data_pool.scan_dir()
 
     def on_filesystem_object_created(self, path):
         try:

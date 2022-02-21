@@ -611,16 +611,6 @@ class BaseStreamerClient(BridgeServiceClient):
             m = importlib.import_module('.datapool', 'karsalib')
             self.data_pool = getattr(m, f'{streamer_type}Pool')(pool_attrs=data_pool_opts)
             self.watcher = FSWatcher(client=self, target_attrs=data_pool_opts, recursive=True)
-        
-        self.target_data_pool = None
-        if self.target_data_pool_path:
-            if not os.path.exists(priv_ns_name):
-                os.mkdir(priv_ns_name)
-            m = importlib.import_module('.datapool', 'karsalib')
-            self.target_data_pool = getattr(m, f'ZarrPool')(pool_attrs={
-                                        'path': priv_ns_name,
-                                        'mask': ['*.h5', '*.raw']
-                                        })
 
     @property
     def instrument_name(self):
