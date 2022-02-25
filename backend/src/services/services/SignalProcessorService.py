@@ -1,17 +1,22 @@
 import asyncio
+
 import numpy as np
 
-from threading import Thread
-from multiprocessing import (Barrier,
-                             Event,
-                             Queue,
-                             RawArray,
-                             Value,
-                             cpu_count)
-from queue import Empty
+from scipy.signal import find_peaks
+
+from scipy.signal._peak_finding import (
+    # _arg_wlen_as_expected,
+    _select_by_property,
+    # _unpack_condition_args,
+    )
+
+from scipy.signal._peak_finding_utils import (
+    _select_by_peak_distance,
+    # _peak_prominences,
+    # _peak_widths
+)
 
 from karsatof.lib.TwTool import TwMassCalibrate, TwTof2Mass
-from karsalib.chemistry import match_mz
 from karsalib.client import BaseClientNamespace, BaseServiceClient
 from karsalib.logging import Logger
 from karsalib.util import parse_cmd_args
@@ -21,15 +26,15 @@ from scenthound.kworker import KEncoder
 from scenthound.kcollector import KCollector
 
 from services.FileIoService import (get_zarr_var_shape,
+                                    load_file,
                                     update_props,
-                                    update_zarr_array_coord
+                                    update_zarr_array_coord,
+                                    zarr_sdk,
                                     )
 
 
 # File cache
 cache = {}
-
-u_list = []
 
 class SignalProcessorNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to Router """
@@ -90,92 +95,181 @@ class SignalProcessorNamespace(BaseClientNamespace):
                                                  }
                                                 )
 
-
-
-async def initialize_feeder():
-    global feeder
-    global process_q
-    
-    feeder = KFeeder(queue_out=process_q,
-                     # barrier=Barrier(2)
-                     )
-    feeder.start()
-
-async def initialize_encoders(process_q,
-                              results_q,
-                              n_jobs=cpu_count(),
-                              alpha=Value('d', 1e-3),
-                              error_log=False
-                              ):
-    """Initialize KEncoder processes
-
-    Parameters
-    ----------
-    process_q : Queue 
-        Queue for segments to be processed
-    code_q : Queue
-        Queue for KEncoder results
-    n_jobs : int, optional
-        Number of processes to initialize, by default the number
-        of available CPU cores as returned by multiprocessing.cpu_count()
-    alpha : multiprocessing.Value
-        SparseCoder regularization parameter
-    error_log : bool, optional
-        Log KEncoder errors to txt files, by default False
-
-    Returns
-    -------
-    encoders : list of KEncoder
-        KEncoder process instances
-    active_events : list of Event
-        List of Event objects, one per KEncoder indicating whether
-        they are currently processing an acquisition.
-    """
-    
-    global encoders
-    global encoder_active_events
-    global D_file    
-    
-    print("Initializing workers...")
-    
-    # Load peak dictionary
-    D = load_peak_dict(D_file) # scipy.sparse.csr_matrix
-    # Make a RawArray of the dictionary D so that encoders can
-    # access it without the need to copy whole dictionary for
-    # each process
-    D_data = RawArray('d', D.data)
-    D_indices = RawArray('i', D.indices)
-    D_indptr = RawArray('i', D.indptr)
-    
-    # Initialize n_jobs KEncoders    
-    if n_jobs == -1:
-        n_jobs = cpu_count()
-    for _ in range(n_jobs):
-        encoder_active = Event()
-        # KEncoder process
-        enc = KEncoder(alpha,
-                       process_q,
-                       results_q,
-                       encoder_active,
-                       D.shape,
-                       D_data,
-                       D_indices,   
-                       D_indptr,
-                       error_log=error_log
-                       )
-        encoders.append(enc)
-        encoder_active_events.append(encoder_active)
-    # Start encoders
-    for i, enc in enumerate(encoders):
-        print("Spawning worker %s/%s" %((i+1), n_jobs))
-        enc.start()
+    async def on_peak_data_request(self, data):
+        value = data['value']
+        client_room = data.get('client_room') or data['cookies']['src_sid'][0]
         
-async def initialize_collector():
-    global collector
-    global results_q
+        filename = value['filename']
+        mz_range = value.get('mz_range')
+        t_range = value.get('t_range')
+
+        peak_threshold = value.get('parameters', {}).get('peak_threshold', None)
+        min_peak_distance = value.get('parameters', {}).get('peak_separation', None)
+        # min_peak_width = value.get('parameters', {}).get('peak_width', 3)
+
+        # Check if file is cached
+        cache_item = cache.get(filename, None)
+        if not cache_item:
+            # File not in cache, load
+            print("Loading file: %s" %filename)
+            cache_item = load_file(filename, vars=['peaks'])
+            cache[filename] = cache_item
+
+        if 'peaks' not in cache_item:
+            # Find peaks and write to file
+            cache_item = find_and_write_peaks(cache_item)
+            cache[filename] = cache_item
+
+        if mz_range is None:
+            # Full mz range
+            mz_range = cache_item.attrs['props']['range']
+            
+        if t_range is None:
+            # Full time range
+            t_range = [0, cache_item.attrs['props']['length']]
+        
+        # Add integer index (MS sample bin)
+        cache_item = cache_item.assign_coords(
+                            tof=('mz', np.arange(len(cache_item.mz)))
+                            )
+
+        filtered_peaks = filter_peaks(cache_item,
+                                      mz_range,
+                                      t_range,
+                                      height=peak_threshold,
+                                      distance=min_peak_distance
+                                      )
+
+        MAX_NO_PEAKS = 20000
+        if len(filtered_peaks) > MAX_NO_PEAKS:
+            await self.parent.push_log.error(
+                        "Warning! Max number of peaks exceeded: %s. \
+                        Peak data omitted." %len(filtered_peaks),
+                        room=client_room,
+                        namespace='/'
+                        )
+            return
+
+        peak_mzs = filtered_peaks.mz.values
+        peak_heights = filtered_peaks.sum(dim='time').values
+        peak_tofs = filtered_peaks.tof.values
+        peak_data = {
+                'filename': filename,
+                'mz': peak_mzs.astype(np.float32).tobytes(),
+                'height': peak_heights.astype(np.float32).tobytes(),
+                'tof': peak_tofs.astype(np.float32).tobytes()
+                }
+
+        await self.emit_client_notification('peak_data',
+                                            peak_data,
+                                            room=client_room
+                                            )
+
+def find_and_write_peaks(cache_item):
+    if 'signal' not in cache_item:
+        # Signal not in cache, load
+        cache_item = load_file(cache_item.props['filename'],
+                               vars=['signal'],
+                               prev_dataset=cache_item
+                               )
+
+    sum_spectrum = cache_item.signal.sum(dim='time').compute()
+    # Interpolate NaNs for smoothing
+    sum_spectrum = sum_spectrum.interpolate_na(dim='mz',
+                                               method='linear',
+                                               limit=None,
+                                               max_gap=2,
+                                               )
+    peaks, peak_props = find_peaks(sum_spectrum,
+                                   height=0,
+                                   distance=None,
+                                   width=None
+                                   )
+                                   
+    # peak_mz = sum_spectrum.mz[peaks].values.astype(np.float32)
+    # peak_heights = peak_props['peak_heights'].astype(np.float32)
+    peak_profiles = cache_item.signal[peaks].astype(np.float32)
+
+    zarr_sdk.write_peak_dataset(peak_profiles, cache_item)
+
+    cache_item = load_file(cache_item.props['filename'],
+                           vars=['peaks'],
+                           prev_dataset=cache_item
+                           )
+    return cache_item
+
+def filter_peaks(cache_item,
+                 mz_range,
+                 t_range,
+                 height=None,
+                 distance=None,
+                 prominence=None,
+                 width=None
+                 ):
+
+    peaks = cache_item.peaks.sel(mz=slice(*mz_range),
+                                 time=slice(*t_range)
+                                 )
+    peaks = peaks.dropna(dim='mz')
+    peak_heights = peaks.sum(dim='time').values
+    # peak_properties = {'peak_heights': peak_heights}
+
+    keep = np.array([True]*len(peaks))
+
+    if height is not None:
+        # peak_heights = peak_properties['peak_heights']
+        # Evaluate height condition
+        keep_height = peak_heights > height
+        keep = np.logical_and(keep, keep_height)
+        # peak_properties = {key: array[keep]
+        #                    for key, array in peak_properties.items()
+        #                    }
     
-    collector = KCollector(results_q)
-    collector.start()
+    if distance is not None:
+        # peak_heights = peak_properties['peak_heights']
+        # Evaluate distance condition
+        keep_distance = _select_by_peak_distance(
+                                np.arange(len(peak_heights), dtype=np.intp),
+                                peak_heights.astype(np.float64),
+                                distance
+                                )
+        keep = np.logical_and(keep, keep_distance)
+        # peak_properties = {key: array[keep]
+        #                    for key, array in peak_properties.items()
+        #                    }
+    
+    if prominence is not None or width is not None:
+        raise NotImplementedError("Filtering based on 'prominence' or 'width' \
+                                  not implemented!"
+                                  )
+        # # Calculate prominence (required for both conditions)
+        # wlen = _arg_wlen_as_expected(wlen)
+        # properties.update(zip(
+        #     ['prominences', 'left_bases', 'right_bases'],
+        #     _peak_prominences(signal, peaks, wlen=wlen)
+        # ))
+    
+    # if prominence is not None:
+    #     # Evaluate prominence condition
+    #     pmin, pmax = _unpack_condition_args(prominence, signal, peaks)
+    #     keep = _select_by_property(properties['prominences'], pmin, pmax)
+    #     peaks = peaks[keep]
+    #     # properties = {key: array[keep] for key, array in properties.items()}
+    
+    # if width is not None:
+    #     # Calculate widths
+    #     properties.update(zip(
+    #         ['widths', 'width_heights', 'left_ips', 'right_ips'],
+    #         _peak_widths(signal, peaks, rel_height, properties['prominences'],
+    #                      properties['left_bases'], properties['right_bases'])
+    #     ))
+    #     # Evaluate width condition
+    #     wmin, wmax = _unpack_condition_args(width, signal, peaks)
+    #     keep = _select_by_property(properties['widths'], wmin, wmax)
+    #     peaks = peaks[keep]
+    #     properties = {key: array[keep] for key, array in properties.items()}
+        
+    return peaks[keep].compute()
 
 def mz_calibrate_tof(peak_tof, peak_mz, exact_mz, nbr_tof_samples):
     # Prepare arguments
@@ -237,61 +331,6 @@ class SignalProcessorClient(BaseServiceClient):
     async def init_service(self):
         self.push_log = Logger(self.__class__.__name__, f_log_level=None)
         self.push_log.configure_notifications(sender=self.ns_handler)
-    # async def init_service(self):
-    #     u_list = []
-    #     u_list = range(200, 220)
-    #     # peaklist = '.\\resources\\xplpar.db'
-    #     D_file = '.\\py_code\\resources\\test.h5'
-
-    #     feeder = None
-    #     forwarder = None
-    #     collector = None
-    #     n_jobs = cpu_count()
-    #     encoders = [] # Processes
-    #     encoder_active_events = [] # Process active 
-    #     process_q = Queue()
-    #     results_q = Queue()
-
-    # async def service_main(self):
-    #     global results_q
-    #     global sio
-        
-    #     while True:
-    #         try:
-    #             data = results_q.get_nowait()
-    #         except Empty:
-    #             await asyncio.sleep(.1)
-    #             continue
-    #         # Received results
-    #         if data:
-    #             # self.processor.transform(data)
-    #             specis = data.get('specis')
-    #             u = data.get('u')
-    #             # snos = data.get('snos').astype(np.float32).tobytes()
-    #             # spec = data.get('spec').astype(np.float32).tobytes()
-    #             # approx = data.get('approx').astype(np.float32).tobytes()
-    #             # code = data.get('code').astype(np.float32).tobytes()
-    #             # peaks = data.get('peaks')
-    #             await emit_client_notification('processed_segment',
-    #                                            {'specis': specis,
-    #                                             'u': u,
-    #                                             #'snos': snos,
-    #                                             #'spec': spec,
-    #                                             #'approx': approx,
-    #                                             #'code': code,
-    #                                             #'peaks': peaks
-    #                                             },
-    #                                            no_data_logging=True
-    #                                            )
-    #         # Received poison pill
-    #         else:
-    #             # Got None
-    #             if data is None:
-    #                 # TODO: Currently None should never be received
-    #                 pass
-    #             else:
-    #                 # TODO: Currently False is never received
-    #                 break
 
 
 def run():

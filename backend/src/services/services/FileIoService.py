@@ -9,7 +9,6 @@ via socket.io, and handles file i/o synchronization.
 Created on Thu May  7 12:43:13 2020
 """
 
-from ctypes import ArgumentError
 import os
 import asyncio
 import fnmatch
@@ -18,16 +17,20 @@ import xarray
 import zarr
 import numpy as np
 import dask.array as da
-from time import sleep, time
+
+from ctypes import ArgumentError
+from shutil import rmtree
 
 from karsalib.client import BaseClientNamespace, BaseServiceClient
+from karsalib.datapool import (METADATA_VERSION_NUMBER,
+                               parse_path_from_sample_name,
+                               )
 from karsalib.logging import this_func_name
 from karsalib.struct import AttrDict, ExtendableDataArray, LRUDict
 from karsalib.util import get_client_notification_context, parse_cmd_args
 from karsalib.datapool import parse_path_from_item_filename
 
 
-from karsalib.datapool import METADATA_VERSION_NUMBER
 DATA_VERSION_NUMBER = '0.01'
 
 
@@ -37,8 +40,29 @@ client = None
 cache = LRUDict(10)
 
 
-from shutil import rmtree
+
 class zarr_sdk:
+    @staticmethod
+    def finalize_signal_dataset(data, item):
+        filename = data['value']['filename']
+        try:
+            final_length = float(item['signal'].time[-1] + item['signal_period'][-1])
+        except Exception as e:
+            print(f"[{this_func_name}] Warning: {e.__class__.__name__}({str(e)})")
+            final_length = item['props']['length']
+
+        # Update properties
+        final_length = min(final_length, item['props']['length'])
+        item['props'].update({'committed_length': final_length})
+        item['props'].update({'length': final_length})
+        # Write properties
+        update_props(filename, item['props'])
+        # flush arrays
+        arrays = [item['signal'], item['signal_period']]
+        for a in arrays:
+            if isinstance(a, ExtendableDataArray):
+                a.flush()
+
     @staticmethod
     def init_centroid_dataset(data, item):
         value = data['value']
@@ -160,9 +184,9 @@ class zarr_sdk:
 
         # Extend data arrays (write to file)
         item['centroids'].extend_array(c_y,
-                                      [c_mz, ti],
-                                      'time'
-                                      )
+                                       [c_mz, ti],
+                                       'time'
+                                       )
         # item['centroid_period'].extend_array(period,
         #                                     [ti],
         #                                     'time'
@@ -213,26 +237,16 @@ class zarr_sdk:
                                 )
 
     @staticmethod
-    def finalize_signal_dataset(data, item):
-        filename = data['value']['filename']
-        try:
-            final_length = float(item['signal'].time[-1] + item['signal_period'][-1])
-        except Exception as e:
-            print(f"[{this_func_name}] Warning: {e.__class__.__name__}({str(e)})")
-            final_length = item['props']['length']
-
-        # Update properties
-        final_length = min(final_length, item['props']['length'])
-        item['props'].update({'committed_length': final_length})
-        item['props'].update({'length': final_length})
-        # Write properties
-        update_props(filename, item['props'])
-        # flush arrays
-        arrays = [item['signal'], item['signal_period']]
-        for a in arrays:
-            if isinstance(a, ExtendableDataArray):
-                a.flush()
-
+    def write_peak_dataset(peak_profiles, item):
+        filename_base = item.props['filename']
+        filename = filename_to_zarr_path(filename_base, 'peaks')
+        peaks_array = ExtendableDataArray(path=filename
+                                          )
+        peaks_array.init_array(dims=('mz', 'time'),
+                               data=peak_profiles,
+                               coords=[peak_profiles.mz, peak_profiles.time],
+                               name='peaks'
+                               )
 
 class FileIoNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to MainService """
@@ -484,21 +498,27 @@ def load_file(base_filename, vars=None, prev_dataset=None):
         vars = [ zarr.strip('.zarr') for zarr in zarrs ]
     # Load arrays from mfzarrs
     print(f"Loading {vars} from {base_filename}")
-    dss = []
+    datasets = []
     zarr_groups = {}
+    # Load requested data arrays
     for var in vars:
         prev_item = None if prev_dataset is None else prev_dataset.get(var)
         if prev_item is not None:
             prev_item.attrs['zarr_groups'] = prev_dataset.attrs.get('zarr_groups', {}).get(var, [])
-        # try:
-        var_ds = load_array(base_filename, var, prev_item)
-        # except Exception as e:
-            # print(f"[{this_func_name()}] Error {base_filename}/{var}: {e.__class__.__name__}({str(e)})")
-            # continue
-        dss.append(var_ds)
-        zarr_groups[var] = var_ds.attrs.get('zarr_groups', [])
-    # Merge arrays into xarray.Dataset
-    dataset = xarray.merge(dss)
+        try:
+            var_dataset = load_array(base_filename, var, prev_item)
+        except FileNotFoundError as e:
+            print(f"[{this_func_name()}] Error {base_filename}/{var}: {e.__class__.__name__}({str(e)})")
+            continue
+        datasets.append(var_dataset)
+        zarr_groups[var] = var_dataset.attrs.get('zarr_groups', [])
+    # Add previously loaded arrays
+    if prev_dataset is not None:
+        for prev_var, prev_var_dataset in prev_dataset.data_vars.items():
+            if prev_var not in vars:
+                datasets.append(prev_var_dataset)
+    # Merge datasets per variable into one dataset
+    dataset = xarray.merge(datasets)
     # Load properties
     prop_path = os.path.join(filepath, '.props')
     with open(prop_path, 'r') as f:
