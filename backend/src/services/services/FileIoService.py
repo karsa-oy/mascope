@@ -23,12 +23,11 @@ from shutil import rmtree
 
 from karsalib.client import BaseClientNamespace, BaseServiceClient
 from karsalib.datapool import (METADATA_VERSION_NUMBER,
-                               parse_path_from_sample_name,
+                               parse_path_from_item_filename,
                                )
 from karsalib.logging import this_func_name
 from karsalib.struct import AttrDict, ExtendableDataArray, LRUDict
 from karsalib.util import get_client_notification_context, parse_cmd_args
-from karsalib.datapool import parse_path_from_item_filename
 
 
 DATA_VERSION_NUMBER = '0.01'
