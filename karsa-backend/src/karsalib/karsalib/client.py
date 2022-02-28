@@ -19,6 +19,8 @@ from .logging import (
 from .util import parse_cmd_args
 
 
+SERVICE_RESPONSE_TIMEOUT = 10   # response timeout for a sync call to karsa service
+
 
 def run_streamer_service(StreamerClient,
                          StreamerPublicNamespace,
@@ -186,6 +188,31 @@ class BaseClientNamespace(AsyncClientNamespace):
                         )
         if name in self.service_state:
             self.service_state[name] = {'value': value, 'room': kwarg.get('room')}
+
+    async def call_client_notification(self, name, value, **kwarg):
+        """
+        send client_notification and wait for a response;
+        client_notification is sent to API provider via Router,
+        name:  a property/API name;
+        value: property/API value/argument;
+        other key arguments are optional and forwarded along as such,
+        e.g. no_logging/no_data_logging=True - skip logging/data_logging; default: False,
+        """
+        no_logging = kwarg.get('no_logging', NO_LOGGING_DEFAULT)
+        no_data_logging = kwarg.get('no_data_logging', NO_DATA_LOGGING_DEFAULT)
+        if no_logging:
+            pass
+        elif no_data_logging:
+            self.log(f"{name}: ... > {kwarg.get('room', name)}")
+        else:
+            self.log(f"{name}: {value} > {kwarg.get('room', name)}")
+        result = await self.client.call('client_notification',
+                            {'name': name, 'value': value, **kwarg},
+                            timeout=kwarg.get('timeout', SERVICE_RESPONSE_TIMEOUT),
+                            )
+        if name in self.service_state:
+            self.service_state[name] = {'value': value, 'room': kwarg.get('room')}
+        return result
 
     @property
     def room_sid(self):

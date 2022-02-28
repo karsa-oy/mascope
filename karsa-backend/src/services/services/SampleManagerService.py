@@ -434,12 +434,24 @@ class MetadataServiceNamespace(BaseClientNamespace):
         filename = value['filename']
         full_length = value['length']
         committed_length = value['committed_length']
+        instrument = filename.split('_')[0]
+        namespace = '/' + instrument
         if committed_length >= full_length:
+
+            # # TODO: REMOVE_THIS - this code is left as example for call_client_notification
+            # try:
+            #     metadata = await self.call_client_notification('raw_metadata_request',
+            #                                             "Ping",
+            #                                             namespace=namespace,
+            #                                             timeout=2)
+            # except TimeoutError:    # no instrument-notebook-service
+            #     metadata = {}
+
             # update sample store
             datetime, date, time = get_date_time_from_sample_name(filename)
             sample_store_data = {
                 'filename': filename,
-                'instrument': filename.split('_')[0],
+                'instrument': instrument,
                 'date': date,
                 'time': time,
                 'length': committed_length,

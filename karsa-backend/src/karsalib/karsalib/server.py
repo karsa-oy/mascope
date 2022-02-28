@@ -63,6 +63,7 @@ class BaseServerNamespace(AsyncNamespace):
         no_logging = data.get('no_logging', False)
         no_data_logging = data.get('no_data_logging', True)
         endpoint = data['name']
+        timeout = data.get('timeout')   # defines if call or emit (sync/async) response
         room = data.get('room')
         namespace = data.get('namespace', self.namespace)
         cb = data.pop('callback', None)
@@ -97,4 +98,11 @@ class BaseServerNamespace(AsyncNamespace):
                             )
         sent_to = len(src_sids) * '>'
         self.log(f"{endpoint} {sent_to} {namespace}:{target_room}")
-        await self.emit(endpoint, data, room=target_room, namespace=namespace, callback=cb and srv_callback)
+        if timeout is None:     # response to emit_client_notification
+            await self.emit(endpoint, data, room=target_room, namespace=namespace, callback=cb and srv_callback)
+        else:                   # response to call_client_notification
+            if cb:
+                raise Exception(f"on_call({endpoint}...) - illegal callback argument: {cb}")
+            result = await self.server.call(endpoint, data, to=target_room, **get_client_notification_context(data))
+            return result
+
