@@ -1,9 +1,7 @@
 import asyncio
 
-HOST, PORT = '0.0.0.0', 65146
 
-
-class SyslogProtocol(asyncio.DatagramProtocol):
+class KarsaMeasProtocol(asyncio.DatagramProtocol):
     def __init__(self):
         super().__init__()
 
@@ -16,7 +14,12 @@ class SyslogProtocol(asyncio.DatagramProtocol):
 
 
 if __name__ == '__main__':
+    from KECU import KECU_UDP_HOST, KECU_UDP_PORT
+
     loop = asyncio.get_event_loop()
-    t = loop.create_datagram_endpoint(SyslogProtocol, local_addr=(HOST, PORT))
+    t = loop.create_datagram_endpoint(
+                        KarsaMeasProtocol,
+                        local_addr=(KECU_UDP_HOST, KECU_UDP_PORT)
+                        )
     loop.run_until_complete(t) # Server starts listening
     loop.run_forever()
