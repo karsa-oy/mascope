@@ -58,6 +58,7 @@ class SampleServiceNamespace(BaseClientNamespace):
 
         workspace_id = value.get('id')
         attributes = value.get('attributes')
+        attributes.update({'id': workspace_id})
         kwargs = get_client_notification_context(data)
 
         self.log(workspace_id)
