@@ -4,11 +4,7 @@ import tkinter as tk
 
 from collections import defaultdict
 
-from karsaecu.nodes import NodeId
-from services.KECUService import KECU, initialize_kecu
-
-
-kecu = None
+from nodes import NodeId
 
 
 class Field():
@@ -327,24 +323,3 @@ class App(tk.Tk):
         while True:
             self.update()
             await asyncio.sleep(interval)
-
-
-
-if __name__ == '__main__':
-    loop = asyncio.get_event_loop()
-    tasks = []
-    
-    if len(sys.argv) > 1 and 'kecu' in sys.argv:
-        kecu = KECU()
-        loop.run_until_complete(initialize_kecu(kecu))
-        # KECU main loop
-        tasks.append( loop.create_task(kecu.run()) )
-        if 'csv' in sys.argv:
-            # KECU csv writer
-            tasks.append( loop.create_task(kecu.writer()) )
-
-    app = App(loop, kecu, tasks=tasks)
-    try:
-        loop.run_forever()
-    except KeyboardInterrupt:
-        app.close()

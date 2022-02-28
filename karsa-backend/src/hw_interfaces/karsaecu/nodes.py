@@ -4,8 +4,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Callable
 
-from .client import AsyncTCPClient
-from .messages import Command
+from client import AsyncTCPClient
+from messages import Command
 
 
 class NodeId(Enum):

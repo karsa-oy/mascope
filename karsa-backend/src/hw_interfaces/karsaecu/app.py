@@ -1,19 +1,12 @@
-import asyncio
-import time
+from client import AsyncTCPClient
 
-from time import sleep
-from .client import AsyncTCPClient
-
-from .messages import Command
-from .nodes import DEVICES, NODES, NodeId, NodeType
-
-KRS_APP_PORT = 65142        # KECU command port
-
+from messages import Command
+from nodes import DEVICES, NODES, NodeId, NodeType
 
 
 class KarsaClient(AsyncTCPClient):
-    def __init__(self):
-        super().__init__(KRS_APP_PORT)
+    def __init__(self, host, port):
+        super().__init__(host, port)
         self._node_dict = {}
         
     async def get_version(self):
@@ -38,55 +31,3 @@ class KarsaClient(AsyncTCPClient):
     
     async def on_NODE_REMOVED(self, node_id):
         pass
-
-
-
-
-async def main():
-    '''Main program'''
-    tcp = KarsaClient()
-    await tcp.connect()
-
-    time.sleep(1)
-    await tcp.get_version()
-    await tcp.get_node_list()
-
-    # print(tcp._nodeList)
-    # print(tcp._nodeTypes)
-
-    if (tcp._nodeCnt > 0):
-        for n in range(tcp._nodeCnt):
-            time.sleep(1)
-            if (tcp._nodeTypes[n] == NodeType.KRS_NODE_TYPE_MFC.value):
-                await tcp.startMfcMeas(tcp._nodeList[n], 0x2004, 0x03, 10)
-                await tcp.startMfcMeas(tcp._nodeList[n], 0x2503, 0x01, 10)
-                await tcp.startMfcMeas(0x00, 0x2C00, 0x01, 30)
-                await tcp.startMfcMeas(0x00, 0x2540, 0x01, 30)
-            if (tcp._nodeTypes[n] == NodeType.KRS_NODE_TYPE_DIO.value):
-                await tcp.startDioMeas(tcp._nodeList[n], 50)
-            if (tcp._nodeTypes[n] == NodeType.KRS_NODE_TYPE_AI.value):
-                await tcp.startAiMeas(tcp._nodeList[n], 0x03, 30)
-
-        time.sleep(30)
-
-        # tcp.stopMfcMeas(0x00,0x0000,0x00) # stop all measurements from all MFC nodes
-        for n in range(tcp._nodeCnt):
-            time.sleep(2)
-            if (tcp._nodeTypes[n] == NodeType.KRS_NODE_TYPE_MFC.value):
-                # tcp.stopMfcMeas(tcp._nodeList[n],0x2004,0x03)
-                await tcp.stopMfcMeas(tcp._nodeList[n], 0x0000, 0x00) # stop all measurements from the node
-            if (tcp._nodeTypes[n] == NodeType.KRS_NODE_TYPE_DIO.value):
-                await tcp.stopDioMeas(tcp._nodeList[n])
-            if (tcp._nodeTypes[n] == NodeType.KRS_NODE_TYPE_AI.value):
-                await tcp.stopAiMeas(tcp._nodeList[n], 0x03)
-
-    # time.sleep(3)
-
-    if (tcp.connected):
-        tcp.close()
-
-    print("exiting")
-
-# Run main.
-if __name__ == "__main__":
-    asyncio.run(main())
