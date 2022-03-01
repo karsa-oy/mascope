@@ -196,8 +196,8 @@ const apiGatewayStoreMixin = {
                     'setPath',
                     'ui/key/activate',
                     'ui/key/deactivate',
-                    'workspace/target/setSelection',
-                    'workspace/sample/setSelection',
+                    'workspace/target/selectionSet',
+                    'workspace/sample/selectionSet',
                 ]
                 return !hiddenMutationTypes.includes(mutation.type)
             },

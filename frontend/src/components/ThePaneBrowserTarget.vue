@@ -140,9 +140,9 @@ export default {
       activateModal: "ui/modal/activate",
     }),
     ...mapActions({
-      toggleTargetCompoundSelection: "workspace/target/compoundToggleSelection",
-      toggleTargetIonSelection: "workspace/target/ionToggleSelection",
-      toggleTargetIsotopeSelection: "workspace/target/isotopeToggleSelection",
+      toggleTargetCompoundSelection: "workspace/target/compoundSelectionToggle",
+      toggleTargetIonSelection: "workspace/target/ionSelectionToggle",
+      toggleTargetIsotopeSelection: "workspace/target/isotopeSelectionToggle",
     }),
   },
 };

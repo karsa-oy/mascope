@@ -85,7 +85,7 @@ export default {
             commit('requestIonCalculation');
         },
         // selection
-        compoundToggleSelection({ state, commit }, compound) {
+        compoundSelectionToggle({ state, commit }, compound) {
             let nextSelection = selection.propegateDown(compound);
             // toggle compound selection
             commit('setSelection', {
@@ -111,7 +111,7 @@ export default {
                 selected: nextChildSelection
             })
         },
-        ionToggleSelection({ state, commit }, ion) {
+        ionSelectionToggle({ state, commit }, ion) {
             let nextSelection = selection.propegateDown(ion);
             // toggle ion selection
             commit('setSelection', {
@@ -138,7 +138,7 @@ export default {
                 selected: nextParentSelection,
             })
         },
-        isotopeToggleSelection({ state, commit }, isotope) {
+        isotopeSelectionToggle({ state, commit }, isotope) {
             let nextSelection = selection.propegateDown(isotope);
             // toggle isotope selection
             commit('setSelection', {

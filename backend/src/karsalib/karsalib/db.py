@@ -1,11 +1,7 @@
-import json
 import sqlite3
-import os
 from karsalib.logging import (
-    NO_DATA_LOGGING_DEFAULT,
     NO_LOGGING_DEFAULT,
     parent_func_name,
-    this_func_name
 )
 
 
@@ -47,6 +43,12 @@ class DBTable:
         self.log(res)
         return res
 
+    def create(self, **kwargs):
+        if not self.get(**kwargs):
+            self.insert(**kwargs)
+        else:
+            raise ValueError("Record already exists!")
+
     def insert(self, **kwargs):
         # kwargs must comply with the table schema
         cols, values = zip(*kwargs.items())
@@ -58,6 +60,13 @@ class DBTable:
         row_id = self.cur.lastrowid
         self.log(row_id, kwargs.get('id') or kwargs.get('name'))
         return row_id
+
+    def update(self, **kwargs):
+        if self.get(**kwargs):
+            # TODO: It actually does REPLACE instead of UPDATE
+            self.insert(**kwargs)
+        else:
+            raise ValueError("Record does not exist!")
 
     def remove(self, item_id):
         sql = f""" DELETE FROM {self.name} WHERE id == {item_id}; """
@@ -88,63 +97,72 @@ class DBTable:
         self.log(res)
         return res
 
+    def get_joined(self, table, left_on, right_on, **kwargs):
+        def wrap_kwargs():
+            res = []
+            for k, v in kwargs.items():
+                res.append(f"{k} = '{v}'")
+            return ' AND '.join(res)
 
-class CatalogTable(DBTable):
-    def __init__(self, db, name='catalog'):
+        sql = f""" SELECT * FROM {self.name} l 
+                   LEFT JOIN {table} r
+                        ON l.{left_on} == r.{right_on}
+                    WHERE {wrap_kwargs()}; """
+        self.cur.execute(sql)
+        res = self._decode_values_list(self.cur)
+        return res
+
+
+class WorkspaceTable(DBTable):
+    def __init__(self, db, name='workspaces'):
         self.schema = [
-            ('id', 'text', 'PRIMARY KEY'),
+            ('id', 'varchar(16)', 'PRIMARY KEY'),
             ('name', 'text'),
-            ('meta', 'text'),
-            ('parent_id', 'text', 'NOT NULL'),
-            ('sample_id', 'integer'),
+            ('description', 'text'),
+            ('attributes', 'json'),
         ]
         self.sql_create = f""" CREATE TABLE IF NOT EXISTS {name} (
-            {self._wrap_schema()},
-            FOREIGN KEY (parent_id) REFERENCES catalog (id),
-            FOREIGN KEY (sample_id) REFERENCES store (id)
+            {self._wrap_schema()}
             ); """
         super().__init__(db, name)
 
-    def walk(self, item_id):
-        sql = f""" SELECT *  FROM {self.name} WHERE id = '{item_id}' or parent_id = '{item_id}'; """
-        self.cur.execute(sql)
-        items = self._decode_values_list(self.cur)
-        res = [None, [], []]
-        for i in items:
-            if i['id'] == item_id:
-                res[0] = i
-            elif i['sample_id'] is None:
-                res[1].append(i)
-            else:
-                res[2].append(i)
-        return res
 
-    def _get_family_ids(self, parent_id, result_list):
-        result_list.append(parent_id)
-        sql = f""" SELECT id FROM '{self.name}' WHERE parent_id = '{parent_id}'; """
-        self.cur.execute(sql)
-        child_list = list(self.cur)
-        for id, in child_list:
-            if id == parent_id:
-                continue
-            self._get_family_ids(id, result_list)
-
-    def remove(self, item_id):
-        ids = []
-        self._get_family_ids(item_id, ids)
-        str_ids = ','.join('?' * len(ids))
-        sql = f""" DELETE FROM {self.name} WHERE id IN ({str_ids}); """
-        self.cur.execute(sql, ids)
-        self.con.commit()
-        self.log(ids)
-        return ids
-
-
-class StoreTable(DBTable):
-    def __init__(self, db, name='store'):
+class SampleBatchTable(DBTable):
+    def __init__(self, db, name='sample_batches'):
         self.schema = [
-            ('id', 'text', 'PRIMARY KEY'),
-            ('filename', 'text'),
+            ('id', 'varchar(16)', 'PRIMARY KEY'),
+            ('workspace_id', 'varchar(16)', 'NOT NULL'),
+            ('name', 'text'),
+            ('description', 'text'),
+            ('attributes', 'json'),
+        ]
+        self.sql_create = f""" CREATE TABLE IF NOT EXISTS {name} (
+            {self._wrap_schema()},
+            FOREIGN KEY (workspace_id) REFERENCES workspaces (id)
+            ); """
+        super().__init__(db, name)
+
+
+class SampleItemTable(DBTable):
+    def __init__(self, db, name='sample_items'):
+        self.schema = [
+            ('id', 'varchar(16)', 'PRIMARY KEY'),
+            ('sample_batch_id', 'varchar(16)', 'NOT NULL'),
+            ('filename', 'varchar(256)', 'NOT NULL'),
+            ('attributes', 'json'),
+        ]
+        self.sql_create = f""" CREATE TABLE IF NOT EXISTS {name} (
+            {self._wrap_schema()},
+            FOREIGN KEY (sample_batch_id) REFERENCES sample_batches (id),
+            FOREIGN KEY (filename) REFERENCES store (filename)
+            ); """
+        super().__init__(db, name)
+
+
+class SampleFileTable(DBTable):
+    def __init__(self, db, name='sample_files'):
+        self.schema = [
+            ('filename', 'varchar(256)', 'PRIMARY KEY'),
             ('instrument', 'text'),
             ('date', 'text'),
             ('time', 'text'),
@@ -156,6 +174,7 @@ class StoreTable(DBTable):
         super().__init__(db, name)
 
 
+
 class SampleManagerDB:
     def log(self, *arg):
         if not NO_LOGGING_DEFAULT:
@@ -164,10 +183,11 @@ class SampleManagerDB:
     def __init__(self, fname):
         self.con = None
         self.cur = None
-        self.store = None
-        self.catalog = None
+        self.workspaces = None
+        self.sample_batches = None
+        self.sample_items = None
+        self.sample_files = None
         self._connect(fname)
-        self.catalog_mkdir('/')
 
     def __del__(self):
         if self.con:
@@ -181,93 +201,73 @@ class SampleManagerDB:
         except Exception as e:
             self.log(e.__class__.__name__(str(e)))
             raise
-        self.store = StoreTable(self)
-        self.catalog = CatalogTable(self)
+        self.workspaces = WorkspaceTable(self)
+        self.sample_batches = SampleBatchTable(self)
+        self.sample_items = SampleItemTable(self)
+        self.sample_files = SampleFileTable(self)
 
-    def catalog_mkdir(self, path, attrs=None):
-        # if self.catalog.get(id=path):
-        #     return
-        dpath, dname = os.path.split(path)
-        if not dpath or dpath[0] != '/':
-            raise Exception(f'[{this_func_name()}] Full path required: {path}')
-        attrs = attrs or {'title': dname, 'description': ''}
-        self.catalog.insert(id=path, parent_id=dpath, name=dname,
-                            meta=json.dumps(attrs))
+    # workspaces
+    def workspace_list(self):
+        return self.workspaces.get_all()
 
-    def catalog_add(self, path, sample_id, attrs=None):
-        # if self.catalog.get(id=path):
-        #     raise FileExistsError(path)
-        dpath, fname = os.path.split(path)
-        if not dpath:
-            raise Exception(f'[{this_func_name()}] Full path required: {path}')
-        attrs = attrs or {'title': fname, 'description': ''}
-        self.catalog.insert(id=path, parent_id=dpath, name=fname,
-                            meta=json.dumps(attrs), sample_id=sample_id)
+    def workspace_create(self, **kwargs):
+        self.workspaces.create(**kwargs)
 
-    def catalog_remove(self, path):
-        self.catalog.remove(path)
+    def workspace_read(self, id):
+        return self.workspaces.get(id=id)
 
-    def store_add(self, **zarr_data):
-        id = zarr_data.get('id') or zarr_data.get('filename')
-        if id:
-            new_sample_data = {**zarr_data, 'id': id}
-        else:
-            new_sample_data = zarr_data
-        self.store.insert(**new_sample_data)
+    def workspace_update(self, **kwargs):
+        self.workspaces.update(**kwargs)
 
-    def store_remove(self, item_id):
-        self.store.remove(item_id)
+    def workspace_delete(self, id):
+        self.workspaces.remove(id=id)
 
+    # sample batches
+    def sample_batch_list(self, workspace_id):
+        return self.sample_batches.get(workspace_id=workspace_id)
+        
+    def sample_batch_create(self, **kwargs):
+        self.sample_batches.create(**kwargs)
 
-if __name__ == '__main__':
-    sm = SampleManagerDB(':memory:')
-    # s_01 = sm.store.insert(id='sample_01', filename='sample_01')
-    # s_02 = sm.store.insert(id='sample_02', filename='sample_02')
-    # root_id = sm.catalog.insert(name='/', id=0, parent_id=0)
-    # d_01 = sm.catalog.insert(name='d_01', parent_id=root_id)
-    # d_02 = sm.catalog.insert(name='d_02', parent_id=root_id)
-    # d_113 = sm.catalog.insert(name='d_113', parent_id=d_01)
-    # d_114 = sm.catalog.insert(name='d_114', parent_id=d_01)
-    # d_02_1 = sm.catalog.insert(name='d_02_1', parent_id=d_02)
-    # f_02_1 = sm.catalog.insert(name='f_02_1', parent_id=d_02, sample_id=s_01)
-    # f_113_1 = sm.catalog.insert(name='f_113_1', parent_id=d_113, sample_id=s_01)
-    # f_02_2 = sm.catalog.insert(name='f_02_2', parent_id=d_02, sample_id=s_02)
-    # sm.store.get_all()
-    # sm.catalog.get_all()
-    # sm.catalog.get(sample_id=s_01)
-    # print('Root walk:', sm.catalog.walk(root_id))
-    # print('Item walk:', sm.catalog.walk(d_02))
-    # sm.catalog.remove(d_02)
-    # sm.store.get_all()
-    # sm.catalog.get_all()
-    # print('parent_id between', root_id, d_02, list(sm.catalog.between('parent_id', root_id, d_02)))
+    def sample_batch_read(self, id):
+        return self.sample_batches.get(id=id)
 
-    s_01 = sm.store_add(filename='sample_01')
-    s_02 = sm.store_add(filename='sample_02')
+    def sample_batch_update(self, **kwargs):
+        self.sample_batches.update(**kwargs)
 
-    sm.catalog_mkdir('/d_1')
-    sm.catalog_mkdir('/d_2')
-    sm.catalog_mkdir('/d_1/d_11')
-    sm.catalog_mkdir('/d_1/d_12')
-    sm.catalog_mkdir('/d_1/d_12/d_121')
-    sm.catalog_add('/d_2/f_21', s_01)
-    sm.catalog_add('/d_1/d_12/f_121', s_01)
-    sm.catalog_add('/d_1/d_11/f_112', s_02)
-    sm.catalog_add('/d_1/d_12/f_122', s_02)
+    def sample_batch_delete(self, id):
+        self.sample_batches.remove(id=id)
 
-    sm.store.get_all()
-    sm.catalog.get_all()
-    sm.catalog.get(sample_id=s_01)
+    # sample items
+    def sample_item_list(self, sample_batch_id):
+        return self.sample_items.get_joined(
+                    'sample_files',
+                    'filename',
+                    'filename',
+                    sample_batch_id=sample_batch_id
+                    )
+        
+    def sample_item_create(self, **kwargs):
+        if not self.sample_files.get(id=kwargs['filename']):
+            self.sample_files.create(filename=kwargs['filename'])
+        self.sample_items.create(**kwargs)
 
-    print('Root walk:', sm.catalog.walk('/'))
-    print('Item walk:', sm.catalog.walk('/d_1/d_12'))
+    def sample_item_read(self, id):
+        return self.sample_items.get_joined(
+                    'sample_files',
+                    'filename',
+                    'filename',
+                    id=id
+                    )
 
-    d11, d12 = ('/d_1/d_11', '/d_1/d_12')
-    print('parent_id between', d11, d12, list(sm.catalog.between('parent_id', d11, d12)))
+    def sample_item_update(self, **kwargs):
+        # Update sample metadata and not sample file
+        self.sample_items.update(**kwargs)
 
-    sm.catalog_remove('/d_1/d_12/f_122')
-    sm.catalog_remove('/d_1/d_12')
-    sm.store.get_all()
-    sm.catalog.get_all()
+    def sample_item_delete(self, id):
+        self.sample_items.remove(id=id)
 
-    print('parent_id between', d11, d12, list(sm.catalog.between('parent_id', d11, d12)))
+    # sample files
+    def sample_file_insert(self, **kwargs):
+        self.sample_files.insert(**kwargs)
+

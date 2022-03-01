@@ -26,8 +26,8 @@ export default {
           slug: "batch",
           cols: [{ field: "name", label: "Batch", width: "90%" }],
           rows: this.batchRows,
-          detailsOpen: this.openBatch,
-          detailsClose: this.closeBatch,
+          detailsOpen: this.batchOpen,
+          detailsClose: this.batchClose,
           rowClick: this.toggleSampleBatchSelection,
         },
         {
@@ -43,10 +43,10 @@ export default {
   },
   methods: {
     ...mapActions({
-      openBatch: "workspace/sample/openBatch",
-      closeBatch: "workspace/sample/closeBatch",
-      toggleSampleBatchSelection: "workspace/sample/batchToggleSelection",
-      toggleSampleItemSelection: "workspace/sample/itemToggleSelection",
+      batchOpen: "workspace/sample/batchOpen",
+      batchClose: "workspace/sample/batchClose",
+      toggleSampleBatchSelection: "workspace/sample/batchSelectionToggle",
+      toggleSampleItemSelection: "workspace/sample/itemSelectionToggle",
     }),
   },
 };
