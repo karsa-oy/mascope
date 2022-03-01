@@ -23,7 +23,8 @@ export default {
         save(state, workspace) {
             state.$saveRequest = {
                 id: workspace.id ? workspace.id : table.genId(),
-                attributes: workspace
+                name: workspace.name,
+                description: workspace.description,
             }
         },
         delete(state, workspace) {

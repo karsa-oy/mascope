@@ -37,14 +37,19 @@ cache = {}
 NO_DATA_LOGGING_DEFAULT = True
 
 workspace_path = 'workspaces' # TODO: make configurable
-datapool = SampleCatalog(workspace_path)
+# datapool = SampleCatalog(workspace_path)
+
+# db_path = ':memory:'
+db_path = 'samples.db'
+db = SampleManagerDB(db_path)
+
 
 class SampleServiceNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to MainService """
 
     service_state = dict(
         workspace_rows = {
-            'value': datapool.get_workspaces(),
+            'value': db.workspace_list(),
             'room': 'workspaces'
         },
     )
@@ -53,28 +58,42 @@ class SampleServiceNamespace(BaseClientNamespace):
 
     # === workspaces === #
     
+    # async def on_workspace_save_request(self, data):
+    #     value = data['value']
+
+    #     workspace_id = value.get('id')
+    #     attributes = value.get('attributes')
+    #     attributes.update({'id': workspace_id})
+    #     kwargs = get_client_notification_context(data)
+
+    #     self.log(workspace_id)
+    #     self.log(datapool.pool.keys())
+
+    #     if workspace_id not in datapool.pool.keys():
+    #         # New workspace
+    #         datapool.new_workspace(workspace_id, attributes)
+    #     else:
+    #         # Edit existing workspace
+    #         datapool.edit_workspace(workspace_id, attributes)
+
+    #     # sync sample db
+    #     self.parent.db.catalog_mkdir('/'.join(['', workspace_id])) 
+        
+    #     workspace_rows = datapool.get_workspaces()
+    #     await self.emit_client_notification(
+    #                                 'workspace_rows',
+    #                                 workspace_rows,
+    #                                 **{**kwargs,
+    #                                     'client_room': 'workspaces'
+    #                                 })
     async def on_workspace_save_request(self, data):
         value = data['value']
-
-        workspace_id = value.get('id')
-        attributes = value.get('attributes')
-        attributes.update({'id': workspace_id})
         kwargs = get_client_notification_context(data)
 
-        self.log(workspace_id)
-        self.log(datapool.pool.keys())
-
-        if workspace_id not in datapool.pool.keys():
-            # New workspace
-            datapool.new_workspace(workspace_id, attributes)
-        else:
-            # Edit existing workspace
-            datapool.edit_workspace(workspace_id, attributes)
-
-        # sync sample db
-        self.parent.db.catalog_mkdir('/'.join(['', workspace_id])) 
+        db.workspace_create(**value)
         
-        workspace_rows = datapool.get_workspaces()
+        workspace_rows = db.workspace_list()
+
         await self.emit_client_notification(
                                     'workspace_rows',
                                     workspace_rows,
@@ -343,7 +362,7 @@ class SampleServiceNamespace(BaseClientNamespace):
                 'time': time,
                 'length': committed_length,
             }
-            self.parent.db.store_add(**sample_store_data)
+            self.parent.db.sample_file_insert(**sample_store_data)
 
     # peaks
 
@@ -428,8 +447,6 @@ class SampleManagerClient(BaseServiceClient):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.db = SampleManagerDB(':memory:')
-
 
 def run():
     args = parse_cmd_args()
