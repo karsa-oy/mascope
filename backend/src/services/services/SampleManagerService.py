@@ -37,14 +37,19 @@ cache = {}
 NO_DATA_LOGGING_DEFAULT = True
 
 workspace_path = 'workspaces' # TODO: make configurable
-datapool = SampleCatalog(workspace_path)
+# datapool = SampleCatalog(workspace_path)
+
+# db_path = ':memory:'
+db_path = 'samples.db'
+db = SampleManagerDB(db_path)
+
 
 class SampleServiceNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to MainService """
 
     service_state = dict(
         workspace_rows = {
-            'value': datapool.get_workspaces(),
+            'value': db.workspace_list(),
             'room': 'workspaces'
         },
     )
@@ -53,276 +58,243 @@ class SampleServiceNamespace(BaseClientNamespace):
 
     # === workspaces === #
     
-    async def on_workspace_save_request(self, data):
+    async def on_workspace_list_request(self, data):
+        value = data['value']
+        
+        await self.emit_client_notification(
+            'workspace_rows', db.workspace_list(),
+            **{
+                'client_room': 'workspaces',
+                **get_client_notification_context(data)
+            })
+
+    async def on_workspace_create_request(self, data):
+        value = data['value']
+        
+        db.workspace_create(**value)
+
+        await self.emit_client_notification(
+            'workspace_rows', db.workspace_list(),
+            **{
+                'client_room': 'workspaces',
+                **get_client_notification_context(data)
+            })
+
+    async def on_workspace_update_request(self, data):
         value = data['value']
 
-        workspace_id = value.get('id')
-        attributes = value.get('attributes')
-        attributes.update({'id': workspace_id})
-        kwargs = get_client_notification_context(data)
+        db.workspace_update(**value)
 
-        self.log(workspace_id)
-        self.log(datapool.pool.keys())
-
-        if workspace_id not in datapool.pool.keys():
-            # New workspace
-            datapool.new_workspace(workspace_id, attributes)
-        else:
-            # Edit existing workspace
-            datapool.edit_workspace(workspace_id, attributes)
-
-        # sync sample db
-        self.parent.db.catalog_mkdir('/'.join(['', workspace_id])) 
-        
-        workspace_rows = datapool.get_workspaces()
         await self.emit_client_notification(
-                                    'workspace_rows',
-                                    workspace_rows,
-                                    **{**kwargs,
-                                        'client_room': 'workspaces'
-                                    })
+            'workspace_rows', db.workspace_list(),
+            **{
+                'client_room': 'workspaces',
+                **get_client_notification_context(data)
+            })
 
     async def on_workspace_delete_request(self, data):
         value = data['value']
+        
+        db.workspace_delete(id=value.get('id'))
 
-        workspace_id = value['id']
-        kwargs = get_client_notification_context(data)
-
-        datapool.delete_workspace(workspace_id)
-
-        # sync sample db
-        self.parent.db.catalog_remove('/'.join(['', workspace_id]))
-
-        workspace_rows = datapool.get_workspaces()
         await self.emit_client_notification(
-                                    'workspace_rows',
-                                    workspace_rows,
-                                    **kwargs,
-                                    )
+            'workspace_rows', db.workspace_list(),
+            **{
+                'client_room': 'workspaces',
+                **get_client_notification_context(data)
+            })
 
     # === sample batches === #
 
-    async def on_workspace_sample_batch_fetch_request(self, data):
+    async def on_workspace_sample_batch_list_request(self, data):
         value = data['value']
 
-        workspace_id = value.get('id')
-        kwargs = get_client_notification_context(data)
-
-        if workspace_id not in datapool.pool.keys():
-            raise ValueError("Requested workspace does not exist!")
-
-        workspace_sample_update = {
-            'type': 'batch-fetch',
-            'requestId': value['requestId'],
-            'payload': {
-                'level': 'batch',
-                'filters': '*',
-                'rows': datapool.get_batches(workspace_id),
-            }
-        }
         await self.emit_client_notification(
-                                    'workspace_sample_update',
-                                    workspace_sample_update,
-                                    **{**kwargs,
-                                       'room': data['client_room']
-                                      },
-                                )
+            'workspace_sample_response', {
+                'type': 'batch-list',
+                'requestId': value['requestId'],
+                'payload': {
+                    'level': 'batch',
+                    'filters': '*',
+                    'rows': db.sample_batch_list(
+                        value.get('workspaceId')
+                    ),
+                }
+            }, **{
+               'room': data['client_room'],
+                **get_client_notification_context(data)
+            })
     
-    async def on_workspace_sample_batch_save_request(self, data):
+    async def on_workspace_sample_batch_create_request(self, data):
         value = data['value']
         
-        workspace_id = value.get('workspaceId')
-        batch_id = value.get('id')
-        attributes = value.get('attributes')
-        item_placeholders = value.get('item_placeholders', [])
-        kwargs = get_client_notification_context(data)
+        db.sample_batch_create(
+            id=value.get('id'),
+            name=value.get('name'), 
+            description=value.get('description')
+            )
 
-        # Create new batch directory
-        if workspace_id not in datapool.pool.keys():
-            raise ValueError("Requested workspace does not exist!")
-        batch_ids = datapool.pool.get(workspace_id).keys()
-        if batch_id not in batch_ids:
-            # New batch
-            datapool.new_batch(workspace_id,
-                               batch_id,
-                               attributes
-                               )
-        else:
-            # Edit batch
-            datapool.edit_batch(workspace_id,
-                                batch_id,
-                                attributes,
-                                )
-
-        # sync sample db
-        self.parent.db.catalog_mkdir('/'.join(['', workspace_id, batch_id]))
-
-        # Create placeholders for each sample
-        for i, item_placeholder in enumerate(item_placeholders):
-            placeholder = '%03d_placeholder' %(i+1)
-            datapool.new_item(workspace_id,
-                              batch_id,
-                              placeholder,
-                              item_placeholder.get('attributes', []),
-                              placeholder=True
-                              )
-
-        workspace_sample_update = {
-            'type': 'batch-save',
-            'requestId': value['requestId'],
-            'payload': {
-                'level': 'batch',
-                'filters': '*',
-                'rows': datapool.get_batches(workspace_id),
-            }
-        }
         await self.emit_client_notification(
-                        'workspace_sample_update',
-                        workspace_sample_update,
-                        **{**kwargs,
-                            'room': workspace_id
-                        })
+            'workspace_sample_response', {
+                'type': 'batch-create',
+                'requestId': value['requestId'],
+                'payload': {
+                    'level': 'batch',
+                    'filters': '*',
+                    'rows': db.sample_batch_list(
+                        value.get('workspaceId')
+                    ),
+                }
+            }, **{
+                'room': workspace_id,
+                **get_client_notification_context(data)
+            })
+
+    async def on_workspace_sample_batch_update_request(self, data):
+        value = data['value']
+        
+        db.sample_batch_update(
+            id=value.get('id'),
+            name=value.get('name'), 
+            description=value.get('description')
+        )
+
+        await self.emit_client_notification(
+            'workspace_sample_response', {
+                'type': 'batch-update',
+                'requestId': value['requestId'],
+                'payload': {
+                    'level': 'batch',
+                    'filters': '*',
+                    'rows': db.sample_batch_list(
+                        value.get('workspaceId')
+                    ),
+                }
+            }, **{
+                'room': workspace_id,
+                **get_client_notification_context(data)
+            })
 
     async def on_workspace_sample_batch_delete_request(self, data):
         value = data['value']
-        self.log(data)
 
-        workspace_id = value['workspaceId']
-        batch_id = value['id']
-        kwargs = get_client_notification_context(data)
-
-        datapool.delete_batch(workspace_id, batch_id)
-
-        # sync sample db
-        self.parent.db.catalog_remove('/'.join(['', workspace_id, batch_id]))
+        db.sample_batch_delete(
+            id=value.get('id')
+        )
         
-        workspace_sample_update = {
-            'type': 'batch-delete',
-            'requestId': value['requestId'],
-            'payload': {
-                'level': 'batch',
-                'filters': '*',
-                'rows': datapool.get_batches(workspace_id),
-            }
-        }
         await self.emit_client_notification(
-                        'workspace_sample_update',
-                        workspace_sample_update,
-                        **{**kwargs,
-                            'room': workspace_id
-                        })
-
+            'workspace_sample_response', {
+                'type': 'batch-delete',
+                'requestId': value['requestId'],
+                'payload': {
+                    'level': 'batch',
+                    'filters': '*',
+                    'rows': datapool.get_batches(
+                        value.get('workspaceId')
+                    ),
+                }
+            }, **{
+                'room': workspace_id,
+                **get_client_notification_context(data)
+            })
 
     # === sample items === #
 
-    async def on_workspace_sample_item_fetch_request(self, data):
+    async def on_workspace_sample_item_list_request(self, data):
         value = data['value']
         
-        workspace_id = value.get('workspaceId')
         batch_id = value.get('id')
-        kwargs = get_client_notification_context(data)
 
         # Update sample table data
-        workspace_sample_update = {
-            'type': 'item-fetch',
-            'requestId': value['requestId'],
-            'payload': {
-                'level': 'item',
-                'filters': {'batchId': batch_id},
-                'rows': datapool.get_items(workspace_id, batch_id),
-            }
-        }
         await self.emit_client_notification(
-                            'workspace_sample_update',
-                            workspace_sample_update,
-                            **{**kwargs,
-                               'room': data['client_room']
-                            })
+            'workspace_sample_response', {
+                'type': 'item-list',
+                'requestId': value['requestId'],
+                'payload': {
+                    'level': 'item',
+                    'filters': {'batchId': batch_id},
+                    'rows': db.sample_item_list(sample_batch_id=batch_id),
+                }
+            }, **{
+               'room': data['client_room'],
+                **get_client_notification_context(data)
+            })
 
-    async def on_workspace_sample_item_save_request(self, data):
-        """Write attributes of a sample item to disk. Make a symbolic link 
-        from the sample directory in 'data_path' to 'workspace_id/batch_id' 
-        path.
-
-        Parameters
-        ----------
-        data : [type]
-            [description]
-
-        Raises
-        ------
-        ValueError
-            [description]
-        """
+    async def on_workspace_sample_item_create_request(self, data):
         value = data['value']
 
-        workspace_id = value['workspaceId']
-        batch_id = value['batchId']
-        item_id = value['id']
-        attributes = value.get('attributes')
-        kwargs = get_client_notification_context(data)
-
-        try:
-            item_ids = datapool.pool.get(workspace_id).get(batch_id)
-        except KeyError:
-            raise ValueError("Requested workspace or batch does not exist!")
-        if item_id not in item_ids:
-            # New sample attributes
-            datapool.new_item(workspace_id, batch_id, item_id, attributes)
-        else:
-            # Edit sample attributes
-            datapool.edit_item(workspace_id, batch_id, item_id, attributes)
-
-        # sync sample db
-        self.parent.db.catalog_add('/'.join(['', workspace_id, batch_id, item_id]), item_id)
-
-        # Update sample table data in UIs
-        workspace_sample_update = {
-            'type': 'item-save',
-            'requestId': value['requestId'],
-            'payload': {
-                'level': 'item',
-                'filters': {'batchId': batch_id},
-                'rows': datapool.get_items(workspace_id, batch_id),
-            }
-        }
+        db.sample_item_create(
+            id=value.get('id'),
+            sample_batch_id=value.get('batch_id'),
+            filename=value.get('filename'),
+            attributes=value.get('attributes')
+        )
+        
         await self.emit_client_notification(
-                            'workspace_sample_update',
-                            workspace_sample_update,
-                            **{**kwargs,
-                                'room': workspace_id + batch_id
-                            })
+            'workspace_sample_response', {
+                'type': 'item-create',
+                'requestId': value['requestId'],
+                'payload': {
+                    'level': 'item',
+                    'filters': {'batchId': batch_id},
+                    'rows': db.sample_item_list(
+                        sample_batch_id=value.get('batchId')
+                    ),
+                }
+            }, **{
+                'room': workspace_id + batch_id,
+                **get_client_notification_context(data)
+            })
+
+    async def on_workspace_sample_item_update_request(self, data):
+        value = data['value']
+
+        db.sample_item_update(
+            id=value.get('id'),
+            sample_batch_id=value.get('batchId'),
+            filename=value.get('filename'),
+            attributes=value.get('attributes')
+        )
+        
+        await self.emit_client_notification(
+            'workspace_sample_response', {
+                'type': 'item-update',
+                'requestId': value['requestId'],
+                'payload': {
+                    'level': 'item',
+                    'filters': {'batchId': batch_id},
+                    'rows': db.sample_item_list(
+                        sample_batch_id=value.get('batchId')
+                    ),
+                }
+            }, **{
+                'room': workspace_id + batch_id,
+                **get_client_notification_context(data)
+            })
 
     async def on_workspace_sample_item_delete_request(self, data):
         ''' Remove sample item from a sample batch '''
         value = data['value']
 
-        workspace_id = value['workspaceId']
-        batch_id = value['batchId']
-        filename = value['filename']
-        kwargs = get_client_notification_context(data)
-        
-        try:
-            datapool.delete_sample(workspace_id, batch_id, filename)
-        except Exception as e:
-            self.log('Error:', str(e))
-        
-        # Update sample table data in UIs
-        workspace_sample_update = {
-            'type': 'item-delete',
-            'requestId': value['requestId'],
-            'payload' : {
-                'level': 'item',
-                'filters': {'batchId': batch_id},
-                'rows': datapool.get_items(workspace_id, batch_id),
-            }
-        }
+        db.sample_item_delete(
+            id=value.get('id')
+        )
+
         await self.emit_client_notification(
-                            'workspace_sample_update',
-                            workspace_sample_update,
-                            **{**kwargs,
-                                'room': workspace_id + batch_id
-                            })
+            'workspace_sample_response', {
+                'type': 'item-delete',
+                'requestId': value['requestId'],
+                'payload': {
+                    'level': 'item',
+                    'filters': {'batchId': batch_id},
+                    'rows': db.sample_item_list(
+                        sample_batch_id=value.get('batchId')
+                    ),
+                }
+            }, **{
+                'room': workspace_id + batch_id,
+                **get_client_notification_context(data)
+            })
 
     # sample db
 
@@ -336,18 +308,17 @@ class SampleServiceNamespace(BaseClientNamespace):
         if committed_length >= full_length:
             # update sample store
             datetime, date, time = get_date_time_from_sample_name(filename)
-            sample_store_data = {
-                'filename': filename,
-                'instrument': filename.split('_')[0],
-                'date': date,
-                'time': time,
-                'length': committed_length,
-            }
-            self.parent.db.store_add(**sample_store_data)
+            db.sample_file_insert(
+                filename=filename,
+                instrument=filename.split('_')[0],
+                date=date,
+                time=time,
+                length=committed_length
+            )
 
     # peaks
 
-    async def on_workspace_sample_peak_request(self, data):
+    async def on_workspace_sample_peak_list_request(self, data):
         value = data['value']
         client_room = data.get('client_room') or data['cookies']['src_sid'][0]
         
@@ -402,34 +373,25 @@ class SampleServiceNamespace(BaseClientNamespace):
         peak_heights_bytes = export(peak_props['peak_heights'])
         peak_tofs_bytes = export(peak_indeces)
 
-        workspace_sample_update = { 
-            'type': 'peak-fetch',
-            'requestId': value['requestId'],
-            'payload': {
-                'sampleItemId': value['sampleItemId'],
-                'mzsBytes': peak_mzs_bytes,
-                'heightsBytes': peak_heights_bytes,
-                'tofsBytes': peak_tofs_bytes
-            }
-        }
-
-        self.log(workspace_sample_update)
-
-        await self.emit_client_notification('workspace_sample_update',
-                                            workspace_sample_update,
-                                            room=client_room
-                                            )
-
-
-
+        await self.emit_client_notification(
+            'workspace_sample_response', {
+                'type': 'peak-list',
+                'requestId': value['requestId'],
+                'payload': {
+                    'sampleItemId': value['sampleItemId'],
+                    'mzsBytes': peak_mzs_bytes,
+                    'heightsBytes': peak_heights_bytes,
+                    'tofsBytes': peak_tofs_bytes
+                }
+            },
+            room=client_room
+            )
 
 
 class SampleManagerClient(BaseServiceClient):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.db = SampleManagerDB(':memory:')
-
 
 def run():
     args = parse_cmd_args()
