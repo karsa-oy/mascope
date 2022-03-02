@@ -100,12 +100,12 @@ class SignalProcessorNamespace(BaseClientNamespace):
         client_room = data.get('client_room') or data['cookies']['src_sid'][0]
         
         filename = value['filename']
-        mz_range = value.get('mz_range')
-        t_range = value.get('t_range')
+        mz_range = value.get('mzRange')
+        t_range = value.get('tRange')
 
-        peak_threshold = value.get('parameters', {}).get('peak_threshold', None)
-        min_peak_distance = value.get('parameters', {}).get('peak_separation', None)
-        # min_peak_width = value.get('parameters', {}).get('peak_width', 3)
+        peak_threshold = value.get('parameters', {}).get('minPeakIntensity', None)
+        min_peak_distance = value.get('parameters', {}).get('minPeakSeparation', None)
+        # min_peak_width = value.get('parameters', {}).get('minPeakWidth', 3)
 
         # Check if file is cached
         cache_item = cache.get(filename, None)
@@ -153,17 +153,20 @@ class SignalProcessorNamespace(BaseClientNamespace):
         peak_mzs = filtered_peaks.mz.values
         peak_heights = filtered_peaks.sum(dim='time').values
         peak_tofs = filtered_peaks.tof.values
-        peak_data = {
-                'filename': filename,
-                'mz': peak_mzs.astype(np.float32).tobytes(),
-                'height': peak_heights.astype(np.float32).tobytes(),
-                'tof': peak_tofs.astype(np.float32).tobytes()
-                }
 
-        await self.emit_client_notification('peak_data',
-                                            peak_data,
-                                            room=client_room
-                                            )
+        await self.emit_client_notification(
+            'workspace_sample_response', {
+                'type': 'peak-list',
+                'requestId': value['requestId'],
+                'payload': {
+                    'sampleItemId': value['sampleItemId'],
+                    'mzsBytes': peak_mzs.astype(np.float32).tobytes(),
+                    'heightsBytes': peak_heights.astype(np.float32).tobytes(),
+                    'tofsBytes': peak_tofs.astype(np.float32).tobytes()
+                }
+            },
+            room=client_room
+            )
 
 def find_and_write_peaks(cache_item):
     if 'signal' not in cache_item:
