@@ -33,22 +33,22 @@ export default {
   },
   computed: {
     ...mapGetters({
-      matchesExist: "workspace/match/exists",
+      matchesExist: "match/exists",
     }),
     compoundStats: function () {
-      return this.$store.getters["workspace/target/stats"]({
+      return this.$store.getters["target/stats"]({
         level: "compound",
         selected: false,
       });
     },
     ionStats: function () {
-      return this.$store.getters["workspace/target/stats"]({
+      return this.$store.getters["target/stats"]({
         level: "ion",
         selected: false,
       });
     },
     isotopeStats: function () {
-      return this.$store.getters["workspace/target/stats"]({
+      return this.$store.getters["target/stats"]({
         level: "isotope",
         selected: false,
       });
@@ -137,12 +137,12 @@ export default {
   },
   methods: {
     ...mapMutations({
-      activateModal: "ui/modal/activate",
+      activateModal: "modal/activate",
     }),
     ...mapActions({
-      toggleTargetCompoundSelection: "workspace/target/compoundSelectionToggle",
-      toggleTargetIonSelection: "workspace/target/ionSelectionToggle",
-      toggleTargetIsotopeSelection: "workspace/target/isotopeSelectionToggle",
+      toggleTargetCompoundSelection: "target/compoundSelectionToggle",
+      toggleTargetIonSelection: "target/ionSelectionToggle",
+      toggleTargetIsotopeSelection: "target/isotopeSelectionToggle",
     }),
   },
 };

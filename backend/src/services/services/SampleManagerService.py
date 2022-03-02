@@ -102,11 +102,11 @@ class SampleServiceNamespace(BaseClientNamespace):
 
     # === sample batches === #
 
-    async def on_workspace_sample_batch_list_request(self, data):
+    async def on_sample_batch_list_request(self, data):
         value = data['value']
 
         await self.emit_client_notification(
-            'workspace_sample_response', {
+            'sample_response', {
                 'type': 'batch-list',
                 'requestId': value['requestId'],
                 'payload': {
@@ -121,7 +121,7 @@ class SampleServiceNamespace(BaseClientNamespace):
                'room': data['client_room']
             })
     
-    async def on_workspace_sample_batch_create_request(self, data):
+    async def on_sample_batch_create_request(self, data):
         value = data['value']
         
         db.sample_batch_create(
@@ -132,7 +132,7 @@ class SampleServiceNamespace(BaseClientNamespace):
             )
 
         await self.emit_client_notification(
-            'workspace_sample_response', {
+            'sample_response', {
                 'type': 'batch-create',
                 'requestId': value['requestId'],
                 'payload': {
@@ -147,7 +147,7 @@ class SampleServiceNamespace(BaseClientNamespace):
                 'room': value.get('workspaceId')
             })
 
-    async def on_workspace_sample_batch_update_request(self, data):
+    async def on_sample_batch_update_request(self, data):
         value = data['value']
         
         db.sample_batch_update(
@@ -157,7 +157,7 @@ class SampleServiceNamespace(BaseClientNamespace):
         )
 
         await self.emit_client_notification(
-            'workspace_sample_response', {
+            'sample_response', {
                 'type': 'batch-update',
                 'requestId': value['requestId'],
                 'payload': {
@@ -172,7 +172,7 @@ class SampleServiceNamespace(BaseClientNamespace):
                 'room': value.get('workspaceId')
             })
 
-    async def on_workspace_sample_batch_delete_request(self, data):
+    async def on_sample_batch_delete_request(self, data):
         value = data['value']
 
         db.sample_batch_delete(
@@ -180,7 +180,7 @@ class SampleServiceNamespace(BaseClientNamespace):
         )
         
         await self.emit_client_notification(
-            'workspace_sample_response', {
+            'sample_response', {
                 'type': 'batch-delete',
                 'requestId': value['requestId'],
                 'payload': {
@@ -197,14 +197,14 @@ class SampleServiceNamespace(BaseClientNamespace):
 
     # === sample items === #
 
-    async def on_workspace_sample_item_list_request(self, data):
+    async def on_sample_item_list_request(self, data):
         value = data['value']
         
         batchId = value.get('id')
 
         # Update sample table data
         await self.emit_client_notification(
-            'workspace_sample_response', {
+            'sample_response', {
                 'type': 'item-list',
                 'requestId': value['requestId'],
                 'payload': {
@@ -219,7 +219,7 @@ class SampleServiceNamespace(BaseClientNamespace):
                'room': data['client_room']
             })
 
-    async def on_workspace_sample_item_create_request(self, data):
+    async def on_sample_item_create_request(self, data):
         value = data['value']
 
         batchId = value.get('batchId')
@@ -232,7 +232,7 @@ class SampleServiceNamespace(BaseClientNamespace):
         )
         
         await self.emit_client_notification(
-            'workspace_sample_response', {
+            'sample_response', {
                 'type': 'item-create',
                 'requestId': value['requestId'],
                 'payload': {
@@ -247,7 +247,7 @@ class SampleServiceNamespace(BaseClientNamespace):
                 'room': batchId
             })
 
-    async def on_workspace_sample_item_update_request(self, data):
+    async def on_sample_item_update_request(self, data):
         value = data['value']
 
         batchId = value.get('batchId')
@@ -260,7 +260,7 @@ class SampleServiceNamespace(BaseClientNamespace):
         )
         
         await self.emit_client_notification(
-            'workspace_sample_response', {
+            'sample_response', {
                 'type': 'item-update',
                 'requestId': value['requestId'],
                 'payload': {
@@ -275,7 +275,7 @@ class SampleServiceNamespace(BaseClientNamespace):
                 'room': batchId
             })
 
-    async def on_workspace_sample_item_delete_request(self, data):
+    async def on_sample_item_delete_request(self, data):
         ''' Remove sample item from a sample batch '''
         value = data['value']
 
@@ -286,7 +286,7 @@ class SampleServiceNamespace(BaseClientNamespace):
         )
 
         await self.emit_client_notification(
-            'workspace_sample_response', {
+            'sample_response', {
                 'type': 'item-delete',
                 'requestId': value['requestId'],
                 'payload': {
@@ -323,7 +323,7 @@ class SampleServiceNamespace(BaseClientNamespace):
 
     # peaks
 
-    async def on_workspace_sample_peak_list_request(self, data):
+    async def on_sample_peak_list_request(self, data):
         value = data['value']
         client_room = data.get('client_room') or data['cookies']['src_sid'][0]
         
@@ -379,7 +379,7 @@ class SampleServiceNamespace(BaseClientNamespace):
         peak_tofs_bytes = export(peak_indeces)
 
         await self.emit_client_notification(
-            'workspace_sample_response', {
+            'sample_response', {
                 'type': 'peak-list',
                 'requestId': value['requestId'],
                 'payload': {

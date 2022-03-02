@@ -3,19 +3,19 @@
     <h2 class="subtitle">Peak identification</h2>
     <base-param-field
       label="Peak intensity threshold [%]"
-      path="workspace/sample/paramPeakMinIntensity"
+      path="sample/paramPeakMinIntensity"
       :range="{ min: 0, max: 20, step: 0.05 }"
     >
     </base-param-field>
     <base-param-field
       label="Minimum peak seperation [m/z]"
-      path="workspace/sample/paramPeakMinSeperation"
+      path="sample/paramPeakMinSeperation"
       :range="{ min: 0, max: 30, step: 0.05 }"
     >
     </base-param-field>
     <base-param-field
       label="Minimum peak width [m/z]"
-      path="workspace/sample/paramPeakMinWidth"
+      path="sample/paramPeakMinWidth"
       :range="{ min: 0, max: 30, step: 0.05 }"
     >
     </base-param-field>

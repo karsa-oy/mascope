@@ -199,9 +199,9 @@ export default {
             },
         compoundStats: (state, getters, rootState, rootGetters) =>
             ({ selected = true, extraGroupings = '' }) => {
-                let matchesExist = rootState.workspace.match.compoundRows.length > 0;
+                let matchesExist = rootState.match.compoundRows.length > 0;
                 if (matchesExist) {
-                    let matches = rootGetters['workspace/match/ratings']({
+                    let matches = rootGetters['match/ratings']({
                         level: 'compound', selected
                     });
                     return table.query(
@@ -227,9 +227,9 @@ export default {
             },
         ionStats: (state, getters, rootState, rootGetters) =>
             ({ selected = true, extraGroupings = '' }) => {
-                let matchesExist = rootState.workspace.match.ionRows.length > 0;
+                let matchesExist = rootState.match.ionRows.length > 0;
                 if (matchesExist) {
-                    let matches = rootGetters['workspace/match/ratings']({
+                    let matches = rootGetters['match/ratings']({
                         level: 'ion', selected
                     });
                     return table.query(
@@ -255,9 +255,9 @@ export default {
             },
         isotopeStats: (state, getters, rootState, rootGetters) =>
             ({ selected = true, extraGroupings = '' }) => {
-                let matchesExist = rootState.workspace.match.isotopeRows.length > 0;
+                let matchesExist = rootState.match.isotopeRows.length > 0;
                 if (matchesExist) {
-                    let matches = rootGetters['workspace/match/ratings']({
+                    let matches = rootGetters['match/ratings']({
                         level: 'isotope', selected
                     });
                     return table.query(

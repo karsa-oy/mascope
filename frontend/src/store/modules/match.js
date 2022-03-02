@@ -41,11 +41,11 @@ export default {
     actions: {
         request({ commit, rootState }, { sampleItem }) {
             let getCompoundId = (ionId) => ({
-                compoundId: table.get(rootState.workspace.target.ionRows, {
+                compoundId: table.get(rootState.target.ionRows, {
                     id: ionId
                 }).compoundId
             })
-            let targetIsotopes = rootState.workspace.target.isotopeRows
+            let targetIsotopes = rootState.target.isotopeRows
                 .map((row) => ({
                     ...row,
                     ...getCompoundId(row.ionId)
@@ -118,11 +118,11 @@ export default {
         compoundJoins: (state, getters, rootState, rootGetters) =>
             ({ selected = true }) => {
                 // only selected samples are stored in the match module
-                let sampleItems = rootState.workspace.sample.itemRows;
+                let sampleItems = rootState.sample.itemRows;
                 // compound level join
                 let targetCompoundsSelected = selected ?
-                    rootGetters['workspace/target/compoundsSelected']
-                    : rootState.workspace.target.compoundRows;
+                    rootGetters['target/compoundsSelected']
+                    : rootState.target.compoundRows;
                 return table.query(
                     `
                     select 
@@ -149,11 +149,11 @@ export default {
         ionJoins: (state, getters, rootState, rootGetters) =>
             ({ selected = true }) => {
                 // only selected samples are stored in the match module
-                let sampleItems = rootState.workspace.sample.itemRows;
+                let sampleItems = rootState.sample.itemRows;
                 // ion level join
                 let targetIonsSelected = selected ?
-                    rootGetters['workspace/target/ionsSelected']
-                    : rootState.workspace.target.ionRows;
+                    rootGetters['target/ionsSelected']
+                    : rootState.target.ionRows;
                 return table.query(
                     `
                     select 
@@ -181,11 +181,11 @@ export default {
         isotopeJoins: (state, getters, rootState, rootGetters) =>
             ({ selected = true }) => {
                 // only selected samples are stored in the match module
-                let sampleItems = rootState.workspace.sample.itemRows;
+                let sampleItems = rootState.sample.itemRows;
                 // isotope level join
                 let targetIsotopesSelected = selected ?
-                    rootGetters['workspace/target/isotopesSelected']
-                    : rootState.workspace.target.isotopeRows;
+                    rootGetters['target/isotopesSelected']
+                    : rootState.target.isotopeRows;
                 return table.query(
                     `
                     select 

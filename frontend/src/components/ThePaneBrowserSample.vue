@@ -35,9 +35,9 @@ export default {
   },
   computed: {
     ...bindState({
-      batchRows: "workspace/sample/batchRows",
-      itemRows: "workspace/sample/itemRows",
-      modalProps: "ui/modal/batchSaveProps",
+      batchRows: "sample/batchRows",
+      itemRows: "sample/itemRows",
+      modalProps: "modal/batchSaveProps",
     }),
     sampleLevels: function () {
       return [
@@ -63,13 +63,13 @@ export default {
   },
   methods: {
     ...mapMutations({
-      activateModal: "ui/modal/activate",
+      activateModal: "modal/activate",
     }),
     ...mapActions({
-      batchOpen: "workspace/sample/batchOpen",
-      batchClose: "workspace/sample/batchClose",
-      toggleSampleBatchSelection: "workspace/sample/batchSelectionToggle",
-      toggleSampleItemSelection: "workspace/sample/itemSelectionToggle",
+      batchOpen: "sample/batchOpen",
+      batchClose: "sample/batchClose",
+      toggleSampleBatchSelection: "sample/batchSelectionToggle",
+      toggleSampleItemSelection: "sample/itemSelectionToggle",
     }),
   },
 };

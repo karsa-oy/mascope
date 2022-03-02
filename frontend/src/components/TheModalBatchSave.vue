@@ -98,9 +98,9 @@ export default {
   },
   computed: {
     ...bindState({
-      modalActive: "ui/modal/batchSaveActive",
-      modalProps: "ui/modal/batchSaveProps",
-      batches: "workspace/sample/batchRows",
+      modalActive: "modal/batchSaveActive",
+      modalProps: "modal/batchSaveProps",
+      batches: "sample/batchRows",
       workspaceActive: "workspace/active",
     }),
     action() {
@@ -145,10 +145,10 @@ export default {
   },
   methods: {
     ...mapMutations({
-      deleteBatch: "workspace/sample/batchDelete",
-      updateBatch: "workspace/sample/batchUpdate",
-      createBatch: "workspace/sample/batchCreate",
-      deactivateModal: "ui/modal/deactivate",
+      deleteBatch: "sample/batchDelete",
+      updateBatch: "sample/batchUpdate",
+      createBatch: "sample/batchCreate",
+      deactivateModal: "modal/deactivate",
     }),
     actionIs(...actions) {
       return actions.includes(this.action);

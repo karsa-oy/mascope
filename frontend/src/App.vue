@@ -34,22 +34,22 @@ export default {
   computed: {
     ...bindState({
       api: "api",
-      query: "ui/query",
+      query: "query",
       workspaceActive: "workspace/active",
       workspaceRoom: "workspace/$roomActive",
-      $targetIonCalculationResponse: "workspace/target/$ionCalculationResponse",
-      $sampleResponse: "workspace/sample/$response",
+      $targetIonCalculationResponse: "target/$ionCalculationResponse",
+      $sampleResponse: "sample/$response",
       sampleSelected: "ui/selected/sample",
-      $matchUpdate: "workspace/match/$update",
+      $matchUpdate: "match/$update",
       // aggregation
-      compoundRows: "workspace/target/compoundRows",
-      compoundMatches: "workspace/match/compoundRows",
+      compoundRows: "target/compoundRows",
+      compoundMatches: "match/compoundRows",
       compoundStatsAgg: "workspace/agg/targetCompoundStats",
-      ionRows: "workspace/target/ionRows",
-      ionMatches: "workspace/match/ionRows",
+      ionRows: "target/ionRows",
+      ionMatches: "match/ionRows",
       ionStatsAgg: "workspace/agg/targetIonStats",
-      isotopeRows: "workspace/target/isotopeRows",
-      isotopeMatches: "workspace/match/isotopeRows",
+      isotopeRows: "target/isotopeRows",
+      isotopeMatches: "match/isotopeRows",
       isotopeStatsAgg: "workspace/agg/targetIsotopeStats",
     }),
     ready: function () {
@@ -62,16 +62,15 @@ export default {
   },
   methods: {
     ...mapMutations({
-      targetHandleIonCalculationResponse:
-        "workspace/target/handleIonCalculationResponse",
+      targetHandleIonCalculationResponse: "target/handleIonCalculationResponse",
     }),
     ...mapActions({
-      sampleBatchList: "workspace/sample/batchList",
-      sampleHandleResponse: "workspace/sample/handleResponse",
-      matchRequest: "workspace/match/request",
-      matchHandleUpdate: "workspace/match/handleUpdate",
-      keydown: "ui/key/down",
-      keyup: "ui/key/up",
+      sampleBatchList: "sample/batchList",
+      sampleHandleResponse: "sample/handleResponse",
+      matchRequest: "match/request",
+      matchHandleUpdate: "match/handleUpdate",
+      keydown: "key/down",
+      keyup: "key/up",
     }),
     workspaceById(id) {
       return this.$store.getters["workspace/byId"](id);
