@@ -92,6 +92,18 @@ class SampleServiceNamespace(BaseClientNamespace):
                 **get_client_notification_context(data)
             })
 
+    async def on_workspace_delete_request(self, data):
+        value = data['value']
+        
+        db.workspace_delete(id=value.get('id'))
+
+        await self.emit_client_notification(
+            'workspace_rows', db.workspace_list(),
+            **{
+                'client_room': 'workspaces',
+                **get_client_notification_context(data)
+            })
+
     # === sample batches === #
 
     async def on_workspace_sample_batch_list_request(self, data):

@@ -38,13 +38,13 @@ class DBTable:
     def get_all(self):
         sql = f""" SELECT * FROM {self.name}; """
         self.cur.execute(sql)
-        # self.con.commit()
+        self.con.commit()
         res = self._decode_values_list(self.cur)
         self.log(res)
         return res
 
     def create(self, **kwargs):
-        if not self.get(**kwargs):
+        if not self.get(id=kwargs['id']):
             self.insert(**kwargs)
         else:
             raise ValueError("Record already exists!")
@@ -62,7 +62,7 @@ class DBTable:
         return row_id
 
     def update(self, **kwargs):
-        if self.get(**kwargs):
+        if self.get(id=kwargs['id']):
             # TODO: It actually does REPLACE instead of UPDATE
             self.insert(**kwargs)
         else:
@@ -92,7 +92,7 @@ class DBTable:
             return ' AND '.join(res)
         sql = f""" SELECT * FROM {self.name} WHERE {wrap_kwargs()}; """
         self.cur.execute(sql)
-        # self.con.commit()
+        self.con.commit()
         res = self._decode_values_list(self.cur)
         self.log(res)
         return res
