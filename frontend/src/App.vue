@@ -34,21 +34,12 @@ export default {
       workspaceRoom: "workspace/$roomActive",
       $targetIonCalcResponse: "target/$ionCalculationResponse",
       $sampleResponse: "sample/$response",
-      sampleSelected: "ui/selected/sample",
       $matchUpdate: "match/$update",
-      // aggregation
-      compoundRows: "target/compoundRows",
-      compoundMatches: "match/compoundRows",
-      compoundStatsAgg: "workspace/agg/targetCompoundStats",
-      ionRows: "target/ionRows",
-      ionMatches: "match/ionRows",
-      ionStatsAgg: "workspace/agg/targetIonStats",
-      isotopeRows: "target/isotopeRows",
-      isotopeMatches: "match/isotopeRows",
-      isotopeStatsAgg: "workspace/agg/targetIsotopeStats",
     }),
     ready: function () {
+      // check that the API connected succesfully to the backend
       let apiConnected = this.api ? this.api.connected : false;
+      // check that workspaces were loaded
       let workspacesExist = this.$workspaceRows
         ? this.$workspaceRows.length > 0
         : false;
