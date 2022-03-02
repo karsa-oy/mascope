@@ -6,12 +6,13 @@ from datetime import datetime
 
 from app import KarsaClient
 from meas import KarsaMeasClient
+from meas_udp import KarsaMeasClientUDP
 from nodes import NodeType, DEVICES
 from udp import KarsaMeasProtocol
 from ui import App
 
 
-KECU_TCP_HOST = '192.168.1.201' # KECU IP address
+KECU_TCP_HOST = '192.168.1.200' # KECU IP address
 KRS_APP_PORT = 65142            # KECU command port
 KRS_MEAS_PORT = 65143           # KECU notification port
 
@@ -23,11 +24,13 @@ class KECU():
     def __init__(self) -> None:
         self._app = KarsaClient(KECU_TCP_HOST, KRS_APP_PORT)
         self._meas = KarsaMeasClient(KECU_TCP_HOST, KRS_MEAS_PORT)
+        self._meas_udp = KarsaMeasClientUDP(KECU_UDP_HOST, KECU_UDP_PORT)
         self.nodes = {}
 
     async def connect(self):
         await self._app.connect()
         await self._meas.connect()
+        await self._meas_udp.connect()
 
     async def disconnect(self):
         # TODO: Stop all measurements
@@ -39,6 +42,7 @@ class KECU():
                 pass
         await self._app.close()
         await self._meas.close()
+        await self._meas_udp.close()
 
     async def initialize(self):
         await self._app.get_node_list()
@@ -83,7 +87,8 @@ class KECU():
             await self.disconnect()
 
     async def wait_for_notification(self):
-        return await self._meas.get_data()
+        # return await self._meas.get_data()
+        return await self._meas_udp.get_data()
 
     async def writer(self, interval=1):
         def new_file():
@@ -153,11 +158,6 @@ if __name__ == '__main__':
     loop.run_until_complete(initialize_kecu(kecu))
     # KECU main loop
     tasks.append(loop.create_task(kecu.run()))
-    # KECU UDP socket
-    tasks.append(loop.create_datagram_endpoint(
-            KarsaMeasProtocol,
-            local_addr=(KECU_UDP_HOST, KECU_UDP_PORT)
-            ))
 
     if len(sys.argv) > 1 and 'csv' in sys.argv:
         # KECU csv writer

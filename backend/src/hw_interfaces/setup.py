@@ -33,6 +33,7 @@ setuptools.setup(
     # ],
     extras_require={
         'karsaecu': [
+            'asyncio_dgram'
         ],
         'karsaHT3000A': [
         ],
