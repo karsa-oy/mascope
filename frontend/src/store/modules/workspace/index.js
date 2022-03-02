@@ -18,6 +18,7 @@ export default {
         $updateRequest: null,
         $deleteRequest: null,
         $room: 'workspaces',
+        $roomActive: [],
         $endpoint: 'workspace_rows'
     },
     mutations: {

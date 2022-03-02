@@ -94,7 +94,6 @@ class DBTable:
         self.cur.execute(sql)
         self.con.commit()
         res = self._decode_values_list(self.cur)
-        self.log(res)
         return res
 
     def get_joined(self, table, left_on, right_on, **kwargs):
@@ -131,14 +130,14 @@ class SampleBatchTable(DBTable):
     def __init__(self, db, name='sample_batches'):
         self.schema = [
             ('id', 'varchar(16)', 'PRIMARY KEY'),
-            ('workspace_id', 'varchar(16)', 'NOT NULL'),
+            ('workspaceId', 'varchar(16)', 'NOT NULL'),
             ('name', 'text'),
             ('description', 'text'),
             ('attributes', 'json'),
         ]
         self.sql_create = f""" CREATE TABLE IF NOT EXISTS {name} (
             {self._wrap_schema()},
-            FOREIGN KEY (workspace_id) REFERENCES workspaces (id)
+            FOREIGN KEY (workspaceId) REFERENCES workspaces (id)
             ); """
         super().__init__(db, name)
 
@@ -147,13 +146,13 @@ class SampleItemTable(DBTable):
     def __init__(self, db, name='sample_items'):
         self.schema = [
             ('id', 'varchar(16)', 'PRIMARY KEY'),
-            ('sample_batch_id', 'varchar(16)', 'NOT NULL'),
+            ('batchId', 'varchar(16)', 'NOT NULL'),
             ('filename', 'varchar(256)', 'NOT NULL'),
             ('attributes', 'json'),
         ]
         self.sql_create = f""" CREATE TABLE IF NOT EXISTS {name} (
             {self._wrap_schema()},
-            FOREIGN KEY (sample_batch_id) REFERENCES sample_batches (id),
+            FOREIGN KEY (batchId) REFERENCES sample_batches (id),
             FOREIGN KEY (filename) REFERENCES store (filename)
             ); """
         super().__init__(db, name)
@@ -223,8 +222,8 @@ class SampleManagerDB:
         self.workspaces.remove(id=id)
 
     # sample batches
-    def sample_batch_list(self, workspace_id):
-        return self.sample_batches.get(workspace_id=workspace_id)
+    def sample_batch_list(self, workspaceId):
+        return self.sample_batches.get(workspaceId=workspaceId)
         
     def sample_batch_create(self, **kwargs):
         self.sample_batches.create(**kwargs)
@@ -239,12 +238,12 @@ class SampleManagerDB:
         self.sample_batches.remove(id=id)
 
     # sample items
-    def sample_item_list(self, sample_batch_id):
+    def sample_item_list(self, batchId):
         return self.sample_items.get_joined(
                     'sample_files',
                     'filename',
                     'filename',
-                    sample_batch_id=sample_batch_id
+                    batchId=batchId
                     )
         
     def sample_item_create(self, **kwargs):

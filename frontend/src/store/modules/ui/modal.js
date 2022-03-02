@@ -10,6 +10,11 @@ export default {
             // action ('create', 'edit' or 'delete')
             // workspaceId (required for edit or delete)
         },
+        batchSaveActive: false,
+        batchSaveProps: {
+            // action ('create', 'edit' or 'delete')
+            // workspaceId (required for edit or delete)
+        },
     },
     mutations: {
         activate(state, { modal }) {
