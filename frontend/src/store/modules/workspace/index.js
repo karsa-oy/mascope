@@ -14,14 +14,22 @@ export default {
         // state
         active: null,
         // API
-        $saveRequest: null,
+        $createRequest: null,
+        $updateRequest: null,
         $deleteRequest: null,
         $room: 'workspaces',
         $endpoint: 'workspace_rows'
     },
     mutations: {
-        save(state, workspace) {
-            state.$saveRequest = {
+        create(state, workspace) {
+            state.$createRequest = {
+                id: workspace.id ? workspace.id : table.genId(),
+                name: workspace.name,
+                description: workspace.description,
+            }
+        },
+        update(state, workspace) {
+            state.$updateRequest = {
                 id: workspace.id ? workspace.id : table.genId(),
                 name: workspace.name,
                 description: workspace.description,

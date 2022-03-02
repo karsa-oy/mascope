@@ -38,7 +38,7 @@ export default {
       $workspaceRows: "workspace/$rows",
       workspaceActive: "workspace/active",
       $targetIonCalculationResponse: "workspace/target/$ionCalculationResponse",
-      $sampleUpdate: "workspace/sample/$update",
+      $sampleResponse: "workspace/sample/$response",
       sampleSelected: "ui/selected/sample",
       $matchUpdate: "workspace/match/$update",
       // aggregation
@@ -66,8 +66,8 @@ export default {
         "workspace/target/handleIonCalculationResponse",
     }),
     ...mapActions({
-      sampleBatchFetch: "workspace/sample/requestBatches",
-      sampleHandleUpdate: "workspace/sample/handleUpdate",
+      sampleBatchList: "workspace/sample/batchList",
+      sampleHandleResponse: "workspace/sample/handleResponse",
       matchRequest: "workspace/match/request",
       matchHandleUpdate: "workspace/match/handleUpdate",
       keydown: "ui/key/down",
@@ -88,7 +88,7 @@ export default {
       }
     },
     workspaceActive: function () {
-      this.sampleBatchFetch();
+      this.sampleBatchList();
     },
     // query
     "$route.query": function () {
@@ -102,12 +102,15 @@ export default {
       this.targetHandleIonCalculationResponse();
     },
     // sample
-    $sampleUpdate: function () {
-      this.sampleHandleUpdate();
+    $sampleResponse: function () {
+      this.sampleHandleResponse();
     },
     // match
     $matchUpdate: function () {
       this.matchHandleUpdate();
+    },
+    $workspaceRows: function () {
+      console.log(this.$workspaceRows);
     },
   },
 };

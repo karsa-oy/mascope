@@ -80,7 +80,7 @@ export default {
   },
   methods: {
     ...mapActions("workspace/sample", {
-      toggleSampleItemSelection: "itemToggleSelection",
+      toggleSampleItemSelection: "itemSelectionToggle",
     }),
     onClick: function (event) {
       console.log(event);

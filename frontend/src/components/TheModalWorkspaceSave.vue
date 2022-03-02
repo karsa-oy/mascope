@@ -36,17 +36,30 @@
           </b-button>
 
           <b-button
-            v-if="actionIs('edit', 'create')"
+            v-if="actionIs('edit')"
             type="is-primary"
             icon-left="content-save"
             @click="
               () => {
-                saveWorkspace(newWorkspace);
+                updateWorkspace(newWorkspace);
                 deactivateModal();
               }
             "
           >
             Save
+          </b-button>
+          <b-button
+            v-if="actionIs('create')"
+            type="is-primary"
+            icon-left="content-save"
+            @click="
+              () => {
+                createWorkspace(newWorkspace);
+                deactivateModal();
+              }
+            "
+          >
+            Create
           </b-button>
           <b-button
             v-if="actionIs('delete')"
@@ -131,7 +144,8 @@ export default {
   methods: {
     ...mapMutations({
       deleteWorkspace: "workspace/delete",
-      saveWorkspace: "workspace/save",
+      updateWorkspace: "workspace/update",
+      createWorkspace: "workspace/create",
       deactivateModal: "ui/modal/deactivate",
     }),
     actionIs(...actions) {

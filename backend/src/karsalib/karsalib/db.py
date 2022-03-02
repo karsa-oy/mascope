@@ -147,8 +147,8 @@ class SampleItemTable(DBTable):
     def __init__(self, db, name='sample_items'):
         self.schema = [
             ('id', 'varchar(16)', 'PRIMARY KEY'),
-            ('filename', 'varchar(256)', 'NOT NULL'),
             ('sample_batch_id', 'varchar(16)', 'NOT NULL'),
+            ('filename', 'varchar(256)', 'NOT NULL'),
             ('attributes', 'json'),
         ]
         self.sql_create = f""" CREATE TABLE IF NOT EXISTS {name} (
@@ -222,7 +222,7 @@ class SampleManagerDB:
     def workspace_delete(self, id):
         self.workspaces.remove(id=id)
 
-    # batches
+    # sample batches
     def sample_batch_list(self, workspace_id):
         return self.sample_batches.get(workspace_id=workspace_id)
         
