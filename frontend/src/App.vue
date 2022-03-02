@@ -32,7 +32,7 @@ export default {
       query: "query",
       workspaceActive: "workspace/active",
       workspaceRoom: "workspace/$roomActive",
-      $targetIonCalculationResponse: "target/$ionCalculationResponse",
+      $targetIonCalcResponse: "target/$ionCalculationResponse",
       $sampleResponse: "sample/$response",
       sampleSelected: "ui/selected/sample",
       $matchUpdate: "match/$update",
@@ -57,7 +57,7 @@ export default {
   },
   methods: {
     ...mapMutations({
-      targetHandleIonCalculationResponse: "target/handleIonCalculationResponse",
+      targetHandleIonCalcResponse: "target/handleIonCalcResponse",
     }),
     ...mapActions({
       sampleBatchList: "sample/batchList",
@@ -95,8 +95,8 @@ export default {
       this.workspaceInit();
     },
     // target
-    $targetIonCalculationResponse: function () {
-      this.targetHandleIonCalculationResponse();
+    $targetIonCalcResponse: function () {
+      this.targetHandleIonCalcResponse();
     },
     // sample
     $sampleResponse: function () {

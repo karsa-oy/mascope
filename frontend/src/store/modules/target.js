@@ -49,7 +49,7 @@ export default {
             }
         },
         // ion calculation
-        requestIonCalculation(state) {
+        requestIonCalc(state) {
             state.$ionCalculationRequest = {
                 requestId: table.genId(),
                 minIsoAbu: state.paramMinIsoAbu,
@@ -57,7 +57,7 @@ export default {
                 compounds: state.compoundRows
             };
         },
-        handleIonCalculationResponse(state) {
+        handleIonCalcResponse(state) {
             let response = state.$ionCalculationResponse;
             if (response) {
                 let _selected = 'none';
@@ -82,7 +82,7 @@ export default {
     actions: {
         add({ commit }, { compounds }) {
             commit('addRows', { level: 'compound', rows: compounds });
-            commit('requestIonCalculation');
+            commit('requestIonCalc');
         },
         // selection
         compoundSelectionToggle({ state, commit }, compound) {
