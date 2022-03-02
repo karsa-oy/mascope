@@ -4,13 +4,8 @@
   </div>
 </template>
 
-
 <style src="./assets/css/style.css"></style>
 <style src="./assets/css/logo.css"></style>
-
-<style src = "vue-multiselect/dist/vue-multiselect.min.css"></style>
-<style src = "./assets/css/multiselect.css"></style>
-
 
 <script>
 import { bindState } from "$lib/store";
