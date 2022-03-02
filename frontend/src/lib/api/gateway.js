@@ -250,13 +250,14 @@ function createApiGatewayPlugin() {
 // helpers
 
 function getApi(store, path) {
+    let apiRelativePath = "api";
     // Check if the module of the variable to be bound 
     // contains its own dedicated API instance and namespace
     let nearestApiPath = path
         .split("/").slice(0, -1)
-        .concat("api").join("/");
+        .concat(apiRelativePath).join("/");
     let nearestApi = store.getters.getPath(nearestApiPath);
-    let rootApi = store.getters.getPath("api");
+    let rootApi = store.getters.getPath(apiRelativePath);
     // Use nearest API if it exists, and default to the root
     // API instance and namespace otherwise
     return nearestApi || rootApi;
