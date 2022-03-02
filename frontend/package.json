@@ -7,7 +7,7 @@
   "description": "Karsa UI applicaiton",
   "homepage": "https://www.karsa.fi",
   "license": "To be added; check the list https://spdx.org/licenses/",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "scripts": {
     "serve": "vue-cli-service serve",
