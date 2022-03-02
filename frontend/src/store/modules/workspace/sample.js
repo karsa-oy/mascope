@@ -37,16 +37,35 @@ export default {
         batchList(state, workspace) {
             state.$batchListRequest = {
                 requestId: table.genId(),
-                ...workspace
+                workspaceId: workspace.id
             }
         },
+        batchCreate(state, batch) {
+            state.$batchCreateRequest = {
+                requestId: table.genId(),
+                id: batch.id ? batch.id : table.genId(),
+                name: batch.name,
+                description: batch.description,
+                workspaceId: batch.workspaceId
+            };
+        },
+        batchUpdate(state, batch) {
+            state.$batchUpdateRequest = {
+                requestId: table.genId(),
+                ...batch
+            };
+        },
+        batchDelete(state, batch) {
+            state.$batchDeleteRequest = {
+                requestId: table.genId(),
+                ...batch
+            };
+        },
         batchFollow(state, batch) {
-            let room = batch.workspaceId + batch.id;
-            state.$rooms.push(room);
+            state.$rooms.push(batch.id);
         },
         batchUnfollow(state, batch) {
-            let room = batch.workspaceId + batch.id;
-            state.$rooms = state.$rooms.filter((r) => (r !== room));
+            state.$rooms = state.$rooms.filter((r) => (r !== batch.id));
         },
         batchOpen(state, batch) {
             table.update(state.batchRows,
@@ -60,7 +79,7 @@ export default {
                 { partial: true }
             );
         },
-        batchHandleUpdate(state, { rows, filters }) {
+        batchHandleResponse(state, { rows, filters }) {
             let extras = {
                 _selected: 'none',
                 _open: false,
@@ -203,14 +222,18 @@ export default {
             }
         },
         async itemHandleResponse({ state, commit, dispatch }, { rows, filters }) {
-            // use the first row to infer batch
-            let firstRow = rows[0];
-            let batch = table.get(state.batchRows, { id: firstRow.batchId });
-            // set selected status based on batch selection
-            let mapSelection = { all: 'all', some: 'none', none: 'none' };
-            let selected = mapSelection[batch._selected];
-            await commit('itemReplace', { rows, filters, selected });
-            dispatch('peakListMissing');
+            if (rows.length > 0) {
+                // use the first row to infer batch
+                let firstRow = rows[0];
+                let batch = table.get(state.batchRows, { id: firstRow.batchId });
+                // set selected status based on batch selection
+                let mapSelection = { all: 'all', some: 'none', none: 'none' };
+                let selected = mapSelection[batch._selected];
+                await commit('itemReplace', { rows, filters, selected });
+                dispatch('peakListMissing');
+            } else {
+                console.log("Handled item response but no data was returned.")
+            }
         },
         // selection
         async batchSelectionToggle({ state, commit, dispatch }, batch) {

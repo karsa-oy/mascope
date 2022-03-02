@@ -36,11 +36,7 @@ cache = {}
 
 NO_DATA_LOGGING_DEFAULT = True
 
-workspace_path = 'workspaces' # TODO: make configurable
-# datapool = SampleCatalog(workspace_path)
-
-# db_path = ':memory:'
-db_path = 'samples.db'
+db_path = 'data/samples.db'
 db = SampleManagerDB(db_path)
 
 
@@ -64,8 +60,8 @@ class SampleServiceNamespace(BaseClientNamespace):
         await self.emit_client_notification(
             'workspace_rows', db.workspace_list(),
             **{
-                'client_room': 'workspaces',
-                **get_client_notification_context(data)
+                **get_client_notification_context(data),
+                'client_room': 'workspaces'
             })
 
     async def on_workspace_create_request(self, data):
@@ -76,8 +72,8 @@ class SampleServiceNamespace(BaseClientNamespace):
         await self.emit_client_notification(
             'workspace_rows', db.workspace_list(),
             **{
+                **get_client_notification_context(data),
                 'client_room': 'workspaces',
-                **get_client_notification_context(data)
             })
 
     async def on_workspace_update_request(self, data):
@@ -88,8 +84,8 @@ class SampleServiceNamespace(BaseClientNamespace):
         await self.emit_client_notification(
             'workspace_rows', db.workspace_list(),
             **{
-                'client_room': 'workspaces',
-                **get_client_notification_context(data)
+                **get_client_notification_context(data),
+                'client_room': 'workspaces'
             })
 
     async def on_workspace_delete_request(self, data):
@@ -100,8 +96,8 @@ class SampleServiceNamespace(BaseClientNamespace):
         await self.emit_client_notification(
             'workspace_rows', db.workspace_list(),
             **{
-                'client_room': 'workspaces',
-                **get_client_notification_context(data)
+                **get_client_notification_context(data),
+                'client_room': 'workspaces'
             })
 
     # === sample batches === #
@@ -117,12 +113,12 @@ class SampleServiceNamespace(BaseClientNamespace):
                     'level': 'batch',
                     'filters': '*',
                     'rows': db.sample_batch_list(
-                        value.get('workspaceId')
+                        workspaceId=value.get('workspaceId')
                     ),
                 }
             }, **{
-               'room': data['client_room'],
-                **get_client_notification_context(data)
+                **get_client_notification_context(data),
+               'room': data['client_room']
             })
     
     async def on_workspace_sample_batch_create_request(self, data):
@@ -131,7 +127,8 @@ class SampleServiceNamespace(BaseClientNamespace):
         db.sample_batch_create(
             id=value.get('id'),
             name=value.get('name'), 
-            description=value.get('description')
+            description=value.get('description'),
+            workspaceId=value.get('workspaceId')
             )
 
         await self.emit_client_notification(
@@ -142,12 +139,12 @@ class SampleServiceNamespace(BaseClientNamespace):
                     'level': 'batch',
                     'filters': '*',
                     'rows': db.sample_batch_list(
-                        value.get('workspaceId')
+                        workspaceId=value.get('workspaceId')
                     ),
                 }
             }, **{
-                'room': workspace_id,
-                **get_client_notification_context(data)
+                **get_client_notification_context(data),
+                'room': value.get('workspaceId')
             })
 
     async def on_workspace_sample_batch_update_request(self, data):
@@ -171,8 +168,8 @@ class SampleServiceNamespace(BaseClientNamespace):
                     ),
                 }
             }, **{
-                'room': workspace_id,
-                **get_client_notification_context(data)
+                **get_client_notification_context(data),
+                'room': value.get('workspaceId')
             })
 
     async def on_workspace_sample_batch_delete_request(self, data):
@@ -189,13 +186,13 @@ class SampleServiceNamespace(BaseClientNamespace):
                 'payload': {
                     'level': 'batch',
                     'filters': '*',
-                    'rows': datapool.get_batches(
+                    'rows': datapool.sample_batch_list(
                         value.get('workspaceId')
                     ),
                 }
             }, **{
-                'room': workspace_id,
-                **get_client_notification_context(data)
+                **get_client_notification_context(data),
+                'room': value.get('workspaceId')
             })
 
     # === sample items === #
@@ -203,7 +200,7 @@ class SampleServiceNamespace(BaseClientNamespace):
     async def on_workspace_sample_item_list_request(self, data):
         value = data['value']
         
-        batch_id = value.get('id')
+        batchId = value.get('id')
 
         # Update sample table data
         await self.emit_client_notification(
@@ -212,20 +209,24 @@ class SampleServiceNamespace(BaseClientNamespace):
                 'requestId': value['requestId'],
                 'payload': {
                     'level': 'item',
-                    'filters': {'batchId': batch_id},
-                    'rows': db.sample_item_list(sample_batch_id=batch_id),
+                    'filters': {'batchId': batchId},
+                    'rows': db.sample_item_list(
+                        batchId=batchId
+                    ),
                 }
             }, **{
-               'room': data['client_room'],
-                **get_client_notification_context(data)
+                **get_client_notification_context(data),
+               'room': data['client_room']
             })
 
     async def on_workspace_sample_item_create_request(self, data):
         value = data['value']
 
+        batchId = value.get('batchId')
+
         db.sample_item_create(
             id=value.get('id'),
-            sample_batch_id=value.get('batch_id'),
+            batchId=batchId,
             filename=value.get('filename'),
             attributes=value.get('attributes')
         )
@@ -236,22 +237,24 @@ class SampleServiceNamespace(BaseClientNamespace):
                 'requestId': value['requestId'],
                 'payload': {
                     'level': 'item',
-                    'filters': {'batchId': batch_id},
+                    'filters': {'batchId': batchId},
                     'rows': db.sample_item_list(
-                        sample_batch_id=value.get('batchId')
+                        batchId=batchId
                     ),
                 }
             }, **{
-                'room': workspace_id + batch_id,
-                **get_client_notification_context(data)
+                **get_client_notification_context(data),
+                'room': batchId
             })
 
     async def on_workspace_sample_item_update_request(self, data):
         value = data['value']
 
+        batchId = value.get('batchId')
+
         db.sample_item_update(
             id=value.get('id'),
-            sample_batch_id=value.get('batchId'),
+            batchId=value.get('batchId'),
             filename=value.get('filename'),
             attributes=value.get('attributes')
         )
@@ -262,19 +265,21 @@ class SampleServiceNamespace(BaseClientNamespace):
                 'requestId': value['requestId'],
                 'payload': {
                     'level': 'item',
-                    'filters': {'batchId': batch_id},
+                    'filters': {'batchId': batchId},
                     'rows': db.sample_item_list(
-                        sample_batch_id=value.get('batchId')
+                        batchId=batchId
                     ),
                 }
             }, **{
-                'room': workspace_id + batch_id,
-                **get_client_notification_context(data)
+                **get_client_notification_context(data),
+                'room': batchId
             })
 
     async def on_workspace_sample_item_delete_request(self, data):
         ''' Remove sample item from a sample batch '''
         value = data['value']
+
+        batchId = value.get('batchId')
 
         db.sample_item_delete(
             id=value.get('id')
@@ -286,14 +291,14 @@ class SampleServiceNamespace(BaseClientNamespace):
                 'requestId': value['requestId'],
                 'payload': {
                     'level': 'item',
-                    'filters': {'batchId': batch_id},
+                    'filters': {'batchId': batchId},
                     'rows': db.sample_item_list(
-                        sample_batch_id=value.get('batchId')
+                        batchId=batchId
                     ),
                 }
             }, **{
-                'room': workspace_id + batch_id,
-                **get_client_notification_context(data)
+                **get_client_notification_context(data),
+                'room': batchId
             })
 
     # sample db

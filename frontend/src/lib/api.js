@@ -193,7 +193,7 @@ const apiGatewayStoreMixin = {
         createLogger({
             filter(mutation) {
                 let hiddenMutationTypes = [
-                    'setPath',
+                    //'setPath',
                     'ui/key/activate',
                     'ui/key/deactivate',
                     'workspace/target/selectionSet',
@@ -292,7 +292,7 @@ function createApiGatewayPlugin() {
                     store.watch(
                         (state, getters) => (getters.getPath(path)),
                         (newValue, oldValue) => {
-                            if (newValue.join("") !== oldValue.join("")) {
+                            if (!_.isEqual(newValue, oldValue)) {
                                 api.leave(oldValue);
                                 api.enter(newValue);
                             }

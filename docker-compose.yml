@@ -4,8 +4,7 @@ services:
     build:
       context: ./backend
     volumes:
-      - ./backend/data/workspaces:/backend/workspaces
-      - ./backend/data/TofDaq:/backend/TofDaq
+      - ./backend/data:/backend/data
     stdin_open: true  
     tty: true
     network_mode: "host"

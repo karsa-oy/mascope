@@ -35,8 +35,8 @@ export default {
     ...bindState({
       api: "api",
       query: "ui/query",
-      $workspaceRows: "workspace/$rows",
       workspaceActive: "workspace/active",
+      workspaceRoom: "workspace/$roomActive",
       $targetIonCalculationResponse: "workspace/target/$ionCalculationResponse",
       $sampleResponse: "workspace/sample/$response",
       sampleSelected: "ui/selected/sample",
@@ -78,6 +78,9 @@ export default {
     },
     workspaceInit() {
       this.workspaceActive = this.workspaceById(this.query.w);
+      if (this.workspaceActive) {
+        this.workspaceRoom = this.workspaceActive.id;
+      }
     },
   },
   watch: {
@@ -108,9 +111,6 @@ export default {
     // match
     $matchUpdate: function () {
       this.matchHandleUpdate();
-    },
-    $workspaceRows: function () {
-      console.log(this.$workspaceRows);
     },
   },
 };
