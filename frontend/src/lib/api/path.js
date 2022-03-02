@@ -1,0 +1,92 @@
+import { Api } from "./socket";
+
+export default {
+    // operations
+    /**
+     * get a nested store variable with a path
+     * path.get(store, "a/b/c") is the same as
+     * store['a']['b']['c']
+     */
+    get(store, path, sep = "/") {
+        if (!path) {
+            throw Error("Path must be provided");
+        }
+        let keys = path.split(sep);
+        if (keys.length == 1) {
+            return store[keys[0]];
+        }
+        return this.get(store[keys[0]], keys.slice(1).join(sep), sep);
+    },
+    /**  
+     * set a nested store variable with a path
+     * path.set(store, "a/b/c", val) is the same as
+     * store['a']['b']['c'] = val
+     */
+    set(store, path, val, sep = "/") {
+        if (!path) {
+            throw Error("Path must be provided");
+        }
+        let keys = path.split(sep);
+        if (keys.length == 1) {
+            store[keys[0]] = val;
+        } else {
+            store = store[keys[0]]
+            return this.set(store, keys.slice(1).join(sep), val, sep);
+        }
+    },
+    /**
+     * find all deep paths in a store
+     * and return them in a path notation
+     * path.find({'x': 1, 'a': {'b': {'c': 'foo', 'y': 'bar'}, 'z': 'baz'}})
+     * returns ["x", "a/b/c", "a/b/y", "a/z"]
+     */
+    find(store, sep = "/") {
+        let paths = [];
+        for (let key in store) {
+            if (key.startsWith('_')) {
+                continue;
+            }
+            paths.push(key);
+            let value = store[key];
+            let isObject = value instanceof Object;
+            let isArray = value instanceof Array;
+            let hasKeys = isObject && !isArray ? Object.keys(value).length > 0 : false;
+            let isApi = value instanceof Api;
+            if (hasKeys && !isApi && !key.startsWith('$')) {
+                let subkeys = this.find(value, sep);
+                paths = paths.concat(subkeys.map(function (subkey) {
+                    return key + sep + subkey;
+                }));
+            }
+        }
+        return paths;
+    },
+    // formatting
+    toSnakeCase(path) {
+        return path
+            .replaceAll("$", "")  // remove bound variable symbol $
+            .replaceAll("/", "_") // replace path seperator / with _
+            .replaceAll(/[A-Z]/g, // replace camelCase with snake_case
+                letter => `_${letter.toLowerCase()}`
+            )
+    },
+    toCamelCase(path) {
+        return path
+            .replaceAll("$", "")  // remove bound variable symbol $
+            .split("/")           // split words by path symbol /
+            .map(                 // capitalize first letters
+                word => word[0].toUpperCase() + word.substring(1)
+            )
+            .join("")             // combine to a single string
+            .replace(/^[A-Z]/,    // lower the case of the first letter
+                firstChar => firstChar.toLowerCase()
+            )
+    },
+    type(path) {
+        if (path.includes('$room')) return 'room';
+        if (path.includes('$endpoint')) return 'endpoint';
+        if (path.includes('$')) return 'boundVariable';
+        //else
+        return 'localVariable';
+    }
+}
