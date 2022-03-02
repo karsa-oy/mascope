@@ -1,5 +1,7 @@
 import { createConnectedStore } from '$lib/api';
 
+import logger from "./plugins/logger"
+
 import modal from './modules/modal';
 import key from './modules/key';
 import workspace from "./modules/workspace";
@@ -19,4 +21,7 @@ export default createConnectedStore({
 		target,
 		match,
 	},
+	plugins: [
+		logger
+	]
 });

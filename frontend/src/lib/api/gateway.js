@@ -2,7 +2,6 @@ const _ = require("underscore");
 
 import { Api } from "./socket"
 import pathlib from "./path"
-import loggerPlugin from "./logger"
 import { createApiModuleMixin } from './store';
 
 import { readDotenv, writeDotenv } from '$lib/env';
@@ -113,7 +112,6 @@ export const apiGatewayStoreMixin = {
     },
     plugins: [
         createApiGatewayPlugin(),
-        loggerPlugin,
         ...rootApiMixin.plugins
     ]
 };

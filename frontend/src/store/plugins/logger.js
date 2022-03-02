@@ -9,6 +9,7 @@ export default createLogger({
             'target/selectionSet',
             'sample/selectionSet',
         ]
-        return !hiddenMutationTypes.includes(mutation.type)
+        return !hiddenMutationTypes
+            .includes(mutation.type)
     },
 })
