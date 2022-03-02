@@ -1,6 +1,0 @@
-py\_code.DataVizService.initialize\_spec\_stack\_figure
-=======================================================
-
-.. currentmodule:: py_code.DataVizService
-
-.. autofunction:: initialize_spec_stack_figure
