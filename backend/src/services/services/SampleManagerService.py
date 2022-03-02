@@ -10,10 +10,7 @@ Created on Thu May  7 12:43:13 2020
 """
 
 import asyncio
-import csv
-import os
-import tempfile
-import random
+import json
 
 import numpy as np
 from scipy.signal import find_peaks
@@ -22,11 +19,10 @@ from karsalib.client import (
                         BaseClientNamespace,
                         BaseServiceClient
                         )
+from karsalib.util import parse_datetime_from_item_filename
 from karsalib.util import parse_cmd_args, get_client_notification_context
 
 from karsalib.db import SampleManagerDB
-from karsalib.datapool import SampleCatalog
-#from karsaHT3000A.ht3000a import parse_csv_report, dup_cycles
 
 
 from services.FileIoService import load_file
@@ -186,7 +182,7 @@ class SampleServiceNamespace(BaseClientNamespace):
                 'payload': {
                     'level': 'batch',
                     'filters': '*',
-                    'rows': datapool.sample_batch_list(
+                    'rows': db.sample_batch_list(
                         value.get('workspaceId')
                     ),
                 }
@@ -312,13 +308,13 @@ class SampleServiceNamespace(BaseClientNamespace):
         committed_length = value['committed_length']
         if committed_length >= full_length:
             # update sample store
-            datetime, date, time = get_date_time_from_sample_name(filename)
+            dt = parse_datetime_from_item_filename(filename)
             db.sample_file_insert(
                 filename=filename,
                 instrument=filename.split('_')[0],
-                date=date,
-                time=time,
-                length=committed_length
+                datetime=dt.isoformat(),
+                length=committed_length,
+                range=json.dumps(value['mz_range'])
             )
 
     # peaks

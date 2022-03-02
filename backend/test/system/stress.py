@@ -9,7 +9,6 @@ import asyncio
 import datetime_glob
 from datetime import datetime
 from systestlib import start_test_client_as_daemon
-from karsalib.datapool import parse_path_from_item_filename
 
 import logging
 logging.basicConfig(filename=f'{os.path.splitext(os.path.basename(__file__))[0]}.log', 

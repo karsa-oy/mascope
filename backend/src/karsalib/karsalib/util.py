@@ -78,48 +78,6 @@ def get_client_notification_context(data):
     """
     return copy_dict(data, ignore_keys=['name', 'value'])
 
-def get_date_time_from_sample_name(fname):
-    ptns = [
-            '*%Y.%m.%d*%Hh%Mm%Ss*',
-            '*%Y%m%d_%H%M_*',
-            '*%Y%m%d_*',
-           ]
-    for ptn in ptns:
-        matcher = datetime_glob.Matcher(pattern=ptn)
-        dt = matcher.match(fname)
-        if dt:
-            break
-    if dt is None:
-        raise Exception(f"Error parsing sample name for date: {fname}")
-    dt = dt.as_datetime()
-    return dt, '%.4d.%.2d.%.2d'%(dt.year, dt.month, dt.day), '%.2d:%.2d:%.2d'%(dt.hour, dt.minute, dt.second)
-
-def recursive_walk(dir_path, *file_masks):
-    print('walking', dir_path)
-    res = []
-    cur_dir, dirs, files = next(os.walk(dir_path))
-    for file_mask in file_masks:
-        fs = fnmatch.filter(files, file_mask)
-        fs = map(lambda fname: os.path.join(cur_dir, fname), fs)
-        res.extend(fs)
-    for d in dirs:
-        fs = recursive_walk(os.path.join(cur_dir, d), *file_masks)
-        res.extend(fs)
-    return res
-
-def recursive_dir_walk(dir_path, *dir_masks):
-    print('walking', dir_path)
-    res = []
-    cur_dir, dirs, files = next(os.walk(dir_path))
-    for dir_mask in dir_masks:
-        ds = fnmatch.filter(dirs, dir_mask)
-        fs = map(lambda dname: os.path.join(cur_dir, dname), ds)
-        res.extend(ds)
-    for d in dirs:
-        ds = recursive_walk(os.path.join(cur_dir, d), *dir_masks)
-        res.extend(ds)
-    return res
-
 def parse_cmd_args():
     """
     Parse command line arguments for the service application:
@@ -156,6 +114,44 @@ def parse_cmd_args():
         **{ **default_args,
             **file_args,
             **cmdline_args})
+
+def parse_datetime_from_item_filename(filename):
+    global FILENAME_DATETIME_PATTERNS
+    for pattern in FILENAME_DATETIME_PATTERNS:
+        matcher = datetime_glob.Matcher(pattern=pattern)
+        dt = matcher.match(filename)
+        if dt:
+            # Parsed succesfully
+            break
+    return dt.as_datetime()
+
+def parse_path_from_item_filename(item_filename):
+    """Return path (relative to wdir) to sample data, based on its name
+
+    Path is
+        wdir/instrument/yyyy.mm.dd/sample_name
+
+    Parameters
+    ----------
+    sample_name : str
+        Sample name (format: instrument_*%Y.%m.%d*%Hh%Mm%Ss*)
+    """
+
+    def parse_subdir_from_datetime(datetime):
+        date_dir = '%.4d.%.2d.%.2d' %(datetime.year,
+                                      datetime.month,
+                                      datetime.day
+                                      )
+        return date_dir
+
+    # Instrument name
+    instrument = item_filename.split('_')[0]
+    # Parse datetime and convert to date subdirectory name (yyyy.mm.dd)
+    item_datetime = parse_datetime_from_item_filename(item_filename)
+    date_dir = parse_subdir_from_datetime(item_datetime)
+    # Join to sample path relative to wdir
+    return os.path.join(instrument, date_dir, item_filename)
+
 
 
 # # TODO: UGLY WORKAROUND -- The old parse_cmd_args is left here for system testing,

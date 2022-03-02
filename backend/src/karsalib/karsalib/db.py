@@ -162,10 +162,10 @@ class SampleFileTable(DBTable):
     def __init__(self, db, name='sample_files'):
         self.schema = [
             ('filename', 'varchar(256)', 'PRIMARY KEY'),
-            ('instrument', 'text'),
-            ('date', 'text'),
-            ('time', 'text'),
+            ('instrument', 'varchar(64)'),
+            ('datetime', 'varchar(64)'),
             ('length', 'real'),
+            ('range', 'json'),
         ]
         self.sql_create = f""" CREATE TABLE IF NOT EXISTS {name} (
             {self._wrap_schema()}
