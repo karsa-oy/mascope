@@ -16,7 +16,7 @@ cache = {}
 class TargetServiceNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to Router """
 
-    async def on_workspace_target_ion_calculation_request(self, data):
+    async def on_target_ion_calculation_request(self, data):
         value = data['value']
         self.log(data)
         client_room = data.get('client_room') or data['cookies']['src_sid'][0]
@@ -79,12 +79,12 @@ class TargetServiceNamespace(BaseClientNamespace):
                                 'relAbu': rel_abu
                             })
                         
-        await self.emit_client_notification('workspace_target_ion_calculation_response',
+        await self.emit_client_notification('target_ion_calculation_response',
                                             {'ions': target_ions, 'isotopes': target_isotopes, 'messages': messages},
                                             room=client_room
                                             )
 
-    async def on_workspace_match_request(self, data):
+    async def on_match_request(self, data):
         client_room = data.get('client_room') or data['cookies']['src_sid'][0]
         value = data['value']
         sample_item = value['sampleItem']
@@ -134,13 +134,13 @@ class TargetServiceNamespace(BaseClientNamespace):
             mz_tolerance
             )
 
-        workspace_match_update = {
+        match_update = {
             'requestId' : value['requestId'], 
             'matchStats': match_stats
         }
 
-        await self.emit_client_notification('workspace_match_update',
-                                            workspace_match_update,
+        await self.emit_client_notification('match_update',
+                                            match_update,
                                             room=client_room
                                             )
 

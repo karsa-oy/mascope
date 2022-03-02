@@ -48,7 +48,7 @@ export default {
     });
   },
   computed: {
-    ...mapState("workspace/match", {
+    ...mapState("match", {
       probableMatchThreshold: "paramProbableMatchThreshold",
       possibleMatchThreshold: "paramPossibleMatchThreshold",
     }),

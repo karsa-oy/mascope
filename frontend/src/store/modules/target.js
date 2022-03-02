@@ -49,7 +49,7 @@ export default {
             }
         },
         // ion calculation
-        requestIonCalculation(state) {
+        requestIonCalc(state) {
             state.$ionCalculationRequest = {
                 requestId: table.genId(),
                 minIsoAbu: state.paramMinIsoAbu,
@@ -57,7 +57,7 @@ export default {
                 compounds: state.compoundRows
             };
         },
-        handleIonCalculationResponse(state) {
+        handleIonCalcResponse(state) {
             let response = state.$ionCalculationResponse;
             if (response) {
                 let _selected = 'none';
@@ -82,7 +82,7 @@ export default {
     actions: {
         add({ commit }, { compounds }) {
             commit('addRows', { level: 'compound', rows: compounds });
-            commit('requestIonCalculation');
+            commit('requestIonCalc');
         },
         // selection
         compoundSelectionToggle({ state, commit }, compound) {
@@ -199,9 +199,9 @@ export default {
             },
         compoundStats: (state, getters, rootState, rootGetters) =>
             ({ selected = true, extraGroupings = '' }) => {
-                let matchesExist = rootState.workspace.match.compoundRows.length > 0;
+                let matchesExist = rootState.match.compoundRows.length > 0;
                 if (matchesExist) {
-                    let matches = rootGetters['workspace/match/ratings']({
+                    let matches = rootGetters['match/ratings']({
                         level: 'compound', selected
                     });
                     return table.query(
@@ -227,9 +227,9 @@ export default {
             },
         ionStats: (state, getters, rootState, rootGetters) =>
             ({ selected = true, extraGroupings = '' }) => {
-                let matchesExist = rootState.workspace.match.ionRows.length > 0;
+                let matchesExist = rootState.match.ionRows.length > 0;
                 if (matchesExist) {
-                    let matches = rootGetters['workspace/match/ratings']({
+                    let matches = rootGetters['match/ratings']({
                         level: 'ion', selected
                     });
                     return table.query(
@@ -255,9 +255,9 @@ export default {
             },
         isotopeStats: (state, getters, rootState, rootGetters) =>
             ({ selected = true, extraGroupings = '' }) => {
-                let matchesExist = rootState.workspace.match.isotopeRows.length > 0;
+                let matchesExist = rootState.match.isotopeRows.length > 0;
                 if (matchesExist) {
-                    let matches = rootGetters['workspace/match/ratings']({
+                    let matches = rootGetters['match/ratings']({
                         level: 'isotope', selected
                     });
                     return table.query(

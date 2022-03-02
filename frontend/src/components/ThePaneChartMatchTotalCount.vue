@@ -20,7 +20,7 @@ export default {
   components: { BaseChartPlotly },
   computed: {
     stats: function () {
-      return this.$store.getters["workspace/match/stats"]({
+      return this.$store.getters["match/stats"]({
         level: "compound",
       });
     },
@@ -48,7 +48,7 @@ export default {
     },
   },
   methods: {
-    ...mapActions("workspace/sample", {
+    ...mapActions("sample", {
       toggleSampleItemSelection: "itemSelectionToggle",
     }),
     onClick: function (event) {

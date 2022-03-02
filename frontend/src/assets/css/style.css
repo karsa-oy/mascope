@@ -1,5 +1,11 @@
 
-// WEBKIT
+// GENERAL
+
+html, body {
+  overflow: hidden !important;
+}
+
+// webkit scrollbars
 
 html::-webkit-scrollbar {
   display: none;
@@ -19,14 +25,11 @@ body::-webkit-scrollbar {
   outline: 1px solid slategrey;
 }
 
-// COMPONENTS
+// BUEFY FIXES
 
-// sliders
+// bulmaswatch superhero theme fixes
 
-html, body {
-  overflow: hidden !important;
-}
-
+// slider thumb text legibility fix
 .b-slider-thumb > span {
   color: #666 !important;
 }

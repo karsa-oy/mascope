@@ -98,8 +98,8 @@ export default {
   },
   computed: {
     ...bindState({
-      modalActive: "ui/modal/workspaceSaveActive",
-      modalProps: "ui/modal/workspaceSaveProps",
+      modalActive: "modal/workspaceSaveActive",
+      modalProps: "modal/workspaceSaveProps",
       $workspaces: "workspace/$rows",
     }),
     action() {
@@ -146,7 +146,7 @@ export default {
       deleteWorkspace: "workspace/delete",
       updateWorkspace: "workspace/update",
       createWorkspace: "workspace/create",
-      deactivateModal: "ui/modal/deactivate",
+      deactivateModal: "modal/deactivate",
     }),
     actionIs(...actions) {
       return actions.includes(this.action);

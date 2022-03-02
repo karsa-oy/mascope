@@ -1,9 +1,5 @@
 import table from "$lib/table";
 
-import target from "./target";
-import sample from "./sample";
-import match from "./match";
-
 export default {
     namespaced: true,
     state: {
@@ -44,10 +40,5 @@ export default {
         byId: (state) => (id) => {
             return table.get(state.$rows, { id });
         }
-    },
-    modules: {
-        target,
-        sample,
-        match,
     },
 }

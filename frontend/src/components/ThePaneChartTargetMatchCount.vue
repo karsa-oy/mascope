@@ -18,7 +18,7 @@ export default {
   components: { BaseChartPlotly },
   computed: {
     stats: function () {
-      return this.$store.getters["workspace/target/stats"]({
+      return this.$store.getters["target/stats"]({
         level: "compound",
         selected: true,
         extraGroupings: ", m.rating",
@@ -79,7 +79,7 @@ export default {
     },
   },
   methods: {
-    ...mapActions("workspace/sample", {
+    ...mapActions("sample", {
       toggleSampleItemSelection: "itemSelectionToggle",
     }),
     onClick: function (event) {

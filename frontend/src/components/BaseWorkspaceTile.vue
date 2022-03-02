@@ -61,12 +61,12 @@ export default {
   },
   computed: {
     ...bindState({
-      modalProps: "ui/modal/workspaceSaveProps",
+      modalProps: "modal/workspaceSaveProps",
     }),
   },
   methods: {
     ...mapMutations({
-      activateModal: "ui/modal/activate",
+      activateModal: "modal/activate",
     }),
     handleClick() {
       this.$router.push({

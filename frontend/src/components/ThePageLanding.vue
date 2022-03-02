@@ -52,12 +52,12 @@ export default {
   computed: {
     ...bindState({
       workspaces: "workspace/$rows",
-      modalProps: "ui/modal/workspaceSaveProps",
+      modalProps: "modal/workspaceSaveProps",
     }),
   },
   methods: {
     ...mapMutations({
-      activateModal: "ui/modal/activate",
+      activateModal: "modal/activate",
     }),
   },
 };

@@ -4,13 +4,8 @@
   </div>
 </template>
 
-
 <style src="./assets/css/style.css"></style>
 <style src="./assets/css/logo.css"></style>
-
-<style src = "vue-multiselect/dist/vue-multiselect.min.css"></style>
-<style src = "./assets/css/multiselect.css"></style>
-
 
 <script>
 import { bindState } from "$lib/store";
@@ -34,26 +29,17 @@ export default {
   computed: {
     ...bindState({
       api: "api",
-      query: "ui/query",
+      query: "query",
       workspaceActive: "workspace/active",
       workspaceRoom: "workspace/$roomActive",
-      $targetIonCalculationResponse: "workspace/target/$ionCalculationResponse",
-      $sampleResponse: "workspace/sample/$response",
-      sampleSelected: "ui/selected/sample",
-      $matchUpdate: "workspace/match/$update",
-      // aggregation
-      compoundRows: "workspace/target/compoundRows",
-      compoundMatches: "workspace/match/compoundRows",
-      compoundStatsAgg: "workspace/agg/targetCompoundStats",
-      ionRows: "workspace/target/ionRows",
-      ionMatches: "workspace/match/ionRows",
-      ionStatsAgg: "workspace/agg/targetIonStats",
-      isotopeRows: "workspace/target/isotopeRows",
-      isotopeMatches: "workspace/match/isotopeRows",
-      isotopeStatsAgg: "workspace/agg/targetIsotopeStats",
+      $targetIonCalcResponse: "target/$ionCalculationResponse",
+      $sampleResponse: "sample/$response",
+      $matchUpdate: "match/$update",
     }),
     ready: function () {
+      // check that the API connected succesfully to the backend
       let apiConnected = this.api ? this.api.connected : false;
+      // check that workspaces were loaded
       let workspacesExist = this.$workspaceRows
         ? this.$workspaceRows.length > 0
         : false;
@@ -62,16 +48,15 @@ export default {
   },
   methods: {
     ...mapMutations({
-      targetHandleIonCalculationResponse:
-        "workspace/target/handleIonCalculationResponse",
+      targetHandleIonCalcResponse: "target/handleIonCalcResponse",
     }),
     ...mapActions({
-      sampleBatchList: "workspace/sample/batchList",
-      sampleHandleResponse: "workspace/sample/handleResponse",
-      matchRequest: "workspace/match/request",
-      matchHandleUpdate: "workspace/match/handleUpdate",
-      keydown: "ui/key/down",
-      keyup: "ui/key/up",
+      sampleBatchList: "sample/batchList",
+      sampleHandleResponse: "sample/handleResponse",
+      matchRequest: "match/request",
+      matchHandleUpdate: "match/handleUpdate",
+      keydown: "key/down",
+      keyup: "key/up",
     }),
     workspaceById(id) {
       return this.$store.getters["workspace/byId"](id);
@@ -101,8 +86,8 @@ export default {
       this.workspaceInit();
     },
     // target
-    $targetIonCalculationResponse: function () {
-      this.targetHandleIonCalculationResponse();
+    $targetIonCalcResponse: function () {
+      this.targetHandleIonCalcResponse();
     },
     // sample
     $sampleResponse: function () {

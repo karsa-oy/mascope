@@ -79,11 +79,11 @@ export default {
   props: {},
   computed: {
     ...bindState({
-      ionMechs: "workspace/target/ionMechs",
-      defaultIonMechs: "workspace/target/defaultIonMechs",
-      modalActive: "ui/modal/targetImportActive",
-      control: "ui/key/control",
-      v: "ui/key/v",
+      ionMechs: "target/ionMechs",
+      defaultIonMechs: "target/defaultIonMechs",
+      modalActive: "modal/targetImportActive",
+      control: "key/control",
+      v: "key/v",
     }),
     fields() {
       return this.cols.map((col) => col.field);
@@ -107,7 +107,7 @@ export default {
   },
   methods: {
     ...mapActions({
-      addTargets: "workspace/target/add",
+      addTargets: "target/add",
     }),
     parseClipboard: async function () {
       let clipboardText = await navigator.clipboard.readText();

@@ -3,7 +3,7 @@
     <h2 class="subtitle">Targets</h2>
     <base-param-field
       label="Minimum isotope abundance [%]"
-      path="workspace/target/paramMinIsoAbu"
+      path="target/paramMinIsoAbu"
       :range="{ min: 0, max: 20, step: 0.05 }"
     >
     </base-param-field>
@@ -33,7 +33,7 @@ export default {
   },
   computed: {
     ...bindState({
-      defaultIonMechs: "workspace/target/defaultIonMechs",
+      defaultIonMechs: "target/defaultIonMechs",
     }),
   },
 };

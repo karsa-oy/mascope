@@ -207,7 +207,7 @@ export default {
                 let sampleItem = table.get(state.itemRows, {
                     id: state.$response.payload.sampleItemId
                 });
-                dispatch('workspace/match/request', {
+                dispatch('match/request', {
                     sampleItem
                 }, { root: true });
             } else {
@@ -294,7 +294,7 @@ export default {
                 );
             } else if (selected == 'none') {
                 await dispatch(
-                    'workspace/match/removeBySampleItem', item,
+                    'match/removeBySampleItem', item,
                     { root: true }
                 );
                 await commit('itemPeakClear', item);
@@ -345,7 +345,7 @@ export default {
                 .select(state.itemRows, { batchId: batch.id });
             for (let item of batchItems) {
                 dispatch(
-                    'workspace/match/removeBySampleItem', item,
+                    'match/removeBySampleItem', item,
                     { root: true }
                 );
             }
@@ -365,7 +365,7 @@ export default {
                     from matches m
                     group by m.sampleItemId, m.rating
                `,
-                    { matches: rootGetters['workspace/match/ratings']({ level, selected }) }
+                    { matches: rootGetters['match/ratings']({ level, selected }) }
                 );
             },
     }

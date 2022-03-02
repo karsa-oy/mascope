@@ -1,16 +1,27 @@
 import { createConnectedStore } from '$lib/api';
 
+import logger from "./plugins/logger"
+
+import modal from './modules/modal';
+import key from './modules/key';
 import workspace from "./modules/workspace";
-import ui from './modules/ui';
+import target from "./modules/target";
+import sample from "./modules/sample";
+import match from "./modules/match";
 
 export default createConnectedStore({
 	state: {
-		error: null,
-		newFile: "",
-		$datasetCoordUpdated: null,
+		query: null
 	},
 	modules: {
+		modal,
+		key,
 		workspace,
-		ui,
-	}
+		sample,
+		target,
+		match,
+	},
+	plugins: [
+		logger
+	]
 });
