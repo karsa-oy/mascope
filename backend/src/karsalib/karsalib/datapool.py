@@ -24,12 +24,6 @@ from datetime import datetime, timedelta
 METADATA_VERSION_NUMBER = '0.01'
 
 
-FILENAME_DATETIME_PATTERNS = [
-        '*%Y.%m.%d*%Hh%Mm%Ss*',
-        '*%Y%m%d_%H%M_*',
-        '*%Y%m%d_*',
-        ]
-
 
 class SamplePool():
     def log(self, *arg):

@@ -1,5 +1,4 @@
 import argparse
-import fnmatch
 import os
 import random
 import string
@@ -116,7 +115,13 @@ def parse_cmd_args():
             **cmdline_args})
 
 def parse_datetime_from_item_filename(filename):
-    global FILENAME_DATETIME_PATTERNS
+
+    FILENAME_DATETIME_PATTERNS = [
+        '*%Y.%m.%d*%Hh%Mm%Ss*',
+        '*%Y%m%d_%H%M_*',
+        '*%Y%m%d_*',
+        ]
+
     for pattern in FILENAME_DATETIME_PATTERNS:
         matcher = datetime_glob.Matcher(pattern=pattern)
         dt = matcher.match(filename)
