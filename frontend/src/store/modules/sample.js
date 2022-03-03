@@ -16,7 +16,6 @@ export default {
         // Parameters
         paramPeakMinIntensity: 5,
         paramPeakMinSeperation: 3,
-        paramPeakMinWidth: 3,
         paramMzRange: null,
         paramTRange: null,
         // API

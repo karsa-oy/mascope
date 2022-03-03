@@ -13,12 +13,6 @@
       :range="{ min: 0, max: 30, step: 0.05 }"
     >
     </base-param-field>
-    <base-param-field
-      label="Minimum peak width [m/z]"
-      path="sample/paramPeakMinWidth"
-      :range="{ min: 0, max: 30, step: 0.05 }"
-    >
-    </base-param-field>
   </section>
 </template>
 
