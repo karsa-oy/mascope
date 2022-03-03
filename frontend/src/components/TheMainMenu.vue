@@ -15,9 +15,9 @@ export default {
     return {
       buttons: [
         {
-          icon: "view-dashboard",
-          label: "Dashboard",
-          path: "/dashboard",
+          icon: "flask",
+          label: "Batch overview",
+          path: "/batch-overview",
         },
       ],
       footerButtons: [

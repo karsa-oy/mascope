@@ -33,7 +33,7 @@ import ThePaneChartSampleIntensity from "./ThePaneChartSampleIntensity.vue";
 import ThePaneChartMatchTotalCount from "./ThePaneChartMatchTotalCount.vue";
 
 export default {
-  name: "ThePageExplorer",
+  name: "ThePageBatchOverview",
   components: {
     TheLayoutSidebar,
     ThePaneBrowserTarget,
