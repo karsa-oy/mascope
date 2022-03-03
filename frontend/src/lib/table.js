@@ -83,30 +83,6 @@ export default {
             oldRow = newRow;
         }
     },
-    max(rows, measureField, groupingFields) {
-        let groups = this.unique(
-            rows.map(       // get group values
-                row => Object.assign({}, ...groupingFields
-                    .map(groupingField => ({
-                        [groupingField]: row[groupingField]
-                    }))
-                )
-            )
-        );
-        let maxima = groups.map(
-            group => ({     // create groups
-                ...group,                           // save grouping field
-                [measureField]: Math.max(           // find max measure
-                    ...this.select(rows, group)
-                        .map(row => row[measureField])
-                ),
-            })
-        );
-        return maxima;
-    },
-    unique(rows) {
-        return Array.from(new Set(rows.map(JSON.stringify))).map(JSON.parse);
-    },
     query(sql, tables) {
         // sort tables by their order in the query
         let tableNames = Object.keys(tables);
