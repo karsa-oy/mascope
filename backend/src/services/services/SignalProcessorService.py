@@ -95,7 +95,7 @@ class SignalProcessorNamespace(BaseClientNamespace):
                                                  }
                                                 )
 
-    async def on_workspace_sample_peak_list_request(self, data):
+    async def on_sample_peak_list_request(self, data):
         value = data['value']
         client_room = data.get('client_room') or data['cookies']['src_sid'][0]
         
