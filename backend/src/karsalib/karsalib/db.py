@@ -148,12 +148,14 @@ class SampleItemTable(DBTable):
             ('id', 'varchar(16)', 'PRIMARY KEY'),
             ('batchId', 'varchar(16)', 'NOT NULL'),
             ('filename', 'varchar(256)', 'NOT NULL'),
+            ('name', 'text'),
+            ('description', 'text'),
             ('attributes', 'json'),
         ]
         self.sql_create = f""" CREATE TABLE IF NOT EXISTS {name} (
             {self._wrap_schema()},
             FOREIGN KEY (batchId) REFERENCES sample_batches (id),
-            FOREIGN KEY (filename) REFERENCES store (filename)
+            FOREIGN KEY (filename) REFERENCES sample_files (id)
             ); """
         super().__init__(db, name)
 
@@ -161,7 +163,7 @@ class SampleItemTable(DBTable):
 class SampleFileTable(DBTable):
     def __init__(self, db, name='sample_files'):
         self.schema = [
-            ('filename', 'varchar(256)', 'PRIMARY KEY'),
+            ('id', 'varchar(256)', 'PRIMARY KEY'),
             ('instrument', 'varchar(64)'),
             ('datetime', 'varchar(64)'),
             ('length', 'real'),
@@ -242,20 +244,20 @@ class SampleManagerDB:
         return self.sample_items.get_joined(
                     'sample_files',
                     'filename',
-                    'filename',
+                    'id',
                     batchId=batchId
                     )
         
     def sample_item_create(self, **kwargs):
-        if not self.sample_files.get(id=kwargs['filename']):
-            self.sample_files.create(filename=kwargs['filename'])
+        if not self.sample_files.get(id=kwargs['id']):
+            self.sample_files.create(id=kwargs['id'])
         self.sample_items.create(**kwargs)
 
     def sample_item_read(self, id):
         return self.sample_items.get_joined(
                     'sample_files',
                     'filename',
-                    'filename',
+                    'id',
                     id=id
                     )
 

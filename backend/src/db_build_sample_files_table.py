@@ -26,7 +26,7 @@ if __name__ == '__main__':
                 with open(props_path, 'r') as f:
                     props = json.load(f)
                 sample = dict(
-                    filename = props['filename'],
+                    id = props['filename'],
                     instrument = props['filename'].split('_')[0],
                     datetime = parse_datetime_from_item_filename(props['filename']).isoformat(),
                     length=props['length'],
