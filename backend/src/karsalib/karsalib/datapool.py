@@ -4,15 +4,14 @@
 Created on Mon Apr 15 15:39:30 2019
 """
 
-import asyncio
 import os
 from ntpath import dirname, basename
-import sys
 import re
 from karsalib.logging import (
                 NO_LOGGING_DEFAULT,
                 parent_func_name
                 )
+from karsalib.util import recursive_walk
 
 import pandas as pd
 
@@ -114,7 +113,7 @@ class SamplePool():
                             'path'
                             ]
                         )
-        self.pool = self.pool.append(df_row).sort_index()
+        self.pool = pd.concat([self.pool, df_row]).sort_index()
         self.log(filename)
 
     def remove_file(self, full_file_path):

@@ -200,7 +200,7 @@ class SampleManagerDB:
             self.con = sqlite3.connect(fname)
             self.cur = self.con.cursor()
         except Exception as e:
-            self.log(e.__class__.__name__(str(e)))
+            self.log(f'{e.__class__.__name__}({str(e)})')
             raise
         self.workspaces = WorkspaceTable(self)
         self.sample_batches = SampleBatchTable(self)

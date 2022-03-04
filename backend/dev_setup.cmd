@@ -18,7 +18,7 @@ echo ========================
 echo ========================
 echo   3. Install hw_interfaces package:
 echo ========================
-  pip install -e hw_interfaces || goto :error
+  pip install -e hw_interfaces[all] || goto :error
 
 echo ========================
 echo   4. Install karsaimg package:
