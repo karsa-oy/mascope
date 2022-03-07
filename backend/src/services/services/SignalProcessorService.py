@@ -213,7 +213,7 @@ def filter_peaks(cache_item,
     peaks = cache_item.peaks.sel(mz=slice(*mz_range),
                                  time=slice(*t_range)
                                  )
-    peaks = peaks.dropna(dim='mz')
+    peaks = peaks.dropna(dim='mz', how='all')
     peak_heights = peaks.sum(dim='time').values
     # peak_properties = {'peak_heights': peak_heights}
 
