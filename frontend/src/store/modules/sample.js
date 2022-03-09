@@ -16,7 +16,6 @@ export default {
         // Parameters
         paramPeakMinIntensity: 5,
         paramPeakMinSeperation: 3,
-        paramPeakMinWidth: 3,
         paramMzRange: null,
         paramTRange: null,
         // API
@@ -274,16 +273,16 @@ export default {
                         selected: 'none'
                     });
                     dispatch('batchMatchClear', batch);
-                    commit('batchPeakClear', batch);
+                    commit('batchPeaksClear', batch);
                 }
-                await dispatch('deactivateBatch', batch);
+                await dispatch('batchDeactivate', batch);
             } else {
                 throw Error('Sample batch selection in a bad state.');
             }
         },
         async itemSelectionToggle({ state, commit, dispatch }, item) {
             let selected = selection.propegateDown(item);
-            commit('setSelection', {
+            commit('selectionSet', {
                 level: 'item',
                 ids: [item.id],
                 selected

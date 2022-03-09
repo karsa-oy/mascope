@@ -70,7 +70,7 @@ export default {
     }),
     handleClick() {
       this.$router.push({
-        path: "/dashboard",
+        path: "/batch-overview",
         query: { w: this.workspace.id },
       });
     },

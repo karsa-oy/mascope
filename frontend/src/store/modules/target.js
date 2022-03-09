@@ -69,7 +69,7 @@ export default {
             }
         },
         // selection
-        setSelection(state, { level, ids, selected }) {
+        selectionSet(state, { level, ids, selected }) {
             let levelRows = level + 'Rows';
             for (let id of ids) {
                 table.update(state[levelRows],
@@ -88,7 +88,7 @@ export default {
         compoundSelectionToggle({ state, commit }, compound) {
             let nextSelection = selection.propegateDown(compound);
             // toggle compound selection
-            commit('setSelection', {
+            commit('selectionSet', {
                 level: 'compound',
                 ids: [compound.id],
                 selected: nextSelection
@@ -96,7 +96,7 @@ export default {
             // toggle child ion selection
             let childIons = table.select(state.ionRows, { compoundId: compound.id });
             let nextChildSelection = nextSelection;
-            commit('setSelection', {
+            commit('selectionSet', {
                 level: 'ion',
                 ids: childIons.map(row => row.id),
                 selected: nextChildSelection,
@@ -105,7 +105,7 @@ export default {
             let childIsotopes = childIons.map(ionRow => {
                 return table.select(state.isotopeRows, { ionId: ionRow.id });
             }).flat();
-            commit('setSelection', {
+            commit('selectionSet', {
                 level: 'isotope',
                 ids: childIsotopes.map(row => row.id),
                 selected: nextChildSelection
@@ -114,7 +114,7 @@ export default {
         ionSelectionToggle({ state, commit }, ion) {
             let nextSelection = selection.propegateDown(ion);
             // toggle ion selection
-            commit('setSelection', {
+            commit('selectionSet', {
                 level: 'ion',
                 ids: [ion.id],
                 selected: nextSelection,
@@ -122,7 +122,7 @@ export default {
             // toggle child isotope selection
             let childIsotopes = table.select(state.isotopeRows, { ionId: ion.id });
             let nextChildSelection = nextSelection;
-            commit('setSelection', {
+            commit('selectionSet', {
                 level: 'isotope',
                 ids: childIsotopes.map(row => row.id),
                 selected: nextChildSelection,
@@ -132,7 +132,7 @@ export default {
                 { compoundId: ion.compoundId }
             );
             let nextParentSelection = selection.propegateUp(syblingIonRows);
-            commit('setSelection', {
+            commit('selectionSet', {
                 level: 'compound',
                 ids: [ion.compoundId],
                 selected: nextParentSelection,
@@ -141,7 +141,7 @@ export default {
         isotopeSelectionToggle({ state, commit }, isotope) {
             let nextSelection = selection.propegateDown(isotope);
             // toggle isotope selection
-            commit('setSelection', {
+            commit('selectionSet', {
                 level: 'isotope',
                 ids: [isotope.id],
                 selected: nextSelection
@@ -151,7 +151,7 @@ export default {
                 { ionId: isotope.ionId }
             );
             let nextParentIonSelection = selection.propegateUp(syblingIsotopeRows);
-            commit('setSelection', {
+            commit('selectionSet', {
                 level: 'ion',
                 ids: [isotope.ionId],
                 selected: nextParentIonSelection,
@@ -164,7 +164,7 @@ export default {
                 { compoundId: ionRow.compoundId }
             );
             let nextParentCompoundSelection = selection.propegateUp(syblingIonRows);
-            commit('setSelection', {
+            commit('selectionSet', {
                 level: 'compound',
                 ids: [ionRow.compoundId],
                 selected: nextParentCompoundSelection

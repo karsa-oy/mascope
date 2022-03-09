@@ -15,7 +15,7 @@ Vue.config.productionTip = false
 import VueRouter from 'vue-router';
 
 import ThePageLanding from "./components/ThePageLanding";
-import ThePageDashboard from "./components/ThePageDashboard";
+import ThePageBatchOverview from "./components/ThePageBatchOverview";
 import ThePageSettings from "./components/ThePageSettings";
 
 Vue.use(VueRouter);
@@ -26,8 +26,8 @@ const router = new VueRouter({
     path: '/',
     component: ThePageLanding
   }, {
-    path: '/dashboard',
-    component: ThePageDashboard
+    path: '/batch-overview',
+    component: ThePageBatchOverview
   }, {
     path: '/settings',
     component: ThePageSettings
