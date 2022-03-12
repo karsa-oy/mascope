@@ -14,8 +14,8 @@ export default {
         batchRows: [],
         itemRows: [],
         // Parameters
-        paramPeakMinIntensity: 5,
-        paramPeakMinSeperation: 3,
+        paramPeakMinIntensity: 1,
+        paramPeakMinSeparation: 3,
         paramMzRange: null,
         paramTRange: null,
         // API
@@ -167,7 +167,7 @@ export default {
             mzRange = state.paramMzRange,
             tRange = state.paramTRange,
             minPeakIntensity = state.paramPeakMinIntensity,
-            minPeakSeperation = state.paramPeakMinSeperation,
+            minPeakSeparation = state.paramPeakMinSeparation,
             minPeakWidth = state.paramPeakMinWidth
         }) {
             commit('itemPeakList', {
@@ -177,7 +177,7 @@ export default {
                     mzRange,
                     tRange,
                     minPeakIntensity,
-                    minPeakSeperation,
+                    minPeakSeparation,
                     minPeakWidth
                 }
             });

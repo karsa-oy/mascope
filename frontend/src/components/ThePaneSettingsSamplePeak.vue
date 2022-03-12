@@ -4,12 +4,12 @@
     <base-param-field
       label="Peak intensity threshold [%]"
       path="sample/paramPeakMinIntensity"
-      :range="{ min: 0, max: 20, step: 0.05 }"
+      :range="{ min: 0, max: 1000, step: 1 }"
     >
     </base-param-field>
     <base-param-field
-      label="Minimum peak seperation [m/z]"
-      path="sample/paramPeakMinSeperation"
+      label="Minimum peak separation [m/z]"
+      path="sample/paramPeakMinSeparation"
       :range="{ min: 0, max: 30, step: 0.05 }"
     >
     </base-param-field>
