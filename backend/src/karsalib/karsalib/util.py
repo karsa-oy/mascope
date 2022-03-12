@@ -93,7 +93,7 @@ def parse_datetime_from_item_filename(filename):
             break
     return dt.as_datetime()
 
-def parse_path_from_item_filename(item_filename):
+def parse_path_from_item_filename(item_filename, base_path=""):
     """Return path (relative to wdir) to sample data, based on its name
 
     Path is
@@ -118,7 +118,8 @@ def parse_path_from_item_filename(item_filename):
     item_datetime = parse_datetime_from_item_filename(item_filename)
     date_dir = parse_subdir_from_datetime(item_datetime)
     # Join to sample path relative to wdir
-    return os.path.join(instrument, date_dir, item_filename)
+    full_path = os.path.join(base_path, instrument, date_dir, item_filename)
+    return full_path
 
 def recursive_walk(dir_path, *file_masks):
     print('walking', dir_path)
