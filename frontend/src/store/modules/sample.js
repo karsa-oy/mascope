@@ -1,5 +1,6 @@
 import table from '$lib/table';
 import selection from '$lib/selection';
+import { toTitleCase } from '$lib/string';
 
 export default {
     namespaced: true,
@@ -351,21 +352,70 @@ export default {
         }
     },
     getters: {
+        // selected
+        selected: (state, getters) =>
+            ({ level }) => {
+                return getters[level + 'Selected'];
+            },
+        itemsSelected: function (state) {
+            let selected = (row) => ['all', 'some'].includes(row._selected)
+            let itemsSelected = state.itemRows.filter(selected);
+            return itemsSelected.length > 0 ? itemsSelected : state.itemRows;
+        },
+        // stats
         itemStats: (state, getters, rootState, rootGetters) =>
             ({ level = 'compound', selected = true }) => {
-                return table.query(
+                let targetLevel = 'target' + toTitleCase(level);
+                let matchLevel = 'match' + toTitleCase(level);
+                let matches = rootGetters['match/ratings']({ level, selected });
+                let total = table.query(
                     `
                     select
                         m.sampleItemId as id
-                        ,m.rating
                         ,first(m.sampleFilename) as filename
-                        ,count(*) as matchCount
-                        ,count(distinct m.target${level}Id) as target${level}Count
+                        ,coalesce(count(distinct m.${targetLevel}Id), 0) 
+                            as ${matchLevel}TotalCount
                     from matches m
-                    group by m.sampleItemId, m.rating
-               `,
-                    { matches: rootGetters['match/ratings']({ level, selected }) }
+                    group by m.sampleItemId
+                    `, { matches }
                 );
+                let probable = table.query(
+                    `
+                    select
+                        m.sampleItemId as id
+                        ,coalesce(count(distinct m.${targetLevel}Id), 0) 
+                            as ${matchLevel}ProbableCount
+                    from matches m
+                    where rating = 'probable'
+                    group by m.sampleItemId
+                    `, { matches }
+                );
+                let possible = table.query(
+                    `
+                    select
+                        m.sampleItemId as id
+                        ,coalesce(count(distinct m.${targetLevel}Id), 0) 
+                            as ${matchLevel}PossibleCount
+                    from matches m
+                    where rating = 'possible'
+                    group by m.sampleItemId
+                    `, { matches }
+                );
+                let result = table.query(
+                    `
+                    select
+                        tot.*
+                        ,prob.*
+                        ,poss.*
+                    from total tot
+                    left join probable prob
+                        using id
+                    left join possible poss
+                        using id
+                    `, { total, probable, possible }
+                );
+                if (rootState.dev.logGetters) console.table(result);
+                return result;
             },
     }
 }
