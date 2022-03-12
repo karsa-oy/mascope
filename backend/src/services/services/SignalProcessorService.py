@@ -155,7 +155,7 @@ class SignalProcessorNamespace(BaseClientNamespace):
         peak_tofs = filtered_peaks.tof.values
 
         await self.emit_client_notification(
-            'workspace_sample_response', {
+            'sample_response', {
                 'type': 'peak-list',
                 'requestId': value['requestId'],
                 'payload': {
