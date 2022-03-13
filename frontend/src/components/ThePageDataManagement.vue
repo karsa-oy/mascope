@@ -69,12 +69,23 @@
         </base-table>
       </b-tab-item>
     </b-tabs>
+    <b-button
+      @click="exportSpreadsheet"
+      style="position: fixed; right: 5em; bottom: 2em"
+      icon-left="content-save"
+      type="is-primary"
+      rounded
+    >
+      Export spreadsheet
+    </b-button>
   </the-layout-sidebar>
 </template>
 
 <script>
 import TheLayoutSidebar from "./TheLayoutSidebar";
 import BaseTable from "./BaseTable";
+
+import table from "$lib/table";
 
 export default {
   name: "ThePageDataManagement",
@@ -208,6 +219,47 @@ export default {
           label: "Possible compound match count",
         },
       ];
+    },
+  },
+  methods: {
+    exportSpreadsheet() {
+      table.toSpreadsheet("test.xlsx", [
+        {
+          name: "Matches (compound)",
+          rows: this.matchCompoundRows,
+          cols: this.matchCompoundCols,
+        },
+        {
+          name: "Matches (ion)",
+          rows: this.matchIonRows,
+          cols: this.matchIonCols,
+        },
+        {
+          name: "Matches (isotope)",
+          rows: this.matchIsotopeRows,
+          cols: this.matchIsotopeCols,
+        },
+        {
+          name: "Targets (compound)",
+          rows: this.targetCompoundRows,
+          cols: this.targetCompoundCols,
+        },
+        {
+          name: "Targets (ion)",
+          rows: this.targetIonRows,
+          cols: this.targetIonCols,
+        },
+        {
+          name: "Targets (isotope)",
+          rows: this.targetIsotopeRows,
+          cols: this.targetIsotopeCols,
+        },
+        {
+          name: "Sample items",
+          rows: this.sampleItemRows,
+          cols: this.sampleItemCols,
+        },
+      ]);
     },
   },
 };
