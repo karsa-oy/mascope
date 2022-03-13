@@ -21,7 +21,10 @@ export default {
       return this.$store.getters["target/stats"]({
         level: "compound",
         selected: true,
-      });
+      }).filter(
+        (row) =>
+          row.matchCompoundProbableCount + row.matchCompoundPossibleCount > 0
+      );
     },
     data: function () {
       return [
