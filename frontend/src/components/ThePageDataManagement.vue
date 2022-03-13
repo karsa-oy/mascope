@@ -164,9 +164,9 @@ export default {
       return [
         { field: "name", label: "Compound name" },
         { field: "formula", label: "Compound formula" },
-        { field: "matchCompoundTotalCount", label: "Total match count" },
         { field: "matchCompoundProbableCount", label: "Probable match count" },
         { field: "matchCompoundPossibleCount", label: "Possible match count" },
+        { field: "matchCompoundTotalCount", label: "Total match count" },
       ];
     },
     targetIonRows() {
@@ -179,9 +179,9 @@ export default {
       return [
         { field: "formula", label: "Compound formula" },
         { field: "ionMech", label: "Compound name" },
-        { field: "matchIonTotalCount", label: "Total match count" },
         { field: "matchIonProbableCount", label: "Probable match count" },
         { field: "matchIonPossibleCount", label: "Possible match count" },
+        { field: "matchIonTotalCount", label: "Total match count" },
       ];
     },
     targetIsotopeRows() {
@@ -194,9 +194,9 @@ export default {
       return [
         { field: "mz", label: "Isotope m/z" },
         { field: "relAbu", label: "Isotope relative abundance" },
-        { field: "matchIsotopeTotalCount", label: "Total match count" },
         { field: "matchIsotopeProbableCount", label: "Probable match count" },
         { field: "matchIsotopePossibleCount", label: "Possible match count" },
+        { field: "matchIsotopeTotalCount", label: "Total match count" },
       ];
     },
     // samples
@@ -208,8 +208,10 @@ export default {
     },
     sampleItemCols() {
       return [
-        { field: "filename", label: "Filename" },
-        { field: "matchCompoundTotalCount", label: "Total peak match count" },
+        {
+          field: "filename",
+          label: "Filename",
+        },
         {
           field: "matchCompoundProbableCount",
           label: "Probable compound match count",
@@ -217,6 +219,10 @@ export default {
         {
           field: "matchCompoundPossibleCount",
           label: "Possible compound match count",
+        },
+        {
+          field: "matchCompoundTotalCount",
+          label: "Total peak match count",
         },
       ];
     },

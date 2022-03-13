@@ -368,13 +368,12 @@ export default {
                 let targetLevel = 'target' + toTitleCase(level);
                 let matchLevel = 'match' + toTitleCase(level);
                 let matches = rootGetters['match/ratings']({ level, selected });
+                let samples = selected ? getters['itemsSelected'] : state.itemRows;
                 let total = table.query(
                     `
                     select
                         m.sampleItemId as id
-                        ,first(m.sampleFilename) as filename
-                        ,coalesce(count(distinct m.${targetLevel}Id), 0) 
-                            as ${matchLevel}TotalCount
+                        ,count(distinct m.${targetLevel}Id) as ${matchLevel}TotalCount
                     from matches m
                     group by m.sampleItemId
                     `, { matches }
@@ -383,8 +382,7 @@ export default {
                     `
                     select
                         m.sampleItemId as id
-                        ,coalesce(count(distinct m.${targetLevel}Id), 0) 
-                            as ${matchLevel}ProbableCount
+                        ,count(distinct m.${targetLevel}Id) as ${matchLevel}ProbableCount
                     from matches m
                     where rating = 'probable'
                     group by m.sampleItemId
@@ -394,8 +392,7 @@ export default {
                     `
                     select
                         m.sampleItemId as id
-                        ,coalesce(count(distinct m.${targetLevel}Id), 0) 
-                            as ${matchLevel}PossibleCount
+                        ,count(distinct m.${targetLevel}Id) as ${matchLevel}PossibleCount
                     from matches m
                     where rating = 'possible'
                     group by m.sampleItemId
@@ -404,15 +401,18 @@ export default {
                 let result = table.query(
                     `
                     select
-                        tot.*
-                        ,prob.*
-                        ,poss.*
-                    from total tot
+                        samp.*
+                        ,coalesce(tot.${matchLevel}TotalCount, 0) as ${matchLevel}TotalCount
+                        ,coalesce(prob.${matchLevel}ProbableCount, 0) as ${matchLevel}ProbableCount
+                        ,coalesce(poss.${matchLevel}PossibleCount, 0) as ${matchLevel}PossibleCount
+                    from samples samp
+                    left join total tot
+                        on samp.id = tot.id
                     left join probable prob
-                        using id
+                        on samp.id = prob.id
                     left join possible poss
-                        using id
-                    `, { total, probable, possible }
+                        on samp.id = poss.id
+                    `, { samples, total, probable, possible }
                 );
                 if (rootState.dev.logGetters) console.table(result);
                 return result;

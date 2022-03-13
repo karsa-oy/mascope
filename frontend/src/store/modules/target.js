@@ -204,15 +204,12 @@ export default {
                     let matches = rootGetters['match/ratings']({
                         level: 'compound', selected
                     });
+                    let targets = selected ? getters['compoundsSelected'] : state.compoundRows;
                     let total = table.query(
                         `
                             select
                                 m.targetCompoundId as id
-                                ,m.rating
-                                ,first(m.targetName) as name
-                                ,first(m.targetFormula) as formula
-                                ,first(m.targetSelected) as _selected
-                                ,coalesce(max(m.matchScore),0) as matchScore
+                                ,max(m.matchScore) as matchScore
                                 ,max(m.samplePeakHeight) as peakHeight
                                 ,count(distinct m.sampleItemId) as matchCompoundTotalCount
                             from matches m
@@ -245,15 +242,20 @@ export default {
                     let result = table.query(
                         `
                         select
-                            tot.*
-                            ,prob.*
-                            ,poss.*
-                        from total tot
-                        outer join probable prob
-                            using id
+                            tar.*    
+                            ,coalesce(tot.matchScore, 0) as matchScore
+                            ,coalesce(tot.peakHeight, 0) as peakHeight
+                            ,coalesce(tot.matchCompoundTotalCount, 0) as matchCompoundTotalCount
+                            ,coalesce(prob.matchCompoundProbableCount, 0) as matchCompoundProbableCount
+                            ,coalesce(poss.matchCompoundPossibleCount,0) as matchCompoundPossibleCount
+                        from targets tar
+                        left join total tot
+                            on tar.id = tot.id
+                        left join probable prob
+                            on tar.id = prob.id
                         left join possible poss
-                            using id
-                    `, { total, probable, possible }
+                            on tar.id = poss.id
+                    `, { targets, total, probable, possible }
                     );
                     if (rootState.dev.logGetters) console.table(result);
                     return result;
@@ -268,18 +270,14 @@ export default {
                     let matches = rootGetters['match/ratings']({
                         level: 'ion', selected
                     });
+                    let targets = selected ? getters['ionsSelected'] : state.ionRows;
                     let total = table.query(
                         `
                             select
                                 m.targetIonId as id
-                                ,first(m.targetCompoundId) as compoundId
-                                ,first(m.targetIonMech) as ionMech
-                                ,first(m.targetFormula) as formula
-                                ,first(m.targetSelected) as _selected
-                                ,coalesce(max(m.matchScore),0) as matchScore
+                                ,max(m.matchScore) as matchScore
                                 ,max(m.samplePeakHeight) as peakHeight
-                                ,count(*) as matchIonTotalCount
-                                ,count(distinct m.sampleItemId) as sampleItemTotalCount
+                                ,count(distinct m.sampleItemId) as matchIonTotalCount
                             from matches m
                             group by m.targetIonId
                         `,
@@ -289,8 +287,8 @@ export default {
                         `
                             select
                                 m.targetIonId as id
-                                ,count(*) as matchIonProbableCount
-                                ,count(distinct m.sampleItemId) as sampleItemProbableCount
+                                ,count(distinct m.sampleItemId) as matchIonProbableCount
+
                             from matches m
                             where rating = 'probable'
                             group by m.targetIonId
@@ -301,8 +299,7 @@ export default {
                         `
                             select
                                 m.targetIonId as id
-                                ,count(*) as matchIonPossibleCount
-                                ,count(distinct m.sampleItemId) as sampleItemPossibleCount
+                                ,count(distinct m.sampleItemId) as matchIonPossibleCount
                             from matches m
                             where rating = 'possible'
                             group by m.targetIonId
@@ -312,15 +309,20 @@ export default {
                     let result = table.query(
                         `
                         select
-                            tot.*
-                            ,prob.*
-                            ,poss.*
-                        from total tot
-                        outer join probable prob
-                            using id
+                            tar.*    
+                            ,coalesce(tot.matchScore, 0) as matchScore
+                            ,coalesce(tot.peakHeight, 0) as peakHeight
+                            ,coalesce(tot.matchIonTotalCount, 0) as matchIonTotalCount
+                            ,coalesce(prob.matchIonProbableCount, 0) as matchIonProbableCount
+                            ,coalesce(poss.matchIonPossibleCount,0) as matchIonPossibleCount
+                        from targets tar
+                        left join total tot
+                            on tar.id = tot.id
+                        left join probable prob
+                            on tar.id = prob.id
                         left join possible poss
-                            using id
-                    `, { total, probable, possible }
+                            on tar.id = poss.id
+                    `, { targets, total, probable, possible }
                     );
                     if (rootState.dev.logGetters) console.table(result);
                     return result;
@@ -335,18 +337,14 @@ export default {
                     let matches = rootGetters['match/ratings']({
                         level: 'isotope', selected
                     });
+                    let targets = selected ? getters['isotopesSelected'] : state.isotopeRows;
                     let total = table.query(
                         `
                             select
                                 m.targetIsotopeId as id
-                                ,first(m.targetIonId) as ionId
-                                ,first(m.targetRelAbu) as relAbu
-                                ,first(m.targetMz) as mz
-                                ,first(m.targetSelected) as _selected
-                                ,coalesce(max(m.matchScore),0) as matchScore
+                                ,max(m.matchScore) as matchScore
                                 ,max(m.samplePeakHeight) as peakHeight
-                                ,count(*) as matchIsotopeTotalCount
-                                ,count(distinct m.sampleItemId) as sampleItemTotalCount
+                                ,count(distinct m.sampleItemId) as matchIsotopeTotalCount
                             from matches m
                             group by m.targetIsotopeId
                         `,
@@ -356,8 +354,7 @@ export default {
                         `
                             select
                                 m.targetIsotopeId as id
-                                ,count(*) as matchIsotopeProbableCount
-                                ,count(distinct m.sampleItemId) as sampleItemProbableCount
+                                ,count(distinct m.sampleItemId) as matchIsotopeProbableCount
                             from matches m
                             where rating = 'probable'
                             group by m.targetIsotopeId
@@ -368,8 +365,7 @@ export default {
                         `
                             select
                                 m.targetIsotopeId as id
-                                ,count(*) as matchIsotopePossibleCount
-                                ,count(distinct m.sampleItemId) as sampleItemPossibleCount
+                                ,count(distinct m.sampleItemId) as matchIsotopePossibleCount
                             from matches m
                             where rating = 'possible'
                             group by m.targetIsotopeId
@@ -379,15 +375,20 @@ export default {
                     let result = table.query(
                         `
                         select
-                            tot.*
-                            ,prob.*
-                            ,poss.*
-                        from total tot
-                        outer join probable prob
-                            using id
+                            tar.*    
+                            ,coalesce(tot.matchScore, 0) as matchScore
+                            ,coalesce(tot.peakHeight, 0) as peakHeight
+                            ,coalesce(tot.matchIsotopeTotalCount, 0) as matchIsotopeTotalCount
+                            ,coalesce(prob.matchIsotopeProbableCount, 0) as matchIsotopeProbableCount
+                            ,coalesce(poss.matchIsotopePossibleCount,0) as matchIsotopePossibleCount
+                        from targets tar
+                        left join total tot
+                            on tar.id = tot.id
+                        left join probable prob
+                            on tar.id = prob.id
                         left join possible poss
-                            using id
-                    `, { total, probable, possible }
+                            on tar.id = poss.id
+                    `, { targets, total, probable, possible }
                     );
                     if (rootState.dev.logGetters) console.table(result);
                     return result;
