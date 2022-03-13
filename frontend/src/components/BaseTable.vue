@@ -7,7 +7,7 @@
     :default-sort="defaultSort"
     show-header
     sticky-header
-    height="calc(100vh - 200px)"
+    :height="height"
   >
     <b-table-column
       v-for="col in cols"
@@ -42,6 +42,11 @@ export default {
       type: Array,
       required: false,
       default: null,
+    },
+    height: {
+      type: String,
+      required: false,
+      default: "100%",
     },
   },
   created: function () {

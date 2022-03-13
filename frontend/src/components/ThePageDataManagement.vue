@@ -4,14 +4,30 @@
       <b-tab-item label="Matches" icon="check-decagram">
         <b-tabs>
           <b-tab-item label="Compounds">
-            <base-table :rows="matchCompoundRows" :cols="matchCompoundCols">
+            <base-table
+              :rows="matchCompoundRows"
+              :cols="matchCompoundCols"
+              :defaultSort="['matchScore', 'desc']"
+              :height="tableHeight"
+            >
             </base-table>
           </b-tab-item>
           <b-tab-item label="Ions">
-            <base-table :rows="matchIonRows" :cols="matchIonCols"> </base-table>
+            <base-table
+              :rows="matchIonRows"
+              :cols="matchIonCols"
+              :defaultSort="['matchScore', 'desc']"
+              :height="tableHeight"
+            >
+            </base-table>
           </b-tab-item>
           <b-tab-item label="Isotopes">
-            <base-table :rows="matchIsotopeRows" :cols="matchIsotopeCols">
+            <base-table
+              :rows="matchIsotopeRows"
+              :cols="matchIsotopeCols"
+              :defaultSort="['matchScore', 'desc']"
+              :height="tableHeight"
+            >
             </base-table>
           </b-tab-item>
         </b-tabs>
@@ -19,21 +35,38 @@
       <b-tab-item label="Targets" icon="target">
         <b-tabs>
           <b-tab-item label="Compounds">
-            <base-table :rows="targetCompoundRows" :cols="targetCompoundCols">
+            <base-table
+              :rows="targetCompoundRows"
+              :cols="targetCompoundCols"
+              :height="tableHeight"
+            >
             </base-table>
           </b-tab-item>
           <b-tab-item label="Ions">
-            <base-table :rows="targetIonRows" :cols="targetIonCols">
+            <base-table
+              :rows="targetIonRows"
+              :cols="targetIonCols"
+              :height="tableHeight"
+            >
             </base-table>
           </b-tab-item>
           <b-tab-item label="Isotopes">
-            <base-table :rows="targetIsotopeRows" :cols="targetIsotopeCols">
+            <base-table
+              :rows="targetIsotopeRows"
+              :cols="targetIsotopeCols"
+              :height="tableHeight"
+            >
             </base-table>
           </b-tab-item>
         </b-tabs>
       </b-tab-item>
       <b-tab-item label="Samples" icon="test-tube">
-        <base-table :rows="sampleItemRows" :cols="sampleItemCols"> </base-table>
+        <base-table
+          :rows="sampleItemRows"
+          :cols="sampleItemCols"
+          :height="tableHeight"
+        >
+        </base-table>
       </b-tab-item>
     </b-tabs>
   </the-layout-sidebar>
@@ -50,6 +83,10 @@ export default {
     BaseTable,
   },
   computed: {
+    // layout
+    tableHeight() {
+      return "calc(100vh - 140px)";
+    },
     // matches
     matchCompoundRows() {
       return this.$store.getters["match/ratings"]({
