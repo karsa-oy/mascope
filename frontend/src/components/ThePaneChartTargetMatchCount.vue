@@ -13,6 +13,13 @@ import BaseChartPlotly from "./BaseChartPlotly";
 
 import { mapActions } from "vuex";
 
+let barSum = (row) =>
+  row.matchCompoundProbableCount + row.matchCompoundPossibleCount;
+
+let compareMatches = (rowA, rowB) =>
+  rowB.matchCompoundProbableCount - rowA.matchCompoundProbableCount ||
+  rowB.matchCompoundPossibleCount - rowA.matchCompoundPossibleCount;
+
 export default {
   name: "ThePaneChartTargetMatchCount",
   components: { BaseChartPlotly },
@@ -21,10 +28,9 @@ export default {
       return this.$store.getters["target/stats"]({
         level: "compound",
         selected: true,
-      }).filter(
-        (row) =>
-          row.matchCompoundProbableCount + row.matchCompoundPossibleCount > 0
-      );
+      })
+        .filter((row) => barSum(row) > 0)
+        .sort(compareMatches);
     },
     data: function () {
       return [
