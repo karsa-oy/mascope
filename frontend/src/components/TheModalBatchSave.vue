@@ -29,8 +29,8 @@
           <b-button
             type="is-warning"
             icon-left="close"
+            expanded
             @click="deactivateModal"
-            style="float: right"
           >
             Cancel
           </b-button>
@@ -39,6 +39,7 @@
             v-if="actionIs('edit')"
             type="is-primary"
             icon-left="content-save"
+            expanded
             @click="
               () => {
                 updateBatch(newBatch);
@@ -52,6 +53,7 @@
             v-if="actionIs('create')"
             type="is-primary"
             icon-left="content-save"
+            expanded
             @click="
               () => {
                 createBatch(newBatch);
@@ -65,6 +67,7 @@
             v-if="actionIs('delete')"
             type="is-danger"
             icon-left="delete"
+            expanded
             @click="
               () => {
                 deleteBatch(oldBatch);
