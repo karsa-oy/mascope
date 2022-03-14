@@ -234,7 +234,7 @@ export default {
 }
 
 .base-browser-header-root {
-  padding: 0.5em;
+  padding: 0.5em 0em;
   display: flex !important;
   flex-direction: flow !important;
   justify-content: space-between;

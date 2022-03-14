@@ -1,22 +1,23 @@
 <template>
   <base-browser name="Samples" :levels="sampleLevels">
     <template v-slot:header>
-      <b-button
-        icon-left="plus"
-        size="is-small"
-        @click="
-          () => {
-            modalProps = {
-              action: 'create',
-            };
-            activateModal({
-              modal: 'batchSave',
-            });
-          }
-        "
-      >
-        <b>create batch</b>
-      </b-button>
+      <b-tooltip label="Create batch" type="is-white" position="is-right">
+        <b-button
+          icon-left="plus"
+          size="is-small"
+          @click="
+            () => {
+              modalProps = {
+                action: 'create',
+              };
+              activateModal({
+                modal: 'batchSave',
+              });
+            }
+          "
+        >
+        </b-button>
+      </b-tooltip>
     </template>
   </base-browser>
 </template>
