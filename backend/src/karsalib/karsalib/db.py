@@ -68,8 +68,8 @@ class DBTable:
         else:
             raise ValueError("Record does not exist!")
 
-    def remove(self, item_id):
-        sql = f""" DELETE FROM {self.name} WHERE id == {item_id}; """
+    def remove(self, row_id):
+        sql = f""" DELETE FROM {self.name} WHERE id == '{row_id}'; """
         self.cur.execute(sql)
         self.con.commit()
         row_id = self.cur.lastrowid
@@ -221,7 +221,7 @@ class SampleManagerDB:
         self.workspaces.update(**kwargs)
 
     def workspace_delete(self, id):
-        self.workspaces.remove(id=id)
+        self.workspaces.remove(row_id=id)
 
     # sample batches
     def sample_batch_list(self, workspaceId):
@@ -237,7 +237,7 @@ class SampleManagerDB:
         self.sample_batches.update(**kwargs)
 
     def sample_batch_delete(self, id):
-        self.sample_batches.remove(id=id)
+        self.sample_batches.remove(row_id=id)
 
     # sample items
     def sample_item_list(self, batchId):
@@ -266,7 +266,7 @@ class SampleManagerDB:
         self.sample_items.update(**kwargs)
 
     def sample_item_delete(self, id):
-        self.sample_items.remove(id=id)
+        self.sample_items.remove(row_id=id)
 
     # sample files
     def sample_file_insert(self, **kwargs):
