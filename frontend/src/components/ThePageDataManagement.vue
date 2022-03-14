@@ -1,8 +1,8 @@
 <template>
   <the-layout-sidebar>
-    <b-tabs>
+    <b-tabs type="is-boxed">
       <b-tab-item label="Matches" icon="check-decagram">
-        <b-tabs>
+        <b-tabs type="is-toggle">
           <b-tab-item label="Compounds">
             <base-table
               :rows="matchCompoundRows"
@@ -33,7 +33,7 @@
         </b-tabs>
       </b-tab-item>
       <b-tab-item label="Targets" icon="target">
-        <b-tabs>
+        <b-tabs type="is-toggle">
           <b-tab-item label="Compounds">
             <base-table
               :rows="targetCompoundRows"
