@@ -4,7 +4,7 @@ services:
     build:
       context: ./backend
     volumes:
-      - ./backend/data:/backend/data
+      - ./testdata:/data
     stdin_open: true  
     tty: true
     network_mode: "host"

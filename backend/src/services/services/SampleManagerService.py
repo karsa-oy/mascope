@@ -32,7 +32,7 @@ cache = {}
 
 NO_DATA_LOGGING_DEFAULT = True
 
-db_path = 'data/samples.db'
+db_path = '/data/samples.db'
 db = SampleManagerDB(db_path)
 
 

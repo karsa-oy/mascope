@@ -23,19 +23,13 @@ export default {
         selected: true,
       });
     },
-    probable: function () {
-      return this.stats.filter((stat) => stat.rating == "probable");
-    },
-    possible: function () {
-      return this.stats.filter((stat) => stat.rating == "possible");
-    },
     data: function () {
       return [
         {
           name: "Probable match",
-          x: this.probable.map((stat) => stat.filename),
-          y: this.probable.map((stat) => stat.matchCount),
-          id: this.probable.map((stat) => stat.id),
+          x: this.stats.map((stat) => stat.filename),
+          y: this.stats.map((stat) => stat.matchCompoundProbableCount),
+          id: this.stats.map((stat) => stat.id),
           type: "bar",
           marker: {
             color: "#5cb85c",
@@ -43,9 +37,9 @@ export default {
         },
         {
           name: "Possible match",
-          x: this.possible.map((stat) => stat.filename),
-          y: this.possible.map((stat) => stat.matchCount),
-          id: this.possible.map((stat) => stat.id),
+          x: this.stats.map((stat) => stat.filename),
+          y: this.stats.map((stat) => stat.matchCompoundPossibleCount),
+          id: this.stats.map((stat) => stat.id),
           type: "bar",
           marker: {
             color: "#df691a",

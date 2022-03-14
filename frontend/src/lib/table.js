@@ -1,6 +1,6 @@
-const { Parser } = require("json2csv")
 import { customAlphabet } from "nanoid";
 import alasql from 'alasql';
+import * as xlsx from 'xlsx/xlsx.mjs';
 
 export default {
     // TODO - decouple ID generators from the table modules
@@ -121,27 +121,31 @@ export default {
         }
         return parsedRows;
     },
-    toSpreadsheet(filename, cols, rows) {
-        const fields = cols.map((col) => ({
-            label: col.label,
-            value: col.field,
-        }));
+    toSpreadsheet(filename, sheets) {
+        var workbook = xlsx.utils.book_new();
+        for (let sheet of sheets) {
+            let { rows, cols, name } = sheet;
+            // construct header
+            let fields = cols.map((col) => col.field);
+            let headerLabels = cols.map((col) => col.label);
+            let header = Object.fromEntries(
+                fields.map((field, index) => ([field, headerLabels[index]]))
+            )
+            // helper function for selecting only used columns
+            let selectFields = (row) => Object.fromEntries(
+                Object.entries(row).filter(([field]) => fields.includes(field))
+            );
+            // add header and filter out unused fields
+            let formattedRows = [header].concat(rows.map(selectFields))
+            let worksheet = xlsx.utils.json_to_sheet(formattedRows, {
+                // the default header uses field names
+                // so we omit since we add our own header
+                skipHeader: true
+            });
+            xlsx.utils.book_append_sheet(workbook, worksheet, name);
+        }
         try {
-            // Parse CSV
-            const parser = new Parser({ fields });
-            const csv = parser.parse(rows);
-            // Make blob
-            const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-            // Create a temporary download link for the blob and "click" it
-            var link = document.createElement("a");
-            var url = URL.createObjectURL(blob);
-            link.setAttribute("href", url);
-            link.setAttribute("download", filename);
-            link.style.visibility = "hidden";
-            document.body.appendChild(link);
-            link.click();
-            // Remove the link
-            document.body.removeChild(link);
+            xlsx.writeFile(workbook, filename, { type: 'xlsx' })
         } catch (err) {
             console.error(err);
         }

@@ -13,6 +13,13 @@ import BaseChartPlotly from "./BaseChartPlotly";
 
 import { mapActions } from "vuex";
 
+let barSum = (row) =>
+  row.matchCompoundProbableCount + row.matchCompoundPossibleCount;
+
+let compareMatches = (rowA, rowB) =>
+  rowB.matchCompoundProbableCount - rowA.matchCompoundProbableCount ||
+  rowB.matchCompoundPossibleCount - rowA.matchCompoundPossibleCount;
+
 export default {
   name: "ThePaneChartTargetMatchCount",
   components: { BaseChartPlotly },
@@ -21,22 +28,17 @@ export default {
       return this.$store.getters["target/stats"]({
         level: "compound",
         selected: true,
-        extraGroupings: ", m.rating",
-      });
-    },
-    probable: function () {
-      return this.stats.filter((stat) => stat.rating == "probable");
-    },
-    possible: function () {
-      return this.stats.filter((stat) => stat.rating == "possible");
+      })
+        .filter((row) => barSum(row) > 0)
+        .sort(compareMatches);
     },
     data: function () {
       return [
         {
           name: "Probable matches",
-          x: this.probable.map((row) => row.formula),
-          y: this.probable.map((row) => row.matchCount),
-          id: this.probable.map((row) => row.id),
+          x: this.stats.map((row) => row.formula),
+          y: this.stats.map((row) => row.matchCompoundProbableCount),
+          id: this.stats.map((row) => row.id),
           type: "bar",
           marker: {
             color: "#5cb85c",
@@ -44,9 +46,9 @@ export default {
         },
         {
           name: "Possible matches",
-          x: this.possible.map((row) => row.formula),
-          y: this.possible.map((row) => row.matchCount),
-          id: this.possible.map((row) => row.id),
+          x: this.stats.map((row) => row.formula),
+          y: this.stats.map((row) => row.matchCompoundPossibleCount),
+          id: this.stats.map((row) => row.id),
           type: "bar",
           marker: {
             color: "#df691a",

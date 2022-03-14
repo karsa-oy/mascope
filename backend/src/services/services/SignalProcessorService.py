@@ -103,9 +103,8 @@ class SignalProcessorNamespace(BaseClientNamespace):
         mz_range = value.get('mzRange')
         t_range = value.get('tRange')
 
-        peak_threshold = value.get('parameters', {}).get('minPeakIntensity', None)
-        min_peak_distance = value.get('parameters', {}).get('minPeakSeparation', None)
-        # min_peak_width = value.get('parameters', {}).get('minPeakWidth', 3)
+        peak_threshold = value['minPeakIntensity']
+        min_peak_distance = value['minPeakSeparation']
 
         # Check if file is cached
         cache_item = cache.get(filename, None)
@@ -155,7 +154,7 @@ class SignalProcessorNamespace(BaseClientNamespace):
         peak_tofs = filtered_peaks.tof.values
 
         await self.emit_client_notification(
-            'workspace_sample_response', {
+            'sample_response', {
                 'type': 'peak-list',
                 'requestId': value['requestId'],
                 'payload': {

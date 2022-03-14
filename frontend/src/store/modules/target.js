@@ -194,89 +194,204 @@ export default {
         },
         // stats
         stats: (state, getters) =>
-            ({ level = 'compound', selected = true, extraGroupings = '' }) => {
-                return getters[level + 'Stats']({ selected, extraGroupings });
+            ({ level = 'compound', selected = true }) => {
+                return getters[level + 'Stats']({ selected });
             },
         compoundStats: (state, getters, rootState, rootGetters) =>
-            ({ selected = true, extraGroupings = '' }) => {
+            ({ selected = true }) => {
                 let matchesExist = rootState.match.compoundRows.length > 0;
                 if (matchesExist) {
                     let matches = rootGetters['match/ratings']({
                         level: 'compound', selected
                     });
-                    return table.query(
+                    let targets = selected ? getters['compoundsSelected'] : state.compoundRows;
+                    let total = table.query(
                         `
                             select
                                 m.targetCompoundId as id
-                                ,m.rating
-                                ,first(m.targetName) as name
-                                ,first(m.targetFormula) as formula
-                                ,first(m.targetSelected) as _selected
-                                ,coalesce(max(m.matchScore),0) as matchScore
+                                ,max(m.matchScore) as matchScore
                                 ,max(m.samplePeakHeight) as peakHeight
-                                ,count(*) as matchCount
-                                ,count(distinct m.sampleItemId) as sampleItemCount
+                                ,count(distinct m.sampleItemId) as matchCompoundTotalCount
                             from matches m
-                            group by m.targetCompoundId ${extraGroupings}
+                            group by m.targetCompoundId
                         `,
                         { matches }
                     );
+                    let probable = table.query(
+                        `
+                            select
+                                m.targetCompoundId as id
+                                ,count(distinct m.sampleItemId) as matchCompoundProbableCount
+                            from matches m
+                            where rating = 'probable'
+                            group by m.targetCompoundId
+                        `,
+                        { matches }
+                    );
+                    let possible = table.query(
+                        `
+                            select
+                                m.targetCompoundId as id
+                                ,count(distinct m.sampleItemId) as matchCompoundPossibleCount
+                            from matches m
+                            where rating = 'possible'
+                            group by m.targetCompoundId
+                        `,
+                        { matches }
+                    );
+                    let result = table.query(
+                        `
+                        select
+                            tar.*    
+                            ,coalesce(tot.matchScore, 0) as matchScore
+                            ,coalesce(tot.peakHeight, 0) as peakHeight
+                            ,coalesce(tot.matchCompoundTotalCount, 0) as matchCompoundTotalCount
+                            ,coalesce(prob.matchCompoundProbableCount, 0) as matchCompoundProbableCount
+                            ,coalesce(poss.matchCompoundPossibleCount,0) as matchCompoundPossibleCount
+                        from targets tar
+                        left join total tot
+                            on tar.id = tot.id
+                        left join probable prob
+                            on tar.id = prob.id
+                        left join possible poss
+                            on tar.id = poss.id
+                    `, { targets, total, probable, possible }
+                    );
+                    if (rootState.dev.logGetters) console.table(result);
+                    return result;
                 } else {
                     return state.compoundRows;
                 }
             },
         ionStats: (state, getters, rootState, rootGetters) =>
-            ({ selected = true, extraGroupings = '' }) => {
+            ({ selected = true }) => {
                 let matchesExist = rootState.match.ionRows.length > 0;
                 if (matchesExist) {
                     let matches = rootGetters['match/ratings']({
                         level: 'ion', selected
                     });
-                    return table.query(
+                    let targets = selected ? getters['ionsSelected'] : state.ionRows;
+                    let total = table.query(
                         `
                             select
                                 m.targetIonId as id
-                                ,first(m.targetCompoundId) as compoundId
-                                ,first(m.targetIonMech) as ionMech
-                                ,first(m.targetFormula) as formula
-                                ,first(m.targetSelected) as _selected
-                                ,coalesce(max(m.matchScore),0) as matchScore
+                                ,max(m.matchScore) as matchScore
                                 ,max(m.samplePeakHeight) as peakHeight
-                                ,count(*) as matchCount
-                                ,count(distinct m.sampleItemId) as sampleItemCount
+                                ,count(distinct m.sampleItemId) as matchIonTotalCount
                             from matches m
-                            group by m.targetIonId ${extraGroupings}
+                            group by m.targetIonId
                         `,
                         { matches }
                     );
+                    let probable = table.query(
+                        `
+                            select
+                                m.targetIonId as id
+                                ,count(distinct m.sampleItemId) as matchIonProbableCount
+
+                            from matches m
+                            where rating = 'probable'
+                            group by m.targetIonId
+                        `,
+                        { matches }
+                    );
+                    let possible = table.query(
+                        `
+                            select
+                                m.targetIonId as id
+                                ,count(distinct m.sampleItemId) as matchIonPossibleCount
+                            from matches m
+                            where rating = 'possible'
+                            group by m.targetIonId
+                        `,
+                        { matches }
+                    );
+                    let result = table.query(
+                        `
+                        select
+                            tar.*    
+                            ,coalesce(tot.matchScore, 0) as matchScore
+                            ,coalesce(tot.peakHeight, 0) as peakHeight
+                            ,coalesce(tot.matchIonTotalCount, 0) as matchIonTotalCount
+                            ,coalesce(prob.matchIonProbableCount, 0) as matchIonProbableCount
+                            ,coalesce(poss.matchIonPossibleCount,0) as matchIonPossibleCount
+                        from targets tar
+                        left join total tot
+                            on tar.id = tot.id
+                        left join probable prob
+                            on tar.id = prob.id
+                        left join possible poss
+                            on tar.id = poss.id
+                    `, { targets, total, probable, possible }
+                    );
+                    if (rootState.dev.logGetters) console.table(result);
+                    return result;
                 } else {
                     return state.ionRows;
                 }
             },
         isotopeStats: (state, getters, rootState, rootGetters) =>
-            ({ selected = true, extraGroupings = '' }) => {
+            ({ selected = true }) => {
                 let matchesExist = rootState.match.isotopeRows.length > 0;
                 if (matchesExist) {
                     let matches = rootGetters['match/ratings']({
                         level: 'isotope', selected
                     });
-                    return table.query(
+                    let targets = selected ? getters['isotopesSelected'] : state.isotopeRows;
+                    let total = table.query(
                         `
                             select
                                 m.targetIsotopeId as id
-                                ,first(m.targetIonId) as ionId
-                                ,first(m.targetRelAbu) as relAbu
-                                ,first(m.targetMz) as mz
-                                ,first(m.targetSelected) as _selected
-                                ,coalesce(max(m.matchScore),0) as matchScore
+                                ,max(m.matchScore) as matchScore
                                 ,max(m.samplePeakHeight) as peakHeight
-                                ,count(*) as matchCount
-                                ,count(distinct m.sampleItemId) as sampleItemCount
+                                ,count(distinct m.sampleItemId) as matchIsotopeTotalCount
                             from matches m
-                            group by m.targetIsotopeId ${extraGroupings}
+                            group by m.targetIsotopeId
                         `,
                         { matches }
                     );
+                    let probable = table.query(
+                        `
+                            select
+                                m.targetIsotopeId as id
+                                ,count(distinct m.sampleItemId) as matchIsotopeProbableCount
+                            from matches m
+                            where rating = 'probable'
+                            group by m.targetIsotopeId
+                        `,
+                        { matches }
+                    );
+                    let possible = table.query(
+                        `
+                            select
+                                m.targetIsotopeId as id
+                                ,count(distinct m.sampleItemId) as matchIsotopePossibleCount
+                            from matches m
+                            where rating = 'possible'
+                            group by m.targetIsotopeId
+                        `,
+                        { matches }
+                    );
+                    let result = table.query(
+                        `
+                        select
+                            tar.*    
+                            ,coalesce(tot.matchScore, 0) as matchScore
+                            ,coalesce(tot.peakHeight, 0) as peakHeight
+                            ,coalesce(tot.matchIsotopeTotalCount, 0) as matchIsotopeTotalCount
+                            ,coalesce(prob.matchIsotopeProbableCount, 0) as matchIsotopeProbableCount
+                            ,coalesce(poss.matchIsotopePossibleCount,0) as matchIsotopePossibleCount
+                        from targets tar
+                        left join total tot
+                            on tar.id = tot.id
+                        left join probable prob
+                            on tar.id = prob.id
+                        left join possible poss
+                            on tar.id = poss.id
+                    `, { targets, total, probable, possible }
+                    );
+                    if (rootState.dev.logGetters) console.table(result);
+                    return result;
                 } else {
                     return state.isotopeRows;
                 }

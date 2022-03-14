@@ -19,6 +19,11 @@ export default {
           label: "Batch overview",
           path: "/batch-overview",
         },
+        {
+          icon: "table-multiple",
+          label: "Data management",
+          path: "/data-management",
+        },
       ],
       footerButtons: [
         {

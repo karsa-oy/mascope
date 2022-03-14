@@ -10,6 +10,7 @@ Created on Thu May  7 12:43:13 2020
 """
 
 import os
+import pathlib
 import asyncio
 import fnmatch
 import json
@@ -36,7 +37,8 @@ client = None
 # Cache for data arrays
 cache = LRUDict(10)
 
-
+root = pathlib.Path(os.getcwd()).root
+data_dir = os.path.join(root, 'data', 'instrument')
 
 class zarr_sdk:
     @staticmethod
@@ -85,7 +87,7 @@ class zarr_sdk:
         mz = np.frombuffer( value['mz'], dtype=np.float32 )
         t_range = value['t_range']
 
-        data_path = parse_path_from_item_filename(filename)
+        data_path = parse_path_from_item_filename(filename, base_path=data_dir)
         data_path = os.path.join(data_root, data_path)
         if os.path.exists(data_path):
             if overwrite:
@@ -214,8 +216,11 @@ class zarr_sdk:
             committed_length = float(item['signal'].time[-1] + item['signal_period'][-1])
             item['props'].update({'committed_length': committed_length})
             prop_path = os.path.join(item.get('data_root', ''),
-                                    parse_path_from_item_filename(value['filename']),
-                                    '.props')
+                parse_path_from_item_filename(
+                    value['filename'], 
+                    base_path=data_dir
+                ),
+                '.props')
             with open(prop_path, 'w') as f:
                 json.dump(item['props'], f, indent=4)
 
@@ -394,7 +399,7 @@ def read_instrument_log(log_path):
     return instrument_log
 
 def filename_to_zarr_path(base_filename, variable):
-    sample_data_path = parse_path_from_item_filename(base_filename)
+    sample_data_path = parse_path_from_item_filename(base_filename, base_path=data_dir)
     zarr_filename = variable + os.extsep + 'zarr'
     return os.path.join(sample_data_path, zarr_filename)
 
@@ -489,7 +494,7 @@ def load_file(base_filename, vars=None, prev_dataset=None):
     xarray.Dataset
         Loaded data
     """
-    filepath = parse_path_from_item_filename(base_filename)
+    filepath = parse_path_from_item_filename(base_filename, base_path=data_dir)
     if not os.path.exists(filepath):
         raise FileNotFoundError(filepath)
     if vars is None:
@@ -597,7 +602,7 @@ def read_zarr_attributes(filepath):
     return attributes
 
 def update_props(base_filename, props_to_update):
-    sample_data_path = parse_path_from_item_filename(base_filename)
+    sample_data_path = parse_path_from_item_filename(base_filename, base_path=data_dir)
     # Update properties
     prop_path = os.path.join(sample_data_path, '.props')
     with open(prop_path, 'r') as f:
@@ -607,7 +612,7 @@ def update_props(base_filename, props_to_update):
         json.dump(props, f, indent=4)
 
 def write_props(base_filename, props):
-    sample_data_path = parse_path_from_item_filename(base_filename)
+    sample_data_path = parse_path_from_item_filename(base_filename, base_path=data_dir)
     # Write properties
     prop_path = os.path.join(sample_data_path, '.props')
     with open(prop_path, 'w') as f:

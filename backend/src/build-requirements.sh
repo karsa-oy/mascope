@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# External and internal requirement seperation
+# External and internal requirement separation
 # is performed to optimize docker image builds
 
 # This rebuilds `external-requirements.txt`

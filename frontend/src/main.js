@@ -16,6 +16,7 @@ import VueRouter from 'vue-router';
 
 import ThePageLanding from "./components/ThePageLanding";
 import ThePageBatchOverview from "./components/ThePageBatchOverview";
+import ThePageDataManagement from "./components/ThePageDataManagement";
 import ThePageSettings from "./components/ThePageSettings";
 
 Vue.use(VueRouter);
@@ -28,6 +29,9 @@ const router = new VueRouter({
   }, {
     path: '/batch-overview',
     component: ThePageBatchOverview
+  }, {
+    path: '/data-management',
+    component: ThePageDataManagement
   }, {
     path: '/settings',
     component: ThePageSettings
