@@ -177,8 +177,8 @@ export default {
     },
     targetIonCols() {
       return [
-        { field: "formula", label: "Compound formula" },
-        { field: "ionMech", label: "Compound name" },
+        { field: "formula", label: "Ion formula" },
+        { field: "ionMech", label: "Ionization mechanism" },
         { field: "matchIonProbableCount", label: "Probable match count" },
         { field: "matchIonPossibleCount", label: "Possible match count" },
         { field: "matchIonTotalCount", label: "Total match count" },
