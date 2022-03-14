@@ -204,7 +204,7 @@ export default {
                     let matches = rootGetters['match/ratings']({
                         level: 'compound', selected
                     });
-                    let targets = selected ? getters['compoundsSelected'] : state.compoundRows;
+                    let compounds = selected ? getters['compoundsSelected'] : state.compoundRows;
                     let total = table.query(
                         `
                             select
@@ -242,20 +242,20 @@ export default {
                     let result = table.query(
                         `
                         select
-                            tar.*    
+                            com.*    
                             ,coalesce(tot.matchScore, 0) as matchScore
                             ,coalesce(tot.peakHeight, 0) as peakHeight
                             ,coalesce(tot.matchCompoundTotalCount, 0) as matchCompoundTotalCount
                             ,coalesce(prob.matchCompoundProbableCount, 0) as matchCompoundProbableCount
                             ,coalesce(poss.matchCompoundPossibleCount,0) as matchCompoundPossibleCount
-                        from targets tar
+                        from compounds com
                         left join total tot
-                            on tar.id = tot.id
+                            on com.id = tot.id
                         left join probable prob
-                            on tar.id = prob.id
+                            on com.id = prob.id
                         left join possible poss
-                            on tar.id = poss.id
-                    `, { targets, total, probable, possible }
+                            on com.id = poss.id
+                    `, { compounds, total, probable, possible }
                     );
                     if (rootState.dev.logGetters) console.table(result);
                     return result;
@@ -270,7 +270,8 @@ export default {
                     let matches = rootGetters['match/ratings']({
                         level: 'ion', selected
                     });
-                    let targets = selected ? getters['ionsSelected'] : state.ionRows;
+                    let ions = selected ? getters['ionsSelected'] : state.ionRows;
+                    let compounds = selected ? getters['compoundsSelected'] : state.compoundRows;
                     let total = table.query(
                         `
                             select
@@ -309,20 +310,24 @@ export default {
                     let result = table.query(
                         `
                         select
-                            tar.*    
+                            ion.*    
+                            ,com.formula as compoundFormula
+                            ,com.name as compoundName
                             ,coalesce(tot.matchScore, 0) as matchScore
                             ,coalesce(tot.peakHeight, 0) as peakHeight
                             ,coalesce(tot.matchIonTotalCount, 0) as matchIonTotalCount
                             ,coalesce(prob.matchIonProbableCount, 0) as matchIonProbableCount
                             ,coalesce(poss.matchIonPossibleCount,0) as matchIonPossibleCount
-                        from targets tar
+                        from ions ion
+                        left join compounds com
+                            on ion.compoundId = com.id
                         left join total tot
-                            on tar.id = tot.id
+                            on ion.id = tot.id
                         left join probable prob
-                            on tar.id = prob.id
+                            on ion.id = prob.id
                         left join possible poss
-                            on tar.id = poss.id
-                    `, { targets, total, probable, possible }
+                            on ion.id = poss.id
+                    `, { ions, compounds, total, probable, possible }
                     );
                     if (rootState.dev.logGetters) console.table(result);
                     return result;
@@ -337,7 +342,9 @@ export default {
                     let matches = rootGetters['match/ratings']({
                         level: 'isotope', selected
                     });
-                    let targets = selected ? getters['isotopesSelected'] : state.isotopeRows;
+                    let isotopes = selected ? getters['isotopesSelected'] : state.isotopeRows;
+                    let ions = selected ? getters['ionsSelected'] : state.ionRows;
+                    let compounds = selected ? getters['compoundsSelected'] : state.compoundRows;
                     let total = table.query(
                         `
                             select
@@ -375,20 +382,28 @@ export default {
                     let result = table.query(
                         `
                         select
-                            tar.*    
+                            iso.*
+                            ,ion.formula as ionFormula
+                            ,ion.ionMech as ionMech
+                            ,com.formula as compoundFormula
+                            ,com.name as compoundName
                             ,coalesce(tot.matchScore, 0) as matchScore
                             ,coalesce(tot.peakHeight, 0) as peakHeight
                             ,coalesce(tot.matchIsotopeTotalCount, 0) as matchIsotopeTotalCount
                             ,coalesce(prob.matchIsotopeProbableCount, 0) as matchIsotopeProbableCount
                             ,coalesce(poss.matchIsotopePossibleCount,0) as matchIsotopePossibleCount
-                        from targets tar
+                        from isotopes iso
+                        left join ions ion
+                            on iso.ionId = ion.id
+                        left join compounds com
+                            on ion.compoundId = com.id
                         left join total tot
-                            on tar.id = tot.id
+                            on iso.id = tot.id
                         left join probable prob
-                            on tar.id = prob.id
+                            on iso.id = prob.id
                         left join possible poss
-                            on tar.id = poss.id
-                    `, { targets, total, probable, possible }
+                            on iso.id = poss.id
+                    `, { isotopes, ions, compounds, total, probable, possible }
                     );
                     if (rootState.dev.logGetters) console.table(result);
                     return result;

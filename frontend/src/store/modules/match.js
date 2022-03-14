@@ -72,9 +72,9 @@ export default {
                 + state.isotopeRows.length
             return totalMatches > 0;
         },
-        ratings: (state, getters) =>
+        ratings: (state, getters, rootState) =>
             ({ level = 'compound', selected = true }) => {
-                return table.query(
+                let ratings = table.query(
                     `
                     select
                         m.*
@@ -89,9 +89,41 @@ export default {
                             else 'unknown'
                         end) as rating
                     from matches m
-               ` ,
+                    ` ,
                     { matches: getters['joins']({ level, selected }) }
                 );
+                let compounds = rootState.target.compoundRows;
+                let ions = rootState.target.ionRows;
+                switch (level) {
+                    case 'compound':
+                        return ratings;
+                    case 'ion':
+                        return table.query(`
+                            select
+                                rat.*
+                                ,com.name as targetCompoundName
+                                ,com.formula as targetCompoundFormula
+                            from ratings rat
+                            left join compounds com
+                                on rat.targetCompoundId = com.id
+                        
+                        `, { ratings, compounds });
+                    case 'isotope':
+                        return table.query(`
+                            select
+                                rat.*
+                                ,com.name as targetCompoundName
+                                ,com.formula as targetCompoundFormula
+                                ,ion.formula as targetIonFormula
+                                ,ion.ionMech as targetIonMech
+                            from ratings rat
+                            left join compounds com
+                                on rat.targetCompoundId = com.id
+                            left join ions ion
+                                on rat.targetIonId = ion.id
+                        
+                        `, { ratings, compounds, ions });
+                }
             },
         stats: (state, getters) =>
             ({ level = 'compound', selected = true }) => {
@@ -105,7 +137,7 @@ export default {
                     from matches m
                     group by m.rating
                     order by m.rating
-               `,
+                    `,
                     { matches: getters['ratings']({ level, selected }) }
                 );
             },
@@ -138,7 +170,7 @@ export default {
                         on t.id = m.targetCompoundId
                     left join samples s
                         on s.id = m.sampleItemId
-                `,
+                    `,
                     {
                         matches: state.compoundRows,
                         targets: targetCompoundsSelected,
@@ -170,7 +202,7 @@ export default {
                         on t.id = m.targetIonId
                     left join samples s
                         on s.id = m.sampleItemId
-                `,
+                    `,
                     {
                         matches: state.ionRows,
                         targets: targetIonsSelected,
@@ -202,7 +234,7 @@ export default {
                         on t.id = m.targetIsotopeId
                     left join samples s
                         on s.id = m.sampleItemId
-                `,
+                    `,
                     {
                         matches: state.isotopeRows,
                         targets: targetIsotopesSelected,

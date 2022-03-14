@@ -126,8 +126,10 @@ export default {
     matchIonCols() {
       return [
         { field: "sampleFilename", label: "Sample filename" },
-        { field: "targetFormula", label: "Ion formula" },
+        { field: "targetCompoundName", label: "Compound name" },
+        { field: "targetCompoundFormula", label: "Compound formula" },
         { field: "targetIonMech", label: "Ionization mechanism" },
+        { field: "targetFormula", label: "Ion formula" },
         { field: "samplePeakHeight", label: "Sample peak intensity" },
         { field: "rating", label: "Match rating" },
         { field: "matchScore", label: "Match score" },
@@ -144,6 +146,10 @@ export default {
     matchIsotopeCols() {
       return [
         { field: "sampleFilename", label: "Sample filename" },
+        { field: "targetCompoundName", label: "Compound name" },
+        { field: "targetCompoundFormula", label: "Compound formula" },
+        { field: "targetIonMech", label: "Ionization mechanism" },
+        { field: "targetIonFormula", label: "Ion formula" },
         { field: "targetMz", label: "Isotope m/z" },
         { field: "targetRelAbu", label: "Relative abundance" },
         { field: "samplePeakHeight", label: "Sample peak intensity" },
@@ -177,8 +183,10 @@ export default {
     },
     targetIonCols() {
       return [
-        { field: "formula", label: "Ion formula" },
+        { field: "compoundName", label: "Compound name" },
+        { field: "compoundFormula", label: "Compound formula" },
         { field: "ionMech", label: "Ionization mechanism" },
+        { field: "formula", label: "Ion formula" },
         { field: "matchIonProbableCount", label: "Probable match count" },
         { field: "matchIonPossibleCount", label: "Possible match count" },
         { field: "matchIonTotalCount", label: "Total match count" },
@@ -192,6 +200,10 @@ export default {
     },
     targetIsotopeCols() {
       return [
+        { field: "compoundName", label: "Compound name" },
+        { field: "compoundFormula", label: "Compound formula" },
+        { field: "ionMech", label: "Ionization mechanism" },
+        { field: "ionFormula", label: "Ion formula" },
         { field: "mz", label: "Isotope m/z" },
         { field: "relAbu", label: "Isotope relative abundance" },
         { field: "matchIsotopeProbableCount", label: "Probable match count" },
