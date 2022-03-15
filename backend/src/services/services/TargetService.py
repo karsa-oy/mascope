@@ -31,12 +31,14 @@ class TargetServiceNamespace(BaseClientNamespace):
         isotope_id = 0
         messages = []
         for compound in compounds:
+            if not compound.get('formula'):
+                continue
             for ionization_mechanism in ionization_mechanisms:
                 ion_id += 1
                 try:
                     # get and save ions
                     ion = Formula('(' +
-                        compound['formula'] +
+                        compound['formula'].rstrip() +
                         ionization_mechanism[:-1] +
                         ')' + ionization_mechanism[-1]
                     )
