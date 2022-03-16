@@ -255,10 +255,6 @@ class FileIoNamespace(BaseClientNamespace):
 
     # ========== TOFControl requests ==========
 
-    # # TODO: REMOVE_THIS - this code is left as example for call_client_notification
-    # async def on_raw_metadata_request(self, data):
-    #     return data['value'] + ' - Pong'
-
     async def on_instrument_log_entry(self, data):
         value = data['value']
         entry = value

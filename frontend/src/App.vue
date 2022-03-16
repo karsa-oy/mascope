@@ -32,6 +32,7 @@ export default {
       query: "query",
       workspaceActive: "workspace/active",
       workspaceRoom: "workspace/$roomActive",
+      workspaceRows: "workspace/$rows",
       $targetIonCalcResponse: "target/$ionCalculationResponse",
       $sampleResponse: "sample/$response",
       $matchUpdate: "match/$update",
@@ -39,11 +40,7 @@ export default {
     ready: function () {
       // check that the API connected succesfully to the backend
       let apiConnected = this.api ? this.api.connected : false;
-      // check that workspaces were loaded
-      let workspacesExist = this.$workspaceRows
-        ? this.$workspaceRows.length > 0
-        : false;
-      return apiConnected && workspacesExist;
+      return apiConnected;
     },
   },
   methods: {
@@ -55,6 +52,7 @@ export default {
       sampleHandleResponse: "sample/handleResponse",
       matchRequest: "match/request",
       matchHandleUpdate: "match/handleUpdate",
+      templateListRequest: "template/listRequest",
       keydown: "key/down",
       keyup: "key/up",
     }),
@@ -73,6 +71,7 @@ export default {
     ready: function () {
       if (this.ready) {
         this.workspaceInit();
+        this.templateListRequest();
       }
     },
     workspaceActive: function () {

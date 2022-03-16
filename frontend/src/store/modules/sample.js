@@ -31,6 +31,8 @@ export default {
         $itemUpdateRequest: null,
         $itemDeleteRequest: null,
         $peakListRequest: null,
+        $saveFileAttributes: null,
+        $saveItemAttributes: null,
     },
     mutations: {
         // Batch
@@ -156,7 +158,18 @@ export default {
         activationSet(state, { batch, active }) {
             let row = table.get(state.batchRows, { id: batch.id });
             row._active = active;
-        }
+        },
+        saveFileAttributes(state, attribs) {
+            state.$saveFileAttributes = {
+                ...attribs,
+            };
+        },
+        // TODO: placeholder for sample_item.attributes
+        saveItemAttributes(state, attribs) {
+            state.$saveItemAttributes = {
+                ...attribs,
+            };
+        },
     },
     actions: {
         // requests

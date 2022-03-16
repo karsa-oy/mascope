@@ -29,6 +29,23 @@
           >
             Create workspace
           </b-button>
+
+          <b-button
+            style="float: right; margin-right :10px"
+            @click="
+              () => {
+                modalProps = {
+                  action: 'create',
+                };
+                activateModal({
+                  modal: 'updateStore',
+                });
+              }
+            "
+          >
+            Update Sample Store
+          </b-button>
+
         </section>
       </section>
     </div>

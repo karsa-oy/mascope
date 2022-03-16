@@ -21,9 +21,7 @@ from karsalib.client import (
                         )
 from karsalib.util import parse_datetime_from_item_filename
 from karsalib.util import parse_cmd_args, get_client_notification_context
-
 from karsalib.db import SampleManagerDB
-
 
 from services.FileIoService import load_file
 
@@ -316,6 +314,54 @@ class SampleServiceNamespace(BaseClientNamespace):
                 length=committed_length,
                 range=json.dumps(value['mz_range'])
             )
+
+    # template table handlers
+
+    async def on_template_list_request(self, data):
+        # templates = [
+        #     {"name":"template_1","type":"sample","template":'[{"label":"fname","required":true,"placeholder":"fname"},{"label":"description","value":"Predefined description"},{"label":"optional attribute"}]'},
+        #     ...,
+        # ]
+        templates = db.attribute_template_list()
+        for t in templates:
+            t['template'] = json.loads(t['template'])
+        # notification for UI, which can work only thru callbacks
+        await self.emit_client_notification(
+            'template_list_response',
+            {'templates': templates, },
+            **{
+                **get_client_notification_context(data),
+               'room': data['client_room']
+            })
+        # return code for (backend) clients, which can use call instead of emit
+        return templates
+
+    async def on_template_save(self, data):
+        value = data['value']
+        template = {
+            'name': value['name'],
+            'type': value.get('type', 'unknown'),
+            'template': json.dumps(value['template']),
+        }
+        db.attribute_template_insert(**template)
+
+    async def on_template_delete(self, data):
+        template_id = data['value']['id']
+        db.attribute_template_delete(template_id)
+
+    async def on_sample_save_file_attributes(self, data):
+        # data[value]: {attribs: [{}, {}...]}
+        in_attribs = data['value']['attribs']
+        schema_fields = [title for title,*_ in db.sample_files.schema]
+        result = {}
+        out_attribs = {}
+        for a in in_attribs:
+            if a['label'] in schema_fields:
+                result[a['label']] = a.get('value', '')
+            else:
+                out_attribs[a['label']] = a.get('value', '')
+        result['attributes'] = json.dumps(out_attribs)
+        db.sample_file_insert(**result)
 
 
 class SampleManagerClient(BaseServiceClient):
