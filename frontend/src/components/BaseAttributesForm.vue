@@ -171,7 +171,12 @@ export default {
     },
     formTitle: {
       type: String,
-      required: false,
+      required: true,
+      default: "",
+    },
+    templateType: {
+      type: String,
+      required: true,
       default: "",
     },
   },
@@ -276,7 +281,7 @@ export default {
               return;
             }
             // copy loadedTempate fields with user input
-            let newTemplate = {name: templateName, template: this.clone(this.formFields)};
+            let newTemplate = {name: templateName, type: this.templateType, template: this.clone(this.formFields)};
             let i = 0;
             // set loaded template
             for (i = 0; i < this.availableTemplates.length; ++i) {

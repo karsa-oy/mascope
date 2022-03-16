@@ -9,6 +9,7 @@
     >
       <base-attributes-form 
         formTitle="Save sample attributes"
+        :templateType="this.templateType"
         :initialTemplates="this.availableTemplates"
         :showEditFunctions="true"
         @saveTemplate="saveTemplate"
