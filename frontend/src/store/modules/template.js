@@ -1,12 +1,7 @@
-// import table from '$lib/table';
 
 export default {
     namespaced: true,
     state: {
-        // meta
-        // data
-        // Parameters
-        // API
         $rooms: [],
         $response: null,
         $listRequest: null,
@@ -14,7 +9,6 @@ export default {
         $save: null,
         $delete: null,
     },
-    getters: {},
     mutations: {
         listRequest(state) {
             state.$listRequest = {};
@@ -41,5 +35,5 @@ export default {
             context.commit('delete', id)
         },
     },
+    getters: {},
 }
-

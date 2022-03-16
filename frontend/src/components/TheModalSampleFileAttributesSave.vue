@@ -9,8 +9,8 @@
     >
       <base-attributes-form 
         formTitle="Save sample attributes"
-        :templateType="this.templateType"
-        :initialTemplates="this.availableTemplates"
+        :templateType="templateType"
+        :initialTemplates="availableTemplates"
         :showEditFunctions="true"
         @saveTemplate="saveTemplate"
         @deleteTemplate="deleteTemplate"
@@ -27,14 +27,14 @@ import { bindState } from "$lib/store";
 import { mapActions, mapMutations } from "vuex";
 
 export default {
-  name: "TheModalUpdateStore",
+  name: "TheModalSampleFileAttributesSave",
   components: {
     BaseAttributesForm,
   },
   props: {},
   computed: {
     ...bindState({
-      modalActive: "modal/updateStoreActive",
+      modalActive: "modal/sampleFileAttributesSaveActive",
       templateListResponse: "template/$listResponse",
     }),
   },
@@ -61,9 +61,6 @@ export default {
     this.availableTemplates = [this.defaultTemplate];
   },
   methods: {
-    log(...args) {
-      console.log('[TheModalUpdateStore]', ...args)
-    },
     ...mapMutations({
       sampleSaveAttributes: "sample/saveFileAttributes",
     }),

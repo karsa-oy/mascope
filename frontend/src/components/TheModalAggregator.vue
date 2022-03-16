@@ -3,7 +3,7 @@
     <the-modal-target-import></the-modal-target-import>
     <the-modal-workspace-save></the-modal-workspace-save>
     <the-modal-batch-save></the-modal-batch-save>
-    <the-modal-update-store></the-modal-update-store>
+    <the-modal-sample-file-attributes-save></the-modal-sample-file-attributes-save>
   </div>
 </template>
 
@@ -11,7 +11,7 @@
 import TheModalTargetImport from "./TheModalTargetImport";
 import TheModalWorkspaceSave from "./TheModalWorkspaceSave";
 import TheModalBatchSave from "./TheModalBatchSave";
-import TheModalUpdateStore from "./TheModalUpdateStore";
+import TheModalSampleFileAttributesSave from "./TheModalSampleFileAttributesSave";
 
 export default {
   name: "TheModalAggregator",
@@ -19,7 +19,8 @@ export default {
     TheModalTargetImport,
     TheModalWorkspaceSave,
     TheModalBatchSave,
-    TheModalUpdateStore,
+    TheModalSampleFileAttributesSave,
   },
 };
 </script>
+    TheModalSampleFileAttributesSave

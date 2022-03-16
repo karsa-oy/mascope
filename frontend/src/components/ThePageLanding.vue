@@ -38,12 +38,12 @@
                   action: 'create',
                 };
                 activateModal({
-                  modal: 'updateStore',
+                  modal: 'sampleFileAttributesSave',
                 });
               }
             "
           >
-            Update Sample Store
+            Save Sample File Attributes
           </b-button>
 
         </section>

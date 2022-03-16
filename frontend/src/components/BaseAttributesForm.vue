@@ -1,11 +1,6 @@
 <template>
   <div>
-    <!-- Modals -->
-    <!-- End of modals -->
-
-    <!-- Main content -->
     <div class="box" style="background-color: inherit">
-    <!-- <div class="box"> -->
       <div style="text-align: right" v-if="editable">
         <b-button
           icon-right="settings"
@@ -15,12 +10,13 @@
         >
         </b-button>
       </div>
-      <h1 style="font-size: 16px; text-align: center">
-        <p>
-          <b>{{ formTitle }}</b>
-        </p>
-      </h1>
-      <div><br /></div>
+      <div style="padding-bottom: 1.5em">
+        <h1 style="font-size: 16px; text-align: center">
+          <p>
+            <b>{{ formTitle }}</b>
+          </p>
+        </h1>
+      </div>
       <div v-for="item in formFields" :key="item.label">
         <template>
           <b-field :label="item.label" custom-class="dark">
@@ -37,19 +33,18 @@
               <b-button
                 :id="item.label"
                 :disabled="item.required"
-                @click="removeField($event)"
+                @click="removeField"
                 type="is-danger"
                 icon-right="delete"
               >
               </b-button>
             </div>
           </b-field>
-          <!-- <div><br></div> -->
         </template>
       </div>
       <div v-if="showEditFunctions">
         <b-field label="New field" custom-class="dark">
-          <b-button @click="addField()" expanded>
+          <b-button @click="addField" expanded>
             <b>+</b>
           </b-button>
         </b-field>
@@ -91,7 +86,7 @@
                     !loadedTemplate.name ||
                     loadedTemplate.name == 'default'
                   "
-                  @click="deleteTemplate()"
+                  @click="deleteTemplate"
                   type="is-danger"
                   icon-right="delete"
                   hover title="Delete Template"
@@ -99,12 +94,12 @@
                 </b-button>
               </div>
               <div
-                class="column is-nerrow"
+                class="column is-narrow"
                 style="text-align: left"
                 v-if="showEditFunctions"
               >
                 <b-button
-                  @click="saveTemplate()"
+                  @click="saveTemplate"
                   :disabled="!formFields.length"
                   type="is-success"
                   icon-left="content-save"
@@ -124,7 +119,7 @@
                   "
                   type="is-success"
                   icon-left="content-save"
-                  @click="saveAttributes()"
+                  @click="saveAttributes"
                 >
                   {{ formTitle }}
                 </b-button>
@@ -137,7 +132,6 @@
         </div>
       </b-field>
     </div>
-    <!-- End of main content -->
   </div>
 </template>
     
@@ -185,19 +179,11 @@ export default {
     return {
       loadedTemplate: null,
       formFields: [],
-      // availableTemplates: this.clone(this.initialTemplates),
       availableTemplates: this.initialTemplates,
     };
   },
   created() {
     this.loadedTemplate = this.clone(this.availableTemplates[0]);
-  },
-  mounted() {
-    this.$nextTick(() => {
-      // // When creating the form, showEditFunctions is true to render space
-      // // for the buttons etc, now set it to false by default
-      // this.showEditFunctions = false;
-    });
   },
   methods: {
     clone(obj) {

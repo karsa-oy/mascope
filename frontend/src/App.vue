@@ -32,7 +32,6 @@ export default {
       query: "query",
       workspaceActive: "workspace/active",
       workspaceRoom: "workspace/$roomActive",
-      workspaceRows: "workspace/$rows",
       $targetIonCalcResponse: "target/$ionCalculationResponse",
       $sampleResponse: "sample/$response",
       $matchUpdate: "match/$update",
