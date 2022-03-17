@@ -35,6 +35,7 @@ export default {
       $targetIonCalcResponse: "target/$ionCalculationResponse",
       $sampleResponse: "sample/$response",
       $matchUpdate: "match/$update",
+      templateListResponse: "template/$listResponse",
     }),
     ready: function () {
       // check that the API connected succesfully to the backend
@@ -51,6 +52,7 @@ export default {
       sampleHandleResponse: "sample/handleResponse",
       matchRequest: "match/request",
       matchHandleUpdate: "match/handleUpdate",
+      templateSetRows: "template/setRows",
       keydown: "key/down",
       keyup: "key/up",
     }),
@@ -92,6 +94,9 @@ export default {
     // match
     $matchUpdate: function () {
       this.matchHandleUpdate();
+    },
+    templateListResponse: function (newValue) {
+      this.templateSetRows(newValue)
     },
   },
 };

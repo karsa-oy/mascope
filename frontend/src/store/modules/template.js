@@ -2,6 +2,7 @@
 export default {
     namespaced: true,
     state: {
+        rows: [],
         $rooms: [],
         $response: null,
         $listRequest: null,
@@ -10,6 +11,9 @@ export default {
         $delete: null,
     },
     mutations: {
+        setRows(state, newData) {
+            state.rows = newData;
+        },
         listRequest(state, request) {
             state.$listRequest = request;
         },
@@ -25,14 +29,17 @@ export default {
         },
     },
     actions: {
+        setRows(context, newData) {
+            context.commit('setRows', newData);
+        },
         listRequest(context, request) {
-            context.commit('listRequest', request)
+            context.commit('listRequest', request);
         },
         save(context, template) {
-            context.commit('save', template)
+            context.commit('save', template);
         },
         delete(context, id) {
-            context.commit('delete', id)
+            context.commit('delete', id);
         },
     },
     getters: {},

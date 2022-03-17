@@ -35,8 +35,11 @@ export default {
   computed: {
     ...bindState({
       modalActive: "modal/sampleFileAttributesSaveActive",
-      templateListResponse: "template/$listResponse",
+      templateRows: "template/rows",
     }),
+    availableTemplates () {
+      return [this.defaultTemplate, ...this.templateRows];
+    },
   },
   data: function () {
     return {
@@ -54,11 +57,7 @@ export default {
           },
         ],
       },
-      availableTemplates: [],
     };
-  },
-  created() {
-    this.availableTemplates = [this.defaultTemplate];
   },
   methods: {
     ...mapMutations({
@@ -82,9 +81,6 @@ export default {
 
   },
   watch: {
-    templateListResponse: function (newValue) {
-      this.availableTemplates = [this.defaultTemplate, ...newValue];
-    },
     modalActive: function (active) {
       if (active)
         this.templateListRequest({type: this.templateType});

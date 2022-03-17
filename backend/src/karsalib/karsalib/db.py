@@ -90,7 +90,7 @@ class DBTable:
             for k, v in kwargs.items():
                 res.append(f"{k} = '{v}'")
             return ' AND '.join(res)
-        sql = f""" SELECT * FROM {self.name} WHERE {wrap_kwargs()}; """
+        sql = f""" SELECT * FROM {self.name} WHERE {wrap_kwargs()} ORDER BY id; """
         self.cur.execute(sql)
         self.con.commit()
         res = self._decode_values_list(self.cur)
