@@ -294,6 +294,9 @@ class SampleManagerDB:
     def attribute_template_list(self):
         return self.attribute_templates.get_all()
 
+    def attribute_template_get(self, **kwargs):
+        return self.attribute_templates.get(**kwargs)
+
     def attribute_template_insert(self, **kwargs):
         kwargs['id'] = kwargs['name']
         self.attribute_templates.insert(**kwargs)

@@ -51,7 +51,6 @@ export default {
       sampleHandleResponse: "sample/handleResponse",
       matchRequest: "match/request",
       matchHandleUpdate: "match/handleUpdate",
-      templateListRequest: "template/listRequest",
       keydown: "key/down",
       keyup: "key/up",
     }),
@@ -70,7 +69,6 @@ export default {
     ready: function () {
       if (this.ready) {
         this.workspaceInit();
-        this.templateListRequest();
       }
     },
     workspaceActive: function () {

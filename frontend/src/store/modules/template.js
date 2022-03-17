@@ -10,8 +10,8 @@ export default {
         $delete: null,
     },
     mutations: {
-        listRequest(state) {
-            state.$listRequest = {};
+        listRequest(state, request) {
+            state.$listRequest = request;
         },
         save(state, template) {
             state.$save = {
@@ -25,8 +25,8 @@ export default {
         },
     },
     actions: {
-        listRequest(context) {
-            context.commit('listRequest', {})
+        listRequest(context, request) {
+            context.commit('listRequest', request)
         },
         save(context, template) {
             context.commit('save', template)

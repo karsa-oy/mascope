@@ -42,10 +42,10 @@
           </b-field>
         </template>
       </div>
-      <div v-if="showEditFunctions">
-        <b-field label="New field" custom-class="dark">
+      <div v-if="showEditFunctions" style="padding-top: 2em">
+        <b-field custom-class="dark">
           <b-button @click="addField" expanded>
-            <b>+</b>
+            <b>Add new field</b>
           </b-button>
         </b-field>
       </div>
@@ -179,8 +179,10 @@ export default {
     return {
       loadedTemplate: null,
       formFields: [],
-      availableTemplates: this.initialTemplates,
     };
+  },
+  computed: {
+    availableTemplates () {return this.initialTemplates},
   },
   created() {
     this.loadedTemplate = this.clone(this.availableTemplates[0]);

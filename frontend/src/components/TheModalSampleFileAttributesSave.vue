@@ -40,7 +40,7 @@ export default {
   },
   data: function () {
     return {
-      templateType: 'sample',
+      templateType: 'sampleFile',
       defaultTemplate: {
         name: 'default',
         template: [
@@ -65,7 +65,7 @@ export default {
       sampleSaveAttributes: "sample/saveFileAttributes",
     }),
     ...mapActions({
-      // templateListRequest: "template/listRequest",
+      templateListRequest: "template/listRequest",
       templateSaveRequest: "template/save",
       templateDeleteRequest: "template/delete",
     }),
@@ -83,7 +83,11 @@ export default {
   },
   watch: {
     templateListResponse: function (newValue) {
-      this.availableTemplates = [this.defaultTemplate, ...newValue.templates];
+      this.availableTemplates = [this.defaultTemplate, ...newValue];
+    },
+    modalActive: function (active) {
+      if (active)
+        this.templateListRequest({type: this.templateType});
     },
   },
 };

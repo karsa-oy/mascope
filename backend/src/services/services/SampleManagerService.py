@@ -322,19 +322,20 @@ class SampleServiceNamespace(BaseClientNamespace):
         #     {"name":"template_1","type":"sample","template":'[{"label":"fname","required":true,"placeholder":"fname"},{"label":"description","value":"Predefined description"},{"label":"optional attribute"}]'},
         #     ...,
         # ]
+        templateType = data['value']['type']
         context = get_client_notification_context(data)
         timeout = context.get('timeout')
-        templates = db.attribute_template_list()
-        for t in templates:
+        templateRows = db.attribute_template_get(type=templateType)
+        for t in templateRows:
             t['template'] = json.loads(t['template'])
         if timeout:
             # return code for (backend) clients, which can use call instead of emit
-            return templates
+            return templateRows
         else:
             # notification for clients, which prefer callbacks
             await self.emit_client_notification(
                 'template_list_response',
-                {'templates': templates, },
+                templateRows,
                 **{
                     **context,
                     'room': data['client_room'],
