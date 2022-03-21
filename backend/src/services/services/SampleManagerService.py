@@ -11,6 +11,7 @@ Created on Thu May  7 12:43:13 2020
 
 import asyncio
 import json
+from time import time
 
 import numpy as np
 from scipy.signal import find_peaks
@@ -325,20 +326,20 @@ class SampleServiceNamespace(BaseClientNamespace):
         templateType = data['value']['type']
         context = get_client_notification_context(data)
         timeout = context.get('timeout')
-        templateRows = db.attribute_template_get(type=templateType)
-        for t in templateRows:
-            t['template'] = json.loads(t['template'])
+        records = db.attribute_template_get(type=templateType)
+        for r in records:
+            r['template'] = json.loads(r['template'])
         if timeout:
             # return code for (backend) clients, which can use call instead of emit
-            return templateRows
+            return records
         else:
             # notification for clients, which prefer callbacks
             await self.emit_client_notification(
                 'template_list_response',
-                templateRows,
+                records,
                 **{
                     **context,
-                    'room': data['client_room'],
+                    'room': data.get('client_room'),
                 })
 
     async def on_template_save(self, data):
@@ -367,6 +368,26 @@ class SampleServiceNamespace(BaseClientNamespace):
                 out_attribs[a['label']] = a.get('value', '')
         result['attributes'] = json.dumps(out_attribs)
         db.sample_file_insert(**result)
+
+    async def on_sample_file_record_request(self, data):
+        # data: {field_name: field_value}
+        timeout = data.get('timeout')
+        context = get_client_notification_context(data)
+        value = data['value']
+        records = db.sample_file_get(**value)
+        for r in records:
+            r['attributes'] = json.loads(r['attributes'])
+            r['dummy'] = time() # ensure response generated, when data not changed
+        if timeout:
+            return records
+        else:
+            await self.emit_client_notification(
+                'sample_file_record_response',
+                records,
+                **{
+                    **context,
+                    'room': data.get('client_room'),
+                })
 
 
 class SampleManagerClient(BaseServiceClient):

@@ -29,6 +29,17 @@
               expanded
             >
             </b-input>
+            <div v-if="item.key">
+              <b-button
+                :id="item.label"
+                :disabled="!item.value || item.value.length==0"
+                @click="loadAttributes({[item.label]: item.value})"
+                type="is-warning"
+                icon-right="database"
+                hover title="Load attributes"
+              >
+              </b-button>
+            </div>
             <div v-if="showEditFunctions">
               <b-button
                 :id="item.label"
@@ -36,6 +47,7 @@
                 @click="removeField"
                 type="is-danger"
                 icon-right="delete"
+                hover title="Delete Field"
               >
               </b-button>
             </div>
@@ -148,6 +160,13 @@ export default {
         return [];
       },
     },
+    attributesToLoad: {
+      type: Object,
+      required: false,
+      default: function () {
+        return {};
+      },
+    },
     showEditFunctions: {
       type: Boolean,
       required: false,
@@ -182,7 +201,7 @@ export default {
     };
   },
   computed: {
-    availableTemplates () {return this.initialTemplates},
+    availableTemplates () { return this.initialTemplates },
   },
   created() {
     this.loadedTemplate = this.clone(this.availableTemplates[0]);
@@ -302,7 +321,9 @@ export default {
         },
       });
     },
-
+    loadAttributes(requestObject) {
+      this.$emit('loadAttributes', requestObject);
+    },
   },
   watch: {
     formFields: {
@@ -319,6 +340,20 @@ export default {
         }
       },
       deep: true,
+    },
+    attributesToLoad: function (data) {
+      if ( _.isEmpty(data) ) {
+        return;
+      }
+      let newTemplate = {
+        name: null,
+        type: this.templateType,
+        template: [{label: 'filename', value: data.filename, key:true, required: true}, ],
+      }
+      Object.keys(data.attributes).forEach( (attr) =>
+        newTemplate.template.push({label: attr, value: data.attributes[attr]})
+      );
+      this.loadedTemplate = this.clone(newTemplate);
     },
   },
 };

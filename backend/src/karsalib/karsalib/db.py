@@ -290,6 +290,9 @@ class SampleManagerDB:
         kwargs['id'] = kwargs['filename']
         self.sample_files.insert(**kwargs)
 
+    def sample_file_get(self, **kwargs):
+        return self.sample_files.get(**kwargs)
+
     # attribute templates
     def attribute_template_list(self):
         return self.attribute_templates.get_all()

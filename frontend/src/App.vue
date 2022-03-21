@@ -11,6 +11,7 @@
 import { bindState } from "$lib/store";
 import { mapMutations, mapActions } from "vuex";
 
+
 export default {
   data: function () {
     return {};
@@ -35,7 +36,7 @@ export default {
       $targetIonCalcResponse: "target/$ionCalculationResponse",
       $sampleResponse: "sample/$response",
       $matchUpdate: "match/$update",
-      templateListResponse: "template/$listResponse",
+      $templateListResponse: "template/$listResponse",
     }),
     ready: function () {
       // check that the API connected succesfully to the backend
@@ -95,8 +96,9 @@ export default {
     $matchUpdate: function () {
       this.matchHandleUpdate();
     },
-    templateListResponse: function (newValue) {
-      this.templateSetRows(newValue)
+    // template
+    $templateListResponse: function (rows) {
+      this.templateSetRows(rows);
     },
   },
 };

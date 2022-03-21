@@ -9,12 +9,14 @@
     >
       <base-attributes-form 
         formTitle="Save sample attributes"
+        :showEditFunctions="true"
         :templateType="templateType"
         :initialTemplates="availableTemplates"
-        :showEditFunctions="true"
+        :attributesToLoad="sampleFileRecordToLoad"
         @saveTemplate="saveTemplate"
         @deleteTemplate="deleteTemplate"
         @saveAttributes="saveAttributes"
+        @loadAttributes="loadAttributes"
       >
       </base-attributes-form>
     </b-modal>
@@ -36,6 +38,7 @@ export default {
     ...bindState({
       modalActive: "modal/sampleFileAttributesSaveActive",
       templateRows: "template/rows",
+      $sampleFileRecordResponse: "sample/$fileRecordResponse",
     }),
     availableTemplates () {
       return [this.defaultTemplate, ...this.templateRows];
@@ -44,6 +47,7 @@ export default {
   data: function () {
     return {
       templateType: 'sampleFile',
+      sampleFileRecordToLoad: {},
       defaultTemplate: {
         name: 'default',
         template: [
@@ -51,6 +55,7 @@ export default {
             label: 'filename',
             required: true,
             placeholder: 'filename',
+            key: true,
           },
           {
             label: 'description',
@@ -62,6 +67,7 @@ export default {
   methods: {
     ...mapMutations({
       sampleSaveAttributes: "sample/saveFileAttributes",
+      sampleFileRecordRequest: "sample/fileRecordRequest",
     }),
     ...mapActions({
       templateListRequest: "template/listRequest",
@@ -78,13 +84,19 @@ export default {
     saveAttributes(newValue) {
       this.sampleSaveAttributes({attribs: newValue});
     },
-
+    loadAttributes(newValue) {
+      this.sampleFileRecordRequest(newValue);
+    },
   },
   watch: {
     modalActive: function (active) {
       if (active)
         this.templateListRequest({type: this.templateType});
     },
+    $sampleFileRecordResponse: function (rows) {
+      this.sampleFileRecordToLoad = rows[0] || {};
+    },
   },
 };
 </script>
+
