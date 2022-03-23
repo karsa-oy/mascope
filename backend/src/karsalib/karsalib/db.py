@@ -36,7 +36,7 @@ class DBTable:
         return res
 
     def get_all(self):
-        sql = f""" SELECT * FROM {self.name}; """
+        sql = f""" SELECT * FROM {self.name} ORDER BY id; """
         self.cur.execute(sql)
         self.con.commit()
         res = self._decode_values_list(self.cur)
@@ -90,7 +90,7 @@ class DBTable:
             for k, v in kwargs.items():
                 res.append(f"{k} = '{v}'")
             return ' AND '.join(res)
-        sql = f""" SELECT * FROM {self.name} WHERE {wrap_kwargs()}; """
+        sql = f""" SELECT * FROM {self.name} WHERE {wrap_kwargs()} ORDER BY id; """
         self.cur.execute(sql)
         self.con.commit()
         res = self._decode_values_list(self.cur)
@@ -164,16 +164,31 @@ class SampleFileTable(DBTable):
     def __init__(self, db, name='sample_files'):
         self.schema = [
             ('id', 'varchar(256)', 'PRIMARY KEY'),
+            ('filename', 'varchar(256)', 'NOT NULL'),
             ('instrument', 'varchar(64)'),
             ('datetime', 'varchar(64)'),
             ('length', 'real'),
             ('range', 'json'),
+            ('attributes', 'json'),
         ]
         self.sql_create = f""" CREATE TABLE IF NOT EXISTS {name} (
             {self._wrap_schema()}
             ); """
         super().__init__(db, name)
 
+
+class AttributeTemplateTable(DBTable):
+    def __init__(self, db, name='attribute_templates'):
+        self.schema = [
+            ('id', 'varchar(256)', 'PRIMARY KEY'),
+            ('name', 'varchar(256)', 'NOT NULL'),
+            ('type', 'varchar(64)'),
+            ('template', 'json'),
+        ]
+        self.sql_create = f""" CREATE TABLE IF NOT EXISTS {name} (
+            {self._wrap_schema()}
+            ); """
+        super().__init__(db, name)
 
 
 class SampleManagerDB:
@@ -188,6 +203,7 @@ class SampleManagerDB:
         self.sample_batches = None
         self.sample_items = None
         self.sample_files = None
+        self.attribute_templates = None
         self._connect(fname)
 
     def __del__(self):
@@ -206,6 +222,7 @@ class SampleManagerDB:
         self.sample_batches = SampleBatchTable(self)
         self.sample_items = SampleItemTable(self)
         self.sample_files = SampleFileTable(self)
+        self.attribute_templates = AttributeTemplateTable(self)
 
     # workspaces
     def workspace_list(self):
@@ -270,5 +287,22 @@ class SampleManagerDB:
 
     # sample files
     def sample_file_insert(self, **kwargs):
+        kwargs['id'] = kwargs['filename']
         self.sample_files.insert(**kwargs)
 
+    def sample_file_get(self, **kwargs):
+        return self.sample_files.get(**kwargs)
+
+    # attribute templates
+    def attribute_template_list(self):
+        return self.attribute_templates.get_all()
+
+    def attribute_template_get(self, **kwargs):
+        return self.attribute_templates.get(**kwargs)
+
+    def attribute_template_insert(self, **kwargs):
+        kwargs['id'] = kwargs['name']
+        self.attribute_templates.insert(**kwargs)
+
+    def attribute_template_delete(self, id):
+        self.attribute_templates.remove(id)

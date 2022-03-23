@@ -10,6 +10,7 @@ import workspace from "./modules/workspace";
 import target from "./modules/target";
 import sample from "./modules/sample";
 import match from "./modules/match";
+import template from "./modules/template";
 
 export default createConnectedStore({
 	state: {
@@ -23,6 +24,7 @@ export default createConnectedStore({
 		sample,
 		target,
 		match,
+		template,
 	},
 	plugins: [
 		logger,

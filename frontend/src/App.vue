@@ -11,6 +11,7 @@
 import { bindState } from "$lib/store";
 import { mapMutations, mapActions } from "vuex";
 
+
 export default {
   data: function () {
     return {};
@@ -35,15 +36,12 @@ export default {
       $targetIonCalcResponse: "target/$ionCalculationResponse",
       $sampleResponse: "sample/$response",
       $matchUpdate: "match/$update",
+      $templateListResponse: "template/$listResponse",
     }),
     ready: function () {
       // check that the API connected succesfully to the backend
       let apiConnected = this.api ? this.api.connected : false;
-      // check that workspaces were loaded
-      let workspacesExist = this.$workspaceRows
-        ? this.$workspaceRows.length > 0
-        : false;
-      return apiConnected && workspacesExist;
+      return apiConnected;
     },
   },
   methods: {
@@ -55,6 +53,7 @@ export default {
       sampleHandleResponse: "sample/handleResponse",
       matchRequest: "match/request",
       matchHandleUpdate: "match/handleUpdate",
+      templateSetRows: "template/setRows",
       keydown: "key/down",
       keyup: "key/up",
     }),
@@ -96,6 +95,10 @@ export default {
     // match
     $matchUpdate: function () {
       this.matchHandleUpdate();
+    },
+    // template
+    $templateListResponse: function (rows) {
+      this.templateSetRows(rows);
     },
   },
 };

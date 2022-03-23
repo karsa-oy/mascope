@@ -14,6 +14,8 @@ export default {
         // data
         batchRows: [],
         itemRows: [],
+        fileRecord: {},
+        itemRecord: {},
         // Parameters
         paramPeakMinIntensity: 1,
         paramPeakMinSeparation: 3,
@@ -31,6 +33,12 @@ export default {
         $itemUpdateRequest: null,
         $itemDeleteRequest: null,
         $peakListRequest: null,
+        $saveFileAttributes: null,
+        $saveItemAttributes: null,
+        $fileRecordRequest: null,
+        $itemRecordRequest: null,
+        $fileRecordResponse: null,
+        $itemRecordResponse: null,
     },
     mutations: {
         // Batch
@@ -156,7 +164,28 @@ export default {
         activationSet(state, { batch, active }) {
             let row = table.get(state.batchRows, { id: batch.id });
             row._active = active;
-        }
+        },
+        saveFileAttributes(state, attribs) {
+            state.$saveFileAttributes = {
+                ...attribs,
+            };
+        },
+        // TODO: placeholder for sample_item.attributes
+        saveItemAttributes(state, attribs) {
+            state.$saveItemAttributes = {
+                ...attribs,
+            };
+        },
+        fileRecordRequest(state, requestObject) {
+            state.$fileRecordRequest = requestObject;
+        },
+        // TODO: placeholder for sample_item record
+        itemRecordRequest(state, requestObject) {
+            state.$itemRecordRequest = requestObject;
+        },
+        fileRecord(state, record) {
+            state.$fileRecord = record;
+        },
     },
     actions: {
         // requests
@@ -349,7 +378,10 @@ export default {
                     { root: true }
                 );
             }
-        }
+        },
+        fileRecord({ commit }, record) {
+            commit("fileRecord", record);
+        },
     },
     getters: {
         // selected

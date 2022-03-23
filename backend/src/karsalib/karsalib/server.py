@@ -84,25 +84,29 @@ class BaseServerNamespace(AsyncNamespace):
         src_sids = cookies['src_sid']
         # sids are added to the cookies only by this procedure
         src_sids.append(sid)
-
         target_room = room if room else endpoint
+        context = get_client_notification_context(data)
 
         async def srv_callback(*arg, **kwarg):
             await self.emit('client_notification_callback',
                             dict(endpoint=endpoint,
                                  cb_name=cb, cb_ctx=cb_ctx,
                                  arg=arg, kwarg=kwarg,
-                                 **{**get_client_notification_context(data), 'no_logging': True}),
+                                 **{**context, 'no_logging': True}),
                             room=sid,
                             namespace=self.namespace
                             )
+
         sent_to = len(src_sids) * '>'
         self.log(f"{endpoint} {sent_to} {namespace}:{target_room}")
-        if timeout is None:     # response to emit_client_notification
+        if timeout is None:     # response to async emit_client_notification
             await self.emit(endpoint, data, room=target_room, namespace=namespace, callback=cb and srv_callback)
-        else:                   # response to call_client_notification
+        else:                   # response to sync emit_client_notification
             if cb:
                 raise Exception(f"on_call({endpoint}...) - illegal callback argument: {cb}")
-            result = await self.server.call(endpoint, data, to=target_room, **get_client_notification_context(data))
+            try:
+                result = await self.server.call(endpoint, data, to=target_room, namespace=namespace, timeout=timeout)
+            except TimeoutError:
+                result = None
             return result
 

@@ -11,6 +11,7 @@ Created on Thu May  7 12:43:13 2020
 
 import asyncio
 import json
+from time import time
 
 import numpy as np
 from scipy.signal import find_peaks
@@ -21,9 +22,7 @@ from karsalib.client import (
                         )
 from karsalib.util import parse_datetime_from_item_filename
 from karsalib.util import parse_cmd_args, get_client_notification_context
-
 from karsalib.db import SampleManagerDB
-
 
 from services.FileIoService import load_file
 
@@ -316,6 +315,79 @@ class SampleServiceNamespace(BaseClientNamespace):
                 length=committed_length,
                 range=json.dumps(value['mz_range'])
             )
+
+    # template table handlers
+
+    async def on_template_list_request(self, data):
+        # templates = [
+        #     {"name":"template_1","type":"sample","template":'[{"label":"fname","required":true,"placeholder":"fname"},{"label":"description","value":"Predefined description"},{"label":"optional attribute"}]'},
+        #     ...,
+        # ]
+        templateType = data['value']['type']
+        context = get_client_notification_context(data)
+        timeout = context.get('timeout')
+        records = db.attribute_template_get(type=templateType)
+        for r in records:
+            r['template'] = json.loads(r['template'])
+        if timeout:
+            # return code for (backend) clients, which can use call instead of emit
+            return records
+        else:
+            # notification for clients, which prefer callbacks
+            await self.emit_client_notification(
+                'template_list_response',
+                records,
+                **{
+                    **context,
+                    'room': data.get('client_room'),
+                })
+
+    async def on_template_save(self, data):
+        value = data['value']
+        template = {
+            'name': value['name'],
+            'type': value.get('type', 'unknown'),
+            'template': json.dumps(value['template']),
+        }
+        db.attribute_template_insert(**template)
+
+    async def on_template_delete(self, data):
+        template_id = data['value']['id']
+        db.attribute_template_delete(template_id)
+
+    async def on_sample_save_file_attributes(self, data):
+        # data[value]: {attribs: [{}, {}...]}
+        in_attribs = data['value']['attribs']
+        schema_fields = [title for title,*_ in db.sample_files.schema]
+        result = {}
+        out_attribs = {}
+        for a in in_attribs:
+            if a['label'] in schema_fields:
+                result[a['label']] = a.get('value', '')
+            else:
+                out_attribs[a['label']] = a.get('value', '')
+        result['attributes'] = json.dumps(out_attribs)
+        db.sample_file_insert(**result)
+
+    async def on_sample_file_record_request(self, data):
+        # data: {field_name: field_value}
+        timeout = data.get('timeout')
+        context = get_client_notification_context(data)
+        value = data['value']
+        records = db.sample_file_get(**value)
+        for r in records:
+            r['attributes'] = json.loads(r['attributes'])
+            r['dummy'] = time() # ensure response generated, when data not changed
+        if timeout:
+            return records
+        else:
+            await self.emit_client_notification(
+                'sample_file_record_response',
+                records,
+                **{
+                    **context,
+                    'room': data.get('client_room'),
+                })
 
 
 class SampleManagerClient(BaseServiceClient):
