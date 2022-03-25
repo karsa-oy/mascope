@@ -21,6 +21,23 @@ from .kinstrument import KInstrument
 from common.base_generator import BaseFileStreamer, strip_filepath, PROGRESS_SHIFT
 
 
+def remove_duplicate_mz_values(mz):
+    # Sometimes TOF signal mz coordinate contains multiple zeros at the beginning
+    # This may cause duplicate coordinate value error in some functions
+    # This function fixes the coordinate vector by setting arbitrary small values for
+    # the zero coordinates
+    mz_unique = mz
+    mz_below_10_mask = mz < 10
+    if (np.diff(mz[mz_below_10_mask]) == 0).any():
+        mz_below_10_maxi = mz_below_10_mask.sum()
+        mz_unique[mz_below_10_mask] = np.linspace(
+                                            0,
+                                            mz[mz_below_10_maxi],
+                                            mz_below_10_maxi,
+                                            endpoint=False
+                                            )
+    return mz_unique
+
 
 class BaseTofDaqStreamer(Thread):
     """Base class for TofDaqStreamer and H5Streamer to inherit common methods from.
@@ -200,6 +217,7 @@ class TofDaqStreamer(BaseTofDaqStreamer):
                                                1,
                                                None
                                                )
+        mz = remove_duplicate_mz_values(mz)
         return mz.astype(np.float32)
 
 
@@ -421,6 +439,7 @@ class H5Streamer(BaseFileStreamer, KInstrument):
                                         0,
                                         0
                                         )
+        mz = remove_duplicate_mz_values(mz)
         return mz.astype(np.float32)
 
     @property
