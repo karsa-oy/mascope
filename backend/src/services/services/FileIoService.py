@@ -243,8 +243,11 @@ class zarr_sdk:
         peaks_array = ExtendableDataArray(path=filename
                                           )
         peaks_array.init_array(dims=('mz', 'time'),
-                               data=peak_profiles,
-                               coords=[peak_profiles.mz, peak_profiles.time],
+                               data=peak_profiles.values,
+                               coords={'mz': peak_profiles.mz.values,
+                                       'time': peak_profiles.time.values,
+                                       'tof': ('mz', peak_profiles.tof.values)
+                                       },
                                name='peaks'
                                )
 

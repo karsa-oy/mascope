@@ -17,6 +17,7 @@ from scipy.signal._peak_finding_utils import (
 )
 
 from karsatof.lib.TwTool import TwMassCalibrate, TwTof2Mass
+from karsatof.kgenerator import remove_duplicate_mz_values
 from karsalib.client import BaseClientNamespace, BaseServiceClient
 from karsalib.logging import Logger
 from karsalib.util import parse_cmd_args
@@ -26,6 +27,7 @@ from scenthound.kworker import KEncoder
 from scenthound.kcollector import KCollector
 
 from services.FileIoService import (get_zarr_var_shape,
+                                    load_coord,
                                     load_file,
                                     update_props,
                                     update_zarr_array_coord,
@@ -74,6 +76,7 @@ class SignalProcessorNamespace(BaseClientNamespace):
         new_mz = np.array([TwTof2Mass(tof, mode, par)
                            for tof in range(nbr_samples)
                            ])
+        new_mz = remove_duplicate_mz_values(new_mz)
         new_range = [new_mz[0], new_mz[-1]]
 
         for filename in filenames:
@@ -82,6 +85,9 @@ class SignalProcessorNamespace(BaseClientNamespace):
                 raise Exception("Number of TOF samples does not match")
             # Write new mz coordinates to file
             update_zarr_array_coord(filename, 'signal', 'mz', new_mz)
+            peak_tofs = load_coord(filename, 'peaks', 'tof')
+            new_peak_mzs = new_mz[peak_tofs.astype(int)]
+            update_zarr_array_coord(filename, 'peaks', 'mz', new_peak_mzs)
             update_props(filename, {'range': new_range})
             cache_item = cache.get(filename)
             if cache_item:
@@ -111,7 +117,8 @@ class SignalProcessorNamespace(BaseClientNamespace):
         if not cache_item:
             # File not in cache, load
             print("Loading file: %s" %filename)
-            cache_item = load_file(filename, vars=['peaks'])
+            cache_item = load_file(filename, vars=['signal'])
+            cache_item = load_file(filename, vars=['peaks'], prev_dataset=cache_item)
             cache[filename] = cache_item
 
         if 'peaks' not in cache_item:
@@ -126,11 +133,6 @@ class SignalProcessorNamespace(BaseClientNamespace):
         if t_range is None:
             # Full time range
             t_range = [0, cache_item.attrs['props']['length']]
-        
-        # Add integer index (MS sample bin)
-        cache_item = cache_item.assign_coords(
-                            tof=('mz', np.arange(len(cache_item.mz)))
-                            )
 
         filtered_peaks = filter_peaks(cache_item,
                                       mz_range,
@@ -178,19 +180,23 @@ def find_and_write_peaks(cache_item):
     sum_spectrum = cache_item.signal.sum(dim='time').compute()
     # Interpolate NaNs for smoothing
     sum_spectrum = sum_spectrum.interpolate_na(dim='mz',
-                                               method='linear',
-                                               limit=None,
-                                               max_gap=2,
-                                               )
+                                                method='linear',
+                                                limit=None,
+                                                max_gap=2,
+                                                )
+        
     peaks, peak_props = find_peaks(sum_spectrum,
                                    height=0,
                                    distance=None,
                                    width=None
                                    )
                                    
+    cache_item = cache_item.assign_coords(
+                    tof=('mz', np.arange(len(cache_item.mz)).astype(np.float32))
+                    )
+    peak_profiles = cache_item.signal[peaks]
     # peak_mz = sum_spectrum.mz[peaks].values.astype(np.float32)
     # peak_heights = peak_props['peak_heights'].astype(np.float32)
-    peak_profiles = cache_item.signal[peaks].astype(np.float32)
 
     zarr_sdk.write_peak_dataset(peak_profiles, cache_item)
 
@@ -229,9 +235,10 @@ def filter_peaks(cache_item,
     
     if distance is not None:
         # peak_heights = peak_properties['peak_heights']
+        peak_indices = peaks.tof.values
         # Evaluate distance condition
         keep_distance = _select_by_peak_distance(
-                                np.arange(len(peak_heights), dtype=np.intp),
+                                peak_indices.astype(np.intp),
                                 peak_heights.astype(np.float64),
                                 distance
                                 )
@@ -272,6 +279,7 @@ def filter_peaks(cache_item,
     #     properties = {key: array[keep] for key, array in properties.items()}
         
     return peaks[keep].compute()
+    
 
 def mz_calibrate_tof(peak_tof, peak_mz, exact_mz, nbr_tof_samples):
     # Prepare arguments
