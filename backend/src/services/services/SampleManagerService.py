@@ -10,6 +10,7 @@ Created on Thu May  7 12:43:13 2020
 """
 
 import asyncio
+import os
 import json
 from time import time
 
@@ -31,7 +32,8 @@ cache = {}
 
 NO_DATA_LOGGING_DEFAULT = True
 
-db_path = '/data/samples.db'
+data_path = os.environ.get('MASCOPE_DATADIR')
+db_path = os.path.join(data_path, 'samples.db')
 db = SampleManagerDB(db_path)
 
 
