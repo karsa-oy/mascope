@@ -39,7 +39,7 @@
     "lodash.clonedeep": "^4.5.0",
     "nanoid": "^3.2.0",
     "plotly.js-dist": "^1.51.2",
-    "socket.io-client": "^3.0.5",
+    "socket.io-client": "^4.4.1",
     "underscore": "^1.11.0",
     "vue": "^2.6.10",
     "vue-material-design-icons": "^4.4.0",
