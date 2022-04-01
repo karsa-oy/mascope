@@ -201,7 +201,7 @@ class SampleServiceNamespace(BaseClientNamespace):
         await self.emit_client_notification(
             'sample_response', {
                 'type': 'item-list',
-                'requestId': value['requestId'],
+                'requestId': value.get('requestId', time()),  # ensure response generated, when data not changed
                 'payload': {
                     'level': 'item',
                     'filters': {'batchId': batchId},
@@ -355,39 +355,116 @@ class SampleServiceNamespace(BaseClientNamespace):
         template_id = data['value']['id']
         db.attribute_template_delete(template_id)
 
-    async def on_sample_save_file_attributes(self, data):
-        # data[value]: {attribs: [{}, {}...]}
-        in_attribs = data['value']['attribs']
+    async def on_sample_file_update_request(self, data):
+        # data[value]: {key: value, ...}
+        row = data['value']
         schema_fields = [title for title,*_ in db.sample_files.schema]
         result = {}
-        out_attribs = {}
-        for a in in_attribs:
-            if a['label'] in schema_fields:
-                result[a['label']] = a.get('value', '')
+        attribs = {}
+        for key, val in row.items():
+            if key in schema_fields:
+                result[key] = val
             else:
-                out_attribs[a['label']] = a.get('value', '')
-        result['attributes'] = json.dumps(out_attribs)
-        db.sample_file_insert(**result)
+                attribs[key] = val
+        result['attributes'] = json.dumps({**row.get('attributes', {}), **attribs})
+        # keep existing unmentioned fields intact
+        the_rows = db.sample_file_get(id=row['id'])
+        the_row = {} if not the_rows else the_rows[0]
+        db.sample_file_insert(**{**the_row,**result})
 
-    async def on_sample_file_record_request(self, data):
+
+    async def on_sample_item_update_request(self, data):
+        # data[value]: [{key:value, ...}, ...]
+        def save_single_item_data(row):
+            schema_fields = [title for title,*_ in db.sample_items.schema]
+            result = {}
+            attribs = {}
+            for key, val in row.items():
+                if key in schema_fields:
+                    result[key] = val
+                else:
+                    attribs[key] = val
+            result['attributes'] = json.dumps({**row.get('attributes', {}), **attribs})
+            # keep existing unmentioned fields intact
+            the_rows = db.sample_item_get(title=row['title'], batchId=row['batchId'])
+            the_row = {} if not the_rows else the_rows[0]
+            if the_row:     # if item exists, skip incoming id to use the existing one
+                result.pop('id')
+            db.sample_item_insert(**{**the_row,**result})
+
+        rows = data['value']
+        batch_ids = []
+        for row in rows:
+            save_single_item_data(row)
+            batch_ids.append(row['batchId'])
+
+        # TODO: refresh batch views - move the call to UI after fixing sync notifications
+        for id in batch_ids:
+            reload_batch_data = {
+                'name': 'sample_item_list_request',
+                'value': {'id': id},
+                **{
+                    **get_client_notification_context(data),
+                    'room': id,
+                  },
+            }
+            await self.on_sample_item_list_request(reload_batch_data)
+
+
+    async def on_sample_file_list_request(self, data):
         # data: {field_name: field_value}
         timeout = data.get('timeout')
         context = get_client_notification_context(data)
         value = data['value']
         records = db.sample_file_get(**value)
-        for r in records:
-            r['attributes'] = json.loads(r['attributes'])
-            r['dummy'] = time() # ensure response generated, when data not changed
+        for record in records:
+            record['attributes'] = json.loads(record['attributes'])
+        result = {'records': records, 'dummy': time()}  # ensure response generated, when data not changed
         if timeout:
-            return records
+            return result
         else:
             await self.emit_client_notification(
-                'sample_file_record_response',
-                records,
+                'sample_file_list_response',
+                result,
                 **{
                     **context,
                     'room': data.get('client_room'),
                 })
+
+    async def on_sample_file_schema_request(self, data):
+        # data: {field_name: field_value}
+        timeout = data.get('timeout')
+        context = get_client_notification_context(data)
+        schema = db.sample_file_get_schema()
+        result = {'schema': schema, 'dummy': time()}     # ensure response generated, when schema not changed
+        if timeout:
+            return result
+        else:
+            await self.emit_client_notification(
+                'sample_file_schema_response',
+                result,
+                **{
+                    **context,
+                    'room': data.get('client_room'),
+                })
+
+    async def on_sample_item_schema_request(self, data):
+        # data: {field_name: field_value}
+        timeout = data.get('timeout')
+        context = get_client_notification_context(data)
+        schema = db.sample_item_get_schema()
+        result = {'schema': schema, 'dummy': time()}     # ensure response generated, when schema not changed
+        if timeout:
+            return result
+        else:
+            await self.emit_client_notification(
+                'sample_item_schema_response',
+                result,
+                **{
+                    **context,
+                    'room': data.get('client_room'),
+                })
+
 
 
 class SampleManagerClient(BaseServiceClient):

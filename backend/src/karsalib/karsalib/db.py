@@ -85,12 +85,17 @@ class DBTable:
         return res
 
     def get(self, **kwargs):
+        # List records filtered by kwargs. With empty filter list all. 
         def wrap_kwargs():
             res = []
             for k, v in kwargs.items():
                 res.append(f"{k} = '{v}'")
             return ' AND '.join(res)
-        sql = f""" SELECT * FROM {self.name} WHERE {wrap_kwargs()} ORDER BY id; """
+        filter = wrap_kwargs()
+        if filter:
+            sql = f""" SELECT * FROM {self.name} WHERE {wrap_kwargs()} ORDER BY id; """
+        else:
+            sql = f""" SELECT * FROM {self.name} ORDER BY id; """
         self.cur.execute(sql)
         self.con.commit()
         res = self._decode_values_list(self.cur)
@@ -148,7 +153,7 @@ class SampleItemTable(DBTable):
             ('id', 'varchar(16)', 'PRIMARY KEY'),
             ('batchId', 'varchar(16)', 'NOT NULL'),
             ('filename', 'varchar(256)', 'NOT NULL'),
-            ('name', 'text'),
+            ('title', 'varchar(256)', 'NOT NULL'),
             ('description', 'text'),
             ('attributes', 'json'),
         ]
@@ -165,10 +170,12 @@ class SampleFileTable(DBTable):
         self.schema = [
             ('id', 'varchar(256)', 'PRIMARY KEY'),
             ('filename', 'varchar(256)', 'NOT NULL'),
+            ('title', 'varchar(256)', 'NOT NULL'),
             ('instrument', 'varchar(64)'),
             ('datetime', 'varchar(64)'),
             ('length', 'real'),
             ('range', 'json'),
+            ('description', 'text'),
             ('attributes', 'json'),
         ]
         self.sql_create = f""" CREATE TABLE IF NOT EXISTS {name} (
@@ -278,6 +285,13 @@ class SampleManagerDB:
                     id=id
                     )
 
+    def sample_item_get(self, **kwargs):
+        return self.sample_items.get(**kwargs)
+
+    def sample_item_insert(self, **kwargs):
+        # creates or updates sample item
+        self.sample_items.insert(**kwargs)
+
     def sample_item_update(self, **kwargs):
         # Update sample metadata and not sample file
         self.sample_items.update(**kwargs)
@@ -285,13 +299,20 @@ class SampleManagerDB:
     def sample_item_delete(self, id):
         self.sample_items.remove(row_id=id)
 
-    # sample files
-    def sample_file_insert(self, **kwargs):
-        kwargs['id'] = kwargs['filename']
-        self.sample_files.insert(**kwargs)
+    def sample_item_get_schema(self):
+        res = [name for name,*_ in self.sample_items.schema]
+        return res
 
+    # sample files
     def sample_file_get(self, **kwargs):
         return self.sample_files.get(**kwargs)
+
+    def sample_file_insert(self, **kwargs):
+        self.sample_files.insert(**kwargs)
+
+    def sample_file_get_schema(self):
+        res = [name for name,*_ in self.sample_files.schema]
+        return res
 
     # attribute templates
     def attribute_template_list(self):

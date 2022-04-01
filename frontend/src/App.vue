@@ -35,6 +35,8 @@ export default {
       workspaceRoom: "workspace/$roomActive",
       $targetIonCalcResponse: "target/$ionCalculationResponse",
       $sampleResponse: "sample/$response",
+      $sampleFileSchemaResponse: "sample/$fileSchemaResponse",
+      $sampleItemSchemaResponse: "sample/$itemSchemaResponse",
       $matchUpdate: "match/$update",
       $templateListResponse: "template/$listResponse",
     }),
@@ -47,6 +49,10 @@ export default {
   methods: {
     ...mapMutations({
       targetHandleIonCalcResponse: "target/handleIonCalcResponse",
+      sampleFileSchemaRequest: "sample/fileSchemaRequest",
+      sampleItemSchemaRequest: "sample/itemSchemaRequest",
+      sampleFileSchema: "sample/fileSchema",
+      sampleItemSchema: "sample/itemSchema",
     }),
     ...mapActions({
       sampleBatchList: "sample/batchList",
@@ -72,6 +78,8 @@ export default {
     ready: function () {
       if (this.ready) {
         this.workspaceInit();
+        this.sampleFileSchemaRequest();
+        this.sampleItemSchemaRequest();
       }
     },
     workspaceActive: function () {
@@ -91,6 +99,12 @@ export default {
     // sample
     $sampleResponse: function () {
       this.sampleHandleResponse();
+    },
+    $sampleFileSchemaResponse: function (response) {
+      this.sampleFileSchema(response);
+    },
+    $sampleItemSchemaResponse: function (response) {
+      this.sampleItemSchema(response);
     },
     // match
     $matchUpdate: function () {

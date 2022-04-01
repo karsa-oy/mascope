@@ -17,6 +17,7 @@ import VueRouter from 'vue-router';
 import ThePageLanding from "./components/ThePageLanding";
 import ThePageBatchOverview from "./components/ThePageBatchOverview";
 import ThePageDataManagement from "./components/ThePageDataManagement";
+import ThePageSampleManagement from "./components/ThePageSampleManagement";
 import ThePageSettings from "./components/ThePageSettings";
 
 Vue.use(VueRouter);
@@ -32,6 +33,9 @@ const router = new VueRouter({
   }, {
     path: '/data-management',
     component: ThePageDataManagement
+  }, {
+    path: '/sample-management',
+    component: ThePageSampleManagement
   }, {
     path: '/settings',
     component: ThePageSettings
