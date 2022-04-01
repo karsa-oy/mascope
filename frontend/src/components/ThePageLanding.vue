@@ -31,7 +31,7 @@
           </b-button>
 
           <b-button
-            style="float: right; margin-right :10px"
+            style="float: right; margin-right: 10px"
             @click="
               () => {
                 modalProps = {
@@ -45,7 +45,6 @@
           >
             Save Sample File Attributes
           </b-button>
-
         </section>
       </section>
     </div>
