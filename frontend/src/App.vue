@@ -11,7 +11,6 @@
 import { bindState } from "$lib/store";
 import { mapMutations, mapActions } from "vuex";
 
-
 export default {
   data: function () {
     return {};
