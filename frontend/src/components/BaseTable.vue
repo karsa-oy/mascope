@@ -8,6 +8,8 @@
     show-header
     sticky-header
     :height="height"
+    :checkable="checkable"
+    :checked-rows.sync="selected"
   >
     <b-table-column
       v-for="col in cols"
@@ -16,8 +18,8 @@
       :field="col.field"
       :label="col.label"
       :width="col.width"
+      :searchable="searchable"
       sortable
-      searchable
       left
     >
       {{ parseValue(props.row[col.field]) }}
@@ -48,6 +50,21 @@ export default {
       required: false,
       default: "100%",
     },
+    checkable: {
+      type: Boolean,
+      required: false,
+      default: false,
+    },
+    searchable: {
+      type: Boolean,
+      required: false,
+      default: false,
+    },
+  },
+  data() {
+    return {
+      selected: [],
+    }
   },
   created: function () {
     this.formatter = new Intl.NumberFormat("en-US", {
@@ -59,6 +76,11 @@ export default {
     parseValue: function (value) {
       let isNumeric = typeof value == "number";
       return isNumeric ? this.formatter.format(value) : value;
+    },
+  },
+  watch: {
+    selected(rows) {
+      this.$emit("selectRows", rows);
     },
   },
 };

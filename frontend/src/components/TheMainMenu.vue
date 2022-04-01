@@ -24,6 +24,11 @@ export default {
           label: "Data management",
           path: "/data-management",
         },
+        {
+          icon: "file-import-outline",
+          label: "Sample management",
+          path: "/sample-management",
+        },
       ],
       footerButtons: [
         {

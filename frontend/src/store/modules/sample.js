@@ -14,8 +14,8 @@ export default {
         // data
         batchRows: [],
         itemRows: [],
-        fileRecord: {},
-        itemRecord: {},
+        fileSchema: {},
+        itemSchema: {},
         // Parameters
         paramPeakMinIntensity: 1,
         paramPeakMinSeparation: 3,
@@ -30,15 +30,16 @@ export default {
         $batchDeleteRequest: null,
         $itemListRequest: null,
         $itemCreateRequest: null,
-        $itemUpdateRequest: null,
         $itemDeleteRequest: null,
         $peakListRequest: null,
-        $saveFileAttributes: null,
-        $saveItemAttributes: null,
-        $fileRecordRequest: null,
-        $itemRecordRequest: null,
-        $fileRecordResponse: null,
-        $itemRecordResponse: null,
+        $fileUpdateRequest: null,
+        $itemUpdateRequest: null,
+        $fileListRequest: null,
+        $fileListResponse: null,
+        $fileSchemaRequest: null,
+        $fileSchemaResponse: null,
+        $itemSchemaRequest: null,
+        $itemSchemaResponse: null,
     },
     mutations: {
         // Batch
@@ -165,26 +166,29 @@ export default {
             let row = table.get(state.batchRows, { id: batch.id });
             row._active = active;
         },
-        saveFileAttributes(state, attribs) {
-            state.$saveFileAttributes = {
-                ...attribs,
-            };
+        fileUpdate(state, row) {
+            // row: {key:value, ...}
+            state.$fileUpdateRequest = {...row, id: row.id || row.filename};
         },
-        // TODO: placeholder for sample_item.attributes
-        saveItemAttributes(state, attribs) {
-            state.$saveItemAttributes = {
-                ...attribs,
-            };
+        itemUpdate(state, rows) {
+            // rows: [{key:value, ...},...]
+            rows.forEach( row => row.id = row.id || table.genId() )
+            state.$itemUpdateRequest = rows;
         },
-        fileRecordRequest(state, requestObject) {
-            state.$fileRecordRequest = requestObject;
+        fileListRequest(state, requestObject) {
+            state.$fileListRequest = requestObject;
         },
-        // TODO: placeholder for sample_item record
-        itemRecordRequest(state, requestObject) {
-            state.$itemRecordRequest = requestObject;
+        fileSchemaRequest(state) {
+            state.$fileSchemaRequest = {};
         },
-        fileRecord(state, record) {
-            state.$fileRecord = record;
+        fileSchema(state, schema) {
+            state.fileSchema = schema;
+        },
+        itemSchemaRequest(state) {
+            state.$itemSchemaRequest = {};
+        },
+        itemSchema(state, schema) {
+            state.itemSchema = schema;
         },
     },
     actions: {
@@ -338,7 +342,7 @@ export default {
             });
         },
         // activation - fetching data and subscribing to backend updates
-        batchActivate({ commit }, batch) {
+        batchActivate({commit }, batch) {
             // only unactive batches can be activated
             if (!batch._active) {
                 commit('itemList', batch);
@@ -346,7 +350,7 @@ export default {
                 commit('activationSet', { batch, active: true });
             }
         },
-        batchDeactivate({ commit, dispatch }, batch) {
+        batchDeactivate({commit, dispatch }, batch) {
             // open and selected batches can't be deactivated
             if (batch._selected == 'none' && !batch._open) {
                 dispatch('batchMatchClear', batch);
@@ -379,9 +383,6 @@ export default {
                 );
             }
         },
-        fileRecord({ commit }, record) {
-            commit("fileRecord", record);
-        },
     },
     getters: {
         // selected
@@ -389,6 +390,11 @@ export default {
             ({ level }) => {
                 return getters[level + 'Selected'];
             },
+        batchesSelected: function (state) {
+            let selected = (row) => ['all', 'some'].includes(row._selected)
+            let batchesSelected = state.batchRows.filter(selected);
+            return batchesSelected.length > 0 ? batchesSelected : state.batchRows;
+        },
         itemsSelected: function (state) {
             let selected = (row) => ['all', 'some'].includes(row._selected)
             let itemsSelected = state.itemRows.filter(selected);

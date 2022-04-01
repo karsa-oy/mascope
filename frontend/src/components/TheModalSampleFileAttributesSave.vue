@@ -38,7 +38,7 @@ export default {
     ...bindState({
       modalActive: "modal/sampleFileAttributesSaveActive",
       templateRows: "template/rows",
-      $sampleFileRecordResponse: "sample/$fileRecordResponse",
+      $sampleFileListResponse: "sample/$fileListResponse",
     }),
     availableTemplates () {
       return [this.defaultTemplate, ...this.templateRows];
@@ -55,10 +55,17 @@ export default {
             label: 'filename',
             required: true,
             placeholder: 'filename',
-            key: true,
+            key: true,    // the field is a key to load data from db
+          },
+          {
+            label: 'title',
+            required: true,
+            placeholder: 'visible title of the file in batches',
           },
           {
             label: 'description',
+            required: true,
+            placeholder: 'description',
           },
         ],
       },
@@ -66,8 +73,8 @@ export default {
   },
   methods: {
     ...mapMutations({
-      sampleSaveAttributes: "sample/saveFileAttributes",
-      sampleFileRecordRequest: "sample/fileRecordRequest",
+      sampleFileUpdate: "sample/fileUpdate",
+      sampleFileListRequest: "sample/fileListRequest",
     }),
     ...mapActions({
       templateListRequest: "template/listRequest",
@@ -82,10 +89,13 @@ export default {
       this.templateDeleteRequest(newValue.name);
     },
     saveAttributes(newValue) {
-      this.sampleSaveAttributes({attribs: newValue});
+      // convert [{label, value...}, ...] to object
+      let row = {};
+      newValue.forEach( field => row[field.label] = field.value || '');
+      this.sampleFileUpdate(row);
     },
     loadAttributes(newValue) {
-      this.sampleFileRecordRequest(newValue);
+      this.sampleFileListRequest(newValue);
     },
   },
   watch: {
@@ -93,8 +103,9 @@ export default {
       if (active)
         this.templateListRequest({type: this.templateType});
     },
-    $sampleFileRecordResponse: function (rows) {
-      this.sampleFileRecordToLoad = rows[0] || {};
+    $sampleFileListResponse: function (response) {
+      let row = (response.records && response.records[0]) || {};
+      this.sampleFileRecordToLoad = {template: this.defaultTemplate.template, row: row};
     },
   },
 };

@@ -125,9 +125,8 @@
               >
                 <b-button
                   :disabled="
-                    !formFields ||
-                    !formFields[0] ||
-                    !formFields[0].value
+                    this.formFields.filter(f => f.required).length !=
+                    this.formFields.filter(f => f.required).filter(f => f.value).length
                   "
                   type="is-success"
                   icon-left="content-save"
@@ -342,18 +341,23 @@ export default {
       deep: true,
     },
     attributesToLoad: function (data) {
-      if ( _.isEmpty(data) ) {
+      if ( _.isEmpty(data) || _.isEmpty(data.row) ) {
         return;
       }
       let newTemplate = {
         name: null,
         type: this.templateType,
-        template: [{label: 'filename', value: data.filename, key:true, required: true}, ],
+        template: [],
       }
-      Object.keys(data.attributes).forEach( (attr) =>
-        newTemplate.template.push({label: attr, value: data.attributes[attr]})
+      for(let {label, key, required} of data.template) {
+        if (required) {
+          newTemplate.template.push({label, key, required, value: data.row[label]});
+        }
+      }
+      Object.keys(data.row.attributes).forEach( (attr) =>
+        newTemplate.template.push({label: attr, value: data.row.attributes[attr]})
       );
-      this.loadedTemplate = this.clone(newTemplate);
+      this.loadedTemplate = newTemplate;
     },
   },
 };
