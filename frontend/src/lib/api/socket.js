@@ -100,6 +100,39 @@ export class Api {
         })
     }
 
+    call({
+        name,
+        value,
+        timeout = 5000,
+        clientTimeout = timeout,
+        room = null,
+        client_room = this.socket.id,
+        requestId = Math.random().toString(36).substring(2),
+        loggingLevel = this.loggingLevel,
+
+    }) {
+        let notifyCall = (resolve, reject) => {
+            this.socket
+                .emit('client_notification', {
+                    name,
+                    value,
+                    room,
+                    timeout,
+                    request_id: requestId,
+                    no_logging: loggingLevel == 'none',
+                    no_data_logging: loggingLevel == 'basic',
+                    client_room,
+                }, (response) => {
+                    resolve(response)
+                });
+            setTimeout(
+                () => reject(Error("Clientside socket timed out")),
+                clientTimeout
+            );
+        }
+        return new Promise(notifyCall);
+    }
+
     bind({ name, callback }) {
         this.socket.on(name, callback)
     }

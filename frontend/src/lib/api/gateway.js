@@ -15,6 +15,7 @@ export const apiGatewayStoreMixin = {
         dotenv: null,
         apiGatewayStatus: null,
         apiGatewayPaths: [],
+        apiEventCache: [],
         ...rootApiMixin.state
     },
     mutations: {
@@ -72,6 +73,14 @@ export const apiGatewayStoreMixin = {
                 pathlib.set(state, path, value);
             }
         },
+        // event cache
+        eventCacheAdd(state, response) {
+            state.apiEventCache.push(response);
+        },
+        eventCacheRemove(state, response) {
+            let responseIndex = state.apiEventCache.indexOf(response);
+            state.apiEventCache.splice(responseIndex, 1);
+        },
         ...rootApiMixin.mutations
     },
     actions: {
@@ -107,6 +116,10 @@ export const apiGatewayStoreMixin = {
         // get full root store
         getRootState(state, getters, rootState) {
             return rootState;
+        },
+        // event cache
+        eventCacheHit: (state) => (response) => {
+            return state.apiEventCache.indexOf(response) > -1;
         },
         ...rootApiMixin.getters
     },
@@ -155,7 +168,18 @@ function createApiGatewayPlugin() {
                     store.watch(
                         (state, getters) => (getters.getPath(path)),
                         (value) => {
-                            api.set({ name, value })
+                            // check cache to prevent backend responses
+                            // being echoed back to the backend
+                            let cached = store.getters['eventCacheHit'](value);
+                            if (!cached) {
+                                // emit the event if not cached
+                                api.set({ name, value });
+                            } else {
+                                // otherwise remove the event from the cache
+                                // since it has been handled so no need to 
+                                // waste memory on it
+                                store.commit('eventCacheRemove', value);
+                            }
                         }
                     );
                     // Frontend Reacts to Backend Changes
@@ -164,6 +188,10 @@ function createApiGatewayPlugin() {
                     api.bind({
                         name,
                         callback: (payload) => {
+                            // cačhe backend events in order
+                            // to prevent echoes
+                            store.commit('eventCacheAdd', payload.value);
+                            // write the event to the path
                             store.commit('setPath', {
                                 path,
                                 value: payload.value
