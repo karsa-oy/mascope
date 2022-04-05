@@ -307,6 +307,9 @@ class SampleManagerDB:
     def sample_file_get(self, **kwargs):
         return self.sample_files.get(**kwargs)
 
+    def sample_file_get_range(self, *args, **kwargs):
+        return self.sample_files.between(*args, **kwargs)
+
     def sample_file_insert(self, **kwargs):
         self.sample_files.insert(**kwargs)
 
