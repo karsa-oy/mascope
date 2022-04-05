@@ -3,6 +3,20 @@
     <section :class="dynamic('base-browser-header')">
       <h2>{{ name }}</h2>
       <slot name="header"></slot>
+      <b-dropdown v-if="menu" aria-role="list" append-to-body>
+        <template #trigger>
+          <b-button icon-left="dots-horizontal" size="is-small" />
+        </template>
+        <template v-for="item of menu">
+          <b-dropdown-item
+            aria-role="listitem"
+            :key="item.label"
+            @click="item.onClick"
+          >
+            {{ item.label }}
+          </b-dropdown-item>
+        </template>
+      </b-dropdown>
     </section>
     <section :class="dynamic('base-browser-content')">
       <b-table
@@ -85,6 +99,10 @@ export default {
     levels: {
       type: Array,
       required: true,
+    },
+    menu: {
+      type: Array,
+      required: false,
     },
     isRoot: {
       type: Boolean,
