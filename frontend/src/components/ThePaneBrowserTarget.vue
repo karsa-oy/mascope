@@ -1,19 +1,17 @@
 <template>
-  <base-browser name="Targets" :levels="targetLevels">
-    <template v-slot:header>
-      <b-tooltip label="Import targets" type="is-white" position="is-right">
-        <b-button
-          icon-left="plus"
-          size="is-small"
-          @click="
-            activateModal({
-              modal: 'targetImport',
-            })
-          "
-        >
-        </b-button>
-      </b-tooltip>
-    </template>
+  <base-browser
+    name="Targets"
+    :levels="targetLevels"
+    :menu="[
+      {
+        label: 'Import targets',
+        onClick: () =>
+          activateModal({
+            modal: 'targetImport',
+          }),
+      },
+    ]"
+  >
   </base-browser>
 </template>
 
