@@ -418,7 +418,11 @@ class SampleServiceNamespace(BaseClientNamespace):
         timeout = data.get('timeout')
         context = get_client_notification_context(data)
         value = data['value']
-        records = db.sample_file_get(**value)
+
+        if sorted(value.keys()) == sorted(['column', 'min_value', 'max_value']):
+            records = db.sample_file_get_range(**value)
+        else:
+            records = db.sample_file_get(**value)
         for record in records:
             record['attributes'] = json.loads(record['attributes'])
         result = {'records': records, 'dummy': time()}  # ensure response generated, when data not changed

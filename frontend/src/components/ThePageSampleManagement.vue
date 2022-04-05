@@ -8,16 +8,30 @@
             <div class="column is-2 base-browser-sidebar">
               <the-pane-browser-sample></the-pane-browser-sample>
             </div>
-
             <div class="column">
-              <div style="padding-top: 0.5em; padding-bottom: 1.5em">
+              <div style="padding-top: 0.5em; padding-bottom: 1em">
                 <h1 style="font-size: 16px; text-align: left">
                   <p>
                     <b>Select Sample Files:</b>
                   </p>
                 </h1>
               </div>
+              <div class="columns">
+                <div class="column is-half">
+                  <b-datetimepicker
+                    placeholder="Starting from..."
+                    v-model="sampleFileMinDateTime">
+                  </b-datetimepicker>
+                </div>
+                <div class="column is-half">
+                  <b-datetimepicker
+                    placeholder="Until..."
+                    v-model="sampleFileMaxDateTime">
+                  </b-datetimepicker>
+                </div>
+              </div>
               <base-table
+                :key="sampleFileTableDataKey"
                 :rows="sampleFileRows"
                 :cols="sampleFileCols"
                 :checkable="true"
@@ -26,7 +40,6 @@
                 @selectRows="selectSampleFiles"
               >
               </base-table>
-
               <div style="padding-top: 1.5em; padding-bottom: 1.5em">
                 <h1 style="font-size: 16px; text-align: left">
                   <p>
@@ -81,6 +94,9 @@ export default {
     return {
       sampleFileRows: [],
       sampleItemRows: [],
+      sampleFileMinDateTime: null,
+      sampleFileMaxDateTime: null,
+      sampleFileTableDataKey: 0,
     };
   },
   computed: {
@@ -122,12 +138,6 @@ export default {
       return result;
     },
   },
-  created() {
-  },
-  mounted() {
-    // TODO: limit the sampleFileSet not to read them all
-    this.$sampleFileListRequest({});
-  },
   methods: {
     ...mapMutations({
       $sampleFileListRequest: "sample/fileListRequest",
@@ -166,10 +176,29 @@ export default {
         },
       });
     },
+    getSampleFiles() {
+      if (!this.sampleFileMinDateTime || !this.sampleFileMaxDateTime)
+        return;
+      // reset sampleItems for new range selected
+      this.sampleItemRows = [];
+      // reset sampleFiles table to clean up internal static selection data
+      this.sampleFileTableDataKey++;
+      this.$sampleFileListRequest({
+        column: 'datetime',
+        min_value: this.sampleFileMinDateTime.toISOString(),
+        max_value: this.sampleFileMaxDateTime.toISOString()
+      });
+    },
   },
   watch: {
     $sampleFileListResponse: function (response) {
       this.sampleFileRows = response.records;
+    },
+    sampleFileMinDateTime: function() {
+      this.getSampleFiles();
+    },
+    sampleFileMaxDateTime: function() {
+      this.getSampleFiles();
     },
   },
 };
