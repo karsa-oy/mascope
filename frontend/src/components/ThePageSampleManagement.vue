@@ -183,8 +183,11 @@ export default {
       this.sampleItemRows = [];
       // reset sampleFiles table to clean up internal static selection data
       this.sampleFileTableDataKey++;
-      this.$sampleFileListRequest(
-        {column: 'datetime', min_value: this.sampleFileMinDateTime.toISOString(), max_value: this.sampleFileMaxDateTime.toISOString()});
+      this.$sampleFileListRequest({
+        column: 'datetime',
+        min_value: this.sampleFileMinDateTime.toISOString(),
+        max_value: this.sampleFileMaxDateTime.toISOString()
+      });
     },
   },
   watch: {
