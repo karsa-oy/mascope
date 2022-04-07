@@ -6,15 +6,19 @@ export default {
         compoundRows: [],
         ionRows: [],
         isotopeRows: [],
-        // Parameters
+        // match params
         paramProbableMatchThreshold: 0.9,
         paramPossibleMatchThreshold: 0.5,
         paramMzTolerance: 100, // ppm
         paramIsoRatioTolerance: 10, // %
+        // peak params
+        paramPeakMinIntensity: 1,
+        paramPeakMinSeparation: 3,
+        paramMzRange: null,
+        paramTRange: null,
         // API
         $request: {},
-        $update: null
-
+        $response: null
     },
     mutations: {
         makeRequest(state, { sampleItem, targetIsotopes }) {
@@ -25,10 +29,15 @@ export default {
                 targetIsotopes,
                 mzTolerance: state.paramMzTolerance,
                 isoAbuTolerance: state.paramIsoRatioTolerance,
+                // peak params
+                mzRange: state.paramMzRange,
+                tRange: state.paramTRange,
+                minPeakIntensity: state.paramPeakMinIntensity,
+                minPeakSeparation: state.paramPeakMinSeparation,
             };
         },
-        handleUpdate(state) {
-            let matchStats = state.$update.matchStats
+        handleResponse(state) {
+            let matchStats = state.$response.matchStats
             state.compoundRows.push(...matchStats.compound);
             state.ionRows.push(...matchStats.ion);
             state.isotopeRows.push(...matchStats.isotope);
@@ -39,7 +48,7 @@ export default {
         }
     },
     actions: {
-        request({ commit, rootState }, { sampleItem }) {
+        request({ commit, rootState }, sampleItem) {
             let getCompoundId = (ionId) => ({
                 compoundId: table.get(rootState.target.ionRows, {
                     id: ionId
@@ -55,10 +64,10 @@ export default {
                 targetIsotopes
             })
         },
-        handleUpdate({ commit }) {
-            commit('handleUpdate');
+        handleResponse({ commit }) {
+            commit('handleResponse');
         },
-        async removeBySampleItem({ commit }, sampleItem) {
+        async remove({ commit }, sampleItem) {
             let filters = { sampleItemId: sampleItem.id };
             commit('remove', { level: 'compound', filters });
             commit('remove', { level: 'ion', filters });

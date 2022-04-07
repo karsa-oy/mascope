@@ -16,11 +16,6 @@ export default {
         itemRows: [],
         fileSchema: {},
         itemSchema: {},
-        // Parameters
-        paramPeakMinIntensity: 1,
-        paramPeakMinSeparation: 3,
-        paramMzRange: null,
-        paramTRange: null,
         // API
         $rooms: [],
         $response: null,
@@ -99,16 +94,6 @@ export default {
             state.batchRows
                 .push(...rows.map(row => ({ ...row, ...extras })));
         },
-        batchPeaksClear(state, batch) {
-            let ids = table
-                .select(state.itemRows, { batchId: batch.id })
-                .map(row => row.id);
-            for (let id of ids) {
-                table.update(state.itemRows,
-                    { id, peaks: null }
-                );
-            }
-        },
         // Item
         itemList(state, batch) {
             state.$itemListRequest = {
@@ -126,32 +111,6 @@ export default {
             state.itemRows
                 .push(...rows.map(row => ({ ...row, _selected: selected })));
         },
-        itemPeakClear(state, item) {
-            table.update(state.itemRows,
-                { id: item.id, peaks: null }
-            );
-        },
-        // Peak
-        itemPeakList(state, { sampleItemId, filename, parameters }) {
-            state.$peakListRequest = {
-                requestId: table.genId(),
-                sampleItemId,
-                filename,
-                ...parameters
-            }
-        },
-        peakListHandleResponse(state, {
-            sampleItemId,
-            mzsBytes,
-            heightsBytes,
-            tofsBytes
-        }) {
-            let sampleRow = table.get(state.itemRows, { id: sampleItemId });
-            let mzCol = new Float32Array(mzsBytes);
-            let heightCol = new Float32Array(heightsBytes);
-            let tofCol = new Float32Array(tofsBytes);
-            sampleRow.peaks = { mzCol, heightCol, tofCol };
-        },
         // selection
         selectionSet(state, { level, ids, selected }) {
             let levelRows = level + 'Rows';
@@ -168,11 +127,11 @@ export default {
         },
         fileUpdate(state, row) {
             // row: {key:value, ...}
-            state.$fileUpdateRequest = {...row, id: row.id || row.filename};
+            state.$fileUpdateRequest = { ...row, id: row.id || row.filename };
         },
         itemUpdate(state, rows) {
             // rows: [{key:value, ...},...]
-            rows.forEach( row => row.id = row.id || table.genId() )
+            rows.forEach(row => row.id = row.id || table.genId())
             state.$itemUpdateRequest = rows;
         },
         fileListRequest(state, requestObject) {
@@ -196,65 +155,18 @@ export default {
         batchList({ commit, rootState }) {
             commit('batchList', rootState.workspace.active)
         },
-        async itemPeakList({ commit, state }, {
-            item,
-            mzRange = state.paramMzRange,
-            tRange = state.paramTRange,
-            minPeakIntensity = state.paramPeakMinIntensity,
-            minPeakSeparation = state.paramPeakMinSeparation,
-            minPeakWidth = state.paramPeakMinWidth
-        }) {
-            commit('itemPeakList', {
-                sampleItemId: item.id,
-                filename: item.filename,
-                parameters: {
-                    mzRange,
-                    tRange,
-                    minPeakIntensity,
-                    minPeakSeparation,
-                    minPeakWidth
-                }
-            });
-        },
-        async batchPeakList({ dispatch, state }, batch) {
-            let batchItems = table.select(state.itemRows, { batchId: batch.id });
-            for (let item of batchItems) {
-                await dispatch('itemPeakList', { item });
-            }
-        },
-        async peakListMissing({ dispatch, state }) {
-            let peakRequestConditions = {
-                _selected: 'all',
-                peaks: null
-            }
-            let itemsRequiringPeaks = table
-                .select(state.itemRows, peakRequestConditions);
-            for (let item of itemsRequiringPeaks) {
-                await dispatch('itemPeakList', { item });
-            }
-        },
         // responses
         handleResponse({ state, commit, dispatch }) {
-            if (state.$response.type == 'peak-list') {
-                commit('peakListHandleResponse', state.$response.payload)
-                let sampleItem = table.get(state.itemRows, {
-                    id: state.$response.payload.sampleItemId
-                });
-                dispatch('match/request', {
-                    sampleItem
-                }, { root: true });
+            let { level, filters, rows } = state.$response.payload;
+            if (level == 'batch') {
+                commit('batchHandleResponse', { rows, filters });
+            } else if (level == 'item') {
+                dispatch('itemHandleResponse', { rows, filters })
             } else {
-                let { level, filters, rows } = state.$response.payload;
-                if (level == 'batch') {
-                    commit('batchHandleResponse', { rows, filters });
-                } else if (level == 'item') {
-                    dispatch('itemHandleResponse', { rows, filters })
-                } else {
-                    throw Error('Undefined sample row level in update');
-                }
+                throw Error('Undefined sample row level in update');
             }
         },
-        async itemHandleResponse({ state, commit, dispatch }, { rows, filters }) {
+        async itemHandleResponse({ state, commit }, { rows, filters }) {
             if (rows.length > 0) {
                 // use the first row to infer batch
                 let firstRow = rows[0];
@@ -263,55 +175,67 @@ export default {
                 let mapSelection = { all: 'all', some: 'none', none: 'none' };
                 let selected = mapSelection[batch._selected];
                 await commit('itemReplace', { rows, filters, selected });
-                dispatch('peakListMissing');
             } else {
                 console.log("Handled item response but no data was returned.")
             }
         },
         // selection
-        async batchSelectionToggle({ state, commit, dispatch }, batch) {
-            let batchWasActive = batch._active;
-            let batchWasOpen = batch._open;
+        async batchSelectionToggle({ dispatch }, batch) {
             let action = batch._selected == 'all' ? 'unselect' : 'select';
             if (action == 'select') {
-                await dispatch('batchActivate', batch);
-                await commit('selectionSet', {
-                    level: 'batch',
-                    ids: [batch.id],
-                    selected: 'all'
-                });
-                if (batchWasActive) {
-                    let batchItemIds = table
-                        .select(state.itemRows, { batchId: batch.id })
-                        .map(item => item.id);
-                    await commit('selectionSet', {
-                        level: 'item',
-                        ids: batchItemIds,
-                        selected: 'all'
-                    });
-                    dispatch('peakListMissing');
-                }
+                await dispatch('batchUnselectAllBut', batch);
+                await dispatch('batchSelect', batch);
             } else if (action == 'unselect') {
-                await commit('selectionSet', {
-                    level: 'batch',
-                    ids: [batch.id],
-                    selected: 'none'
-                });
-                if (batchWasOpen) {
-                    let batchItemIds = table
-                        .select(state.itemRows, { batchId: batch.id })
-                        .map(item => item.id);
-                    await commit('selectionSet', {
-                        level: 'item',
-                        ids: batchItemIds,
-                        selected: 'none'
-                    });
-                    dispatch('batchMatchClear', batch);
-                    commit('batchPeaksClear', batch);
-                }
-                await dispatch('batchDeactivate', batch);
+                await dispatch('batchUnselect', batch);
             } else {
                 throw Error('Sample batch selection in a bad state.');
+            }
+        },
+        async batchSelect({ dispatch, commit, state }, batch) {
+            await dispatch('batchActivate', batch);
+            await commit('selectionSet', {
+                level: 'batch',
+                ids: [batch.id],
+                selected: 'all'
+            });
+            let batchItemIds = table
+                .select(state.itemRows, { batchId: batch.id })
+                .map(item => item.id);
+            await commit('selectionSet', {
+                level: 'item',
+                ids: batchItemIds,
+                selected: 'all'
+            });
+            dispatch('batchMatchRequest', batch);
+        },
+        async batchUnselect({ dispatch, commit, state }, batch) {
+            await dispatch('batchMatchClear', batch);
+            await commit('selectionSet', {
+                level: 'batch',
+                ids: [batch.id],
+                selected: 'none'
+            });
+            let batchItemIds = table
+                .select(state.itemRows, { batchId: batch.id })
+                .map(item => item.id);
+            await commit('selectionSet', {
+                level: 'item',
+                ids: batchItemIds,
+                selected: 'none'
+            });
+            await dispatch('batchDeactivate', batch);
+        },
+        async batchUnselectAllBut({ state, dispatch }, batch) {
+            let fullySelectedBatches = table
+                .select(state.batchRows, { _selected: 'all' });
+            let partiallySelectedBatches = table
+                .select(state.batchRows, { _selected: 'some' });
+            let batchesToUnselect = table.remove([
+                ...fullySelectedBatches,
+                ...partiallySelectedBatches
+            ], { id: batch.id });
+            for (let batchToUnselect of batchesToUnselect) {
+                await dispatch('batchUnselect', batchToUnselect);
             }
         },
         async itemSelectionToggle({ state, commit, dispatch }, item) {
@@ -322,15 +246,14 @@ export default {
                 selected
             });
             if (selected == 'all') {
-                await dispatch(
-                    'itemPeakList', { item }
-                );
-            } else if (selected == 'none') {
-                await dispatch(
-                    'match/removeBySampleItem', item,
+                dispatch('batchUnselectAllBut', { id: item.batchId });
+                dispatch('match/request', item,
                     { root: true }
                 );
-                await commit('itemPeakClear', item);
+            } else if (selected == 'none') {
+                await dispatch('match/remove', item,
+                    { root: true }
+                );
             }
             // propegate batch selection state
             let batchItems = table
@@ -342,7 +265,7 @@ export default {
             });
         },
         // activation - fetching data and subscribing to backend updates
-        batchActivate({commit }, batch) {
+        batchActivate({ commit }, batch) {
             // only unactive batches can be activated
             if (!batch._active) {
                 commit('itemList', batch);
@@ -350,10 +273,9 @@ export default {
                 commit('activationSet', { batch, active: true });
             }
         },
-        batchDeactivate({commit, dispatch }, batch) {
+        batchDeactivate({ commit }, batch) {
             // open and selected batches can't be deactivated
             if (batch._selected == 'none' && !batch._open) {
-                dispatch('batchMatchClear', batch);
                 commit('itemClear', batch);
                 commit('batchUnfollow', batch);
                 commit('activationSet', { batch, active: false });
@@ -372,13 +294,20 @@ export default {
                 dispatch('batchDeactivate', batch);
             }
         },
-        // helpers
+        // match helpers
+        batchMatchRequest({ state, dispatch }, batch) {
+            let batchItems = table
+                .select(state.itemRows, { batchId: batch.id });
+            for (let item of batchItems) {
+                dispatch('match/request', item, { root: true });
+            }
+        },
         batchMatchClear({ state, dispatch }, batch) {
             let batchItems = table
                 .select(state.itemRows, { batchId: batch.id });
             for (let item of batchItems) {
                 dispatch(
-                    'match/removeBySampleItem', item,
+                    'match/remove', item,
                     { root: true }
                 );
             }
