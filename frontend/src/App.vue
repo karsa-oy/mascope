@@ -36,7 +36,7 @@ export default {
       $sampleResponse: "sample/$response",
       $sampleFileSchemaResponse: "sample/$fileSchemaResponse",
       $sampleItemSchemaResponse: "sample/$itemSchemaResponse",
-      $matchUpdate: "match/$update",
+      $matchResponse: "match/$response",
       $templateListResponse: "template/$listResponse",
     }),
     ready: function () {
@@ -57,7 +57,7 @@ export default {
       sampleBatchList: "sample/batchList",
       sampleHandleResponse: "sample/handleResponse",
       matchRequest: "match/request",
-      matchHandleUpdate: "match/handleUpdate",
+      matchHandleResponse: "match/handleResponse",
       templateSetRows: "template/setRows",
       keydown: "key/down",
       keyup: "key/up",
@@ -106,8 +106,8 @@ export default {
       this.sampleItemSchema(response);
     },
     // match
-    $matchUpdate: function () {
-      this.matchHandleUpdate();
+    $matchResponse: function () {
+      this.matchHandleResponse();
     },
     // template
     $templateListResponse: function (rows) {
