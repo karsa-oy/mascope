@@ -130,11 +130,6 @@ class TargetServiceNamespace(BaseClientNamespace):
         if t_range is None:
             # Full time range
             t_range = [0, cache_item.attrs['props']['length']]
-        
-        # Add integer index (MS sample bin)
-        cache_item = cache_item.assign_coords(
-            tof=('mz', np.arange(len(cache_item.mz)))
-        )
 
         filtered_peaks = filter_peaks(
             cache_item,

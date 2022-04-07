@@ -1,3 +1,4 @@
+from services.FileIoService import (load_file, zarr_sdk)
 
 from karsatof.lib.TwTool import TwMassCalibrate, TwTof2Mass
 
@@ -131,9 +132,10 @@ def mz_calibrate_tof(peak_tof, peak_mz, exact_mz, nbr_tof_samples):
 
     stats = {
         'mz': mass,
+        'new_mz': new_peak_mz,
         'pre_dmz': pre_dmz,
         'post_dmz': post_dmz,
-        'per_dmz_norm': pre_dmz_norm,
+        'pre_dmz_norm': pre_dmz_norm,
         'post_dmz_norm': post_dmz_norm
     }
 
