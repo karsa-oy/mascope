@@ -5,23 +5,18 @@ import numpy as np
 
 from karsalib.client import BaseClientNamespace, BaseServiceClient
 from karsalib.logging import Logger
+from karsalib.peak import mz_calibrate_tof
 from karsalib.util import parse_cmd_args
 
 from karsatof.lib.TwTool import TwTof2Mass
 from karsatof.kgenerator import remove_duplicate_mz_values
 
-from scenthound.karsavlm.msAlign import find_vlm
-from scenthound.kfeeder import KFeeder, FeederProcessor
-from scenthound.kworker import KEncoder
-from scenthound.kcollector import KCollector
 
 from services.FileIoService import (
     get_zarr_var_shape,
     load_coord,
-    load_file,
     update_props,
     update_zarr_array_coord,
-    zarr_sdk,
 )
 
 
@@ -31,28 +26,27 @@ cache = {}
 class SignalProcessorNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to Router """
 
-    async def on_fit_mz_calib_function(self, data):
+    async def on_sample_mz_fit_request(self, data):
         value = data['value']
         client_room = data.get('client_room') or data['cookies']['src_sid'][0]
 
         mz_calib, stats = mz_calibrate_tof(
-            value['peak_tofs'],
-            value['peak_mzs'],
-            value['exact_mzs'],
-            int(np.max(value['peak_tofs'])+1) # TODO: nbrSamples
-        )
-        
+            value['peakTofs'],
+            value['peakMzs'],
+            value['exactMzs']
+            )
         await self.emit_client_notification(
-            'mz_calibration', {
+            'sample_mz_fit_response', {
                 'fit': mz_calib,
                 'stats': {
-                    'mz': stats['mz'].astype(np.float32).tobytes(),
-                    'pre_dmz': stats['pre_dmz'].astype(np.float32).tobytes(),
-                    'post_dmz': stats['post_dmz'].astype(np.float32).tobytes()
+                    'postMz': stats['new_mz'].astype(np.float32).tobytes(),
+                    'postDmz': stats['post_dmz'].astype(np.float32).tobytes(),
+                    'postDmzNorm': stats['post_dmz_norm'],
+                    'preDmzNorm': stats['pre_dmz_norm'],
                 }
             },
             room=client_room
-        )
+            )
         
     async def on_mz_calibrate_samples(self, data):
         global cache
