@@ -54,7 +54,9 @@ def identify_matches(peak_mzs, peak_heights, target_isotope_df, mz_tolerance):
             isotope_match_df.loc[target_isotope_index, 'samplePeakMz'] = peak_mz
             isotope_match_df.loc[target_isotope_index, 'samplePeakHeight'] = peak_height
 
-    isotope_match_df = isotope_match_df.dropna(subset=['samplePeakMz'])
+    isotope_match_df = isotope_match_df \
+        .dropna(subset=['samplePeakMz']) \
+        .reset_index()
 
     return isotope_match_df
 
@@ -75,6 +77,9 @@ def calculate_match_stats(isotope_match_df, sample_item, iso_abu_tolerance, mz_t
     isotope_match_df.loc[:, 'isoAbuError'] = np.nan
     isotope_match_df.loc[:, 'mzError'] = np.nan
     isotope_match_df.loc[:, 'matchScore'] = np.nan
+    isotope_match_df.loc[:, 'sampleItemId'] = np.nan
+
+    isotope_match_df.reset_index(inplace=True)
 
     # STEP 1 - Select good isotope level matches
         
@@ -90,7 +95,7 @@ def calculate_match_stats(isotope_match_df, sample_item, iso_abu_tolerance, mz_t
         isotope_match_df, 
         ion_level_peak_sums\
             .rename(columns={'samplePeakHeight': 'samplePeakHeightSum'}),
-        on=['targetIonId'], how='outer'
+        on=['targetIonId'], how='left'
     )
 
     # compute relative peak heights
@@ -126,6 +131,7 @@ def calculate_match_stats(isotope_match_df, sample_item, iso_abu_tolerance, mz_t
             samplePeakHeight = ('samplePeakHeight', 'sum') \
             ) \
         .reset_index()
+
     # append sample id
     ion_match_df.loc[:, 'sampleItemId'] = sample_item['id']
 
