@@ -206,10 +206,10 @@ export default {
                 ids: batchItemIds,
                 selected: 'all'
             });
-            dispatch('batchMatchRequest', batch);
+            dispatch('match/request', batch, { root: true });
         },
         async batchUnselect({ dispatch, commit, state }, batch) {
-            await dispatch('batchMatchClear', batch);
+            await dispatch('match/clear', batch, { root: true });
             await commit('selectionSet', {
                 level: 'batch',
                 ids: [batch.id],
@@ -240,28 +240,24 @@ export default {
         },
         async itemSelectionToggle({ state, commit, dispatch }, item) {
             let selected = selection.propegateDown(item);
+            // if selecting
+            if (selected == 'all') {
+                // deselect all batches except current
+                await dispatch('batchUnselectAllBut', { id: item.batchId });
+            }
+            // set batch selection state
+            let batchItems = table
+                .select(state.itemRows, { batchId: item.batchId });
+            await commit('selectionSet', {
+                level: 'batch',
+                ids: [item.batchId],
+                selected: selection.propegateUp(batchItems)
+            });
+            // set item selection state
             commit('selectionSet', {
                 level: 'item',
                 ids: [item.id],
                 selected
-            });
-            if (selected == 'all') {
-                dispatch('batchUnselectAllBut', { id: item.batchId });
-                dispatch('match/request', item,
-                    { root: true }
-                );
-            } else if (selected == 'none') {
-                await dispatch('match/remove', item,
-                    { root: true }
-                );
-            }
-            // propegate batch selection state
-            let batchItems = table
-                .select(state.itemRows, { batchId: item.batchId });
-            commit('selectionSet', {
-                level: 'batch',
-                ids: [item.batchId],
-                selected: selection.propegateUp(batchItems)
             });
         },
         // activation - fetching data and subscribing to backend updates
@@ -292,24 +288,6 @@ export default {
             if (batch._open) {
                 commit('batchClose', batch);
                 dispatch('batchDeactivate', batch);
-            }
-        },
-        // match helpers
-        batchMatchRequest({ state, dispatch }, batch) {
-            let batchItems = table
-                .select(state.itemRows, { batchId: batch.id });
-            for (let item of batchItems) {
-                dispatch('match/request', item, { root: true });
-            }
-        },
-        batchMatchClear({ state, dispatch }, batch) {
-            let batchItems = table
-                .select(state.itemRows, { batchId: batch.id });
-            for (let item of batchItems) {
-                dispatch(
-                    'match/remove', item,
-                    { root: true }
-                );
             }
         },
     },

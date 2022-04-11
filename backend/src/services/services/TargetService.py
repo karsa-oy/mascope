@@ -92,10 +92,10 @@ class TargetServiceNamespace(BaseClientNamespace):
                                             )
 
     async def on_match_request(self, data):
-        value = data['value']
         client_room = data.get('client_room') or data['cookies']['src_sid'][0]
 
-        sample_item = value['sampleItem'] 
+        value = data['value']
+        sample_item = value['sampleItem']
         filename = sample_item['filename']
 
         # peak parameters
@@ -173,37 +173,31 @@ class TargetServiceNamespace(BaseClientNamespace):
 
         # match peaks to isotopes
         isotope_match_df = identify_matches(
-            peak_mzs, 
-            peak_heights, 
-            target_isotope_df, 
+            peak_mzs,
+            peak_heights,
+            target_isotope_df,
             mz_tolerance
         )
 
-        # append peak TOFs
-        match_tofs = []
-        for peak_id in isotope_match_df['samplePeakId']:
-            if not np.isnan(peak_id):
-                match_tofs.append(peak_tofs[int(peak_id)])
-            else:
-                match_tofs.append(None)
-        isotope_match_df.loc[:, 'samplePeakTof'] = match_tofs
+        if len(isotope_match_df) > 0:
+            # append peak TOFs
+            match_tofs = []
+            for peak_id in isotope_match_df['samplePeakId']:
+                if not np.isnan(peak_id):
+                    match_tofs.append(peak_tofs[int(peak_id)])
+                else:
+                    match_tofs.append(None)
+            isotope_match_df.loc[:, 'samplePeakTof'] = match_tofs
 
-        # calculate ion and compound target match scores
-        match_stats = calculate_match_stats(
-            isotope_match_df, 
-            sample_item, 
-            iso_abu_tolerance, 
-            mz_tolerance
-        )
-
-        await self.emit_client_notification(
-            'match_response', {
-                'requestId' : value['requestId'],
-                'matchStats': match_stats,
-                'sampleItem': sample_item
-            },
-            room=client_room
-        )
+            # calculate ion and compound target match scores
+            return calculate_match_stats(
+                isotope_match_df,
+                sample_item,
+                iso_abu_tolerance,
+                mz_tolerance
+            )
+        else:
+            return None
 
 
 class TargetServiceClient(BaseServiceClient):
