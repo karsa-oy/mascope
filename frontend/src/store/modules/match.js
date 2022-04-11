@@ -1,4 +1,5 @@
 import table from '$lib/table';
+import { handleCalls } from '$lib/api';
 
 export default {
     namespaced: true,
@@ -18,37 +19,27 @@ export default {
         paramTRange: null,
         // API
         $request: {},
-        $response: null
     },
     mutations: {
-        makeRequest(state, { sampleItem, targetIsotopes }) {
-            let requestId = table.genId();
-            state.$request = {
-                requestId,
-                sampleItem,
-                targetIsotopes,
-                mzTolerance: state.paramMzTolerance,
-                isoAbuTolerance: state.paramIsoRatioTolerance,
-                // peak params
-                mzRange: state.paramMzRange,
-                tRange: state.paramTRange,
-                minPeakIntensity: state.paramPeakMinIntensity,
-                minPeakSeparation: state.paramPeakMinSeparation,
-            };
+        add(state, { matches }) {
+            state.compoundRows.push(...matches.compound);
+            state.ionRows.push(...matches.ion);
+            state.isotopeRows.push(...matches.isotope);
         },
-        handleResponse(state) {
-            let matchStats = state.$response.matchStats
-            state.compoundRows.push(...matchStats.compound);
-            state.ionRows.push(...matchStats.ion);
-            state.isotopeRows.push(...matchStats.isotope);
-        },
-        remove(state, { level, filters }) {
+        remove(state, { level, sampleItemIds }) {
             let levelRows = level + 'Rows';
-            state[levelRows] = table.remove(state[levelRows], filters);
+            state[levelRows] = state[levelRows].filter(
+                (row) => !sampleItemIds.includes(row.sampleItemId)
+            );
         }
     },
     actions: {
-        request({ commit, rootState }, sampleItem) {
+        // add
+        async request({ state, dispatch, rootState }, batch) {
+            // prepare sample items
+            let sampleItems = table
+                .select(rootState.sample.itemRows, { batchId: batch.id });
+            // prepare targets
             let getCompoundId = (ionId) => ({
                 compoundId: table.get(rootState.target.ionRows, {
                     id: ionId
@@ -59,20 +50,48 @@ export default {
                     ...row,
                     ...getCompoundId(row.ionId)
                 }));
-            commit('makeRequest', {
-                sampleItem,
-                targetIsotopes
-            })
+            // prepare parameters
+            let params = {
+                // match params
+                mzTolerance: state.paramMzTolerance,
+                isoAbuTolerance: state.paramIsoRatioTolerance,
+                // peak params
+                mzRange: state.paramMzRange,
+                tRange: state.paramTRange,
+                minPeakIntensity: state.paramPeakMinIntensity,
+                minPeakSeparation: state.paramPeakMinSeparation,
+            }
+            // request matches
+            handleCalls({
+                api: rootState.api,
+                name: 'match_request',
+                values: sampleItems.map((sampleItem) => {
+                    return {
+                        requestId: table.genId(),
+                        sampleItem,
+                        targetIsotopes,
+                        ...params
+                    }
+                }),
+                handler: async (response) => {
+                    await dispatch('match/handleResponse', response, { root: true });
+                }
+            });
         },
-        handleResponse({ commit }) {
-            commit('handleResponse');
+        // remove
+        async handleResponse({ commit }, response) {
+            if (response) {
+                await commit('add', { matches: response });
+            }
         },
-        async remove({ commit }, sampleItem) {
-            let filters = { sampleItemId: sampleItem.id };
-            commit('remove', { level: 'compound', filters });
-            commit('remove', { level: 'ion', filters });
-            commit('remove', { level: 'isotope', filters });
-        }
+        async clear({ commit, rootState }, batch) {
+            let sampleItemIds = table
+                .select(rootState.sample.itemRows, { batchId: batch.id })
+                .map(item => item.id);
+            commit('remove', { level: 'compound', sampleItemIds });
+            commit('remove', { level: 'ion', sampleItemIds });
+            commit('remove', { level: 'isotope', sampleItemIds });
+        },
     },
     getters: {
         exists: function (state) {
