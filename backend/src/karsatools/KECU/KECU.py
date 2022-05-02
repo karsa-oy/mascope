@@ -1,15 +1,20 @@
+"""KECU application
+
+Connects to KECU and provides a graphical user interface to control and monitor
+devices connected to it.
+"""
+
 import asyncio
 import csv
-import sys
+import os
 
 from datetime import datetime
 
-from app import KarsaClient
-from meas import KarsaMeasClient
-from meas_udp import KarsaMeasClientUDP
-from nodes import NodeType, DEVICES
-from udp import KarsaMeasProtocol
-from ui import App
+from karsaecu.app import KarsaClient
+from karsaecu.devices import DEVICES
+from karsaecu.meas import KarsaMeasClient
+from karsaecu.meas_udp import KarsaMeasClientUDP
+from karsaecu.ui import App
 
 
 KECU_TCP_HOST = '192.168.1.200' # KECU IP address
@@ -25,16 +30,46 @@ class KECU():
         self._app = KarsaClient(KECU_TCP_HOST, KRS_APP_PORT)
         self._meas = KarsaMeasClient(KECU_TCP_HOST, KRS_MEAS_PORT)
         self._meas_udp = KarsaMeasClientUDP(KECU_UDP_HOST, KECU_UDP_PORT)
-        self.nodes = {}
+        self.connected_callbacks = []
+        self.nodes_callbacks = []
+
+    @property
+    def connected(self):
+        return (self._app.connected and
+                self._meas.connected and
+                self._meas_udp.connected
+                )
+
+    @connected.setter
+    def connected(self, connected: bool):
+        self._connected = connected
+        for callback in self.connected_callbacks:
+            callback()
+
+    @property
+    def nodes(self):
+        return self._app.nodes
+
+    @nodes.setter
+    def nodes(self, nodes: dict):
+        self._nodes = nodes
+        for callback in self.nodes_callbacks:
+            callback(nodes)
+
+    @property
+    def version(self) -> str:
+        return self._app._version
 
     async def connect(self):
         await self._app.connect()
         await self._meas.connect()
         await self._meas_udp.connect()
+        for callback in self.connected_callbacks:
+            callback()
 
     async def disconnect(self):
-        # TODO: Stop all measurements
-        for node_id, node in self._app._node_dict.items():
+        print("Disconnecting...")
+        for node_id, node in self.nodes.items():
             try:
                 await node.stop_measurement()
             except Exception as e:
@@ -45,29 +80,41 @@ class KECU():
         await self._meas_udp.close()
 
     async def initialize(self):
+        self.connected = (
+            self._app.connected and
+            self._meas.connected and
+            self._meas_udp.connected
+            )
+        await self._app.get_version()
         await self._app.get_node_list()
-        self.nodes = self._app._node_dict
+        self.nodes = self._app.nodes
+        for node_id, node in self.nodes.items():
+            await node.initialize()
 
     async def run(self):
         try:
             while True:
-                print('.')
+                if not self.connected:
+                    # print(':')
+                    await asyncio.sleep(1)
+                    continue
+                # print('.')
                 try:
                     node_id, ntf, data = await asyncio.wait_for(
-                                            self.wait_for_notification(),
-                                            timeout=1
-                                            )
+                        self.wait_for_notification(),
+                        timeout=1
+                        )
                 except asyncio.TimeoutError:
                     continue
                 except Exception as e:
                     print("Exception in KECU.run(): %s" %e)
-                print('..')
+                # print('..')
                 try:
                     # Notify app
                     ntf_handler = getattr(self._app,
                                           'on_{}'.format(ntf.name)
                                           )
-                    await ntf_handler(node_id)
+                    await ntf_handler(node_id, data)
                 except AttributeError:
                     pass
                 except Exception as e:
@@ -75,9 +122,10 @@ class KECU():
                 try:
                     # Notify node
                     # print('on_{}({})'.format(ntf.name, data))
-                    ntf_handler = getattr(self.nodes[node_id],
-                                          'on_{}'.format(ntf.name)
-                                          )
+                    ntf_handler = getattr(
+                        self.nodes[node_id],
+                        'on_{}'.format(ntf.name)
+                        )
                     await ntf_handler(data)
                 except Exception as e:
                     print(e)
@@ -92,7 +140,12 @@ class KECU():
 
     async def writer(self, interval=1):
         def new_file():
-            filename = datetime.now().strftime('%Y%m%d') + '_kecu.dat'
+            if not os.path.exists('data'):
+                os.mkdir('data')
+            filename = os.path.join(
+                'data',
+                'KECU_' + datetime.now().strftime('%Y%m%d') + '.csv'
+            )
             try:
                 with open(filename, 'x') as f:
                     writer = csv.writer(f)
@@ -101,18 +154,21 @@ class KECU():
                 pass
             return filename
 
-        field_names = ['timestamp',
-                       *[(node_id.name+'('+channel.description+')')
-                         for node_id, device in DEVICES.items() for _, channel in device.channels.items()
-                         ]
-                       ]
+        field_names = [
+                'timestamp (UTC)',
+                *[
+                (node_id.name+'('+channel.description+')')
+                for node_id, device in DEVICES.items()
+                for _, channel in device.channels.items()
+                ]
+            ]
         
-        date_now = datetime.now()
+        date_now = datetime.utcnow()
         date_prev = date_now
         filename = new_file()
         
         while True:
-            date_now = datetime.now()
+            date_now = datetime.utcnow()
             if date_now.day != date_prev.day:
                 # New file per day
                 filename = new_file()
@@ -138,32 +194,42 @@ class KECU():
 
 
 async def initialize_kecu(kecu):
-    await kecu.connect()
-    await kecu.initialize()
-    for node_id, node in kecu._app._node_dict.items():
-        if node._device.node_type == NodeType.MFC:
-            await node.start_measurement(index=0x2F00, subindex=0x01, interval=10) # Flow setpoint
-            await node.start_measurement(index=0x2C00, subindex=0x01, interval=10) # Flow monitor
-        elif node._device.node_type == NodeType.AI:
-            await node.start_measurement(interval=10)
-        elif node._device.node_type == NodeType.DIO:
-            await node.start_measurement(interval=10)
+    while True:
+        try:
+            await asyncio.wait_for(
+                kecu.connect(),
+                timeout=2
+                )
+            break
+        except asyncio.TimeoutError:
+            print("Connection timed out")
+            await asyncio.sleep(1)
+            continue
+    print("Initializing...")
+    await asyncio.wait_for(kecu.initialize(), None)
+    print("Initialized")
 
 
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()
     tasks = []
-    
     kecu = KECU()
-    loop.run_until_complete(initialize_kecu(kecu))
+    # KECU initialization
+    tasks.append(
+        asyncio.shield(
+            loop.create_task(initialize_kecu(kecu))
+            )
+        )
     # KECU main loop
-    tasks.append(loop.create_task(kecu.run()))
-
-    if len(sys.argv) > 1 and 'csv' in sys.argv:
-        # KECU csv writer
-        tasks.append( loop.create_task(kecu.writer()) )
-
+    tasks.append(
+        loop.create_task(kecu.run())
+        )
+    # KECU csv writer
+    tasks.append(
+        loop.create_task(kecu.writer())
+        )
     app = App(loop, kecu, tasks=tasks)
+    kecu.nodes_callbacks.append(app.update_fields)
     try:
         loop.run_forever()
     except KeyboardInterrupt:

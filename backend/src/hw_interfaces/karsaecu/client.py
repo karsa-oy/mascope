@@ -1,7 +1,7 @@
 import asyncio
 
-from errors import ErrorCode
-from messages import APP_CMD_MIN_LEN, APP_RSP_MIN_LEN, ETX, STX
+from .errors import ErrorCode
+from .messages import APP_CMD_MIN_LEN, APP_RSP_MIN_LEN, ETX, STX
 
 
 BUFFER_SIZE = 256   # TCP socket reader buffer size limit
@@ -9,6 +9,18 @@ BUFFER_SIZE = 256   # TCP socket reader buffer size limit
 
 class AsyncTCPClient():
     def __init__(self, host: str, port: int) -> None:
+        """Asynchronous TCP client
+
+        Client used to transmit
+        command messages to KECU.
+
+        Parameters
+        ----------
+        host : str
+            KECU IP address
+        port : int
+            KECU TCP port
+        """
         self._host = host
         self._port = port
         self._reader = None
@@ -44,15 +56,7 @@ class AsyncTCPClient():
     async def get_response(self, command: bytes) -> bytes:
         """Read response to command message from the socket.
 
-        Parameters
-        ----------
-        command : bytes
-            Command to which expecting response
-
-        Returns
-        -------
-        bytes
-            Response message payload
+        Refer to interface specifications for message format.
         """
         # Read response message header, to get payload length
         header = await self._reader.readexactly(3)
@@ -78,14 +82,9 @@ class AsyncTCPClient():
         raise Exception
         
     async def send_cmd(self, command: bytes, payload: bytes) -> None:
-        """[summary]
+        """Send command to KECU.
 
-        Parameters
-        ----------
-        command : bytes
-            [description]
-        payload : bytes
-            [description]
+        Refer to interface specifications for message format.
         """
         l = len(payload)
         c = bytearray(APP_CMD_MIN_LEN + l)
@@ -100,19 +99,9 @@ class AsyncTCPClient():
         await self._writer.drain()
         
     async def send_cmd_wait_resp(self, command: bytes, payload: bytes) -> str:
-        """[summary]
+        """Send a command message to KECU and wait for response.
 
-        Parameters
-        ----------
-        command : bytes
-            [description]
-        payload : bytes
-            [description]
-
-        Returns
-        -------
-        str
-            [description]
+        Refer to interface specifications for message formats.
         """
         await self.send_cmd(command, payload)
         return await self.get_response(command)

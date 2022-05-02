@@ -1,3 +1,4 @@
+import asyncio_dgram
 import setuptools
 
 
@@ -13,7 +14,7 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
 #    packages=setuptools.find_packages(),
-    packages=['sample_mover', ],
+    packages=['KECU', 'sample_mover'],
     include_package_data=True,
     python_requires=">=3.6",
     classifiers=[
@@ -21,11 +22,13 @@ setuptools.setup(
         'License :: Other/Proprietary License',
         'Operating System :: OS Independent',
     ],
-    # install_requires=[
-    #     'karsalib',
-    #     ...
-    # ],
+    install_requires=[
+        'pyinstaller',
+    ],
     extras_require={
+        'KECU': [
+            asyncio_dgram,
+        ],
         'sample_mover': [
         ],
         'all': [

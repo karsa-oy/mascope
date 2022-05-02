@@ -1,10 +1,14 @@
-from client import AsyncTCPClient
-from messages import ETX, MIN_MEAS_MSG_SIZE, STX, Notification
-from nodes import NodeId
+from .client import AsyncTCPClient
+from .messages import ETX, MIN_MEAS_MSG_SIZE, STX, Notification
+from .nodes import NodeId
 
 
 class KarsaMeasClient(AsyncTCPClient):
     def __init__(self, host, port):
+        """TCP measurement client
+
+        Currently no measurement data is transmitted via TCP.
+        """
         super().__init__(host, port)
 
     async def get_data(self) -> bytes:
@@ -26,4 +30,4 @@ class KarsaMeasClient(AsyncTCPClient):
             ntf = Notification(type_)
             data = payload[1:]
             return node_id, ntf, data
-        raise Exception("Failed to read data")
+        print("Failed to read data")
