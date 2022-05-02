@@ -1,12 +1,23 @@
-import asyncio
 import asyncio_dgram
 
-from messages import ETX, MIN_MEAS_MSG_SIZE, STX, Notification
-from nodes import NodeId
+from .messages import ETX, MIN_MEAS_MSG_SIZE, STX, Notification
+from .nodes import NodeId
 
 
 class KarsaMeasClientUDP():
     def __init__(self, host, port):
+        """UDP measurement client
+
+        Asynchronous datagram to read measurement
+        notifications from KECU.
+
+        Parameters
+        ----------
+        host : str
+            UDP host address
+        port : int
+            UDP port
+        """
         self._host = host
         self._port = port
         self._stream = None
@@ -43,6 +54,6 @@ class KarsaMeasClientUDP():
             node_id = NodeId(payload[0])
             ntf = Notification(type_)
             data = payload[1:]
-            print(node_id, ntf, data)
+            # print(node_id, ntf, data)
             return node_id, ntf, data
         raise Exception("Failed to read data")

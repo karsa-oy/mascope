@@ -2,7 +2,10 @@ from enum import Enum
 
 
 class ErrorCode(Enum):
-    # Reply message error codes
+    """Reply message error codes
+
+    Refer to interface specifications.
+    """
     KRS_SUCCESS	= 0x00
     KRS_ERR_UNKOWN_COMMAND = 0x01
     KRS_ERR_INVALID_PARAM = 0x02
