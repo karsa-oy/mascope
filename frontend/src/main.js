@@ -19,6 +19,7 @@ import ThePageBatchOverview from "./components/ThePageBatchOverview";
 import ThePageDataManagement from "./components/ThePageDataManagement";
 import ThePageSampleManagement from "./components/ThePageSampleManagement";
 import ThePageSettings from "./components/ThePageSettings";
+import ThePageWorkspaceHome from "./components/ThePageWorkspaceHome";
 
 Vue.use(VueRouter);
 
@@ -39,6 +40,9 @@ const router = new VueRouter({
   }, {
     path: '/settings',
     component: ThePageSettings
+  }, {
+    path: '/workspace-home',
+    component: ThePageWorkspaceHome
   }, {
     path: "*",
     redirect: '/'

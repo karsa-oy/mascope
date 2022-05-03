@@ -15,7 +15,7 @@
 
 <script>
 import TheLayout from "./TheLayout";
-import TheMainMenu from "./TheMainMenu.vue";
+import TheMainMenu from "./TheMainMenu";
 
 export default {
   name: "TheLayoutSidebar",
