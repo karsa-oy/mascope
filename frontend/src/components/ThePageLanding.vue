@@ -1,9 +1,12 @@
 <template>
-  <the-layout>
-    <div class="container">
-      <section class="base-home-page">
+  <the-layout-sidebar>
+    <section style="padding: 1em 0em 2em 0em">
+      <h1 class="title">Karsa Mascope</h1>
+    </section>
+    <div class="columns">
+      <div class="column is-half">
         <section style="padding: 1em 0em 2em 0em">
-          <h1 class="title">Karsa Mascope</h1>
+          <h1 class="title">Workspaces:</h1>
         </section>
         <section class="base-tile-container">
           <base-workspace-tile
@@ -15,7 +18,7 @@
         <section style="padding: 0.5em">
           <b-button
             type="is-primary"
-            style="float: right"
+            style="position: fixed; left: 5em; bottom: 2em"
             @click="
               () => {
                 modalProps = {
@@ -29,9 +32,16 @@
           >
             Create workspace
           </b-button>
-
+        </section>
+      </div>
+      <div class="column is-half">
+        <section style="padding: 1em 0em 2em 0em">
+          <h1 class="title">Acquisitions:</h1>
+        </section>
+        <section style="padding: 0.5em">
           <b-button
-            style="float: right; margin-right: 10px"
+            type="is-primary"
+            style="position: fixed; right: 5em; bottom: 2em"
             @click="
               () => {
                 modalProps = {
@@ -46,13 +56,13 @@
             Save Sample File Attributes
           </b-button>
         </section>
-      </section>
+      </div>
     </div>
-  </the-layout>
+  </the-layout-sidebar>
 </template>
 
 <script>
-import TheLayout from "./TheLayout";
+import TheLayoutSidebar from "./TheLayoutSidebar";
 import BaseWorkspaceTile from "./BaseWorkspaceTile";
 
 import { bindState } from "$lib/store";
@@ -62,14 +72,18 @@ import { mapMutations } from "vuex";
 export default {
   name: "ThePageLanding",
   components: {
-    TheLayout,
+    TheLayoutSidebar,
     BaseWorkspaceTile,
   },
   computed: {
     ...bindState({
+      workspaceActive: "workspace/active",
       workspaces: "workspace/$rows",
       modalProps: "modal/workspaceSaveProps",
     }),
+  },
+  mounted() {
+    this.workspaceActive = null;
   },
   methods: {
     ...mapMutations({

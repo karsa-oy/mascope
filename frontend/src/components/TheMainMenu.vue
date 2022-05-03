@@ -4,45 +4,61 @@
 </template>
 
 <script>
-import BaseMenuBar from "./BaseMenuBar.vue";
+import BaseMenuBar from "./BaseMenuBar";
+
+import { bindState } from "$lib/store";
 
 export default {
   name: "TheMainMenu",
   components: {
     BaseMenuBar,
   },
-  data: function () {
-    return {
-      buttons: [
+  computed: {
+    ...bindState({
+      workspaceActive: "workspace/active",
+    }),
+    buttons() {
+      return [
+        {
+          icon: "home",
+          label: "Workspace home",
+          path: "/workspace-home",
+          visible: this.workspaceActive,
+        },
         {
           icon: "flask",
           label: "Batch overview",
           path: "/batch-overview",
+          visible: this.workspaceActive,
         },
         {
           icon: "table-multiple",
           label: "Data management",
           path: "/data-management",
+          visible: this.workspaceActive,
         },
         {
           icon: "file-import-outline",
           label: "Sample management",
           path: "/sample-management",
-        },
-      ],
-      footerButtons: [
+          visible: this.workspaceActive,
+        }].filter(b => b.visible);
+    },
+    footerButtons() {
+      return [
         {
           icon: "tune",
           label: "Settings",
           path: "/settings",
+          visible: true,
         },
         {
           icon: "logout-variant",
           label: "Change workspace",
           path: "/",
-        },
-      ],
-    };
+          visible: true,
+        }].filter(b => b.visible);
+    },
   },
 };
 </script>

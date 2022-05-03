@@ -39,9 +39,11 @@ export default {
     mutations: {
         // Batch
         batchList(state, workspace) {
-            state.$batchListRequest = {
-                requestId: table.genId(),
-                workspaceId: workspace.id
+            if ( workspace ) {
+                state.$batchListRequest = {
+                    requestId: table.genId(),
+                    workspaceId: workspace.id
+                }
             }
         },
         batchCreate(state, batch) {
