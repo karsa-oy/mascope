@@ -13,6 +13,7 @@ import asyncio
 import os
 import json
 from time import time
+from datetime import timedelta
 
 import numpy as np
 from scipy.signal import find_peaks
@@ -32,7 +33,7 @@ cache = {}
 
 NO_DATA_LOGGING_DEFAULT = True
 
-data_path = os.environ.get('MASCOPE_DATADIR')
+data_path = os.environ.get('MASCOPE_DATADIR', '.')
 db_path = os.path.join(data_path, 'samples.db')
 db = SampleManagerDB(db_path)
 
@@ -309,13 +310,19 @@ class SampleServiceNamespace(BaseClientNamespace):
         committed_length = value['committed_length']
         if committed_length >= full_length:
             # update sample store
+            instrument = filename.split('_')[0]
             dt = parse_datetime_from_item_filename(filename)
+            title = value.get('title', "")
+            utc_offset = timedelta(seconds=int(value['utc_offset']))
             db.sample_file_insert(
+                id=filename,
                 filename=filename,
-                instrument=filename.split('_')[0],
+                instrument=instrument,
+                title=title,
                 datetime=dt.isoformat(),
+                datetime_utc=(dt - utc_offset).isoformat(),
                 length=committed_length,
-                range=json.dumps(value['mz_range'])
+                range=json.dumps(value['range'])
             )
 
     # template table handlers
@@ -424,7 +431,7 @@ class SampleServiceNamespace(BaseClientNamespace):
         else:
             records = db.sample_file_get(**value)
         for record in records:
-            record['attributes'] = json.loads(record['attributes'])
+            record['attributes'] = json.loads(record.get('attributes') or '[]')
         result = {'records': records, 'dummy': time()}  # ensure response generated, when data not changed
         if timeout:
             return result

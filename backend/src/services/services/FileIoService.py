@@ -10,7 +10,7 @@ Created on Thu May  7 12:43:13 2020
 """
 
 import os
-import pathlib
+from datetime import datetime, timezone
 import asyncio
 import fnmatch
 import json
@@ -37,7 +37,7 @@ client = None
 # Cache for data arrays
 cache = LRUDict(10)
 
-data_path = os.environ.get('MASCOPE_DATADIR')
+data_path = os.environ.get('MASCOPE_DATADIR', '.')
 base_path = os.path.join(data_path, 'instrument')
 
 class zarr_sdk:
@@ -112,10 +112,13 @@ class zarr_sdk:
                                 coords=[[]],
                                 name='signal_period'
                                 )
+        t = datetime.now()
+        utc_offset = (t - t.astimezone(timezone.utc).replace(tzinfo=None)).seconds
         properties = {'filename': filename,
                         'length': float(t_range[1]),
                         'committed_length': 0.,
                         'range': [ float(mz[0]), float(mz[-1]) ],
+                        'utc_offset': utc_offset,
                     }
         write_props(filename, properties)
 
