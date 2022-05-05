@@ -11,6 +11,9 @@ if defined CONDA_EXE (
 :: Start Router locally, if not already running
 powershell Test-NetConnection 127.0.0.1 -p 5010 | find /i "failed" && start cmd /k karsa-router-service
 
+:: Set global path to mascope data directory
+set MASCOPE_DATADIR=.
+
 :: Start TOFService
 start cmd /k karsa-tof-service --ns=TofDaq || goto :error
 
@@ -19,9 +22,9 @@ pushd .venv || goto :error
 
 :: Start other services
 start cmd /k karsa-fileio-service --ns=TofDaq || goto :error
-:: start cmd /k karsa-file-streamer --config=../services/services/file_streamer_config/h5.yaml || goto :error
+:: start cmd /k karsa-file-streamer --config=../services/services/file_streamer_config/h5.yaml  --transit || goto :error
 :: start cmd /k karsa-fileio-service --ns=H5Data || goto :error
-:: start cmd /k karsa-file-streamer --config=../services/services/file_streamer_config/raw.yaml || goto :error
+:: start cmd /k karsa-file-streamer --config=../services/services/file_streamer_config/raw.yaml  --transit || goto :error
 :: start cmd /k karsa-fileio-service --ns=OrbitrapData || goto :error
 
 echo Wait for FileIO services to start:

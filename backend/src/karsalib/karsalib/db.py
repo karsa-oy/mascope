@@ -170,9 +170,10 @@ class SampleFileTable(DBTable):
         self.schema = [
             ('id', 'varchar(256)', 'PRIMARY KEY'),
             ('filename', 'varchar(256)', 'NOT NULL'),
-            ('title', 'varchar(256)', 'NOT NULL'),
+            ('title', 'varchar(256)'),
             ('instrument', 'varchar(64)'),
             ('datetime', 'varchar(64)'),
+            ('datetime_utc', 'varchar(64)'),
             ('length', 'real'),
             ('range', 'json'),
             ('description', 'text'),

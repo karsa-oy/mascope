@@ -8,7 +8,7 @@
             <div class="column is-2 base-browser-sidebar">
               <the-pane-browser-sample></the-pane-browser-sample>
             </div>
-            <div class="column">
+            <div class="column" style="padding-right: 1em">
               <div style="padding-top: 0.5em; padding-bottom: 1em">
                 <h1 style="font-size: 16px; text-align: left">
                   <p>
@@ -183,10 +183,13 @@ export default {
       this.sampleItemRows = [];
       // reset sampleFiles table to clean up internal static selection data
       this.sampleFileTableDataKey++;
+      // recalculate from UTC to local timezone
+      let d1 = this.sampleFileMinDateTime - (this.sampleFileMinDateTime.getTimezoneOffset() * 60000);
+      let d2 = this.sampleFileMaxDateTime - (this.sampleFileMaxDateTime.getTimezoneOffset() * 60000);
       this.$sampleFileListRequest({
         column: 'datetime',
-        min_value: this.sampleFileMinDateTime.toISOString(),
-        max_value: this.sampleFileMaxDateTime.toISOString()
+        min_value: new Date(d1).toISOString(),
+        max_value: new Date(d2).toISOString()
       });
     },
   },
