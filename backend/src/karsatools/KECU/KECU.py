@@ -4,10 +4,11 @@ Connects to KECU and provides a graphical user interface to control and monitor
 devices connected to it.
 """
 
+import argparse
+from yaml import safe_load
 import asyncio
 import csv
 import os
-
 from datetime import datetime
 
 from karsaecu.app import KarsaClient
@@ -17,12 +18,58 @@ from karsaecu.meas_udp import KarsaMeasClientUDP
 from karsaecu.ui import App
 
 
+# KECU vars: can be overridden from cmd_line or yaml config file
+# priority: cmd_line_value | config_file_value | defalt_value
 KECU_TCP_HOST = '192.168.1.200' # KECU IP address
 KRS_APP_PORT = 65142            # KECU command port
 KRS_MEAS_PORT = 65143           # KECU notification port
-
 KECU_UDP_HOST = '0.0.0.0'       # KECU UDP host
 KECU_UDP_PORT = 65146           # KECU UDP port
+INSTRUMENTS = 'all'             # kecu, mion, mion2, scenthound, calibrator, flushplate
+
+default_config_fname = './config.yaml'
+valid_instruments = ['kecu', 'mion', 'mion2', 'scenthound', 'calibrator', 'flushplate']
+
+class InstrumentValidator(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        instruments = values.split(',')
+        for instr in instruments:
+            if instr not in valid_instruments:
+                raise ValueError(f"Invalid instrument: {instr}. Should be one of {valid_instruments}")
+        setattr(namespace, self.dest, values)
+
+def parse_cmd_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", help="path to yaml config file", type=str, required=False)
+    parser.add_argument("--INSTRUMENTS", help="comma separated list of instruments",
+                        type=str, required=False, action=InstrumentValidator)
+    parser.add_argument("--KECU_TCP_HOST", help="KECU IP address", type=str, required=False)
+    parser.add_argument("--KRS_APP_PORT", help="KECU command port", type=int, required=False)
+    parser.add_argument("--KRS_MEAS_PORT", help="KECU notification port", type=int, required=False)
+    parser.add_argument("--KECU_UDP_HOST", help="KECU UDP host", type=str, required=False)
+    parser.add_argument("--KECU_UDP_PORT", help="KECU UDP port", type=int, required=False)
+    cmd_line_args = parser.parse_args()
+    cmd_line_args = dict( filter(lambda i: i[1] is not None, vars(cmd_line_args).items()) )
+    config_fname = cmd_line_args.pop('config', None)
+    file_args = {}
+    # KECU vars may also be defined in yaml file
+    if config_fname:
+        with open(config_fname, 'r') as f:
+            print(f"Loading KECU parameters from {config_fname}")
+            file_args = safe_load(f) or {}
+    else:
+        # try default config file, if available
+        try:
+            with open(default_config_fname, 'r') as f:
+                print(f"Loading KECU parameters from {default_config_fname}")
+                file_args = safe_load(f) or {}
+        except FileNotFoundError:
+            pass
+    # cmd_line args have a priority over config_file args
+    args = {**file_args, **cmd_line_args}
+    # replace default KECU vars with those specified in cmd args
+    for key, value in args.items():
+        globals()[key] = value
 
 
 class KECU():
@@ -211,6 +258,7 @@ async def initialize_kecu(kecu):
 
 
 if __name__ == '__main__':
+    parse_cmd_args()
     loop = asyncio.get_event_loop()
     tasks = []
     kecu = KECU()
@@ -228,7 +276,7 @@ if __name__ == '__main__':
     tasks.append(
         loop.create_task(kecu.writer())
         )
-    app = App(loop, kecu, tasks=tasks)
+    app = App(loop, kecu, INSTRUMENTS, tasks=tasks)
     kecu.nodes_callbacks.append(app.update_fields)
     try:
         loop.run_forever()

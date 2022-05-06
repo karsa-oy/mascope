@@ -351,7 +351,7 @@ class VoltageField(Field):
         
 
 class App(tk.Tk):
-    def __init__(self, loop, kecu, tasks=[], interval=.1):
+    def __init__(self, loop, kecu, instruments, tasks=[], interval=.1):
         """UI
 
         Tkinter application
@@ -370,6 +370,7 @@ class App(tk.Tk):
         super().__init__()
         self.loop = loop
         self.kecu = kecu
+        self.instruments = instruments
         self.protocol("WM_DELETE_WINDOW", self.close)
         self.tasks = tasks
         self.tasks.append(loop.create_task(self.updater(interval)))
@@ -412,7 +413,6 @@ class App(tk.Tk):
 
             self.status_fields.update({'connected': connected_str})
             self.status_fields.update({'version': version_str})
-
 
         def build_mion2_frame():
             # MION2 frame
@@ -1105,12 +1105,20 @@ class App(tk.Tk):
                 )
             )
 
-        build_kecu_frame()
-        build_mion2_frame()
-        build_mion_frame()
-        build_scenthound_frame()
-        build_calibrator_frame()
-        build_flushplate_frame()
+        if self.instruments == 'all':
+            build_kecu_frame()
+            build_mion2_frame()
+            build_mion_frame()
+            build_scenthound_frame()
+            build_calibrator_frame()
+            build_flushplate_frame()
+        else:
+            build_kecu_frame()
+            instruments = self.instruments.split(',')
+            for instr in instruments:
+                build_frame = locals()[f"build_{instr}_frame"]
+                build_frame()
+
 
     def close(self):
         self.loop.create_task(
