@@ -2,7 +2,7 @@ import asyncio
 import numpy as np
 import pandas as pd
 
-from karsalib.peak import detect_peaks, filter_peaks, mz_calibrate_tof
+from karsalib.peak import detect_peaks, filter_peaks
 from karsalib.match import identify_matches, calculate_match_stats
 
 from karsalib.molmass import Formula
@@ -86,10 +86,10 @@ class TargetServiceNamespace(BaseClientNamespace):
                                 'relAbu': rel_abu
                             })
                         
-        await self.emit_client_notification('target_ion_calculation_response',
-                                            {'ions': target_ions, 'isotopes': target_isotopes, 'messages': messages},
-                                            room=client_room
-                                            )
+        return {
+            'type': 'success',
+            'body': {'ions': target_ions, 'isotopes': target_isotopes, 'messages': messages},
+        }
 
     async def on_match_request(self, data):
         client_room = data.get('client_room') or data['cookies']['src_sid'][0]
@@ -185,12 +185,18 @@ class TargetServiceNamespace(BaseClientNamespace):
             isotope_match_df.loc[:, 'samplePeakTof'] = match_tofs
 
             # calculate ion and compound target match scores
-            return calculate_match_stats(
-                isotope_match_df,
-                sample_item,
-                iso_abu_tolerance,
-                mz_tolerance
-            )
+            return {
+                'type': 'success',
+                'body': {
+                    'matches': calculate_match_stats(
+                        isotope_match_df,
+                        sample_item,
+                        iso_abu_tolerance,
+                        mz_tolerance
+                    ),
+                    'sampleItems': [sample_item]
+                }
+            }
         else:
             return None
 

@@ -14,7 +14,7 @@ Vue.config.productionTip = false
 
 import VueRouter from 'vue-router';
 
-import ThePageLanding from "./components/ThePageLanding";
+import ThePageHome from "./components/ThePageHome";
 import ThePageBatchOverview from "./components/ThePageBatchOverview";
 import ThePageDataManagement from "./components/ThePageDataManagement";
 import ThePageSampleManagement from "./components/ThePageSampleManagement";
@@ -27,7 +27,7 @@ const router = new VueRouter({
   mode: process.env.NODE_ENV == 'production' ? 'hash' : 'history',
   routes: [{
     path: '/',
-    component: ThePageLanding
+    component: ThePageHome
   }, {
     path: '/batch-overview',
     component: ThePageBatchOverview
@@ -66,9 +66,8 @@ Vue.directive('cleave', {
 
 // App
 
-import App from './App'
-import store from "./store"
-
+import App from './App';
+import store from './store';
 
 new Vue({
   router,

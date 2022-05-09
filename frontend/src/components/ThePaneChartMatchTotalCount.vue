@@ -20,7 +20,7 @@ export default {
   components: { BaseChartPlotly },
   computed: {
     stats: function () {
-      return this.$store.getters["match/stats"]({
+      return this.$store.getters["match/stat/rows"]({
         level: "compound",
       });
     },

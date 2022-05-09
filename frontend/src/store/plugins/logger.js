@@ -6,8 +6,9 @@ export default createLogger({
             'setPath',
             'key/activate',
             'key/deactivate',
-            'target/selectionSet',
-            'sample/selectionSet',
+            'target/SET_SELECTION',
+            'match/LOAD',
+            'match/UNLOAD',
         ]
         return !hiddenMutationTypes
             .includes(mutation.type)

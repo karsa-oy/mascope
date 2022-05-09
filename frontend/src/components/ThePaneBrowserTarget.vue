@@ -17,6 +17,7 @@
 
 <script>
 import { mapMutations, mapActions, mapGetters } from "vuex";
+import { bindState } from "$lib/store";
 
 import BaseBrowser from "./BaseBrowser";
 
@@ -31,23 +32,26 @@ export default {
     };
   },
   computed: {
+    ...bindState({
+      controlPressed: "key/control",
+    }),
     ...mapGetters({
       matchesExist: "match/exists",
     }),
     compoundStats: function () {
-      return this.$store.getters["target/stats"]({
+      return this.$store.getters["target/stat/rows"]({
         level: "compound",
         selected: false,
       });
     },
     ionStats: function () {
-      return this.$store.getters["target/stats"]({
+      return this.$store.getters["target/stat/rows"]({
         level: "ion",
         selected: false,
       });
     },
     isotopeStats: function () {
-      return this.$store.getters["target/stats"]({
+      return this.$store.getters["target/stat/rows"]({
         level: "isotope",
         selected: false,
       });
@@ -76,7 +80,8 @@ export default {
           rows: this.compoundStats,
           defaultSort: ["matchScore", "desc"],
           detailsIcon: "default",
-          rowClick: this.toggleTargetCompoundSelection,
+          rowClick: this.targetCompoundClick,
+          rowStatus: this.$store.getters["target/status"],
         },
         {
           name: "Ion",
@@ -99,7 +104,8 @@ export default {
           rows: this.ionStats,
           defaultSort: ["matchScore", "desc"],
           detailsIcon: "default",
-          rowClick: this.toggleTargetIonSelection,
+          rowClick: this.targetIonClick,
+          rowStatus: this.$store.getters["target/status"],
         },
         {
           name: "Isotope",
@@ -123,7 +129,8 @@ export default {
           rows: this.isotopeStats,
           defaultSort: ["matchScore", "desc"],
           detailsIcon: null,
-          rowClick: this.toggleTargetIsotopeSelection,
+          rowClick: this.targetIsotopeClick,
+          rowStatus: this.$store.getters["target/status"],
         },
       ];
     },
@@ -142,7 +149,38 @@ export default {
       toggleTargetCompoundSelection: "target/compoundSelectionToggle",
       toggleTargetIonSelection: "target/ionSelectionToggle",
       toggleTargetIsotopeSelection: "target/isotopeSelectionToggle",
+      toggleTargetFocus: "target/focus/toggle",
     }),
+    targetCompoundClick(row) {
+      if (!this.controlPressed) {
+        this.toggleTargetCompoundSelection(row);
+      } else {
+        this.toggleTargetFocus({
+          level: "compound",
+          target: row,
+        });
+      }
+    },
+    targetIonClick(row) {
+      if (!this.controlPressed) {
+        this.toggleTargetIonSelection(row);
+      } else {
+        this.toggleTargetFocus({
+          level: "ion",
+          target: row,
+        });
+      }
+    },
+    targetIsotopeClick(row) {
+      if (!this.controlPressed) {
+        this.toggleTargetIsotopeSelection(row);
+      } else {
+        this.toggleTargetFocus({
+          level: "isotope",
+          target: row,
+        });
+      }
+    },
   },
 };
 </script>

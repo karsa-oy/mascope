@@ -48,9 +48,9 @@ export default {
     });
   },
   computed: {
-    ...mapState("match", {
-      probableMatchThreshold: "paramProbableMatchThreshold",
-      possibleMatchThreshold: "paramPossibleMatchThreshold",
+    ...mapState("match/param", {
+      probableMatchThreshold: "probableMatchThreshold",
+      possibleMatchThreshold: "possibleMatchThreshold",
     }),
     tag: function () {
       if (this.matchScore >= this.probableMatchThreshold) {

@@ -25,7 +25,7 @@ export default {
   components: { BaseChartPlotly },
   computed: {
     stats: function () {
-      return this.$store.getters["target/stats"]({
+      return this.$store.getters["target/stat/rows"]({
         level: "compound",
         selected: true,
       })

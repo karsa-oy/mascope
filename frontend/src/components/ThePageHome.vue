@@ -1,12 +1,12 @@
 <template>
   <the-layout-sidebar>
     <section style="padding: 1em 0em 2em 0em">
-      <h1 class="title">Karsa Mascope</h1>
+      <h1 class="title is-3">Karsa Mascope</h1>
     </section>
     <div class="columns">
       <div class="column is-half">
         <section style="padding: 1em 0em 2em 0em">
-          <h1 class="title">Workspaces:</h1>
+          <h1 class="title is-4">Workspaces:</h1>
         </section>
         <section class="base-tile-container">
           <base-workspace-tile
@@ -36,7 +36,7 @@
       </div>
       <div class="column is-half">
         <section style="padding: 1em 0em 2em 0em">
-          <h1 class="title">Acquisitions:</h1>
+          <h1 class="title is-4">Acquisitions:</h1>
         </section>
         <section style="padding: 0.5em">
           <b-button
@@ -70,7 +70,7 @@ import { bindState } from "$lib/store";
 import { mapMutations } from "vuex";
 
 export default {
-  name: "ThePageLanding",
+  name: "ThePageHome",
   components: {
     TheLayoutSidebar,
     BaseWorkspaceTile,

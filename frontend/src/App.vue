@@ -32,11 +32,10 @@ export default {
       query: "query",
       workspaceActive: "workspace/active",
       workspaceRoom: "workspace/$roomActive",
-      $targetIonCalcResponse: "target/$ionCalculationResponse",
-      $sampleResponse: "sample/$response",
-      $sampleFileSchemaResponse: "sample/$fileSchemaResponse",
-      $sampleItemSchemaResponse: "sample/$itemSchemaResponse",
-      $matchResponse: "match/$response",
+      $sampleItemSchemaRequest: "sample/item/schema/$request",
+      $sampleItemSchemaResponse: "sample/item/schema/$response",
+      $sampleFileSchemaRequest: "sample/file/schema/$request",
+      $sampleFileSchemaResponse: "sample/file/schema/$response",
       $templateListResponse: "template/$listResponse",
     }),
     ready: function () {
@@ -47,17 +46,11 @@ export default {
   },
   methods: {
     ...mapMutations({
-      targetHandleIonCalcResponse: "target/handleIonCalcResponse",
-      sampleFileSchemaRequest: "sample/fileSchemaRequest",
-      sampleItemSchemaRequest: "sample/itemSchemaRequest",
-      sampleFileSchema: "sample/fileSchema",
-      sampleItemSchema: "sample/itemSchema",
+      sampleFileSchemaHandleResponse: "sample/file/schema/HANDLE_RESPONSE",
+      sampleItemSchemaHandleResponse: "sample/item/schema/HANDLE_RESPONSE",
     }),
     ...mapActions({
-      sampleBatchList: "sample/batchList",
-      sampleHandleResponse: "sample/handleResponse",
-      matchRequest: "match/request",
-      matchHandleResponse: "match/handleResponse",
+      sampleBatchRead: "sample/batch/read",
       templateSetRows: "template/setRows",
       keydown: "key/down",
       keyup: "key/up",
@@ -68,7 +61,14 @@ export default {
     workspaceInit() {
       this.workspaceActive = this.workspaceById(this.query.w);
       if (this.workspaceActive) {
-        this.workspaceRoom = this.workspaceActive.id;
+        this.$nextTick(() => {
+          this.workspaceRoom = this.workspaceActive.id;
+          this.$sampleFileSchemaRequest = {};
+          this.$sampleItemSchemaRequest = {};
+          this.sampleBatchRead({
+            workspaceId: this.workspaceActive.id,
+          });
+        });
       }
     },
   },
@@ -77,12 +77,7 @@ export default {
     ready: function () {
       if (this.ready) {
         this.workspaceInit();
-        this.sampleFileSchemaRequest();
-        this.sampleItemSchemaRequest();
       }
-    },
-    workspaceActive: function () {
-      this.sampleBatchList();
     },
     // query
     "$route.query": function () {
@@ -91,23 +86,12 @@ export default {
     query: function () {
       this.workspaceInit();
     },
-    // target
-    $targetIonCalcResponse: function () {
-      this.targetHandleIonCalcResponse();
-    },
     // sample
-    $sampleResponse: function () {
-      this.sampleHandleResponse();
+    $sampleFileSchemaResponse: function () {
+      this.sampleFileSchemaHandleResponse();
     },
-    $sampleFileSchemaResponse: function (response) {
-      this.sampleFileSchema(response);
-    },
-    $sampleItemSchemaResponse: function (response) {
-      this.sampleItemSchema(response);
-    },
-    // match
-    $matchResponse: function () {
-      this.matchHandleResponse();
+    $sampleItemSchemaResponse: function () {
+      this.sampleItemSchemaHandleResponse();
     },
     // template
     $templateListResponse: function (rows) {

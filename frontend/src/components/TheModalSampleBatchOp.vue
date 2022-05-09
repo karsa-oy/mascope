@@ -15,10 +15,10 @@
           <h2 class="subtitle">{{ modalTitle }}</h2>
         </header>
         <section class="modal-card-body" style="min-height: 250px">
-          <b-field v-if="actionIs('create', 'edit')" label="Name">
+          <b-field v-if="actionIs('create', 'update')" label="Name">
             <b-input v-model="batchName"></b-input>
           </b-field>
-          <b-field v-if="actionIs('create', 'edit')" label="Description">
+          <b-field v-if="actionIs('create', 'update')" label="Description">
             <b-input v-model="batchDesc"></b-input>
           </b-field>
           <p v-if="actionIs('delete')">
@@ -34,21 +34,6 @@
           >
             Cancel
           </b-button>
-
-          <b-button
-            v-if="actionIs('edit')"
-            type="is-primary"
-            icon-left="content-save"
-            expanded
-            @click="
-              () => {
-                updateBatch(newBatch);
-                deactivateModal();
-              }
-            "
-          >
-            Save
-          </b-button>
           <b-button
             v-if="actionIs('create')"
             type="is-primary"
@@ -56,12 +41,26 @@
             expanded
             @click="
               () => {
-                createBatch(newBatch);
+                createBatch([newBatch]);
                 deactivateModal();
               }
             "
           >
             Create
+          </b-button>
+          <b-button
+            v-if="actionIs('update')"
+            type="is-primary"
+            icon-left="content-save"
+            expanded
+            @click="
+              () => {
+                updateBatch([newBatch]);
+                deactivateModal();
+              }
+            "
+          >
+            Save
           </b-button>
           <b-button
             v-if="actionIs('delete')"
@@ -70,7 +69,7 @@
             expanded
             @click="
               () => {
-                deleteBatch(oldBatch);
+                deleteBatch([oldBatch.id]);
                 deactivateModal();
               }
             "
@@ -86,9 +85,7 @@
 <script>
 import { bindState } from "$lib/store";
 
-import { mapMutations } from "vuex";
-
-import table from "$lib/table";
+import { mapMutations, mapActions } from "vuex";
 
 export default {
   name: "",
@@ -101,27 +98,27 @@ export default {
   },
   computed: {
     ...bindState({
-      modalActive: "modal/batchSaveActive",
-      modalProps: "modal/batchSaveProps",
-      batches: "sample/batchRows",
+      modalActive: "modal/sampleBatchOpActive",
+      modalProps: "modal/sampleBatchOpProps",
+      batches: "sample/batch/rows",
       workspaceActive: "workspace/active",
     }),
     action() {
       return this.modalProps.action;
     },
     oldBatch() {
-      if (this.actionIs("edit", "delete")) {
-        return table.get(this.batches, {
-          id: this.modalProps.batchId,
-        });
-      } else {
-        return null;
-      }
+      return this.modalProps.batch || null;
     },
     newBatch() {
-      if (this.actionIs("create", "edit")) {
+      if (this.actionIs("create")) {
         return {
-          id: this.oldBatch ? this.oldBatch.id : null,
+          name: this.batchName,
+          description: this.batchDesc,
+          workspaceId: this.workspaceActive.id,
+        };
+      } else if (this.actionIs("update")) {
+        return {
+          id: this.oldBatch.id,
           name: this.batchName,
           description: this.batchDesc,
           workspaceId: this.workspaceActive.id,
@@ -136,8 +133,8 @@ export default {
         case "create":
           title = `Create a new sample batch`;
           break;
-        case "edit":
-          title = `Edit sample batch ${this.oldBatch.name}`;
+        case "update":
+          title = `Update sample batch ${this.oldBatch.name}`;
           break;
         case "delete":
           title = `Delete sample batch ${this.oldBatch.name}`;
@@ -148,10 +145,12 @@ export default {
   },
   methods: {
     ...mapMutations({
-      deleteBatch: "sample/batchDelete",
-      updateBatch: "sample/batchUpdate",
-      createBatch: "sample/batchCreate",
       deactivateModal: "modal/deactivate",
+    }),
+    ...mapActions({
+      deleteBatch: "sample/batch/delete",
+      updateBatch: "sample/batch/update",
+      createBatch: "sample/batch/create",
     }),
     actionIs(...actions) {
       return actions.includes(this.action);

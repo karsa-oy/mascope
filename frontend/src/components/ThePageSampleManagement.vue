@@ -2,7 +2,6 @@
   <the-layout-sidebar>
     <b-tabs type="is-boxed">
       <b-tab-item label="Batch Items" icon="test-tube">
-
         <section>
           <div class="columns">
             <div class="column is-2 base-browser-sidebar">
@@ -20,13 +19,15 @@
                 <div class="column is-half">
                   <b-datetimepicker
                     placeholder="Starting from..."
-                    v-model="sampleFileMinDateTime">
+                    v-model="sampleFileMinDateTime"
+                  >
                   </b-datetimepicker>
                 </div>
                 <div class="column is-half">
                   <b-datetimepicker
                     placeholder="Until..."
-                    v-model="sampleFileMaxDateTime">
+                    v-model="sampleFileMaxDateTime"
+                  >
                   </b-datetimepicker>
                 </div>
               </div>
@@ -43,7 +44,10 @@
               <div style="padding-top: 1.5em; padding-bottom: 1.5em">
                 <h1 style="font-size: 16px; text-align: left">
                   <p>
-                    <b>Items to add to {{workspaceActive.name}} batches: {{batchesSelected.map(b => b.name)}} :</b>
+                    <b>
+                      Items to add to {{ workspaceActive.name }} batch:
+                      {{ batchSelected.name }}
+                    </b>
                   </p>
                 </h1>
               </div>
@@ -59,11 +63,11 @@
           </div>
 
           <b-button
-            @click="addItems"
+            @click="itemsAdd"
             style="position: fixed; right: 5em; bottom: 2em"
             icon-left="content-save"
             type="is-primary"
-            :disabled="sampleItemRows.length == 0 || batchesSelected.length == 0"
+            :disabled="!sampleItemRows.length || !batchSelected"
             rounded
           >
             Add Items
@@ -71,7 +75,6 @@
         </section>
       </b-tab-item>
     </b-tabs>
-
   </the-layout-sidebar>
 </template>
 
@@ -81,7 +84,7 @@ import ThePaneBrowserSample from "./ThePaneBrowserSample";
 import BaseTable from "./BaseTable";
 
 import { bindState } from "$lib/store";
-import { mapMutations } from "vuex";
+import { mapActions } from "vuex";
 
 export default {
   name: "ThePageSampleManagement",
@@ -90,7 +93,7 @@ export default {
     ThePaneBrowserSample,
     BaseTable,
   },
-  data: function() {
+  data: function () {
     return {
       sampleFileRows: [],
       sampleItemRows: [],
@@ -102,94 +105,87 @@ export default {
   computed: {
     ...bindState({
       workspaceActive: "workspace/active",
-      sampleFileSchema: "sample/fileSchema",
-      sampleItemSchema: "sample/itemSchema",
-      $sampleFileListResponse: "sample/$fileListResponse",
+      sampleFileSchema: "sample/file/schema/row",
+      sampleItemSchema: "sample/item/schema/row",
+      $sampleFileListRequest: "sample/file/$listRequest",
+      $sampleFileListResponse: "sample/file/$listResponse",
+      batchSelected: "sample/batch/selection/row",
     }),
-    batchesSelected: function() {
-      return this.$store.getters["sample/batchesSelected"];
-    },
     // layout
     srcTableHeight() {
-      // return "calc(50vh - 140px)";
       return "calc(40vh)";
     },
     targetTableHeight() {
       return "calc(30vh)";
     },
+    // columns
     sampleFileCols() {
       let result = [];
-      this.sampleFileSchema.schema.forEach(
-        (el) => {
-            if (el !== 'id')
-              result.push({field: el, label: el})
-          }
-      );
+      this.sampleFileSchema.forEach((el) => {
+        if (el !== "id") result.push({ field: el, label: el });
+      });
       return result;
     },
     sampleItemCols() {
       let result = [];
-      this.sampleItemSchema.schema.forEach(
-        (field) => {
-            if (field !== 'id' && field !== 'batchId')
-              result.push({field: field, label: field})
-          }
-      );
+      this.sampleItemSchema.forEach((field) => {
+        if (field !== "id" && field !== "batchId")
+          result.push({ field: field, label: field });
+      });
       return result;
     },
   },
   methods: {
-    ...mapMutations({
-      $sampleFileListRequest: "sample/fileListRequest",
-      sampleItemUpdate: "sample/itemUpdate",
+    ...mapActions({
+      sampleItemUpdate: "sample/item/update",
     }),
-    selectSampleFiles(rows) {
-      let result = [];
-      rows.forEach( (fileRow) => {
-          let itemRow = {};
-          this.sampleItemSchema.schema.forEach( field => {
-            if (field !== 'id' && field != 'batchId' && fileRow[field]) {
-              itemRow[field] = fileRow[field];
-            }}
-          );
-          result.push(itemRow);
-        }
+    selectSampleFiles(files) {
+      let fields = this.sampleItemSchema.filter(
+        (field) => !["id", "batchId"].includes(field)
       );
-      this.sampleItemRows = result;
+      this.sampleItemRows = files.map((file) =>
+        fields
+          .map((field) => ({ [field]: file[field] }))
+          .reduce((i, j) => ({ ...i, ...j }), {})
+      );
     },
-    addItems() {
-      let items = this.sampleItemRows.length == 1 ?
-                `1  item` : `${this.sampleItemRows.length}  items`
-      let batches = this.batchesSelected.length == 1 ? 'batch' : 'batches'
+    itemsAdd() {
+      let n = this.sampleItemRows.length;
+      let s = n > 1 ? "s" : "";
+      let w = this.workspaceActive.name;
+      let b = this.batchSelected.name;
       this.$buefy.dialog.confirm({
         title: "Batch Items",
-        message: `Add  ${items} to ${this.workspaceActive.name} ${batches} ${this.batchesSelected.map(b => b.name)}?`,
+        message: `
+          Add ${n} sample item${s} to batch ${b} in workspace ${w}?
+        `,
         confirmText: "Add",
         onConfirm: () => {
-          let rows = [];
-          this.batchesSelected.forEach( (batch) => {
-            this.sampleItemRows.forEach( (row) => {
-              rows.push({...row, batchId: batch.id});
-            });
-          });
+          let rows = this.sampleItemRows.map((row) => ({
+            ...row,
+            batchId: this.batchSelected.id,
+          }));
           this.sampleItemUpdate(rows);
         },
       });
     },
     getSampleFiles() {
-      if (!this.sampleFileMinDateTime || !this.sampleFileMaxDateTime)
-        return;
+      if (!this.sampleFileMinDateTime || !this.sampleFileMaxDateTime) return;
       // reset sampleItems for new range selected
       this.sampleItemRows = [];
       // reset sampleFiles table to clean up internal static selection data
       this.sampleFileTableDataKey++;
       // recalculate from UTC to local timezone
-      let d1 = this.sampleFileMinDateTime - (this.sampleFileMinDateTime.getTimezoneOffset() * 60000);
-      let d2 = this.sampleFileMaxDateTime - (this.sampleFileMaxDateTime.getTimezoneOffset() * 60000);
+      let d1 =
+        this.sampleFileMinDateTime -
+        this.sampleFileMinDateTime.getTimezoneOffset() * 60000;
+      let d2 =
+        this.sampleFileMaxDateTime -
+        this.sampleFileMaxDateTime.getTimezoneOffset() * 60000;
       this.$sampleFileListRequest({
-        column: 'datetime',
+        column: "datetime",
         min_value: new Date(d1).toISOString(),
-        max_value: new Date(d2).toISOString()
+        max_value: new Date(d2).toISOString(),
       });
     },
   },
@@ -197,10 +193,10 @@ export default {
     $sampleFileListResponse: function (response) {
       this.sampleFileRows = response.records;
     },
-    sampleFileMinDateTime: function() {
+    sampleFileMinDateTime: function () {
       this.getSampleFiles();
     },
-    sampleFileMaxDateTime: function() {
+    sampleFileMaxDateTime: function () {
       this.getSampleFiles();
     },
   },

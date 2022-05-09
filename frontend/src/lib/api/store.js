@@ -1,12 +1,13 @@
-import Vue from 'vue'
-import Vuex from 'vuex'
+import Vue from 'vue';
+import Vuex from 'vuex';
+import path from "./path";
 
 import { apiGatewayStoreMixin } from './gateway';
 
 export function createConnectedStore(rawStoreConfig) {
     let canonicalStoreConfig = makeCanonicalConfig(rawStoreConfig);
     Vue.use(Vuex);
-    return new Vuex.Store({
+    let store = new Vuex.Store({
         state: {
             ...canonicalStoreConfig.state,
             ...apiGatewayStoreMixin.state,
@@ -32,6 +33,20 @@ export function createConnectedStore(rawStoreConfig) {
             ...apiGatewayStoreMixin.plugins,
         ]
     });
+    let watchers = path.find(rawStoreConfig)
+        .filter(p => p.endsWith("watchers"))
+        .map(p => path.get(rawStoreConfig, p))
+        .reduce((prev, next) => ({ ...prev, ...next }), {});
+    Object.entries(watchers).forEach(
+        ([target, action]) => {
+            let fn = target in store.getters
+                ? () => store.getters[target]
+                : (state) => path.get(state, target);
+            let callback = () => store.dispatch(action);
+            store.watch(fn, callback);
+        }
+    )
+    return store;
 }
 
 export function createConnectedModule(apiConfig, rawModuleConfig = {}) {

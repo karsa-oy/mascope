@@ -100,7 +100,7 @@ export default {
     },
     // matches
     matchCompoundRows() {
-      return this.$store.getters["match/ratings"]({
+      return this.$store.getters["match/rating/rows"]({
         level: "compound",
         selected: true,
       });
@@ -118,7 +118,7 @@ export default {
       ];
     },
     matchIonRows() {
-      return this.$store.getters["match/ratings"]({
+      return this.$store.getters["match/rating/rows"]({
         level: "ion",
         selected: true,
       });
@@ -138,7 +138,7 @@ export default {
       ];
     },
     matchIsotopeRows() {
-      return this.$store.getters["match/ratings"]({
+      return this.$store.getters["match/rating/rows"]({
         level: "isotope",
         selected: true,
       });
@@ -161,7 +161,7 @@ export default {
     },
     // targets
     targetCompoundRows() {
-      return this.$store.getters["target/stats"]({
+      return this.$store.getters["target/stat/rows"]({
         level: "compound",
         selected: true,
       });
@@ -176,7 +176,7 @@ export default {
       ];
     },
     targetIonRows() {
-      return this.$store.getters["target/stats"]({
+      return this.$store.getters["target/stat/rows"]({
         level: "ion",
         selected: true,
       });
@@ -193,7 +193,7 @@ export default {
       ];
     },
     targetIsotopeRows() {
-      return this.$store.getters["target/stats"]({
+      return this.$store.getters["target/stat/rows"]({
         level: "isotope",
         selected: true,
       });
@@ -213,7 +213,7 @@ export default {
     },
     // samples
     sampleItemRows() {
-      return this.$store.getters["sample/itemStats"]({
+      return this.$store.getters["sample/item/stat/rows"]({
         level: "compound",
         selected: true,
       });
