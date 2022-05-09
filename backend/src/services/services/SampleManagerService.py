@@ -54,7 +54,7 @@ class SampleServiceNamespace(BaseClientNamespace):
     
     async def on_workspace_create_request(self, data):
         workspaces = [
-            {'id': gen_id(), **workspace}
+            {**workspace, 'id': gen_id()}
             for workspace in data['value']
         ]
         for workspace in workspaces:        
