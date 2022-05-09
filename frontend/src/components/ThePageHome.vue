@@ -3,7 +3,7 @@
     <section style="padding: 1em 0em 2em 0em">
       <h1 class="title is-3">Karsa Mascope</h1>
     </section>
-    <template v-if="!workspaceActive">
+    <template v-if="!workspaceSelected">
       <div class="columns">
         <div class="column is-half">
           <section style="padding: 1em 0em 2em 0em">
@@ -74,7 +74,7 @@ import BaseWorkspaceTile from "./BaseWorkspaceTile";
 
 import { bindState } from "$lib/store";
 
-import { mapMutations } from "vuex";
+import { mapMutations, mapGetters } from "vuex";
 
 export default {
   name: "ThePageHome",
@@ -84,13 +84,15 @@ export default {
   },
   computed: {
     ...bindState({
-      workspaceActive: "workspace/active",
       workspaces: "workspace/rows",
       modalProps: "modal/workspaceSaveProps",
     }),
+    ...mapGetters({
+      workspaceSelected: "workspace/selectedRow",
+    }),
     workspaceHomeText() {
-      if (this.workspaceActive) {
-        return `Welcome to workspace ${this.workspaceActive.name}!`;
+      if (this.workspaceSelected) {
+        return `Welcome to workspace ${this.workspaceSelected.name}!`;
       } else {
         return `Loading workspace...`;
       }

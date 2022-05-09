@@ -1,6 +1,6 @@
-from services.FileIoService import (load_file, zarr_sdk)
+from services.file_io import (load_file, zarr_sdk)
 
-from karsatof.lib.TwTool import TwMassCalibrate, TwTof2Mass
+#from karsatof.lib.TwTool import TwMassCalibrate, TwTof2Mass
 
 import numpy as np
 
@@ -27,13 +27,16 @@ def detect_peaks(cache_item):
             limit=None,
             max_gap=2,
         )
-        
+
+    print('spectrum', sum_spectrum)
+
     peaks, peak_props = find_peaks(
         sum_spectrum,
         height=0,
         distance=None,
         width=None
     )
+    print('peaks', peaks)
                                    
     cache_item = cache_item \
         .assign_coords(
@@ -48,6 +51,7 @@ def detect_peaks(cache_item):
         prev_dataset=cache_item
     )
     return cache_item
+
 
 def filter_peaks(
     cache_item,

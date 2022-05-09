@@ -1,11 +1,11 @@
 import json
 import os
 
-from karsalib.db import SampleManagerDB
+from karsalib.db import DbInstance
 from karsalib.util import generate_unique_key # TODO: Review key generation method
 
 db_path = 'test.db' # Path to SampleManager database
-db = SampleManagerDB(db_path)
+db = DbInstance(db_path)
 
 projects_path = './Projects'
 project_dirs = next( os.walk(projects_path) )[1]

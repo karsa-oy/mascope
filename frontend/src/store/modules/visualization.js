@@ -27,16 +27,16 @@ export default {
     actions: {
         focusIon({ rootState, rootGetters, getters, commit }) {
             if (!getters['readyToFocusIon']) return;
-            let itemFocused = rootState.sample.item.focus.row;
-            let targetFocused = rootState.target.focus.row;
-            let isotopesSelected = rootGetters['target/isotopesSelected'];
+            let itemFocused = rootState.sample.item.focusedRow;
+            let targetFocused = rootState.target.ion.focusedRow;
+            let isotopesSelected = rootGetters['target/isotope/selectedRows'];
             let ionId = targetFocused.id;
             let mzs = isotopesSelected.filter(
-                        isotope => isotope.ionId == ionId
-                        ).map(isotope => isotope.mz);
+                isotope => isotope.ionId == ionId
+            ).map(isotope => isotope.mz);
             let relAbus = isotopesSelected.filter(
-                        isotope => isotope.ionId == ionId
-                        ).map(isotope => isotope.relAbu);
+                isotope => isotope.ionId == ionId
+            ).map(isotope => isotope.relAbu);
             let tRange = null;
             commit('REQUEST_ION_FOCUS', {
                 sampleItemId: itemFocused.id,
@@ -75,19 +75,18 @@ export default {
     },
     getters: {
         readyToFocusIon(state, getters, rootState, rootGetters) {
-            if (rootState.sample.item.focus.row &&
-                rootState.target.focus.row &&
-                rootState.target.focus.level === 'ion' &&
-                rootGetters['target/isotopesSelected'].length
-                ) {
+            if (rootState.sample.item.focusedRow &&
+                rootState.target.ion.focusedRow &&
+                rootGetters['target/isotope/selectedRows'].length
+            ) {
                 return true;
             }
             return false;
         },
     },
     watchers: {
-        'sample/item/focus/row': 'visualization/focusIon',
-        'target/focus/row': 'visualization/focusIon',
+        'sample/item/focusedRow': 'visualization/focusIon',
+        'target/ion/focusedRow': 'visualization/focusIon',
         'visualization/$ionFocusResponse': 'visualization/handleIonFocusResponse',
     }
 }

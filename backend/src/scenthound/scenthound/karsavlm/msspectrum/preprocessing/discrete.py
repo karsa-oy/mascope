@@ -2,7 +2,7 @@
 
 from .base import PreprocessorMixin
 from ..spectrum import copy_spectrum_with_new_intensities, copy_spectrum_with_new_mz_and_intensities
-from ..utils import binary_search_for_left_range, binary_search_for_right_range
+from ..table import binary_search_for_left_range, binary_search_for_right_range
 import copy
 import numpy as np
 

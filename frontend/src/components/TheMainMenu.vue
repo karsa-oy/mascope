@@ -6,7 +6,7 @@
 <script>
 import BaseMenuBar from "./BaseMenuBar";
 
-import { bindState } from "$lib/store";
+import { mapGetters } from "vuex";
 
 export default {
   name: "TheMainMenu",
@@ -14,8 +14,8 @@ export default {
     BaseMenuBar,
   },
   computed: {
-    ...bindState({
-      workspaceActive: "workspace/active",
+    ...mapGetters({
+      workspaceSelected: "workspace/selectedRow",
     }),
     buttons() {
       return [
@@ -29,33 +29,32 @@ export default {
           icon: "file-plus",
           label: "Sample management",
           path: "/sample-management",
-          visible: this.workspaceActive,
+          visible: this.workspaceSelected,
         },
         {
           icon: "format-horizontal-align-center",
           label: "m/z calibration",
           path: "/mz-calibration",
-          visible: this.workspaceActive,
+          visible: this.workspaceSelected,
         },
         {
           icon: "flask",
           label: "Batch overview",
           path: "/batch-overview",
-          visible: this.workspaceActive,
+          visible: this.workspaceSelected,
         },
         {
           icon: "sine-wave",
           label: "Sample signal",
           path: "/sample-signal",
-          visible: this.workspaceActive,
+          visible: this.workspaceSelected,
         },
         {
           icon: "table-multiple",
           label: "Data management",
           path: "/data-management",
-          visible: this.workspaceActive,
+          visible: this.workspaceSelected,
         },
-
       ].filter((b) => b.visible);
     },
     footerButtons() {

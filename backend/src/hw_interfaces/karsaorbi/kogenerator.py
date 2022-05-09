@@ -12,7 +12,7 @@ import numpy as np
 from threading import current_thread
 from time import sleep
 
-from services.FileIoService import zarr_sdk
+from services.file_io import zarr_sdk
 from .lib import Business as ThermoBusiness
 from .koutil import net2np_array
 from common.base_generator import BaseFileStreamer, PROGRESS_SHIFT

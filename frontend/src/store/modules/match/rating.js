@@ -25,8 +25,8 @@ export default {
                     ` ,
                     { matches: getJoinedMatches({ level, selected }) }
                 );
-                let compounds = rootState.target.compoundRows;
-                let ions = rootState.target.ionRows;
+                let compounds = rootState.target.compound.rows;
+                let ions = rootState.target.ion.rows;
                 switch (level) {
                     case 'compound':
                         return ratings;
