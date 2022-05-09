@@ -1,4 +1,5 @@
 import sqlite3
+from nanoid import generate
 from karsalib.logging import (
     NO_LOGGING_DEFAULT,
     parent_func_name,
@@ -233,58 +234,47 @@ class SampleManagerDB:
         self.attribute_templates = AttributeTemplateTable(self)
 
     # workspaces
-    def workspace_list(self):
+    def workspace_create(self, **row):
+        self.workspaces.create(**row)
+
+    def workspace_read(self):
         return self.workspaces.get_all()
 
-    def workspace_create(self, **kwargs):
-        self.workspaces.create(**kwargs)
-
-    def workspace_read(self, id):
-        return self.workspaces.get(id=id)
-
-    def workspace_update(self, **kwargs):
-        self.workspaces.update(**kwargs)
+    def workspace_update(self, **row):
+        self.workspaces.update(**row)
 
     def workspace_delete(self, id):
         self.workspaces.remove(row_id=id)
 
     # sample batches
-    def sample_batch_list(self, workspaceId):
-        return self.sample_batches.get(workspaceId=workspaceId)
-        
-    def sample_batch_create(self, **kwargs):
-        self.sample_batches.create(**kwargs)
+    def sample_batch_create(self, **row):
+        self.sample_batches.create(**row)
 
-    def sample_batch_read(self, id):
-        return self.sample_batches.get(id=id)
+    def sample_batch_read(self, **filters):
+        return self.sample_batches.get(**filters)
 
-    def sample_batch_update(self, **kwargs):
-        self.sample_batches.update(**kwargs)
+    def sample_batch_update(self, **row):
+        self.sample_batches.update(**row)
 
     def sample_batch_delete(self, id):
         self.sample_batches.remove(row_id=id)
 
     # sample items
-    def sample_item_list(self, batchId):
-        return self.sample_items.get_joined(
-                    'sample_files',
-                    'filename',
-                    'id',
-                    batchId=batchId
-                    )
-        
-    def sample_item_create(self, **kwargs):
-        if not self.sample_files.get(id=kwargs['id']):
-            self.sample_files.create(id=kwargs['id'])
-        self.sample_items.create(**kwargs)
+    def sample_item_create(self, **row):
+        self.sample_items.create(**row)
 
-    def sample_item_read(self, id):
+    def sample_item_read(self, **filters):
         return self.sample_items.get_joined(
-                    'sample_files',
-                    'filename',
-                    'id',
-                    id=id
-                    )
+            'sample_files', 'filename', 'id',
+            **filters
+        )
+
+    def sample_item_update(self, **row):
+        # Update sample metadata and not sample file
+        self.sample_items.update(**row)
+
+    def sample_item_delete(self, id):
+        self.sample_items.remove(row_id=id)
 
     def sample_item_get(self, **kwargs):
         return self.sample_items.get(**kwargs)
@@ -293,16 +283,11 @@ class SampleManagerDB:
         # creates or updates sample item
         self.sample_items.insert(**kwargs)
 
-    def sample_item_update(self, **kwargs):
-        # Update sample metadata and not sample file
-        self.sample_items.update(**kwargs)
-
-    def sample_item_delete(self, id):
-        self.sample_items.remove(row_id=id)
-
     def sample_item_get_schema(self):
-        res = [name for name,*_ in self.sample_items.schema]
-        return res
+        return [ 
+            name for name,*_ 
+            in self.sample_items.schema
+        ]
 
     # sample files
     def sample_file_get(self, **kwargs):
@@ -331,3 +316,7 @@ class SampleManagerDB:
 
     def attribute_template_delete(self, id):
         self.attribute_templates.remove(id)
+
+def gen_id(length = 16):
+    alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890'
+    return generate(alphabet, length)

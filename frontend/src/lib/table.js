@@ -44,7 +44,14 @@ export default {
                 if (filters) {
                     result = rows.filter((row) => {
                         let partialMatch = Object.entries(filters)
-                            .some(([field, filter]) => (row[field] == filter));
+                            .some(([field, filter]) => {
+                                let value = row[field]
+                                if (filter instanceof Array) {
+                                    return filter.includes(value)
+                                } else {
+                                    return value == filter
+                                }
+                            });
                         return !partialMatch;
                     })
                 } else {
@@ -98,8 +105,16 @@ export default {
         let replace = (s, p) => s.replace(p, '?');
         let parsedSql = sortedTableNames.reduce(replace, sql);
         // execute query with alasql
-        let result = alasql(parsedSql, sortedTables);
-        return result;
+        try {
+            let result = alasql(parsedSql, sortedTables);
+            return result;
+        } catch (error) {
+            console.error(`The following frontend SQL query failed:` +
+                `${sql}`, {
+                tables,
+                error
+            })
+        }
     },
     fromSpreadsheet(clipboardText, fields) {
         // Split full text to rows

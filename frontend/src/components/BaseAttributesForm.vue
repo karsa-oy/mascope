@@ -349,9 +349,9 @@ export default {
         type: this.templateType,
         template: [],
       }
-      for(let {label, key, required} of data.template) {
+      for(let {label, key, required, disabled} of data.template) {
         if (required) {
-          newTemplate.template.push({label, key, required, value: data.row[label]});
+          newTemplate.template.push({label, key, required, disabled, value: data.row[label]});
         }
       }
       Object.keys(data.row.attributes).forEach( (attr) =>

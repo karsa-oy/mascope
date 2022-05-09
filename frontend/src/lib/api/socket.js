@@ -101,36 +101,95 @@ export class Api {
     }
 
     call({
-        name,
-        value,
+        endpoint,
+        onSuccess = () => { },
+        onFailure = () => { },
         timeout = 5000,
         clientTimeout = timeout,
         room = null,
         client_room = this.socket.id,
         requestId = Math.random().toString(36).substring(2),
         loggingLevel = this.loggingLevel,
+    }, ...values) {
 
-    }) {
-        let notifyCall = (resolve, reject) => {
-            this.socket
-                .emit('client_notification', {
-                    name,
-                    value,
-                    room,
-                    timeout,
-                    request_id: requestId,
-                    no_logging: loggingLevel == 'none',
-                    no_data_logging: loggingLevel == 'basic',
-                    client_room,
-                }, (response) => {
-                    resolve(response)
-                });
-            setTimeout(
-                () => reject(Error("Clientside socket timed out")),
-                clientTimeout
-            );
+        // response handler
+        let handler = (response) => {
+            if (response.type == 'success') {
+                try {
+                    onSuccess(response.body);
+                } catch (error) {
+                    console.error(
+                        `Encountered frontend exception while calling async call onSuccess handler;`,
+                        { endpoint, onSuccess, response, error }
+                    )
+                }
+            } else if (response.type == 'failure') {
+                console.error(
+                    `Encountered backend exception while performing async call;`,
+                    { endpoint, values, response }
+                );
+                try {
+                    onFailure(response.body);
+                } catch (error) {
+                    console.error(
+                        `Encountered backend exception while calling async call onFailure handler;`,
+                        { endpoint, onFailure, response, error }
+                    );
+                }
+            }
         }
-        return new Promise(notifyCall);
+        // make calls
+        let makeCall = (value) => {
+            let notifyCall = (resolve, reject) => {
+                this.socket
+                    .emit('client_notification', {
+                        name: endpoint,
+                        value,
+                        room,
+                        timeout,
+                        request_id: requestId,
+                        no_logging: loggingLevel == 'none',
+                        no_data_logging: loggingLevel == 'basic',
+                        client_room,
+                    }, (response) => {
+                        resolve(response)
+                    });
+                setTimeout(
+                    () => reject(Error("Clientside socket timed out")),
+                    clientTimeout
+                );
+            }
+            return new Promise(notifyCall);
+        }
+        let calls = values.map((value) => () => makeCall(value));
+        let firstCall = calls.shift();
+
+        return new Promise((resolve, reject) => {
+            calls
+                .reduce(
+                    (promise, fn) => {
+                        // intermediate calls handled here
+                        return promise.then((result) => {
+                            handler(result);
+                            return fn(result);
+                        });
+                    },
+                    firstCall() // first call is made seperately
+                )
+                .then((result) => {
+                    // a handler can be called to process the final result
+                    handler(result);
+                    resolve();
+                })
+                .catch((error) => {
+                    // errors handled here
+                    console.error(
+                        `Encountered a frontend exception while performing async call;`,
+                        { endpoint, values, error }
+                    );
+                    reject();
+                });
+        });
     }
 
     bind({ name, callback }) {

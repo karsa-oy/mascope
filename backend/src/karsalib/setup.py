@@ -33,7 +33,8 @@ setuptools.setup(
         'xarray',
         'asynctest',
         'decorator',
-        'watchdog'
+        'watchdog',
+        'nanoid'
     ]
 )
 

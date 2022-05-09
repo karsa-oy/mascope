@@ -21,6 +21,7 @@
     <section :class="dynamic('base-browser-content')">
       <b-table
         v-if="rows.length > 0"
+        ref="table"
         :data="rows"
         narrowed
         hoverable
@@ -29,11 +30,10 @@
         custom-detail-row
         detail-key="id"
         :detail-icon="detailsIcon"
+        :opened-details="opened"
         :show-header="showHeader"
         :row-class="rowClass"
         @click="rowClick"
-        @details-open="detailsOpen"
-        @details-close="detailsClose"
       >
         <b-table-column
           v-for="col in cols"
@@ -104,6 +104,8 @@ export default {
       type: Array,
       required: false,
     },
+    // recursion props
+    // don't use these externally
     isRoot: {
       type: Boolean,
       required: false,
@@ -164,11 +166,12 @@ export default {
       };
       return handleClick ?? doNothing;
     },
-    detailsOpen: function () {
-      return this.currentLevel.detailsOpen ?? doNothing;
+    rowStatus: function () {
+      let none = () => "not-selected";
+      return this.currentLevel.rowStatus ?? none;
     },
-    detailsClose: function () {
-      return this.currentLevel.detailsClose ?? doNothing;
+    opened: function () {
+      return this.currentLevel.opened ?? null;
     },
     minPrecision: function () {
       return this.currentLevel.minPrecision ?? 1;
@@ -214,25 +217,43 @@ export default {
       }
     },
     rowClass: function (row) {
-      let result;
-      switch (row._selected) {
-        case "all":
-          result = "base-browser-row-all-selected";
-          break;
-        case "some":
-          result = "base-browser-row-some-selected";
-          break;
-        case "none":
-          result = "";
-          break;
+      switch (this.rowStatus(row)) {
+        case "focused":
+          return "base-browser-row-focused";
+        case "fully-selected":
+          return "base-browser-row-fully-selected";
+        case "partially-selected":
+          return "base-browser-row-partially-selected";
+        case "not-selected":
+          return "";
       }
-      return result;
     },
     refresh: function () {
       if (this.isRoot) {
         this.$forceUpdate();
       } else {
         this.rootRefresh();
+      }
+    },
+    open: function (row) {
+      this.$refs.table.openDetailRow(row);
+    },
+    close: function (row) {
+      this.$refs.table.closeDetailRow(row);
+    },
+  },
+  watch: {
+    opened: function (openedRows) {
+      if (this.opened) {
+        this.$nextTick(() => {
+          this.rows.forEach((row) => {
+            if (openedRows.includes(row)) {
+              this.open(row);
+            } else {
+              this.close(row);
+            }
+          });
+        });
       }
     },
   },
@@ -278,11 +299,15 @@ export default {
   display: none;
 }
 
-.base-browser-row-all-selected {
+.base-browser-row-focused {
+  background: #a5690e;
+}
+
+.base-browser-row-fully-selected {
   background: #4c7799;
 }
 
-.base-browser-row-some-selected {
+.base-browser-row-partially-selected {
   background: #496275;
 }
 

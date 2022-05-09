@@ -8,11 +8,11 @@
       aria-modal
     >
       <base-attributes-form
-        formTitle="Save sample attributes"
+        formTitle="Save item attributes"
         :showEditFunctions="true"
         :templateType="templateType"
         :initialTemplates="availableTemplates"
-        :attributesToLoad="sampleFileRecordToLoad"
+        :attributesToLoad="sampleItemRecordToLoad"
         @saveTemplate="saveTemplate"
         @deleteTemplate="deleteTemplate"
         @saveAttributes="saveAttributes"
@@ -29,39 +29,28 @@ import { bindState } from "$lib/store";
 import { mapActions, mapMutations } from "vuex";
 
 export default {
-  name: "TheModalSampleFileAttributesSave",
+  name: "TheModalSampleItemAttributesSave",
   components: {
     BaseAttributesForm,
   },
   props: {},
-  computed: {
-    ...bindState({
-      modalActive: "modal/sampleFileAttributesSaveActive",
-      templateRows: "template/rows",
-      $sampleFileListRequest: "sample/file/$listRequest",
-      $sampleFileListResponse: "sample/file/$listResponse",
-    }),
-    availableTemplates() {
-      return [this.defaultTemplate, ...this.templateRows];
-    },
-  },
   data: function () {
     return {
-      templateType: "sampleFile",
-      sampleFileRecordToLoad: {},
+      templateType: "sampleItem",
+      sampleItemRecordToLoad: {},
       defaultTemplate: {
         name: "default",
         template: [
           {
+            label: "title",
+            required: true,
+            placeholder: "visible title of the item in batches",
+          },
+          {
             label: "filename",
             required: true,
             placeholder: "filename",
-            key: true, // the field is a key to load data from db
-          },
-          {
-            label: "title",
-            required: true,
-            placeholder: "visible title of the file in batches",
+            disabled: true,
           },
           {
             label: "description",
@@ -72,9 +61,26 @@ export default {
       },
     };
   },
+  computed: {
+    ...bindState({
+      modalActive: "modal/sampleItemAttributesSaveActive",
+      templateRows: "template/rows",
+      $sampleItemListResponse: "sample/$itemListResponse",
+      batchSelected: "sample/batch/selection/row",
+    }),
+    availableTemplates() {
+      return [this.defaultTemplate, ...this.templateRows];
+    },
+    itemSelected: function () {
+      let items = this.$store.state.sample.item.selection.rows;
+      return items.length == 1 ? items[0] : null;
+    },
+  },
   methods: {
     ...mapMutations({
-      sampleFileUpdate: "sample/file/UPDATE",
+      sampleItemUpdate: "sample/item/update",
+      sampleItemRead: "sample/item/read",
+      deactivateModal: "modal/deactivate",
     }),
     ...mapActions({
       templateListRequest: "template/listRequest",
@@ -92,19 +98,22 @@ export default {
       // convert [{label, value...}, ...] to object
       let row = {};
       newValue.forEach((field) => (row[field.label] = field.value || ""));
-      this.sampleFileUpdate(row);
+      row.id = this.itemSelected.id;
+      row.batchId = this.itemSelected.batchId;
+      this.sampleItemUpdate([row]);
+      this.deactivateModal();
     },
     loadAttributes(newValue) {
-      this.$sampleFileListRequest = newValue;
+      this.sampleItemRead(newValue);
     },
   },
   watch: {
     modalActive: function (active) {
       if (active) this.templateListRequest({ type: this.templateType });
     },
-    $sampleFileListResponse: function (response) {
+    $sampleItemListResponse: function (response) {
       let row = (response.records && response.records[0]) || {};
-      this.sampleFileRecordToLoad = {
+      this.sampleItemRecordToLoad = {
         template: this.defaultTemplate.template,
         row: row,
       };

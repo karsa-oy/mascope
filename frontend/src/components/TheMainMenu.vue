@@ -38,11 +38,12 @@ export default {
           visible: this.workspaceActive,
         },
         {
-          icon: "file-import-outline",
+          icon: "file-plus",
           label: "Sample management",
           path: "/sample-management",
           visible: this.workspaceActive,
-        }].filter(b => b.visible);
+        },
+      ].filter((b) => b.visible);
     },
     footerButtons() {
       return [
@@ -57,7 +58,8 @@ export default {
           label: "Change workspace",
           path: "/",
           visible: true,
-        }].filter(b => b.visible);
+        },
+      ].filter((b) => b.visible);
     },
   },
 };

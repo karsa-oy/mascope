@@ -18,7 +18,7 @@ export default {
   components: { BaseChartPlotly },
   computed: {
     stats: function () {
-      return this.$store.getters["match/ratings"]({
+      return this.$store.getters["match/rating/rows"]({
         level: "compound",
         selected: true,
       });
