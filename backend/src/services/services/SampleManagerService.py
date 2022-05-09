@@ -81,7 +81,7 @@ class SampleServiceNamespace(BaseClientNamespace):
         }
 
     async def on_workspace_delete_request(self, data):
-        workspaces_ids = [
+        workspace_ids = [
             workspace['id']
             for workspace in data['value']
         ]
@@ -147,7 +147,11 @@ class SampleServiceNamespace(BaseClientNamespace):
 
     async def on_sample_item_create_request(self, data):
         items = [
-            {'id': gen_id(), **item}
+            {
+                'id': gen_id(),
+                **item,
+                'attributes': json.dumps(item['attributes'])
+            }
             for item in data['value']
         ]
         for item in items:
@@ -183,70 +187,25 @@ class SampleServiceNamespace(BaseClientNamespace):
             'body': None
         }
 
-    # sample db
-
-    async def on_dataset_updated(self, data):
-        value = data['value']
-        if value['data_type'] != 'signal':
-            raise ValueError(f"Expected data_type: signal - got {value['data_type']}")
-        filename = value['filename']
-        full_length = value['length']
-        committed_length = value['committed_length']
-        if committed_length >= full_length:
-            # update sample store
-            instrument = filename.split('_')[0]
-            dt = parse_datetime_from_item_filename(filename)
-            title = value.get('title', "")
-            utc_offset = timedelta(seconds=int(value['utc_offset']))
-            db.sample_file_insert(
-                id=filename,
-                filename=filename,
-                instrument=instrument,
-                title=title,
-                datetime=dt.isoformat(),
-                datetime_utc=(dt - utc_offset).isoformat(),
-                length=committed_length,
-                range=json.dumps(value['range'])
-            )
-
-    # template table handlers
-
-    async def on_template_list_request(self, data):
-        # templates = [
-        #     {"name":"template_1","type":"sample","template":'[{"label":"fname","required":true,"placeholder":"fname"},{"label":"description","value":"Predefined description"},{"label":"optional attribute"}]'},
-        #     ...,
-        # ]
-        templateType = data['value']['type']
+    async def on_sample_item_schema_request(self, data):
+        # data: {field_name: field_value}
+        timeout = data.get('timeout')
         context = get_client_notification_context(data)
-        timeout = context.get('timeout')
-        records = db.attribute_template_get(type=templateType)
-        for r in records:
-            r['template'] = json.loads(r['template'])
+        schema = db.sample_item_get_schema()
+        result = {'schema': schema, 'dummy': time()}     # ensure response accepted, when schema not changed
         if timeout:
-            # return code for (backend) clients, which can use call instead of emit
-            return records
+            return result
         else:
-            # notification for clients, which prefer callbacks
             await self.emit_client_notification(
-                'template_list_response',
-                records,
+                'sample_item_schema_response',
+                result,
                 **{
                     **context,
                     'room': data.get('client_room'),
                 })
 
-    async def on_template_save(self, data):
-        value = data['value']
-        template = {
-            'name': value['name'],
-            'type': value.get('type', 'unknown'),
-            'template': json.dumps(value['template']),
-        }
-        db.attribute_template_insert(**template)
 
-    async def on_template_delete(self, data):
-        template_id = data['value']['id']
-        db.attribute_template_delete(template_id)
+    # === sample files === #
 
     async def on_sample_file_update_request(self, data):
         # data[value]: {key: value, ...}
@@ -264,49 +223,6 @@ class SampleServiceNamespace(BaseClientNamespace):
         the_rows = db.sample_file_get(id=row['id'])
         the_row = {} if not the_rows else the_rows[0]
         db.sample_file_insert(**{**the_row,**result})
-
-
-    async def on_sample_item_update_request(self, data):
-        # data[value]: [{key:value, ...}, ...]
-        def save_single_item_data(row):
-            schema_fields = [title for title,*_ in db.sample_items.schema]
-            result = {}
-            attribs = {}
-            for key, val in row.items():
-                if key in schema_fields:
-                    result[key] = val
-                else:
-                    attribs[key] = val
-            result['attributes'] = json.dumps({**row.get('attributes', {}), **attribs})
-            # keep existing unmentioned fields intact
-            the_rows = db.sample_item_get(title=row['title'], batchId=row['batchId'])
-            the_row = {} if not the_rows else the_rows[0]
-            if the_row:     # if item exists, skip incoming id to use the existing one
-                result.pop('id')
-            db.sample_item_insert(**{**the_row,**result})
-
-        rows = data['value']
-        batch_ids = []
-        for row in rows:
-            save_single_item_data(row)
-            batch_ids.append(row['batchId'])
-
-        # TODO: refresh batch views - move the call to UI after fixing sync notifications
-        for id in batch_ids:
-            reload_batch_data = {
-                'name': 'sample_batch_item_list_request',
-                'value': {'id': id},
-                'value': {
-                    'id': id, 
-                    'requestId': time(),    # ensure response accepted, when data not changed
-                },
-                **{
-                    **get_client_notification_context(data),
-                    'client_room': id,
-                  },
-            }
-            await self.on_sample_batch_item_list_request(reload_batch_data)
-
 
     async def on_sample_file_list_request(self, data):
         # data: {field_name: field_value}
@@ -349,22 +265,70 @@ class SampleServiceNamespace(BaseClientNamespace):
                     'room': data.get('client_room'),
                 })
 
-    async def on_sample_item_schema_request(self, data):
-        # data: {field_name: field_value}
-        timeout = data.get('timeout')
+    async def on_dataset_updated(self, data):
+        value = data['value']
+        if value['data_type'] != 'signal':
+            raise ValueError(f"Expected data_type: signal - got {value['data_type']}")
+        filename = value['filename']
+        full_length = value['length']
+        committed_length = value['committed_length']
+        if committed_length >= full_length:
+            # update sample store
+            instrument = filename.split('_')[0]
+            dt = parse_datetime_from_item_filename(filename)
+            title = value.get('title', "")
+            utc_offset = timedelta(seconds=int(value['utc_offset']))
+            db.sample_file_insert(
+                id=filename,
+                filename=filename,
+                instrument=instrument,
+                title=title,
+                datetime=dt.isoformat(),
+                datetime_utc=(dt - utc_offset).isoformat(),
+                length=committed_length,
+                range=json.dumps(value['range'])
+            )
+
+    # === templates === #
+
+    async def on_template_list_request(self, data):
+        # templates = [
+        #     {"name":"template_1","type":"sample","template":'[{"label":"fname","required":true,"placeholder":"fname"},{"label":"description","value":"Predefined description"},{"label":"optional attribute"}]'},
+        #     ...,
+        # ]
+        templateType = data['value']['type']
         context = get_client_notification_context(data)
-        schema = db.sample_item_get_schema()
-        result = {'schema': schema, 'dummy': time()}     # ensure response accepted, when schema not changed
+        timeout = context.get('timeout')
+        records = db.attribute_template_get(type=templateType)
+        for r in records:
+            r['template'] = json.loads(r['template'])
         if timeout:
-            return result
+            # return code for (backend) clients, which can use call instead of emit
+            return records
         else:
+            # notification for clients, which prefer callbacks
             await self.emit_client_notification(
-                'sample_item_schema_response',
-                result,
+                'template_list_response',
+                records,
                 **{
                     **context,
                     'room': data.get('client_room'),
                 })
+
+    async def on_template_save(self, data):
+        value = data['value']
+        template = {
+            'name': value['name'],
+            'type': value.get('type', 'unknown'),
+            'template': json.dumps(value['template']),
+        }
+        db.attribute_template_insert(**template)
+
+    async def on_template_delete(self, data):
+        template_id = data['value']['id']
+        db.attribute_template_delete(template_id)
+
+
 
 
 

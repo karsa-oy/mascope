@@ -45,8 +45,11 @@
                 <h1 style="font-size: 16px; text-align: left">
                   <p>
                     <b>
-                      Items to add to {{ workspaceActive.name }} batch:
-                      {{ batchSelected.name }}
+                      {{
+                        batchSelected
+                        ? "Items to add to batch: " + batchSelected.name
+                        : "Please select a batch"
+                      }}
                     </b>
                   </p>
                 </h1>
@@ -137,7 +140,7 @@ export default {
   },
   methods: {
     ...mapActions({
-      sampleItemUpdate: "sample/item/update",
+      sampleItemCreate: "sample/item/create",
     }),
     selectSampleFiles(files) {
       let fields = this.sampleItemSchema.filter(
@@ -165,7 +168,7 @@ export default {
             ...row,
             batchId: this.batchSelected.id,
           }));
-          this.sampleItemUpdate(rows);
+          this.sampleItemCreate(rows);
         },
       });
     },
@@ -182,11 +185,11 @@ export default {
       let d2 =
         this.sampleFileMaxDateTime -
         this.sampleFileMaxDateTime.getTimezoneOffset() * 60000;
-      this.$sampleFileListRequest({
+      this.$sampleFileListRequest = {
         column: "datetime",
         min_value: new Date(d1).toISOString(),
         max_value: new Date(d2).toISOString(),
-      });
+      };
     },
   },
   watch: {
