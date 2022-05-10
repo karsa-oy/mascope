@@ -15,7 +15,6 @@ import json
 from time import time
 from datetime import timedelta
 
-import numpy as np
 from scipy.signal import find_peaks
 
 from karsalib.client import (
@@ -41,13 +40,6 @@ db = SampleManagerDB(db_path)
 class SampleServiceNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to MainService """
 
-    service_state = dict(
-        workspace_rows = {
-            'value': db.workspace_read(),
-            'room': 'workspaces'
-        },
-    )
-
     # ========== UI requests ==========
 
     # === workspaces === #
@@ -57,7 +49,7 @@ class SampleServiceNamespace(BaseClientNamespace):
             {**workspace, 'id': gen_id()}
             for workspace in data['value']
         ]
-        for workspace in workspaces:        
+        for workspace in workspaces:
             db.workspace_create(**workspace)
         return {
             'type': 'success',
@@ -81,10 +73,7 @@ class SampleServiceNamespace(BaseClientNamespace):
         }
 
     async def on_workspace_delete_request(self, data):
-        workspace_ids = [
-            workspace['id']
-            for workspace in data['value']
-        ]
+        workspace_ids = data['value']
         for workspace_id in workspace_ids:
             db.workspace_delete(id=workspace_id)
         return {

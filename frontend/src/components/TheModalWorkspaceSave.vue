@@ -42,7 +42,7 @@
             expanded
             @click="
               () => {
-                updateWorkspace(newWorkspace);
+                updateWorkspace([newWorkspace]);
                 deactivateModal();
               }
             "
@@ -56,7 +56,7 @@
             expanded
             @click="
               () => {
-                createWorkspace(newWorkspace);
+                createWorkspace([newWorkspace]);
                 deactivateModal();
               }
             "
@@ -70,7 +70,7 @@
             expanded
             @click="
               () => {
-                deleteWorkspace(oldWorkspace);
+                deleteWorkspace([oldWorkspace.id]);
                 deactivateModal();
               }
             "
@@ -86,7 +86,7 @@
 <script>
 import { bindState } from "$lib/store";
 
-import { mapMutations } from "vuex";
+import { mapMutations, mapActions } from "vuex";
 
 import table from "$lib/table";
 
@@ -103,14 +103,14 @@ export default {
     ...bindState({
       modalActive: "modal/workspaceSaveActive",
       modalProps: "modal/workspaceSaveProps",
-      $workspaces: "workspace/$rows",
+      workspaces: "workspace/rows",
     }),
     action() {
       return this.modalProps.action;
     },
     oldWorkspace() {
       if (this.actionIs("edit", "delete")) {
-        return table.get(this.$workspaces, {
+        return table.get(this.workspaces, {
           id: this.modalProps.workspaceId,
         });
       } else {
@@ -146,10 +146,12 @@ export default {
   },
   methods: {
     ...mapMutations({
+      deactivateModal: "modal/deactivate",
+    }),
+    ...mapActions({
       deleteWorkspace: "workspace/delete",
       updateWorkspace: "workspace/update",
       createWorkspace: "workspace/create",
-      deactivateModal: "modal/deactivate",
     }),
     actionIs(...actions) {
       return actions.includes(this.action);

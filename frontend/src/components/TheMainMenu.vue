@@ -22,8 +22,8 @@ export default {
         {
           icon: "home",
           label: "Workspace home",
-          path: "/workspace-home",
-          visible: this.workspaceActive,
+          path: "/",
+          visible: true,
         },
         {
           icon: "flask",
@@ -57,6 +57,7 @@ export default {
           icon: "logout-variant",
           label: "Change workspace",
           path: "/",
+          newQuery: {},
           visible: true,
         },
       ].filter((b) => b.visible);

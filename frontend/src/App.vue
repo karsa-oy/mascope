@@ -50,24 +50,20 @@ export default {
       sampleItemSchemaHandleResponse: "sample/item/schema/HANDLE_RESPONSE",
     }),
     ...mapActions({
+      workspaceRead: "workspace/read",
       sampleBatchRead: "sample/batch/read",
       templateSetRows: "template/setRows",
       keydown: "key/down",
       keyup: "key/up",
     }),
-    workspaceById(id) {
-      return this.$store.getters["workspace/byId"](id);
-    },
-    workspaceInit() {
-      this.workspaceActive = this.workspaceById(this.query.w);
-      if (this.workspaceActive) {
-        this.$nextTick(() => {
-          this.workspaceRoom = this.workspaceActive.id;
-          this.$sampleFileSchemaRequest = {};
-          this.$sampleItemSchemaRequest = {};
-          this.sampleBatchRead({
-            workspaceId: this.workspaceActive.id,
-          });
+    load() {
+      if (!this.workspaceActive) {
+        this.workspaceRead();
+      } else {
+        this.$sampleFileSchemaRequest = {};
+        this.$sampleItemSchemaRequest = {};
+        this.sampleBatchRead({
+          workspaceId: this.workspaceActive.id,
         });
       }
     },
@@ -76,15 +72,15 @@ export default {
     // initialization
     ready: function () {
       if (this.ready) {
-        this.workspaceInit();
+        this.load();
       }
     },
     // query
     "$route.query": function () {
       this.query = this.$route.query;
     },
-    query: function () {
-      this.workspaceInit();
+    workspaceActive: function () {
+      this.load();
     },
     // sample
     $sampleFileSchemaResponse: function () {
