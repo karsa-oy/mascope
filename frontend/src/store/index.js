@@ -1,7 +1,6 @@
 import { createConnectedStore } from '$lib/api';
 
 import logger from "./plugins/logger";
-import { sessionStorage } from './plugins/storage';
 
 import dev from "./modules/dev";
 import modal from './modules/modal';
@@ -27,7 +26,6 @@ export default createConnectedStore({
 		template,
 	},
 	plugins: [
-		logger,
-		sessionStorage
+		logger
 	]
 });

@@ -20,6 +20,11 @@ export default {
       type: String,
       required: true,
     },
+    newQuery: {
+      type: Object,
+      required: false,
+      default: null,
+    },
     tooltipPosition: {
       type: String,
       required: false,
@@ -33,8 +38,11 @@ export default {
   },
   computed: {
     ...mapState({
-      query: "query",
+      existingQuery: "query",
     }),
+    query() {
+      return this.newQuery ?? this.existingQuery;
+    },
   },
 };
 </script>

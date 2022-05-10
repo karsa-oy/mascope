@@ -70,7 +70,6 @@ export default {
     }),
     handleClick() {
       this.$router.push({
-        path: "/workspace-home",
         query: { w: this.workspace.id },
       });
     },

@@ -237,8 +237,8 @@ class SampleManagerDB:
     def workspace_create(self, **row):
         self.workspaces.create(**row)
 
-    def workspace_read(self):
-        return self.workspaces.get_all()
+    def workspace_read(self, **filters):
+        return self.workspaces.get(**filters)
 
     def workspace_update(self, **row):
         self.workspaces.update(**row)

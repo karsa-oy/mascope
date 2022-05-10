@@ -1,44 +1,41 @@
+import { createTableModule } from "$lib/store";
 import table from "$lib/table";
 
-export default {
-    namespaced: true,
+export default createTableModule({
+    namespace: 'workspace',
     state: {
-        // meta
-        cols: [],
-        // data
-        $rows: [],
         // state
         active: null,
         // API
-        $createRequest: null,
-        $updateRequest: null,
-        $deleteRequest: null,
         $room: 'workspaces',
-        $roomActive: [],
-        $endpoint: 'workspace_rows'
+        $roomActive: null,
     },
     mutations: {
-        create(state, workspace) {
-            state.$createRequest = {
-                id: workspace.id ? workspace.id : table.genId(),
-                name: workspace.name,
-                description: workspace.description,
-            }
+        SET(state, { workspace }) {
+            state.active = workspace;
+            state.$roomActive = [workspace.id];
         },
-        update(state, workspace) {
-            state.$updateRequest = {
-                id: workspace.id ? workspace.id : table.genId(),
-                name: workspace.name,
-                description: workspace.description,
+        RESET(state) {
+            state.active = null
+        }
+    },
+    actions: {
+        sync({ state, getters, commit }) {
+            let workspaceId = getters['queryString'];
+            if (workspaceId) {
+                let workspace = table.get(state.rows, { id: workspaceId });
+                commit('SET', { workspace });
+            } else {
+                commit('RESET');
             }
-        },
-        delete(state, workspace) {
-            state.$deleteRequest = workspace;
         }
     },
     getters: {
-        byId: (state) => (id) => {
-            return table.get(state.$rows, { id });
+        queryString(state, getters, rootState) {
+            return rootState.query ? rootState.query.w : null;
         }
     },
-}
+    watchers: {
+        "workspace/queryString": "workspace/sync"
+    }
+})
