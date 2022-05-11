@@ -26,9 +26,21 @@ export default {
           visible: true,
         },
         {
+          icon: "file-plus",
+          label: "Sample management",
+          path: "/sample-management",
+          visible: this.workspaceActive,
+        },
+        {
           icon: "flask",
           label: "Batch overview",
           path: "/batch-overview",
+          visible: this.workspaceActive,
+        },
+        {
+          icon: "sine-wave",
+          label: "Sample signal",
+          path: "/sample-signal",
           visible: this.workspaceActive,
         },
         {
@@ -37,12 +49,7 @@ export default {
           path: "/data-management",
           visible: this.workspaceActive,
         },
-        {
-          icon: "file-plus",
-          label: "Sample management",
-          path: "/sample-management",
-          visible: this.workspaceActive,
-        },
+
       ].filter((b) => b.visible);
     },
     footerButtons() {

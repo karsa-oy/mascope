@@ -9,7 +9,7 @@
 
 <script>
 import { bindState } from "$lib/store";
-import { mapMutations, mapActions } from "vuex";
+import { mapActions, mapMutations } from "vuex";
 
 export default {
   data: function () {
@@ -30,12 +30,15 @@ export default {
     ...bindState({
       api: "api",
       query: "query",
+      // workspace
       workspaceActive: "workspace/active",
       workspaceRoom: "workspace/$roomActive",
+      // schema
       $sampleItemSchemaRequest: "sample/item/schema/$request",
       $sampleItemSchemaResponse: "sample/item/schema/$response",
       $sampleFileSchemaRequest: "sample/file/schema/$request",
       $sampleFileSchemaResponse: "sample/file/schema/$response",
+      // template
       $templateListResponse: "template/$listResponse",
     }),
     ready: function () {
@@ -86,6 +89,7 @@ export default {
     $sampleFileSchemaResponse: function () {
       this.sampleFileSchemaHandleResponse();
     },
+    // schema
     $sampleItemSchemaResponse: function () {
       this.sampleItemSchemaHandleResponse();
     },

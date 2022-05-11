@@ -10,6 +10,7 @@ import target from "./modules/target";
 import sample from "./modules/sample";
 import match from "./modules/match";
 import template from "./modules/template";
+import visualization from "./modules/visualization";
 
 export default createConnectedStore({
 	state: {
@@ -24,6 +25,7 @@ export default createConnectedStore({
 		target,
 		match,
 		template,
+		visualization,
 	},
 	plugins: [
 		logger
