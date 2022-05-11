@@ -2,7 +2,7 @@
   <section>
     <plotly
       :data="data"
-      :layout="{ ...layout, ...baseLayout }"
+      :layout="{ ...baseLayout, ...layout }"
       :display-logo="false"
       :display-mode-bar="false"
       style="width: 100%; height: 100%"
@@ -46,8 +46,7 @@ export default {
           color: "#fff",
         },
         hoverinfo: "name+y",
-        dragmode: "select",
-        plot_bgcolor: "#505151",
+        plot_bgcolor: "transparent",
         paper_bgcolor: "transparent",
         autosize: false,
         useResizeHandler: true,
