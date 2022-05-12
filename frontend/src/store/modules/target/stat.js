@@ -5,16 +5,22 @@ export default {
     getters: {
         // stats
         rows: (state, getters) =>
-            ({ level = 'compound', selected = true }) => {
-                return getters[level + 's']({ selected });
+            ({ level = 'compound', selected = true, itemFocused = false }) => {
+                return getters[level + 's']({ selected, itemFocused });
             },
         compounds: (state, getters, rootState, rootGetters) =>
-            ({ selected = true }) => {
+            ({ selected = true, itemFocused = false }) => {
                 let matchesExist = rootState.match.compoundRows.length > 0;
                 if (matchesExist) {
                     let matches = rootGetters['match/rating/rows']({
                         level: 'compound', selected
                     });
+                    if (itemFocused) {
+                        if (!rootState.sample.item.focus.row) return rootState.target.compoundRows; 
+                        matches = matches.filter(
+                            (m) => m.sampleItemId === rootState.sample.item.focus.row.id
+                            );
+                    }
                     let compounds = selected ? rootGetters['target/compoundsSelected'] : rootState.target.compoundRows;
                     let total = table.query(
                         `
@@ -75,12 +81,18 @@ export default {
                 }
             },
         ions: (state, getters, rootState, rootGetters) =>
-            ({ selected = true }) => {
+            ({ selected = true, itemFocused = false }) => {
                 let matchesExist = rootState.match.ionRows.length > 0;
                 if (matchesExist) {
                     let matches = rootGetters['match/rating/rows']({
                         level: 'ion', selected
                     });
+                    if (itemFocused) {
+                        if (!rootState.sample.item.focus.row) return rootState.target.ionRows; 
+                        matches = matches.filter(
+                            (m) => m.sampleItemId === rootState.sample.item.focus.row.id
+                            );
+                    }
                     let ions = selected ? rootGetters['target/ionsSelected'] : rootState.target.ionRows;
                     let compounds = selected ? rootGetters['target/compoundsSelected'] : rootState.target.compoundRows;
                     let total = table.query(
@@ -147,12 +159,18 @@ export default {
                 }
             },
         isotopes: (state, getters, rootState, rootGetters) =>
-            ({ selected = true }) => {
+            ({ selected = true, itemFocused = false }) => {
                 let matchesExist = rootState.match.isotopeRows.length > 0;
                 if (matchesExist) {
                     let matches = rootGetters['match/rating/rows']({
                         level: 'isotope', selected
                     });
+                    if (itemFocused) {
+                        if (!rootState.sample.item.focus.row) return rootState.target.isotopeRows; 
+                        matches = matches.filter(
+                            (m) => m.sampleItemId === rootState.sample.item.focus.row.id
+                            );
+                    }
                     let isotopes = selected ? rootGetters['target/isotopesSelected'] : rootState.target.isotopeRows;
                     let ions = selected ? rootGetters['target/ionsSelected'] : rootState.target.ionRows;
                     let compounds = selected ? rootGetters['target/compoundsSelected'] : rootState.target.compoundRows;

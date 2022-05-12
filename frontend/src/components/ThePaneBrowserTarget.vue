@@ -34,6 +34,7 @@ export default {
   computed: {
     ...bindState({
       controlPressed: "key/control",
+      sampleItemFocused: "sample/item/focus/row",
     }),
     ...mapGetters({
       matchesExist: "match/exists",
@@ -42,22 +43,25 @@ export default {
       return this.$store.getters["target/stat/rows"]({
         level: "compound",
         selected: false,
+        itemFocused: true,
       });
     },
     ionStats: function () {
       return this.$store.getters["target/stat/rows"]({
         level: "ion",
         selected: false,
+        itemFocused: true,
       });
     },
     isotopeStats: function () {
       return this.$store.getters["target/stat/rows"]({
         level: "isotope",
         selected: false,
+        itemFocused: true,
       });
     },
     targetLevels: function () {
-      let hidden = !this.matchesExist;
+      let hidden = !(this.matchesExist && this.sampleItemFocused);
       return [
         {
           name: "Compound",
@@ -127,7 +131,7 @@ export default {
             },
           ],
           rows: this.isotopeStats,
-          defaultSort: ["matchScore", "desc"],
+          defaultSort: ["mz", "asc"],
           detailsIcon: null,
           rowClick: this.targetIsotopeClick,
           rowStatus: this.$store.getters["target/status"],
