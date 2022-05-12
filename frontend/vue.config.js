@@ -15,7 +15,7 @@ module.exports = {
   },
   pluginOptions: {
     electronBuilder: {
-      mainProcessFile: "src/electron.js",
+      mainProcessFile: "src/background.js",
       builderOptions: {
         // options placed here will be merged with default 
         // configuration and passed to electron-builder
@@ -36,11 +36,6 @@ module.exports = {
           {
             "from": ".env",
             "to": ".env",
-            "filter": ["**/*"]
-          },
-          {
-            "from": "configs",
-            "to": "configs",
             "filter": ["**/*"]
           },
         ]

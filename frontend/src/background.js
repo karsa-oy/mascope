@@ -5,7 +5,6 @@ import { createProtocol } from 'vue-cli-plugin-electron-builder/lib';
 import { autoUpdater } from "electron-updater";
 
 const isDevelopment = process.env.NODE_ENV !== 'production';
-const _ = require('underscore');
 
 let parentWin;
 

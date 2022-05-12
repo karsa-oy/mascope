@@ -36,7 +36,7 @@ yarn lint
 
 2) build the application
 
-yarn electron:build
+yarn electron:build --legacy
 
 ### Compile, build and publish distribution package (to github.com)
 1) run checklist.cmd to make sure all build pre-requisits are in place
@@ -45,7 +45,7 @@ yarn electron:build
 
 3) build and publish the application
 
-yarn electron:publish
+yarn electron:publish --legacy
 
 ### Customize configuration
 See [Configuration Reference](https://cli.vuejs.org/config/).
