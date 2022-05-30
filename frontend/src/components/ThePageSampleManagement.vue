@@ -1,83 +1,79 @@
 <template>
   <the-layout-sidebar>
-    <b-tabs type="is-boxed">
-      <b-tab-item label="Batch Items" icon="test-tube">
-        <section>
+    <section>
+      <div class="columns">
+        <div class="column is-2 base-browser-sidebar">
+          <the-pane-browser-sample></the-pane-browser-sample>
+        </div>
+        <div class="column is-10" style="padding-right: 1em">
+          <div style="padding-top: 0.5em; padding-bottom: 1em">
+            <h1 style="font-size: 16px; text-align: left">
+              <p>
+                <b>Select Sample Files:</b>
+              </p>
+            </h1>
+          </div>
           <div class="columns">
-            <div class="column is-2 base-browser-sidebar">
-              <the-pane-browser-sample></the-pane-browser-sample>
+            <div class="column is-half">
+              <b-datetimepicker
+                placeholder="Starting from..."
+                v-model="sampleFileMinDateTime"
+              >
+              </b-datetimepicker>
             </div>
-            <div class="column" style="padding-right: 1em">
-              <div style="padding-top: 0.5em; padding-bottom: 1em">
-                <h1 style="font-size: 16px; text-align: left">
-                  <p>
-                    <b>Select Sample Files:</b>
-                  </p>
-                </h1>
-              </div>
-              <div class="columns">
-                <div class="column is-half">
-                  <b-datetimepicker
-                    placeholder="Starting from..."
-                    v-model="sampleFileMinDateTime"
-                  >
-                  </b-datetimepicker>
-                </div>
-                <div class="column is-half">
-                  <b-datetimepicker
-                    placeholder="Until..."
-                    v-model="sampleFileMaxDateTime"
-                  >
-                  </b-datetimepicker>
-                </div>
-              </div>
-              <base-table
-                :key="sampleFileTableDataKey"
-                :rows="sampleFileRows"
-                :cols="sampleFileCols"
-                :checkable="true"
-                :searchable="true"
-                :height="srcTableHeight"
-                @selectRows="selectSampleFiles"
+            <div class="column is-half">
+              <b-datetimepicker
+                placeholder="Until..."
+                v-model="sampleFileMaxDateTime"
               >
-              </base-table>
-              <div style="padding-top: 1.5em; padding-bottom: 1.5em">
-                <h1 style="font-size: 16px; text-align: left">
-                  <p>
-                    <b>
-                      {{
-                        batchSelected
-                        ? "Items to add to batch: " + batchSelected.name
-                        : "Please select a batch"
-                      }}
-                    </b>
-                  </p>
-                </h1>
-              </div>
-              <base-table
-                :rows="sampleItemRows"
-                :cols="sampleItemCols"
-                :checkable="false"
-                :searchable="false"
-                :height="targetTableHeight"
-              >
-              </base-table>
+              </b-datetimepicker>
             </div>
           </div>
-
-          <b-button
-            @click="itemsAdd"
-            style="position: fixed; right: 5em; bottom: 2em"
-            icon-left="content-save"
-            type="is-primary"
-            :disabled="!sampleItemRows.length || !batchSelected"
-            rounded
+          <base-table
+            :key="sampleFileTableDataKey"
+            :rows="sampleFileRows"
+            :cols="sampleFileCols"
+            :checkable="true"
+            :searchable="true"
+            :height="sampleFileTableHeight"
+            @selectRows="selectSampleFiles"
           >
-            Add Items
-          </b-button>
-        </section>
-      </b-tab-item>
-    </b-tabs>
+          </base-table>
+          <div style="padding-top: 1.5em; padding-bottom: 1.5em">
+            <h1 style="font-size: 16px; text-align: left">
+              <p>
+                <b>
+                  {{
+                    batchSelected
+                    ? "Items to add to batch: " + batchSelected.name
+                    : "Please select a batch"
+                  }}
+                </b>
+              </p>
+            </h1>
+          </div>
+          <base-table
+            :rows="sampleItemRows"
+            :cols="sampleItemCols"
+            :checkable="false"
+            :searchable="false"
+            :height="sampleItemTableHeight"
+          >
+          </base-table>
+        </div>
+      </div>
+
+      <b-button
+        @click="itemsAdd"
+        style="position: fixed; right: 5em; bottom: 2em"
+        icon-left="content-save"
+        type="is-primary"
+        :disabled="!sampleItemRows.length || !batchSelected"
+        rounded
+      >
+        Add Items
+      </b-button>
+    </section>
   </the-layout-sidebar>
 </template>
 
