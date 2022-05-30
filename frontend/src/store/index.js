@@ -2,6 +2,7 @@ import { createConnectedStore } from '$lib/api';
 
 import logger from "./plugins/logger";
 
+import calibration from "./modules/calibration";
 import dev from "./modules/dev";
 import modal from './modules/modal';
 import key from './modules/key';
@@ -17,6 +18,7 @@ export default createConnectedStore({
 		query: null
 	},
 	modules: {
+		calibration,
 		dev,
 		modal,
 		key,

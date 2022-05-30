@@ -11,12 +11,8 @@ Created on Thu May  7 12:43:13 2020
 
 import asyncio
 import os
-import json
 from time import time
 from datetime import timedelta
-
-from scipy.signal import find_peaks
-
 from karsalib.client import (
                         BaseClientNamespace,
                         BaseServiceClient
@@ -25,10 +21,6 @@ from karsalib.util import parse_datetime_from_item_filename
 from karsalib.util import parse_cmd_args, get_client_notification_context
 from karsalib.db import SampleManagerDB, gen_id
 
-from services.FileIoService import load_file
-
-# File cache
-cache = {}
 
 NO_DATA_LOGGING_DEFAULT = True
 
@@ -139,7 +131,6 @@ class SampleServiceNamespace(BaseClientNamespace):
             {
                 'id': gen_id(),
                 **item,
-                'attributes': json.dumps(item['attributes'])
             }
             for item in data['value']
         ]
@@ -198,20 +189,23 @@ class SampleServiceNamespace(BaseClientNamespace):
 
     async def on_sample_file_update_request(self, data):
         # data[value]: {key: value, ...}
-        row = data['value']
-        schema_fields = [title for title,*_ in db.sample_files.schema]
-        result = {}
+        row_update = data['value']
+        schema_fields = [column for column, *_ in db.sample_files.schema]
+        row_new = {}
         attribs = {}
-        for key, val in row.items():
-            if key in schema_fields:
-                result[key] = val
+        for column, value in row_update.items():
+            if column in schema_fields:
+                row_new[column] = value
             else:
-                attribs[key] = val
-        result['attributes'] = json.dumps({**row.get('attributes', {}), **attribs})
+                attribs[column] = value
+        row_new['attributes'] = {
+            **row_update.get('attributes', {}),
+            **attribs,
+            }
         # keep existing unmentioned fields intact
-        the_rows = db.sample_file_get(id=row['id'])
-        the_row = {} if not the_rows else the_rows[0]
-        db.sample_file_insert(**{**the_row,**result})
+        the_rows = db.sample_file_get(id=row_update['id'])
+        row_old = {} if not the_rows else the_rows[0]
+        db.sample_file_insert(**{**row_old, **row_new})
 
     async def on_sample_file_list_request(self, data):
         # data: {field_name: field_value}
@@ -223,8 +217,6 @@ class SampleServiceNamespace(BaseClientNamespace):
             records = db.sample_file_get_range(**value)
         else:
             records = db.sample_file_get(**value)
-        for record in records:
-            record['attributes'] = json.loads(record.get('attributes') or '[]')
         result = {'records': records, 'dummy': time()}  # ensure response generated, when data not changed
         if timeout:
             return result
@@ -275,7 +267,7 @@ class SampleServiceNamespace(BaseClientNamespace):
                 datetime=dt.isoformat(),
                 datetime_utc=(dt - utc_offset).isoformat(),
                 length=committed_length,
-                range=json.dumps(value['range'])
+                range=value['range']
             )
 
     # === templates === #
@@ -289,8 +281,6 @@ class SampleServiceNamespace(BaseClientNamespace):
         context = get_client_notification_context(data)
         timeout = context.get('timeout')
         records = db.attribute_template_get(type=templateType)
-        for r in records:
-            r['template'] = json.loads(r['template'])
         if timeout:
             # return code for (backend) clients, which can use call instead of emit
             return records
@@ -309,7 +299,7 @@ class SampleServiceNamespace(BaseClientNamespace):
         template = {
             'name': value['name'],
             'type': value.get('type', 'unknown'),
-            'template': json.dumps(value['template']),
+            'template': value['template'],
         }
         db.attribute_template_insert(**template)
 
@@ -319,12 +309,10 @@ class SampleServiceNamespace(BaseClientNamespace):
 
 
 
-
-
 class SampleManagerClient(BaseServiceClient):
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
 
 def run():
     args = parse_cmd_args()

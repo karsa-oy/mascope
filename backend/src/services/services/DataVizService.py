@@ -171,6 +171,7 @@ class DataVizServiceNamespace(BaseClientNamespace):
                 room=client_room,
                 no_data_logging=True,
                 )
+            # Sleep 0 to let other tasks be scheduled before next iteration
             await asyncio.sleep(0)
 
         timeseries_time = sum_timeseries.time.values.astype(np.float32)

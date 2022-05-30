@@ -85,16 +85,13 @@ def filter_peaks(
     return peaks[keep].compute()
     
 
-def mz_calibrate_tof(peak_tof, peak_mz, exact_mz, nbr_tof_samples):
+def mz_calibrate_tof(peak_tof, peak_mz, exact_mz):
     # Prepare arguments
     mass_calib_mode = 2
     nbr_points = len(peak_tof)
     mass = np.array(exact_mz, dtype=np.double)
-    sind = np.argsort(mass)
     tofs = np.array(peak_tof, dtype=np.double)
-    mass = mass[sind]
-    tofs = tofs[sind]
-    peak_mz = np.array(peak_mz)[sind]
+    peak_mz = np.array(peak_mz)
     weight = np.ones((nbr_points,)) # TODO: Set weights?
     nbr_params = np.array([3], dtype=np.int)
     mass_calib_par = np.zeros((nbr_params[0],), dtype=np.double)
@@ -118,15 +115,11 @@ def mz_calibrate_tof(peak_tof, peak_mz, exact_mz, nbr_tof_samples):
                   'par': list(mass_calib_par)
                   }
 
-    # new_mz_coord = [TwTof2Mass(tof, massCalibMode, p)
-    #                 for tof in range(nbr_tof_samples)
-    #                 ]
-
     new_peak_mz = np.array([TwTof2Mass(tof, mass_calib_mode, mass_calib_par)
                             for tof in tofs
                             ])
-    pre_dmz = (mass - peak_mz) / mass * 1e6
-    post_dmz = (mass - new_peak_mz) / mass * 1e6
+    pre_dmz = (peak_mz - mass) / mass * 1e6
+    post_dmz = (new_peak_mz - mass) / mass * 1e6
     pre_dmz_norm = np.linalg.norm(pre_dmz)
     post_dmz_norm = np.linalg.norm(post_dmz)
 

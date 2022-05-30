@@ -19,6 +19,7 @@ import ThePageBatchOverview from "./components/ThePageBatchOverview";
 import ThePageDataManagement from "./components/ThePageDataManagement";
 import ThePageSampleSignal from "./components/ThePageSampleSignal";
 import ThePageSampleManagement from "./components/ThePageSampleManagement";
+import ThePageMzCalibration from "./components/ThePageMzCalibration";
 import ThePageSettings from "./components/ThePageSettings";
 
 Vue.use(VueRouter);
@@ -40,6 +41,9 @@ const router = new VueRouter({
   },{
     path: '/sample-management',
     component: ThePageSampleManagement
+  }, {
+    path: '/mz-calibration',
+    component: ThePageMzCalibration
   }, {
     path: '/settings',
     component: ThePageSettings

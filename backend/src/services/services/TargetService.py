@@ -2,22 +2,34 @@ import asyncio
 import numpy as np
 import pandas as pd
 
-from karsalib.peak import detect_peaks, filter_peaks
-from karsalib.match import identify_matches, calculate_match_stats
-
-from karsalib.molmass import Formula
 from karsalib.chemistry import get_exact_isotope_mzs
 from karsalib.client import BaseClientNamespace, BaseServiceClient
+from karsalib.match import identify_matches, calculate_match_stats
+from karsalib.molmass import Formula
+from karsalib.peak import detect_peaks, filter_peaks
+from karsalib.struct import  LRUDict
 from karsalib.util import parse_cmd_args
 
-from services.FileIoService import load_file
+from services.FileIoService import load_coord, load_file
 
 
 # File cache
-cache = {}
+cache = LRUDict(10)
 
 class TargetServiceNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to Router """
+
+    async def on_dataset_coord_updated(self, data):
+        value = data['value']
+        filename = value['filename']
+        var = value['var']
+        coord_name = value['coord']
+        global cache
+        try:
+            cache_item = cache.pop(filename)
+        except KeyError:
+            pass
+
 
     async def on_target_ion_calculation_request(self, data):
         value = data['value']

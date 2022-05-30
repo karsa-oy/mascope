@@ -18,6 +18,7 @@
       :field="col.field"
       :label="col.label"
       :width="col.width"
+      :subheading="col.subheading"
       :searchable="searchable"
       sortable
       left
@@ -79,6 +80,9 @@ export default {
     },
   },
   watch: {
+    rows() {
+      this.selected = [];
+    },
     selected(rows) {
       this.$emit("selectRows", rows);
     },
