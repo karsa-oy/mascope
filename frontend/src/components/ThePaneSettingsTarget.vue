@@ -3,8 +3,8 @@
     <h2 class="subtitle">Targets</h2>
     <base-param-field
       label="Minimum isotope abundance [%]"
-      path="target/paramMinIsoAbu"
-      :range="{ min: 0, max: 20, step: 0.05 }"
+      path="target/param/minIsoAbu"
+      :range="{ min: 0, max: 100, step: 1 }"
     >
     </base-param-field>
     <b-field label="Default ionization mechanisms">

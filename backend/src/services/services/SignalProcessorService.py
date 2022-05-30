@@ -1,5 +1,6 @@
 import asyncio
 
+import json
 import numpy as np
 
 
@@ -26,7 +27,7 @@ cache = {}
 class SignalProcessorNamespace(BaseClientNamespace):
     """ python-socket.io client namespace for connecting to Router """
 
-    async def on_sample_mz_fit_request(self, data):
+    async def on_calibration_mz_fit_request(self, data):
         value = data['value']
         client_room = data.get('client_room') or data['cookies']['src_sid'][0]
 
@@ -36,7 +37,7 @@ class SignalProcessorNamespace(BaseClientNamespace):
             value['exactMzs']
             )
         await self.emit_client_notification(
-            'sample_mz_fit_response', {
+            'calibration_mz_fit_response', {
                 'fit': mz_calib,
                 'stats': {
                     'postMz': stats['new_mz'].astype(np.float32).tobytes(),
@@ -48,10 +49,9 @@ class SignalProcessorNamespace(BaseClientNamespace):
             room=client_room
             )
         
-    async def on_mz_calibrate_samples(self, data):
+    async def on_calibration_mz_apply_request(self, data):
         global cache
 
-        self.log(data)
         value = data['value']
         mode = value['fit']['mode']
         par = value['fit']['par']
@@ -82,6 +82,7 @@ class SignalProcessorNamespace(BaseClientNamespace):
                 cache_item['mz'] = new_mz
                 cache_item.attrs['props'].update({'range': new_range})
                 cache[filename] = cache_item
+
             await self.emit_client_notification(
                 'dataset_coord_updated', {
                     'filename': filename,
@@ -89,6 +90,13 @@ class SignalProcessorNamespace(BaseClientNamespace):
                     'var': 'signal'
                 }
             )
+            await self.emit_client_notification(
+                'sample_file_update_request', {
+                    'id': filename,
+                    'mz_calibration': value['fit']
+                }
+            )
+            await asyncio.sleep(0)
 
 
 class SignalProcessorClient(BaseServiceClient):

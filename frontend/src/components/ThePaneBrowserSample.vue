@@ -19,6 +19,7 @@ export default {
       batchRows: "sample/batch/rows",
       itemRows: "sample/item/rows",
       batchSelected: "sample/batch/selection/row",
+      itemFocused: "sample/item/focus/row",
       itemsSelected: "sample/item/selection/rows",
       modalSampleBatchOpProps: "modal/sampleBatchOpProps",
       modalSampleItemAttributesSave: "modal/sampleItemAttributesSave",
@@ -86,8 +87,17 @@ export default {
           : this.itemSelectedCount == 1
           ? [updateItemButton, deleteItemButton]
           : [deleteItemButton];
+      // 
+      let calibrateItemButton = {
+        label: `Calibrate sample item${s}`,
+        onClick: this.itemCalibrate,
+      };
+      let calibrateButtons = 
+        this.itemFocused
+          ? [calibrateItemButton]
+          : [];
       // menu
-      return [...batchButtons, ...itemButtons];
+      return [...batchButtons, ...itemButtons, ...calibrateButtons];
     },
     opened() {
       return this.batchSelected && this.itemRows.length > 0
@@ -100,6 +110,7 @@ export default {
       activateModal: "modal/activate",
     }),
     ...mapActions({
+      calibrateItems: "calibration/calibrateItems",
       toggleBatchSelection: "sample/batch/selection/toggle",
       toggleItemSelection: "sample/item/selection/toggle",
       toggleItemFocus: "sample/item/focus/toggle",
@@ -130,6 +141,20 @@ export default {
       };
       this.activateModal({
         modal: "sampleBatchOp",
+      });
+    },
+    itemCalibrate() {
+      let itemsToCalibrate = this.itemsSelected.filter(
+        (item) => item.id !== this.itemFocused.id
+        );
+      let fit = this.itemFocused.mz_calibration;
+      this.$buefy.dialog.confirm({
+        title: "Copy mass calibration",
+        message: `Copy calibration from ${this.itemFocused.title} to ${itemsToCalibrate.length} selected samples?`,
+        confirmText: "Copy",
+        onConfirm: () => {
+          this.calibrateItems({items: itemsToCalibrate, fit});
+        },
       });
     },
     itemClick(row) {

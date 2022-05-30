@@ -32,6 +32,12 @@ export default {
           visible: this.workspaceActive,
         },
         {
+          icon: "format-horizontal-align-center",
+          label: "m/z calibration",
+          path: "/mz-calibration",
+          visible: this.workspaceActive,
+        },
+        {
           icon: "flask",
           label: "Batch overview",
           path: "/batch-overview",

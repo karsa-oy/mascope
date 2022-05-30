@@ -1,3 +1,4 @@
+import json
 import sqlite3
 from nanoid import generate
 from karsalib.logging import (
@@ -28,19 +29,31 @@ class DBTable:
         self.con.commit()
         self.log(name)
 
-    def _decode_values_list(self, vslist):
-        res = []
-        for vs in vslist:
-            r = {}
-            r.update((k,v) for k,v in zip(self.keys, vs))
-            res.append(r)
-        return res
+    def _decode_values_list(self):
+        def load(value):
+            """Try to load value as JSON, and return the parsed object
+            If not valid JSON, return the raw value"""
+            try:
+                return json.loads(value)
+            except (TypeError, json.JSONDecodeError):
+                return value
+        rows = []
+        columns = [description[0] for description in self.cur.description]
+        for values in self.cur.fetchall():
+            row = {}
+            row.update(
+                (column, load(value))
+                for column, value in zip(columns, values)
+                if column not in row
+                )
+            rows.append(row)
+        return rows        
 
     def get_all(self):
         sql = f""" SELECT * FROM {self.name} ORDER BY id; """
         self.cur.execute(sql)
         self.con.commit()
-        res = self._decode_values_list(self.cur)
+        res = self._decode_values_list()
         self.log(res)
         return res
 
@@ -51,8 +64,15 @@ class DBTable:
             raise ValueError("Record already exists!")
 
     def insert(self, **kwargs):
+        def dump(value):
+            """If value is either of type list or dict, dump to JSON"""
+            if isinstance(value, list) or isinstance(value, dict):
+                return json.dumps(value)
+            else:
+                return value
         # kwargs must comply with the table schema
         cols, values = zip(*kwargs.items())
+        values = [ dump(value) for value in values ]
         str_cols = ','.join(cols)
         str_values = ','.join('?' * len(values))
         sql = f""" INSERT OR REPLACE INTO {self.name}({str_cols}) VALUES({str_values}); """
@@ -82,7 +102,7 @@ class DBTable:
                    WHERE {column} BETWEEN '{min_value}' AND '{max_value}'
                    ORDER BY {column}; """
         self.cur.execute(sql)
-        res = self._decode_values_list(self.cur)
+        res = self._decode_values_list()
         return res
 
     def get(self, **kwargs):
@@ -99,7 +119,7 @@ class DBTable:
             sql = f""" SELECT * FROM {self.name} ORDER BY id; """
         self.cur.execute(sql)
         self.con.commit()
-        res = self._decode_values_list(self.cur)
+        res = self._decode_values_list()
         return res
 
     def get_joined(self, table, left_on, right_on, **kwargs):
@@ -114,7 +134,7 @@ class DBTable:
                         ON l.{left_on} == r.{right_on}
                     WHERE {wrap_kwargs()}; """
         self.cur.execute(sql)
-        res = self._decode_values_list(self.cur)
+        res = self._decode_values_list()
         return res
 
 
@@ -174,11 +194,12 @@ class SampleFileTable(DBTable):
             ('title', 'varchar(256)'),
             ('instrument', 'varchar(64)'),
             ('datetime', 'varchar(64)'),
-            ('datetime_utc', 'varchar(64)'),
             ('length', 'real'),
             ('range', 'json'),
             ('description', 'text'),
             ('attributes', 'json'),
+            ('mz_calibration', 'json'),
+            ('datetime_utc', 'varchar(64)'),
         ]
         self.sql_create = f""" CREATE TABLE IF NOT EXISTS {name} (
             {self._wrap_schema()}
