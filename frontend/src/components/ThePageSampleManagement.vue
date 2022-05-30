@@ -94,11 +94,12 @@ export default {
   },
   data: function () {
     return {
-      sampleFileRows: [],
       sampleItemRows: [],
       sampleFileMinDateTime: null,
       sampleFileMaxDateTime: null,
       sampleFileTableDataKey: 0,
+      sampleFileTableHeight: "calc(40vh)",
+      sampleItemTableHeight: "calc(30vh)",
     };
   },
   computed: {
@@ -106,17 +107,9 @@ export default {
       workspaceActive: "workspace/active",
       sampleFileSchema: "sample/file/schema/row",
       sampleItemSchema: "sample/item/schema/row",
-      $sampleFileListRequest: "sample/file/$listRequest",
-      $sampleFileListResponse: "sample/file/$listResponse",
+      sampleFileRows: "sample/file/rows",
       batchSelected: "sample/batch/selection/row",
     }),
-    // layout
-    srcTableHeight() {
-      return "calc(40vh)";
-    },
-    targetTableHeight() {
-      return "calc(30vh)";
-    },
     // columns
     sampleFileCols() {
       let result = [];
@@ -136,6 +129,7 @@ export default {
   },
   methods: {
     ...mapActions({
+      listSampleFiles: "sample/file/listFiles",
       sampleItemCreate: "sample/item/create",
     }),
     selectSampleFiles(files) {
@@ -181,17 +175,15 @@ export default {
       let d2 =
         this.sampleFileMaxDateTime -
         this.sampleFileMaxDateTime.getTimezoneOffset() * 60000;
-      this.$sampleFileListRequest = {
+      this.listSampleFiles({filters: {
         column: "datetime",
         min_value: new Date(d1).toISOString(),
         max_value: new Date(d2).toISOString(),
-      };
+        }
+      });
     },
   },
   watch: {
-    $sampleFileListResponse: function (response) {
-      this.sampleFileRows = response.records;
-    },
     sampleFileMinDateTime: function () {
       this.getSampleFiles();
     },
