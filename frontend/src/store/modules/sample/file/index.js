@@ -13,7 +13,6 @@ export default {
     },
     mutations: {
         GET_ROWS(state, filters) {
-            console.log(filters);
             state.$listRequest = filters;
         },
         SET_ROWS(state, fileList) {
