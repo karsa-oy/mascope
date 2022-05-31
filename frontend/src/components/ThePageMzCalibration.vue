@@ -101,7 +101,6 @@ export default {
         { field: "samplePeakHeight", label: "Sample peak intensity" },
         { field: "matchScore", label: "Match score" },
       ],
-      candidateTableHeight: "calc(30vh)",
       selectedTableCols: [
         { field: "mz", label: "Isotope m/z" },
         { field: "samplePeakMz", label: "Pre peak m/z" },
@@ -123,6 +122,9 @@ export default {
       itemFocused: "sample/item/focus/row",
       itemsSelected: "sample/item/selection/rows",
     }),
+    candidateTableHeight() {
+      return "calc(30vh)";
+    },
     candidateTableRows() {
       if (!this.itemFocused) return [];
       return this.$store.getters["match/rating/rows"]({
