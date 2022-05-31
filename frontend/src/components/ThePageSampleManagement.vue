@@ -97,9 +97,7 @@ export default {
       sampleItemRows: [],
       sampleFileMinDateTime: null,
       sampleFileMaxDateTime: null,
-      sampleFileTableDataKey: 0,
-      sampleFileTableHeight: "calc(40vh)",
-      sampleItemTableHeight: "calc(30vh)",
+      sampleFileTableDataKey: 0,      
     };
   },
   computed: {
@@ -113,18 +111,26 @@ export default {
     // columns
     sampleFileCols() {
       let result = [];
+      if (!this.sampleFileSchema) return result;
       this.sampleFileSchema.forEach((el) => {
         if (el !== "id") result.push({ field: el, label: el });
       });
       return result;
     },
+    sampleFileTableHeight() {
+      return "calc(40vh)";
+    },
     sampleItemCols() {
       let result = [];
+      if (!this.sampleItemSchema) return result;
       this.sampleItemSchema.forEach((field) => {
         if (field !== "id" && field !== "batchId")
           result.push({ field: field, label: field });
       });
       return result;
+    },
+    sampleItemTableHeight() {
+      return "calc(30vh)";
     },
   },
   methods: {

@@ -110,7 +110,6 @@ export default {
         { field: "fitMzError", label: "Post m/z error [ppm]", subheading: null },
         { field: "mzErrorDiff", label: "m/z error diff", subheading: null },
       ],
-      selectedTableHeight: "calc(30vh)",
       selectedTableKey: 0,
       selectedTableRows: [],
     }
@@ -130,6 +129,9 @@ export default {
         level: "isotope",
         selected: true,
       }).filter((row) => row.sampleItemId === this.itemFocused.id);
+    },
+    selectedTableHeight() {
+      return "calc(30vh)";
     },
   },
   methods: {
