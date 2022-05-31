@@ -45,6 +45,16 @@
           <section style="padding: 1em 0em 2em 0em">
             <h1 class="title is-4">Acquisitions:</h1>
           </section>
+          <base-table
+            :key="sampleFileTableDataKey"
+            :rows="sampleFileRows"
+            :cols="sampleFileCols"
+            :checkable="true"
+            :searchable="true"
+            :height="sampleFileTableHeight"
+            @selectRows=";"
+          >
+          </base-table>
           <section style="padding: 0.5em">
             <b-button
               type="is-primary"
@@ -70,24 +80,44 @@
 
 <script>
 import TheLayoutSidebar from "./TheLayoutSidebar";
+import BaseTable from "./BaseTable";
 import BaseWorkspaceTile from "./BaseWorkspaceTile";
 
 import { bindState } from "$lib/store";
 
-import { mapMutations } from "vuex";
+import { mapActions, mapMutations } from "vuex";
 
 export default {
   name: "ThePageHome",
   components: {
-    TheLayoutSidebar,
+    BaseTable,
     BaseWorkspaceTile,
+    TheLayoutSidebar,
+  },
+  data: function() {
+    return {
+      sampleFileTableDataKey: 0,
+    };
   },
   computed: {
     ...bindState({
       workspaceActive: "workspace/active",
       workspaces: "workspace/rows",
       modalProps: "modal/workspaceSaveProps",
+      sampleFileRows: "sample/file/rows",
+      sampleFileSchema: "sample/file/schema/row",
     }),
+    sampleFileCols() {
+      let result = [];
+      if (!this.sampleFileSchema) return result;
+      this.sampleFileSchema.forEach((el) => {
+        if (el !== "id") result.push({ field: el, label: el });
+      });
+      return result;
+    },
+    sampleFileTableHeight() {
+      return "calc(75vh)";
+    },
     workspaceHomeText() {
       if (this.workspaceActive) {
         return `Welcome to workspace ${this.workspaceActive.name}!`;
@@ -96,7 +126,20 @@ export default {
       }
     },
   },
+  created: function(){
+    let d1 = new Date;
+    d1.setHours(0, 0, 0, 0);
+    this.listSampleFiles({filters: {
+      column: "datetime",
+      min_value: d1.toISOString(),
+      max_value: new Date().toISOString(),
+      }
+    });
+  },
   methods: {
+    ...mapActions({
+      listSampleFiles: "sample/file/listFiles",
+    }),
     ...mapMutations({
       activateModal: "modal/activate",
     }),
