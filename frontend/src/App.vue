@@ -30,9 +30,6 @@ export default {
     ...bindState({
       api: "api",
       query: "query",
-      // workspace
-      workspaceActive: "workspace/active",
-      workspaceRoom: "workspace/$roomActive",
       // schema
       $sampleItemSchemaRequest: "sample/item/schema/$request",
       $sampleItemSchemaResponse: "sample/item/schema/$response",
@@ -54,21 +51,14 @@ export default {
     }),
     ...mapActions({
       workspaceRead: "workspace/read",
-      sampleBatchRead: "sample/batch/read",
       templateSetRows: "template/setRows",
       keydown: "key/down",
       keyup: "key/up",
     }),
     load() {
-      if (!this.workspaceActive) {
-        this.workspaceRead();
-      } else {
-        this.$sampleFileSchemaRequest = {};
-        this.$sampleItemSchemaRequest = {};
-        this.sampleBatchRead({
-          workspaceId: this.workspaceActive.id,
-        });
-      }
+      this.workspaceRead();
+      this.$sampleFileSchemaRequest = {};
+      this.$sampleItemSchemaRequest = {};
     },
   },
   watch: {
@@ -81,9 +71,6 @@ export default {
     // query
     "$route.query": function () {
       this.query = this.$route.query;
-    },
-    workspaceActive: function () {
-      this.load();
     },
     // sample
     $sampleFileSchemaResponse: function () {

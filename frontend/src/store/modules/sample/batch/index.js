@@ -1,5 +1,4 @@
 import selection from "./selection"
-
 import { createTableModule } from "$lib/store";
 
 export default createTableModule({
@@ -28,7 +27,20 @@ export default createTableModule({
                 }
             }
     },
+    actions: {
+        async workspaceSelected({ dispatch, state, rootState }) {
+            if (!rootState.workspace.active) {
+                state.rows = [];
+                return;
+            }
+            await dispatch(
+                'read', { workspaceId: rootState.workspace.active.id });
+        },
+    },
     modules: {
         selection
+    },
+    watchers: {
+        'workspace/active': 'sample/batch/workspaceSelected',
     }
 });
