@@ -77,7 +77,7 @@ export default {
       sampleFileUpdate: "sample/file/UPDATE",
     }),
     ...mapActions({
-      templateListRequest: "template/listRequest",
+      templateListRequest: "template/requestTemplates",
       templateSaveRequest: "template/save",
       templateDeleteRequest: "template/delete",
     }),

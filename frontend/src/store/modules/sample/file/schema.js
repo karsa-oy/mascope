@@ -6,8 +6,22 @@ export default {
         $response: null
     },
     mutations: {
-        HANDLE_RESPONSE(state) {
-            state.row = state.$response.schema;
+        GET_SCHEMA(state, requestObject) {
+            state.$request = requestObject;
+        },
+        SET_SCHEMA(state, schema) {
+            state.row = schema;
         }
+    },
+    actions: {
+        handleResponse: function({ state, commit }) {
+            commit('SET_SCHEMA', state.$response.schema);
+        },
+        requestSchema: function({ commit }) {
+            commit('GET_SCHEMA', {});
+        },
+    },
+    watchers: {
+        'sample/file/schema/$response': 'sample/file/schema/handleResponse',
     }
 }

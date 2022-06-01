@@ -9,7 +9,7 @@
 
 <script>
 import { bindState } from "$lib/store";
-import { mapActions, mapMutations } from "vuex";
+import { mapActions } from "vuex";
 
 export default {
   data: function () {
@@ -30,13 +30,6 @@ export default {
     ...bindState({
       api: "api",
       query: "query",
-      // schema
-      $sampleItemSchemaRequest: "sample/item/schema/$request",
-      $sampleItemSchemaResponse: "sample/item/schema/$response",
-      $sampleFileSchemaRequest: "sample/file/schema/$request",
-      $sampleFileSchemaResponse: "sample/file/schema/$response",
-      // template
-      $templateListResponse: "template/$listResponse",
     }),
     ready: function () {
       // check that the API connected succesfully to the backend
@@ -45,20 +38,17 @@ export default {
     },
   },
   methods: {
-    ...mapMutations({
-      sampleFileSchemaHandleResponse: "sample/file/schema/HANDLE_RESPONSE",
-      sampleItemSchemaHandleResponse: "sample/item/schema/HANDLE_RESPONSE",
-    }),
     ...mapActions({
+      sampleFileGetSchema: "sample/file/schema/requestSchema",
+      sampleItemGetSchema: "sample/item/schema/requestSchema",
       workspaceRead: "workspace/read",
-      templateSetRows: "template/setRows",
       keydown: "key/down",
       keyup: "key/up",
     }),
     load() {
       this.workspaceRead();
-      this.$sampleFileSchemaRequest = {};
-      this.$sampleItemSchemaRequest = {};
+      this.sampleFileGetSchema();
+      this.sampleItemGetSchema();
     },
   },
   watch: {
@@ -71,18 +61,6 @@ export default {
     // query
     "$route.query": function () {
       this.query = this.$route.query;
-    },
-    // sample
-    $sampleFileSchemaResponse: function () {
-      this.sampleFileSchemaHandleResponse();
-    },
-    // schema
-    $sampleItemSchemaResponse: function () {
-      this.sampleItemSchemaHandleResponse();
-    },
-    // template
-    $templateListResponse: function (rows) {
-      this.templateSetRows(rows);
     },
   },
 };

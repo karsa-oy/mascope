@@ -277,10 +277,10 @@ class SampleServiceNamespace(BaseClientNamespace):
         #     {"name":"template_1","type":"sample","template":'[{"label":"fname","required":true,"placeholder":"fname"},{"label":"description","value":"Predefined description"},{"label":"optional attribute"}]'},
         #     ...,
         # ]
-        templateType = data['value']['type']
+        template_type = data['value']['type']
         context = get_client_notification_context(data)
         timeout = context.get('timeout')
-        records = db.attribute_template_get(type=templateType)
+        records = db.attribute_template_get(type=template_type)
         if timeout:
             # return code for (backend) clients, which can use call instead of emit
             return records

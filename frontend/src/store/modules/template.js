@@ -4,43 +4,45 @@ export default {
     state: {
         rows: [],
         $rooms: [],
-        $response: null,
         $listRequest: null,
         $listResponse: null,
         $save: null,
         $delete: null,
     },
     mutations: {
-        setRows(state, newData) {
-            state.rows = newData;
+        SET_ROWS(state, rows) {
+            state.rows = rows;
         },
-        listRequest(state, request) {
-            state.$listRequest = request;
+        GET_ROWS(state, requestObject) {
+            state.$listRequest = requestObject;
         },
-        save(state, template) {
+        SAVE(state, template) {
             state.$save = {
                 ...template,
             }
         },
-        delete(state, id) {
+        DELETE(state, id) {
             state.$delete = {
                 id: id,
             }
         },
     },
     actions: {
-        setRows(context, newData) {
-            context.commit('setRows', newData);
+        requestTemplates({ commit }, requestObject) {
+            commit('GET_ROWS', requestObject);
         },
-        listRequest(context, request) {
-            context.commit('listRequest', request);
+        handleResponse({ state, commit }) {
+            console.log("teplate handleResponse", state.$listResponse);
+            commit('SET_ROWS', state.$listResponse);
         },
-        save(context, template) {
-            context.commit('save', template);
+        save({ commit }, template) {
+            commit('SAVE', template);
         },
-        delete(context, id) {
-            context.commit('delete', id);
+        delete({ commit }, id) {
+            commit('DELETE', id);
         },
     },
-    getters: {},
+    watchers: {
+        'template/$listResponse': 'template/handleResponse',
+    }
 }
