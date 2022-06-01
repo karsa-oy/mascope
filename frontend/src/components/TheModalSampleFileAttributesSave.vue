@@ -38,8 +38,7 @@ export default {
     ...bindState({
       modalActive: "modal/sampleFileAttributesSaveActive",
       templateRows: "template/rows",
-      $sampleFileListRequest: "sample/file/$listRequest",
-      $sampleFileListResponse: "sample/file/$listResponse",
+      sampleFileRows: "sample/file/rows",
     }),
     availableTemplates() {
       return [this.defaultTemplate, ...this.templateRows];
@@ -77,6 +76,7 @@ export default {
       sampleFileUpdate: "sample/file/UPDATE",
     }),
     ...mapActions({
+      getSampleFile: "sample/file/listFiles",
       templateListRequest: "template/requestTemplates",
       templateSaveRequest: "template/save",
       templateDeleteRequest: "template/delete",
@@ -94,19 +94,19 @@ export default {
       newValue.forEach((field) => (row[field.label] = field.value || ""));
       this.sampleFileUpdate(row);
     },
-    loadAttributes(newValue) {
-      this.$sampleFileListRequest = newValue;
+    loadAttributes(filters) {
+      this.getSampleFile({ filters });
     },
   },
   watch: {
     modalActive: function (active) {
       if (active) this.templateListRequest({ type: this.templateType });
     },
-    $sampleFileListResponse: function (response) {
-      let row = (response.records && response.records[0]) || {};
+    sampleFileRows: function () {
+      if (this.sampleFileRows.length != 1) this.sampleFileRecordToLoad = {};
       this.sampleFileRecordToLoad = {
         template: this.defaultTemplate.template,
-        row: row,
+        row: this.sampleFileRows[0],
       };
     },
   },
