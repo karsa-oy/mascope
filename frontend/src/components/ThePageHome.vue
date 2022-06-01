@@ -43,7 +43,15 @@
         </div>
         <div class="column is-half">
           <section style="padding: 1em 0em 2em 0em">
-            <h1 class="title is-4">Acquisitions:</h1>
+            <h1 class="title is-4">Recent acquisitions:</h1>
+          </section>
+          <section>
+            <b-button
+              type="is-primary"
+              @click="getRecentAcquisitions"
+            >
+              <b-icon icon="reload"></b-icon>
+            </b-button>
           </section>
           <base-table
             :key="sampleFileTableDataKey"
@@ -127,14 +135,7 @@ export default {
     },
   },
   created: function(){
-    let d1 = new Date;
-    d1.setHours(0, 0, 0, 0);
-    this.listSampleFiles({filters: {
-      column: "datetime",
-      min_value: d1.toISOString(),
-      max_value: new Date().toISOString(),
-      }
-    });
+    this.getRecentAcquisitions();
   },
   methods: {
     ...mapActions({
@@ -143,6 +144,16 @@ export default {
     ...mapMutations({
       activateModal: "modal/activate",
     }),
+    getRecentAcquisitions() {
+      let d1 = new Date;
+      d1.setHours(-10000, 0, 0, 0);
+      this.listSampleFiles({filters: {
+        column: "datetime",
+        min_value: d1.toISOString(),
+        max_value: new Date().toISOString(),
+        }
+      });
+    },
   },
 };
 </script>
