@@ -103,7 +103,10 @@ export default {
       if (active) this.templateListRequest({ type: this.templateType });
     },
     sampleFileRows: function () {
-      if (this.sampleFileRows.length != 1) this.sampleFileRecordToLoad = {};
+      if (this.sampleFileRows.length != 1) {
+        this.sampleFileRecordToLoad = {};
+        return;
+      }
       this.sampleFileRecordToLoad = {
         template: this.defaultTemplate.template,
         row: this.sampleFileRows[0],

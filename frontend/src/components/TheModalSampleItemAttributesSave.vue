@@ -16,7 +16,6 @@
         @saveTemplate="saveTemplate"
         @deleteTemplate="deleteTemplate"
         @saveAttributes="saveAttributes"
-        @loadAttributes="loadAttributes"
       >
       </base-attributes-form>
     </b-modal>
@@ -65,25 +64,23 @@ export default {
     ...bindState({
       modalActive: "modal/sampleItemAttributesSaveActive",
       templateRows: "template/rows",
-      $sampleItemListResponse: "sample/$itemListResponse",
       batchSelected: "sample/batch/selection/row",
+      itemsSelected: "sample/item/selection/rows",
     }),
     availableTemplates() {
       return [this.defaultTemplate, ...this.templateRows];
     },
-    itemSelected: function () {
-      let items = this.$store.state.sample.item.selection.rows;
-      return items.length == 1 ? items[0] : null;
+    itemSelected() {
+      return this.itemsSelected.length == 1 ? this.itemsSelected[0] : null;
     },
   },
   methods: {
     ...mapMutations({
       sampleItemUpdate: "sample/item/update",
-      sampleItemRead: "sample/item/read",
       deactivateModal: "modal/deactivate",
     }),
     ...mapActions({
-      templateListRequest: "template/listRequest",
+      templateListRequest: "template/requestTemplates",
       templateSaveRequest: "template/save",
       templateDeleteRequest: "template/delete",
     }),
@@ -103,20 +100,22 @@ export default {
       this.sampleItemUpdate([row]);
       this.deactivateModal();
     },
-    loadAttributes(newValue) {
-      this.sampleItemRead(newValue);
-    },
   },
   watch: {
-    modalActive: function (active) {
-      if (active) this.templateListRequest({ type: this.templateType });
-    },
-    $sampleItemListResponse: function (response) {
-      let row = (response.records && response.records[0]) || {};
+    itemSelected: function() {
+      if (!this.itemSelected) {
+        this.sampleItemRecordToLoad = {};
+        return;
+      }
       this.sampleItemRecordToLoad = {
         template: this.defaultTemplate.template,
-        row: row,
+        row: this.itemSelected,
       };
+    },
+    modalActive: function (active) {
+      if (active) {
+        this.templateListRequest({ type: this.templateType });
+      }
     },
   },
 };
