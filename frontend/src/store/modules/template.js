@@ -32,7 +32,6 @@ export default {
             commit('GET_ROWS', requestObject);
         },
         handleResponse({ state, commit }) {
-            console.log("teplate handleResponse", state.$listResponse);
             commit('SET_ROWS', state.$listResponse);
         },
         save({ commit }, template) {
