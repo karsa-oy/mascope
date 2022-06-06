@@ -57,7 +57,7 @@
             :key="sampleFileTableDataKey"
             :rows="sampleFileRows"
             :cols="sampleFileCols"
-            :checkable="true"
+            :checkable="false"
             :searchable="true"
             :height="sampleFileTableHeight"
             @selectRows=";"
