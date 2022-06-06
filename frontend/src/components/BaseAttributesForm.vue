@@ -340,24 +340,27 @@ export default {
       },
       deep: true,
     },
-    attributesToLoad: function (data) {
-      if ( _.isEmpty(data) || _.isEmpty(data.row) ) {
-        return;
-      }
-      let newTemplate = {
-        name: null,
-        type: this.templateType,
-        template: [],
-      }
-      for(let {label, key, required, disabled} of data.template) {
-        if (required) {
-          newTemplate.template.push({label, key, required, disabled, value: data.row[label]});
+    attributesToLoad: {
+      handler (data) {
+        if ( _.isEmpty(data) || _.isEmpty(data.row) ) {
+          return;
         }
-      }
-      Object.keys(data.row.attributes).forEach( (attr) =>
-        newTemplate.template.push({label: attr, value: data.row.attributes[attr]})
-      );
-      this.loadedTemplate = newTemplate;
+        let newTemplate = {
+          name: null,
+          type: this.templateType,
+          template: [],
+        }
+        for(let {label, key, required, disabled} of data.template) {
+          if (required) {
+            newTemplate.template.push({label, key, required, disabled, value: data.row[label]});
+          }
+        }
+        Object.keys(data.row.attributes).forEach( (attr) =>
+          newTemplate.template.push({label: attr, value: data.row.attributes[attr]})
+        );
+        this.loadedTemplate = newTemplate;
+      },
+      deep: true
     },
   },
 };
