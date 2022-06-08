@@ -146,9 +146,9 @@ export default {
     }),
     getRecentAcquisitions() {
       let d1 = new Date;
-      d1.setHours(-10000, 0, 0, 0);
+      d1.setHours(0, 0, 0, 0);
       this.listSampleFiles({filters: {
-        column: "datetime",
+        column: "datetime_utc",
         min_value: d1.toISOString(),
         max_value: new Date().toISOString(),
         }

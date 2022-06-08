@@ -182,7 +182,7 @@ export default {
         this.sampleFileMaxDateTime -
         this.sampleFileMaxDateTime.getTimezoneOffset() * 60000;
       this.listSampleFiles({filters: {
-        column: "datetime",
+        column: "datetime_utc",
         min_value: new Date(d1).toISOString(),
         max_value: new Date(d2).toISOString(),
         }

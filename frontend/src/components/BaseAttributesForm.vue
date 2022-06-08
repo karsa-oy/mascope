@@ -355,9 +355,11 @@ export default {
             newTemplate.template.push({label, key, required, disabled, value: data.row[label]});
           }
         }
-        Object.keys(data.row.attributes).forEach( (attr) =>
-          newTemplate.template.push({label: attr, value: data.row.attributes[attr]})
-        );
+        if (data.row.attributes) {
+          Object.keys(data.row.attributes).forEach( (attr) =>
+            newTemplate.template.push({label: attr, value: data.row.attributes[attr]})
+          );
+        }
         this.loadedTemplate = newTemplate;
       },
       deep: true

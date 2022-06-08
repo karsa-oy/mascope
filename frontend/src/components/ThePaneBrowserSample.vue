@@ -167,9 +167,6 @@ export default {
     async itemUpdate() {
       this.modalSampleItemAttributesSave = { action: "create" };
       this.activateModal({ modal: "sampleItemAttributesSave" });
-      // get the item data into the modal fields
-      await this.$nextTick();
-      this.sampleItemRead({ id: this.itemsSelected[0].id });
     },
     itemDelete() {
       this.$buefy.dialog.confirm({

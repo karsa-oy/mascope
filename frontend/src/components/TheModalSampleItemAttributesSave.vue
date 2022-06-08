@@ -107,14 +107,15 @@ export default {
         this.sampleItemRecordToLoad = {};
         return;
       }
-      this.sampleItemRecordToLoad = {
-        template: this.defaultTemplate.template,
-        row: this.itemSelected,
-      };
     },
-    modalActive: function (active) {
+    modalActive: async function (active) {
       if (active) {
         this.templateListRequest({ type: this.templateType });
+        await this.$nextTick();
+        this.sampleItemRecordToLoad = {
+          template: this.defaultTemplate.template,
+          row: this.itemsSelected[0],
+        };
       }
     },
   },
