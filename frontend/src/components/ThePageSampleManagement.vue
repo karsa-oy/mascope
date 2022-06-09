@@ -108,13 +108,13 @@ export default {
   computed: {
     ...mapGetters({
       workspaceSelected: "workspace/selectedRow",
+      batchSelected: "sample/batch/selectedRow",
     }),
     ...bindState({
       sampleFileSchema: "sample/file/schema/row",
       sampleItemSchema: "sample/item/schema/row",
       $sampleFileListRequest: "sample/file/$listRequest",
       $sampleFileListResponse: "sample/file/$listResponse",
-      batchSelected: "sample/batch/selectedRow",
     }),
     // layout
     srcTableHeight() {

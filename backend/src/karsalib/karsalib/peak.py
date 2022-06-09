@@ -18,30 +18,28 @@ def detect_peaks(cache_item):
             vars=['signal'],
             prev_dataset=cache_item
         )
-
-    sum_spectrum = cache_item \
-        .signal.sum(dim='time').compute() \
-        .interpolate_na( # Interpolate NaNs for smoothing
+    sum_spectrum = (
+        cache_item
+        .signal.sum(dim='time').compute()
+        .interpolate_na(  # Interpolate NaNs for smoothing
             dim='mz',
             method='linear',
             limit=None,
             max_gap=2,
         )
-
-    print('spectrum', sum_spectrum)
-
+    )
     peaks, peak_props = find_peaks(
         sum_spectrum,
         height=0,
         distance=None,
         width=None
     )
-    print('peaks', peaks)
-                                   
-    cache_item = cache_item \
+    cache_item = (
+        cache_item
         .assign_coords(
             tof=('mz', np.arange(len(cache_item.mz)).astype(np.float32))
         )
+    )
     peak_profiles = cache_item.signal[peaks]
     zarr_sdk.write_peak_dataset(peak_profiles, cache_item)
 

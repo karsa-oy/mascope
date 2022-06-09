@@ -167,7 +167,7 @@ class SampleServiceNamespace(BaseClientNamespace):
         }
 
     async def on_sample_batch_delete_request(self, data):
-        batch_ids = data.get['value']
+        batch_ids = data['value']
         item_ids = get_ids(
             db.sample_item_read(batchId=batch_ids)
         )

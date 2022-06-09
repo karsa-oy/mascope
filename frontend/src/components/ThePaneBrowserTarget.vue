@@ -22,12 +22,12 @@ export default {
   computed: {
     ...bindState({
       controlPressed: "key/control",
-      sampleItemFocused: "sample/item/focusedRow",
       modalTargetCollectionOpProps: "modal/targetCollectionOpProps",
-      targetCollectionsSelected: "target/collection/selectedRows",
     }),
     ...mapGetters({
       matchesExist: "match/exists",
+      sampleItemFocused: "sample/item/focusedRow",
+      targetCollectionsSelected: "target/collection/selectedRows",
     }),
     collectionStats: function () {
       return this.$store.getters["target/stat/rows"]({

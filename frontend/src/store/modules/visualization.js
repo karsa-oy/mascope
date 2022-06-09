@@ -25,10 +25,10 @@ export default {
         },
     },
     actions: {
-        focusIon({ rootState, rootGetters, getters, commit }) {
+        focusIon({ rootGetters, getters, commit }) {
             if (!getters['readyToFocusIon']) return;
-            let itemFocused = rootState.sample.item.focusedRow;
-            let targetFocused = rootState.target.ion.focusedRow;
+            let itemFocused = rootGetters['sample/item/focusedRow'];
+            let targetFocused = rootGetters['target/ion/focusedRow'];
             let isotopesSelected = rootGetters['target/isotope/selectedRows'];
             let ionId = targetFocused.id;
             let mzs = isotopesSelected.filter(
@@ -75,8 +75,8 @@ export default {
     },
     getters: {
         readyToFocusIon(state, getters, rootState, rootGetters) {
-            if (rootState.sample.item.focusedRow &&
-                rootState.target.ion.focusedRow &&
+            if (rootGetters['sample/item/focusedRow'] &&
+                rootGetters['target/ion/focusedRow'] &&
                 rootGetters['target/isotope/selectedRows'].length
             ) {
                 return true;

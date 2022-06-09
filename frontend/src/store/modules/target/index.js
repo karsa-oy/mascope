@@ -20,6 +20,7 @@ export default {
             parents: ['target/compound'],
             namespace: 'target/ion',
             children: ['target/isotope'],
+            focusable: true,
         }),
         isotope: createTableModule({
             parents: ['target/ion'],

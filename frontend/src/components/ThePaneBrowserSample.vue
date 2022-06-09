@@ -4,7 +4,7 @@
 </template>
 
 <script>
-import { mapActions, mapMutations } from "vuex";
+import { mapActions, mapMutations, mapGetters } from "vuex";
 import { bindState } from "$lib/store";
 
 import BaseBrowser from "./BaseBrowser";
@@ -15,11 +15,13 @@ export default {
     BaseBrowser,
   },
   computed: {
+    ...mapGetters({
+      batchSelected: "sample/batch/selectedRow",
+      itemsSelected: "sample/item/selectedRows",
+    }),
     ...bindState({
       batchRows: "sample/batch/rows",
       itemRows: "sample/item/rows",
-      batchSelected: "sample/batch/selectedRows",
-      itemsSelected: "sample/item/selectedRows",
       modalSampleBatchOpProps: "modal/sampleBatchOpProps",
       modalSampleItemAttributesSave: "modal/sampleItemAttributesSave",
     }),

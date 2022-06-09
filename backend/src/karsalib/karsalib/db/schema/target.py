@@ -35,8 +35,6 @@ class TargetIonTable(DbTable):
             ('target_compound_id', 'VARCHAR(32)', 'NOT NULL'),
             ('mechanism_id', 'VARCHAR(32)', 'NOT NULL'),
             ('formula', 'VARCHAR(256)', 'NOT NULL'),
-            ('polarity', 'VARCHAR(1)', 'NOT NULL'),
-            ('charge', 'VARCHAR(3)', 'NOT NULL')
         ]
         self.sql_create = f""" CREATE TABLE IF NOT EXISTS {name} (
             {self._wrap_schema()}

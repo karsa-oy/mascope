@@ -138,6 +138,15 @@ class DbTable:
             else None
         )
         res = []
+        valid_keys = [
+            f for f in filters 
+            if not isinstance(filters[f], list) 
+            or len(filters[f]) > 0
+        ]
+        valid_vals = [
+            filters[k] for k in valid_keys
+        ]
+        filters = dict(zip(valid_keys, valid_vals))
         if filters:
             for col, val in filters.items():
                 if isinstance(val, list):
