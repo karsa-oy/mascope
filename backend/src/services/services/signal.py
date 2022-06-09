@@ -9,8 +9,8 @@ from karsalib.logging import Logger
 from karsalib.peak import mz_calibrate_tof
 from karsalib.util import parse_cmd_args
 
-#from karsatof.lib.TwTool import TwTof2Mass
-#from karsatof.kgenerator import remove_duplicate_mz_values
+from karsatof.lib.TwTool import TwTof2Mass
+from karsatof.kgenerator import remove_duplicate_mz_values
 
 from services.file_io import (
     get_zarr_var_shape,
