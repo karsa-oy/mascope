@@ -32,11 +32,11 @@ export default {
             let isotopesSelected = rootGetters['target/isotope/selectedRows'];
             let ionId = targetFocused.id;
             let mzs = isotopesSelected.filter(
-                isotope => isotope.ionId == ionId
+                isotope => isotope.targetIonId == ionId
             ).map(isotope => isotope.mz);
             let relAbus = isotopesSelected.filter(
-                isotope => isotope.ionId == ionId
-            ).map(isotope => isotope.relAbu);
+                isotope => isotope.targetIonId == ionId
+            ).map(isotope => isotope.relativeAbundance);
             let tRange = null;
             commit('REQUEST_ION_FOCUS', {
                 sampleItemId: itemFocused.id,

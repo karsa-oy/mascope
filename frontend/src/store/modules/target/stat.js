@@ -88,9 +88,10 @@ export default {
                         level: 'compound', selected
                     });
                     if (itemFocused) {
-                        if (!rootState.sample.item.focusedRow) return rootState.target.compound.rows;
+                        let focusedSample = rootGetters['sample/item/focusedRow'];
+                        if (!focusedSample) return rootGetters['target/compound/rows'];
                         matches = matches.filter(
-                            (m) => m.sampleItemId === rootState.sample.item.focusedRow.id
+                            (m) => m.sampleItemId === focusedSample.id
                         );
                     }
                     let compounds = selected ? rootGetters['target/compound/selectedRows'] : rootState.target.compound.rows;
@@ -160,9 +161,10 @@ export default {
                         level: 'ion', selected
                     });
                     if (itemFocused) {
-                        if (!rootState.sample.item.focusedRow) return rootState.target.ion.rows;
+                        let focusedSample = rootGetters['sample/item/focusedRow'];
+                        if (!focusedSample) return rootGetters['target/ion/rows'];
                         matches = matches.filter(
-                            (m) => m.sampleItemId === rootState.sample.item.focusedRow.id
+                            (m) => m.sampleItemId === focusedSample.id
                         );
                     }
                     let ions = selected ? rootGetters['target/ion/selectedRows'] : rootState.target.ion.rows;
@@ -238,9 +240,10 @@ export default {
                         level: 'isotope', selected
                     });
                     if (itemFocused) {
-                        if (!rootState.sample.item.focusedRow) return rootState.target.isotope.rows;
+                        let focusedSample = rootGetters['sample/item/focusedRow'];
+                        if (!focusedSample) return rootGetters['target/isotope/rows'];
                         matches = matches.filter(
-                            (m) => m.sampleItemId === rootState.sample.item.focusedRow.id
+                            (m) => m.sampleItemId === focusedSample.id
                         );
                     }
                     let isotopes = selected ? rootGetters['target/isotope/selectedRows'] : rootState.target.isotope.rows;
