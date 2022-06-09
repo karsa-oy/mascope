@@ -7,51 +7,53 @@
           <the-pane-browser-sample></the-pane-browser-sample>
         </div>
         <div class="column">
-            <div style="padding-top: 0.5em; padding-bottom: 1em">
-              <h1 style="font-size: 16px; text-align: left">
-                <p>
-                  <b>Select calibration peaks:</b>
-                </p>
-              </h1>
-            </div>
-            <base-table
-              :rows="candidateTableRows"
-              :cols="candidateTableCols"
-              :checkable="true"
-              :searchable="false"
-              :height="candidateTableHeight"
-              @selectRows="selectCandidates"
-            >
-            </base-table>
-            <div style="padding-top: 1.5em; padding-bottom: 1.5em">
-              <h1 style="font-size: 16px; text-align: left">
-                <p>
-                  <template v-if="itemFocused">
-                    <b>Current parameters: {{ itemFocused.mz_calibration.par }}</b>
-                  </template>
-                  <br>
-                  <template v-if="mzFit">
-                    <b>Fit parameters: {{ mzFit.par }}</b>
-                  </template>
-                </p>
-              </h1>
-            </div>
-            <div style="padding-top: 1.5em; padding-bottom: 1.5em">
-              <h1 style="font-size: 16px; text-align: left">
-                <p>
-                  <b>Selected calibration peaks:</b>
-                </p>
-              </h1>
-            </div>
-            <base-table
-              :key="selectedTableKey"
-              :rows="selectedTableRows"
-              :cols="selectedTableCols"
-              :checkable="false"
-              :searchable="false"
-              :height="selectedTableHeight"
-            >
-            </base-table>
+          <div style="padding-top: 0.5em; padding-bottom: 1em">
+            <h1 style="font-size: 16px; text-align: left">
+              <p>
+                <b>Select calibration peaks:</b>
+              </p>
+            </h1>
+          </div>
+          <base-table
+            :rows="candidateTableRows"
+            :cols="candidateTableCols"
+            :checkable="true"
+            :searchable="false"
+            :height="candidateTableHeight"
+            @selectRows="selectCandidates"
+          >
+          </base-table>
+          <div style="padding-top: 1.5em; padding-bottom: 1.5em">
+            <h1 style="font-size: 16px; text-align: left">
+              <p>
+                <template v-if="itemFocused">
+                  <b
+                    >Current parameters: {{ itemFocused.mz_calibration.par }}</b
+                  >
+                </template>
+                <br />
+                <template v-if="mzFit">
+                  <b>Fit parameters: {{ mzFit.par }}</b>
+                </template>
+              </p>
+            </h1>
+          </div>
+          <div style="padding-top: 1.5em; padding-bottom: 1.5em">
+            <h1 style="font-size: 16px; text-align: left">
+              <p>
+                <b>Selected calibration peaks:</b>
+              </p>
+            </h1>
+          </div>
+          <base-table
+            :key="selectedTableKey"
+            :rows="selectedTableRows"
+            :cols="selectedTableCols"
+            :checkable="false"
+            :searchable="false"
+            :height="selectedTableHeight"
+          >
+          </base-table>
         </div>
       </div>
 
@@ -86,7 +88,7 @@ export default {
     ThePaneBrowserSample,
     BaseTable,
   },
-  data: function() {
+  data: function () {
     return {
       candidateTableCols: [
         { field: "targetCompoundName", label: "Compound name" },
@@ -106,21 +108,24 @@ export default {
         { field: "samplePeakMz", label: "Pre peak m/z" },
         { field: "mzError", label: "Pre m/z error [ppm]", subheading: null },
         { field: "fitMz", label: "Post peak m/z" },
-        { field: "fitMzError", label: "Post m/z error [ppm]", subheading: null },
+        {
+          field: "fitMzError",
+          label: "Post m/z error [ppm]",
+          subheading: null,
+        },
         { field: "mzErrorDiff", label: "m/z error diff", subheading: null },
       ],
       selectedTableKey: 0,
       selectedTableRows: [],
-    }
+    };
   },
-  created: function() {
-  },
+  created: function () {},
   computed: {
     ...bindState({
       mzFit: "calibration/mzFit",
       mzFitStats: "calibration/mzFitStats",
-      itemFocused: "sample/item/focus/row",
-      itemsSelected: "sample/item/selection/rows",
+      itemFocused: "sample/item/focusedRow",
+      itemsSelected: "sample/item/selectedRows",
     }),
     candidateTableHeight() {
       return "calc(30vh)";
@@ -149,45 +154,44 @@ export default {
         message: `Apply calibration to ${this.itemsSelected.length} selected items?`,
         confirmText: "Apply",
         onConfirm: () => {
-          this.calibrateItems({items: this.itemsSelected, fit: this.mzFit});
-          },
+          this.calibrateItems({ items: this.itemsSelected, fit: this.mzFit });
+        },
       });
     },
     selectCandidates(rows) {
       this.mzFit = null;
       this.selectedTableRows = rows;
       if (rows.length > 3) {
-        let peakTofs = rows.map(row => row.samplePeakTof);
-        let peakMzs = rows.map(row => row.samplePeakMz);
-        let exactMzs = rows.map(row => row.mz);
+        let peakTofs = rows.map((row) => row.samplePeakTof);
+        let peakMzs = rows.map((row) => row.samplePeakMz);
+        let exactMzs = rows.map((row) => row.mz);
         this.$mzFitRequest({
           peakTofs,
           peakMzs,
-          exactMzs
+          exactMzs,
         });
       }
     },
   },
   watch: {
-    mzFitStats: function() {
-      this.selectedTableRows.forEach( (row, i) => {
+    mzFitStats: function () {
+      this.selectedTableRows.forEach((row, i) => {
         row.fitMz = this.mzFitStats.fitMz[i];
         row.fitMzError = this.mzFitStats.fitMzError[i];
         row.mzErrorDiff = Math.abs(row.fitMzError) - Math.abs(row.mzError);
       });
       this.selectedTableCols.filter(
-        col => col.field == "mzError"
-        )[0].subheading = this.mzFitStats.preDmzNorm;
+        (col) => col.field == "mzError"
+      )[0].subheading = this.mzFitStats.preDmzNorm;
       this.selectedTableCols.filter(
-        col => col.field == "fitMzError"
-        )[0].subheading = this.mzFitStats.postDmzNorm;
+        (col) => col.field == "fitMzError"
+      )[0].subheading = this.mzFitStats.postDmzNorm;
       this.selectedTableCols.filter(
-        col => col.field == "mzErrorDiff"
-        )[0].subheading = (
-          this.mzFitStats.postDmzNorm - this.mzFitStats.preDmzNorm
-          );
+        (col) => col.field == "mzErrorDiff"
+      )[0].subheading =
+        this.mzFitStats.postDmzNorm - this.mzFitStats.preDmzNorm;
       this.selectedTableKey++;
     },
-  }
+  },
 };
 </script>

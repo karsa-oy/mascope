@@ -166,10 +166,6 @@ export default {
       };
       return handleClick ?? doNothing;
     },
-    rowStatus: function () {
-      let none = () => "not-selected";
-      return this.currentLevel.rowStatus ?? none;
-    },
     opened: function () {
       return this.currentLevel.opened ?? null;
     },
@@ -217,8 +213,8 @@ export default {
       }
     },
     rowClass: function (row) {
-      switch (this.rowStatus(row)) {
-        case "focused":
+      switch (row.status) {
+        case "in-focus":
           return "base-browser-row-focused";
         case "fully-selected":
           return "base-browser-row-fully-selected";

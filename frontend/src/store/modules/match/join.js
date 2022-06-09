@@ -8,20 +8,45 @@ export default {
             ({ level = 'compound', selected = true }) => {
                 return getters[level + 's']({ selected });
             },
+        collections: (state, getters, rootState, rootGetters) =>
+            ({ selected = true }) => {
+                let sampleItems = rootGetters['sample/item/selectedRows'];
+                let targetCollectionsSelected = selected ?
+                    rootGetters['target/collection/selectedRows']
+                    : rootState.target.collection.rows;
+                return table.query(
+                    `
+                    select 
+                        m.*
+                        ,t.name as targetName
+                        ,s.filename as sampleFilename
+                        ,s.method as sampleMethod
+                        ,s.properties as sampleProperties
+                    from matches m
+                    inner join targets t
+                        on t.id = m.targetCollectionId
+                    left join samples s
+                        on s.id = m.sampleItemId
+                    `,
+                    {
+                        matches: rootState.match.collectionRows,
+                        targets: targetCollectionsSelected,
+                        samples: sampleItems
+                    }
+                );
+            },
         compounds: (state, getters, rootState, rootGetters) =>
             ({ selected = true }) => {
-                let sampleItems = rootState.sample.item.selection.rows;
-                // compound level join
+                let sampleItems = rootGetters['sample/item/selectedRows'];
                 let targetCompoundsSelected = selected ?
-                    rootGetters['target/compoundsSelected']
-                    : rootState.target.compoundRows;
+                    rootGetters['target/compound/selectedRows']
+                    : rootState.target.compound.rows;
                 return table.query(
                     `
                     select 
                         m.*
                         ,t.name as targetName
                         ,t.formula as targetFormula
-                        ,t._selected as targetSelected
                         ,s.filename as sampleFilename
                         ,s.method as sampleMethod
                         ,s.properties as sampleProperties
@@ -40,11 +65,10 @@ export default {
             },
         ions: (state, getters, rootState, rootGetters) =>
             ({ selected = true }) => {
-                let sampleItems = rootState.sample.item.selection.rows;
-                // ion level join
+                let sampleItems = rootGetters['sample/item/selectedRows'];
                 let targetIonsSelected = selected ?
-                    rootGetters['target/ionsSelected']
-                    : rootState.target.ionRows;
+                    rootGetters['target/ion/selectedRows']
+                    : rootState.target.ion.rows;
                 return table.query(
                     `
                     select 
@@ -52,7 +76,6 @@ export default {
                         ,t.compoundId as targetCompoundId
                         ,t.ionMech as targetIonMech
                         ,t.formula as targetFormula
-                        ,t._selected as targetSelected
                         ,s.filename as sampleFilename
                         ,s.method as sampleMethod
                         ,s.properties as sampleProperties
@@ -71,11 +94,10 @@ export default {
             },
         isotopes: (state, getters, rootState, rootGetters) =>
             ({ selected = true }) => {
-                let sampleItems = rootState.sample.item.selection.rows;
-                // isotope level join
+                let sampleItems = rootGetters['sample/item/selectedRows'];
                 let targetIsotopesSelected = selected ?
-                    rootGetters['target/isotopesSelected']
-                    : rootState.target.isotopeRows;
+                    rootGetters['target/isotope/selectedRows']
+                    : rootState.target.isotope.rows;
                 return table.query(
                     `
                     select 
@@ -83,7 +105,6 @@ export default {
                         ,t.ionId as targetIonId
                         ,t.relAbu as targetRelAbu
                         ,t.mz as targetMz
-                        ,t._selected as targetSelected
                         ,s.filename as sampleFilename
                         ,s.method as sampleMethod
                         ,s.properties as sampleProperties

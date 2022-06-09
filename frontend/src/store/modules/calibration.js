@@ -25,14 +25,14 @@ export default {
         },
     },
     actions: {
-        calibrateItems: function({ commit }, {items, fit}) {
+        calibrateItems: function ({ commit }, { items, fit }) {
             let requestObject = {
                 filenames: items.map(item => item.filename),
                 fit,
             };
             commit('MZ_APPLY_REQUEST', requestObject);
         },
-        handleMzFitResponse: function({ state, commit }) {
+        handleMzFitResponse: function ({ state, commit }) {
             let response = state.$mzFitResponse;
             let fit = response.fit;
             let fitStats = {
@@ -44,8 +44,6 @@ export default {
             commit('MZ_FIT', fit);
             commit('MZ_FIT_STATS', fitStats);
         },
-    },
-    getters: {
     },
     watchers: {
         'calibration/$mzFitResponse': 'calibration/handleMzFitResponse',

@@ -16,7 +16,7 @@ from time import sleep
 from ctypes import create_string_buffer
 import inspect
 
-from services.FileIoService import zarr_sdk
+from services.file_io import zarr_sdk
 from .kinstrument import KInstrument
 from common.base_generator import BaseFileStreamer, strip_filepath, PROGRESS_SHIFT
 

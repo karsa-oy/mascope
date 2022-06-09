@@ -46,6 +46,39 @@ export function createConnectedStore(rawStoreConfig) {
             store.watch(fn, callback);
         }
     )
+    let subs = path.find(rawStoreConfig)
+        .filter(p => p.endsWith("subs"))
+        .map(p => path.get(rawStoreConfig, p))
+        .reduce((prev, next) => {
+            let keys = Object.keys(prev)
+                .concat(Object.keys(next));
+            let result = {};
+            for (let key of keys) {
+                let prevVals =
+                    key in prev ? prev[key] : [];
+                let nextVals =
+                    key in next ? next[key] : [];
+                result[key] = prevVals.concat(nextVals);
+            }
+            return result;
+        }, {});
+    Object.entries(subs).forEach(
+        ([mutationType, actions]) => {
+            let callback = (payload) => {
+                actions.forEach((action) => {
+                    store.dispatch(action, {
+                        payload,
+                        mutation: mutationType
+                    });
+                });
+            }
+            store.subscribe((mutation) => {
+                if (mutation.type == mutationType) {
+                    callback(mutation.payload);
+                }
+            });
+        }
+    )
     return store;
 }
 

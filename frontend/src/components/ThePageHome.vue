@@ -5,7 +5,7 @@
     </section>
       <div class="columns">
         <div class="column is-half">
-          <template v-if="!workspaceActive">
+          <template v-if="!workspaceSelected">
             <section style="padding: 1em 0em 2em 0em">
               <h1 class="title is-4">Workspaces:</h1>
             </section>
@@ -93,7 +93,7 @@ import BaseWorkspaceTile from "./BaseWorkspaceTile";
 
 import { bindState } from "$lib/store";
 
-import { mapActions, mapMutations } from "vuex";
+import { mapActions, mapMutations, mapGetters } from "vuex";
 
 export default {
   name: "ThePageHome",
@@ -109,11 +109,13 @@ export default {
   },
   computed: {
     ...bindState({
-      workspaceActive: "workspace/active",
       workspaces: "workspace/rows",
       modalProps: "modal/workspaceSaveProps",
       sampleFileRows: "sample/file/rows",
       sampleFileSchema: "sample/file/schema/row",
+    }),
+    ...mapGetters({
+      workspaceSelected: "workspace/selectedRow",
     }),
     sampleFileCols() {
       let result = [];
@@ -127,8 +129,8 @@ export default {
       return "calc(75vh)";
     },
     workspaceHomeText() {
-      if (this.workspaceActive) {
-        return `Welcome to workspace ${this.workspaceActive.name}!`;
+      if (this.workspaceSelected) {
+        return `Welcome to workspace ${this.workspaceSelected.name}!`;
       } else {
         return `Loading workspace...`;
       }

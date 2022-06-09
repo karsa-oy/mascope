@@ -83,7 +83,7 @@ import ThePaneBrowserSample from "./ThePaneBrowserSample";
 import BaseTable from "./BaseTable";
 
 import { bindState } from "$lib/store";
-import { mapActions } from "vuex";
+import { mapActions, mapGetters } from "vuex";
 
 export default {
   name: "ThePageSampleManagement",
@@ -101,12 +101,14 @@ export default {
     };
   },
   computed: {
+    ...mapGetters({
+      batchSelected: "sample/batch/selectedRow",
+      workspaceSelected: "workspace/selectedRow",
+    }),
     ...bindState({
-      workspaceActive: "workspace/active",
       sampleFileSchema: "sample/file/schema/row",
       sampleItemSchema: "sample/item/schema/row",
       sampleFileRows: "sample/file/rows",
-      batchSelected: "sample/batch/selection/row",
     }),
     // columns
     sampleFileCols() {
@@ -151,7 +153,7 @@ export default {
     itemsAdd() {
       let n = this.sampleItemRows.length;
       let s = n > 1 ? "s" : "";
-      let w = this.workspaceActive.name;
+      let w = this.workspaceSelected.name;
       let b = this.batchSelected.name;
       this.$buefy.dialog.confirm({
         title: "Batch Items",

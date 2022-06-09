@@ -1,7 +1,7 @@
 <template>
   <div class="card base-tile">
     <header class="card-header">
-      <p class="card-header-title" @click="handleClick">
+      <p class="card-header-title" @click="onClick">
         {{ workspace.name }}
       </p>
       <b-dropdown aria-role="list">
@@ -48,7 +48,7 @@
 
 
 <script>
-import { mapMutations } from "vuex";
+import { mapMutations, mapActions } from "vuex";
 import { bindState } from "$lib/store";
 
 export default {
@@ -65,13 +65,14 @@ export default {
     }),
   },
   methods: {
+    ...mapActions({
+      workspaceToggle: "workspace/toggle",
+    }),
     ...mapMutations({
       activateModal: "modal/activate",
     }),
-    handleClick() {
-      this.$router.push({
-        query: { w: this.workspace.id },
-      });
+    onClick() {
+      this.workspaceToggle(this.workspace);
     },
   },
 };

@@ -656,7 +656,7 @@ def run():
     args = parse_cmd_args()
     # FileIo should always be in private namespace with data producer
     if args['ns'] == '/':
-        print("FileIoService must be in a private namespace. " +
+        print("file_io must be in a private namespace. " +
               "Please restart the service with --ns option."
               )
         return

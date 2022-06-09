@@ -9,7 +9,7 @@
 
 <script>
 import { bindState } from "$lib/store";
-import { mapActions } from "vuex";
+import { mapActions, mapGetters } from "vuex";
 
 export default {
   data: function () {
@@ -30,6 +30,9 @@ export default {
     ...bindState({
       api: "api",
       query: "query",
+    }),
+    ...mapGetters({
+      workspaceSelected: "workspace/selectedRow",
     }),
     ready: function () {
       // check that the API connected succesfully to the backend

@@ -10,23 +10,28 @@ Created on Thu May  7 12:43:13 2020
 """
 
 import asyncio
-import os
 from time import time
 from datetime import timedelta
+
 from karsalib.client import (
                         BaseClientNamespace,
                         BaseServiceClient
                         )
-from karsalib.util import parse_datetime_from_item_filename
-from karsalib.util import parse_cmd_args, get_client_notification_context
-from karsalib.db import SampleManagerDB, gen_id
+from karsalib.util import (
+    parse_datetime_from_item_filename,
+    parse_cmd_args,
+    get_client_notification_context,
+    map_to_snake_case,
+    map_to_camel_case
+)
+from karsalib.db import DbInstance, gen_id, get_ids
 
+# File cache
+cache = {}
 
 NO_DATA_LOGGING_DEFAULT = True
 
-data_path = os.environ.get('MASCOPE_DATADIR', '.')
-db_path = os.path.join(data_path, 'samples.db')
-db = SampleManagerDB(db_path)
+db = DbInstance()
 
 
 class SampleServiceNamespace(BaseClientNamespace):
@@ -35,30 +40,55 @@ class SampleServiceNamespace(BaseClientNamespace):
     # ========== UI requests ==========
 
     # === workspaces === #
-    
+
     async def on_workspace_create_request(self, data):
         workspaces = [
             {**workspace, 'id': gen_id()}
-            for workspace in data['value']
+            for workspace in map_to_snake_case(
+                data['value']
+            )
         ]
         for workspace in workspaces:
             db.workspace_create(**workspace)
+        workspace_ids = get_ids(workspaces)
+        await self.notify(
+            'workspace_event', {'type': 'create', 'ids': workspace_ids},
+            **{
+                **get_client_notification_context(data),
+                'room': 'workspace',
+            }
+        )
         return {
             'type': 'success',
-            'body': workspaces
+            'body': workspace_ids
         }
 
     async def on_workspace_read_request(self, data):
-        workspaces = db.workspace_read()
+        filters = map_to_snake_case(
+            data.get('value', {})
+        )
+        workspaces = db.workspace_read(**filters)
         return {
             'type': 'success',
-            'body': workspaces
+            'body': map_to_camel_case(
+                workspaces
+            )
         }
 
     async def on_workspace_update_request(self, data):
-        workspaces = data['value']
+        workspaces = map_to_snake_case(
+            data['value']
+        )
         for workspace in workspaces:
             db.workspace_update(**workspace)
+        workspace_ids = get_ids(workspaces)
+        await self.notify(
+            'workspace_event', {'type': 'update', 'ids': workspace_ids},
+            **{
+                **get_client_notification_context(data),
+                'room': 'workspace',
+            }
+        )
         return {
             'type': 'success',
             'body': None
@@ -66,8 +96,18 @@ class SampleServiceNamespace(BaseClientNamespace):
 
     async def on_workspace_delete_request(self, data):
         workspace_ids = data['value']
-        for workspace_id in workspace_ids:
-            db.workspace_delete(id=workspace_id)
+        batch_ids = get_ids(
+            db.sample_batch_read(workspace_id=workspace_ids)
+        )
+        db.workspace_delete(id=workspace_ids)
+        self.on_sample_batch_delete_request(batch_ids)
+        await self.notify(
+            'workspace_event', {'type': 'delete', 'ids': workspace_ids},
+            **{
+                **get_client_notification_context(data),
+                'room': 'workspace',
+            }
+        )
         return {
             'type': 'success',
             'body': None
@@ -78,44 +118,68 @@ class SampleServiceNamespace(BaseClientNamespace):
     async def on_sample_batch_create_request(self, data):
         batches = [
             {'id': gen_id(), **batch}
-            for batch in data['value']
+            for batch in map_to_snake_case(
+                data['value']
+            )
         ]
         for batch in batches:
             db.sample_batch_create(**batch)
+        batch_ids = get_ids(batches)
+        await self.notify(
+            'sample_batch_event', {'type': 'create', 'ids': batch_ids},
+            **{
+                **get_client_notification_context(data),
+                'room': 'sample/batch',
+            }
+        )
         return {
             'type': 'success',
-            'body': batches
+            'body': batch_ids
         }
 
     async def on_sample_batch_read_request(self, data):
-        filters = data['value']
+        filters = map_to_snake_case(
+            data.get('value', {})
+        )
         batches = db.sample_batch_read(**filters)
         return {
             'type': 'success',
-            'body': batches
+            'body': map_to_camel_case(batches)
         }
-    
+
     async def on_sample_batch_update_request(self, data):
-        batches = data['value']
+        batches = map_to_snake_case(
+            data['value']
+        )
         for batch in batches:
             db.sample_batch_update(**batch)
+        batch_ids = get_ids(batches)
+        await self.notify(
+            'sample_batch_event', {'type': 'update', 'ids': batch_ids},
+            **{
+                **get_client_notification_context(data),
+                'room': 'sample/batch',
+            }
+        )
         return {
             'type': 'success',
             'body': None
         }
 
     async def on_sample_batch_delete_request(self, data):
-        batch_ids = data['value']
-        item_ids = []
-        for batch_id in batch_ids:
-            # delete the batch record
-            db.sample_batch_delete(id=batch_id)
-            # delete associated item records
-            items = db.sample_item_read(batchId=batch_id)
-            for item in items:
-                item_id = item['id']
-                db.sample_item_delete(id=item_id)
-                item_ids.push(item_id)
+        batch_ids = data.get['value']
+        item_ids = get_ids(
+            db.sample_item_read(batchId=batch_ids)
+        )
+        self.sample_item_delete_request(item_ids)
+        db.sample_batch_delete(id=batch_ids)
+        await self.notify(
+            'sample_batch_event', {'type': 'delete', 'ids': batch_ids},
+            **{
+                **get_client_notification_context(data),
+                'room': 'sample/batch',
+            }
+        )
         return {
             'type': 'success',
             'body': {
@@ -127,41 +191,67 @@ class SampleServiceNamespace(BaseClientNamespace):
     # === sample items === #
 
     async def on_sample_item_create_request(self, data):
-        items = [
-            {
+        items = [{
                 'id': gen_id(),
                 **item,
-            }
-            for item in data['value']
+            } for item in map_to_snake_case(
+                data['value']
+            )
         ]
         for item in items:
             db.sample_item_create(**item)
-        return {
-            'type': 'success',
-            'body': items
-        }
-
-    async def on_sample_item_read_request(self, data):
-        filters = data['value']
-        items = db.sample_item_read(**filters)
-        return {
-            'type': 'success',
-            'body': items
-        }
-
-    async def on_sample_item_update_request(self, data):
-        items = data['value']
-        for item in items:
-            db.sample_item_update(**item)
+        item_ids = get_ids(items)
+        await self.notify(
+            'sample_item_event', {'type': 'create', 'ids': item_ids},
+            **{
+                **get_client_notification_context(data),
+                'room': 'sample/item',
+            }
+        )
         return {
             'type': 'success',
             'body': None
         }
-    
+
+    async def on_sample_item_read_request(self, data):
+        filters = map_to_snake_case(
+            data.get('value', {})
+        )
+        items = db.sample_item_read(**filters)
+        return {
+            'type': 'success',
+            'body': map_to_camel_case(items)
+        }
+
+    async def on_sample_item_update_request(self, data):
+        items = map_to_snake_case(
+            data['value']
+        )
+        for item in items:
+            db.sample_item_update(**item)
+        item_ids = get_ids(items)
+        await self.notify(
+            'sample_item_event', {'type': 'update', 'ids': item_ids},
+            **{
+                **get_client_notification_context(data),
+                'room': 'sample/item',
+            }
+        )
+        return {
+            'type': 'success',
+            'body': None
+        }
+
     async def on_sample_item_delete_request(self, data):
         item_ids = data['value']
-        for item_id in item_ids:
-            db.sample_item_delete(id=item_id)
+        db.sample_item_delete(id=item_ids)
+        await self.notify(
+            'sample_item_event', {'type': 'delete', 'ids': item_ids},
+            **{
+                **get_client_notification_context(data),
+                'room': 'sample/item',
+            }
+        )
         return {
             'type': 'success',
             'body': None
@@ -172,7 +262,8 @@ class SampleServiceNamespace(BaseClientNamespace):
         timeout = data.get('timeout')
         context = get_client_notification_context(data)
         schema = db.sample_item_get_schema()
-        result = {'schema': schema, 'dummy': time()}     # ensure response accepted, when schema not changed
+        # ensure response accepted, when schema not changed
+        result = {'schema': schema, 'dummy': time()}
         if timeout:
             return result
         else:
@@ -183,7 +274,6 @@ class SampleServiceNamespace(BaseClientNamespace):
                     **context,
                     'room': data.get('client_room'),
                 })
-
 
     # === sample files === #
 
@@ -213,11 +303,14 @@ class SampleServiceNamespace(BaseClientNamespace):
         context = get_client_notification_context(data)
         value = data['value']
 
-        if sorted(value.keys()) == sorted(['column', 'min_value', 'max_value']):
+        sorted_range_keys = sorted(['column', 'min_value', 'max_value'])
+        is_range_request = sorted(value.keys()) == sorted_range_keys
+        if is_range_request:
             records = db.sample_file_get_range(**value)
         else:
             records = db.sample_file_get(**value)
-        result = {'records': records, 'dummy': time()}  # ensure response generated, when data not changed
+        # ensure response generated, when data not changed
+        result = {'records': records, 'dummy': time()}
         if timeout:
             return result
         else:
@@ -234,7 +327,8 @@ class SampleServiceNamespace(BaseClientNamespace):
         timeout = data.get('timeout')
         context = get_client_notification_context(data)
         schema = db.sample_file_get_schema()
-        result = {'schema': schema, 'dummy': time()}     # ensure response accepted, when schema not changed
+        # ensure response accepted, when schema not changed
+        result = {'schema': schema, 'dummy': time()}
         if timeout:
             return result
         else:
@@ -249,7 +343,9 @@ class SampleServiceNamespace(BaseClientNamespace):
     async def on_dataset_updated(self, data):
         value = data['value']
         if value['data_type'] != 'signal':
-            raise ValueError(f"Expected data_type: signal - got {value['data_type']}")
+            raise ValueError(
+                f"Expected data_type: signal - got {value['data_type']}"
+            )
         filename = value['filename']
         full_length = value['length']
         committed_length = value['committed_length']
@@ -274,7 +370,20 @@ class SampleServiceNamespace(BaseClientNamespace):
 
     async def on_template_list_request(self, data):
         # templates = [
-        #     {"name":"template_1","type":"sample","template":'[{"label":"fname","required":true,"placeholder":"fname"},{"label":"description","value":"Predefined description"},{"label":"optional attribute"}]'},
+        #     {
+        #       "name": "template_1",
+        #       "type":"sample",
+        #       "template":'[{
+        #           "label":"fname",
+        #           "required":true,
+        #           "placeholder":"fname"
+        #         },{
+        #           "label":"description",
+        #           "value":"Predefined description"
+        #         },{
+        #           "label":"optional attribute"
+        #       }]'
+        #     },
         #     ...,
         # ]
         template_type = data['value']['type']
@@ -282,10 +391,8 @@ class SampleServiceNamespace(BaseClientNamespace):
         timeout = context.get('timeout')
         records = db.attribute_template_get(type=template_type)
         if timeout:
-            # return code for (backend) clients, which can use call instead of emit
             return records
         else:
-            # notification for clients, which prefer callbacks
             await self.emit_client_notification(
                 'template_list_response',
                 records,
@@ -308,7 +415,6 @@ class SampleServiceNamespace(BaseClientNamespace):
         db.attribute_template_delete(template_id)
 
 
-
 class SampleManagerClient(BaseServiceClient):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -324,14 +430,17 @@ def run():
     try:
         loop.run_until_complete(client.run())
     except KeyboardInterrupt as e:
-        print(f"{client.__class__.__name__} : {e.__class__.__name__}({str(e)})")
+        print(
+            f"{client.__class__.__name__} : {e.__class__.__name__}({str(e)})"
+        )
     except Exception as e:
-        print(f"{client.__class__.__name__} : {e.__class__.__name__}({str(e)})")
+        print(
+            f"{client.__class__.__name__} : {e.__class__.__name__}({str(e)})"
+        )
     finally:
         client.shutdown_event.set()
-        print(f'Service stopped.')
+        print('Service stopped.')
 
 
-
-if __name__=='__main__':
+if __name__ == '__main__':
     run()
