@@ -25,6 +25,7 @@ export function createTableModule({
     children = null, // parent module paths
     loadWhen = 'parent-loaded', // 'parents-selected' 'parents-loaded' 'always'
     singleSelect = false,
+    focusable = false,
     // standard elements
     state,
     mutations,
@@ -176,11 +177,11 @@ export function createTableModule({
                     }
                 }
             },
-            async toggle({ dispatch, state, rootState }, row) {
+            async toggle({ dispatch, state, rootState, getters }, row) {
                 let toggledRowId = row.id;
                 // keyboard shortcuts set operation mode
                 let mode;
-                if (rootState.key.alt) {
+                if (rootState.key.alt && focusable) {
                     mode = 'focus';
                 } else if (rootState.key.control) {
                     mode = 'multiselect'
@@ -219,10 +220,29 @@ export function createTableModule({
                             });
                         break;
                     }
-                    case 'focus':
                     case 'multiselect': {
                         // only toggled row is changed
                         change = [{ [row.id]: { status: nextStatus } }];
+                        break;
+                    }
+                    case 'focus': {
+                        let focusedRow = getters['focusedRow'];
+                        let togglingFocusedRow = focusedRow
+                            ? focusedRow.id == row.id
+                            : false;
+                        if (focusedRow && !togglingFocusedRow) {
+                            change = [
+                                // defocus the focused row
+                                { [focusedRow.id]: { status: 'fully-selected' } },
+                                // focus the toggled row
+                                { [row.id]: { status: nextStatus } },
+                            ];
+                        } else {
+                            // only toggled row is changed
+                            change = [
+                                { [row.id]: { status: nextStatus } }
+                            ];
+                        }
                         break;
                     }
                 }
@@ -362,7 +382,7 @@ export function createTableModule({
                     .status,
             propagateStatusDown: (state, getters) =>
                 (row) => {
-                    if (!parents) return { status: 'not-selected' };
+                    if (!parents || singleSelect) return { status: 'not-selected' };
                     // get parent statuses
                     let parentStatuses = parents.map(
                         parent => getters['parentRows'](parent, [row])

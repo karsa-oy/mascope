@@ -7,6 +7,7 @@ export default createTableModule({
     parents: ['sample/batch'],
     namespace: 'sample/item',
     loadWhen: 'parent-selected',
+    focusable: true,
     modules: {
         schema,
         stat

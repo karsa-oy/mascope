@@ -7,7 +7,4 @@ def gen_id(length=16):
 
 
 def get_ids(rows):
-    return list(map(
-        lambda row: row['id'],
-        rows
-    ))
+    return [row['id'] for row in rows]

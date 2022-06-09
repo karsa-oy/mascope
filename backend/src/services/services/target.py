@@ -4,7 +4,6 @@ import pandas as pd
 
 from karsalib.peak import detect_peaks, filter_peaks
 from karsalib.match import identify_matches, calculate_match_stats
-
 from karsalib.molmass import Formula
 from karsalib.chemistry import get_exact_isotope_mzs
 from karsalib.client import BaseClientNamespace, BaseServiceClient
@@ -15,7 +14,6 @@ from karsalib.util import (
     map_to_camel_case
 )
 from karsalib.struct import LRUDict
-
 from karsalib.db import DbInstance, gen_id, get_ids
 
 from services.file_io import load_file
@@ -55,7 +53,7 @@ class TargetServiceNamespace(BaseClientNamespace):
                 await self.on_target_compound_create_request(
                     {'value': target_collection['target_compounds']}
                 )
-            )['body']['compound'],
+            )['body']['compound']
             # create collection
             db.target_collection_create(
                 id=target_collection['id'],
@@ -250,8 +248,6 @@ class TargetServiceNamespace(BaseClientNamespace):
                         'target_compound_id': compound['id'],
                         'mechanism_id': ionization_mechanism['id'],
                         'formula': raw_ion.formula + charge_string(raw_ion),
-                        'polarity': charge_string(raw_ion),
-                        'charge': raw_ion.charge,
                     }
                     db.target_ion_create(**ion)
                     ion_ids.append(ion['id'])
@@ -297,12 +293,21 @@ class TargetServiceNamespace(BaseClientNamespace):
         target_collection_ids = filters.pop('target_collection_id')
         compounds = []
         for target_collection_id in target_collection_ids:
-            target_compound_ids = [
+            collection_compound_ids = [
                 link['target_compound_id']
                 for link in db.target_compound_in_target_collection.read(
                     target_collection_id=target_collection_id
                 )
             ]
+            if 'id' in filters:
+                filter_ids = filters.pop('id')
+                target_compound_ids = [
+                    target_compound_id 
+                    for target_compound_id in collection_compound_ids
+                    if target_compound_id in filter_ids
+                ]
+            else:
+                target_compound_ids = collection_compound_ids
             # get compounds based on filters
             compounds += [
                 {**compound, 'target_collection_id': target_collection_id}
