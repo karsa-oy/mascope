@@ -16,9 +16,10 @@ export default {
                         level: 'collection', selected
                     });
                     if (itemFocused) {
-                        if (!rootState.sample.item.focusedRow) return rootState.target.collection.rows;
-                        matches = matches.filter(
-                            (m) => m.sampleItemId === rootState.sample.item.focusedRow.id
+                        let focusedSample = rootGetters['sample/item/focusedRow'];
+                        if (!focusedSample) return rootState.target.collection.rows;
+                            matches = matches.filter(
+                            (m) => m.sampleItemId === focusedSample.id
                         );
                     }
                     let collections = selected ? rootGetters['target/collection/selectedRows'] : rootState.target.collection.rows;
