@@ -217,6 +217,7 @@ class SampleServiceNamespace(BaseClientNamespace):
         filters = map_to_snake_case(
             data.get('value', {})
         )
+        print(filters)
         items = db.sample_item_read(**filters)
         return {
             'type': 'success',

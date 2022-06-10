@@ -76,7 +76,7 @@ class TargetServiceNamespace(BaseClientNamespace):
         target_collection_ids = get_ids(target_collections)
         await self.notify(
             'target_collection_event', {
-                'type': 'create', 
+                'type': 'create',
                 'ids': target_collection_ids
             },
             **{
@@ -93,12 +93,21 @@ class TargetServiceNamespace(BaseClientNamespace):
         filters = map_to_snake_case(data['value'])
         # get target collection ids linked to sample batch
         sample_batch_id = filters.pop('sample_batch_id')
-        target_collection_ids = [
+        batch_collection_ids = [
             link['target_collection_id']
             for link in db.target_collection_in_sample_batch.read(
                 sample_batch_id=sample_batch_id
             )
         ]
+        if 'id' in filters:
+            filter_ids = filters.pop('id')
+            target_collection_ids = [
+                target_collection_id 
+                for target_collection_id in batch_collection_ids
+                if target_collection_id in filter_ids
+            ]
+        else:
+            target_collection_ids = batch_collection_ids
         # read target collections
         target_collections = db.target_collection_read(
             id=target_collection_ids,

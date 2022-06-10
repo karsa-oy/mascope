@@ -9,11 +9,15 @@ export default {
     getters: {
         rows: (state, getters, rootState, rootGetters) =>
             ({ level = 'compound', selected = true }) => {
-                let sampleItem = rootState.sample.item;
                 let targetLevel = 'target' + toTitleCase(level);
                 let matchLevel = 'match' + toTitleCase(level);
-                let matches = rootGetters['match/rating/rows']({ level, selected });
-                let samples = selected ? rootGetters['sample/item/selectedRows'] : sampleItem.rows;
+                let sampleItem =
+                    rootState.sample.item;
+                let matches =
+                    rootGetters['match/rating/rows']({ level, selected });
+                let samples = selected
+                    ? rootGetters['sample/item/selectedRows']
+                    : sampleItem.rows;
                 let total = table.query(
                     `
                     select
@@ -59,7 +63,7 @@ export default {
                         on samp.id = poss.id
                     `, { samples, total, probable, possible }
                 );
-                if (rootState.dev.logGetters) console.table(result);
+                if (rootState.dev.logGetters) console.table(result[0]);
                 return result;
             },
     }

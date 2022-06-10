@@ -471,10 +471,11 @@ export function createTableModule({
                         }
                     }
                 } else {
-                    console.error(
-                        `${namespace} is not configured with singleSelect;`
-                        + `use selectedRows or reconfigure the store module`
-                    );
+                    switch (selectedRows.length) {
+                        case 0: return null
+                        case 1: return selectedRows[0]
+                        default: return null
+                    }
                 }
             },
             selectedId: (state, getters) => {
@@ -504,6 +505,16 @@ export function createTableModule({
             },
             focusedId: (state, getters) =>
                 getters['focusedRow'].id,
+            // helpers
+            uniqueRow: (state, getters) => {
+                if (getters['focusedRow']) {
+                    return getters['focusedRow'];
+                } else if (getters['selectedRow']) {
+                    return getters['selectedRow'];
+                } else {
+                    return null;
+                }
+            },
             ...getters,
         },
         watchers: {

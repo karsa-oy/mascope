@@ -167,7 +167,7 @@
 <script>
 import { bindState } from "$lib/store";
 
-import { mapActions } from "vuex";
+import { mapActions, mapMutations } from "vuex";
 
 import BaseSpreadsheetInput from "./BaseSpreadsheetInput";
 
@@ -212,6 +212,9 @@ export default {
     },
   },
   methods: {
+    ...mapMutations({
+      deactivateModal: "modal/deactivate",
+    }),
     ...mapActions({
       createTargetCollection: "target/collection/create",
       updateTargetCollection: "target/collection/update",

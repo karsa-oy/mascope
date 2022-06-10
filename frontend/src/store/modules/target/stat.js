@@ -18,11 +18,13 @@ export default {
                     if (itemFocused) {
                         let focusedSample = rootGetters['sample/item/focusedRow'];
                         if (!focusedSample) return rootState.target.collection.rows;
-                            matches = matches.filter(
+                        matches = matches.filter(
                             (m) => m.sampleItemId === focusedSample.id
                         );
                     }
-                    let collections = selected ? rootGetters['target/collection/selectedRows'] : rootState.target.collection.rows;
+                    let collections = selected
+                        ? rootGetters['target/collection/selectedRows']
+                        : rootState.target.collection.rows;
                     let total = table.query(
                         `
                             select
@@ -75,7 +77,7 @@ export default {
                             on com.id = poss.id
                     `, { collections, total, probable, possible }
                     );
-                    if (rootState.dev.logGetters) console.table(result);
+                    if (rootState.dev.logGetters) console.table(result[0]);
                     return result;
                 } else {
                     return rootState.target.collection.rows;
@@ -95,7 +97,9 @@ export default {
                             (m) => m.sampleItemId === focusedSample.id
                         );
                     }
-                    let compounds = selected ? rootGetters['target/compound/selectedRows'] : rootState.target.compound.rows;
+                    let compounds = selected
+                        ? rootGetters['target/compound/selectedRows']
+                        : rootState.target.compound.rows;
                     let total = table.query(
                         `
                             select
@@ -148,7 +152,7 @@ export default {
                             on com.id = poss.id
                     `, { compounds, total, probable, possible }
                     );
-                    if (rootState.dev.logGetters) console.table(result);
+                    if (rootState.dev.logGetters) console.table(result[0]);
                     return result;
                 } else {
                     return rootState.target.compound.rows;
@@ -168,8 +172,12 @@ export default {
                             (m) => m.sampleItemId === focusedSample.id
                         );
                     }
-                    let ions = selected ? rootGetters['target/ion/selectedRows'] : rootState.target.ion.rows;
-                    let compounds = selected ? rootGetters['target/compound/selectedRows'] : rootState.target.compound.rows;
+                    let ions = selected
+                        ? rootGetters['target/ion/selectedRows']
+                        : rootState.target.ion.rows;
+                    let compounds = selected
+                        ? rootGetters['target/compound/selectedRows']
+                        : rootState.target.compound.rows;
                     let total = table.query(
                         `
                             select
@@ -227,7 +235,7 @@ export default {
                             on ion.id = poss.id
                     `, { ions, compounds, total, probable, possible }
                     );
-                    if (rootState.dev.logGetters) console.table(result);
+                    if (rootState.dev.logGetters) console.table(result[0]);
                     return result;
                 } else {
                     return rootState.target.ion.rows;
@@ -247,9 +255,15 @@ export default {
                             (m) => m.sampleItemId === focusedSample.id
                         );
                     }
-                    let isotopes = selected ? rootGetters['target/isotope/selectedRows'] : rootState.target.isotope.rows;
-                    let ions = selected ? rootGetters['target/ion/selectedRows'] : rootState.target.ion.rows;
-                    let compounds = selected ? rootGetters['target/compound/selectedRows'] : rootState.target.compound.rows;
+                    let isotopes = selected
+                        ? rootGetters['target/isotope/selectedRows']
+                        : rootState.target.isotope.rows;
+                    let ions = selected
+                        ? rootGetters['target/ion/selectedRows']
+                        : rootState.target.ion.rows;
+                    let compounds = selected
+                        ? rootGetters['target/compound/selectedRows']
+                        : rootState.target.compound.rows;
                     let total = table.query(
                         `
                             select
@@ -310,7 +324,7 @@ export default {
                             on iso.id = poss.id
                     `, { isotopes, ions, compounds, total, probable, possible }
                     );
-                    if (rootState.dev.logGetters) console.table(result);
+                    if (rootState.dev.logGetters) console.table(result[0]);
                     return result;
                 } else {
                     return rootState.target.isotope.rows;

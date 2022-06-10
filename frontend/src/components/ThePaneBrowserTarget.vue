@@ -1,6 +1,8 @@
 <template>
-  <base-browser name="Targets" :levels="targetLevels" :menu="menu">
-  </base-browser>
+  <section>
+    <base-browser name="Targets" :levels="targetLevels" :menu="menu">
+    </base-browser>
+  </section>
 </template>
 
 <script>
@@ -28,6 +30,7 @@ export default {
       matchesExist: "match/exists",
       sampleItemFocused: "sample/item/focusedRow",
       targetCollectionsSelected: "target/collection/selectedRows",
+      uniqueTargetCollection: "target/collection/uniqueRow",
     }),
     collectionStats: function () {
       return this.$store.getters["target/stat/rows"]({
@@ -64,8 +67,7 @@ export default {
           name: "Collection",
           slug: "targetCollection",
           cols: [
-            { field: "name", label: "Name", width: "40%" },
-            { field: "formula", label: "Collection", width: "40%" },
+            { field: "name", label: "Collection", width: "90%" },
             {
               field: "matchScore",
               label: "Score",
@@ -87,8 +89,8 @@ export default {
           name: "Compound",
           slug: "targetCompound",
           cols: [
-            { field: "name", label: "Name", width: "40%" },
-            { field: "formula", label: "Compound", width: "40%" },
+            { field: "formula", label: "Compound", width: "45%" },
+            { field: "name", label: "", width: "45%" },
             {
               field: "matchScore",
               label: "Score",
@@ -110,8 +112,8 @@ export default {
           name: "Ion",
           slug: "targetIon",
           cols: [
-            { field: "ionMech", label: "Mechanism", width: "45%" },
             { field: "formula", label: "Ion", width: "45%" },
+            { field: "ionMech", label: "", width: "45%" },
             {
               field: "matchScore",
               label: "Score",
@@ -133,8 +135,8 @@ export default {
           name: "Isotope",
           slug: "targetIsotope",
           cols: [
-            { field: "mz", label: "m/z", width: "45%" },
-            { field: "relAbu", label: "Rel. Abu.", width: "45%" },
+            { field: "mz", label: "Isotope", width: "45%" },
+            { field: "relativeAbundance", label: "", width: "45%" },
             {
               field: "matchScore",
               label: "Score",
@@ -143,7 +145,9 @@ export default {
               tooltip: (row) => {
                 return {
                   "Peak intensity": this.formatter.format(row.peakHeight),
-                  "Rel. abundance": this.formatter.format(row.relAbu),
+                  "Rel. abundance": this.formatter.format(
+                    row.relativeAbundance
+                  ),
                 };
               },
             },
@@ -169,17 +173,14 @@ export default {
         label: "Delete target collection",
         onClick: this.collectionDelete,
       };
-      switch (this.collectionStats.length) {
-        case 0:
-          return [createCollectionButton];
-        case 1:
-          return [
-            createCollectionButton,
-            updateCollectionButton,
-            deleteCollectionButton,
-          ];
-        default:
-          return [createCollectionButton];
+      if (this.uniqueTargetCollection) {
+        return [
+          createCollectionButton,
+          updateCollectionButton,
+          deleteCollectionButton,
+        ];
+      } else {
+        return [createCollectionButton];
       }
     },
   },

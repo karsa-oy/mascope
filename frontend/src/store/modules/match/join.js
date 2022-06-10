@@ -10,9 +10,10 @@ export default {
             },
         collections: (state, getters, rootState, rootGetters) =>
             ({ selected = true }) => {
-                let sampleItems = rootGetters['sample/item/selectedRows'];
-                let targetCollectionsSelected = selected ?
-                    rootGetters['target/collection/selectedRows']
+                let sampleItems =
+                    rootGetters['sample/item/selectedRows'];
+                let targetCollectionsSelected = selected
+                    ? rootGetters['target/collection/selectedRows']
                     : rootState.target.collection.rows;
                 return table.query(
                     `
@@ -37,7 +38,8 @@ export default {
             },
         compounds: (state, getters, rootState, rootGetters) =>
             ({ selected = true }) => {
-                let sampleItems = rootGetters['sample/item/selectedRows'];
+                let sampleItems =
+                    rootGetters['sample/item/selectedRows'];
                 let targetCompoundsSelected = selected ?
                     rootGetters['target/compound/selectedRows']
                     : rootState.target.compound.rows;
@@ -50,6 +52,7 @@ export default {
                         ,s.filename as sampleFilename
                         ,s.method as sampleMethod
                         ,s.properties as sampleProperties
+                        ,s.title as sampleTitle
                     from matches m
                     inner join targets t
                         on t.id = m.targetCompoundId

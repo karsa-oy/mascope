@@ -38,7 +38,7 @@ export default {
         {
           name: "Item",
           slug: "sampleItem",
-          cols: [{ field: "title", label: "Title", width: "90%" }],
+          cols: [{ field: "title", label: "Item", width: "90%" }],
           rows: this.itemRows,
           detailsIcon: null,
           rowClick: this.itemToggle,
