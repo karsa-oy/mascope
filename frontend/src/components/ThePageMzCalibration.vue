@@ -28,7 +28,7 @@
               <p>
                 <template v-if="itemFocused">
                   <b
-                    >Current parameters: {{ itemFocused.mz_calibration.par }}</b
+                    >Current parameters: {{ itemFocused.mz_calibration ? itemFocused.mz_calibration.par : "undefined"}}</b
                   >
                 </template>
                 <br />
@@ -78,7 +78,7 @@ import ThePaneBrowserTarget from "./ThePaneBrowserTarget";
 import BaseTable from "./BaseTable";
 
 import { bindState } from "$lib/store";
-import { mapActions, mapMutations } from "vuex";
+import { mapActions, mapGetters, mapMutations } from "vuex";
 
 export default {
   name: "ThePageMassCalibration",
@@ -124,6 +124,8 @@ export default {
     ...bindState({
       mzFit: "calibration/mzFit",
       mzFitStats: "calibration/mzFitStats",
+    }),
+    ...mapGetters({
       itemFocused: "sample/item/focusedRow",
       itemsSelected: "sample/item/selectedRows",
     }),
