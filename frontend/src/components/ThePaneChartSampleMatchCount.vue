@@ -27,9 +27,8 @@ export default {
       return [
         {
           name: "Probable match",
-          x: this.stats.map((stat) => stat.filename),
+          x: this.stats.map((stat) => stat.id),
           y: this.stats.map((stat) => stat.matchCompoundProbableCount),
-          id: this.stats.map((stat) => stat.id),
           type: "bar",
           marker: {
             color: "#5cb85c",
@@ -37,9 +36,8 @@ export default {
         },
         {
           name: "Possible match",
-          x: this.stats.map((stat) => stat.filename),
+          x: this.stats.map((stat) => stat.id),
           y: this.stats.map((stat) => stat.matchCompoundPossibleCount),
-          id: this.stats.map((stat) => stat.id),
           type: "bar",
           marker: {
             color: "#df691a",
@@ -54,8 +52,8 @@ export default {
           autorange: true,
           showgrid: true,
           tickmode: "array",
-          tickvals: this.stats.map((item, index) => index),
-          ticktext: this.stats.map((item, index) => index + 1),
+          tickvals: this.stats.map((item) => item.id),
+          ticktext: this.stats.map((item) => item.title),
           gridcolor: "#757575",
         },
         yaxis: {

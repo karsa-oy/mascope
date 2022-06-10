@@ -3,10 +3,8 @@
     <plotly
       :data="data"
       :layout="{ ...baseLayout, ...layout }"
-      :display-logo="false"
-      :display-mode-bar="false"
       style="width: 100%; height: 100%"
-      :responsive="true"
+      v-bind="{ ...baseConfig, ...config }"
       v-on="$listeners"
     ></plotly>
   </section>
@@ -24,6 +22,10 @@ export default {
     title: {
       type: String,
     },
+    config: {
+      type: Object,
+      required: false,
+    },
     data: {
       type: Array,
     },
@@ -35,6 +37,15 @@ export default {
       required: false,
       default: null,
     },
+  },
+  data: function() {
+    return {
+      baseConfig: {
+        displayLogo: false,
+        displayModeBar: false,
+        responsive: true,
+      },
+    };
   },
   computed: {
     baseLayout: function () {
