@@ -52,6 +52,7 @@ export default {
                         ,s.filename as sampleFilename
                         ,s.method as sampleMethod
                         ,s.properties as sampleProperties
+                        ,s.title as sampleTitle
                     from matches m
                     inner join targets t
                         on t.id = m.targetCompoundId

@@ -36,9 +36,8 @@ export default {
       return [
         {
           name: "Probable matches",
-          x: this.stats.map((row) => row.formula),
+          x: this.stats.map((row) => row.id),
           y: this.stats.map((row) => row.matchCompoundProbableCount),
-          id: this.stats.map((row) => row.id),
           type: "bar",
           marker: {
             color: "#5cb85c",
@@ -46,9 +45,8 @@ export default {
         },
         {
           name: "Possible matches",
-          x: this.stats.map((row) => row.formula),
+          x: this.stats.map((row) => row.id),
           y: this.stats.map((row) => row.matchCompoundPossibleCount),
-          id: this.stats.map((row) => row.id),
           type: "bar",
           marker: {
             color: "#df691a",
@@ -63,8 +61,8 @@ export default {
           autorange: true,
           showgrid: true,
           tickmode: "array",
-          tickvals: this.stats.map((item, index) => index),
-          ticktext: this.stats.map((stat) => stat.formula),
+          tickvals: this.stats.map((stat) => stat.id),
+          ticktext: this.stats.map((stat) => stat.name.trim() ? stat.name : stat.formula),
           gridcolor: "#757575",
         },
         yaxis: {

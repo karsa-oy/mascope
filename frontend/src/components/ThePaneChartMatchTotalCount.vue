@@ -30,7 +30,6 @@ export default {
           name: "Match counts",
           labels: this.stats.map((stat) => stat.rating),
           values: this.stats.map((stat) => stat.matchCount),
-          id: this.stats.map((stat) => stat.id),
           type: "pie",
           hole: 40,
           marker: {
