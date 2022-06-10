@@ -47,8 +47,8 @@
                     <b>
                       {{
                         batchSelected
-                        ? "Items to add to batch: " + batchSelected.name
-                        : "Please select a batch"
+                          ? "Items to add to batch: " + batchSelected.name
+                          : "Please select a batch"
                       }}
                     </b>
                   </p>
@@ -87,7 +87,7 @@ import ThePaneBrowserSample from "./ThePaneBrowserSample";
 import BaseTable from "./BaseTable";
 
 import { bindState } from "$lib/store";
-import { mapActions } from "vuex";
+import { mapActions, mapGetters } from "vuex";
 
 export default {
   name: "ThePageSampleManagement",
@@ -106,13 +106,15 @@ export default {
     };
   },
   computed: {
+    ...mapGetters({
+      workspaceSelected: "workspace/selectedRow",
+      batchSelected: "sample/batch/selectedRow",
+    }),
     ...bindState({
-      workspaceActive: "workspace/active",
       sampleFileSchema: "sample/file/schema/row",
       sampleItemSchema: "sample/item/schema/row",
       $sampleFileListRequest: "sample/file/$listRequest",
       $sampleFileListResponse: "sample/file/$listResponse",
-      batchSelected: "sample/batch/selection/row",
     }),
     // layout
     srcTableHeight() {
@@ -155,7 +157,7 @@ export default {
     itemsAdd() {
       let n = this.sampleItemRows.length;
       let s = n > 1 ? "s" : "";
-      let w = this.workspaceActive.name;
+      let w = this.workspaceSelected.name;
       let b = this.batchSelected.name;
       this.$buefy.dialog.confirm({
         title: "Batch Items",

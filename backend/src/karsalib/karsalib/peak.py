@@ -1,4 +1,4 @@
-from services.FileIoService import (load_file, zarr_sdk)
+from services.file_io import (load_file, zarr_sdk)
 
 from karsatof.lib.TwTool import TwMassCalibrate, TwTof2Mass
 
@@ -18,27 +18,28 @@ def detect_peaks(cache_item):
             vars=['signal'],
             prev_dataset=cache_item
         )
-
-    sum_spectrum = cache_item \
-        .signal.sum(dim='time').compute() \
-        .interpolate_na( # Interpolate NaNs for smoothing
+    sum_spectrum = (
+        cache_item
+        .signal.sum(dim='time').compute()
+        .interpolate_na(  # Interpolate NaNs for smoothing
             dim='mz',
             method='linear',
             limit=None,
             max_gap=2,
         )
-        
+    )
     peaks, peak_props = find_peaks(
         sum_spectrum,
         height=0,
         distance=None,
         width=None
     )
-                                   
-    cache_item = cache_item \
+    cache_item = (
+        cache_item
         .assign_coords(
             tof=('mz', np.arange(len(cache_item.mz)).astype(np.float32))
         )
+    )
     peak_profiles = cache_item.signal[peaks]
     zarr_sdk.write_peak_dataset(peak_profiles, cache_item)
 
@@ -48,6 +49,7 @@ def detect_peaks(cache_item):
         prev_dataset=cache_item
     )
     return cache_item
+
 
 def filter_peaks(
     cache_item,

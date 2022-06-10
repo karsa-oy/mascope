@@ -1,16 +1,23 @@
-import { toTitleCase } from '$lib/string';
 import table from "$lib/table";
+
+function toTitleCase(string) {
+    return string[0].toUpperCase() + string.substring(1).toLowerCase();
+}
 
 export default {
     namespaced: true,
     getters: {
         rows: (state, getters, rootState, rootGetters) =>
             ({ level = 'compound', selected = true }) => {
-                let itemState = rootState.sample.item;
                 let targetLevel = 'target' + toTitleCase(level);
                 let matchLevel = 'match' + toTitleCase(level);
-                let matches = rootGetters['match/rating/rows']({ level, selected });
-                let samples = selected ? itemState.selection.rows : itemState.rows;
+                let sampleItem =
+                    rootState.sample.item;
+                let matches =
+                    rootGetters['match/rating/rows']({ level, selected });
+                let samples = selected
+                    ? rootGetters['sample/item/selectedRows']
+                    : sampleItem.rows;
                 let total = table.query(
                     `
                     select
@@ -56,7 +63,7 @@ export default {
                         on samp.id = poss.id
                     `, { samples, total, probable, possible }
                 );
-                if (rootState.dev.logGetters) console.table(result);
+                if (rootState.dev.logGetters) console.table(result[0]);
                 return result;
             },
     }

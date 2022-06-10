@@ -77,6 +77,8 @@ export default {
             case 1:
                 return results[0];
             default:
+                console.log(rows.map(row => row.id))
+                console.log(rows, filters)
                 throw `There is no unique row`
         }
     },

@@ -12,10 +12,10 @@ import numpy as np
 from colorcet import glasbey_hv as colormap
 
 from karsalib.client import BaseClientNamespace, BaseServiceClient
-from karsalib.struct import  LRUDict
+from karsalib.struct import LRUDict
 from karsalib.util import parse_cmd_args
 
-from services.FileIoService import load_coord, load_file
+from services.file_io import load_coord, load_file
 
 
 NO_DATA_LOGGING_DEAULT = False

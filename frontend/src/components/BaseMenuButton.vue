@@ -1,5 +1,10 @@
 <template>
-  <b-menu-item tag="router-link" :to="{ path, query }" :icon="icon">
+  <b-menu-item
+    tag="router-link"
+    :to="{ path, query }"
+    :icon="icon"
+    @click="onClick"
+  >
   </b-menu-item>
 </template>
 
@@ -34,6 +39,11 @@ export default {
       type: Number,
       required: false,
       default: 200,
+    },
+    onClick: {
+      type: Function,
+      required: false,
+      default: () => {},
     },
   },
   computed: {
