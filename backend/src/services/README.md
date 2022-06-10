@@ -1,3 +1,3 @@
-# Karsa Services: DataVizService, FileIoService, SampleManagerService SignalProcessorService FileStreamer
+# Karsa Services: DataVizService, file_io, SampleManagerService SignalProcessorService FileStreamer
 
 To be updated...

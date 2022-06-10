@@ -9,7 +9,7 @@
 
 <script>
 import { bindState } from "$lib/store";
-import { mapActions, mapMutations } from "vuex";
+import { mapActions, mapMutations, mapGetters } from "vuex";
 
 export default {
   data: function () {
@@ -30,9 +30,6 @@ export default {
     ...bindState({
       api: "api",
       query: "query",
-      // workspace
-      workspaceActive: "workspace/active",
-      workspaceRoom: "workspace/$roomActive",
       // schema
       $sampleItemSchemaRequest: "sample/item/schema/$request",
       $sampleItemSchemaResponse: "sample/item/schema/$response",
@@ -40,6 +37,9 @@ export default {
       $sampleFileSchemaResponse: "sample/file/schema/$response",
       // template
       $templateListResponse: "template/$listResponse",
+    }),
+    ...mapGetters({
+      workspaceSelected: "workspace/selectedRow",
     }),
     ready: function () {
       // check that the API connected succesfully to the backend
@@ -54,20 +54,16 @@ export default {
     }),
     ...mapActions({
       workspaceRead: "workspace/read",
-      sampleBatchRead: "sample/batch/read",
       templateSetRows: "template/setRows",
       keydown: "key/down",
       keyup: "key/up",
     }),
     load() {
-      if (!this.workspaceActive) {
+      if (!this.workspaceSelected) {
         this.workspaceRead();
       } else {
         this.$sampleFileSchemaRequest = {};
         this.$sampleItemSchemaRequest = {};
-        this.sampleBatchRead({
-          workspaceId: this.workspaceActive.id,
-        });
       }
     },
   },
@@ -82,7 +78,8 @@ export default {
     "$route.query": function () {
       this.query = this.$route.query;
     },
-    workspaceActive: function () {
+    // loading
+    workspaceSelected: function () {
       this.load();
     },
     // sample

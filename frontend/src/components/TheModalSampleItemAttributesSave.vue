@@ -26,7 +26,7 @@
 <script>
 import BaseAttributesForm from "./BaseAttributesForm.vue";
 import { bindState } from "$lib/store";
-import { mapActions, mapMutations } from "vuex";
+import { mapActions, mapMutations, mapGetters } from "vuex";
 
 export default {
   name: "TheModalSampleItemAttributesSave",
@@ -66,14 +66,13 @@ export default {
       modalActive: "modal/sampleItemAttributesSaveActive",
       templateRows: "template/rows",
       $sampleItemListResponse: "sample/$itemListResponse",
-      batchSelected: "sample/batch/selection/row",
+      batchSelected: "sample/batch/selectedRow",
+    }),
+    ...mapGetters({
+      itemsSelected: "sample/item/selectedRows",
     }),
     availableTemplates() {
       return [this.defaultTemplate, ...this.templateRows];
-    },
-    itemSelected: function () {
-      let items = this.$store.state.sample.item.selection.rows;
-      return items.length == 1 ? items[0] : null;
     },
   },
   methods: {

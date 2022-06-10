@@ -1,18 +1,8 @@
 <template>
-  <base-browser
-    name="Targets"
-    :levels="targetLevels"
-    :menu="[
-      {
-        label: 'Import targets',
-        onClick: () =>
-          activateModal({
-            modal: 'targetImport',
-          }),
-      },
-    ]"
-  >
-  </base-browser>
+  <section>
+    <base-browser name="Targets" :levels="targetLevels" :menu="menu">
+    </base-browser>
+  </section>
 </template>
 
 <script>
@@ -34,11 +24,21 @@ export default {
   computed: {
     ...bindState({
       controlPressed: "key/control",
-      sampleItemFocused: "sample/item/focus/row",
+      modalTargetCollectionOpProps: "modal/targetCollectionOpProps",
     }),
     ...mapGetters({
       matchesExist: "match/exists",
+      sampleItemFocused: "sample/item/focusedRow",
+      targetCollectionsSelected: "target/collection/selectedRows",
+      uniqueTargetCollection: "target/collection/uniqueRow",
     }),
+    collectionStats: function () {
+      return this.$store.getters["target/stat/rows"]({
+        level: "collection",
+        selected: false,
+        itemFocused: true,
+      });
+    },
     compoundStats: function () {
       return this.$store.getters["target/stat/rows"]({
         level: "compound",
@@ -64,11 +64,33 @@ export default {
       let hidden = !(this.matchesExist && this.sampleItemFocused);
       return [
         {
-          name: "Compound",
-          slug: "compound",
+          name: "Collection",
+          slug: "targetCollection",
           cols: [
-            { field: "name", label: "Name", width: "40%" },
-            { field: "formula", label: "Compound", width: "40%" },
+            { field: "name", label: "Collection", width: "90%" },
+            {
+              field: "matchScore",
+              label: "Score",
+              width: "10%",
+              hidden,
+              tooltip: (row) => {
+                return {
+                  "Peak intensity": this.formatter.format(row.samplePeakHeight),
+                };
+              },
+            },
+          ],
+          rows: this.collectionStats,
+          defaultSort: ["matchScore", "desc"],
+          detailsIcon: "default",
+          rowClick: this.targetCollectionToggle,
+        },
+        {
+          name: "Compound",
+          slug: "targetCompound",
+          cols: [
+            { field: "formula", label: "Compound", width: "45%" },
+            { field: "name", label: "", width: "45%" },
             {
               field: "matchScore",
               label: "Score",
@@ -84,15 +106,14 @@ export default {
           rows: this.compoundStats,
           defaultSort: ["matchScore", "desc"],
           detailsIcon: "default",
-          rowClick: this.targetCompoundClick,
-          rowStatus: this.$store.getters["target/status"],
+          rowClick: this.targetCompoundToggle,
         },
         {
           name: "Ion",
-          slug: "ion",
+          slug: "targetIon",
           cols: [
-            { field: "ionMech", label: "Mechanism", width: "45%" },
             { field: "formula", label: "Ion", width: "45%" },
+            { field: "ionMech", label: "", width: "45%" },
             {
               field: "matchScore",
               label: "Score",
@@ -108,15 +129,14 @@ export default {
           rows: this.ionStats,
           defaultSort: ["matchScore", "desc"],
           detailsIcon: "default",
-          rowClick: this.targetIonClick,
-          rowStatus: this.$store.getters["target/status"],
+          rowClick: this.targetIonToggle,
         },
         {
           name: "Isotope",
-          slug: "isotope",
+          slug: "targetIsotope",
           cols: [
-            { field: "mz", label: "m/z", width: "45%" },
-            { field: "relAbu", label: "Rel. Abu.", width: "45%" },
+            { field: "mz", label: "Isotope", width: "45%" },
+            { field: "relativeAbundance", label: "", width: "45%" },
             {
               field: "matchScore",
               label: "Score",
@@ -125,7 +145,9 @@ export default {
               tooltip: (row) => {
                 return {
                   "Peak intensity": this.formatter.format(row.peakHeight),
-                  "Rel. abundance": this.formatter.format(row.relAbu),
+                  "Rel. abundance": this.formatter.format(
+                    row.relativeAbundance
+                  ),
                 };
               },
             },
@@ -133,10 +155,33 @@ export default {
           rows: this.isotopeStats,
           defaultSort: ["mz", "asc"],
           detailsIcon: null,
-          rowClick: this.targetIsotopeClick,
-          rowStatus: this.$store.getters["target/status"],
+          rowClick: this.targetIsotopeToggle,
         },
       ];
+    },
+    menu() {
+      // target collection
+      let createCollectionButton = {
+        label: "Create target collection",
+        onClick: this.collectionCreate,
+      };
+      let updateCollectionButton = {
+        label: "Update target collection",
+        onClick: this.collectionUpdate,
+      };
+      let deleteCollectionButton = {
+        label: "Delete target collection",
+        onClick: this.collectionDelete,
+      };
+      if (this.uniqueTargetCollection) {
+        return [
+          createCollectionButton,
+          updateCollectionButton,
+          deleteCollectionButton,
+        ];
+      } else {
+        return [createCollectionButton];
+      }
     },
   },
   created: function () {
@@ -150,40 +195,36 @@ export default {
       activateModal: "modal/activate",
     }),
     ...mapActions({
-      toggleTargetCompoundSelection: "target/compoundSelectionToggle",
-      toggleTargetIonSelection: "target/ionSelectionToggle",
-      toggleTargetIsotopeSelection: "target/isotopeSelectionToggle",
-      toggleTargetFocus: "target/focus/toggle",
+      targetCollectionToggle: "target/collection/toggle",
+      targetCompoundToggle: "target/compound/toggle",
+      targetIonToggle: "target/ion/toggle",
+      targetIsotopeToggle: "target/isotope/toggle",
     }),
-    targetCompoundClick(row) {
-      if (!this.controlPressed) {
-        this.toggleTargetCompoundSelection(row);
-      } else {
-        this.toggleTargetFocus({
-          level: "compound",
-          target: row,
-        });
-      }
+    collectionCreate() {
+      this.modalTargetCollectionOpProps = {
+        action: "create",
+      };
+      this.activateModal({
+        modal: "targetCollectionOp",
+      });
     },
-    targetIonClick(row) {
-      if (!this.controlPressed) {
-        this.toggleTargetIonSelection(row);
-      } else {
-        this.toggleTargetFocus({
-          level: "ion",
-          target: row,
-        });
-      }
+    collectionUpdate() {
+      this.modalTargetCollectionOpProps = {
+        action: "update",
+        collection: this.targetCollectionsSelected[0],
+      };
+      this.activateModal({
+        modal: "targetCollectionOp",
+      });
     },
-    targetIsotopeClick(row) {
-      if (!this.controlPressed) {
-        this.toggleTargetIsotopeSelection(row);
-      } else {
-        this.toggleTargetFocus({
-          level: "isotope",
-          target: row,
-        });
-      }
+    collectionDelete() {
+      this.modalTargetCollectionOpProps = {
+        action: "delete",
+        collection: this.targetCollectionsSelected[0],
+      };
+      this.activateModal({
+        modal: "targetCollectionOp",
+      });
     },
   },
 };

@@ -8,6 +8,81 @@ export default {
             ({ level = 'compound', selected = true, itemFocused = false }) => {
                 return getters[level + 's']({ selected, itemFocused });
             },
+        collections: (state, getters, rootState, rootGetters) =>
+            ({ selected = true, itemFocused = false }) => {
+                let matchesExist = rootState.match.collectionRows.length > 0;
+                if (matchesExist) {
+                    let matches = rootGetters['match/rating/rows']({
+                        level: 'collection', selected
+                    });
+                    if (itemFocused) {
+                        let focusedSample = rootGetters['sample/item/focusedRow'];
+                        if (!focusedSample) return rootState.target.collection.rows;
+                        matches = matches.filter(
+                            (m) => m.sampleItemId === focusedSample.id
+                        );
+                    }
+                    let collections = selected
+                        ? rootGetters['target/collection/selectedRows']
+                        : rootState.target.collection.rows;
+                    let total = table.query(
+                        `
+                            select
+                                m.targetCollectionId as id
+                                ,max(m.matchScore) as matchScore
+                                ,max(m.samplePeakHeight) as peakHeight
+                                ,count(distinct m.sampleItemId) as matchCollectionTotalCount
+                            from matches m
+                            group by m.targetCollectionId
+                        `,
+                        { matches }
+                    );
+                    let probable = table.query(
+                        `
+                            select
+                                m.targetCollectionId as id
+                                ,count(distinct m.sampleItemId) as matchCollectionProbableCount
+                            from matches m
+                            where rating = 'probable'
+                            group by m.targetCollectionId
+                        `,
+                        { matches }
+                    );
+                    let possible = table.query(
+                        `
+                            select
+                                m.targetCollectionId as id
+                                ,count(distinct m.sampleItemId) as matchCollectionPossibleCount
+                            from matches m
+                            where rating = 'possible'
+                            group by m.targetCollectionId
+                        `,
+                        { matches }
+                    );
+                    let result = table.query(
+                        `
+                        select
+                            com.*    
+                            ,coalesce(tot.matchScore, 0) as matchScore
+                            ,coalesce(tot.peakHeight, 0) as peakHeight
+                            ,coalesce(tot.matchCollectionTotalCount, 0) as matchCollectionTotalCount
+                            ,coalesce(prob.matchCollectionProbableCount, 0) as matchCollectionProbableCount
+                            ,coalesce(poss.matchCollectionPossibleCount,0) as matchCollectionPossibleCount
+                        from collections com
+                        left join total tot
+                            on com.id = tot.id
+                        left join probable prob
+                            on com.id = prob.id
+                        left join possible poss
+                            on com.id = poss.id
+                    `, { collections, total, probable, possible }
+                    );
+                    if (rootState.dev.logGetters) console.table(result[0]);
+                    return result;
+                } else {
+                    return rootState.target.collection.rows;
+                }
+            },
         compounds: (state, getters, rootState, rootGetters) =>
             ({ selected = true, itemFocused = false }) => {
                 let matchesExist = rootState.match.compoundRows.length > 0;
@@ -16,12 +91,15 @@ export default {
                         level: 'compound', selected
                     });
                     if (itemFocused) {
-                        if (!rootState.sample.item.focus.row) return rootState.target.compoundRows; 
+                        let focusedSample = rootGetters['sample/item/focusedRow'];
+                        if (!focusedSample) return rootGetters['target/compound/rows'];
                         matches = matches.filter(
-                            (m) => m.sampleItemId === rootState.sample.item.focus.row.id
-                            );
+                            (m) => m.sampleItemId === focusedSample.id
+                        );
                     }
-                    let compounds = selected ? rootGetters['target/compoundsSelected'] : rootState.target.compoundRows;
+                    let compounds = selected
+                        ? rootGetters['target/compound/selectedRows']
+                        : rootState.target.compound.rows;
                     let total = table.query(
                         `
                             select
@@ -74,10 +152,10 @@ export default {
                             on com.id = poss.id
                     `, { compounds, total, probable, possible }
                     );
-                    if (rootState.dev.logGetters) console.table(result);
+                    if (rootState.dev.logGetters) console.table(result[0]);
                     return result;
                 } else {
-                    return rootState.target.compoundRows;
+                    return rootState.target.compound.rows;
                 }
             },
         ions: (state, getters, rootState, rootGetters) =>
@@ -88,13 +166,18 @@ export default {
                         level: 'ion', selected
                     });
                     if (itemFocused) {
-                        if (!rootState.sample.item.focus.row) return rootState.target.ionRows; 
+                        let focusedSample = rootGetters['sample/item/focusedRow'];
+                        if (!focusedSample) return rootGetters['target/ion/rows'];
                         matches = matches.filter(
-                            (m) => m.sampleItemId === rootState.sample.item.focus.row.id
-                            );
+                            (m) => m.sampleItemId === focusedSample.id
+                        );
                     }
-                    let ions = selected ? rootGetters['target/ionsSelected'] : rootState.target.ionRows;
-                    let compounds = selected ? rootGetters['target/compoundsSelected'] : rootState.target.compoundRows;
+                    let ions = selected
+                        ? rootGetters['target/ion/selectedRows']
+                        : rootState.target.ion.rows;
+                    let compounds = selected
+                        ? rootGetters['target/compound/selectedRows']
+                        : rootState.target.compound.rows;
                     let total = table.query(
                         `
                             select
@@ -152,10 +235,10 @@ export default {
                             on ion.id = poss.id
                     `, { ions, compounds, total, probable, possible }
                     );
-                    if (rootState.dev.logGetters) console.table(result);
+                    if (rootState.dev.logGetters) console.table(result[0]);
                     return result;
                 } else {
-                    return rootState.target.ionRows;
+                    return rootState.target.ion.rows;
                 }
             },
         isotopes: (state, getters, rootState, rootGetters) =>
@@ -166,14 +249,21 @@ export default {
                         level: 'isotope', selected
                     });
                     if (itemFocused) {
-                        if (!rootState.sample.item.focus.row) return rootState.target.isotopeRows; 
+                        let focusedSample = rootGetters['sample/item/focusedRow'];
+                        if (!focusedSample) return rootGetters['target/isotope/rows'];
                         matches = matches.filter(
-                            (m) => m.sampleItemId === rootState.sample.item.focus.row.id
-                            );
+                            (m) => m.sampleItemId === focusedSample.id
+                        );
                     }
-                    let isotopes = selected ? rootGetters['target/isotopesSelected'] : rootState.target.isotopeRows;
-                    let ions = selected ? rootGetters['target/ionsSelected'] : rootState.target.ionRows;
-                    let compounds = selected ? rootGetters['target/compoundsSelected'] : rootState.target.compoundRows;
+                    let isotopes = selected
+                        ? rootGetters['target/isotope/selectedRows']
+                        : rootState.target.isotope.rows;
+                    let ions = selected
+                        ? rootGetters['target/ion/selectedRows']
+                        : rootState.target.ion.rows;
+                    let compounds = selected
+                        ? rootGetters['target/compound/selectedRows']
+                        : rootState.target.compound.rows;
                     let total = table.query(
                         `
                             select
@@ -234,10 +324,10 @@ export default {
                             on iso.id = poss.id
                     `, { isotopes, ions, compounds, total, probable, possible }
                     );
-                    if (rootState.dev.logGetters) console.table(result);
+                    if (rootState.dev.logGetters) console.table(result[0]);
                     return result;
                 } else {
-                    return rootState.target.isotopeRows;
+                    return rootState.target.isotope.rows;
                 }
             },
     }

@@ -2,10 +2,10 @@ import json
 import os
 
 from karsalib.util import parse_datetime_from_item_filename
-from karsalib.db import SampleManagerDB
+from karsalib.db import DbInstance
 
 db_path = 'test.db' # Path to SampleManager database
-db = SampleManagerDB(db_path)
+db = DbInstance(db_path)
 
 path = '.'
 # instrument_dirs = next( os.walk(path) )[1]

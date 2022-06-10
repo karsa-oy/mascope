@@ -1,7 +1,6 @@
 import asyncio
 import importlib
 import inspect
-import os
 import time
 
 from queue import Empty
@@ -18,8 +17,8 @@ from .logging import (
                 )
 from .util import parse_cmd_args
 
-
-SERVICE_RESPONSE_TIMEOUT = 10   # response timeout for a sync call to karsa service
+# response timeout for a sync call to karsa service
+SERVICE_RESPONSE_TIMEOUT = 10
 
 
 def run_streamer_service(StreamerClient,
@@ -39,7 +38,8 @@ def run_streamer_service(StreamerClient,
         streamer_type = args.get('streamer_type')
         n_jobs = int(args.get('n_jobs', 1))
         transit = args.get('transit', False)
-        # existing target_data_pool_path switches from mode.stream to mode.store
+        # existing target_data_pool_path switches
+        # from mode.stream to mode.store
         target_data_pool_path = args.get('target_data_pool_path')
         streamer_opts = {'type': streamer_type,
                          'n_jobs': n_jobs,
@@ -48,8 +48,10 @@ def run_streamer_service(StreamerClient,
                          }
         data_pool_path = args.get('data_pool_path')
         data_pool_mask = args.get('data_pool_mask')
-        data_pool_opts = None if not data_pool_path else \
-            {'path': data_pool_path, 'mask': data_pool_mask}
+        data_pool_opts = (
+            None if not data_pool_path
+            else {'path': data_pool_path, 'mask': data_pool_mask}
+        )
         try:
             client = StreamerClient(streamer_opts,
                                     data_pool_opts,
@@ -91,11 +93,18 @@ class BaseClientNamespace(AsyncClientNamespace):
 
     async def declare_endpoints(self):
         # endpoints - API providing Router-managed client functionality
-        not_endpoints = ['on_connect', 'on_disconnect', 'on_client_notification_callback', ]
-        endpoints = [e[3:] for e in dir(self) if e.startswith('on_') and e not in not_endpoints]
+        not_endpoints = [
+            'on_connect',
+            'on_disconnect',
+            'on_client_notification_callback'
+        ]
+        endpoints = [
+            e[3:] for e in dir(self)
+            if e.startswith('on_') and e not in not_endpoints
+        ]
         data = dict(
-            app_name = self.app_name,
-            endpoints = endpoints,
+            app_name=self.app_name,
+            endpoints=endpoints,
         )
         await self.emit('declare_endpoints', data)
         await self.on_service_state({})
@@ -103,15 +112,15 @@ class BaseClientNamespace(AsyncClientNamespace):
 
     async def enter_room(self, room):
         data = dict(
-            app_name = self.app_name,
-            room = room,
+            app_name=self.app_name,
+            room=room,
         )
         await self.emit('enter_room', data)
 
     async def leave_room(self, room):
         data = dict(
-            app_name = self.app_name,
-            room = room,
+            app_name=self.app_name,
+            room=room,
         )
         await self.emit('leave_room', data)
 
@@ -173,7 +182,7 @@ class BaseClientNamespace(AsyncClientNamespace):
         name:  a property/API name;
         value: property/API value/argument;
         other key arguments are optional and forwarded along as such,
-        e.g. no_logging/no_data_logging=True - skip logging/data_logging; default: False,
+        e.g. no_logging/no_data_logging=True - skip logging/data_logging
         """
         no_logging = kwarg.get('no_logging', NO_LOGGING_DEFAULT)
         no_data_logging = kwarg.get('no_data_logging', NO_DATA_LOGGING_DEFAULT)
@@ -185,26 +194,91 @@ class BaseClientNamespace(AsyncClientNamespace):
             self.log(f"{name}: {value} > {kwarg.get('room', name)}")
 
         if name in self.service_state:
-            self.service_state[name] = {'value': value, 'room': kwarg.get('room')}
+            self.service_state[name] = {
+                'value': value,
+                'room': kwarg.get('room')
+            }
         timeout = kwarg.get('timeout')
         if timeout:     # sync call returns result from handler
-            result = await self.call('client_notification',
-                            {'name': name, 'value': value, **kwarg},
-                            )
+            result = await self.call(
+                'client_notification',
+                {'name': name, 'value': value, **kwarg},
+            )
             return result
         else:           # async call
-            await self.emit('client_notification',
-                            {'name': name, 'value': value, **kwarg},
-                            )
+            await self.emit(
+                'client_notification',
+                {'name': name, 'value': value, **kwarg},
+            )
+
+    async def notify(self, name, value, **kwarg):
+        """
+        client_notification is sent to API provider via Router,
+        name:  a property/API name;
+        value: property/API value/argument;
+        other key arguments are optional and forwarded along as such,
+        e.g. no_logging/no_data_logging=True - skip logging/data_logging
+        """
+        no_logging = kwarg.get('no_logging', NO_LOGGING_DEFAULT)
+        no_data_logging = kwarg.get('no_data_logging', NO_DATA_LOGGING_DEFAULT)
+        if no_logging:
+            pass
+        elif no_data_logging:
+            self.log(f"{name}: ... > {kwarg.get('room', name)}")
+        else:
+            self.log(f"{name}: {value} > {kwarg.get('room', name)}")
+
+        if name in self.service_state:
+            self.service_state[name] = {
+                'value': value,
+                'room': kwarg.get('room')
+            }
+        await self.emit(
+            'client_notification',
+            {'name': name, 'value': value, **kwarg},
+        )
+
+    async def execute(self, name, value, **kwarg):
+        """
+        client_notification is sent to API provider via Router,
+        name:  a property/API name;
+        value: property/API value/argument;
+        other key arguments are optional and forwarded along as such,
+        e.g. no_logging/no_data_logging=True - skip logging/data_logging
+        """
+        no_logging = kwarg.get('no_logging', NO_LOGGING_DEFAULT)
+        no_data_logging = kwarg.get('no_data_logging', NO_DATA_LOGGING_DEFAULT)
+        if no_logging:
+            pass
+        elif no_data_logging:
+            self.log(f"{name}: ... > {kwarg.get('room', name)}")
+        else:
+            self.log(f"{name}: {value} > {kwarg.get('room', name)}")
+
+        if name in self.service_state:
+            self.service_state[name] = {
+                'value': value,
+                'room': kwarg.get('room')
+            }
+        result = await self.call(
+            'client_notification',
+            {'name': name, 'value': value, **kwarg},
+        )
+        return result
 
     @property
     def room_sid(self):
         return self.parent.sio.get_sid(self.namespace)
 
+
 class BaseServiceClient:
     def log(self, *arg, **kwarg):
         if not NO_LOGGING_DEFAULT:
-            print(f"[{self.__class__.__name__}.{inspect.stack()[1].function}]", *arg, **kwarg)
+            print(
+                f"[{self.__class__.__name__}.{inspect.stack()[1].function}]",
+                *arg,
+                **kwarg
+            )
 
     def __init__(self, url, port, client_namespace_data):
         self.addr = f'{url}:{port}'
@@ -215,11 +289,11 @@ class BaseServiceClient:
         if not ns_name.startswith('/'):
             ns_name = '/' + ns_name
         self.log('Register handler for namespace', ns_name)
-        self.sio.register_namespace( ns_class(ns_name) )
+        self.sio.register_namespace(ns_class(ns_name))
         self.ns_handler = self.sio.namespace_handlers.get(ns_name)
         # root ns handler is needed to communicate with router at re-connect
         if '/' not in self.sio.namespace_handlers:
-            self.sio.register_namespace( BaseClientNamespace('/') )
+            self.sio.register_namespace( BaseClientNamespace('/'))
         for ns_handler in self.sio.namespace_handlers.values():
             ns_handler.parent = self
         # for shutdown sync with threads
@@ -270,6 +344,7 @@ class BaseServiceClient:
         await self.connect()
         await self.init_service()
         await self.service_main()
+
 
 class BridgeServiceClient(BaseServiceClient):
     def __init__(self, url, port, public_namespace_data, private_namespace_data):

@@ -4,7 +4,10 @@ export default {
         // active modal indicator
         active: null,
         // modal-specific active sync helpers and data
-        targetImportActive: false,
+        targetCollectionOpActive: false,
+        targetCollectionOpProps: {
+
+        },
         workspaceSaveActive: false,
         workspaceSaveProps: {
             // action ('create', 'edit' or 'delete')

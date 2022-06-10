@@ -13,8 +13,7 @@ setuptools.setup(
     description="Karsa Services",
     long_description=long_description,
     long_description_content_type="text/markdown",
-#    packages=setuptools.find_packages(),
-    packages=['services', ],
+    packages=['services'],
     include_package_data=True,
     python_requires=">=3.6",
     classifiers=[
@@ -30,12 +29,12 @@ setuptools.setup(
     ],
     entry_points={
         'console_scripts': [
-            'karsa-dataviz-service = services.DataVizService:run',
-            'karsa-file-streamer = services.FileStreamer:run',
-            'karsa-fileio-service = services.FileIoService:run',
-            'karsa-sample-service = services.SampleManagerService:run',
-            'karsa-signal-service = services.SignalProcessorService:run',
-            'karsa-target-service = services.TargetService:run'
+            'karsa-dataviz-service = services.visualization:run',
+            'karsa-file-streamer = services.file_streaming:run',
+            'karsa-fileio-service = services.file_io:run',
+            'karsa-sample-service = services.sample:run',
+            'karsa-signal-service = services.signal:run',
+            'karsa-target-service = services.target:run'
         ],
     }
 )

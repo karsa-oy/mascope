@@ -12,10 +12,14 @@ export default {
             throw Error("Path must be provided");
         }
         let keys = path.split(sep);
-        if (keys.length == 1) {
-            return store[keys[0]];
+        try {
+            let result = keys.length == 1
+                ? store[keys[0]]
+                : this.get(store[keys[0]], keys.slice(1).join(sep), sep);
+            return result;
+        } catch (error) {
+            throw Error(`Failed to get path ${path}`, error)
         }
-        return this.get(store[keys[0]], keys.slice(1).join(sep), sep);
     },
     /**  
      * set a nested store variable with a path
@@ -27,11 +31,15 @@ export default {
             throw Error("Path must be provided");
         }
         let keys = path.split(sep);
-        if (keys.length == 1) {
-            store[keys[0]] = val;
-        } else {
-            store = store[keys[0]]
-            return this.set(store, keys.slice(1).join(sep), val, sep);
+        try {
+            if (keys.length == 1) {
+                store[keys[0]] = val;
+            } else {
+                store = store[keys[0]]
+                return this.set(store, keys.slice(1).join(sep), val, sep);
+            }
+        } catch (error) {
+            throw Error(`Failed to set path ${path}`, error)
         }
     },
     /**
@@ -60,6 +68,39 @@ export default {
             }
         }
         return paths;
+    },
+    map({ from, sources, to, target, triggerIf = true }) {
+        if (from && triggerIf) {
+            let toNamespae = to;
+            let mappings = from
+                .map(
+                    fromNamespace => sources.map(
+                        source => ({
+                            [fromNamespace + "/" + source]: toNamespae + "/" + target
+                        })
+                    )
+                )
+                .flat()
+                .reduce((i, j) => ({ ...i, ...j }), {});
+            return mappings;
+        } else {
+            return null;
+        }
+    },
+    zipMaps(args) {
+        let maps = args.map(arg => this.map(arg));
+        let result = {}
+        for (let map of maps) {
+            if (map) {
+                for (let [source, target] of Object.entries(map)) {
+                    if (!(source in result)) {
+                        result[source] = []
+                    }
+                    result[source].push(target);
+                }
+            }
+        }
+        return result;
     },
     // formatting
     toSnakeCase(path) {

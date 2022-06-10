@@ -179,7 +179,7 @@ export class Api {
                 .then((result) => {
                     // a handler can be called to process the final result
                     handler(result);
-                    resolve();
+                    resolve(result);
                 })
                 .catch((error) => {
                     // errors handled here

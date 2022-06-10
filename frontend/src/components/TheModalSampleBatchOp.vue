@@ -7,7 +7,7 @@
       :can-cancel="true"
       aria-role="dialog"
       aria-modal
-      @after-enter="loadBatch"
+      @after-enter="initData"
       :type="actionIs('delete') ? 'is-danger' : 'is-primary'"
     >
       <div class="modal-card" style="width: 500px">
@@ -85,7 +85,7 @@
 <script>
 import { bindState } from "$lib/store";
 
-import { mapMutations, mapActions } from "vuex";
+import { mapMutations, mapActions, mapGetters } from "vuex";
 
 export default {
   name: "",
@@ -101,27 +101,29 @@ export default {
       modalActive: "modal/sampleBatchOpActive",
       modalProps: "modal/sampleBatchOpProps",
       batches: "sample/batch/rows",
-      workspaceActive: "workspace/active",
+    }),
+    ...mapGetters({
+      workspaceSelected: "workspace/selectedRow",
     }),
     action() {
       return this.modalProps.action;
     },
     oldBatch() {
-      return this.modalProps.batch || null;
+      return this.modalProps.batch ?? null;
     },
     newBatch() {
       if (this.actionIs("create")) {
         return {
           name: this.batchName,
           description: this.batchDesc,
-          workspaceId: this.workspaceActive.id,
+          workspaceId: this.workspaceSelected.id,
         };
       } else if (this.actionIs("update")) {
         return {
           id: this.oldBatch.id,
           name: this.batchName,
           description: this.batchDesc,
-          workspaceId: this.workspaceActive.id,
+          workspaceId: this.workspaceSelected.id,
         };
       } else {
         return null;
@@ -155,7 +157,7 @@ export default {
     actionIs(...actions) {
       return actions.includes(this.action);
     },
-    loadBatch() {
+    initData() {
       if (this.oldBatch) {
         this.batchName = this.oldBatch.name;
         this.batchDesc = this.oldBatch.description;
