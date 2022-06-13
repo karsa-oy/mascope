@@ -188,16 +188,17 @@ export default {
         let parentIdField = currentLevel.slug + "Id";
         let parentIds = currentLevel.rows.map((row) => row.id);
         let childLevel = nextLevels.shift();
-        childLevel.rows = childLevel.rows.filter((childRow) =>
-          parentIds.includes(childRow[parentIdField])
-        );
-        if (childLevel.rows.length == 0) {
+        if (childLevel.rows && childLevel.rows.length > 0) {
+          childLevel.rows = childLevel.rows.filter((childRow) =>
+            parentIds.includes(childRow[parentIdField])
+          );
+          // push results
+          childLevels.push(childLevel);
+          // update iteration parameters
+          currentLevel = childLevel;
+        } else {
           break;
         }
-        // push results
-        childLevels.push(childLevel);
-        // update iteration parameters
-        currentLevel = childLevel;
       }
       return childLevels;
     },
