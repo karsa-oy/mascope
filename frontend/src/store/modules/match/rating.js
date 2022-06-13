@@ -28,6 +28,8 @@ export default {
                 let compounds = rootState.target.compound.rows;
                 let ions = rootState.target.ion.rows;
                 switch (level) {
+                    case 'collection':
+                        return ratings;
                     case 'compound':
                         return ratings;
                     case 'ion':

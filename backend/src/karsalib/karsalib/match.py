@@ -77,7 +77,7 @@ def calculate_match_stats(
         mz_tolerance
         ):
 
-    isotope_match_df.loc[:, 'relPeakHeight'] = np.nan 
+    isotope_match_df.loc[:, 'relPeakHeight'] = np.nan
     isotope_match_df.loc[:, 'isoAbuError'] = np.nan
     isotope_match_df.loc[:, 'mzError'] = np.nan
     isotope_match_df.loc[:, 'matchScore'] = np.nan
@@ -143,15 +143,18 @@ def calculate_match_stats(
     # ion level score is the sum of isotope relative abundances
     ion_match_df = (
         isotope_match_df
-        .groupby(['targetIonId', 'targetCompoundId', 'targetCollectionId'])
+        .groupby([
+            'targetIonId',
+            'targetCompoundId',
+            'targetCollectionId',
+            'sampleItemId'
+        ])
         .agg(
             matchScore=('relativeAbundance', 'sum'),
             samplePeakHeight=('samplePeakHeight', 'sum')
         )
         .reset_index()
     )
-    # append sample id
-    ion_match_df.loc[:, 'sampleItemId'] = sample_item['id']
 
     # save ion level peak sums 
     ion_match_df.loc[:, 'samplePeakHeight'] = ion_level_peak_sums
@@ -161,30 +164,33 @@ def calculate_match_stats(
     # compound level aggregation
     compound_match_df = (
         ion_match_df
-        .groupby(['targetCompoundId', 'targetCollectionId'])
+        .groupby([
+            'targetCompoundId',
+            'targetCollectionId',
+            'sampleItemId'
+        ])
         .agg(
             matchScore=('matchScore', 'max'),
             samplePeakHeight=('samplePeakHeight', 'sum')
         )
         .reset_index()
     )
-    # append sample id
-    compound_match_df.loc[:, 'sampleItemId'] = sample_item['id']
 
     # STEP 5 - Calculate collection level stats
 
-    # compound level aggregation
+    # collection level aggregation
     collection_match_df = (
         compound_match_df
-        .groupby(['targetCollectionId'])
+        .groupby([
+            'targetCollectionId',
+            'sampleItemId'
+        ])
         .agg(
             matchScore=('matchScore', 'max'),
             samplePeakHeight=('samplePeakHeight', 'sum')
         )
         .reset_index()
     )
-    # append sample id
-    compound_match_df.loc[:, 'sampleItemId'] = sample_item['id']
 
     # STEP 6 - Format output
 
