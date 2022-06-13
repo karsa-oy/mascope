@@ -1,11 +1,8 @@
 <template>
-  <b-menu-item
-    tag="router-link"
-    :to="{ path, query }"
-    :icon="icon"
-    @click="onClick"
-  >
-  </b-menu-item>
+  <div v-on:click="onClick">
+    <b-menu-item tag="router-link" :to="{ path, query }" :icon="icon">
+    </b-menu-item>
+  </div>
 </template>
 
 <script>

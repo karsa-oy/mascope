@@ -45,8 +45,8 @@
                 <b>
                   {{
                     batchSelected
-                    ? "Items to add to batch: " + batchSelected.name
-                    : "Please select a batch"
+                      ? "Items to add to batch: " + batchSelected.name
+                      : "Please select a batch"
                   }}
                 </b>
               </p>
@@ -97,7 +97,7 @@ export default {
       sampleItemRows: [],
       sampleFileMinDateTime: null,
       sampleFileMaxDateTime: null,
-      sampleFileTableDataKey: 0,      
+      sampleFileTableDataKey: 0,
     };
   },
   computed: {
@@ -164,7 +164,7 @@ export default {
         onConfirm: () => {
           let rows = this.sampleItemRows.map((row) => ({
             ...row,
-            batchId: this.batchSelected.id,
+            sampleBatchId: this.batchSelected.id,
           }));
           this.sampleItemCreate(rows);
         },
@@ -183,11 +183,12 @@ export default {
       let d2 =
         this.sampleFileMaxDateTime -
         this.sampleFileMaxDateTime.getTimezoneOffset() * 60000;
-      this.listSampleFiles({filters: {
-        column: "datetime_utc",
-        min_value: new Date(d1).toISOString(),
-        max_value: new Date(d2).toISOString(),
-        }
+      this.listSampleFiles({
+        filters: {
+          column: "datetime_utc",
+          min_value: new Date(d1).toISOString(),
+          max_value: new Date(d2).toISOString(),
+        },
       });
     },
   },

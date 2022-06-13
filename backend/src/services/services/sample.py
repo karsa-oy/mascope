@@ -100,7 +100,10 @@ class SampleServiceNamespace(BaseClientNamespace):
             db.sample_batch_read(workspace_id=workspace_ids)
         )
         db.workspace_delete(id=workspace_ids)
-        self.on_sample_batch_delete_request(batch_ids)
+        await self.on_sample_batch_delete_request({
+            'value': batch_ids,
+            **get_client_notification_context(data),
+        })
         await self.notify(
             'workspace_event', {'type': 'delete', 'ids': workspace_ids},
             **{
@@ -169,9 +172,13 @@ class SampleServiceNamespace(BaseClientNamespace):
     async def on_sample_batch_delete_request(self, data):
         batch_ids = data['value']
         item_ids = get_ids(
-            db.sample_item_read(batchId=batch_ids)
+            db.sample_item_read(sample_batch_id=batch_ids)
         )
-        self.sample_item_delete_request(item_ids)
+        await self.on_sample_item_delete_request({
+            'value': item_ids,
+            **get_client_notification_context(data),
+
+        })
         db.sample_batch_delete(id=batch_ids)
         await self.notify(
             'sample_batch_event', {'type': 'delete', 'ids': batch_ids},
@@ -217,7 +224,6 @@ class SampleServiceNamespace(BaseClientNamespace):
         filters = map_to_snake_case(
             data.get('value', {})
         )
-        print(filters)
         items = db.sample_item_read(**filters)
         return {
             'type': 'success',

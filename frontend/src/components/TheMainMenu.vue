@@ -6,7 +6,7 @@
 <script>
 import BaseMenuBar from "./BaseMenuBar";
 
-import { mapGetters } from "vuex";
+import { mapGetters, mapActions } from "vuex";
 
 export default {
   name: "TheMainMenu",
@@ -69,11 +69,16 @@ export default {
           icon: "logout-variant",
           label: "Change workspace",
           path: "/",
-          newQuery: {},
+          onClick: this.workspaceDeselect,
           visible: true,
         },
       ].filter((b) => b.visible);
     },
+  },
+  methods: {
+    ...mapActions({
+      workspaceDeselect: "workspace/selectNone",
+    }),
   },
 };
 </script>
