@@ -73,7 +73,7 @@ export function createTableModule({
                 }
                 if (unload.length) {
                     state.rows = state.rows
-                        .filter(row => unload.includes(row.id));
+                        .filter(row => !unload.includes(row.id));
                 }
             },
             TOCK(state, { load, unload, change }) {
@@ -98,7 +98,7 @@ export function createTableModule({
                 }
                 if (unload.length) {
                     state.rows = state.rows
-                        .filter(row => unload.includes(row.id));
+                        .filter(row => !unload.includes(row.id));
                 }
             },
             ...mutations,
@@ -248,6 +248,10 @@ export function createTableModule({
                 }
                 // iterate state
                 dispatch('tick', { change });
+            },
+            selectNone({ getters, dispatch }) {
+                let selected = getters['selectedRows'];
+                selected.forEach(row => dispatch('toggle', row));
             },
             async syncToParent({ dispatch, getters, rootState }, { mutation, payload }) {
                 if (getters['missing']) {

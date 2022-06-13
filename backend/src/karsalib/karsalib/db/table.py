@@ -68,6 +68,7 @@ class DbTable:
         record_id = kwargs['id']
         if self.read(id=record_id):
             # TODO: It actually does REPLACE instead of UPDATE
+            self.delete(id=record_id)
             self.insert(**kwargs)
         else:
             raise ValueError(f"No record with id {record_id} found")
