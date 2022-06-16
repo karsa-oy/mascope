@@ -1,9 +1,11 @@
 import struct
-
 from enum import Enum
 
 from .client import AsyncTCPClient
 from .messages import Command
+
+import logging
+logger = logging.getLogger(__name__)
 
 
 class NodeId(Enum):
@@ -110,7 +112,6 @@ class NodeType(Enum):
     UNKNOWN = 255
 
 
-
 class BaseNode():
     def __init__(self, client: AsyncTCPClient, device):
         """Base class for a CAN node for connecting with a device
@@ -154,6 +155,9 @@ class BaseNode():
             )
 
     async def _set_data(self, index: int, subindex: int, data):
+
+        logger.debug(f'- set_data {index}, {subindex}, {data}')
+
         l = len(data)
         payload = bytearray(4+l)
         payload[0] = self._id
@@ -195,7 +199,7 @@ class BaseNode():
                                     )
 
     async def initialize(self, *args, **kwargs):
-        print("Initializing node %s" %self._device.description)
+        logger.info("Initializing node %s" %self._device.description)
         return await self._initialize(*args, **kwargs)
 
     async def reset(self):
@@ -525,7 +529,7 @@ class HvNode(BaseNode):
             )
 
     async def get_voltage_scale(self):
-        for channel in range(1, len(self._device.channels)+1):
+        for channel in range(1, 4):
             value_b = await self._get_data(0x2000, channel)
             value = struct.unpack('h', value_b)[0] # unsigned short
             self._device.channels[(0x7300, channel)].scaling_factor = (

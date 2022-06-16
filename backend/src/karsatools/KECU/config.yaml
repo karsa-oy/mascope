@@ -1,0 +1,67 @@
+KECU_TCP_HOST: '192.168.100.01'
+# KRS_APP_PORT: 65142
+# KRS_MEAS_PORT: 65143
+# KECU_UDP_HOST: '0.0.0.0'
+# KECU_UDP_PORT: 65146
+# INSTRUMENTS: 'kecu,mion,mion2,scenthound,calibrator,flushplate'
+# MION_SEQUENCE: one of those defined in MION_SEQUENCES section
+# MIN_MODE_DURATION: 20
+# RCP_RECONNECT_TIMEOUT: 12
+# LOG_LEVEL LOG_LEVEL: one of 'ERROR/WARN/INFO/DEBUG'
+MION_MODES:
+   Ambient:
+      MION1v5_DIO:
+         # X-ray 1
+         4: 0
+         # Ion filter
+         5: 0
+         # Xray 2
+         7: 0
+      MION2_SRC1_HV:
+         # Deflector
+         2: 0
+      MION2_SRC2_HV:
+         # Deflector
+         2: 0
+   IS2:
+      MION1v5_DIO:
+         # X-ray 1
+         4: 0
+         # Ion filter
+         5: 1
+         # Xray 2
+         7: 1
+      MION2_SRC1_HV:
+         # Deflector
+         2: 0
+      MION2_SRC2_HV:
+         # Deflector
+         2: 200
+   Zero:
+      MION1v5_DIO:
+         # X-ray 1
+         4: 0
+         # Ion filter
+         5: 1
+         # Xray 2
+         7: 0
+      MION2_SRC1_HV:
+         # Deflector
+         2: 0
+      MION2_SRC2_HV:
+         # Deflector
+         2: 0
+
+MION_SEQUENCE: 'long'
+MION_SEQUENCES:
+   long:
+      - Ambient, 60
+      - IS2, 60
+      - Ambient, 60
+      - IS2, 60
+      - Zero, 60
+   short:
+      - IS2, 30
+      - Ambient, 10
+      - IS2, 5
+      - Zero, 10
