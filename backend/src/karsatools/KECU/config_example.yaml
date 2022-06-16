@@ -1,6 +1,0 @@
-# KECU_TCP_HOST: '192.168.1.200'
-# KRS_APP_PORT: 65142
-# KRS_MEAS_PORT: 65143
-# KECU_UDP_HOST: '0.0.0.0'
-# KECU_UDP_PORT: 65146
-# INSTRUMENTS: 'kecu,mion,mion2,scenthound,calibrator,flushplate'

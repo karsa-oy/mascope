@@ -3,9 +3,12 @@ from .devices import DEVICES
 from .messages import Command
 from .nodes import NODES, NodeId, NodeType
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class KarsaClient(AsyncTCPClient):
-    def __init__(self, host, port):
+    def __init__(self, host, port, parent):
         """Wrapper for TCP client
 
         Implements some convenience methods and
@@ -18,7 +21,8 @@ class KarsaClient(AsyncTCPClient):
         port : int
             KECU TCP port
         """
-        super().__init__(host, port)
+        super().__init__(host, port, parent)
+        self.kecu = parent
         self._nodes = {}
         self._version = None
 
@@ -36,7 +40,7 @@ class KarsaClient(AsyncTCPClient):
             self._version = '{0}.{1}'.format(resp[0], resp[1])
         else:
             self._version = "unknown"
-            print("Failed to get FW version")
+            logger.error("Failed to get FW version")
 
     async def get_node_list(self):
         """Update list of nodes present
@@ -52,6 +56,10 @@ class KarsaClient(AsyncTCPClient):
             device = DEVICES[node_id]
             node = NODES[node_type](self, device)
             self._nodes.update({node_id: node})
+
+    async def init_nodes(self):
+        for node in self._nodes.values():
+            await node.initialize()
 
     async def on_NTF_NODE_INSERTED(self, node_id, data):
         """Handler for NTF_NODE_INSERTED

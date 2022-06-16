@@ -4,19 +4,20 @@ from .nodes import NodeId
 
 
 class KarsaMeasClient(AsyncTCPClient):
-    def __init__(self, host, port):
+    def __init__(self, host, port, parent):
         """TCP measurement client
 
         Currently no measurement data is transmitted via TCP.
         """
-        super().__init__(host, port)
+        super().__init__(host, port, parent)
 
     async def get_data(self) -> bytes:
-        # Read start header
-        header = await self._reader.readexactly(3)
-        stx, type_, length = header
-        # Read rest of the msg
-        payload_etx = await self._reader.readexactly(length + 1)
+        async with self._lock:
+            # Read start header
+            header = await self._reader.readexactly(3)
+            stx, type_, length = header
+            # Read rest of the msg
+            payload_etx = await self._reader.readexactly(length + 1)
         payload = payload_etx[:-1]
         etx = payload_etx[-1]
         nbytes = len(header) + len(payload_etx)
