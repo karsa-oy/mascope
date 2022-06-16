@@ -121,6 +121,8 @@ export default {
     fromSpreadsheet(clipboardText, fields) {
         // Split full text to rows
         let clipboardLines = clipboardText.split(String.fromCharCode(10));
+        // Remove last line if empty
+        if (!clipboardLines[clipboardLines.length - 1].length) clipboardLines.pop();
         let spreadsheet = []
         for (let clipboardLine of clipboardLines) {
             spreadsheet.push(
