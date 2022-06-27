@@ -263,6 +263,7 @@ export default {
   display: flex !important;
   flex-direction: column !important;
   min-height: 400px;
+  max-height: 50vh;
 }
 
 .base-browser-container-other {

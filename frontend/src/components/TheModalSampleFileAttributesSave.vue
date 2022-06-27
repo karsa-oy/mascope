@@ -93,6 +93,7 @@ export default {
       let row = {};
       newValue.forEach((field) => (row[field.label] = field.value || ""));
       this.sampleFileUpdate(row);
+      this.modalActive = false;
     },
     loadAttributes(filters) {
       this.getSampleFile({ filters });

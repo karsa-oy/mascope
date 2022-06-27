@@ -101,6 +101,10 @@ export function createTableModule({
                         .filter(row => !unload.includes(row.id));
                 }
             },
+            UNLOAD(state) {
+                if (loadWhen === 'always') return;
+                state.rows = [];
+            },
             ...mutations,
         },
         actions: {
@@ -125,6 +129,9 @@ export function createTableModule({
                 }
                 // propagate up
                 commit('TOCK', { load, unload, change });
+            },
+            async unload({ commit }) {
+                commit('UNLOAD');
             },
             // CRUD endpoints
             async create({ rootState }, rows) {
@@ -207,12 +214,16 @@ export function createTableModule({
                 let change;
                 switch (mode) {
                     case 'singleselect': {
-                        // all rows unselected
+                        // all rows except toggled unselected
                         change = state.rows
                             .map(row => {
                                 let status;
                                 if (row.id == toggledRowId) {
-                                    status = nextStatus
+                                    if (singleSelect) {
+                                        status = nextStatus;
+                                    } else {
+                                        status = 'fully-selected';
+                                    }
                                 } else {
                                     status = 'not-selected';
                                 }
@@ -249,9 +260,10 @@ export function createTableModule({
                 // iterate state
                 dispatch('tick', { change });
             },
-            selectNone({ getters, dispatch }) {
+            selectNone({ dispatch, getters }) {
                 let selected = getters['selectedRows'];
                 selected.forEach(row => dispatch('toggle', row));
+                dispatch('unload');
             },
             async syncToParent({ dispatch, getters, rootState }, { mutation, payload }) {
                 if (getters['missing']) {
@@ -537,6 +549,11 @@ export function createTableModule({
                     sources: ['TOCK'],
                     to: namespace,
                     target: 'syncToChild'
+                }, {
+                    from: parents,
+                    sources: ['UNLOAD'],
+                    to: namespace,
+                    target: 'unload'
                 }
             ]),
             ...subs

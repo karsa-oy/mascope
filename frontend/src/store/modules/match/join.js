@@ -77,7 +77,7 @@ export default {
                     select 
                         m.*
                         ,t.compoundId as targetCompoundId
-                        ,t.ionMech as targetIonMech
+                        ,t.mechanism as targetIonMech
                         ,t.formula as targetFormula
                         ,s.filename as sampleFilename
                         ,s.method as sampleMethod
@@ -106,7 +106,7 @@ export default {
                     select 
                         m.*
                         ,t.ionId as targetIonId
-                        ,t.relAbu as targetRelAbu
+                        ,t.relativeAbundance as targetRelAbu
                         ,t.mz as targetMz
                         ,s.filename as sampleFilename
                         ,s.method as sampleMethod

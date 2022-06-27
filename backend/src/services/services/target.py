@@ -67,13 +67,14 @@ class TargetServiceNamespace(BaseClientNamespace):
                     compound_id=created_compound_id
                 )
             # add collection to sample batches
-            for sample_batch_id in target_collection['sample_batches']:
+            for sample_batch_id in target_collection.get('sample_batches', []):
                 db.target_collection_add_to_sample_batch(
                     target_collection_id=target_collection['id'],
                     sample_batch_id=sample_batch_id,
                 )
 
         target_collection_ids = get_ids(target_collections)
+
         await self.notify(
             'target_collection_event', {
                 'type': 'create',
@@ -84,6 +85,7 @@ class TargetServiceNamespace(BaseClientNamespace):
                 'room': 'target/collection',
             }
         )
+        
         return {
             'type': 'success',
             'body': target_collection_ids
@@ -91,23 +93,29 @@ class TargetServiceNamespace(BaseClientNamespace):
 
     async def on_target_collection_read_request(self, data):
         filters = map_to_snake_case(data['value'])
-        # get target collection ids linked to sample batch
-        sample_batch_id = filters.pop('sample_batch_id')
-        batch_collection_ids = [
-            link['target_collection_id']
-            for link in db.target_collection_in_sample_batch.read(
-                sample_batch_id=sample_batch_id
-            )
-        ]
+        target_collection_ids = []
+        if 'sample_batch_id' in filters:
+            # get target collection ids linked to sample batch
+            sample_batch_id = filters.pop('sample_batch_id')
+            target_collection_ids = [
+                link['target_collection_id']
+                for link in db.target_collection_in_sample_batch.read(
+                    sample_batch_id=sample_batch_id
+                )
+            ]
+            if not target_collection_ids:
+                # No target collections in the batch
+                return {
+                    'type': 'success',
+                    'body': []
+                }
         if 'id' in filters:
             filter_ids = filters.pop('id')
             target_collection_ids = [
                 target_collection_id 
-                for target_collection_id in batch_collection_ids
+                for target_collection_id in target_collection_ids
                 if target_collection_id in filter_ids
             ]
-        else:
-            target_collection_ids = batch_collection_ids
         # read target collections
         target_collections = db.target_collection_read(
             id=target_collection_ids,
@@ -121,26 +129,33 @@ class TargetServiceNamespace(BaseClientNamespace):
     async def on_target_collection_update_request(self, data):
         target_collections = map_to_snake_case(data['value'])
         for target_collection in target_collections:
-            # N.B - instead of updating compounds, we
-            # simply create new ones and update the collection
-            # record to link to them.
-            created_compound_ids = await (
-                self.on_target_compound_create_request(
-                    target_collection['compounds']
-                )['body']['compound']
-            )
             db.target_collection_update(
                 id=target_collection['id'],
                 name=target_collection['name'],
                 description=target_collection['description'],
             )
-            db.target_collection_remove_all_compounds(
-                id=target_collection['id']
-            )
-            for created_compound_id in created_compound_ids:
-                db.target_collection_add_compound(
-                    collection_id=target_collection['id'],
-                    compound_id=created_compound_id
+            # N.B - instead of updating compounds, we
+            # simply create new ones and update the collection
+            # record to link to them.
+            if 'compounds' in target_collection:
+                created_compound_ids = await (
+                    self.on_target_compound_create_request(
+                        target_collection['compounds']
+                    )['body']['compound']
+                )
+                db.target_collection_remove_all_compounds(
+                    id=target_collection['id']
+                )
+                for created_compound_id in created_compound_ids:
+                    db.target_collection_add_compound(
+                        collection_id=target_collection['id'],
+                        compound_id=created_compound_id
+                    )
+            # add collection to sample batches
+            for sample_batch_id in target_collection.get('sample_batches', []):
+                db.target_collection_add_to_sample_batch(
+                    target_collection_id=target_collection['id'],
+                    sample_batch_id=sample_batch_id,
                 )
 
         target_collection_ids = get_ids(target_collections)
@@ -352,6 +367,15 @@ class TargetServiceNamespace(BaseClientNamespace):
 
     async def on_target_ion_read_request(self, data):
         filters = map_to_snake_case(data['value'])
+
+        # TODO: Get from the frontend
+        ionization_mechanisms = db.config_ion_mechanism_read(
+            mechanism=['-H-', '+Br-']
+            )
+        filters.update(
+            {'mechanism_id': [row['id'] for row in ionization_mechanisms]}
+            )
+
         ions = db.target_ion_read(**filters)
         return {
             'type': 'success',
@@ -380,6 +404,10 @@ class TargetServiceNamespace(BaseClientNamespace):
 
     async def on_target_isotope_read_request(self, data):
         filters = map_to_snake_case(data['value'])
+
+        # TODO: Get from the frontend
+        filters.update({'min_isotope_abundance': .1})
+        
         isotopes = db.target_isotope_read(**filters)
         return {
             'type': 'success',
@@ -485,31 +513,28 @@ class TargetServiceNamespace(BaseClientNamespace):
             mz_tolerance
         )
 
-        if len(isotope_match_df) > 0:
-            # append peak TOFs
-            match_tofs = []
-            for peak_id in isotope_match_df['samplePeakId']:
-                if not np.isnan(peak_id):
-                    match_tofs.append(peak_tofs[int(peak_id)])
-                else:
-                    match_tofs.append(None)
-            isotope_match_df.loc[:, 'samplePeakTof'] = match_tofs
+        # append peak TOFs
+        match_tofs = []
+        for peak_id in isotope_match_df['samplePeakId']:
+            if not np.isnan(peak_id):
+                match_tofs.append(peak_tofs[int(peak_id)])
+            else:
+                match_tofs.append(None)
+        isotope_match_df.loc[:, 'samplePeakTof'] = match_tofs
 
-            # calculate ion and compound target match scores
-            return {
-                'type': 'success',
-                'body': {
-                    'matches': calculate_match_stats(
-                        isotope_match_df,
-                        sample_item,
-                        iso_abu_tolerance,
-                        mz_tolerance
-                    ),
-                    'sampleItems': [sample_item]
-                }
+        # calculate ion and compound target match scores
+        return {
+            'type': 'success',
+            'body': {
+                'matches': calculate_match_stats(
+                    isotope_match_df,
+                    sample_item,
+                    iso_abu_tolerance,
+                    mz_tolerance
+                ),
+                'sampleItems': [sample_item]
             }
-        else:
-            return None
+        }
 
 
 class TargetServiceClient(BaseServiceClient):

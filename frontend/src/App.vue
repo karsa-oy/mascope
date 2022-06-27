@@ -44,14 +44,16 @@ export default {
     ...mapActions({
       sampleFileGetSchema: "sample/file/schema/requestSchema",
       sampleItemGetSchema: "sample/item/schema/requestSchema",
+      targetCollectionRead: "target/collection/read",
       workspaceRead: "workspace/read",
       keydown: "key/down",
       keyup: "key/up",
     }),
     load() {
-      this.workspaceRead();
       this.sampleFileGetSchema();
       this.sampleItemGetSchema();
+      this.targetCollectionRead();
+      this.workspaceRead();
     },
   },
   watch: {

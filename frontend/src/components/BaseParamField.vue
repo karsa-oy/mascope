@@ -3,6 +3,7 @@
     <b-numberinput
       v-model="param"
       v-bind="range"
+      :disabled="disabled"
       :type="type"
       size="is-small"
       controls-alignment="right"
@@ -12,6 +13,7 @@
     <b-slider
       v-model="param"
       v-bind="range"
+      :disabled="disabled"
       :type="type"
       :tooltip="tooltip"
       tooltip-type="is-white"
@@ -25,6 +27,11 @@
 export default {
   name: "BaseParamField",
   props: {
+    disabled: {
+      type: Boolean,
+      required: false,
+      default: false,
+    },
     label: {
       type: String,
       required: true,

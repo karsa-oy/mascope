@@ -16,12 +16,14 @@ export default {
   },
   computed: {
     ...mapGetters({
+      itemFocused: "sample/item/focusedRow",
       batchSelected: "sample/batch/selectedRow",
       itemsSelected: "sample/item/selectedRows",
     }),
     ...bindState({
       batchRows: "sample/batch/rows",
       itemRows: "sample/item/rows",
+      targetCollectionRows: "target/collection/rows",
       modalSampleBatchOpProps: "modal/sampleBatchOpProps",
       modalSampleItemAttributesSave: "modal/sampleItemAttributesSave",
     }),
@@ -32,7 +34,7 @@ export default {
           slug: "sampleBatch",
           cols: [{ field: "name", label: "Batch", width: "90%" }],
           rows: this.batchRows,
-          rowClick: this.batchToggle,
+          rowClick: this.batchHandleToggle,
           opened: this.opened,
         },
         {
@@ -119,18 +121,23 @@ export default {
         modal: "sampleBatchOp",
       });
     },
-    batchUpdate() {
+    batchDelete() {
       this.modalSampleBatchOpProps = {
-        action: "update",
+        action: "delete",
         batch: this.batchSelected,
       };
       this.activateModal({
         modal: "sampleBatchOp",
       });
     },
-    batchDelete() {
+    batchHandleToggle(row) {
+      this.itemRows = [];
+      this.targetCollectionRows = [];
+      this.batchToggle(row);
+    },
+    batchUpdate() {
       this.modalSampleBatchOpProps = {
-        action: "delete",
+        action: "update",
         batch: this.batchSelected,
       };
       this.activateModal({
@@ -141,7 +148,7 @@ export default {
       let itemsToCalibrate = this.itemsSelected.filter(
         (item) => item.id !== this.itemFocused.id
       );
-      let fit = this.itemFocused.mz_calibration;
+      let fit = this.itemFocused.mzCalibration;
       this.$buefy.dialog.confirm({
         title: "Copy mass calibration",
         message: `Copy calibration from ${this.itemFocused.title} to ${itemsToCalibrate.length} selected samples?`,
