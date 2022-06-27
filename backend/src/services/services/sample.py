@@ -225,6 +225,7 @@ class SampleServiceNamespace(BaseClientNamespace):
             data.get('value', {})
         )
         items = db.sample_item_read(**filters)
+        items.sort(key=lambda row: row['datetime_utc'])
         return {
             'type': 'success',
             'body': map_to_camel_case(items)

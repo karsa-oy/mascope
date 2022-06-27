@@ -92,7 +92,7 @@ export default {
                     });
                     if (itemFocused) {
                         let focusedSample = rootGetters['sample/item/focusedRow'];
-                        if (!focusedSample) return rootGetters['target/compound/rows'];
+                        if (!focusedSample) return rootState.target.compound.rows;
                         matches = matches.filter(
                             (m) => m.sampleItemId === focusedSample.id
                         );
@@ -167,7 +167,7 @@ export default {
                     });
                     if (itemFocused) {
                         let focusedSample = rootGetters['sample/item/focusedRow'];
-                        if (!focusedSample) return rootGetters['target/ion/rows'];
+                        if (!focusedSample) return rootState.target.ion.rows;
                         matches = matches.filter(
                             (m) => m.sampleItemId === focusedSample.id
                         );
@@ -250,7 +250,7 @@ export default {
                     });
                     if (itemFocused) {
                         let focusedSample = rootGetters['sample/item/focusedRow'];
-                        if (!focusedSample) return rootGetters['target/isotope/rows'];
+                        if (!focusedSample) return rootState.target.isotope.rows;
                         matches = matches.filter(
                             (m) => m.sampleItemId === focusedSample.id
                         );

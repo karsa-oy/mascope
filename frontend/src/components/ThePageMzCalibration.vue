@@ -18,7 +18,7 @@
             :rows="candidateTableRows"
             :cols="candidateTableCols"
             :checkable="true"
-            :searchable="false"
+            :searchable="true"
             :height="candidateTableHeight"
             @selectRows="selectCandidates"
           >
@@ -28,7 +28,7 @@
               <p>
                 <template v-if="itemFocused">
                   <b
-                    >Current parameters: {{ itemFocused.mz_calibration ? itemFocused.mz_calibration.par : "undefined"}}</b
+                    >Current parameters: {{ itemFocused.mzCalibration ? itemFocused.mzCalibration.par : "undefined"}}</b
                   >
                 </template>
                 <br />
@@ -98,7 +98,7 @@ export default {
         { field: "mz", label: "Isotope m/z" },
         { field: "samplePeakMz", label: "Sample m/z" },
         { field: "mzError", label: "m/z error [ppm]" },
-        { field: "relAbu", label: "Relative abundance" },
+        { field: "relativeAbundance", label: "Relative abundance" },
         { field: "relPeakHeight", label: "Relative peak height" },
         { field: "samplePeakHeight", label: "Sample peak intensity" },
         { field: "matchScore", label: "Match score" },

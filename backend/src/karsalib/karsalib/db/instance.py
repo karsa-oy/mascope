@@ -233,7 +233,10 @@ class DbInstance:
         self.target_ions.create(**row)
 
     def target_ion_read(self, **filters):
-        return self.target_ions.read(**filters)
+        return self.target_ions.get_joined(
+            'config_ion_mechanisms', 'mechanism_id', 'id',
+            **filters
+        )
 
     def target_ion_update(self, **row):
         self.target_ions.update(**row)
@@ -246,7 +249,14 @@ class DbInstance:
         self.target_isotopes.create(**row)
 
     def target_isotope_read(self, **filters):
-        return self.target_isotopes.read(**filters)
+        min_isotope_abundance = filters.pop(
+            'min_isotope_abundance'
+            )
+        return self.target_isotopes.ge(
+            'relative_abundance',
+            min_isotope_abundance,
+            **filters
+            )
 
     def target_isotope_update(self, **row):
         self.target_isotopes.update(**row)

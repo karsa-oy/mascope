@@ -10,6 +10,61 @@
       @after-enter="initData"
       :type="actionIs('delete') ? 'is-danger' : 'is-primary'"
     >
+      <template v-if="actionIs('addToBatch')">
+        <div class="modal-card" style="height: 85vh">
+          <header class="modal-card-head">
+            <p class="modal-card-title">Add target collection to batch</p>
+          </header>
+          <section class="modal-card-body">
+            <b-field label="Name">
+              <b-input
+                v-model="newCollectionName"
+                :disabled="true"
+              ></b-input>
+            </b-field>
+            <b-field
+              label="Description"
+            >
+              <b-input
+                v-model="newCollectionDesc"
+                :disabled="true"
+                >
+              </b-input>
+            </b-field>
+            <b-field label="Add to sample batch">
+              <base-table
+                :rows="sampleBatches"
+                :cols="[{'field': 'name', 'label': 'Batch'}]"
+                :checkable="true"
+                @selectRows="selectBatchesToAddTo"
+              >
+              </base-table>
+            </b-field>
+          </section>
+          <footer class="modal-card-foot">
+            <b-button expanded @click="modalActive = false"> Cancel </b-button>
+            <b-button
+              type="is-primary"
+              expanded
+              @click="
+                () => {
+                  updateTargetCollection([
+                    {
+                      id: oldCollection.id,
+                      name: newCollectionName,
+                      description: newCollectionDesc,
+                      sampleBatches: batchesToAddTo,
+                    },
+                  ]);
+                  deactivateModal();
+                }
+              "
+            >
+              Update
+            </b-button>
+          </footer>
+        </div>
+      </template>
       <template v-if="actionIs('create')">
         <div class="modal-card" style="height: 85vh">
           <header class="modal-card-head">
@@ -48,15 +103,17 @@
               type="is-primary"
               expanded
               @click="
-                () =>
+                () => {
                   createTargetCollection([
                     {
                       name: newCollectionName,
                       description: newCollectionDesc,
                       targetCompounds: newTargetCompounds,
-                      sampleBatches,
+                      sampleBatches: addToSampleBatch && sampleBatchSelected ? [sampleBatchSelected] : [],
                     },
-                  ])
+                  ]);
+                  deactivateModal();
+                }
               "
             >
               Create
@@ -82,11 +139,6 @@
             >
               <b-input v-model="newCollectionDesc"></b-input>
             </b-field>
-            <b-field v-if="sampleBatch" label="Add to sample batch">
-              <b-checkbox v-model="addToSampleBatch"
-                >Add target collection to {{ sampleBatch.name }}</b-checkbox
-              >
-            </b-field>
             <base-spreadsheet-input
               label="Target compounds"
               :cols="targetCompoundCols"
@@ -99,15 +151,17 @@
               type="is-primary"
               expanded
               @click="
-                () =>
+                () => {
                   updateTargetCollection([
                     {
+                      id: oldCollection.id,
                       name: newCollectionName,
                       description: newCollectionDesc,
                       targetCompounds: newTargetCompounds,
-                      sampleBatches,
                     },
-                  ])
+                  ]);
+                  deactivateModal();
+                }
               "
             >
               Update
@@ -170,12 +224,14 @@ import { bindState } from "$lib/store";
 import { mapActions, mapMutations } from "vuex";
 
 import BaseSpreadsheetInput from "./BaseSpreadsheetInput";
+import BaseTable from "./BaseTable";
 
 export default {
   name: "TheModalTargetCollectionOp",
-  components: { BaseSpreadsheetInput },
+  components: { BaseSpreadsheetInput, BaseTable },
   data: function () {
     return {
+      batchesToAddTo: [],
       newCollectionName: "",
       newCollectionDesc: "",
       newTargetCompounds: [],
@@ -185,6 +241,7 @@ export default {
   },
   computed: {
     ...bindState({
+      sampleBatches: "sample/batch/rows",
       modalActive: "modal/targetCollectionOpActive",
       modalProps: "modal/targetCollectionOpProps",
     }),
@@ -207,9 +264,6 @@ export default {
     sampleBatchSelected() {
       return this.$store.getters["sample/batch/selectedRow"];
     },
-    sampleBatches() {
-      return this.addToSampleBatch ? [this.sampleBatchSelected.id] : [];
-    },
   },
   methods: {
     ...mapMutations({
@@ -223,14 +277,17 @@ export default {
     actionIs(...actions) {
       return actions.includes(this.action);
     },
-    loadTargetCompounds(rows) {
-      this.newTargetCompounds = rows;
-    },
     initData() {
       if (this.oldCollection) {
         this.newCollectionName = this.oldCollection.name;
         this.newCollectionDesc = this.oldCollection.description;
       }
+    },
+    loadTargetCompounds(rows) {
+      this.newTargetCompounds = rows;
+    },
+    selectBatchesToAddTo(rows) {
+      this.batchesToAddTo = rows.map(row => row.id);
     },
   },
 };

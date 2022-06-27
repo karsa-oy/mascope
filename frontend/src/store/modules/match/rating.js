@@ -50,7 +50,7 @@ export default {
                                 ,com.name as targetCompoundName
                                 ,com.formula as targetCompoundFormula
                                 ,ion.formula as targetIonFormula
-                                ,ion.ionMech as targetIonMech
+                                ,ion.mechanism as targetIonMech
                             from ratings rat
                             left join compounds com
                                 on rat.targetCompoundId = com.id

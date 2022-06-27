@@ -27,6 +27,7 @@ export default {
       modalTargetCollectionOpProps: "modal/targetCollectionOpProps",
     }),
     ...mapGetters({
+      batchSelected: "sample/batch/selectedRows",
       matchesExist: "match/exists",
       sampleItemFocused: "sample/item/focusedRow",
       targetCollectionsSelected: "target/collection/selectedRows",
@@ -173,8 +174,13 @@ export default {
         label: "Delete target collection",
         onClick: this.collectionDelete,
       };
+      let addCollectionToBatchButton = {
+        label: "Add target collection to batch",
+        onClick: this.collectionAddToBatch,
+      };
       if (this.uniqueTargetCollection) {
         return [
+          addCollectionToBatchButton,
           createCollectionButton,
           updateCollectionButton,
           deleteCollectionButton,
@@ -195,23 +201,24 @@ export default {
       activateModal: "modal/activate",
     }),
     ...mapActions({
+      targetCollectionRead: "target/collection/read",
       targetCollectionToggle: "target/collection/toggle",
       targetCompoundToggle: "target/compound/toggle",
       targetIonToggle: "target/ion/toggle",
       targetIsotopeToggle: "target/isotope/toggle",
     }),
-    collectionCreate() {
+    collectionAddToBatch() {
       this.modalTargetCollectionOpProps = {
-        action: "create",
+        action: "addToBatch",
+        collection: this.targetCollectionsSelected[0],
       };
       this.activateModal({
         modal: "targetCollectionOp",
       });
     },
-    collectionUpdate() {
+    collectionCreate() {
       this.modalTargetCollectionOpProps = {
-        action: "update",
-        collection: this.targetCollectionsSelected[0],
+        action: "create",
       };
       this.activateModal({
         modal: "targetCollectionOp",
@@ -226,6 +233,26 @@ export default {
         modal: "targetCollectionOp",
       });
     },
+    collectionGetAll() {
+      this.targetCollectionRead();
+    },
+    collectionUpdate() {
+      this.modalTargetCollectionOpProps = {
+        action: "update",
+        collection: this.targetCollectionsSelected[0],
+      };
+      this.activateModal({
+        modal: "targetCollectionOp",
+      });
+    },
+
   },
+  watch: {
+    batchSelected: function() {
+      if (!this.batchSelected.length) {
+        this.collectionGetAll();
+      }
+    },
+  }
 };
 </script>

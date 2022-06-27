@@ -117,6 +117,22 @@ class DbTable:
         res = self._decode_values_list()
         return res
 
+    def ge(self, column, min_value, **kwargs):
+        if kwargs:
+            sql = f"""
+                SELECT * FROM {self.name}
+                {self.where(kwargs)}
+                AND {column} >= {min_value}
+            """
+        else:
+            sql = f"""
+                SELECT * FROM {self.name}
+                WHERE {column} >= {min_value}
+            """
+        self.cur.execute(sql)
+        res = self._decode_values_list()
+        return res
+
     def get_joined(self, table, left_on, right_on, **kwargs):
         sql = f"""
             SELECT * FROM {self.name} l

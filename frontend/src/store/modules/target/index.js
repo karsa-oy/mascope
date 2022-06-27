@@ -10,6 +10,7 @@ export default {
             namespace: 'target/collection',
             children: ['target/compound'],
             loadWhen: 'parent-selected',
+            singleSelect: true,
         }),
         compound: createTableModule({
             parents: ['target/collection'],

@@ -1,6 +1,6 @@
 export default {
     namespaced: true,
     state: {
-        minIsoAbu: 1
+        minIsoAbu: 10
     }
 }

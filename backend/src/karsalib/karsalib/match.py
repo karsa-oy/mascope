@@ -77,6 +77,16 @@ def calculate_match_stats(
         mz_tolerance
         ):
 
+    empty_stats = {
+            'isotope': [],
+            'ion': [],
+            'compound': [],
+            'collection': []
+        }
+
+    if len(isotope_match_df) == 0:
+        return empty_stats
+
     isotope_match_df.loc[:, 'relPeakHeight'] = np.nan
     isotope_match_df.loc[:, 'isoAbuError'] = np.nan
     isotope_match_df.loc[:, 'mzError'] = np.nan
@@ -122,6 +132,10 @@ def calculate_match_stats(
             np.abs(isotope_match_df['isoAbuError']) <= iso_abu_tolerance
         ]
     )
+
+    if len(isotope_match_df) == 0:
+        return empty_stats
+
     # STEP 2 - Calculate isotope level stats
 
     # calculate mz errors
@@ -195,7 +209,7 @@ def calculate_match_stats(
     # STEP 6 - Format output
 
     def output(df):
-        return list(df.to_dict(orient='index').values())
+        return list(df.to_dict(orient='index').values()) if len(df) else []
 
     match_stats = {
         'isotope': output(isotope_match_df),
