@@ -23,6 +23,7 @@ export function createTableModule({
     namespace, // own path
     parents = null, // child module paths
     children = null, // parent module paths
+    params = null, // store addresses to pass as filters on read
     loadWhen = 'parent-loaded', // 'parents-selected' 'parents-loaded' 'always'
     singleSelect = false,
     focusable = false,
@@ -140,6 +141,7 @@ export function createTableModule({
                 }, rows);
             },
             async read({ rootState, dispatch, getters }, filters = {}) {
+                console.log(namespace)
                 let status = getters['propagateStatusDown'];
                 await rootState.api.call({
                     endpoint: endpoint('read', 'request'),
@@ -147,7 +149,7 @@ export function createTableModule({
                         let rows = resp.map(row => ({ ...row, ...status(row.id) }));
                         dispatch('tick', { load: rows });
                     }
-                }, filters);
+                }, { ...filters, ...getters['paramFilters'] });
             },
             async update({ rootState }, rows) {
                 await rootState.api.call({
@@ -174,7 +176,7 @@ export function createTableModule({
                     case 'update': {
                         dispatch('read', {
                             id: event.ids,
-                            ...getters['missing']
+                            ...getters['missingFilters']
                         });
                         break;
                     }
@@ -266,7 +268,7 @@ export function createTableModule({
                 dispatch('unload');
             },
             async syncToParent({ dispatch, getters, rootState }, { mutation, payload }) {
-                if (getters['missing']) {
+                if (getters['missingFilters']) {
                     let {
                         change: parentChange
                     } = payload;
@@ -284,7 +286,7 @@ export function createTableModule({
                                 : null;
                             await dispatch('tick', { load, change });
                         }
-                    }, getters['missing']);
+                    }, getters['missingFilters']);
                 }
             },
             async syncToChild({ dispatch, getters }, { mutation, payload }) {
@@ -355,7 +357,7 @@ export function createTableModule({
                     }, filters);
                 },
             // filters
-            missing: (state, getters) => {
+            missingFilters: (state, getters) => {
                 let active, filters;
                 if (loadWhen == 'always') {
                     return {};
@@ -381,6 +383,7 @@ export function createTableModule({
                 } else {
                     filters = {}
                 }
+                filters = { ...filters, ...getters['paramFilters'] }
                 if (Object.keys(filters).length == 0) {
                     return null;
                 } else {
@@ -390,6 +393,15 @@ export function createTableModule({
                     }
                     return filters;
                 }
+            },
+            paramFilters: (state, getters, rootState, rootGetters) => {
+                let filters = {};
+                if (params) {
+                    for (const [key, path] of Object.entries(params)) {
+                        filters[key] = rootGetters['getPath'](path);
+                    }
+                }
+                return filters;
             },
             // status
             status: (state) =>

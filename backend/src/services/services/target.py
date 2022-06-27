@@ -85,7 +85,7 @@ class TargetServiceNamespace(BaseClientNamespace):
                 'room': 'target/collection',
             }
         )
-        
+
         return {
             'type': 'success',
             'body': target_collection_ids
@@ -405,9 +405,6 @@ class TargetServiceNamespace(BaseClientNamespace):
     async def on_target_isotope_read_request(self, data):
         filters = map_to_snake_case(data['value'])
 
-        # TODO: Get from the frontend
-        filters.update({'min_isotope_abundance': .1})
-        
         isotopes = db.target_isotope_read(**filters)
         return {
             'type': 'success',

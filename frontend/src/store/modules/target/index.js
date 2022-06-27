@@ -26,6 +26,9 @@ export default {
         isotope: createTableModule({
             parents: ['target/ion'],
             namespace: 'target/isotope',
+            params: {
+                minIsotopeAbundance: 'target/param/minIsoAbu'
+            }
         }),
         stat,
         param

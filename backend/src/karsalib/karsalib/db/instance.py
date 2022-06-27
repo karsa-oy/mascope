@@ -254,7 +254,7 @@ class DbInstance:
             )
         return self.target_isotopes.ge(
             'relative_abundance',
-            min_isotope_abundance,
+            min_isotope_abundance/100,
             **filters
             )
 

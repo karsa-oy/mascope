@@ -4,8 +4,7 @@
     <base-param-field
       label="Minimum isotope abundance [%]"
       path="target/param/minIsoAbu"
-      :disabled="true"
-      :range="{ min: 0, max: 100, step: 1 }"
+      :range="{ min: 0, max: 100, step: 0.05 }"
     >
     </base-param-field>
   </section>
