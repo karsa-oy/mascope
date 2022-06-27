@@ -141,7 +141,6 @@ export function createTableModule({
                 }, rows);
             },
             async read({ rootState, dispatch, getters }, filters = {}) {
-                console.log(namespace)
                 let status = getters['propagateStatusDown'];
                 await rootState.api.call({
                     endpoint: endpoint('read', 'request'),
