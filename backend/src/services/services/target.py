@@ -367,15 +367,14 @@ class TargetServiceNamespace(BaseClientNamespace):
 
     async def on_target_ion_read_request(self, data):
         filters = map_to_snake_case(data['value'])
-
-        # TODO: Get from the frontend
-        ionization_mechanisms = db.config_ion_mechanism_read(
-            mechanism=['-H-', '+Br-']
-            )
-        filters.update(
-            {'mechanism_id': [row['id'] for row in ionization_mechanisms]}
-            )
-
+        ion_mechanisms = filters.pop('ion_mechanisms')
+        if len(ion_mechanisms):
+            filters.update({
+                'mechanism_id': [
+                    mechanism['id']
+                    for mechanism in ion_mechanisms
+                ]
+            })
         ions = db.target_ion_read(**filters)
         return {
             'type': 'success',
@@ -421,6 +420,16 @@ class TargetServiceNamespace(BaseClientNamespace):
         return {
             'type': 'failure',
             'body': 'Not implemented'
+        }
+
+    # ionization mechanisms
+
+    async def on_config_ion_mechanism_read_request(self, data):
+        filters = map_to_snake_case(data['value'])
+        ion_mechanisms = db.config_ion_mechanism_read(**filters)
+        return {
+            'type': 'success',
+            'body': map_to_camel_case(ion_mechanisms)
         }
 
     # MATCHES

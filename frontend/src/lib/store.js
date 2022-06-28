@@ -397,7 +397,10 @@ export function createTableModule({
                 let filters = {};
                 if (params) {
                     for (const [key, path] of Object.entries(params)) {
-                        filters[key] = rootGetters['getPath'](path);
+                        let fn = path in rootGetters
+                            ? () => rootGetters[path]
+                            : () => rootGetters['getPath'](path);
+                        filters[key] = fn();
                     }
                 }
                 return filters;

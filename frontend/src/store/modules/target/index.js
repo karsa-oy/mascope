@@ -21,6 +21,9 @@ export default {
             parents: ['target/compound'],
             namespace: 'target/ion',
             children: ['target/isotope'],
+            params: {
+                ionMechanisms: 'config/ion_mechanism/selectedRows'
+            },
             focusable: true,
         }),
         isotope: createTableModule({
@@ -28,7 +31,7 @@ export default {
             namespace: 'target/isotope',
             params: {
                 minIsotopeAbundance: 'target/param/minIsoAbu'
-            }
+            },
         }),
         stat,
         param

@@ -42,6 +42,7 @@ export default {
   },
   methods: {
     ...mapActions({
+      ionMechanismRead: "config/ion_mechanism/read",
       sampleFileGetSchema: "sample/file/schema/requestSchema",
       sampleItemGetSchema: "sample/item/schema/requestSchema",
       targetCollectionRead: "target/collection/read",
@@ -50,6 +51,7 @@ export default {
       keyup: "key/up",
     }),
     load() {
+      this.ionMechanismRead();
       this.sampleFileGetSchema();
       this.sampleItemGetSchema();
       this.targetCollectionRead();
