@@ -11,9 +11,7 @@ let parentWin;
 const { ipcMain } = require('electron');
 // Event handler for asynchronous incoming messages
 ipcMain.on('asynchronous-message', (event, msg) => {
-    if (msg === "closeSplashWin") {
-        splashWin.close();
-    }
+
 });
 
 // Scheme must be registered before the app is ready
@@ -39,7 +37,7 @@ function createWindow() {
         webPreferences: {
             nodeIntegration: true,
         },
-        frame: isDevelopment,
+        frame: true,
     });
 
     parentWin.on("closed", () => {
