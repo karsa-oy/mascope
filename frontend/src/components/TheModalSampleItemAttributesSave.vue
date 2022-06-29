@@ -78,10 +78,10 @@ export default {
   },
   methods: {
     ...mapMutations({
-      sampleItemUpdate: "sample/item/update",
       deactivateModal: "modal/deactivate",
     }),
     ...mapActions({
+      sampleItemUpdate: "sample/item/update",
       templateListRequest: "template/requestTemplates",
       templateSaveRequest: "template/save",
       templateDeleteRequest: "template/delete",
@@ -98,7 +98,7 @@ export default {
       let row = {};
       newValue.forEach((field) => (row[field.label] = field.value || ""));
       row.id = this.itemSelected.id;
-      row.batchId = this.itemSelected.batchId;
+      row.sampleBatchId = this.itemSelected.sampleBatchId;
       this.sampleItemUpdate([row]);
       this.deactivateModal();
     },
