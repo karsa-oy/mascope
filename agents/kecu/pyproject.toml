@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "mascope-kecu-agent"
+version = "1.0"
+description = "User-friendly chemical detection platform"
+authors = ["Karsa Oy <support@karsa.fi>"]
+license = "Proprietary"
+include = ["kecu"]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.dependencies]
+python = ">=3.8,<3.11"
+asyncio_dgram = "2.1.2"
+PyYAML = "6.0"
+setuptools = "62.6.0"

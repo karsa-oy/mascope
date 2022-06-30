@@ -1,3 +1,0 @@
-# karsalib utils library module
-
-To be updated...

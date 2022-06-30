@@ -3,6 +3,7 @@ services:
   backend:
     build:
       context: ./backend
+      dockerfile: ./docker/Dockerfile
     volumes:
       - ./testdata:/data
     stdin_open: true  

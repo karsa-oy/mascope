@@ -1,1 +1,0 @@
-VIZ_TYPES_SUPPORTED = {'spectrogram', 'timeseries', 'waterfall'}

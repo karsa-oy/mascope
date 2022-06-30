@@ -1,3 +1,0 @@
-# karsaimg visualization library module
-
-To be updated...

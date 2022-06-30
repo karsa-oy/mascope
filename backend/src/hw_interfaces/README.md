@@ -1,3 +1,0 @@
-# Karsa mass spec hardware interfaces
-
-To be updated...
