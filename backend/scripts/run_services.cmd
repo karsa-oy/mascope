@@ -4,8 +4,8 @@
 powershell Test-NetConnection 127.0.0.1 -p 5010 | find /i "failed" && start cmd /k poetry run router
 
 :: Start other services
-:: start cmd /k karsa-file-streamer --config=../services/services/file_streamer_config/h5_local.yaml  --transit || goto :error
-:: start cmd /k karsa-file-streamer --config=../services/services/file_streamer_config/raw_local.yaml  --transit || goto :error
+:: start cmd /k poetry run file-streaming-service --config=../services/services/file_streamer_config/h5_local.yaml  --transit || goto :error
+:: start cmd /k poetry run file-streaming-service --config=../services/services/file_streamer_config/raw_local.yaml  --transit || goto :error
 
 start cmd /k poetry run sample-service || goto :error
 start cmd /k poetry run signal-service || goto :error
