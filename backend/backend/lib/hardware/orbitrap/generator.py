@@ -13,13 +13,14 @@ from threading import current_thread
 from time import sleep
 
 from backend.services.file_io import zarr_sdk
-from backend.lib.hardware.util import net2np_array
 from backend.lib.hardware.common.base_generator import (
     BaseFileStreamer,
     PROGRESS_SHIFT
 )
 
 from ThermoFisher.CommonCore.Data import Business as ThermoBusiness
+
+from .util import net2np_array
 
 
 class RawStreamer(BaseFileStreamer):

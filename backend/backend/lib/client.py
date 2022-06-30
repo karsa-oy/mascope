@@ -20,6 +20,21 @@ from .util import parse_cmd_args
 # response timeout for a sync call to karsa service
 SERVICE_RESPONSE_TIMEOUT = 10
 
+streamer_info = {
+    'H5': {
+        'package': 'backend.lib.hardware.tofwerk',
+        'module': '.generator'
+    },
+    'Raw': {
+        'package': 'backend.lib.hardware.orbitrap',
+        'module': '.generator'
+    },
+    'TofDaq': {
+        'package': 'backend.lib.hardware.tofwerk',
+        'module': '.generator'
+    },
+}
+
 
 def run_streamer_service(StreamerClient,
                          StreamerPublicNamespace,
@@ -28,9 +43,10 @@ def run_streamer_service(StreamerClient,
     args = parse_cmd_args()
     # streamer should always be in private namespace with data producer
     if args['ns'] == '/':
-        print( "The service must be in a private namespace.",
-               "Please restart the service with --ns option."
-              )
+        print(
+            "The service must be in a private namespace.",
+            "Please restart the service with --ns option."
+        )
         return
 
     client = None
@@ -53,13 +69,14 @@ def run_streamer_service(StreamerClient,
             else {'path': data_pool_path, 'mask': data_pool_mask}
         )
         try:
-            client = StreamerClient(streamer_opts,
-                                    data_pool_opts,
-                                    args['url'],
-                                    args['port'],
-                                    ('/', StreamerPublicNamespace),
-                                    (args['ns'], StreamerPrivateNamespace)
-                                )
+            client = StreamerClient(
+                streamer_opts,
+                data_pool_opts,
+                args['url'],
+                args['port'],
+                ('/', StreamerPublicNamespace),
+                (args['ns'], StreamerPrivateNamespace)
+            )
             break
         except ModuleNotFoundError as e:
             print(str(e))
@@ -68,8 +85,6 @@ def run_streamer_service(StreamerClient,
             except KeyboardInterrupt:
                 print('Cancelled')
                 return
-        except:
-            raise
 
     loop = asyncio.get_event_loop()
     try:
@@ -339,7 +354,6 @@ class BaseServiceClient:
         finally:
             self.shutdown_event.set()
 
-
     async def run(self):
         await self.connect()
         await self.init_service()
@@ -397,13 +411,10 @@ class TOFStreamerClient(BridgeServiceClient):
         self.watcher = None
         self.lock = Lock()
 
-        streamer_info = {
-            'H5': {'package': 'karsatof', 'module': '.kgenerator'},
-            'Raw': {'package': 'karsaorbi', 'module': '.kogenerator'},
-            'TofDaq': {'package': 'karsatof', 'module': '.kgenerator'},
-        }
-        m = importlib.import_module(streamer_info[streamer_type]['module'],
-                                    streamer_info[streamer_type]['package'])
+        m = importlib.import_module(
+            streamer_info[streamer_type]['module'],
+            streamer_info[streamer_type]['package']
+        )
         self.streamer = getattr(m, f'{streamer_type}Streamer')(client=self)
 
         self.data_pool = None
@@ -430,7 +441,6 @@ class TOFStreamerClient(BridgeServiceClient):
                 await self.sio.sleep(2)
                 continue
 
-
     async def init_service(self):
         while True:
             # TODO: TBR python-socketio BadNamespaceError connection bug
@@ -456,7 +466,6 @@ class TOFStreamerClient(BridgeServiceClient):
                                     room='room_data_sources',
                                     no_data_logging=False
                                     )
-
 
     async def service_main(self):
         self.log('started')
@@ -681,19 +690,16 @@ class BaseStreamerClient(BridgeServiceClient):
         self.watcher = None
         self.lock = Lock()
 
-        streamer_info = {
-            'H5': {'package': 'karsatof', 'module': '.kgenerator'},
-            'Raw': {'package': 'karsaorbi', 'module': '.kogenerator'},
-            'TofDaq': {'package': 'karsatof', 'module': '.kgenerator'},
-        }
-        m = importlib.import_module(streamer_info[streamer_type]['module'],
-                                    streamer_info[streamer_type]['package'])
+        m = importlib.import_module(
+            streamer_info[streamer_type]['module'],
+            streamer_info[streamer_type]['package']
+        )
         for _ in range(self.n_jobs):
             self.streamers.append( getattr(m, f'{streamer_type}Streamer')(client=self) )
 
         self.data_pool = None
         if data_pool_opts:
-            m = importlib.import_module('.datapool', '')
+            m = importlib.import_module('.datapool', 'backend.lib')
             self.data_pool = getattr(m, f'{streamer_type}Pool')(pool_attrs=data_pool_opts)
             self.watcher = FSWatcher(client=self, target_attrs=data_pool_opts, recursive=True)
 
@@ -723,7 +729,6 @@ class BaseStreamerClient(BridgeServiceClient):
                 self.log(f'{e}\nRetrying...')
                 await self.sio.sleep(2)
                 continue
-
 
     async def init_service(self):
         while True:
