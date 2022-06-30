@@ -51,7 +51,7 @@ Vagrant.configure("2") do |config|
   config.vm.provision "shell", inline: "cd /vagrant/vbox/router && ./pre_provision.sh", privileged: false
   config.vm.provision "shell", inline: "cd /vagrant/vbox/router && ./provision_ssh_access.sh", privileged: false
   config.vm.provision "shell", inline: "cd /vagrant/vbox/router && ./provision_router_box.sh", privileged: false
-  config.vm.provision "shell", inline: "cd /vagrant/src && python3 -m pip install -e karsalib", privileged: false
+  config.vm.provision "shell", inline: "cd /vagrant/src && python3 -m pip install -e .lib", privileged: false
   config.vm.provision "shell", inline: "cd /vagrant/src && python3 -m pip install -e router_service", privileged: false
   config.vm.provision "shell", run: 'always', inline: '/bin/bash -c "echo ========; echo Now run karsa-router-service --url=0.0.0.0 --port=#{KARSA_ROUTER_PORT} in a terminal; echo ========"', privileged: false
   # config.vm.provision "shell", run: 'always', inline: "cd /vagrant && karsa-router-service --url=0.0.0.0 --port=#{KARSA_ROUTER_PORT}", privileged: false

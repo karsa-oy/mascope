@@ -1,5 +1,0 @@
-asyncio
-numpy
-python-socketio
-# karsatof
-# karsalib

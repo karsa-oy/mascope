@@ -1,3 +1,0 @@
-# Karsa TOF service
-
-To be updated...

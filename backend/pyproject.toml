@@ -1,0 +1,49 @@
+[tool.poetry]
+name = "backend"
+version = "1.0"
+description = "User-friendly chemical detection platform"
+authors = ["Karsa Oy <support@karsa.fi>"]
+license = "Proprietary"
+include = ["backend"]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+
+[tool.poetry.scripts]
+router = 'backend.router:run'
+visualization-service = 'backend.services.visualization:run'
+file-streaming-service = 'backend.services.file_streaming:run'
+file-io-service = 'backend.services.file_io:run'
+sample-service = 'backend.services.sample:run'
+signal-service = 'backend.services.signal:run'
+target-service = 'backend.services.target:run'
+
+[tool.poetry.dependencies]
+python = ">=3.8,<3.11"
+aiohttp = "3.8.1"
+aiohttp_cors = "0.7.0"
+asynctest = "0.13.0"
+clr = "1.0.3"
+colorcet = "3.0.0"
+dask = "2022.6.1"
+datashader = "0.14.1"
+datetime_glob = "1.0.8"
+decorator = "5.1.1"
+h5py = "3.7.0"
+h5sparse = "0.1.0"
+lmfit = "1.0.3"
+nanoid = "2.0.0"
+numpy = "1.23.0"
+pandas = "1.4.3"
+Pillow = "9.1.1"
+python-socketio = "5.6.0"
+PyYAML = "6.0"
+scikit_learn = "1.1.1"
+scipy = "1.8.1"
+setuptools = "62.6.0"
+sparse = "0.13.0"
+watchdog = "2.1.9"
+xarray = "2022.3.0"
+zarr = "2.12.0"

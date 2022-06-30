@@ -1,0 +1,10 @@
+asyncio
+bottleneck
+dask[array]
+environs
+numpy
+openpyxl
+xarray
+zarr
+# karsatof
+# ..lib

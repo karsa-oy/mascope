@@ -1,0 +1,11 @@
+session_name: karsa-services
+windows:
+  - window_name: karsa services
+    layout: tiled
+    panes:
+      - init router --url 0.0.0.0
+      - init file-io-service --ns TofDaq
+      - init sample-service
+      - init signal-service
+      - init target-service
+      - prep-visualization && init visualization-service
