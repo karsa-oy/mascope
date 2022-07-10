@@ -9,7 +9,7 @@
 import { mapMutations, mapActions, mapGetters } from "vuex";
 import { bindState } from "$lib/store";
 
-import BaseBrowser from "./BaseBrowser";
+import BaseBrowser from "./BaseBrowser.vue";
 
 export default {
   name: "ThePaneBrowserTarget",
@@ -245,14 +245,13 @@ export default {
         modal: "targetCollectionOp",
       });
     },
-
   },
   watch: {
-    batchSelected: function() {
+    batchSelected: function () {
       if (!this.batchSelected.length) {
         this.collectionGetAll();
       }
     },
-  }
+  },
 };
 </script>

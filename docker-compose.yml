@@ -6,6 +6,7 @@ services:
       dockerfile: ./docker/Dockerfile
     volumes:
       - ./testdata:/data
+      - ./backend:/backend
     stdin_open: true  
     tty: true
     network_mode: "host"
@@ -16,10 +17,5 @@ services:
     build:
       context: ./frontend
     volumes:
-      - /tmp/.X11-unix:/temp/.X11-unix
       - ./frontend/src:/frontend/src
-    environment:
-      - DISPLAY
     network_mode: "host"
-    ipc: host
-    mem_limit: 4g

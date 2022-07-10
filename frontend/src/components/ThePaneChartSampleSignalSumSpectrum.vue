@@ -4,15 +4,13 @@
     title="Sum spectrum"
     :data="data"
     :layout="layout"
-    @click=;
   ></base-chart-plotly>
 </template>
 
 <script>
-
 import { bindState } from "$lib/store";
 
-import BaseChartPlotly from "./BaseChartPlotly";
+import BaseChartPlotly from "./BaseChartPlotly.vue";
 
 export default {
   name: "ThePaneChartSampleSignalSumSpectrum",
@@ -29,7 +27,7 @@ export default {
         grid: {
           rows: 3,
           columns: 3,
-          pattern: 'independent'
+          pattern: "independent",
         },
         dragmode: "zoom",
         showlegend: false,

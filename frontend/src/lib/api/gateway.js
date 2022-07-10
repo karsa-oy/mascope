@@ -1,10 +1,9 @@
-const _ = require("underscore");
+import * as _ from "underscore";
 
 import { Api } from "./socket"
 import pathlib from "./path"
 import { createApiModuleMixin } from './store';
 
-import { readDotenv, writeDotenv } from '$lib/env';
 
 const rootApiMixin = createApiModuleMixin({
     apiName: 'root'
@@ -12,39 +11,16 @@ const rootApiMixin = createApiModuleMixin({
 
 export const apiGatewayStoreMixin = {
     state: {
-        dotenv: null,
         apiGatewayStatus: null,
         apiGatewayPaths: [],
         apiEventCache: [],
         ...rootApiMixin.state
     },
     mutations: {
-        // load the .env file into the store
-        readDotenv(state) {
-            gatewayLogGroup("Reading dotenv file")
-            let dotenv = readDotenv();
-            gatewayLog("Loaded dotenv file:", dotenv)
-            state.dotenv = dotenv;
-            gatewayLog("Saved dotenv file to state.dotenv");
-            gatewayLogGroupEnd();
-        },
-        // save the .env file to disk
-        // TODO - ensure consistancy with apiUrl parameter
-        writeDotenv(state) {
-            gatewayLogGroup("Writing dotenv file");
-            let dotenv = state.dotenv;
-            gatewayLog("Loaded dotenv state:", dotenv)
-            writeDotenv(dotenv);
-            gatewayLog("Saved dotenv state to .env file");
-            gatewayLogGroupEnd();
-
-        },
         // initialize root API url
         initRootApiUrl(state) {
             gatewayLogGroup("Initalizing root API url");
-            let apiUrl = state.dotenv.protocol
-                + "//" + state.dotenv.host
-                + ":" + state.dotenv.port;
+            let apiUrl = "http://127.0.0.1:5010"
             gatewayLog("Constructed apiUrl:", apiUrl);
             state.apiUrl = apiUrl;
             gatewayLog("Saved apiUrl to state.apiUrl");
@@ -104,7 +80,6 @@ export const apiGatewayStoreMixin = {
         },
         changeRootApiUrl({ commit }, { url }) {
             commit('apiChangeUrl', { url })
-            commit('writeDotenv')
         },
         ...rootApiMixin.actions
     },
@@ -139,8 +114,7 @@ function createApiGatewayPlugin() {
 
         gatewayLog('Initializing state');
 
-        // Load dotenv and build API URL
-        store.commit('readDotenv');
+        // Get API URL
         store.commit('initRootApiUrl');
 
         // Init all API instances / namespaces in the store

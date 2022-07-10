@@ -223,8 +223,8 @@ import { bindState } from "$lib/store";
 
 import { mapActions, mapMutations } from "vuex";
 
-import BaseSpreadsheetInput from "./BaseSpreadsheetInput";
-import BaseTable from "./BaseTable";
+import BaseSpreadsheetInput from "./BaseSpreadsheetInput.vue";
+import BaseTable from "./BaseTable.vue";
 
 export default {
   name: "TheModalTargetCollectionOp",

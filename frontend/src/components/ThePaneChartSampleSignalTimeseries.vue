@@ -4,15 +4,13 @@
     title="Timeseries"
     :data="data"
     :layout="layout"
-    @click=;
   ></base-chart-plotly>
 </template>
 
 <script>
-
 import { bindState } from "$lib/store";
 
-import BaseChartPlotly from "./BaseChartPlotly";
+import BaseChartPlotly from "./BaseChartPlotly.vue";
 
 export default {
   name: "ThePaneChartSampleSignalTimeseries",
@@ -44,7 +42,6 @@ export default {
       };
     },
   },
-  methods: {
-  },
+  methods: {},
 };
 </script>

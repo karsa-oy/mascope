@@ -8,7 +8,7 @@
 </template>
 
 <script>
-import TheModalAggregator from "./TheModalAggregator";
+import TheModalAggregator from "./TheModalAggregator.vue";
 
 export default {
   name: "TheLayout",

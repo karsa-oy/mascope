@@ -9,7 +9,7 @@
 </template>
 
 <script>
-import BaseChartPlotly from "./BaseChartPlotly";
+import BaseChartPlotly from "./BaseChartPlotly.vue";
 
 import { mapActions } from "vuex";
 
@@ -62,7 +62,9 @@ export default {
           showgrid: true,
           tickmode: "array",
           tickvals: this.stats.map((stat) => stat.id),
-          ticktext: this.stats.map((stat) => stat.name.trim() ? stat.name : stat.formula),
+          ticktext: this.stats.map((stat) =>
+            stat.name.trim() ? stat.name : stat.formula
+          ),
           gridcolor: "#757575",
         },
         yaxis: {

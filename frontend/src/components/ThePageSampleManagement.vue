@@ -78,9 +78,9 @@
 </template>
 
 <script>
-import TheLayoutSidebar from "./TheLayoutSidebar";
-import ThePaneBrowserSample from "./ThePaneBrowserSample";
-import BaseTable from "./BaseTable";
+import TheLayoutSidebar from "./TheLayoutSidebar.vue";
+import ThePaneBrowserSample from "./ThePaneBrowserSample.vue";
+import BaseTable from "./BaseTable.vue";
 
 import { bindState } from "$lib/store";
 import { mapActions, mapGetters } from "vuex";

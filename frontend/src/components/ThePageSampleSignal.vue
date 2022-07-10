@@ -16,12 +16,11 @@
 </template>
 
 <script>
-
-import TheLayoutSidebar from "./TheLayoutSidebar";
-import ThePaneBrowserSample from "./ThePaneBrowserSample";
-import ThePaneBrowserTarget from "./ThePaneBrowserTarget";
-import ThePaneChartSampleSignalSumSpectrum from "./ThePaneChartSampleSignalSumSpectrum";
-import ThePaneChartSampleSignalTimeseries from './ThePaneChartSampleSignalTimeseries.vue';
+import TheLayoutSidebar from "./TheLayoutSidebar.vue";
+import ThePaneBrowserSample from "./ThePaneBrowserSample.vue";
+import ThePaneBrowserTarget from "./ThePaneBrowserTarget.vue";
+import ThePaneChartSampleSignalSumSpectrum from "./ThePaneChartSampleSignalSumSpectrum.vue";
+import ThePaneChartSampleSignalTimeseries from "./ThePaneChartSampleSignalTimeseries.vue";
 
 export default {
   name: "ThePageSampleSignal",
@@ -31,6 +30,6 @@ export default {
     ThePaneBrowserSample,
     ThePaneChartSampleSignalSumSpectrum,
     ThePaneChartSampleSignalTimeseries,
-  }
+  },
 };
 </script>

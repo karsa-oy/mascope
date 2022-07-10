@@ -9,7 +9,7 @@
 </template>
 
 <script>
-import BaseChartPlotly from "./BaseChartPlotly";
+import BaseChartPlotly from "./BaseChartPlotly.vue";
 
 import { mapActions } from "vuex";
 

@@ -7,7 +7,7 @@
 import { mapActions, mapMutations, mapGetters } from "vuex";
 import { bindState } from "$lib/store";
 
-import BaseBrowser from "./BaseBrowser";
+import BaseBrowser from "./BaseBrowser.vue";
 
 export default {
   name: "ThePaneBrowserSample",

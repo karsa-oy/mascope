@@ -14,13 +14,13 @@ Vue.config.productionTip = false
 
 import VueRouter from 'vue-router';
 
-import ThePageHome from "./components/ThePageHome";
-import ThePageBatchOverview from "./components/ThePageBatchOverview";
-import ThePageDataManagement from "./components/ThePageDataManagement";
-import ThePageSampleSignal from "./components/ThePageSampleSignal";
-import ThePageSampleManagement from "./components/ThePageSampleManagement";
-import ThePageMzCalibration from "./components/ThePageMzCalibration";
-import ThePageSettings from "./components/ThePageSettings";
+import ThePageHome from "./components/ThePageHome.vue";
+import ThePageBatchOverview from "./components/ThePageBatchOverview.vue";
+import ThePageDataManagement from "./components/ThePageDataManagement.vue";
+import ThePageSampleSignal from "./components/ThePageSampleSignal.vue";
+import ThePageSampleManagement from "./components/ThePageSampleManagement.vue";
+import ThePageMzCalibration from "./components/ThePageMzCalibration.vue";
+import ThePageSettings from "./components/ThePageSettings.vue";
 
 Vue.use(VueRouter);
 
@@ -38,7 +38,7 @@ const router = new VueRouter({
   }, {
     path: '/sample-signal',
     component: ThePageSampleSignal
-  },{
+  }, {
     path: '/sample-management',
     component: ThePageSampleManagement
   }, {
@@ -53,24 +53,9 @@ const router = new VueRouter({
   }]
 });
 
-// Directives 
-
-import Cleave from "cleave.js";
-
-Vue.directive('cleave', {
-  bind(el, binding) {
-    const input = el.querySelector("input");
-    input._vCleave = new Cleave(input, binding.value);
-  },
-  unbind(el) {
-    const input = el.querySelector("input");
-    input._vCleave.destroy();
-  },
-});
-
 // App
 
-import App from './App';
+import App from './App.vue';
 import store from './store';
 
 new Vue({

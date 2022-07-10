@@ -4,7 +4,7 @@
 </template>
 
 <script>
-import BaseMenuBar from "./BaseMenuBar";
+import BaseMenuBar from "./BaseMenuBar.vue";
 
 import { mapGetters, mapActions } from "vuex";
 

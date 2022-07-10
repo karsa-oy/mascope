@@ -78,9 +78,9 @@
 </template>
 
 <script>
-import BaseTagMatch from "./BaseTagMatch";
+import BaseTagMatch from "./BaseTagMatch.vue";
 
-const cloneDeep = require("lodash.clonedeep");
+import { cloneDeep } from "lodash";
 
 let doNothing = () => ({});
 

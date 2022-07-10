@@ -82,8 +82,8 @@
 </template>
 
 <script>
-import TheLayoutSidebar from "./TheLayoutSidebar";
-import BaseTable from "./BaseTable";
+import TheLayoutSidebar from "./TheLayoutSidebar.vue";
+import BaseTable from "./BaseTable.vue";
 
 import table from "$lib/table";
 

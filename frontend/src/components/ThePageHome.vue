@@ -3,93 +3,89 @@
     <section style="padding: 1em 0em 2em 0em">
       <h1 class="title is-3">Karsa Mascope</h1>
     </section>
-      <div class="columns">
-        <div class="column is-half">
-          <template v-if="!workspaceSelected">
-            <section style="padding: 1em 0em 2em 0em">
-              <h1 class="title is-4">Workspaces:</h1>
-            </section>
-            <section class="base-tile-container">
-              <base-workspace-tile
-                v-for="workspace in workspaces"
-                :key="workspace.id"
-                :workspace="workspace"
-              ></base-workspace-tile>
-            </section>
-            <section style="padding: 0.5em">
-              <b-button
-                type="is-primary"
-                style="position: fixed; left: 5em; bottom: 2em"
-                @click="
-                  () => {
-                    modalProps = {
-                      action: 'create',
-                    };
-                    activateModal({
-                      modal: 'workspaceSave',
-                    });
-                  }
-                "
-              >
-                Create workspace
-              </b-button>
-            </section>
-          </template>
-          <template v-else>
-            <section style="padding: 2em 2em 2em 2em">
-              <h1 class="title is-3">{{ workspaceHomeText }}</h1>
-            </section>
-          </template>
-        </div>
-        <div class="column is-half">
+    <div class="columns">
+      <div class="column is-half">
+        <template v-if="!workspaceSelected">
           <section style="padding: 1em 0em 2em 0em">
-            <h1 class="title is-4">Recent acquisitions:</h1>
+            <h1 class="title is-4">Workspaces:</h1>
           </section>
-          <section>
-            <b-button
-              type="is-primary"
-              @click="getRecentAcquisitions"
-            >
-              <b-icon icon="reload"></b-icon>
-            </b-button>
+          <section class="base-tile-container">
+            <base-workspace-tile
+              v-for="workspace in workspaces"
+              :key="workspace.id"
+              :workspace="workspace"
+            ></base-workspace-tile>
           </section>
-          <base-table
-            :key="sampleFileTableDataKey"
-            :rows="sampleFileRows"
-            :cols="sampleFileCols"
-            :checkable="false"
-            :searchable="true"
-            :height="sampleFileTableHeight"
-            @selectRows=";"
-          >
-          </base-table>
           <section style="padding: 0.5em">
             <b-button
               type="is-primary"
-              style="position: fixed; right: 5em; bottom: 2em"
+              style="position: fixed; left: 5em; bottom: 2em"
               @click="
                 () => {
                   modalProps = {
                     action: 'create',
                   };
                   activateModal({
-                    modal: 'sampleFileAttributesSave',
+                    modal: 'workspaceSave',
                   });
                 }
               "
             >
-              Save Sample File Attributes
+              Create workspace
             </b-button>
           </section>
-        </div>
+        </template>
+        <template v-else>
+          <section style="padding: 2em 2em 2em 2em">
+            <h1 class="title is-3">{{ workspaceHomeText }}</h1>
+          </section>
+        </template>
       </div>
+      <div class="column is-half">
+        <section style="padding: 1em 0em 2em 0em">
+          <h1 class="title is-4">Recent acquisitions:</h1>
+        </section>
+        <section>
+          <b-button type="is-primary" @click="getRecentAcquisitions">
+            <b-icon icon="reload"></b-icon>
+          </b-button>
+        </section>
+        <base-table
+          :key="sampleFileTableDataKey"
+          :rows="sampleFileRows"
+          :cols="sampleFileCols"
+          :checkable="false"
+          :searchable="true"
+          :height="sampleFileTableHeight"
+        >
+        </base-table>
+        <section style="padding: 0.5em">
+          <b-button
+            type="is-primary"
+            style="position: fixed; right: 5em; bottom: 2em"
+            @click="
+              () => {
+                modalProps = {
+                  action: 'create',
+                };
+                activateModal({
+                  modal: 'sampleFileAttributesSave',
+                });
+              }
+            "
+          >
+            Save Sample File Attributes
+          </b-button>
+        </section>
+      </div>
+    </div>
   </the-layout-sidebar>
 </template>
 
 <script>
-import TheLayoutSidebar from "./TheLayoutSidebar";
-import BaseTable from "./BaseTable";
-import BaseWorkspaceTile from "./BaseWorkspaceTile";
+import TheLayoutSidebar from "./TheLayoutSidebar.vue";
+import BaseTable from "./BaseTable.vue";
+import BaseWorkspaceTile from "./BaseWorkspaceTile.vue";
 
 import { bindState } from "$lib/store";
 
@@ -102,7 +98,7 @@ export default {
     BaseWorkspaceTile,
     TheLayoutSidebar,
   },
-  data: function() {
+  data: function () {
     return {
       sampleFileTableDataKey: 0,
     };
@@ -136,7 +132,7 @@ export default {
       }
     },
   },
-  created: function(){
+  created: function () {
     this.getRecentAcquisitions();
   },
   methods: {
@@ -147,13 +143,14 @@ export default {
       activateModal: "modal/activate",
     }),
     getRecentAcquisitions() {
-      let d1 = new Date;
+      let d1 = new Date();
       d1.setHours(0, 0, 0, 0);
-      this.listSampleFiles({filters: {
-        column: "datetime_utc",
-        min_value: d1.toISOString(),
-        max_value: new Date().toISOString(),
-        }
+      this.listSampleFiles({
+        filters: {
+          column: "datetime_utc",
+          min_value: d1.toISOString(),
+          max_value: new Date().toISOString(),
+        },
       });
     },
   },

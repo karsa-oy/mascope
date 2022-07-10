@@ -9,11 +9,11 @@
 </template>
 
 <script>
-import TheModalTargetCollectionOp from "./TheModalTargetCollectionOp";
-import TheModalWorkspaceSave from "./TheModalWorkspaceSave";
-import TheModalSampleBatchOp from "./TheModalSampleBatchOp";
-import TheModalSampleFileAttributesSave from "./TheModalSampleFileAttributesSave";
-import TheModalSampleItemAttributesSave from "./TheModalSampleItemAttributesSave";
+import TheModalTargetCollectionOp from "./TheModalTargetCollectionOp.vue";
+import TheModalWorkspaceSave from "./TheModalWorkspaceSave.vue";
+import TheModalSampleBatchOp from "./TheModalSampleBatchOp.vue";
+import TheModalSampleFileAttributesSave from "./TheModalSampleFileAttributesSave.vue";
+import TheModalSampleItemAttributesSave from "./TheModalSampleItemAttributesSave.vue";
 
 export default {
   name: "TheModalAggregator",
