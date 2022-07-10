@@ -20,7 +20,10 @@ export const apiGatewayStoreMixin = {
         // initialize root API url
         initRootApiUrl(state) {
             gatewayLogGroup("Initalizing root API url");
-            let apiUrl = "http://127.0.0.1:5010"
+            let protocol = import.meta.env.VITE_API_PROTOCOL;
+            let host = import.meta.env.VITE_API_HOST;
+            let port = import.meta.env.VITE_API_PORT;
+            let apiUrl = `${protocol}://${host}:${port}`
             gatewayLog("Constructed apiUrl:", apiUrl);
             state.apiUrl = apiUrl;
             gatewayLog("Saved apiUrl to state.apiUrl");
