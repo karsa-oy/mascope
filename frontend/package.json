@@ -30,7 +30,6 @@
     "jquery-csv": "^1.0.21",
     "json2csv": "^5.0.6",
     "lodash.clonedeep": "^4.5.0",
-    "nanoid": "^3.2.0",
     "plotly.js-dist-min": "^2.12.1",
     "socket.io-client": "^4.4.1",
     "underscore": "^1.11.0",

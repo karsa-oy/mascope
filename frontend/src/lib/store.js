@@ -484,8 +484,6 @@ export function createTableModule({
                 (row) => selectedStatuses.includes(row.status),
             selectedRows: (state, getters) =>
                 state.rows.filter(getters['selected']),
-            selectedIds: (state, getters) =>
-                getters['selectedRows'].map(row => row.id),
             selectedRow: (state, getters) => {
                 let selectedRows = getters['selectedRows'];
                 if (singleSelect) {
@@ -495,8 +493,8 @@ export function createTableModule({
                         default: {
                             console.error(
                                 `${namespace} is configured for singleSelect`
-                                + `but multiple rows are selected; the module`
-                                + `is likely in a bad state.`
+                                + ` but multiple rows are selected; the module`
+                                + ` is likely in a bad state.`
                             )
                         }
                     }
@@ -507,18 +505,6 @@ export function createTableModule({
                         default: return null
                     }
                 }
-            },
-            selectedId: (state, getters) => {
-                if (singleSelect) {
-                    let selectedRow = getters['selectedRow'];
-                    return selectedRow ? selectedRow.id : null;
-                } else {
-                    console.error(
-                        `${namespace} is not configured with singleSelect;`
-                        + `use selectedIds or reconfigure the store module`
-                    );
-                }
-
             },
             // focus
             focused: () =>

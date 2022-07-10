@@ -11,7 +11,7 @@
 <script>
 import BaseChartPlotly from "./BaseChartPlotly.vue";
 
-import { glasbeyHv } from "$lib/colorcet";
+import { glasbeyHv } from "$lib/styles";
 import { mapActions } from "vuex";
 
 export default {

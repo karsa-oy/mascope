@@ -1,17 +1,7 @@
-import { customAlphabet } from "nanoid";
 import alasql from 'alasql';
 import * as xlsx from 'xlsx/xlsx.mjs';
 
 export default {
-    // TODO - decouple ID generators from the table modules
-    genId(length = 16) {
-        let id = generateId(length);
-        return id;
-    },
-    genIds(number, length = 16) {
-        return Array(number).fill()
-            .map(() => this.genId(length));
-    },
     select(rows, filters) {
         let result;
         switch (typeof filters) {
@@ -37,38 +27,6 @@ export default {
         }
         return result;
     },
-    remove(rows, filters) {
-        let result;
-        switch (typeof filters) {
-            case 'object':
-                if (filters) {
-                    result = rows.filter((row) => {
-                        let partialMatch = Object.entries(filters)
-                            .some(([field, filter]) => {
-                                let value = row[field]
-                                if (filter instanceof Array) {
-                                    return filter.includes(value)
-                                } else {
-                                    return value == filter
-                                }
-                            });
-                        return !partialMatch;
-                    })
-                } else {
-                    result = rows;
-                }
-                break;
-            case 'string':
-                switch (filters) {
-                    case '*':
-                        result = [];
-                        break;
-                    default:
-                        throw Error("Unknown filter format in remove operation");
-                }
-        }
-        return result;
-    },
     get(rows, filters) {
         let results = this.select(rows, filters);
         switch (results.length) {
@@ -80,16 +38,6 @@ export default {
                 console.log(rows.map(row => row.id))
                 console.log(rows, filters)
                 throw `There is no unique row`
-        }
-    },
-    update(rows, newRow, partial = true) {
-        let oldRow = this.get(rows, { id: newRow.id });
-        if (partial) {
-            for (let field in newRow) {
-                oldRow[field] = newRow[field];
-            }
-        } else {
-            oldRow = newRow;
         }
     },
     query(sql, tables) {
@@ -170,8 +118,3 @@ export default {
         }
     }
 }
-
-let generateId = (length) => (customAlphabet(
-    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890',
-    length
-)());

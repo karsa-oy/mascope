@@ -21,8 +21,9 @@
               });
             }
           "
-          >Edit</b-dropdown-item
         >
+          Edit
+        </b-dropdown-item>
         <b-dropdown-item
           aria-role="listitem"
           @click="
@@ -36,8 +37,9 @@
               });
             }
           "
-          >Delete</b-dropdown-item
         >
+          Delete
+        </b-dropdown-item>
       </b-dropdown>
     </header>
     <div class="card-content">
