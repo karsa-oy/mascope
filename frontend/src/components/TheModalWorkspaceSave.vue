@@ -84,9 +84,8 @@
 </template>
 
 <script>
-import { bindState } from "$lib/store";
-
-import { mapMutations, mapActions } from "vuex";
+import { mapMutations } from "vuex";
+import { sync, call, get } from "vuex-pathify";
 
 import table from "$lib/table";
 
@@ -100,10 +99,12 @@ export default {
     };
   },
   computed: {
-    ...bindState({
+    ...get({
+      workspaces: "app/workspaces",
       modalActive: "modal/workspaceSaveActive",
+    }),
+    ...sync({
       modalProps: "modal/workspaceSaveProps",
-      workspaces: "workspace/rows",
     }),
     action() {
       return this.modalProps.action;
@@ -148,7 +149,7 @@ export default {
     ...mapMutations({
       deactivateModal: "modal/deactivate",
     }),
-    ...mapActions({
+    ...call({
       deleteWorkspace: "workspace/delete",
       updateWorkspace: "workspace/update",
       createWorkspace: "workspace/create",

@@ -16,7 +16,7 @@ from time import sleep
 from ctypes import create_string_buffer
 import inspect
 
-from backend.services.file_io import zarr_sdk
+from backend.lib.file import zarr_sdk
 
 from .instrument import KInstrument
 

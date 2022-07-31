@@ -50,31 +50,30 @@
 
 
 <script>
-import { mapMutations, mapActions } from "vuex";
-import { bindState } from "$lib/store";
+import { mapMutations } from "vuex";
+import { sync, call } from "vuex-pathify";
 
 export default {
   name: "BaseWorkspaceTile",
   props: {
     workspace: {
-      type: Object,
       required: true,
     },
   },
   computed: {
-    ...bindState({
+    ...sync({
       modalProps: "modal/workspaceSaveProps",
     }),
   },
   methods: {
-    ...mapActions({
-      workspaceToggle: "workspace/toggle",
+    ...call({
+      workspaceLoad: "workspace/load",
     }),
     ...mapMutations({
       activateModal: "modal/activate",
     }),
     onClick() {
-      this.workspaceToggle(this.workspace);
+      this.workspaceLoad(this.workspace);
     },
   },
 };

@@ -27,7 +27,7 @@ export default {
       modalTargetCollectionOpProps: "modal/targetCollectionOpProps",
     }),
     ...mapGetters({
-      batchSelected: "sample/batch/selectedRows",
+      batchActive: "batch/activeRows",
       matchesExist: "match/exists",
       sampleItemFocused: "sample/item/focusedRow",
       targetCollectionsSelected: "target/collection/selectedRows",
@@ -247,8 +247,8 @@ export default {
     },
   },
   watch: {
-    batchSelected: function () {
-      if (!this.batchSelected.length) {
+    batchActive: function () {
+      if (!this.batchActive.length) {
         this.collectionGetAll();
       }
     },

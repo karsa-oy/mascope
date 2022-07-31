@@ -10,100 +10,154 @@
       @after-enter="initData"
       :type="actionIs('delete') ? 'is-danger' : 'is-primary'"
     >
-      <div class="modal-card" style="width: 500px">
-        <header class="modal-card-head">
-          <h2 class="subtitle">{{ modalTitle }}</h2>
-        </header>
-        <section class="modal-card-body" style="min-height: 250px">
-          <b-field v-if="actionIs('create', 'update')" label="Name">
-            <b-input v-model="batchName"></b-input>
-          </b-field>
-          <b-field v-if="actionIs('create', 'update')" label="Description">
-            <b-input v-model="batchDesc"></b-input>
-          </b-field>
-          <p v-if="actionIs('delete')">
-            Are you sure you want to delete this sample batch?
-          </p>
-        </section>
-        <footer class="modal-card-foot">
-          <b-button
-            type="is-warning"
-            icon-left="close"
-            expanded
-            @click="deactivateModal"
-          >
-            Cancel
-          </b-button>
-          <b-button
-            v-if="actionIs('create')"
-            type="is-primary"
-            icon-left="content-save"
-            expanded
-            @click="
-              () => {
-                createBatch([newBatch]);
-                deactivateModal();
-              }
-            "
-          >
-            Create
-          </b-button>
-          <b-button
-            v-if="actionIs('update')"
-            type="is-primary"
-            icon-left="content-save"
-            expanded
-            @click="
-              () => {
-                updateBatch([newBatch]);
-                deactivateModal();
-              }
-            "
-          >
-            Save
-          </b-button>
-          <b-button
-            v-if="actionIs('delete')"
-            type="is-danger"
-            icon-left="delete"
-            expanded
-            @click="
-              () => {
-                deleteBatch([oldBatch.id]);
-                deactivateModal();
-              }
-            "
-          >
-            Delete
-          </b-button>
-        </footer>
-      </div>
+      <template v-if="actionIs('create', 'update')">
+        <div class="modal-card" style="height: 800px">
+          <header class="modal-card-head">
+            <h2 class="subtitle">{{ modalTitle }}</h2>
+          </header>
+          <section class="modal-card-body" style="min-height: 250px">
+            <b-tabs type="is-boxed">
+              <b-tab-item label="Info">
+                <b-field label="Name">
+                  <b-input v-model="batchName"></b-input>
+                </b-field>
+                <b-field label="Description">
+                  <b-input v-model="batchDesc"></b-input>
+                </b-field>
+              </b-tab-item>
+              <b-tab-item label="Target collections">
+                <b-table
+                  :data="allTargetCollections"
+                  :columns="[
+                    { field: 'name', label: 'Name' },
+                    { field: 'description', label: 'Description' },
+                  ]"
+                  checkable
+                  :checked-rows.sync="targetCollections"
+                >
+                </b-table>
+              </b-tab-item>
+              <b-tab-item label="Ionization mechanisms">
+                {{ ionMechanisms }}
+                <b-table
+                  :data="allIonMechanisms"
+                  :columns="[
+                    { field: 'mechanism', label: 'Mechanism' },
+                    { field: 'polarity', label: 'Polarity' },
+                  ]"
+                  checkable
+                  :checked-rows.sync="ionMechanisms"
+                >
+                </b-table>
+              </b-tab-item>
+              <b-tab-item label="Settings"> MATCHP - todo </b-tab-item>
+            </b-tabs>
+          </section>
+          <footer class="modal-card-foot">
+            <b-button
+              type="is-warning"
+              icon-left="close"
+              expanded
+              @click="deactivateModal"
+            >
+              Cancel
+            </b-button>
+            <b-button
+              type="is-primary"
+              icon-left="content-save"
+              expanded
+              @click="
+                () => {
+                  actionIs('create')
+                    ? createBatch([newBatch])
+                    : updateBatch([newBatch]);
+                  deactivateModal();
+                }
+              "
+            >
+              Save
+            </b-button>
+          </footer>
+        </div>
+      </template>
+      <template v-if="actionIs('delete')">
+        <div class="modal-card" style="width: 500px">
+          <header class="modal-card-head">
+            <h2 class="subtitle">{{ modalTitle }}</h2>
+          </header>
+          <section class="modal-card-body" style="min-height: 250px">
+            <p>Are you sure you want to delete this sample batch?</p>
+          </section>
+          <footer class="modal-card-foot">
+            <b-button
+              type="is-warning"
+              icon-left="close"
+              expanded
+              @click="deactivateModal"
+            >
+              Cancel
+            </b-button>
+            <b-button
+              type="is-danger"
+              icon-left="delete"
+              expanded
+              @click="
+                () => {
+                  deleteBatch([oldBatch.id]);
+                  deactivateModal();
+                }
+              "
+            >
+              Delete
+            </b-button>
+          </footer>
+        </div>
+      </template>
     </b-modal>
   </section>
 </template>
 
 <script>
-import { bindState } from "$lib/store";
-
-import { mapMutations, mapActions, mapGetters } from "vuex";
+import { mapMutations } from "vuex";
+import { get, sync } from "vuex-pathify";
 
 export default {
-  name: "",
+  name: "TheModalSampleBatchOp",
   components: {},
   data: function () {
     return {
       batchName: null,
       batchDesc: null,
+      defaultConfig: {
+        // target params
+        targetCollections: [],
+        ionMechanisms: [
+          "fVuWwQ82sJI", // +Br-
+          "5rm2sP6epAs", // +H+
+        ],
+        isotopeAbundanceMin: 10, // %
+        // match params
+        mzTolerance: 10, // ppm
+        isotopeRatioTolerance: 10, // %
+        // peak params
+        peakIntensityMin: 1,
+        peakSeperationMin: 3,
+      },
+      ionMechanisms: [],
+      targetCollections: [],
     };
   },
+  created() {},
   computed: {
-    ...bindState({
+    ...sync({
       modalActive: "modal/sampleBatchOpActive",
       modalProps: "modal/sampleBatchOpProps",
-      batches: "sample/batch/rows",
+      allIonMechanisms: "app/ionMechanisms",
+      allTargetCollections: "app/targetCollections",
     }),
-    ...mapGetters({
-      workspaceSelected: "workspace/selectedRow",
+    ...get({
+      workspaceActive: "workspace/active",
+      batches: "workspace/batches",
     }),
     action() {
       return this.modalProps.action;
@@ -116,14 +170,14 @@ export default {
         return {
           name: this.batchName,
           description: this.batchDesc,
-          workspaceId: this.workspaceSelected.id,
+          workspaceId: this.workspaceActive.id,
         };
       } else if (this.actionIs("update")) {
         return {
           id: this.oldBatch.id,
           name: this.batchName,
           description: this.batchDesc,
-          workspaceId: this.workspaceSelected.id,
+          workspaceId: this.workspaceActive.id,
         };
       } else {
         return null;
@@ -148,11 +202,6 @@ export default {
   methods: {
     ...mapMutations({
       deactivateModal: "modal/deactivate",
-    }),
-    ...mapActions({
-      deleteBatch: "sample/batch/delete",
-      updateBatch: "sample/batch/update",
-      createBatch: "sample/batch/create",
     }),
     actionIs(...actions) {
       return actions.includes(this.action);

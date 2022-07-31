@@ -6,7 +6,7 @@ from threading import Thread
 from multiprocessing import Event
 
 from backend.lib.util import copy_dict
-from backend.services.file_io import zarr_sdk
+from backend.lib.file import zarr_sdk
 
 MAX_RESPONSE_TIME = 5       # secs to wait for notification acknowledgement
 PROGRESS_SHIFT = 10         # shift with acknowledged progress

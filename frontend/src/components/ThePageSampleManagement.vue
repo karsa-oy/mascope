@@ -44,8 +44,8 @@
               <p>
                 <b>
                   {{
-                    batchSelected
-                      ? "Items to add to batch: " + batchSelected.name
+                    batchActive
+                      ? "Items to add to batch: " + batchActive.name
                       : "Please select a batch"
                   }}
                 </b>
@@ -68,7 +68,7 @@
         style="position: fixed; right: 5em; bottom: 2em"
         icon-left="content-save"
         type="is-primary"
-        :disabled="!sampleItemRows.length || !batchSelected"
+        :disabled="!sampleItemRows.length || !batchActive"
         rounded
       >
         Add Items
@@ -102,8 +102,8 @@ export default {
   },
   computed: {
     ...mapGetters({
-      batchSelected: "sample/batch/selectedRow",
-      workspaceSelected: "workspace/selectedRow",
+      batchActive: "batch/activeRow",
+      workspaceActive: "workspace/selectedRow",
     }),
     ...bindState({
       sampleFileSchema: "sample/file/schema/row",
@@ -153,8 +153,8 @@ export default {
     itemsAdd() {
       let n = this.sampleItemRows.length;
       let s = n > 1 ? "s" : "";
-      let w = this.workspaceSelected.name;
-      let b = this.batchSelected.name;
+      let w = this.workspaceActive.name;
+      let b = this.batchActive.name;
       this.$buefy.dialog.confirm({
         title: "Batch Items",
         message: `
@@ -164,7 +164,7 @@ export default {
         onConfirm: () => {
           let rows = this.sampleItemRows.map((row) => ({
             ...row,
-            sampleBatchId: this.batchSelected.id,
+            sampleBatchId: this.batchActive.id,
           }));
           this.sampleItemCreate(rows);
         },

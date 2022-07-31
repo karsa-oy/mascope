@@ -6,6 +6,7 @@
 <script>
 import { mapActions, mapMutations, mapGetters } from "vuex";
 import { bindState } from "$lib/store";
+import { sync, get, call } from "vuex-pathify";
 
 import BaseBrowser from "./BaseBrowser.vue";
 
@@ -17,11 +18,15 @@ export default {
   computed: {
     ...mapGetters({
       itemFocused: "sample/item/focusedRow",
-      batchSelected: "sample/batch/selectedRow",
+      batchActive: "batch/activeRow",
       itemsSelected: "sample/item/selectedRows",
     }),
-    ...bindState({
-      batchRows: "sample/batch/rows",
+    ...get({
+      batchRows: "workspace/batches",
+      itemRows: "batch/sampleItems",
+      targetCollectionRows: "batch/targetCollections",
+    }),
+    ...sync({
       itemRows: "sample/item/rows",
       targetCollectionRows: "target/collection/rows",
       modalSampleBatchOpProps: "modal/sampleBatchOpProps",
@@ -47,8 +52,8 @@ export default {
         },
       ];
     },
-    batchSelectedCount() {
-      return this.batchSelected ? 1 : 0;
+    batchActiveCount() {
+      return this.batchActive ? 1 : 0;
     },
     itemSelectedCount() {
       return this.itemsSelected ? this.itemsSelected.length : 0;
@@ -68,7 +73,7 @@ export default {
         onClick: this.batchDelete,
       };
       let batchButtons =
-        this.batchSelectedCount == 0
+        this.batchActiveCount == 0
           ? [createBatchButton]
           : [createBatchButton, updateBatchButton, deleteBatchButton];
       // sample items
@@ -97,8 +102,8 @@ export default {
       return [...batchButtons, ...itemButtons, ...calibrateButtons];
     },
     opened() {
-      return this.batchSelected && this.itemRows.length > 0
-        ? [this.batchSelected]
+      return this.batchActive && this.itemRows.length > 0
+        ? [this.batchActive]
         : [];
     },
   },
@@ -124,7 +129,7 @@ export default {
     batchDelete() {
       this.modalSampleBatchOpProps = {
         action: "delete",
-        batch: this.batchSelected,
+        batch: this.batchActive,
       };
       this.activateModal({
         modal: "sampleBatchOp",
@@ -138,7 +143,7 @@ export default {
     batchUpdate() {
       this.modalSampleBatchOpProps = {
         action: "update",
-        batch: this.batchSelected,
+        batch: this.batchActive,
       };
       this.activateModal({
         modal: "sampleBatchOp",
@@ -172,7 +177,7 @@ export default {
     itemDelete() {
       this.$buefy.dialog.confirm({
         title: "Deleting items",
-        message: `Delete ${this.itemsSelected.length} item(s) from ${this.batchSelected.name} ?`,
+        message: `Delete ${this.itemsSelected.length} item(s) from ${this.batchActive.name} ?`,
         confirmText: "Delete",
         onConfirm: () => {
           let itemIds = this.itemsSelected.map((item) => item.id);

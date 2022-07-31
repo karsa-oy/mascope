@@ -1,37 +1,29 @@
-import { createConnectedStore } from '$lib/api';
+import Vue from 'vue'
+import Vuex from 'vuex'
+import pathify from 'vuex-pathify'
 
 import logger from "./plugins/logger";
+import api from "./plugins/api";
 
-import calibration from "./modules/calibration";
-import config from "./modules/config";
-import dev from "./modules/dev";
+import app from './modules/app';
+import workspace from './modules/workspace';
+import batch from './modules/batch';
 import key from './modules/key';
-import match from "./modules/match";
 import modal from './modules/modal';
-import sample from "./modules/sample";
-import target from "./modules/target";
-import template from "./modules/template";
-import visualization from "./modules/visualization";
-import workspace from "./modules/workspace";
 
-export default createConnectedStore({
-	state: {
-		query: null
-	},
+Vue.use(Vuex)
+
+export default new Vuex.Store({
 	modules: {
-		calibration,
-		config,
-		dev,
-		key,
-		match,
-		modal,
-		sample,
-		target,
-		template,
-		visualization,
+		app,
 		workspace,
+		batch,
+		key,
+		modal
 	},
-	plugins: [
-		logger
+	plugins: [ // plugin order matters!
+		logger, // logging first, so that next plugins log
+		pathify.plugin, // pathify is a dependency of the api plugin
+		api, // this last, so it has access to pathify
 	]
 });

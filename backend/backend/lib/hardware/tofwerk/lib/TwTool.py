@@ -30,7 +30,7 @@ if platform.architecture() == ('64bit', 'WindowsPE'):
 libnames = {'linux':'libtwtool.so', 'linux2':'libtwtool.so', 'darwin':'libtwtool.dylib', 'win32':'TwToolDll.dll'}
 
 # container overrides
-is_docker = os.environ.get('MASCOPE_ENV') == 'docker'
+is_docker = os.environ.get('MASCOPE_PRIVATE_ENV') == 'docker'
 libpath = 'linux_x86_64' if is_docker else libpath
 libname = 'libtwtool.so' if is_docker else libnames[sys.platform]
 

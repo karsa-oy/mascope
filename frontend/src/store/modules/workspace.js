@@ -1,11 +1,33 @@
-import { createTableModule } from "$lib/store";
+import { make } from 'vuex-pathify';
 
-export default createTableModule({
-    namespace: 'workspace',
-    children: [
-        'sample/batch',
-        'target/collection',
-    ],
-    loadWhen: 'always',
-    singleSelect: true,
-})
+const state = {
+    active: null,
+    batches: [],
+}
+
+export default {
+    namespaced: true,
+    state,
+    mutations: make.mutations(state),
+    actions: {
+        async load({ commit, rootState }, workspace) {
+            const dbcon = rootState.api.dbcon;
+            // reload sample batches
+            const batches = await dbcon.query(`--sql
+                SELECT * FROM sample_batch
+                WHERE workspace_id == '${workspace.workspace_id}';
+            `);
+            await commit('SET_BATCHES', batches.toArray());
+            await commit('SET_ACTIVE', workspace);
+        },
+        async unload({ commit }) {
+            commit('SET_ACTIVE', null);
+            commit('SET_BATCHES', []);
+        },
+        async onWorkspaceReload({ state, dispatch }, workspaceId) {
+            if (state.active == workspaceId) {
+                dispatch('load', workspaceId);
+            }
+        }
+    }
+}

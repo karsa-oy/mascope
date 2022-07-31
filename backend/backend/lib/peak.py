@@ -1,5 +1,5 @@
-from ..services.file_io import (load_file, zarr_sdk)
-from .hardware.tofwerk.lib.TwTool import TwMassCalibrate, TwTof2Mass
+from backend.lib.file import load_file, zarr_sdk
+#from .hardware.tofwerk.lib.TwTool import TwMassCalibrate, TwTof2Mass
 
 import numpy as np
 
@@ -50,14 +50,24 @@ def detect_peaks(cache_item):
     return cache_item
 
 
+def get_peaks(
+        cache_item
+        ):
+
+    peaks = cache_item.peaks
+    peaks = peaks.dropna(dim='mz', how='all')
+
+    return peaks.compute()
+
+
 def filter_peaks(
-    cache_item,
-    mz_range,
-    t_range,
-    height=None,
-    distance=None,
-    width=None
-    ):
+        cache_item,
+        mz_range,
+        t_range,
+        height=None,
+        distance=None,
+        width=None
+        ):
 
     peaks = cache_item.peaks.sel(
         mz=slice(*mz_range),
@@ -72,7 +82,7 @@ def filter_peaks(
         # Evaluate height condition
         keep_height = peak_heights > height
         keep = np.logical_and(keep, keep_height)
-    
+
     if distance is not None:
         peak_indices = peaks.tof.values
         # Evaluate distance condition
@@ -82,9 +92,9 @@ def filter_peaks(
             distance
         )
         keep = np.logical_and(keep, keep_distance)
-    
+
     return peaks[keep].compute()
-    
+
 
 def mz_calibrate_tof(peak_tof, peak_mz, exact_mz):
     # Prepare arguments

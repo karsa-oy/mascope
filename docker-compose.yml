@@ -10,12 +10,12 @@ services:
     stdin_open: true  
     tty: true
     network_mode: "host"
-    environment:
-      - MASCOPE_ENV=docker
-      - MASCOPE_DATADIR=/data
+    env_file: .env.development
   frontend:
     build:
       context: ./frontend
     volumes:
+      - ./testdata:/data
       - ./frontend/src:/frontend/src
     network_mode: "host"
+    env_file: .env.development

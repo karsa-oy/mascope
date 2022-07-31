@@ -17,24 +17,15 @@
           </header>
           <section class="modal-card-body">
             <b-field label="Name">
-              <b-input
-                v-model="newCollectionName"
-                :disabled="true"
-              ></b-input>
+              <b-input v-model="newCollectionName" :disabled="true"></b-input>
             </b-field>
-            <b-field
-              label="Description"
-            >
-              <b-input
-                v-model="newCollectionDesc"
-                :disabled="true"
-                >
-              </b-input>
+            <b-field label="Description">
+              <b-input v-model="newCollectionDesc" :disabled="true"> </b-input>
             </b-field>
             <b-field label="Add to sample batch">
               <base-table
                 :rows="sampleBatches"
-                :cols="[{'field': 'name', 'label': 'Batch'}]"
+                :cols="[{ field: 'name', label: 'Batch' }]"
                 :checkable="true"
                 @selectRows="selectBatchesToAddTo"
               >
@@ -87,9 +78,9 @@
               v-if="sampleBatchSelected"
               label="Add to selected sample batch"
             >
-              <b-checkbox v-model="addToSampleBatch"
-                >Add to {{ sampleBatchSelected.name }}</b-checkbox
-              >
+              <b-checkbox v-model="addToSampleBatch">
+                Add to {{ sampleBatchSelected.name }}
+              </b-checkbox>
             </b-field>
             <base-spreadsheet-input
               label="Target compounds"
@@ -109,7 +100,10 @@
                       name: newCollectionName,
                       description: newCollectionDesc,
                       targetCompounds: newTargetCompounds,
-                      sampleBatches: addToSampleBatch && sampleBatchSelected ? [sampleBatchSelected] : [],
+                      sampleBatches:
+                        addToSampleBatch && sampleBatchSelected
+                          ? [sampleBatchSelected]
+                          : [],
                     },
                   ]);
                   deactivateModal();
@@ -219,9 +213,8 @@
 </template>
 
 <script>
-import { bindState } from "$lib/store";
-
-import { mapActions, mapMutations } from "vuex";
+import { mapMutations } from "vuex";
+import { sync, call, get } from "vuex-pathify";
 
 import BaseSpreadsheetInput from "./BaseSpreadsheetInput.vue";
 import BaseTable from "./BaseTable.vue";
@@ -240,10 +233,12 @@ export default {
     };
   },
   computed: {
-    ...bindState({
-      sampleBatches: "sample/batch/rows",
-      modalActive: "modal/targetCollectionOpActive",
+    ...sync({
       modalProps: "modal/targetCollectionOpProps",
+    }),
+    ...get({
+      sampleBatches: "workspace/batches",
+      modalActive: "modal/targetCollectionOpActive",
     }),
     fields() {
       return this.cols.map((col) => col.field);
@@ -262,14 +257,14 @@ export default {
       ];
     },
     sampleBatchSelected() {
-      return this.$store.getters["sample/batch/selectedRow"];
+      return this.$store.getters["batch/activeRow"];
     },
   },
   methods: {
     ...mapMutations({
       deactivateModal: "modal/deactivate",
     }),
-    ...mapActions({
+    ...call({
       createTargetCollection: "target/collection/create",
       updateTargetCollection: "target/collection/update",
       deleteTargetCollection: "target/collection/delete",
@@ -287,7 +282,7 @@ export default {
       this.newTargetCompounds = rows;
     },
     selectBatchesToAddTo(rows) {
-      this.batchesToAddTo = rows.map(row => row.id);
+      this.batchesToAddTo = rows.map((row) => row.id);
     },
   },
 };

@@ -6,7 +6,7 @@
 <script>
 import BaseMenuBar from "./BaseMenuBar.vue";
 
-import { mapGetters, mapActions } from "vuex";
+import { get, call } from "vuex-pathify";
 
 export default {
   name: "TheMainMenu",
@@ -14,8 +14,8 @@ export default {
     BaseMenuBar,
   },
   computed: {
-    ...mapGetters({
-      workspaceSelected: "workspace/selectedRow",
+    ...get({
+      workspaceActive: "workspace/active",
     }),
     buttons() {
       return [
@@ -29,31 +29,31 @@ export default {
           icon: "file-plus",
           label: "Sample management",
           path: "/sample-management",
-          visible: this.workspaceSelected,
+          visible: this.workspaceActive,
         },
         {
           icon: "format-horizontal-align-center",
           label: "m/z calibration",
           path: "/mz-calibration",
-          visible: this.workspaceSelected,
+          visible: this.workspaceActive,
         },
         {
           icon: "flask",
           label: "Batch overview",
           path: "/batch-overview",
-          visible: this.workspaceSelected,
+          visible: this.workspaceActive,
         },
         {
           icon: "sine-wave",
           label: "Sample signal",
           path: "/sample-signal",
-          visible: this.workspaceSelected,
+          visible: this.workspaceActive,
         },
         {
           icon: "table-multiple",
           label: "Data management",
           path: "/data-management",
-          visible: this.workspaceSelected,
+          visible: this.workspaceActive,
         },
       ].filter((b) => b.visible);
     },
@@ -69,15 +69,15 @@ export default {
           icon: "logout-variant",
           label: "Change workspace",
           path: "/",
-          onClick: this.workspaceDeselect,
+          onClick: this.workspaceUnload,
           visible: true,
         },
       ].filter((b) => b.visible);
     },
   },
   methods: {
-    ...mapActions({
-      workspaceDeselect: "workspace/selectNone",
+    ...call({
+      workspaceUnload: "workspace/unload",
     }),
   },
 };

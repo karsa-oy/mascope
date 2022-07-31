@@ -12,7 +12,7 @@ import numpy as np
 from threading import current_thread
 from time import sleep
 
-from backend.services.file_io import zarr_sdk
+from backend.lib.file import zarr_sdk
 from backend.lib.hardware.common.base_generator import (
     BaseFileStreamer,
     PROGRESS_SHIFT

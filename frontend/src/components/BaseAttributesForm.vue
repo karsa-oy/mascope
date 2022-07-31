@@ -191,7 +191,6 @@ export default {
       default: "",
     },
   },
-
   data() {
     return {
       loadedTemplate: null,

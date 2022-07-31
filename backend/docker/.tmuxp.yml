@@ -1,11 +1,13 @@
-session_name: karsa-services
+session_name: mascope
 windows:
-  - window_name: karsa services
-    layout: tiled
+  - window_name: server
+    layout: even-horizontal
+    panes:
+      - init server
+  - window_name: services
+    layout: main-horizontal
     panes:
       - init router --url 0.0.0.0
       - init file-io-service --ns TofDaq
-      - init sample-service
-      - init signal-service
-      - init target-service
-      - prep-visualization && init visualization-service
+      - init file-streaming-service --config=./backend/service/file_streamer_config/h5_localstore.yaml  --transit
+      - init file-streaming-service --config=./backend/service/file_streamer_config/raw_localstore.yaml  --transit
