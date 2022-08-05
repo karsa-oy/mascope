@@ -589,7 +589,6 @@ class H5Streamer(BaseFileStreamer, KInstrument):
                 }
             self.feed_tps_data(tps_data)
 
-
     def _update(self):
         """Update per acquisition attributes. If new data is available, feed into queues.
         """
@@ -624,7 +623,6 @@ class H5Streamer(BaseFileStreamer, KInstrument):
             # allow PROGRESS_SHIFT to make it quicker
             if not self.wait_for_ack(progress_shift=PROGRESS_SHIFT):
                 raise TimeoutError
-
 
     def run(self):
         # Main loop
@@ -685,7 +683,6 @@ class H5Streamer(BaseFileStreamer, KInstrument):
         # Out of main loop
         self.log(f"stopped {current_thread().name}")
         self.shutdown()
-
 
     #======== H5 extension of a streamer service communication protocol ===============
     def feed_tps_parameter_info(self):

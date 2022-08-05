@@ -49,8 +49,6 @@ class BaseFileStreamer(Thread):
             self.filename = self.fdata['filename']
             self.target_filename = '_'.join([self.client.instrument_name, self.filename]).replace(' ', '_')
             self.attrs = self.fdata['attrs']    # attrs normally contain sci data coming along with the sample
-            self.project = self.attrs.get('project', None)
-            self.experiment = self.attrs.get('experiment', None)
             if 'title' not in self.attrs:
                 self.attrs['title'] = self.filename
         init_sample_data()
@@ -66,8 +64,6 @@ class BaseFileStreamer(Thread):
         def reset_sample_data():
             self.filename = None
             self.target_filename = None
-            self.project = None
-            self.experiment = None
         with self.client.lock:
             self.client.in_progress.pop(self.job_id, None)
         self.request_id = None
@@ -174,8 +170,6 @@ class BaseFileStreamer(Thread):
                     'filename': self.target_filename,
                     'mz_range': [float(self.mz[0]), float(self.mz[-1])],
                     't_range': [0, self.length],
-                    'project': self.project,
-                    'experiment': self.experiment,
                 },
                 'context': {
                     **self.rcontext,
@@ -339,25 +333,6 @@ class BaseFileStreamer(Thread):
                 },
             }
             gen_notifications.append(dataset_updated)
-        # update sample_catalog, if project/experiment specified
-        if all([self.project, self.experiment]):
-            # save sample data to experiment, if project/experiment defined in request
-            sample_data = {
-                'filename': self.target_filename,
-                'experiment': self.experiment,
-                'project': self.project,
-                'attributes': [{'label': k, 'value': v} for (k,v) in self.attrs.items()],
-                'method': None,
-            }
-            sample_to_save = {
-                'name': 'save_sample',
-                'value': sample_data,
-                'context': {
-                    **self.rcontext,
-                    'namespace': '/',
-                    'room': None,
-                },
-            }
-            gen_notifications.append(sample_to_save)
+
         self.feed_notifications(gen_notifications, streamer_notifications)
     # ===Streamer service communication protocol implementation end=================
