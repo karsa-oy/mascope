@@ -9,7 +9,7 @@ Created on Tue Apr 09 13:08:29 2019
 
 import os
 import numpy as np
-from multiprocessing import Event, Queue
+from multiprocessing import Event, Queue, Lock
 from queue import Empty
 from threading import Thread
 from time import sleep
@@ -40,6 +40,7 @@ class RawStreamer(Thread):
             self,
             file_queue=Queue(),
             shutdown_event=Event(),
+            lock=Lock(),
             mz_precision=4
             ):
         print("RawStreamer initializing")
@@ -51,6 +52,7 @@ class RawStreamer(Thread):
         # Synchronization primitives
         self.file_queue = file_queue            # Queue for files to stream
         self.shutdown_event = shutdown_event    # Set to break out from main loop
+        self.lock = lock
         self.cancel_event = Event()             # Set to cancel current stream
         self.active = Event()                   # Acquisition active event
         self.spec_queue = Queue()               # Signal output queue
@@ -76,10 +78,12 @@ class RawStreamer(Thread):
         # == Get and feed mass spectrum data ==
         scan_no = self.speci + 1
         # Get the scan statistics from the RAW file for this scan number
-        scan_stats = self.raw.GetScanStatsForScanNumber(scan_no)
+        with self.lock:
+            scan_stats = self.raw.GetScanStatsForScanNumber(scan_no)
         # Get timestamp from scan stats
         ti = scan_stats.StartTime * 60. # [s]
-        scan = self.raw.GetSegmentedScanFromScanNumber(scan_no, scan_stats)
+        with self.lock:
+            scan = self.raw.GetSegmentedScanFromScanNumber(scan_no, scan_stats)
         # Map .NET arrays into numpy arrays
         mz = net2np_array(scan.Positions).astype(np.float32)
         spec = net2np_array(scan.Intensities).astype(np.float32)
@@ -201,9 +205,10 @@ class RawStreamer(Thread):
                 file_to_stream = self.file_queue.get(timeout=.1)
                 # Initialize Raw file reader
                 try:
-                    self.raw = ThermoBusiness.RawFileReaderFactory.ReadFile(
-                                                                    file_to_stream
-                                                                    )
+                    with self.lock:
+                        self.raw = ThermoBusiness.RawFileReaderFactory.ReadFile(
+                            file_to_stream
+                        )
                     self.raw.SelectInstrument(0, 1)
                 except Exception as e:
                     print("Error reading file %s: %s" %(file_to_stream, e))

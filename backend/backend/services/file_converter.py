@@ -7,7 +7,7 @@ from backend.lib.struct import AttrDict, LRUDict
 from backend.lib.util import parse_cmd_args
 from file_io import zarr_sdk
 
-from multiprocessing import Event, Queue
+from multiprocessing import Event, Queue, Lock
 from queue import Empty
 from threading import Thread
 from time import sleep
@@ -79,7 +79,10 @@ def handle_spec_data(data):
         zarr_sdk.finalize_signal_dataset({'value': data}, cache_item)
     elif spec_i < 0:
         # New file
-        cache_item = zarr_sdk.init_signal_dataset({'value': data})
+        try:
+            cache_item = zarr_sdk.init_signal_dataset({'value': data})
+        except FileExistsError:
+            print("File exists: %s filename")
         cache_item = AttrDict(cache_item)
         cache[data['filename']] = cache_item
     else:
@@ -95,7 +98,10 @@ def handle_tps_data(data):
         pass
     elif spec_i < 0:
         # New file
-        zarr_sdk.init_tps_dataset({'value': data}, cache_item)
+        try:
+            zarr_sdk.init_tps_dataset({'value': data}, cache_item)
+        except FileExistsError:
+            print("File exists: %s filename")
     else:
         # New data to existing file
         zarr_sdk.update_tps_dataset({'value': data}, cache_item)
@@ -135,10 +141,12 @@ if __name__ == '__main__':
 
     n_jobs = args.get('n_jobs', 1)
     cache = LRUDict(n_jobs)
+    streamer_lock = Lock()
     streamers = [
         streamer_class(
             file_queue=file_queue,
             shutdown_event=shutdown_event,
+            lock=streamer_lock,
         )
         for _ in range(n_jobs)
     ]
