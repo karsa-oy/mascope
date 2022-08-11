@@ -1,11 +1,14 @@
 from backend.lib.hardware.tofwerk.generator import H5Streamer
+from backend.lib.hardware.orbitrap.generator import RawStreamer
 from backend.lib.struct import AttrDict, LRUDict
+from backend.lib.util import parse_cmd_args
 from file_io import zarr_sdk
 
 
 import inspect
+import os
 
-from multiprocessing import Event
+from multiprocessing import Event, Queue
 from queue import Empty
 from threading import Thread
 from time import sleep
@@ -22,10 +25,14 @@ class FSWatcher:
 
         def on_created(self, event):
             filepath = event.src_path
-            print("on_created: %s" %filepath)
-            global streamer
-            sleep(3)
-            streamer.start_stream(filepath)
+            print("New file to be converted: %s" %filepath)
+            # Wait until the file is ready
+            filesize = -1
+            while filesize != os.path.getsize(filepath):
+                filesize = os.path.getsize(filepath)
+                sleep(.1)
+            global file_queue
+            file_queue.put(filepath)
 
     def log(self, *arg):
         print(f"[{self.__class__.__name__}.{inspect.stack()[1].function}]", *arg)
@@ -89,30 +96,54 @@ def handle_tps_data(data):
     else:
         zarr_sdk.update_tps_dataset({'value': data}, cache_item)
 
-def run():
-    global streamer
+def streamer_processor(streamer):
     while not streamer.shutdown_event.is_set():
         try:
             spec_data = streamer.spec_queue.get(timeout=None)
             handle_spec_data(spec_data)
-            tps_data = streamer.tps_queue.get()
-            handle_tps_data(tps_data)
+            if hasattr(streamer, 'tps_queue'):
+                tps_data = streamer.tps_queue.get()
+                handle_tps_data(tps_data)
         except Empty:
             sleep(.1)
 
 
-cache = LRUDict(1)
-streamer = H5Streamer()
+def run():
+    while not shutdown_event.is_set():
+        sleep(1)
+
+n_jobs = 3
+cache = LRUDict(n_jobs)
+file_queue = Queue()
+shutdown_event = Event()
+
+streamer_class = H5Streamer
+file_mask = '*.h5'
+# streamer_class = RawStreamer
+# file_mask = '*.raw'
+
+streamers = [
+    streamer_class(
+        file_queue=file_queue,
+        shutdown_event=shutdown_event,
+        )
+    for _ in range(n_jobs)
+    ]
+# streamer = RawStreamer(file_queue=file_queue)
 fs_watcher = FSWatcher(
     path='.',
-    mask='*.h5',
-    shutdown_event=streamer.shutdown_event,
+    mask=file_mask,
+    shutdown_event=shutdown_event,
     )
 
 
 if __name__ == '__main__':
+    args = parse_cmd_args()
+    print(args)
     fs_watcher.run_as_daemon()
-    streamer.start()
+    for streamer in streamers:
+        streamer.start()
+        Thread(target=streamer_processor, args=(streamer,)).start()
     try:
         run()
     except KeyboardInterrupt:
