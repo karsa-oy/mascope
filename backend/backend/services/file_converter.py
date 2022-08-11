@@ -1,12 +1,11 @@
+import inspect
+import os
+
 from backend.lib.hardware.tofwerk.generator import H5Streamer
 from backend.lib.hardware.orbitrap.generator import RawStreamer
 from backend.lib.struct import AttrDict, LRUDict
 from backend.lib.util import parse_cmd_args
 from file_io import zarr_sdk
-
-
-import inspect
-import os
 
 from multiprocessing import Event, Queue
 from queue import Empty
@@ -76,24 +75,29 @@ def handle_spec_data(data):
     spec_i = data['i']
     cache_item = cache.get(filename)
     if spec_i is None:
+        # File finished
         zarr_sdk.finalize_signal_dataset({'value': data}, cache_item)
     elif spec_i < 0:
+        # New file
         cache_item = zarr_sdk.init_signal_dataset({'value': data})
         cache_item = AttrDict(cache_item)
         cache[data['filename']] = cache_item
     else:
+        # New data to existing file
         zarr_sdk.update_signal_dataset({'value': data}, cache_item)
         
-
 def handle_tps_data(data):
     filename = data['filename']
     spec_i = data['i']
     cache_item = cache.get(filename)
     if spec_i is None:
+        # File finished
         pass
     elif spec_i < 0:
+        # New file
         zarr_sdk.init_tps_dataset({'value': data}, cache_item)
     else:
+        # New data to existing file
         zarr_sdk.update_tps_dataset({'value': data}, cache_item)
 
 def streamer_processor(streamer):
@@ -112,38 +116,45 @@ def run():
     while not shutdown_event.is_set():
         sleep(1)
 
-n_jobs = 3
-cache = LRUDict(n_jobs)
+
+cache = None
 file_queue = Queue()
 shutdown_event = Event()
-
-streamer_class = H5Streamer
-file_mask = '*.h5'
-# streamer_class = RawStreamer
-# file_mask = '*.raw'
-
-streamers = [
-    streamer_class(
-        file_queue=file_queue,
-        shutdown_event=shutdown_event,
-        )
-    for _ in range(n_jobs)
-    ]
-# streamer = RawStreamer(file_queue=file_queue)
-fs_watcher = FSWatcher(
-    path='.',
-    mask=file_mask,
-    shutdown_event=shutdown_event,
-    )
-
 
 if __name__ == '__main__':
     args = parse_cmd_args()
     print(args)
-    fs_watcher.run_as_daemon()
+
+    streamer_type = args['streamer_type']
+    if streamer_type == 'H5':
+        streamer_class = H5Streamer
+        file_mask = '*.h5'
+    if streamer_type == 'Raw':
+        streamer_class = RawStreamer
+        file_mask = '*.raw'
+
+    n_jobs = args.get('n_jobs', 1)
+    cache = LRUDict(n_jobs)
+    streamers = [
+        streamer_class(
+            file_queue=file_queue,
+            shutdown_event=shutdown_event,
+        )
+        for _ in range(n_jobs)
+    ]
+    
     for streamer in streamers:
         streamer.start()
         Thread(target=streamer_processor, args=(streamer,)).start()
+
+    source_path = args.get('data_pool_path', '.')
+    fs_watcher = FSWatcher(
+        path=source_path,
+        mask=file_mask,
+        shutdown_event=shutdown_event,
+        )
+    fs_watcher.run_as_daemon()
+    
     try:
         run()
     except KeyboardInterrupt:

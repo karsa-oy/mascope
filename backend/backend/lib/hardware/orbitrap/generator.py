@@ -231,9 +231,10 @@ class RawStreamer(Thread):
                     # Shutdown
                     break
             # Out of stream loop
-            self.active.clear()
-            self._finalize()
             self.raw.Dispose()
+            self.active.clear()
+            self.cancel_event.clear()
+            self._finalize()
             print("RawStream finished")
         # Out of main loop
         print('RawStreamer exiting')

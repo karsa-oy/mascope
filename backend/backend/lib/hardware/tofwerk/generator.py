@@ -406,6 +406,7 @@ class TofDaqStreamer(BaseStreamer):
         """
         self.stop_acquisition()
 
+
 class H5Streamer(BaseStreamer, KInstrument):
     from .lib.TwH5 import (
             TwCloseH5,
@@ -657,10 +658,10 @@ class H5Streamer(BaseStreamer, KInstrument):
                 if self.cancel_event.is_set() or self.shutdown_event.is_set():
                     break
             # Out of write loop
+            H5Streamer.TwCloseH5(file_to_stream.encode())
             self.active.clear()
             self.cancel_event.clear()
             self._finalize()
-            H5Streamer.TwCloseH5(file_to_stream.encode())
             print("h5Stream finished")
         # Out of main loop
         print('H5Streamer exiting')
