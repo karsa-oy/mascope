@@ -9,14 +9,11 @@ Created on Tue Apr 09 13:08:29 2019
 
 import os
 import numpy as np
-from threading import Thread, current_thread
+from threading import Thread
 from multiprocessing import (Event, Queue)
 from queue import Empty
 from time import sleep
 from ctypes import create_string_buffer
-import inspect
-
-from backend.services.file_io import zarr_sdk
 
 from .instrument import KInstrument
 
@@ -59,17 +56,17 @@ class BaseStreamer(Thread):
     """
     def __init__(self):
         # Synchronization primitives
-        self.shutdown_event = Event()   # Set to break out from main loop
-        self.active = Event()           # TofDaqStreamer active event
-        self.spec_queue = Queue()       # Signal output queue
-        self.tps_queue = Queue()        # TPS output queue
+        self.shutdown_event = Event()           # Set to break out from main loop
+        self.active = Event()                   # TofDaqStreamer active event
+        self.spec_queue = Queue()               # Signal output queue
+        self.tps_queue = Queue()                # TPS output queue
         # Per acquisition attributes
-        self.filename = None            # Filename base from TW h5 file
-        self.interval = None            # TofDaqStreamer interval [s]
-        self.length = None              # TofDaqStreamer length [s]
-        self.progress = 0               # TofDaqStreamer progress [%]
-        self.speci = -1                 # Index of last received spectrum,
-                                        # -1 when there is no active acquisition
+        self.filename = None                    # Filename base from TW h5 file
+        self.interval = None                    # TofDaqStreamer interval [s]
+        self.length = None                      # TofDaqStreamer length [s]
+        self.progress = 0                       # TofDaqStreamer progress [%]
+        self.speci = -1                         # Index of last received spectrum,
+                                                # -1 when there is no active acquisition
         Thread.__init__(self)
         
     @property
@@ -411,6 +408,7 @@ class TofDaqStreamer(BaseStreamer):
 
 class H5Streamer(BaseStreamer, KInstrument):
     from .lib.TwH5 import (
+            TwCloseH5,
             TwGetBufTimeFromH5,
             TwGetH5Descriptor,
             TwGetRegUserDataFromH5,
@@ -418,7 +416,7 @@ class H5Streamer(BaseStreamer, KInstrument):
             TwGetTofSpectrumFromH5,
             TwH5Desc,
             )
-    def __init__(self):
+    def __init__(self, file_queue=Queue(), shutdown_event=Event()):
         """Initialize self
 
         Inherits 'karsatof.kinstrument.KInstrument' which provides some
@@ -438,8 +436,9 @@ class H5Streamer(BaseStreamer, KInstrument):
 
         # Synchronization primitives
         # Streamer specific
-        self.file_queue = Queue()       # Queue for files to stream
-        self.cancel_event = Event()     # Set to cancel current stream
+        self.file_queue = file_queue            # Queue for files to stream
+        self.cancel_event = Event()             # Set to cancel current stream
+        self.shutdown_event = shutdown_event    # Set to break out from main loop
 
     @property
     def mz(self):
@@ -661,6 +660,7 @@ class H5Streamer(BaseStreamer, KInstrument):
             self.active.clear()
             self.cancel_event.clear()
             self._finalize()
+            H5Streamer.TwCloseH5(file_to_stream.encode())
             print("h5Stream finished")
         # Out of main loop
         print('H5Streamer exiting')
