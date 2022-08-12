@@ -1,6 +1,7 @@
-from backend.db import con
+from backend.db import init_con
 from backend.server import sio
 
+con = init_con()
 cur = con.cursor()
 
 

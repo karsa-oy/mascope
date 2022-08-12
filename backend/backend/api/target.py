@@ -1,6 +1,6 @@
 import pandas as pd
 
-from backend.db import con, gen_id
+from backend.db import init_con, gen_id
 
 from backend.lib.molmass import Formula
 from backend.lib.chemistry import get_exact_isotope_mzs
@@ -8,6 +8,7 @@ from backend.lib.struct import LRUDict
 
 from backend.server import sio
 
+con = init_con()
 cur = con.cursor()
 
 # File cache

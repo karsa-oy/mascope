@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import asyncio
 
-from backend.db import con, gen_ids
+from backend.db import init_con, gen_ids
 from backend.lib.peak import detect_peaks, get_peaks
 from backend.lib.struct import LRUDict
 from backend.lib.chemistry import match_mz
@@ -11,6 +11,7 @@ from backend.lib.file import load_file
 
 from backend.server import sio
 
+con = init_con()
 cur = con.cursor()
 
 # File cache
