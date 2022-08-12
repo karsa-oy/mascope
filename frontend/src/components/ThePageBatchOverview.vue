@@ -24,9 +24,9 @@
 </template>
 
 <script>
-import TheLayoutSidebar from "./TheLayoutSidebar";
-import ThePaneBrowserSample from "./ThePaneBrowserSample";
-import ThePaneBrowserTarget from "./ThePaneBrowserTarget";
+import TheLayoutSidebar from "./TheLayoutSidebar.vue";
+import ThePaneBrowserSample from "./ThePaneBrowserSample.vue";
+import ThePaneBrowserTarget from "./ThePaneBrowserTarget.vue";
 import ThePaneChartTargetMatchCount from "./ThePaneChartTargetMatchCount.vue";
 import ThePaneChartSampleMatchCount from "./ThePaneChartSampleMatchCount.vue";
 import ThePaneChartSampleIntensity from "./ThePaneChartSampleIntensity.vue";

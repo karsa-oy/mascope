@@ -1,11 +1,12 @@
 <template>
-  <the-layout-sidebar>
-    <section style="padding: 1em 0em 2em 0em">
-      <h1 class="title is-3">Karsa Mascope</h1>
-    </section>
+  <section>
+    <the-layout-sidebar>
+      <section style="padding: 1em 0em 2em 0em">
+        <h1 class="title is-3">Karsa Mascope</h1>
+      </section>
       <div class="columns">
         <div class="column is-half">
-          <template v-if="!workspaceSelected">
+          <template v-if="!workspaceActive">
             <section style="padding: 1em 0em 2em 0em">
               <h1 class="title is-4">Workspaces:</h1>
             </section>
@@ -46,21 +47,17 @@
             <h1 class="title is-4">Recent acquisitions:</h1>
           </section>
           <section>
-            <b-button
-              type="is-primary"
-              @click="getRecentAcquisitions"
-            >
+            <b-button type="is-primary" @click="getRecentAcquisitions">
               <b-icon icon="reload"></b-icon>
             </b-button>
           </section>
           <base-table
             :key="sampleFileTableDataKey"
-            :rows="sampleFileRows"
+            :rows="sampleFiles"
             :cols="sampleFileCols"
             :checkable="false"
             :searchable="true"
             :height="sampleFileTableHeight"
-            @selectRows=";"
           >
           </base-table>
           <section style="padding: 0.5em">
@@ -83,17 +80,17 @@
           </section>
         </div>
       </div>
-  </the-layout-sidebar>
+    </the-layout-sidebar>
+  </section>
 </template>
 
 <script>
-import TheLayoutSidebar from "./TheLayoutSidebar";
-import BaseTable from "./BaseTable";
-import BaseWorkspaceTile from "./BaseWorkspaceTile";
+import TheLayoutSidebar from "./TheLayoutSidebar.vue";
+import BaseTable from "./BaseTable.vue";
+import BaseWorkspaceTile from "./BaseWorkspaceTile.vue";
 
-import { bindState } from "$lib/store";
-
-import { mapActions, mapMutations, mapGetters } from "vuex";
+import { mapMutations } from "vuex";
+import { sync, call, get } from "vuex-pathify";
 
 export default {
   name: "ThePageHome",
@@ -102,59 +99,53 @@ export default {
     BaseWorkspaceTile,
     TheLayoutSidebar,
   },
-  data: function() {
+  data: function () {
     return {
       sampleFileTableDataKey: 0,
+      sampleFiles: [],
     };
   },
   computed: {
-    ...bindState({
-      workspaces: "workspace/rows",
+    ...sync({
       modalProps: "modal/workspaceSaveProps",
-      sampleFileRows: "sample/file/rows",
-      sampleFileSchema: "sample/file/schema/row",
     }),
-    ...mapGetters({
-      workspaceSelected: "workspace/selectedRow",
+    ...get({
+      workspaces: "app/workspaces",
+      workspaceActive: "workspace/active",
+      sampleFileCols: "app/schema@sample_file",
     }),
-    sampleFileCols() {
-      let result = [];
-      if (!this.sampleFileSchema) return result;
-      this.sampleFileSchema.forEach((el) => {
-        if (el !== "id") result.push({ field: el, label: el });
-      });
-      return result;
-    },
     sampleFileTableHeight() {
       return "calc(75vh)";
     },
     workspaceHomeText() {
-      if (this.workspaceSelected) {
-        return `Welcome to workspace ${this.workspaceSelected.name}!`;
+      if (this.workspaceActive) {
+        return `Welcome to workspace ${this.workspaceActive.name}!`;
       } else {
         return `Loading workspace...`;
       }
     },
   },
-  created: function(){
+  created: function () {
     this.getRecentAcquisitions();
   },
   methods: {
-    ...mapActions({
+    ...call({
       listSampleFiles: "sample/file/listFiles",
     }),
     ...mapMutations({
       activateModal: "modal/activate",
     }),
     getRecentAcquisitions() {
-      let d1 = new Date;
-      d1.setHours(0, 0, 0, 0);
-      this.listSampleFiles({filters: {
-        column: "datetime_utc",
-        min_value: d1.toISOString(),
-        max_value: new Date().toISOString(),
-        }
-      });
+      this.$api
+        .query(
+          `--sql
+          SELECT *
+          FROM sample_file
+          WHERE date_diff('hours', datetime_utc, now()) <= 24;`
+        )
+        .then((res) => {
+          this.sampleFiles = res.toArray();
+        });
     },
   },
 };

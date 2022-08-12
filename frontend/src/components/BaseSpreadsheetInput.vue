@@ -19,7 +19,7 @@
 
 <script>
 import table from "$lib/table";
-import { bindState } from "$lib/store";
+import { get } from "vuex-pathify";
 
 export default {
   name: "BaseSpreadsheetInput",
@@ -45,7 +45,7 @@ export default {
     };
   },
   computed: {
-    ...bindState({
+    ...get({
       control: "key/control",
       v: "key/v",
     }),

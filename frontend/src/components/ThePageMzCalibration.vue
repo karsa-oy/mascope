@@ -28,7 +28,12 @@
               <p>
                 <template v-if="itemFocused">
                   <b
-                    >Current parameters: {{ itemFocused.mzCalibration ? itemFocused.mzCalibration.par : "undefined"}}</b
+                    >Current parameters:
+                    {{
+                      itemFocused.mzCalibration
+                        ? itemFocused.mzCalibration.par
+                        : "undefined"
+                    }}</b
                   >
                 </template>
                 <br />
@@ -72,10 +77,10 @@
 </template>
 
 <script>
-import TheLayoutSidebar from "./TheLayoutSidebar";
-import ThePaneBrowserSample from "./ThePaneBrowserSample";
-import ThePaneBrowserTarget from "./ThePaneBrowserTarget";
-import BaseTable from "./BaseTable";
+import TheLayoutSidebar from "./TheLayoutSidebar.vue";
+import ThePaneBrowserSample from "./ThePaneBrowserSample.vue";
+import ThePaneBrowserTarget from "./ThePaneBrowserTarget.vue";
+import BaseTable from "./BaseTable.vue";
 
 import { bindState } from "$lib/store";
 import { mapActions, mapGetters, mapMutations } from "vuex";

@@ -22,7 +22,9 @@
           <b-field :label="item.label" custom-class="dark">
             <b-input
               v-model="item.value"
-              :placeholder="showEditFunctions ? item.placeholder||'default value' : ''"
+              :placeholder="
+                showEditFunctions ? item.placeholder || 'default value' : ''
+              "
               :required="fillable && item.required"
               :disabled="!fillable || item.disabled"
               lazy
@@ -32,11 +34,12 @@
             <div v-if="item.key">
               <b-button
                 :id="item.label"
-                :disabled="!item.value || item.value.length==0"
-                @click="loadAttributes({[item.label]: item.value})"
+                :disabled="!item.value || item.value.length == 0"
+                @click="loadAttributes({ [item.label]: item.value })"
                 type="is-warning"
                 icon-right="database"
-                hover title="Load attributes"
+                hover
+                title="Load attributes"
               >
               </b-button>
             </div>
@@ -47,7 +50,8 @@
                 @click="removeField"
                 type="is-danger"
                 icon-right="delete"
-                hover title="Delete Field"
+                hover
+                title="Delete Field"
               >
               </b-button>
             </div>
@@ -62,17 +66,11 @@
         </b-field>
       </div>
       <div><br /></div>
-      <b-field
-        label="Reuse template"
-        custom-class="dark"
-      >
+      <b-field label="Reuse template" custom-class="dark">
         <div class="container">
           <div class="row">
             <div class="columns">
-              <div
-                class="column is-half"
-                style="text-align: center"
-              >
+              <div class="column is-half" style="text-align: center">
                 <b-select
                   v-model="loadedTemplate"
                   placeholder="Load template"
@@ -101,7 +99,8 @@
                   @click="deleteTemplate"
                   type="is-danger"
                   icon-right="delete"
-                  hover title="Delete Template"
+                  hover
+                  title="Delete Template"
                 >
                 </b-button>
               </div>
@@ -115,18 +114,18 @@
                   :disabled="!formFields.length"
                   type="is-success"
                   icon-left="content-save"
-                  hover title="Save Template"
+                  hover
+                  title="Save Template"
                 >
                 </b-button>
               </div>
-              <div
-                class="column is-one-half"
-                style="text-align: right"
-              >
+              <div class="column is-one-half" style="text-align: right">
                 <b-button
                   :disabled="
-                    this.formFields.filter(f => f.required).length !=
-                    this.formFields.filter(f => f.required).filter(f => f.value).length
+                    this.formFields.filter((f) => f.required).length !=
+                    this.formFields
+                      .filter((f) => f.required)
+                      .filter((f) => f.value).length
                   "
                   type="is-success"
                   icon-left="content-save"
@@ -147,7 +146,7 @@
 </template>
     
 <script type="text/javascript">
-const _ = require("underscore");
+import * as _ from "underscore";
 
 export default {
   name: "BaseMetadataForm",
@@ -192,7 +191,6 @@ export default {
       default: "",
     },
   },
-
   data() {
     return {
       loadedTemplate: null,
@@ -200,7 +198,9 @@ export default {
     };
   },
   computed: {
-    availableTemplates () { return this.initialTemplates },
+    availableTemplates() {
+      return this.initialTemplates;
+    },
   },
   created() {
     this.loadedTemplate = this.clone(this.availableTemplates[0]);
@@ -221,8 +221,8 @@ export default {
         onConfirm: (fieldToAdd) => {
           this.loadedTemplate = {
             name: null,
-            template: [...this.formFields, { label: fieldToAdd, value: "" },]
-          }
+            template: [...this.formFields, { label: fieldToAdd, value: "" }],
+          };
         },
       });
     },
@@ -242,7 +242,10 @@ export default {
         if (_.isEqual(fieldToRemove, this.loadedTemplate.template[i].label)) {
           this.loadedTemplate = {
             name: null,
-            template: [...this.loadedTemplate.template.slice(0,i), ...this.loadedTemplate.template.slice(i+1)],
+            template: [
+              ...this.loadedTemplate.template.slice(0, i),
+              ...this.loadedTemplate.template.slice(i + 1),
+            ],
           };
           break;
         }
@@ -257,14 +260,17 @@ export default {
           "</b>?",
         confirmText: "Delete",
         onConfirm: () => {
-          for(let i=0; i<this.availableTemplates.length; ++i) {
-            if ( this.loadedTemplate.name === this.availableTemplates[i].name ) {
-              this.$emit('deleteTemplate', this.availableTemplates[i]);
+          for (let i = 0; i < this.availableTemplates.length; ++i) {
+            if (this.loadedTemplate.name === this.availableTemplates[i].name) {
+              this.$emit("deleteTemplate", this.availableTemplates[i]);
               this.availableTemplates.splice(i, 1);
               break;
             }
           }
-          this.loadedTemplate = this.availableTemplates.length > 0 ? this.clone(this.availableTemplates[0]) : null;
+          this.loadedTemplate =
+            this.availableTemplates.length > 0
+              ? this.clone(this.availableTemplates[0])
+              : null;
         },
       });
     },
@@ -273,37 +279,43 @@ export default {
         title: "Template name",
         confirmText: "Save",
         inputAttrs: {
-          placeholder: this.loadedTemplate.name === 'default' ? "template name":this.loadedTemplate.name,
+          placeholder:
+            this.loadedTemplate.name === "default"
+              ? "template name"
+              : this.loadedTemplate.name,
           maxlength: 100,
         },
         trapFocus: true,
         onConfirm: (templateName) => {
-            if (templateName.toLowerCase() === 'default') {
-              this.$buefy.toast.open({
-                message: `Name "${templateName}" is not allowed`,
-                duration: 5000,
-                type: 'is-danger'
-              });
-              return;
-            }
-            // copy loadedTempate fields with user input
-            let newTemplate = {name: templateName, type: this.templateType, template: this.clone(this.formFields)};
-            let i = 0;
-            // set loaded template
-            for (i = 0; i < this.availableTemplates.length; ++i) {
-              if (_.isEqual(templateName, this.availableTemplates[i].name))
-                break;
-            }
-            if ( i < this.availableTemplates.length ) {
-              // existing template
-              this.availableTemplates[i] = this.clone(newTemplate);
-            } else {
-              // new template
-              this.availableTemplates.push(this.clone(newTemplate));
-            }
-            this.loadedTemplate = this.clone(newTemplate);
-            // push new template
-            this.$emit('saveTemplate', this.loadedTemplate);
+          if (templateName.toLowerCase() === "default") {
+            this.$buefy.toast.open({
+              message: `Name "${templateName}" is not allowed`,
+              duration: 5000,
+              type: "is-danger",
+            });
+            return;
+          }
+          // copy loadedTempate fields with user input
+          let newTemplate = {
+            name: templateName,
+            type: this.templateType,
+            template: this.clone(this.formFields),
+          };
+          let i = 0;
+          // set loaded template
+          for (i = 0; i < this.availableTemplates.length; ++i) {
+            if (_.isEqual(templateName, this.availableTemplates[i].name)) break;
+          }
+          if (i < this.availableTemplates.length) {
+            // existing template
+            this.availableTemplates[i] = this.clone(newTemplate);
+          } else {
+            // new template
+            this.availableTemplates.push(this.clone(newTemplate));
+          }
+          this.loadedTemplate = this.clone(newTemplate);
+          // push new template
+          this.$emit("saveTemplate", this.loadedTemplate);
         },
       });
     },
@@ -311,17 +323,15 @@ export default {
       this.$buefy.dialog.confirm({
         title: this.formTitle,
         message:
-          `${this.formTitle} for <b>` +
-          this.formFields[0].value +
-          "</b>?",
+          `${this.formTitle} for <b>` + this.formFields[0].value + "</b>?",
         confirmText: "Save",
         onConfirm: () => {
-          this.$emit('saveAttributes', this.formFields);
+          this.$emit("saveAttributes", this.formFields);
         },
       });
     },
     loadAttributes(requestObject) {
-      this.$emit('loadAttributes', requestObject);
+      this.$emit("loadAttributes", requestObject);
     },
   },
   watch: {
@@ -332,7 +342,7 @@ export default {
       deep: true,
     },
     loadedTemplate: {
-      handler (newValue) {
+      handler(newValue) {
         if (newValue) {
           // Make a copy to avoid mutating the loaded template directly
           this.formFields = this.clone(newValue.template);
@@ -341,28 +351,37 @@ export default {
       deep: true,
     },
     attributesToLoad: {
-      handler (data) {
-        if ( _.isEmpty(data) || _.isEmpty(data.row) ) {
+      handler(data) {
+        if (_.isEmpty(data) || _.isEmpty(data.row)) {
           return;
         }
         let newTemplate = {
           name: null,
           type: this.templateType,
           template: [],
-        }
-        for(let {label, key, required, disabled} of data.template) {
+        };
+        for (let { label, key, required, disabled } of data.template) {
           if (required) {
-            newTemplate.template.push({label, key, required, disabled, value: data.row[label]});
+            newTemplate.template.push({
+              label,
+              key,
+              required,
+              disabled,
+              value: data.row[label],
+            });
           }
         }
         if (data.row.attributes) {
-          Object.keys(data.row.attributes).forEach( (attr) =>
-            newTemplate.template.push({label: attr, value: data.row.attributes[attr]})
+          Object.keys(data.row.attributes).forEach((attr) =>
+            newTemplate.template.push({
+              label: attr,
+              value: data.row.attributes[attr],
+            })
           );
         }
         this.loadedTemplate = newTemplate;
       },
-      deep: true
+      deep: true,
     },
   },
 };

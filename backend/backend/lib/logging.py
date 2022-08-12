@@ -11,6 +11,7 @@ NO_DATA_LOGGING_DEFAULT = True
 def parent_func_name():
     return inspect.stack()[2][3]
 
+
 def t_mark(data, note=None):
     if 't_mark' not in os.environ:
         return
@@ -21,6 +22,7 @@ def t_mark(data, note=None):
     data['t_mark'][-1][-1] = round(t - data['t_mark'][-1][-1], 3)
     data['t_mark'].append([note or parent_func_name(), t])
     print('t_mark :', data['t_mark'], data.get('request_id', data.get('filename', '')))
+
 
 def this_func_name():
     return inspect.stack()[1][3]

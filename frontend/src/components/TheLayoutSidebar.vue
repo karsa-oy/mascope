@@ -14,8 +14,8 @@
 </template>
 
 <script>
-import TheLayout from "./TheLayout";
-import TheMainMenu from "./TheMainMenu";
+import TheLayout from "./TheLayout.vue";
+import TheMainMenu from "./TheMainMenu.vue";
 
 export default {
   name: "TheLayoutSidebar",

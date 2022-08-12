@@ -9,7 +9,7 @@
 import { mapMutations, mapActions, mapGetters } from "vuex";
 import { bindState } from "$lib/store";
 
-import BaseBrowser from "./BaseBrowser";
+import BaseBrowser from "./BaseBrowser.vue";
 
 export default {
   name: "ThePaneBrowserTarget",
@@ -27,7 +27,7 @@ export default {
       modalTargetCollectionOpProps: "modal/targetCollectionOpProps",
     }),
     ...mapGetters({
-      batchSelected: "sample/batch/selectedRows",
+      batchActive: "batch/activeRows",
       matchesExist: "match/exists",
       sampleItemFocused: "sample/item/focusedRow",
       targetCollectionsSelected: "target/collection/selectedRows",
@@ -245,14 +245,13 @@ export default {
         modal: "targetCollectionOp",
       });
     },
-
   },
   watch: {
-    batchSelected: function() {
-      if (!this.batchSelected.length) {
+    batchActive: function () {
+      if (!this.batchActive.length) {
         this.collectionGetAll();
       }
     },
-  }
+  },
 };
 </script>

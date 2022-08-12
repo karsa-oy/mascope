@@ -84,7 +84,7 @@ def get_client_notification_context(data):
     return copy_dict(data, ignore_keys=['name', 'value'])
 
 
-def parse_datetime_from_item_filename(filename):
+def timestamp_from_filename(filename):
 
     FILENAME_DATETIME_PATTERNS = [
         '*%Y.%m.%d*%Hh%Mm%Ss*',
@@ -124,7 +124,7 @@ def parse_path_from_item_filename(item_filename, base_path=""):
     # Instrument name
     instrument = item_filename.split('_')[0]
     # Parse datetime and convert to date subdirectory name (yyyy.mm.dd)
-    item_datetime = parse_datetime_from_item_filename(item_filename)
+    item_datetime = timestamp_from_filename(item_filename)
     date_dir = parse_subdir_from_datetime(item_datetime)
     # Join to sample path relative to wdir
     full_path = os.path.join(base_path, instrument, date_dir, item_filename)

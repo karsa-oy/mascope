@@ -24,8 +24,8 @@
 
 <script>
 import BaseAttributesForm from "./BaseAttributesForm.vue";
-import { bindState } from "$lib/store";
-import { mapActions, mapMutations, mapGetters } from "vuex";
+import { mapMutations, mapGetters } from "vuex";
+import { sync, call, get } from "vuex-pathify";
 
 export default {
   name: "TheModalSampleItemAttributesSave",
@@ -61,12 +61,12 @@ export default {
     };
   },
   computed: {
-    ...bindState({
+    ...get({
       modalActive: "modal/sampleItemAttributesSaveActive",
-      templateRows: "template/rows",
+      templateRows: "app/attributeTemplates",
     }),
     ...mapGetters({
-      batchSelected: "sample/batch/selectedRow",
+      batchActive: "batch/activeRow",
       itemsSelected: "sample/item/selectedRows",
     }),
     availableTemplates() {
@@ -80,7 +80,7 @@ export default {
     ...mapMutations({
       deactivateModal: "modal/deactivate",
     }),
-    ...mapActions({
+    ...call({
       sampleItemUpdate: "sample/item/update",
       templateListRequest: "template/requestTemplates",
       templateSaveRequest: "template/save",
@@ -104,7 +104,7 @@ export default {
     },
   },
   watch: {
-    itemSelected: function() {
+    itemSelected: function () {
       if (!this.itemSelected) {
         this.sampleItemRecordToLoad = {};
         return;

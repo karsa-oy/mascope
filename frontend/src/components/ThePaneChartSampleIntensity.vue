@@ -9,8 +9,9 @@
 </template>
 
 <script>
-import BaseChartPlotly from "./BaseChartPlotly";
-import { glasbeyHv } from "$lib/colorcet"
+import BaseChartPlotly from "./BaseChartPlotly.vue";
+
+import { glasbeyHv } from "$lib/styles";
 import { mapActions } from "vuex";
 
 export default {
@@ -32,18 +33,20 @@ export default {
     data: function () {
       if (!this.stats.length) return [];
       // Read target compound ids from the first sample item
-      // and make an object with id as key and color as value 
+      // and make an object with id as key and color as value
       let allCompoundIds = this.stats.map((stat) => stat.targetCompoundId);
       let uniqueCompoundIds = [...new Set(allCompoundIds)];
       let compoundColors = Object.fromEntries(
-        uniqueCompoundIds.map((compoundId, index) => 
-          ([ [compoundId], glasbeyHv[index] ])
-          )
+        uniqueCompoundIds.map((compoundId, index) => [
+          [compoundId],
+          glasbeyHv[index],
+        ])
       );
       let data = [];
       for (let stat of this.stats) {
         let compoundColor = compoundColors[stat.targetCompoundId];
-        let markerSymbol = stat.rating ==='probable' ? 'square' : 'square-open';
+        let markerSymbol =
+          stat.rating === "probable" ? "square" : "square-open";
         data.push({
           name: stat.targetName.trim() ? stat.targetName : stat.targetFormula,
           x: [stat.sampleItemId],
@@ -57,7 +60,7 @@ export default {
           },
         });
       }
-      return data
+      return data;
     },
     layout: function () {
       return {

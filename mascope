@@ -120,7 +120,7 @@ if [ ${subcommand} = "logs" ]; then
     if [[ "${target}" = "frontend" ]]; then
         compose logs -f frontend
     elif [[ "${target}" = "backend" ]]; then
-        docker exec -it mascope-backend-1 /bin/bash -c 'tmux attach -t karsa-services'
+        docker exec -it mascope-backend-1 /bin/bash -c 'tmux attach -t mascope'
     fi
 fi
 

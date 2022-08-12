@@ -8,8 +8,8 @@ set -eu -o pipefail
 #trap read debug
 
 cd
-echo Set MASCOPE_DATADIR for karsa services
-export MASCOPE_DATADIR="/data"
+echo Set MASCOPE_PRIVATE_DATADIR for karsa services
+export MASCOPE_PRIVATE_DATADIR="/data"
 
 echo running karsa-router-service
 xterm -hold -e "karsa-router-service --url 0.0.0.0; bash" &

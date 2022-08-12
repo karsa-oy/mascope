@@ -15,10 +15,10 @@
 </template>
 
 <script>
-import TheLayoutSidebar from "./TheLayoutSidebar";
-import ThePaneSettingsConnection from "./ThePaneSettingsConnection";
-import ThePaneSettingsMatch from "./ThePaneSettingsMatch";
-import ThePaneSettingsTarget from "./ThePaneSettingsTarget";
+import TheLayoutSidebar from "./TheLayoutSidebar.vue";
+import ThePaneSettingsConnection from "./ThePaneSettingsConnection.vue";
+import ThePaneSettingsMatch from "./ThePaneSettingsMatch.vue";
+import ThePaneSettingsTarget from "./ThePaneSettingsTarget.vue";
 
 export default {
   name: "ThePageSettings",

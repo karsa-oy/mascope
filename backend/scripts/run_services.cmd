@@ -10,6 +10,7 @@ powershell Test-NetConnection 127.0.0.1 -p 5010 | find /i "failed" && start cmd 
 start cmd /k poetry run sample-service || goto :error
 start cmd /k poetry run signal-service || goto :error
 start cmd /k poetry run target-service || goto :error
+start cmd /k poetry run match-service || goto :error
 start cmd /k poetry run visualization-service || goto :error
 
 popd

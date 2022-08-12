@@ -25,8 +25,8 @@
 
 <script>
 import BaseAttributesForm from "./BaseAttributesForm.vue";
-import { bindState } from "$lib/store";
-import { mapActions, mapMutations } from "vuex";
+import { mapMutations } from "vuex";
+import { call, get } from "vuex-pathify";
 
 export default {
   name: "TheModalSampleFileAttributesSave",
@@ -35,10 +35,9 @@ export default {
   },
   props: {},
   computed: {
-    ...bindState({
+    ...get({
+      templateRows: "app/attributeTemplates",
       modalActive: "modal/sampleFileAttributesSaveActive",
-      templateRows: "template/rows",
-      sampleFileRows: "sample/file/rows",
     }),
     availableTemplates() {
       return [this.defaultTemplate, ...this.templateRows];
@@ -47,6 +46,7 @@ export default {
   data: function () {
     return {
       templateType: "sampleFile",
+      sampleFiles: [],
       sampleFileRecordToLoad: {},
       defaultTemplate: {
         name: "default",
@@ -75,7 +75,7 @@ export default {
     ...mapMutations({
       sampleFileUpdate: "sample/file/UPDATE",
     }),
-    ...mapActions({
+    ...call({
       getSampleFile: "sample/file/listFiles",
       templateListRequest: "template/requestTemplates",
       templateSaveRequest: "template/save",
@@ -96,22 +96,20 @@ export default {
       this.modalActive = false;
     },
     loadAttributes(filters) {
-      this.getSampleFile({ filters });
-    },
-  },
-  watch: {
-    modalActive: function (active) {
-      if (active) this.templateListRequest({ type: this.templateType });
-    },
-    sampleFileRows: function () {
-      if (this.sampleFileRows.length != 1) {
-        this.sampleFileRecordToLoad = {};
-        return;
-      }
-      this.sampleFileRecordToLoad = {
-        template: this.defaultTemplate.template,
-        row: this.sampleFileRows[0],
-      };
+      const filename = filters.filename;
+      this.$api
+        .query(
+          `--sql
+          SELECT *
+          FROM sample_file
+          WHERE filename == '${filename}';`
+        )
+        .then((res) => {
+          this.sampleFileRecordToLoad = {
+            template: this.defaultTemplate.template,
+            row: res.toArray()[0],
+          };
+        });
     },
   },
 };

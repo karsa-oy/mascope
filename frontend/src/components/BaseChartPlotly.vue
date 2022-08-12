@@ -11,7 +11,7 @@
 </template>
 
 <script>
-import { Plotly } from "vue-plotly";
+import Plotly from "./external/Plotly.vue";
 
 export default {
   name: "ThePageExplorerChartBatch",
@@ -38,7 +38,7 @@ export default {
       default: null,
     },
   },
-  data: function() {
+  data: function () {
     return {
       baseConfig: {
         displayLogo: false,

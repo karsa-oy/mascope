@@ -6,20 +6,16 @@ services:
       dockerfile: ./docker/Dockerfile
     volumes:
       - ./testdata:/data
+      - ./backend:/backend
     stdin_open: true  
     tty: true
     network_mode: "host"
-    environment:
-      - MASCOPE_ENV=docker
-      - MASCOPE_DATADIR=/data
+    env_file: .env.development
   frontend:
     build:
       context: ./frontend
     volumes:
-      - /tmp/.X11-unix:/temp/.X11-unix
+      - ./testdata:/data
       - ./frontend/src:/frontend/src
-    environment:
-      - DISPLAY
     network_mode: "host"
-    ipc: host
-    mem_limit: 4g
+    env_file: .env.development
