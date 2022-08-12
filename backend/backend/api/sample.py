@@ -1,14 +1,14 @@
 import pandas as pd
 from datetime import timedelta
 
-from backend.db import con, gen_id
+from backend.db import init_con, gen_id
 from backend.lib.util import (
     timestamp_from_filename,
 )
 from backend.server import sio
 
+con = init_con()
 cur = con.cursor()
-
 
 # === sample batches === #
 

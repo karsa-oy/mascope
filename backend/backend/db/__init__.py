@@ -6,9 +6,6 @@ import re
 import traceback
 from importlib import import_module
 
-# exports
-__all__ = ['gen_id', 'gen_ids', 'get_ids', 'con']  # noqa
-
 # env vars
 data_dir = os.environ.get('MASCOPE_PRIVATE_DATADIR')
 db_dir = os.path.join(data_dir, 'database')
@@ -29,14 +26,6 @@ def run():
     else:
         print(f"This version of mascope requires: v{target_version}")
         current_version = migrate(current_version, target_version)
-    # establish and dynamically export the database connection
-    globals().update({
-        'con': duckdb.connect(
-            database=os.path.join(
-                db_dir, f'mascope.v{current_version}.duckdb'
-            )
-        )
-    })
     # load api
     import_module('backend.api')
     # check for write-ahead-log file
@@ -120,3 +109,12 @@ def get_current_db_version():
         if len(versions) > 0:
             v = max(versions)
     return v
+
+
+def init_con():
+    current_version = get_current_db_version()
+    return duckdb.connect(
+        database=os.path.join(
+            db_dir, f'mascope.v{current_version}.duckdb'
+        )
+    )

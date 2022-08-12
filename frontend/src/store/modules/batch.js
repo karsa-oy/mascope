@@ -1,5 +1,4 @@
-import { dispatch, make } from 'vuex-pathify';
-import * as sql from '$lib/sql';
+import { make } from 'vuex-pathify';
 
 const state = {
     active: null,
@@ -152,165 +151,253 @@ export default {
                 dispatch('reload');
             }
         },
-        // filters
+        // Sample selection toggling
+        // Directly updates the sample filter
         toggleSampleItem({ dispatch, getters }, { sampleItemId }) {
             // get updated selection
-            const currentSelection =
-                getters['getSampleItem'](sampleItemId).selection;
-            const nextSelection = currentSelection < 2 ? 2 : 0;
-            // save toggled isotopes and next selection in temp table
-            await api.query(`--sql
-                CREATE OR REPLACE TEMPORARY TABLE sample_item_filter AS (
-                    SELECT
-                        sample_item_id,
-                        CASE
-                            WHEN (
-                                sample_item_id == '${sampleItemId}'
-                            ) THEN ${nextSelection}
-                            ELSE current.selection
-                        END AS next_selection
-                    FROM sample_item_filter current
-                );
-            `);
+            const {
+                nextOwnSelection,
+                nextPeerSelection
+            } = getters['sampleItemNextSelection'](sampleItemId);
+            // update sample item filter directly
+            if (nextPeerSelection == null) {
+                await api.query(`--sql
+                    CREATE OR REPLACE TEMPORARY TABLE sample_item_filter AS (
+                        SELECT
+                            sample_item_id,
+                            CASE
+                                WHEN (
+                                    sample_item_id == '${sampleItemId}'
+                                ) THEN ${nextOwnSelection}
+                                ELSE current.selection
+                            END AS next_selection
+                        FROM sample_item_filter current
+                    );
+                `);
+            } else {
+                await api.query(`--sql
+                    CREATE OR REPLACE TEMPORARY TABLE sample_item_filter AS (
+                        SELECT
+                            sample_item_id,
+                            CASE
+                                WHEN (
+                                    sample_item_id == '${sampleItemId}'
+                                ) THEN ${nextOwnSelection}
+                                ELSE ${nextPeerSelection}
+                            END AS next_selection
+                        FROM sample_item_filter
+                    );
+                `);
+            }
             dispatch('reload');
         },
+        // Target selection toggling actions
+        // these retrieve toggled isotope selections and trigger the updateTargetFilter 
+        // action which propagates these to up the hierarchy.
         targetCollectionToggle({ dispatch, getters }, { targetCollectionId }) {
             // get updated selection
-            const currentSelection =
-                getters['getTargetCollection'](targetCollectionId).selection;
-            const nextSelection = currentSelection < 2 ? 2 : 0;
+            const {
+                nextOwnSelection,
+                nextChildSelection,
+                nextPeerSelection
+            } = getters['targetCollectionNextSelection'](targetCollectionId);
             // save toggled isotopes and next selection in temp table
-            await api.query(`--sql
-                CREATE OR REPLACE TEMPORARY TABLE toggled_isotope AS (
-                    SELECT
-                        target_isotope_id,
-                        ${nextSelection} AS next_selection
-                    FROM target_isotope
-                    NATURAL JOIN target_ion
-                    NATURAL JOIN target_compound_in_target_collection
-                    WHERE target_collection_id == '${targetCollectionId}'
-                );
-            `);
-            dispatch('updateTargetFilters');
+            if (nextPeerSelection == null) {
+                await api.query(`--sql
+                    CREATE OR REPLACE TEMPORARY TABLE toggled_isotope AS (
+                        SELECT
+                            target_isotope_id,
+                            ${nextChildSelection} AS next_selection
+                        FROM target_isotope_filter
+                        NATURAL JOIN target_ion
+                        NATURAL JOIN target_compound_in_target_collection
+                        WHERE target_collection_id == '${targetCollectionId}'
+                    );
+                `);
+            } else {
+                await api.query(`--sql
+                    CREATE OR REPLACE TEMPORARY TABLE toggled_isotope AS (
+                        SELECT
+                            target_isotope_id,
+                            CASE
+                                WHEN target_collection_id == '${targetCollectionId}' THEN ${nextChildSelection}
+                                ELSE ${nextPeerSelection}
+                            END AS next_selection
+                        FROM target_isotope_filter
+                        NATURAL JOIN target_ion
+                        NATURAL JOIN target_compound_in_target_collection
+                    );
+                `);
+            }
+            // create focus clause
+            const targetCollectionFocusClause = `--sql
+                WHEN target_collection_id == '${targetCollectionId}' THEN ${nextOwnSelection}
+            `
+            dispatch('updateTargetFilters', { targetCollectionFocusClause });
         },
         targetCompoundToggle({ dispatch, getters }, { targetCompoundId }) {
             // get updated selection
-            const currentSelection =
-                getters['getTargetCompound'](targetCompoundId).selection;
-            const nextSelection = currentSelection < 2 ? 2 : 0;
+            const {
+                nextOwnSelection,
+                nextChildSelection,
+                nextPeerSelection
+            } = getters['targetCompoundNextSelection'](targetCompoundId);
             // save toggled isotopes and next selection in temp table
-            await api.query(`--sql
-                CREATE OR REPLACE TEMPORARY TABLE toggled_isotope AS (
-                    SELECT
-                        target_isotope_id,
-                        ${nextSelection} AS next_selection
-                    NATURAL JOIN target_isotope
-                    NATURAL JOIN target_ion
-                    WHERE target_compound_id == '${targetCompoundId}'
-                );
-            `);
-            dispatch('updateTargetFilters');
+            if (nextPeerSelection == null) {
+                await api.query(`--sql
+                    CREATE OR REPLACE TEMPORARY TABLE toggled_isotope AS (
+                        SELECT
+                            target_isotope_id,
+                            ${nextChildSelection} AS next_selection
+                        FROM target_isotope_filter
+                        NATURAL JOIN target_ion
+                        WHERE target_compound_id == '${targetCompoundId}'
+                    );
+                `);
+            } else {
+                await api.query(`--sql
+                    CREATE OR REPLACE TEMPORARY TABLE toggled_isotope AS (
+                        SELECT
+                            target_isotope_id,
+                            CASE
+                                WHEN target_compound_id == '${targetCompoundId}' THEN ${nextChildSelection}
+                                ELSE ${nextPeerSelection}
+                            END AS next_selection
+                        FROM target_isotope_filter
+                        NATURAL JOIN target_ion
+                    );
+                `);
+            }
+            // create focus clause
+            const targetCompoundFocusClause = `--sql
+                WHEN target_compound_id == '${targetCompoundId}' THEN ${nextOwnSelection}
+            `
+            dispatch('updateTargetFilters', { targetCompoundFocusClause });
         },
         targetIonToggle({ dispatch, getters }, { targetIonId }) {
             // get updated selection
-            const currentSelection =
-                getters['getTargetIon'](targetIonId).selection;
-            const nextSelection = currentSelection < 2 ? 2 : 0;
+            const {
+                nextOwnSelection,
+                nextChildSelection,
+                nextPeerSelection
+            } = getters['targetIonNextSelection'](targetIonId);
             // save toggled isotopes and next selection in temp table
-            await api.query(`--sql
-                CREATE OR REPLACE TEMPORARY TABLE toggled_isotope AS (
-                    SELECT
-                        target_isotope_id,
-                        ${nextSelection} AS next_selection
-                    FROM target_isotope
-                    NATURAL JOIN target_ion
-                    WHERE target_ion_id == '${targetIonId}'
-                );
-            `);
-            dispatch('updateTargetFilters');
+            if (nextPeerSelection == null) {
+                await api.query(`--sql
+                    CREATE OR REPLACE TEMPORARY TABLE toggled_isotope AS (
+                        SELECT
+                            target_isotope_id,
+                            ${nextChildSelection} AS next_selection
+                        FROM target_isotope_filter
+                        WHERE target_ion_id == '${targetIonId}'
+                    );
+                `);
+            } else {
+                await api.query(`--sql
+                    CREATE OR REPLACE TEMPORARY TABLE toggled_isotope AS (
+                        SELECT
+                            target_isotope_id,
+                            CASE
+                                WHEN target_ion_id == '${targetIonId}' THEN ${nextChildSelection}
+                                ELSE ${nextPeerSelection}
+                            END AS next_selection
+                        FROM target_isotope_filter
+                    );
+                `);
+            }
+            // create focus clause
+            const targetIonFocusClause = `--sql
+                WHEN target_ion_id == '${targetIonId}' THEN ${nextOwnSelection}
+            `
+            dispatch('updateTargetFilters', { targetIonFocusClause });
         },
         targetIsotopeToggle({ dispatch, getters }, { targetIsotopeId }) {
-            // get updated selection
-            const currentSelection =
-                getters['getTargetIsotope'](targetIsotopeId).selection;
-            const nextSelection = currentSelection < 2 ? 2 : 0;
+            const {
+                nextOwnSelection,
+                nextPeerSelection
+            } = getters['targetIsotopeNextSelection'](targetIsotopeId);
             // save toggled isotopes and next selection in temp table
-            await api.query(`--sql
-                CREATE OR REPLACE TEMPORARY TABLE toggled_isotope AS (
-                    SELECT
-                        '${targetIsotopeId}' AS target_isotope_id
-                        ${nextSelection} AS next_selection
-                );
-            `);
+            if (nextPeerSelection == null) {
+                await api.query(`--sql
+                    CREATE OR REPLACE TEMPORARY TABLE toggled_isotope AS (
+                        SELECT
+                            '${targetIsotopeId}' AS target_isotope_id
+                            ${nextOwnSelection} AS next_selection
+                    );
+                `);
+            } else {
+                await api.query(`--sql
+                    CREATE OR REPLACE TEMPORARY TABLE toggled_isotope AS (
+                        SELECT
+                            target_isotope_id,
+                            CASE
+                                WHEN target_isotope_id == '${targetIsotopeId}' THEN ${nextOwnSelection}
+                                ELSE ${nextPeerSelection}
+                            END AS next_selection
+                        FROM target_isotope_filter
+                    );
+                `);
+            }
             dispatch('updateTargetFilters');
         },
         // internal target consistancy API - do not use externally
-        async updateTargetFilters({ rootState, dispatch }) {
+        async updateTargetFilters({ rootState, dispatch }, {
+            targetIonFocusClause = "",
+            targetCompoundFocusClause = "",
+            targetCollectionFocusClause = ""
+        }) {
             const api = rootState.api;
             // Iterate filter state using temporary tables
             await api.query(`--sql
-                CREATE OR REPLACE TEMPORARY TABLE target_isotope_filter AS (
+                CREATE OR REPLACE TEMPORARY TABLE target_isotope_filter AS(
                     SELECT
                         target_isotope_id,
-                        CASE
-                            WHEN (
-                                target_isotope_id IN toggled
-                            ) THEN toggled.next_selection
-                            WHEN (
-                                target_isotope_id NOT IN toggled
-                            ) THEN current.selection
+                    CASE
+                            WHEN target_isotope_id IN toggled THEN toggled.next_selection
+                            WHEN target_isotope_id NOT IN toggled THEN current.selection
                         END AS selection
                     FROM target_isotope_filter current
                     NATURAL JOIN toggled_target_isotope toggled
                 );
-                CREATE OR REPLACE TEMPORARY TABLE target_ion_filter AS (
+                CREATE OR REPLACE TEMPORARY TABLE target_ion_filter AS(
                     SELECT
                         target_ion_id,
-                        target_compound_id,
-                        CASE
-                            WHEN (
-                                2 <= ALL(List(isotope.selection))
-                            ) THEN 2
-                            WHEN (
-                                0 == ALL(List(isotope.selection))
-                            ) THEN 0
+                    target_compound_id,
+                    CASE
+                            ${targetIonFocusClause}
+                            WHEN 2 <= ALL(List(isotope.selection)) THEN 2
+                            WHEN 0 == ALL(List(isotope.selection)) THEN 0
                             ELSE 1
                         END AS selection
                     FROM target_isotope_selection isotope
                     NATURAL JOIN target_ion
                     GROUP BY ALL
                 );
-                CREATE OR REPLACE TEMPORARY TABLE target_compound_filter AS (
-                        target_compound_id,
-                        target_collection_id,
-                        CASE
-                            WHEN (
-                                2 <= ALL(List(ion.selection))
-                            ) THEN 2
-                            WHEN (
-                                0 == ALL(List(ion.selection))
-                            ) THEN 0
+                CREATE OR REPLACE TEMPORARY TABLE target_compound_filter AS(
+                    target_compound_id,
+                    target_collection_id,
+                    CASE
+                            ${targetCompoundFocusClause}
+                            WHEN 2 <= ALL(List(ion.selection)) THEN 2
+                            WHEN 0 == ALL(List(ion.selection)) THEN 0
                             ELSE 1
                         END AS selection
                     FROM target_ion_filter ion
                     NATURAL JOIN target_compound_in_target_collection
                     GROUP BY ALL
                 );
-                CREATE OR REPLACE TEMPORARY TABLE target_collection_filter AS (
-                        target_collection_id,
-                        CASE
-                            WHEN (
-                                2 <= ALL(List(compound.selection))
-                            ) THEN 2
-                            WHEN (
-                                0 == ALL(List(compound.selection))
-                            ) THEN 0
+                CREATE OR REPLACE TEMPORARY TABLE target_collection_filter AS(
+                    target_collection_id,
+                    CASE
+                            ${targetCollectionFocusClause}
+                            WHEN 2 <= ALL(List(compound.selection)) THEN 2
+                            WHEN 0 == ALL(List(compound.selection)) THEN 0
                             ELSE 1
                         END AS selection
                     FROM target_compound_filter compound
                     GROUP BY ALL
                 );
-            `);
+                `);
             dispatch('reload')
         },
     },
@@ -383,6 +470,7 @@ export default {
     }
 }
 
+// get next selection based on mode and current selection
 function nextSelection(mode, currentSelection) {
     const mapSelection = {
         0: 2,  // unselected => selected
@@ -396,28 +484,24 @@ function nextSelection(mode, currentSelection) {
         2: 3,  // selected => focused
         3: 0   // focused => unselected
     };
-    let ownNextSelection, peerNextSelection;
+    let nextOwnSelection, nextPeerSelection;
     switch (mode) {
         case 'singleselect': {
-            ownNextSelection = mapSelection(currentSelection);
-            peerNextSelection = 0;  // deselect peers
+            nextOwnSelection = mapSelection(currentSelection);
+            nextPeerSelection = 0;  // deselect peers
             break;
         }
         case 'multiselect': {
-            ownNextSelection = mapSelection(currentSelection);
-            peerNextSelection = null;  // do not change peers
+            nextOwnSelection = mapSelection(currentSelection);
+            nextPeerSelection = null;  // do not change peers
             break;
         }
         case 'focus': {
-            ownNextSelection = mapFocus(currentSelection);
-            peerNextSelection = null;  // do not change peers
+            nextOwnSelection = mapFocus(currentSelection);
+            nextPeerSelection = null;  // do not change peers
             break;
         }
     }
-    const childNextSelection = currentSelection < 2 ? 2 : 0;
-    return {
-        own: ownNextSelection,
-        child: childNextSelection,
-        peer: peerNextSelection
-    }
+    const nextChildSelection = currentSelection < 2 ? 2 : 0;
+    return { nextOwnSelection, nextChildSelection, nextPeerSelection }
 }
