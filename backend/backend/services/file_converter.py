@@ -30,6 +30,13 @@ class FSWatcher:
             while filesize != os.path.getsize(filepath):
                 filesize = os.path.getsize(filepath)
                 sleep(.1)
+            path = os.path.dirname(filepath)
+            filename = os.path.basename(filepath)
+            instrument_name = 'instrument'
+            new_filename = '_'.join([instrument_name, filename])
+            new_filepath = os.path.join(path, new_filename)
+            os.rename(filepath, new_filepath)
+            filepath = new_filepath
             global file_queue
             file_queue.put(filepath)
 
