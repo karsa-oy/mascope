@@ -1,11 +1,11 @@
 import inspect
 import os
 
+from backend.lib.file import zarr_sdk
 from backend.lib.hardware.tofwerk.generator import H5Streamer
 from backend.lib.hardware.orbitrap.generator import RawStreamer
 from backend.lib.struct import AttrDict, LRUDict
 from backend.lib.util import parse_cmd_args
-from file_io import zarr_sdk
 
 from multiprocessing import Event, Queue, Lock
 from queue import Empty
@@ -35,7 +35,11 @@ class FSWatcher:
             instrument_name = 'instrument'
             new_filename = '_'.join([instrument_name, filename])
             new_filepath = os.path.join(path, new_filename)
-            os.rename(filepath, new_filepath)
+            try:
+                os.rename(filepath, new_filepath)
+            except FileExistsError:
+                print("File exists: %s" %new_filepath)
+                return
             filepath = new_filepath
             global file_queue
             file_queue.put(filepath)
@@ -89,7 +93,7 @@ def handle_spec_data(data):
         try:
             cache_item = zarr_sdk.init_signal_dataset({'value': data})
         except FileExistsError:
-            print("File exists: %s filename")
+            print("File exists: %s" %filename)
         cache_item = AttrDict(cache_item)
         cache[data['filename']] = cache_item
     else:
@@ -108,7 +112,7 @@ def handle_tps_data(data):
         try:
             zarr_sdk.init_tps_dataset({'value': data}, cache_item)
         except FileExistsError:
-            print("File exists: %s filename")
+            print("File exists: %s" %filename)
     else:
         # New data to existing file
         zarr_sdk.update_tps_dataset({'value': data}, cache_item)
