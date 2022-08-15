@@ -1,4 +1,4 @@
-from backend.db import init_cursor
+from backend.db.conn import init_cursor
 from backend.server import sio
 
 cur = init_cursor()

@@ -1,6 +1,7 @@
 import pandas as pd
 
-from backend.db import init_cursor, gen_id
+from backend.db.conn import init_cursor
+from backend.db.id import gen_id
 from backend.server import sio
 
 cur = init_cursor()

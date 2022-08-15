@@ -1,6 +1,7 @@
 import pandas as pd
 
-from backend.db import init_cursor, gen_id
+from backend.db.conn import init_cursor
+from backend.db.id import gen_id
 
 from backend.lib.molmass import Formula
 from backend.lib.chemistry import get_exact_isotope_mzs

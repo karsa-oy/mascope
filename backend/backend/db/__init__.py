@@ -30,7 +30,7 @@ def run():
             current_version = migrate(current_version, target_version)
         # init database connection
         globals()['init_cursor'] = (
-            getattr(import_module('backend.db.con'), 'init_cursor')
+            getattr(import_module('backend.db.conn'), 'init_cursor')
         )
         # load api
         import_module('backend.api')

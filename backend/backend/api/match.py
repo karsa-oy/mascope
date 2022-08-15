@@ -2,7 +2,8 @@ import numpy as np
 import pandas as pd
 import asyncio
 
-from backend.db import init_cursor, gen_ids
+from backend.db.conn import init_cursor
+from backend.db.id import gen_ids
 from backend.lib.peak import detect_peaks, get_peaks
 from backend.lib.struct import LRUDict
 from backend.lib.chemistry import match_mz

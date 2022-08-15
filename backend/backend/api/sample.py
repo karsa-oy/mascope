@@ -1,7 +1,8 @@
 import pandas as pd
 from datetime import timedelta
 
-from backend.db import init_cursor, gen_id
+from backend.db.conn import init_cursor
+from backend.db.id import gen_id
 from backend.lib.util import (
     timestamp_from_filename,
 )
