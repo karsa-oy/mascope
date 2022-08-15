@@ -28,7 +28,7 @@
         detailed
         :default-sort="defaultSort"
         custom-detail-row
-        detail-key="id"
+        :detail-key="slug + '_id'"
         :detail-icon="detailsIcon"
         :opened-details="opened"
         :show-header="showHeader"
@@ -185,8 +185,8 @@ export default {
       let nextLevels = cloneDeep(this.levels).splice(1);
       // loop through next levels, removing as we go
       while (nextLevels.length > 0) {
-        let parentIdField = currentLevel.slug + "Id";
-        let parentIds = currentLevel.rows.map((row) => row.id);
+        let parentIdField = currentLevel.slug + "_id";
+        let parentIds = currentLevel.rows.map((row) => row[parentIdField]);
         let childLevel = nextLevels.shift();
         if (childLevel.rows && childLevel.rows.length > 0) {
           childLevel.rows = childLevel.rows.filter((childRow) =>
@@ -214,14 +214,14 @@ export default {
       }
     },
     rowClass: function (row) {
-      switch (row.status) {
-        case "in-focus":
+      switch (row.selection) {
+        case 3:
           return "base-browser-row-focused";
-        case "fully-selected":
+        case 2:
           return "base-browser-row-fully-selected";
-        case "partially-selected":
+        case 1:
           return "base-browser-row-partially-selected";
-        case "not-selected":
+        case 0:
           return "";
       }
     },

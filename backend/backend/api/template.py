@@ -1,10 +1,9 @@
 import pandas as pd
 
-from backend.db import init_con, gen_id
+from backend.db import init_cursor, gen_id
 from backend.server import sio
 
-con = init_con()
-cur = con.cursor()
+cur = init_cursor()
 
 
 @sio.event(namespace='/api')

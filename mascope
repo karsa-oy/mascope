@@ -98,7 +98,7 @@ if [[ "${subcommand}" = "cycle" ]]; then
         echo "Restarting mascope services and rebuilding backend..."
         compose down && compose build backend && compose up -d
     elif [ "${rebuild}" = "frontend" ]; then
-        echo "Restarting mascope services and rebuilding backend..."
+        echo "Restarting mascope services and rebuilding frontend..."
         compose down && compose build frontend && compose up -d
     else
         echo "Restarting mascope services and rebuilding services..."

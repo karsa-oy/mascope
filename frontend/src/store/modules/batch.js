@@ -3,12 +3,12 @@ import { make } from 'vuex-pathify';
 const state = {
     active: null,
     // samples
-    sampleItems: [],
+    sampleItems: null,
     // targets
-    targetCollections: [],
-    targetCompounds: [],
-    targetIons: [],
-    targetIsotopes: [],
+    targetCollections: null,
+    targetCompounds: null,
+    targetIons: null,
+    targetIsotopes: null,
 }
 
 export default {
@@ -16,120 +16,99 @@ export default {
     state,
     mutations: make.mutations(state),
     actions: {
-        async load({ rootState, state, commit }, batchId) {
+        async load({ rootState, commit, dispatch }, batch) {
             const api = rootState.api;
+            const batchId = batch.sample_batch_id;
             await commit('SET_ACTIVE', null);
+            if (!(await allFiltersExist(api))) {
+                await dispatch('initFilters', batchId);
+            }
             // load data w/ statistical aggregates
             const stats = `--sql
-                max(coalesce(match_score, 0)) AS match_score,
-                sum(coalesce(sample_peak_height,0)) AS sample_peak_height
-            `
-            await Promise.all([
-                // load sample items
-                api.query(`--sql
-                    WITH sample_item_in_batch AS (
-                        SELECT
-                            *
-                        FROM sample_item
-                        WHERE sample_batch_id == '${batchId}'
-                    )
-                    SELECT
-                        sample_item_in_batch.*
-                        sample_file.*,
-                        ${stats}
-                    FROM sample_item_in_batch
-                    NATURAL LEFT JOIN sample_file
-                    NATURAL LEFT JOIN match
-                    GROUP BY ALL
-                `).then((res) => {
-                    commit('SET_SAMPLE_ITEMS', res.toArray());
-                }),
-                // load target isotopes
-                api.query(`--sql
-                    WITH target_isotope_in_batch AS (
-                        SELECT
-                            *
-                        FROM target_isotope
-                        NATURAL JOIN target_ion
-                        NATURAL JOIN target_compound_in_target_collection
-                        NATURAL JOIN target_collection_in_sample_batch
-                        WHERE sample_batch_id == '${batchId}';
-                    )
-                    SELECT
-                        target_isotope_in_batch.*,
-                        match.sample_peak_height,
-                        match.match_score
-                    FROM target_isotope_in_batch
-                    NATURAL LEFT JOIN match
-                `).then((res) => {
-                    commit('SET_TARGET_ISOTOPES', res.toArray());
-                }),
-                // load target ions
-                api.query(`--sql
-                    WITH target_ion_in_batch AS (
-                        SELECT
-                            *
-                        FROM target_ion
-                        NATURAL JOIN target_compound_in_target_collection
-                        NATURAL JOIN target_collection_in_sample_batch
-                        WHERE sample_batch_id == '${batchId}'
-                    )
-                    SELECT
-                        target_ion_in_batch.*,
-                        config_mechanism.*,
-                        ${stats}
-                    FROM target_ion_in_batch
-                    NATURAL LEFT JOIN config_mechanism
-                    NATURAL LEFT JOIN target_isotope
-                    NATURAL LEFT JOIN match
-                    GROUP BY ALL;
-                `).then((res) => {
-                    commit('SET_TARGET_IONS', res.toArray());
-                }),
-                // load target compounds
-                api.query(`--sql
-                    WITH target_compound_in_batch AS (
-                        SELECT
-                            *
-                        FROM target_compound
-                        NATURAL JOIN target_compound_in_target_collection
-                        NATURAL JOIN target_collection_in_sample_batch
-                        WHERE sample_batch_id == '${batchId}'
-                    )
-                    SELECT
-                        target_compound_in_batch.*,
-                        ${stats}
-                    FROM target_compound_in_batch
-                    NATURAL LEFT JOIN target_ion
-                    NATURAL LEFT JOIN target_isotope
-                    NATURAL LEFT JOIN match
-                    GROUP BY ALL;
-                `).then((res) => {
-                    commit('SET_TARGET_COMPOUNDS', res.toArray())
-                }),
-                // load target collections
-                api.query(`--sql
-                    WITH target_collection_in_batch (
-                        SELECT
-                            *
-                        FROM target_collection
-                        NATURAL JOIN target_collection_in_sample_batch
-                        WHERE sample_batch_id == '${batchId}'
-                    )
-                    SELECT
-                        target_collection_in_batch.*,
-                        ${stats}
-                    FROM target_collection_in_batch
-                    NATURAL LEFT JOIN target_compound_in_target_collection
-                    NATURAL LEFT JOIN target_ion
-                    NATURAL LEFT JOIN target_isotope
-                    NATURAL LEFT JOIN match
-                    GROUP BY ALL;
-                `).then((res) => {
-                    commit('SET_TARGET_COLLECTIONS', res.toArray())
-                }),
-            ]);
-            await commit('SET_ACTIVE', batchId);
+                max(selected(match_score, selection))
+                    AS match_score,
+                sum(selected(sample_peak_height, selection))
+                    AS sample_peak_height_sum
+            `;
+            // load sample items
+            const sampleItems = await api.query(`--sql
+                SELECT
+                    sample_item.*,
+                    sample_file.* EXCLUDE (
+                        filename,
+                        title,
+                        description,
+                        attributes),
+                    selection,
+                    ${stats}
+                FROM sample_item_filter
+                NATURAL LEFT JOIN sample_item
+                NATURAL LEFT JOIN sample_file
+                NATURAL LEFT JOIN match
+                GROUP BY ALL
+            `);
+            commit('SET_SAMPLE_ITEMS', Object.freeze(sampleItems));
+            // load target isotopes
+            const targetIsotopes = await api.query(`--sql
+                SELECT
+                    target_isotope.*,
+                    selection,
+                    selected(match.sample_peak_height, selection)
+                        AS sample_peak_height_sum,
+                    selected(match.match_score, selection)
+                        AS match_score
+                FROM target_isotope_filter
+                NATURAL LEFT JOIN target_isotope
+                NATURAL LEFT JOIN match
+            `);
+            commit('SET_TARGET_ISOTOPES', Object.freeze(targetIsotopes));
+            // load target ions
+            const targetIons = await api.query(`--sql
+                SELECT
+                    target_ion.*,
+                    config_mechanism.* EXCLUDE (
+                        mechanism_id
+                    ),
+                    selection,
+                    ${stats}
+                FROM target_ion_filter
+                NATURAL LEFT JOIN target_ion
+                NATURAL LEFT JOIN config_mechanism
+                NATURAL LEFT JOIN target_isotope
+                NATURAL LEFT JOIN match
+                GROUP BY ALL;
+            `);
+            commit('SET_TARGET_IONS', Object.freeze(targetIons));
+            // load target compounds
+            const targetCompounds = await api.query(`--sql
+                SELECT
+                    target_compound.*,
+                    selection,
+                    ${stats}
+                FROM target_compound_filter
+                NATURAL LEFT JOIN target_compound
+                NATURAL LEFT JOIN target_ion
+                NATURAL LEFT JOIN target_isotope
+                NATURAL LEFT JOIN match
+                GROUP BY ALL;
+            `);
+            commit('SET_TARGET_COMPOUNDS', Object.freeze(targetCompounds));
+            // load target collections
+            const targetCollections = await api.query(`--sql
+                SELECT
+                    target_collection.*,
+                    selection,
+                    ${stats}
+                FROM target_collection_filter
+                NATURAL LEFT JOIN target_collection
+                NATURAL LEFT JOIN target_compound_in_target_collection
+                NATURAL LEFT JOIN target_ion
+                NATURAL LEFT JOIN target_isotope
+                NATURAL LEFT JOIN match
+                GROUP BY ALL;
+            `);
+            commit('SET_TARGET_COLLECTIONS', Object.freeze(targetCollections));
+            await commit('SET_ACTIVE', batch);
         },
         async unload({ commit }) {
             commit('SET_ACTIVE', null);
@@ -151,9 +130,60 @@ export default {
                 dispatch('reload');
             }
         },
+        // selection
+        async initFilters({ rootState }, batchId) {
+            const api = rootState.api;
+            await api.query(`--sql
+                -- samples
+                CREATE OR REPLACE TEMPORARY TABLE sample_item_filter AS (
+                    SELECT
+                        sample_item_id
+                        ,2 as selection
+                    FROM sample_item
+                    WHERE sample_batch_id == '${batchId}'
+                );
+                -- targets
+                CREATE OR REPLACE TEMPORARY TABLE target_isotope_filter AS (
+                    SELECT
+                        target_isotope_id
+                        ,2 as selection
+                    FROM target_isotope
+                    NATURAL JOIN target_ion
+                    NATURAL JOIN target_compound_in_target_collection
+                    NATURAL JOIN target_collection_in_sample_batch
+                    WHERE sample_batch_id == '${batchId}'
+                );
+                CREATE OR REPLACE TEMPORARY TABLE target_ion_filter AS (
+                    SELECT
+                        target_ion_id
+                        ,2 as selection
+                    FROM target_ion
+                    NATURAL JOIN target_compound_in_target_collection
+                    NATURAL JOIN target_collection_in_sample_batch
+                    WHERE sample_batch_id == '${batchId}'
+                );
+                CREATE OR REPLACE TEMPORARY TABLE target_compound_filter AS (
+                    SELECT
+                        target_compound_id
+                        ,2 as selection
+                    FROM target_compound
+                    NATURAL JOIN target_compound_in_target_collection
+                    NATURAL JOIN target_collection_in_sample_batch
+                    WHERE sample_batch_id == '${batchId}'
+                );
+                CREATE OR REPLACE TEMPORARY TABLE target_collection_filter AS (
+                    SELECT
+                        target_collection_id
+                        ,2 as selection
+                    FROM target_collection
+                    NATURAL JOIN target_collection_in_sample_batch
+                    WHERE sample_batch_id == '${batchId}'
+                );
+            `);
+        },
         // Sample selection toggling
         // Directly updates the sample filter
-        toggleSampleItem({ dispatch, getters }, { sampleItemId }) {
+        async sampleItemToggle({ dispatch, getters }, { sampleItemId }) {
             // get updated selection
             const {
                 nextOwnSelection,
@@ -194,7 +224,7 @@ export default {
         // Target selection toggling actions
         // these retrieve toggled isotope selections and trigger the updateTargetFilter 
         // action which propagates these to up the hierarchy.
-        targetCollectionToggle({ dispatch, getters }, { targetCollectionId }) {
+        async targetCollectionToggle({ dispatch, getters }, { targetCollectionId }) {
             // get updated selection
             const {
                 nextOwnSelection,
@@ -235,7 +265,7 @@ export default {
             `
             dispatch('updateTargetFilters', { targetCollectionFocusClause });
         },
-        targetCompoundToggle({ dispatch, getters }, { targetCompoundId }) {
+        async targetCompoundToggle({ dispatch, getters }, { targetCompoundId }) {
             // get updated selection
             const {
                 nextOwnSelection,
@@ -274,7 +304,7 @@ export default {
             `
             dispatch('updateTargetFilters', { targetCompoundFocusClause });
         },
-        targetIonToggle({ dispatch, getters }, { targetIonId }) {
+        async targetIonToggle({ dispatch, getters }, { targetIonId }) {
             // get updated selection
             const {
                 nextOwnSelection,
@@ -311,7 +341,7 @@ export default {
             `
             dispatch('updateTargetFilters', { targetIonFocusClause });
         },
-        targetIsotopeToggle({ dispatch, getters }, { targetIsotopeId }) {
+        async targetIsotopeToggle({ dispatch, getters }, { targetIsotopeId }) {
             const {
                 nextOwnSelection,
                 nextPeerSelection
@@ -349,7 +379,7 @@ export default {
             const api = rootState.api;
             // Iterate filter state using temporary tables
             await api.query(`--sql
-                CREATE OR REPLACE TEMPORARY TABLE target_isotope_filter AS(
+                CREATE OR REPLACE TEMPORARY TABLE target_isotope_filter AS (
                     SELECT
                         target_isotope_id,
                     CASE
@@ -359,11 +389,10 @@ export default {
                     FROM target_isotope_filter current
                     NATURAL JOIN toggled_target_isotope toggled
                 );
-                CREATE OR REPLACE TEMPORARY TABLE target_ion_filter AS(
+                CREATE OR REPLACE TEMPORARY TABLE target_ion_filter AS (
                     SELECT
                         target_ion_id,
-                    target_compound_id,
-                    CASE
+                        CASE
                             ${targetIonFocusClause}
                             WHEN 2 <= ALL(List(isotope.selection)) THEN 2
                             WHEN 0 == ALL(List(isotope.selection)) THEN 0
@@ -373,10 +402,10 @@ export default {
                     NATURAL JOIN target_ion
                     GROUP BY ALL
                 );
-                CREATE OR REPLACE TEMPORARY TABLE target_compound_filter AS(
-                    target_compound_id,
-                    target_collection_id,
-                    CASE
+                CREATE OR REPLACE TEMPORARY TABLE target_compound_filter AS (
+                    SELECT
+                        target_compound_id,
+                        CASE
                             ${targetCompoundFocusClause}
                             WHEN 2 <= ALL(List(ion.selection)) THEN 2
                             WHEN 0 == ALL(List(ion.selection)) THEN 0
@@ -386,9 +415,10 @@ export default {
                     NATURAL JOIN target_compound_in_target_collection
                     GROUP BY ALL
                 );
-                CREATE OR REPLACE TEMPORARY TABLE target_collection_filter AS(
-                    target_collection_id,
-                    CASE
+                CREATE OR REPLACE TEMPORARY TABLE target_collection_filter AS (
+                    SELECT
+                        target_collection_id,
+                        CASE
                             ${targetCollectionFocusClause}
                             WHEN 2 <= ALL(List(compound.selection)) THEN 2
                             WHEN 0 == ALL(List(compound.selection)) THEN 0
@@ -402,26 +432,70 @@ export default {
         },
     },
     getters: {
-        // get row from id
-        sampleItem: (state) => (sampleItemId) => {
+        // get all rows as proxy array
+        sampleItems: (state) => {
             return state.sampleItems
-                .filter((row) => (row.sample_item_id == sampleItemId))[0]
+                ? state.sampleItems.toArray()
+                : [];
         },
-        targetCollection: (state) => (targetCollectionId) => {
+        targetCollections: (state) => {
             return state.targetCollections
-                .filter((row) => (row.sample_item_id == targetCollectionId))[0]
+                ? state.targetCollections.toArray()
+                : [];
         },
-        targetCompound: (state) => (targetCompoundId) => {
+        targetCompounds: (state) => {
             return state.targetCompounds
-                .filter((row) => (row.sample_item_id == targetCompoundId))[0]
+                ? state.targetCompounds.toArray()
+                : [];
         },
-        targetIon: (state) => (targetIonId) => {
+        targetIons: (state) => {
             return state.targetIons
-                .filter((row) => (row.sample_item_id == targetIonId))[0]
+                ? state.targetIons.toArray()
+                : []
         },
-        targetIsotope: (state) => (targetIsotopeId) => {
+        targetIsotopes: (state) => {
             return state.targetIsotopes
-                .filter((row) => (row.sample_item_id == targetIsotopeId))[0]
+                ? state.targetIsotopes.toArray()
+                : [];
+        },
+        // get row from id
+        sampleItem: (state, getters) => (sampleItemId) => {
+            const [sampleItem] = getters['sampleItems']
+                .filter((row) => (row.sample_item_id == sampleItemId));
+            return sampleItem ?? null;
+        },
+        targetCollection: (state, getters) => (targetCollectionId) => {
+            const [targetCollection] = getters['targetCollections']
+                .filter((row) => (row.sample_item_id == targetCollectionId));
+            return targetCollection ?? null;
+        },
+        targetCompound: (state, getters) => (targetCompoundId) => {
+            const [targetCompound] = getters['targetCompounds']
+                .filter((row) => (row.sample_item_id == targetCompoundId));
+            return targetCompound ?? null;
+        },
+        targetIon: (state, getters) => (targetIonId) => {
+            const [targetIon] = getters['targetIons']
+                .filter((row) => (row.sample_item_id == targetIonId));
+            return targetIon ?? null;
+        },
+        targetIsotope: (state, getters) => (targetIsotopeId) => {
+            const [targetIsotope] = getters['targetIsotopes']
+                .filter((row) => (row.sample_item_id == targetIsotopeId));
+            return targetIsotope ?? null;
+        },
+        // get selected
+        sampleItemsSelected: (state, getters) => {
+            return getters['sampleItems']
+                .filter((sampleItem) => sampleItem.selection >= 2);
+        },
+        sampleItemsToCalibrate: (state, getters) => {
+            return getters['sampleItems']
+                .filter((sampleItem) => sampleItem.selection == 2);
+        },
+        sampleItemFocused: (state, getters) => {
+            return getters['sampleItems']
+                .filter((sampleItem) => sampleItem.selection == 3);
         },
         // get selection mode
         selectionMode: (state, getters, rootState) => {
@@ -437,31 +511,31 @@ export default {
             return mode;
         },
         // get next selection from id
-        sampleItemNextSelection: (state) => (sampleItemId) => {
+        sampleItemNextSelection: (state, getters) => (sampleItemId) => {
             const mode = getters['selectionMode'];
             const currentSelection =
                 getters['sampleItem'](sampleItemId).selection;
             return nextSelection(mode, currentSelection);
         },
-        targetCollectionNextSelection: (state) => (targetCollectionId) => {
+        targetCollectionNextSelection: (state, getters) => (targetCollectionId) => {
             const mode = getters['selectionMode'];
             const currentSelection =
                 getters['targetCollection'](targetCollectionId).selection;
             return nextSelection(mode, currentSelection);
         },
-        targetCompoundNextSelection: (state) => (targetCompoundId) => {
+        targetCompoundNextSelection: (state, getters) => (targetCompoundId) => {
             const mode = getters['selectionMode'];
             const currentSelection =
                 getters['targetCompound'](targetCompoundId).selection;
             return nextSelection(mode, currentSelection);
         },
-        targetIonNextSelection: (state) => (targetIonId) => {
+        targetIonNextSelection: (state, getters) => (targetIonId) => {
             const mode = getters['selectionMode'];
             const currentSelection =
                 getters['targetIon'](targetIonId).selection;
             return nextSelection(mode, currentSelection);
         },
-        targetIsotopeNextSelection: (state) => (targetIsotopeId) => {
+        targetIsotopeNextSelection: (state, getters) => (targetIsotopeId) => {
             const mode = getters['selectionMode'];
             const currentSelection =
                 getters['targetIsotope'](targetIsotopeId).selection;
@@ -504,4 +578,21 @@ function nextSelection(mode, currentSelection) {
     }
     const nextChildSelection = currentSelection < 2 ? 2 : 0;
     return { nextOwnSelection, nextChildSelection, nextPeerSelection }
+}
+
+async function allFiltersExist(api) {
+    const tables = (await api.query(`--sql
+            describe;
+        `))
+        .getChild('table_name')
+        .toArray();
+    const filterTables = [
+        'sample_item_filter',
+        'target_isotope_filter',
+        'target_ion_filter',
+        'target_compound_filter',
+        'target_collection_filter'
+    ];
+    return filterTables
+        .every((filterTable) => tables.includes(filterTable));
 }

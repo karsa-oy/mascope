@@ -6,8 +6,8 @@
 </template>
 
 <script>
-import { mapMutations, mapActions, mapGetters } from "vuex";
-import { bindState } from "$lib/store";
+import { mapMutations } from "vuex";
+import { sync, get, call } from "vuex-pathify";
 
 import BaseBrowser from "./BaseBrowser.vue";
 
@@ -22,12 +22,11 @@ export default {
     };
   },
   computed: {
-    ...bindState({
-      controlPressed: "key/control",
+    ...sync({
       modalTargetCollectionOpProps: "modal/targetCollectionOpProps",
     }),
-    ...mapGetters({
-      batchActive: "batch/activeRows",
+    ...get({
+      batchActive: "batch/active",
       matchesExist: "match/exists",
       sampleItemFocused: "sample/item/focusedRow",
       targetCollectionsSelected: "target/collection/selectedRows",

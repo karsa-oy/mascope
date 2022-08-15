@@ -19,7 +19,15 @@ export default {
             // workspaceId (required for edit or delete)
         },
         sampleFileAttributesSaveActive: false,
+        sampleFileAttributesSaveProps: {
+            // action ('create', 'edit' or 'delete')
+            // sampleFileId (required for edit or delete)
+        },
         sampleItemAttributesSaveActive: false,
+        sampleItemAttributesSaveProps: {
+            // action ('create', 'edit' or 'delete')
+            // sampleItemId (required for edit or delete)
+        },
     },
     mutations: {
         activate(state, { modal }) {
