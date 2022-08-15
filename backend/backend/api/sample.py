@@ -193,7 +193,7 @@ async def sample_item_delete(sid, sample_item_ids):
 @sio.event(namespace='/api')
 async def sample_file_create(sid, sample_files):
     sample_files = [
-        {**sample_file, 'id': gen_id()}
+        {'id': gen_id(), **sample_file}
         for sample_file in sample_files
     ]
     sample_file_df = pd.DataFrame.from_records(sample_files)
@@ -229,13 +229,14 @@ async def dataset_updated(sid, data):
         instrument = filename.split('_')[0]
         date = timestamp_from_filename(filename)
         title = data.get('title', "")
+        description = data.get('description', "")
         utc_offset = timedelta(seconds=int(data['utc_offset']))
         await sample_file_create(
             None,
             [{
                 "filename": filename,
                 "title": title,
-                "description": "",
+                "description": description,
                 "instrument": instrument,
                 "datetime": date.isoformat(),
                 "datetime_utc": (date - utc_offset).isoformat(),
