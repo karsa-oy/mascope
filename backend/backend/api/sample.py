@@ -222,10 +222,6 @@ async def sample_file_update(sid, sample_files):
 
 @sio.event(namespace='/api')
 async def dataset_updated(sid, data):
-    if data['data_type'] != 'signal':
-        raise ValueError(
-            f"Expected data_type: signal - got {data['data_type']}"
-        )
     filename = data['filename']
     full_length = data['length']
     committed_length = data['committed_length']
@@ -234,13 +230,18 @@ async def dataset_updated(sid, data):
         date = timestamp_from_filename(filename)
         title = data.get('title', "")
         utc_offset = timedelta(seconds=int(data['utc_offset']))
-        sample_file_create([{
-            "id": filename,
-            "filename": filename,
-            "instrument": instrument,
-            "title": title,
-            "datetime": date.isoformat(),
-            "datetime_utc": (date - utc_offset).isoformat(),
-            "length": committed_length,
-            "range": data['range']
-        }])
+        await sample_file_create(
+            None,
+            [{
+                "filename": filename,
+                "title": title,
+                "description": "",
+                "instrument": instrument,
+                "datetime": date.isoformat(),
+                "datetime_utc": (date - utc_offset).isoformat(),
+                "length": committed_length,
+                "range": data['range'],
+                "mz_calibration": {},
+                "attributes": {},
+            }]
+        )
