@@ -1,6 +1,8 @@
+import asyncio
 import inspect
 import os
 
+from backend.api.sample import dataset_updated
 from backend.lib.file import zarr_sdk
 from backend.lib.hardware.tofwerk.generator import H5Streamer
 from backend.lib.hardware.orbitrap.generator import RawStreamer
@@ -88,12 +90,16 @@ def handle_spec_data(data):
     if spec_i is None:
         # File finished
         zarr_sdk.finalize_signal_dataset({'value': data}, cache_item)
+        asyncio.run(
+            dataset_updated(None, cache_item.props)
+        )
     elif spec_i < 0:
         # New file
         try:
             cache_item = zarr_sdk.init_signal_dataset({'value': data})
         except FileExistsError:
             print("File exists: %s" %filename)
+            return
         cache_item = AttrDict(cache_item)
         cache[data['filename']] = cache_item
     else:
@@ -113,6 +119,7 @@ def handle_tps_data(data):
             zarr_sdk.init_tps_dataset({'value': data}, cache_item)
         except FileExistsError:
             print("File exists: %s" %filename)
+            return
     else:
         # New data to existing file
         zarr_sdk.update_tps_dataset({'value': data}, cache_item)
