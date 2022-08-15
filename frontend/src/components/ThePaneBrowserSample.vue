@@ -4,8 +4,7 @@
 </template>
 
 <script>
-import { mapActions, mapMutations, mapGetters } from "vuex";
-import { bindState } from "$lib/store";
+import { mapMutations } from "vuex";
 import { sync, get, call } from "vuex-pathify";
 
 import BaseBrowser from "./BaseBrowser.vue";
@@ -16,37 +15,34 @@ export default {
     BaseBrowser,
   },
   computed: {
-    ...mapGetters({
-      itemFocused: "sample/item/focusedRow",
-      batchActive: "batch/activeRow",
-      itemsSelected: "sample/item/selectedRows",
-    }),
     ...get({
-      batchRows: "workspace/batches",
-      itemRows: "batch/sampleItems",
-      targetCollectionRows: "batch/targetCollections",
+      batches: "workspace/batches",
+      batchActive: "batch/active",
+      items: "batch/sampleItems",
+      itemsSelected: "batch/sampleItemsSelected",
+      itemsToCalibrate: "batch/sampleItemsToCalibrate",
+      itemFocused: "batch/sampleItemFocused",
+      targetCollections: "batch/targetCollections",
     }),
     ...sync({
-      itemRows: "sample/item/rows",
-      targetCollectionRows: "target/collection/rows",
       modalSampleBatchOpProps: "modal/sampleBatchOpProps",
-      modalSampleItemAttributesSave: "modal/sampleItemAttributesSave",
+      modalSampleItemAttributesSaveProps: "modal/sampleItemAttributesSaveProps",
     }),
     sampleLevels() {
       return [
         {
           name: "Batch",
-          slug: "sampleBatch",
+          slug: "sample_batch",
           cols: [{ field: "name", label: "Batch", width: "90%" }],
-          rows: this.batchRows,
-          rowClick: this.batchHandleToggle,
+          rows: this.batches,
+          rowClick: this.batchLoad,
           opened: this.opened,
         },
         {
           name: "Item",
-          slug: "sampleItem",
+          slug: "sample_item",
           cols: [{ field: "title", label: "Item", width: "90%" }],
-          rows: this.itemRows,
+          rows: this.items,
           detailsIcon: null,
           rowClick: this.itemToggle,
         },
@@ -56,7 +52,7 @@ export default {
       return this.batchActive ? 1 : 0;
     },
     itemSelectedCount() {
-      return this.itemsSelected ? this.itemsSelected.length : 0;
+      return this.itemsSelected.length;
     },
     menu() {
       // sample batch
@@ -102,7 +98,7 @@ export default {
       return [...batchButtons, ...itemButtons, ...calibrateButtons];
     },
     opened() {
-      return this.batchActive && this.itemRows.length > 0
+      return this.batchActive && this.items.length > 0
         ? [this.batchActive]
         : [];
     },
@@ -111,12 +107,10 @@ export default {
     ...mapMutations({
       activateModal: "modal/activate",
     }),
-    ...mapActions({
+    ...call({
       calibrateItems: "calibration/calibrateItems",
-      batchToggle: "sample/batch/toggle",
-      itemToggle: "sample/item/toggle",
-      sampleItemRead: "sample/item/read",
-      sampleItemDelete: "sample/item/delete",
+      batchLoad: "batch/load",
+      itemToggle: "batch/sampleItemToggle",
     }),
     batchCreate() {
       this.modalSampleBatchOpProps = {
@@ -150,34 +144,24 @@ export default {
       });
     },
     itemCalibrate() {
-      let itemsToCalibrate = this.itemsSelected.filter(
-        (item) => item.id !== this.itemFocused.id
-      );
       let fit = this.itemFocused.mzCalibration;
       this.$buefy.dialog.confirm({
         title: "Copy mass calibration",
-        message: `Copy calibration from ${this.itemFocused.title} to ${itemsToCalibrate.length} selected samples?`,
+        message: `Copy calibration from ${this.itemFocused.title} to ${this.itemsToCalibrate.length} selected samples?`,
         confirmText: "Copy",
         onConfirm: () => {
           this.calibrateItems({ items: itemsToCalibrate, fit });
         },
       });
     },
-    itemClick(row) {
-      if (!this.controlPressed) {
-        this.toggleItemSelection(row);
-      } else {
-        this.toggleItemFocus(row);
-      }
-    },
     async itemUpdate() {
-      this.modalSampleItemAttributesSave = { action: "create" };
+      this.modalSampleItemAttributesSaveProps = { action: "create" };
       this.activateModal({ modal: "sampleItemAttributesSave" });
     },
     itemDelete() {
       this.$buefy.dialog.confirm({
         title: "Deleting items",
-        message: `Delete ${this.itemsSelected.length} item(s) from ${this.batchActive.name} ?`,
+        message: `Delete ${this.itemsSelected.length} item(s) from ${this.batchActive.name}?`,
         confirmText: "Delete",
         onConfirm: () => {
           let itemIds = this.itemsSelected.map((item) => item.id);

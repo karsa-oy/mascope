@@ -163,6 +163,16 @@ def run():
                 ,match_score FLOAT NOT NULL
                     CHECK (match_score BETWEEN 0 AND 1)
         );
+
+        -- selection
+
+        DROP FUNCTION IF EXISTS selected;
+
+        CREATE FUNCTION selected(col, selection, default_value := 0) AS
+            CASE
+                WHEN selection >= 2 THEN coalesce(col, default_value)
+                ELSE default_value
+            END;
     """)
 
     # STEP 2 - load sqlite3 tables into pandas dataframes

@@ -24,7 +24,7 @@
 
 <script>
 import BaseAttributesForm from "./BaseAttributesForm.vue";
-import { mapMutations, mapGetters } from "vuex";
+import { mapMutations } from "vuex";
 import { sync, call, get } from "vuex-pathify";
 
 export default {
@@ -64,10 +64,8 @@ export default {
     ...get({
       modalActive: "modal/sampleItemAttributesSaveActive",
       templateRows: "app/attributeTemplates",
-    }),
-    ...mapGetters({
-      batchActive: "batch/activeRow",
-      itemsSelected: "sample/item/selectedRows",
+      batchActive: "batch/active",
+      itemsSelected: "batch/sampleItemsSelected",
     }),
     availableTemplates() {
       return [this.defaultTemplate, ...this.templateRows];

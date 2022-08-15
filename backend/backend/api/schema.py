@@ -1,8 +1,7 @@
-from backend.db import init_con
+from backend.db import init_cursor
 from backend.server import sio
 
-con = init_con()
-cur = con.cursor()
+cur = init_cursor()
 
 
 @sio.event(namespace='/api')

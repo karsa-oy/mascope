@@ -1,6 +1,5 @@
-from .id import *  # noqa
+from backend.db.id import *  # noqa
 
-import duckdb
 import os
 import re
 import traceback
@@ -10,34 +9,44 @@ from importlib import import_module
 data_dir = os.environ.get('MASCOPE_PRIVATE_DATADIR')
 db_dir = os.path.join(data_dir, 'database')
 
+__all__ = ['init_cursor']
+
 
 def run():
-    print("Initializing mascope database")
-    target_version = int(os.environ.get('MASCOPE_PUBLIC_DB_VERSION'))
-    current_version = get_current_db_version()
-    available_version = get_available_db_version()
-    print(f"Detected mascope database version: v{current_version}")
-    if target_version > available_version:
-        raise ValueError(f"""
-            Latest available version is: {available_version}.
-        """)
-    if current_version == target_version:
-        print("No database migration needed.")
-    else:
-        print(f"This version of mascope requires: v{target_version}")
-        current_version = migrate(current_version, target_version)
-    # load api
-    import_module('backend.api')
-    # check for write-ahead-log file
-    wal_path = os.path.join(
-        db_dir, f"mascope.v{current_version}.duckdb.wal"
-    )
-    if not os.path.exists(wal_path):
-        # create an empty wal file
-        with open(wal_path, 'w') as fp:  # noqa
-            pass
-        # note - this is needed because duckdb-wasm tries to find the file
-        # this can be removed once read-only mode is available in duckdb-wasm
+    try:
+        print("Initializing mascope database")
+        target_version = int(os.environ.get('MASCOPE_PUBLIC_DB_VERSION'))
+        current_version = get_current_db_version()
+        available_version = get_available_db_version()
+        print(f"Detected mascope database version: v{current_version}")
+        if target_version > available_version:
+            raise ValueError(f"""
+                Latest available version is: {available_version}.
+            """)
+        if current_version == target_version:
+            print("No database migration needed.")
+        else:
+            print(f"This version of mascope requires: v{target_version}")
+            current_version = migrate(current_version, target_version)
+        # init database connection
+        globals()['init_cursor'] = (
+            getattr(import_module('backend.db.con'), 'init_cursor')
+        )
+        # load api
+        import_module('backend.api')
+        # check for write-ahead-log file
+        wal_path = os.path.join(
+            db_dir, f"mascope.v{current_version}.duckdb.wal"
+        )
+        if not os.path.exists(wal_path):
+            # create an empty wal file
+            with open(wal_path, 'w') as fp:  # noqa
+                pass
+            # note - this is needed because duckdb-wasm tries to find the file
+            # this can be removed once read-only mode is available in 
+            # duckdb-wasm
+    except Exception as error:  # noqa
+        traceback.print_exc()
 
 
 def migrate(current_version, target_version):
@@ -109,12 +118,3 @@ def get_current_db_version():
         if len(versions) > 0:
             v = max(versions)
     return v
-
-
-def init_con():
-    current_version = get_current_db_version()
-    return duckdb.connect(
-        database=os.path.join(
-            db_dir, f'mascope.v{current_version}.duckdb'
-        )
-    )
