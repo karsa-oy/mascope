@@ -6,6 +6,7 @@
       :can-cancel="true"
       aria-role="dialog"
       aria-modal
+      @close="deactivateModal"
     >
       <base-attributes-form
         formTitle="Save item attributes"

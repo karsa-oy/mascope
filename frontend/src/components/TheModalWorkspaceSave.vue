@@ -8,6 +8,7 @@
       aria-role="dialog"
       aria-modal
       @after-enter="loadWorkspace"
+      @close="deactivateModal"
       :type="actionIs('delete') ? 'is-danger' : 'is-primary'"
     >
       <div class="modal-card" style="width: 500px">
@@ -100,8 +101,8 @@ export default {
   },
   computed: {
     ...get({
-      workspaces: "app/workspaces",
       modalActive: "modal/workspaceSaveActive",
+      workspaces: "app/workspaces",
     }),
     ...sync({
       modalProps: "modal/workspaceSaveProps",

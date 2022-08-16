@@ -8,6 +8,7 @@
       aria-role="dialog"
       aria-modal
       @after-enter="initData"
+      @close="deactivateModal"
       :type="actionIs('delete') ? 'is-danger' : 'is-primary'"
     >
       <template v-if="actionIs('create', 'update')">

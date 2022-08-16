@@ -6,6 +6,7 @@
       :can-cancel="true"
       aria-role="dialog"
       aria-modal
+      @close="deactivateModal"
     >
       <base-attributes-form
         formTitle="Save sample attributes"
@@ -73,6 +74,7 @@ export default {
   },
   methods: {
     ...mapMutations({
+      deactivateModal: "modal/deactivate",
       sampleFileUpdate: "sample/file/UPDATE",
     }),
     ...call({
@@ -93,7 +95,7 @@ export default {
       let row = {};
       newValue.forEach((field) => (row[field.label] = field.value || ""));
       this.sampleFileUpdate(row);
-      this.modalActive = false;
+      this.deactivateModal();
     },
     loadAttributes(filters) {
       const filename = filters.filename;
