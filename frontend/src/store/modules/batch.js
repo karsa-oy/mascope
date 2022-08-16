@@ -31,7 +31,7 @@ export default {
                     AS sample_peak_height_sum
             `;
             // load sample items
-            const sampleItems = await api.query(`--sql
+            api.query(`--sql
                 SELECT
                     sample_item.*,
                     sample_file.* EXCLUDE (
@@ -46,8 +46,9 @@ export default {
                 NATURAL LEFT JOIN sample_file
                 NATURAL LEFT JOIN match
                 GROUP BY ALL
-            `);
-            commit('SET_SAMPLE_ITEMS', Object.freeze(sampleItems));
+            `).then((res) => {
+                commit('SET_SAMPLE_ITEMS', res);
+            });
             // load target isotopes
             const targetIsotopes = await api.query(`--sql
                 SELECT
@@ -60,8 +61,9 @@ export default {
                 FROM target_isotope_filter
                 NATURAL LEFT JOIN target_isotope
                 NATURAL LEFT JOIN match
-            `);
-            commit('SET_TARGET_ISOTOPES', Object.freeze(targetIsotopes));
+            `).then((res) => {
+                commit('SET_TARGET_ISOTOPES', res);
+            });
             // load target ions
             const targetIons = await api.query(`--sql
                 SELECT
@@ -77,10 +79,11 @@ export default {
                 NATURAL LEFT JOIN target_isotope
                 NATURAL LEFT JOIN match
                 GROUP BY ALL;
-            `);
-            commit('SET_TARGET_IONS', Object.freeze(targetIons));
+            `).then((res) => {
+                commit('SET_TARGET_IONS', res);
+            });
             // load target compounds
-            const targetCompounds = await api.query(`--sql
+            api.query(`--sql
                 SELECT
                     target_compound.*,
                     selection,
@@ -91,10 +94,11 @@ export default {
                 NATURAL LEFT JOIN target_isotope
                 NATURAL LEFT JOIN match
                 GROUP BY ALL;
-            `);
-            commit('SET_TARGET_COMPOUNDS', Object.freeze(targetCompounds));
+            `).then((res) => {
+                commit('SET_TARGET_COMPOUNDS', res);
+            });
             // load target collections
-            const targetCollections = await api.query(`--sql
+            api.query(`--sql
                 SELECT
                     target_collection.*,
                     selection,
@@ -106,8 +110,9 @@ export default {
                 NATURAL LEFT JOIN target_isotope
                 NATURAL LEFT JOIN match
                 GROUP BY ALL;
-            `);
-            commit('SET_TARGET_COLLECTIONS', Object.freeze(targetCollections));
+            `).then((res) => {
+                commit('SET_TARGET_COLLECTIONS', res);
+            });
             await commit('SET_ACTIVE', batch);
         },
         async unload({ commit }) {
@@ -125,9 +130,19 @@ export default {
                 dispatch('load', state.active);
             }
         },
-        async onBatchReload({ state, dispatch }, batchId) {
-            if (state.active == batchId) {
+        async onBatchReload({ state, dispatch }, batch) {
+            if (state.active.sample_batch_id == batch.sample_batch_id) {
                 dispatch('reload');
+            }
+        },
+        async batchToggle({ state, dispatch }, batch) {
+            const active_batch_id = state.active
+                ? state.active.sample_batch_id
+                : null;
+            if (active_batch_id == batch.sample_batch_id) {
+                dispatch('unload');
+            } else {
+                dispatch('load', batch);
             }
         },
         // selection
@@ -183,7 +198,9 @@ export default {
         },
         // Sample selection toggling
         // Directly updates the sample filter
-        async sampleItemToggle({ dispatch, getters }, { sampleItemId }) {
+        async sampleItemToggle({ rootState, dispatch, getters }, sampleItem) {
+            const api = rootState.api;
+            const sampleItemId = sampleItem.sample_item_id;
             // get updated selection
             const {
                 nextOwnSelection,
@@ -224,7 +241,9 @@ export default {
         // Target selection toggling actions
         // these retrieve toggled isotope selections and trigger the updateTargetFilter 
         // action which propagates these to up the hierarchy.
-        async targetCollectionToggle({ dispatch, getters }, { targetCollectionId }) {
+        async targetCollectionToggle({ rootState, dispatch, getters }, targetCollection) {
+            const api = rootState.api;
+            const targetCollectionId = targetCollection.target_collection_id;
             // get updated selection
             const {
                 nextOwnSelection,
@@ -265,7 +284,9 @@ export default {
             `
             dispatch('updateTargetFilters', { targetCollectionFocusClause });
         },
-        async targetCompoundToggle({ dispatch, getters }, { targetCompoundId }) {
+        async targetCompoundToggle({ rootState, dispatch, getters }, targetCompound) {
+            const api = rootState.api;
+            const targetCompoundId = targetCompound.target_compound_id;
             // get updated selection
             const {
                 nextOwnSelection,
@@ -304,7 +325,9 @@ export default {
             `
             dispatch('updateTargetFilters', { targetCompoundFocusClause });
         },
-        async targetIonToggle({ dispatch, getters }, { targetIonId }) {
+        async targetIonToggle({ rootState, dispatch, getters }, targetIon) {
+            const api = rootState.api;
+            const targetIonId = targetIon.target_ion_id;
             // get updated selection
             const {
                 nextOwnSelection,
@@ -341,7 +364,9 @@ export default {
             `
             dispatch('updateTargetFilters', { targetIonFocusClause });
         },
-        async targetIsotopeToggle({ dispatch, getters }, { targetIsotopeId }) {
+        async targetIsotopeToggle({ rootState, dispatch, getters }, targetIsotope) {
+            const api = rootState.api;
+            const targetIsotopeId = targetIsotope.target_isotope_id;
             const {
                 nextOwnSelection,
                 nextPeerSelection
@@ -561,17 +586,17 @@ function nextSelection(mode, currentSelection) {
     let nextOwnSelection, nextPeerSelection;
     switch (mode) {
         case 'singleselect': {
-            nextOwnSelection = mapSelection(currentSelection);
+            nextOwnSelection = mapSelection[currentSelection];
             nextPeerSelection = 0;  // deselect peers
             break;
         }
         case 'multiselect': {
-            nextOwnSelection = mapSelection(currentSelection);
+            nextOwnSelection = mapSelection[currentSelection];
             nextPeerSelection = null;  // do not change peers
             break;
         }
         case 'focus': {
-            nextOwnSelection = mapFocus(currentSelection);
+            nextOwnSelection = mapFocus[currentSelection];
             nextPeerSelection = null;  // do not change peers
             break;
         }

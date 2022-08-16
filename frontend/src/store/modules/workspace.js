@@ -25,7 +25,7 @@ export default {
             commit('SET_BATCHES', []);
         },
         async onWorkspaceReload({ state, dispatch }, workspaceId) {
-            if (state.active == workspaceId) {
+            if (state.active.workspace_id == workspaceId) {
                 dispatch('load', workspaceId);
             }
         }

@@ -35,7 +35,7 @@ export default {
           slug: "sample_batch",
           cols: [{ field: "name", label: "Batch", width: "90%" }],
           rows: this.batches,
-          rowClick: this.batchLoad,
+          rowClick: this.batchToggle,
           opened: this.opened,
         },
         {
@@ -111,6 +111,7 @@ export default {
       calibrateItems: "calibration/calibrateItems",
       batchLoad: "batch/load",
       itemToggle: "batch/sampleItemToggle",
+      batchToggle: "batch/batchToggle",
     }),
     batchCreate() {
       this.modalSampleBatchOpProps = {
@@ -128,11 +129,6 @@ export default {
       this.activateModal({
         modal: "sampleBatchOp",
       });
-    },
-    batchHandleToggle(row) {
-      this.itemRows = [];
-      this.targetCollectionRows = [];
-      this.batchToggle(row);
     },
     batchUpdate() {
       this.modalSampleBatchOpProps = {
