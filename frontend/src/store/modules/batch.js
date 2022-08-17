@@ -86,10 +86,12 @@ export default {
             api.query(`--sql
                 SELECT
                     target_compound.*,
+                    target_collection_id,
                     selection,
                     ${stats}
                 FROM target_compound_filter
                 NATURAL LEFT JOIN target_compound
+                NATURAL LEFT JOIN target_compound_in_target_collection
                 NATURAL LEFT JOIN target_ion
                 NATURAL LEFT JOIN target_isotope
                 NATURAL LEFT JOIN match

@@ -27,45 +27,21 @@ export default {
     }),
     ...get({
       batchActive: "batch/active",
-      matchesExist: "match/exists",
-      sampleItemFocused: "sample/item/focusedRow",
-      targetCollectionsSelected: "target/collection/selectedRows",
-      uniqueTargetCollection: "target/collection/uniqueRow",
+      // matchesExist: "match/exists",
+      // sampleItemFocused: "sample/item/focusedRow",
+      targetCollections: "batch/targetCollections",
+      targetCompounds: "batch/targetCompounds",
+      targetIons: "batch/targetIons",
+      targetIsotopes: "batch/targetIsotopes",
+      // targetCollectionsSelected: "target/collection/selectedRows",
+      // uniqueTargetCollection: "target/collection/uniqueRow",
     }),
-    collectionStats: function () {
-      return this.$store.getters["target/stat/rows"]({
-        level: "collection",
-        selected: false,
-        itemFocused: true,
-      });
-    },
-    compoundStats: function () {
-      return this.$store.getters["target/stat/rows"]({
-        level: "compound",
-        selected: false,
-        itemFocused: true,
-      });
-    },
-    ionStats: function () {
-      return this.$store.getters["target/stat/rows"]({
-        level: "ion",
-        selected: false,
-        itemFocused: true,
-      });
-    },
-    isotopeStats: function () {
-      return this.$store.getters["target/stat/rows"]({
-        level: "isotope",
-        selected: false,
-        itemFocused: true,
-      });
-    },
     targetLevels: function () {
       let hidden = !(this.matchesExist && this.sampleItemFocused);
       return [
         {
           name: "Collection",
-          slug: "targetCollection",
+          slug: "target_collection",
           cols: [
             { field: "name", label: "Collection", width: "90%" },
             {
@@ -80,14 +56,14 @@ export default {
               },
             },
           ],
-          rows: this.collectionStats,
+          rows: this.targetCollections,
           defaultSort: ["matchScore", "desc"],
           detailsIcon: "default",
           rowClick: this.targetCollectionToggle,
         },
         {
           name: "Compound",
-          slug: "targetCompound",
+          slug: "target_compound",
           cols: [
             { field: "formula", label: "Compound", width: "45%" },
             { field: "name", label: "", width: "45%" },
@@ -103,14 +79,14 @@ export default {
               },
             },
           ],
-          rows: this.compoundStats,
+          rows: this.targetCompounds,
           defaultSort: ["matchScore", "desc"],
           detailsIcon: "default",
           rowClick: this.targetCompoundToggle,
         },
         {
           name: "Ion",
-          slug: "targetIon",
+          slug: "target_ion",
           cols: [
             { field: "formula", label: "Ion", width: "45%" },
             { field: "ionMech", label: "", width: "45%" },
@@ -126,14 +102,14 @@ export default {
               },
             },
           ],
-          rows: this.ionStats,
+          rows: this.targetIons,
           defaultSort: ["matchScore", "desc"],
           detailsIcon: "default",
           rowClick: this.targetIonToggle,
         },
         {
           name: "Isotope",
-          slug: "targetIsotope",
+          slug: "target_isotope",
           cols: [
             { field: "mz", label: "Isotope", width: "45%" },
             { field: "relativeAbundance", label: "", width: "45%" },
@@ -152,7 +128,7 @@ export default {
               },
             },
           ],
-          rows: this.isotopeStats,
+          rows: this.targetIsotopes,
           defaultSort: ["mz", "asc"],
           detailsIcon: null,
           rowClick: this.targetIsotopeToggle,
@@ -199,12 +175,11 @@ export default {
     ...mapMutations({
       activateModal: "modal/activate",
     }),
-    ...mapActions({
-      targetCollectionRead: "target/collection/read",
-      targetCollectionToggle: "target/collection/toggle",
-      targetCompoundToggle: "target/compound/toggle",
-      targetIonToggle: "target/ion/toggle",
-      targetIsotopeToggle: "target/isotope/toggle",
+    ...call({
+      targetCollectionToggle: "batch/targetCollectionToggle",
+      targetCompoundToggle: "batch/targetCompoundToggle",
+      targetIonToggle: "batch/targetIonToggle",
+      targetIsotopeToggle: "batch/targetIsotopeToggle",
     }),
     collectionAddToBatch() {
       this.modalTargetCollectionOpProps = {
@@ -243,13 +218,6 @@ export default {
       this.activateModal({
         modal: "targetCollectionOp",
       });
-    },
-  },
-  watch: {
-    batchActive: function () {
-      if (!this.batchActive.length) {
-        this.collectionGetAll();
-      }
     },
   },
 };
