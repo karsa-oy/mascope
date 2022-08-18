@@ -107,7 +107,7 @@ def run():
         CREATE TABLE IF NOT EXISTS target_compound (
             target_compound_id VARCHAR(32) PRIMARY KEY
             ,name TEXT
-            ,formula VARCHAR(256) NOT NULL
+            ,target_compound_formula VARCHAR(256) NOT NULL
             ,cas_number VARCHAR(12)
         );
 
@@ -117,7 +117,7 @@ def run():
                 REFERENCES target_compound(target_compound_id)
             ,mechanism_id VARCHAR(16) NOT NULL
                 REFERENCES config_mechanism(mechanism_id)
-            ,formula VARCHAR(256) NOT NULL
+            ,target_ion_formula VARCHAR(256) NOT NULL
         );
 
         CREATE TABLE IF NOT EXISTS target_isotope (
@@ -364,12 +364,15 @@ def run():
             ,cas_number
         FROM target_compounds;
     """, sqlite_con)
-
+    target_compound_df.rename(
+        columns={'formula':'target_compound_formula'},
+        inplace=True
+        )
     duckdb_con.execute("""--sql
         INSERT INTO target_compound (
             target_compound_id
             ,name
-            ,formula
+            ,target_compound_formula
             ,cas_number
         )
         (SELECT * FROM target_compound_df)
@@ -383,13 +386,17 @@ def run():
             ,formula
         FROM target_ions;
     """, sqlite_con)
+    target_ion_df.rename(
+        columns={'formula':'target_ion_formula'},
+        inplace=True
+        )
 
     duckdb_con.execute("""--sql
         INSERT INTO target_ion (
             target_ion_id
             ,target_compound_id
             ,mechanism_id
-            ,formula
+            ,target_ion_formula
         )
         (SELECT * FROM target_ion_df)
     """)
