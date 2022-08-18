@@ -20,9 +20,7 @@ export default {
             const api = rootState.api;
             const batchId = batch.sample_batch_id;
             await commit('SET_ACTIVE', null);
-            if (!(await allFiltersExist(api))) {
-                await dispatch('initFilters', batchId);
-            }
+            await dispatch('initFilters', batchId);
             // load data w/ statistical aggregates
             const stats = `--sql
                 max(selected(match_score, selection))
@@ -118,12 +116,12 @@ export default {
         async unload({ commit }) {
             commit('SET_ACTIVE', null);
             // samples
-            commit('SET_SAMPLE_ITEMS', []);
+            commit('SET_SAMPLE_ITEMS', null);
             // targets
-            commit('SET_TARGET_COLLECTIONS', []);
-            commit('SET_TARGET_COMPOUNDS', []);
-            commit('SET_TARGET_IONS', []);
-            commit('SET_TARGET_ISOTOPES', []);
+            commit('SET_TARGET_COLLECTIONS', null);
+            commit('SET_TARGET_COMPOUNDS', null);
+            commit('SET_TARGET_IONS', null);
+            commit('SET_TARGET_ISOTOPES', null);
         },
         async reload({ dispatch, state }) {
             if (state.active) {
