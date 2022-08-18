@@ -27,7 +27,6 @@ export default {
     }),
     ...get({
       batchActive: "batch/active",
-      // matchesExist: "match/exists",
       // sampleItemFocused: "sample/item/focusedRow",
       targetCollections: "batch/targetCollections",
       targetCompounds: "batch/targetCompounds",
@@ -37,7 +36,7 @@ export default {
       // uniqueTargetCollection: "target/collection/uniqueRow",
     }),
     targetLevels: function () {
-      let hidden = !(this.matchesExist && this.sampleItemFocused);
+      let hidden = false;
       return [
         {
           name: "Collection",
@@ -45,19 +44,19 @@ export default {
           cols: [
             { field: "name", label: "Collection", width: "90%" },
             {
-              field: "matchScore",
+              field: "match_score",
               label: "Score",
               width: "10%",
               hidden,
               tooltip: (row) => {
                 return {
-                  "Peak intensity": this.formatter.format(row.samplePeakHeight),
+                  "Peak intensity": this.formatter.format(row.sample_peak_height_sum),
                 };
               },
             },
           ],
           rows: this.targetCollections,
-          defaultSort: ["matchScore", "desc"],
+          defaultSort: ["match_score", "desc"],
           detailsIcon: "default",
           rowClick: this.targetCollectionToggle,
         },
@@ -65,22 +64,22 @@ export default {
           name: "Compound",
           slug: "target_compound",
           cols: [
-            { field: "formula", label: "Compound", width: "45%" },
+            { field: "target_compound_formula", label: "Compound", width: "45%" },
             { field: "name", label: "", width: "45%" },
             {
-              field: "matchScore",
+              field: "match_score",
               label: "Score",
               width: "10%",
               hidden,
               tooltip: (row) => {
                 return {
-                  "Peak intensity": this.formatter.format(row.samplePeakHeight),
+                  "Peak intensity": this.formatter.format(row.sample_peak_height_sum),
                 };
               },
             },
           ],
           rows: this.targetCompounds,
-          defaultSort: ["matchScore", "desc"],
+          defaultSort: ["match_score", "desc"],
           detailsIcon: "default",
           rowClick: this.targetCompoundToggle,
         },
@@ -88,22 +87,22 @@ export default {
           name: "Ion",
           slug: "target_ion",
           cols: [
-            { field: "formula", label: "Ion", width: "45%" },
+            { field: "target_ion_formula", label: "Ion", width: "45%" },
             { field: "ionMech", label: "", width: "45%" },
             {
-              field: "matchScore",
+              field: "match_score",
               label: "Score",
               width: "10%",
               hidden,
               tooltip: (row) => {
                 return {
-                  "Peak intensity": this.formatter.format(row.peakHeight),
+                  "Peak intensity": this.formatter.format(row.sample_peak_height_sum),
                 };
               },
             },
           ],
           rows: this.targetIons,
-          defaultSort: ["matchScore", "desc"],
+          defaultSort: ["match_score", "desc"],
           detailsIcon: "default",
           rowClick: this.targetIonToggle,
         },
@@ -114,15 +113,15 @@ export default {
             { field: "mz", label: "Isotope", width: "45%" },
             { field: "relativeAbundance", label: "", width: "45%" },
             {
-              field: "matchScore",
+              field: "match_score",
               label: "Score",
               width: "10%",
               hidden,
               tooltip: (row) => {
                 return {
-                  "Peak intensity": this.formatter.format(row.peakHeight),
+                  "Peak intensity": this.formatter.format(row.sample_peak_height_sum),
                   "Rel. abundance": this.formatter.format(
-                    row.relativeAbundance
+                    row.relative_abundance
                   ),
                 };
               },
