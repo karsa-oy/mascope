@@ -54,13 +54,11 @@ export default {
                 SELECT
                     target_isotope.*,
                     selection,
-                    selected(match.sample_peak_height, selection)
-                        AS sample_peak_height_sum,
-                    selected(match.match_score, selection)
-                        AS match_score
+                    ${stats}
                 FROM target_isotope_filter
                 NATURAL LEFT JOIN target_isotope
                 NATURAL LEFT JOIN match
+                GROUP BY ALL;
             `).then((res) => {
                 commit('SET_TARGET_ISOTOPES', res);
             });
