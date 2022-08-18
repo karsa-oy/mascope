@@ -43,7 +43,7 @@ export default {
                 NATURAL LEFT JOIN sample_item
                 NATURAL LEFT JOIN sample_file
                 NATURAL LEFT JOIN match
-                GROUP BY ALL
+                GROUP BY ALL;
             `).then((res) => {
                 commit('SET_SAMPLE_ITEMS', res);
             });
@@ -251,11 +251,11 @@ export default {
             // save toggled isotopes and next selection in temp table
             if (nextPeerSelection == null) {
                 await api.query(`--sql
-                    CREATE OR REPLACE TEMPORARY TABLE toggled_isotope AS (
+                    CREATE OR REPLACE TEMPORARY TABLE toggled_target_collection AS (
                         SELECT
-                            target_isotope_id,
+                            target_collection_id,
                             ${nextChildSelection} AS next_selection
-                        FROM target_isotope_filter
+                        FROM target_collection_filter
                         NATURAL JOIN target_ion
                         NATURAL JOIN target_compound_in_target_collection
                         WHERE target_collection_id == '${targetCollectionId}'
@@ -263,7 +263,7 @@ export default {
                 `);
             } else {
                 await api.query(`--sql
-                    CREATE OR REPLACE TEMPORARY TABLE toggled_isotope AS (
+                    CREATE OR REPLACE TEMPORARY TABLE toggled_target_collection AS (
                         SELECT
                             target_isotope_id,
                             CASE
@@ -294,25 +294,25 @@ export default {
             // save toggled isotopes and next selection in temp table
             if (nextPeerSelection == null) {
                 await api.query(`--sql
-                    CREATE OR REPLACE TEMPORARY TABLE toggled_isotope AS (
+                    CREATE OR REPLACE TEMPORARY TABLE toggled_target_compound AS (
                         SELECT
-                            target_isotope_id,
+                            target_compound_id,
                             ${nextChildSelection} AS next_selection
-                        FROM target_isotope_filter
+                        FROM target_compound_filter
                         NATURAL JOIN target_ion
                         WHERE target_compound_id == '${targetCompoundId}'
                     );
                 `);
             } else {
                 await api.query(`--sql
-                    CREATE OR REPLACE TEMPORARY TABLE toggled_isotope AS (
+                    CREATE OR REPLACE TEMPORARY TABLE toggled_target_compound AS (
                         SELECT
-                            target_isotope_id,
+                            target_compound_id,
                             CASE
                                 WHEN target_compound_id == '${targetCompoundId}' THEN ${nextChildSelection}
                                 ELSE ${nextPeerSelection}
                             END AS next_selection
-                        FROM target_isotope_filter
+                        FROM target_compound_filter
                         NATURAL JOIN target_ion
                     );
                 `);
@@ -335,24 +335,24 @@ export default {
             // save toggled isotopes and next selection in temp table
             if (nextPeerSelection == null) {
                 await api.query(`--sql
-                    CREATE OR REPLACE TEMPORARY TABLE toggled_isotope AS (
+                    CREATE OR REPLACE TEMPORARY TABLE toggled_target_ion AS (
                         SELECT
-                            target_isotope_id,
+                            target_ion_id,
                             ${nextChildSelection} AS next_selection
-                        FROM target_isotope_filter
+                        FROM target_ion_filter
                         WHERE target_ion_id == '${targetIonId}'
                     );
                 `);
             } else {
                 await api.query(`--sql
-                    CREATE OR REPLACE TEMPORARY TABLE toggled_isotope AS (
+                    CREATE OR REPLACE TEMPORARY TABLE toggled_target_ion AS (
                         SELECT
-                            target_isotope_id,
+                        target_ion_id,
                             CASE
                                 WHEN target_ion_id == '${targetIonId}' THEN ${nextChildSelection}
                                 ELSE ${nextPeerSelection}
                             END AS next_selection
-                        FROM target_isotope_filter
+                        FROM target_ion_filter
                     );
                 `);
             }
@@ -372,7 +372,7 @@ export default {
             // save toggled isotopes and next selection in temp table
             if (nextPeerSelection == null) {
                 await api.query(`--sql
-                    CREATE OR REPLACE TEMPORARY TABLE toggled_isotope AS (
+                    CREATE OR REPLACE TEMPORARY TABLE toggled_target_isotope AS (
                         SELECT
                             '${targetIsotopeId}' AS target_isotope_id
                             ${nextOwnSelection} AS next_selection
@@ -380,7 +380,7 @@ export default {
                 `);
             } else {
                 await api.query(`--sql
-                    CREATE OR REPLACE TEMPORARY TABLE toggled_isotope AS (
+                    CREATE OR REPLACE TEMPORARY TABLE toggled_target_isotope AS (
                         SELECT
                             target_isotope_id,
                             CASE
