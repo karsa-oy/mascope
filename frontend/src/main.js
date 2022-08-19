@@ -25,8 +25,8 @@ import ThePageHome from "./components/ThePageHome.vue";
 import ThePageBatchOverview from "./components/ThePageBatchOverview.vue";
 //import ThePageDataManagement from "./components/ThePageDataManagement.vue";
 //import ThePageSampleSignal from "./components/ThePageSampleSignal.vue";
-//import ThePageSampleManagement from "./components/ThePageSampleManagement.vue";
 //import ThePageMzCalibration from "./components/ThePageMzCalibration.vue";
+import ThePageSampleManagement from "./components/ThePageSampleManagement.vue";
 //import ThePageSettings from "./components/ThePageSettings.vue";
 
 Vue.use(VueRouter);
@@ -46,11 +46,11 @@ const router = new VueRouter({
     //    path: '/sample-signal',
     //    component: ThePageSampleSignal
     //  }, {
-    //    path: '/sample-management',
-    //    component: ThePageSampleManagement
-    //  }, {
     //    path: '/mz-calibration',
     //    component: ThePageMzCalibration
+     }, {
+       path: '/sample-management',
+       component: ThePageSampleManagement
     //  }, {
     //    path: '/settings',
     //    component: ThePageSettings

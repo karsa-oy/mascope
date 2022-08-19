@@ -82,8 +82,7 @@ import TheLayoutSidebar from "./TheLayoutSidebar.vue";
 import ThePaneBrowserSample from "./ThePaneBrowserSample.vue";
 import BaseTable from "./BaseTable.vue";
 
-import { bindState } from "$lib/store";
-import { mapActions, mapGetters } from "vuex";
+import { sync, get } from "vuex-pathify";
 
 export default {
   name: "ThePageSampleManagement",
@@ -94,57 +93,39 @@ export default {
   },
   data: function () {
     return {
-      sampleItemRows: [],
+      sampleFileRows: [],
       sampleFileMinDateTime: null,
       sampleFileMaxDateTime: null,
       sampleFileTableDataKey: 0,
+      sampleItemRows: [],
     };
   },
   computed: {
-    ...mapGetters({
-      batchActive: "batch/activeRow",
-      workspaceActive: "workspace/selectedRow",
+    ...sync({
     }),
-    ...bindState({
-      sampleFileSchema: "sample/file/schema/row",
-      sampleItemSchema: "sample/item/schema/row",
-      sampleFileRows: "sample/file/rows",
+    ...get({
+      batchActive: "batch/active",
+      workspaces: "app/workspaces",
+      workspaceActive: "workspace/active",
+      sampleFileCols: "app/schema@sample_file",
+      sampleItemCols: "app/schema@sample_item",
     }),
-    // columns
-    sampleFileCols() {
-      let result = [];
-      if (!this.sampleFileSchema) return result;
-      this.sampleFileSchema.forEach((el) => {
-        if (el !== "id") result.push({ field: el, label: el });
-      });
-      return result;
-    },
     sampleFileTableHeight() {
       return "calc(40vh)";
-    },
-    sampleItemCols() {
-      let result = [];
-      if (!this.sampleItemSchema) return result;
-      this.sampleItemSchema.forEach((field) => {
-        if (field !== "id" && field !== "batchId")
-          result.push({ field: field, label: field });
-      });
-      return result;
     },
     sampleItemTableHeight() {
       return "calc(30vh)";
     },
   },
   methods: {
-    ...mapActions({
-      listSampleFiles: "sample/file/listFiles",
-      sampleItemCreate: "sample/item/create",
-    }),
-    selectSampleFiles(files) {
-      let fields = this.sampleItemSchema.filter(
-        (field) => !["id", "batchId"].includes(field)
+    sampleItemCreate(items) {
+      this.$api.emit('sample_item_create', items);
+    },
+    selectSampleFiles(selectedFiles) {
+      let fields = this.sampleItemCols
+        .map((col) => col.field
       );
-      this.sampleItemRows = files.map((file) =>
+      this.sampleItemRows = selectedFiles.map((file) =>
         fields
           .map((field) => ({ [field]: file[field] }))
           .reduce((i, j) => ({ ...i, ...j }), {})
@@ -164,7 +145,7 @@ export default {
         onConfirm: () => {
           let rows = this.sampleItemRows.map((row) => ({
             ...row,
-            sampleBatchId: this.batchActive.id,
+            sample_batch_id: this.batchActive.sample_batch_id,
           }));
           this.sampleItemCreate(rows);
         },
@@ -177,19 +158,17 @@ export default {
       // reset sampleFiles table to clean up internal static selection data
       this.sampleFileTableDataKey++;
       // recalculate from UTC to local timezone
-      let d1 =
-        this.sampleFileMinDateTime -
-        this.sampleFileMinDateTime.getTimezoneOffset() * 60000;
-      let d2 =
-        this.sampleFileMaxDateTime -
-        this.sampleFileMaxDateTime.getTimezoneOffset() * 60000;
-      this.listSampleFiles({
-        filters: {
-          column: "datetime_utc",
-          min_value: new Date(d1).toISOString(),
-          max_value: new Date(d2).toISOString(),
-        },
-      });
+      let dt1 = new Date(this.sampleFileMinDateTime).toISOString();
+      let dt2 = new Date(this.sampleFileMaxDateTime).toISOString();
+      this.$api
+        .query(`--sql
+          SELECT *
+          FROM sample_file
+          WHERE datetime_utc BETWEEN '${dt1}' AND '${dt2}'
+        `)
+        .then((res) => {
+          this.sampleFileRows = res.toArray().map((row) => ({...row}));
+        });
     },
   },
   watch: {
