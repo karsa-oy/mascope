@@ -26,12 +26,12 @@
           <div style="padding-top: 1.5em; padding-bottom: 1.5em">
             <h1 style="font-size: 16px; text-align: left">
               <p>
-                <template v-if="itemFocused">
+                <template v-if="sampleItemFocused">
                   <b
                     >Current parameters:
                     {{
-                      itemFocused.mzCalibration
-                        ? itemFocused.mzCalibration.par
+                      sampleItemFocused.mz_calibration
+                        ? sampleItemFocused.mz_calibration.par
                         : "undefined"
                     }}</b
                   >
@@ -82,8 +82,7 @@ import ThePaneBrowserSample from "./ThePaneBrowserSample.vue";
 import ThePaneBrowserTarget from "./ThePaneBrowserTarget.vue";
 import BaseTable from "./BaseTable.vue";
 
-import { bindState } from "$lib/store";
-import { mapActions, mapGetters, mapMutations } from "vuex";
+import { sync, get } from "vuex-pathify";
 
 export default {
   name: "ThePageMassCalibration",
@@ -126,42 +125,43 @@ export default {
   },
   created: function () {},
   computed: {
-    ...bindState({
-      mzFit: "calibration/mzFit",
+    ...get({
       mzFitStats: "calibration/mzFitStats",
+      sampleItemFocused: "batch/sampleItemFocused",
+      sampleItemsSelected: "batch/sampleItemsSelected",
     }),
-    ...mapGetters({
-      itemFocused: "sample/item/focusedRow",
-      itemsSelected: "sample/item/selectedRows",
+    ...sync({
+      mzFit: "calibration/mzFit",
     }),
     candidateTableHeight() {
       return "calc(30vh)";
     },
     candidateTableRows() {
-      if (!this.itemFocused) return [];
-      return this.$store.getters["match/rating/rows"]({
-        level: "isotope",
-        selected: true,
-      }).filter((row) => row.sampleItemId === this.itemFocused.id);
+      return [];
+      // if (!this.sampleItemFocused) return [];
+      // return this.$store.getters["match/rating/rows"]({
+      //   level: "isotope",
+      //   selected: true,
+      // }).filter((row) => row.sampleItemId === this.sampleItemFocused.id);
     },
     selectedTableHeight() {
       return "calc(30vh)";
     },
   },
   methods: {
-    ...mapActions({
-      calibrateItems: "calibration/calibrateItems",
-    }),
-    ...mapMutations({
-      $mzFitRequest: "calibration/MZ_FIT_REQUEST",
-    }),
+    // ...mapActions({
+    //   calibrateItems: "calibration/calibrateItems",
+    // }),
+    // ...mapMutations({
+    //   $mzFitRequest: "calibration/MZ_FIT_REQUEST",
+    // }),
     applyCalibration() {
       this.$buefy.dialog.confirm({
         title: "Calibrate items",
-        message: `Apply calibration to ${this.itemsSelected.length} selected items?`,
+        message: `Apply calibration to ${this.sampleItemsSelected.length} selected items?`,
         confirmText: "Apply",
         onConfirm: () => {
-          this.calibrateItems({ items: this.itemsSelected, fit: this.mzFit });
+          this.calibrateItems({ items: this.sampleItemsSelected, fit: this.mzFit });
         },
       });
     },
@@ -169,8 +169,8 @@ export default {
       this.mzFit = null;
       this.selectedTableRows = rows;
       if (rows.length > 3) {
-        let peakTofs = rows.map((row) => row.samplePeakTof);
-        let peakMzs = rows.map((row) => row.samplePeakMz);
+        let peakTofs = rows.map((row) => row.sample_peak_tof);
+        let peakMzs = rows.map((row) => row.sample_peak_mz);
         let exactMzs = rows.map((row) => row.mz);
         this.$mzFitRequest({
           peakTofs,
