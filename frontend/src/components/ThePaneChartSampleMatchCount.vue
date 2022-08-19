@@ -11,24 +11,30 @@
 <script>
 import BaseChartPlotly from "./BaseChartPlotly.vue";
 
-import { mapActions } from "vuex";
+import { get } from "vuex-pathify";
 
 export default {
   name: "ThePaneChartSampleMatchCount",
   components: { BaseChartPlotly },
+  data: function() {
+    return {
+      possibleMatchThreshold: .5,
+      probableMatchThreshold: .8,
+    }
+  },
   computed: {
-    stats: function () {
-      return this.$store.getters["sample/item/stat/rows"]({
-        level: "compound",
-        selected: true,
-      });
-    },
+    ...get({
+      sampleItems: "batch/sampleItems",
+      targetCompounds: "batch/targetCompounds",
+      matchCompounds: "batch/matchCompounds",
+    }),
     data: function () {
+      if (!(this.sampleItems && this.matchCompounds)) return [];
       return [
         {
           name: "Probable match",
-          x: this.stats.map((stat) => stat.id),
-          y: this.stats.map((stat) => stat.matchCompoundProbableCount),
+          x: this.sampleItems.map((item) => item.sample_item_id),
+          y: this.sampleItems.map((item) => this.itemMatchCompoundProbableCount(item.sample_item_id)),
           type: "bar",
           marker: {
             color: "#5cb85c",
@@ -36,8 +42,8 @@ export default {
         },
         {
           name: "Possible match",
-          x: this.stats.map((stat) => stat.id),
-          y: this.stats.map((stat) => stat.matchCompoundPossibleCount),
+          x: this.sampleItems.map((item) => item.sample_item_id),
+          y: this.sampleItems.map((item) => this.itemMatchCompoundPossibleCount(item.sample_item_id)),
           type: "bar",
           marker: {
             color: "#df691a",
@@ -52,8 +58,8 @@ export default {
           autorange: true,
           showgrid: true,
           tickmode: "array",
-          tickvals: this.stats.map((item) => item.id),
-          ticktext: this.stats.map((item) => item.title),
+          tickvals: this.sampleItems.map((item) => item.sample_item_id),
+          ticktext: this.sampleItems.map((item) => item.title),
           gridcolor: "#757575",
         },
         yaxis: {
@@ -69,9 +75,21 @@ export default {
     },
   },
   methods: {
-    ...mapActions("sample", {
-      toggleSampleItemSelection: "itemSelectionToggle",
-    }),
+    itemMatchCompoundPossibleCount: function(sampleItemId) {
+      return this.matchCompounds
+        .filter((item) => item.sample_item_id === sampleItemId)
+        .filter((match) => 
+          (match.match_score >= this.possibleMatchThreshol
+          && match.match_score < this.probableMatchThreshold)
+          )
+        .length
+    },
+    itemMatchCompoundProbableCount: function(sampleItemId) {
+      return this.matchCompounds
+        .filter((item) => item.sample_item_id === sampleItemId)
+        .filter((match) => match.match_score >= this.probableMatchThreshold)
+        .length
+    },
     onClick: function (event) {
       console.log(event);
     },

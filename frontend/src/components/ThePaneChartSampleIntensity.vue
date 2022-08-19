@@ -10,20 +10,18 @@
 
 <script>
 import BaseChartPlotly from "./BaseChartPlotly.vue";
-
+import { get } from "vuex-pathify";
 import { glasbeyHv } from "$lib/styles";
-import { mapActions } from "vuex";
 
 export default {
   name: "ThePaneChartSampleIntensity",
   components: { BaseChartPlotly },
   computed: {
-    stats: function () {
-      return this.$store.getters["match/rating/rows"]({
-        level: "compound",
-        selected: true,
-      });
-    },
+    ...get({
+      sampleItems: "batch/sampleItems",
+      targetCompounds: "batch/targetCompounds",
+      matchCompounds: "batch/matchCompounds",
+    }),
     probable: function () {
       return this.stats.filter((stat) => stat.rating == "probable");
     },
@@ -31,34 +29,49 @@ export default {
       return this.stats.filter((stat) => stat.rating == "possible");
     },
     data: function () {
-      if (!this.stats.length) return [];
-      // Read target compound ids from the first sample item
-      // and make an object with id as key and color as value
-      let allCompoundIds = this.stats.map((stat) => stat.targetCompoundId);
-      let uniqueCompoundIds = [...new Set(allCompoundIds)];
+      if (!(this.sampleItems && this.matchCompounds)) return [];
+      let allCompoundIds = this.targetCompounds.map(
+        (compound) => compound.target_compound_id
+        );
       let compoundColors = Object.fromEntries(
-        uniqueCompoundIds.map((compoundId, index) => [
+        allCompoundIds.map((compoundId, index) => [
           [compoundId],
           glasbeyHv[index],
         ])
       );
       let data = [];
-      for (let stat of this.stats) {
-        let compoundColor = compoundColors[stat.targetCompoundId];
-        let markerSymbol =
-          stat.rating === "probable" ? "square" : "square-open";
-        data.push({
-          name: stat.targetName.trim() ? stat.targetName : stat.targetFormula,
-          x: [stat.sampleItemId],
-          y: [stat.samplePeakHeight],
-          mode: "markers",
-          type: "scatter",
-          marker: {
-            color: `rgb(${compoundColor[0]},${compoundColor[1]},${compoundColor[2]})`,
-            size: 10,
-            symbol: markerSymbol,
-          },
-        });
+      // Loop through sample items
+      for (let item of this.sampleItems) {
+        let x = [item.sample_item_id];
+        let itemMatches = this.matchCompounds.filter(
+          row => row.sample_item_id === item.sample_item_id
+          );
+        // Loop through target compounds
+        for (let compound of this.targetCompounds) {
+          let y = itemMatches
+            .filter(
+              (match) => match.target_compound_id === compound.target_compound_id)
+            .map(compoundMatch => compoundMatch.sample_peak_height_sum);
+          let compoundColor = compoundColors[compound.target_compound_id];
+          let markerSymbol =
+            compound.rating === "probable"
+            ? "square"
+            : "square-open";
+          data.push({
+            name: compound.name.trim()
+              ? compound.name
+              : compound.target_compound_formula,
+            x,
+            y,
+            mode: "markers",
+            type: "scatter",
+            marker: {
+              color: `rgb(${compoundColor[0]},${compoundColor[1]},${compoundColor[2]})`,
+              size: 10,
+              symbol: markerSymbol,
+            },
+          });
+        }
       }
       return data;
     },
@@ -69,8 +82,8 @@ export default {
           autorange: true,
           showgrid: true,
           tickmode: "array",
-          tickvals: this.stats.map((item) => item.sampleItemId),
-          ticktext: this.stats.map((item) => item.sampleTitle),
+          tickvals: this.sampleItems.map((item) => item.sample_item_id),
+          ticktext: this.sampleItems.map((item) => item.title),
           gridcolor: "#757575",
         },
         yaxis: {
@@ -85,9 +98,6 @@ export default {
     },
   },
   methods: {
-    ...mapActions("sample", {
-      toggleSampleItemSelection: "itemSelectionToggle",
-    }),
     onClick: function (event) {
       console.log(event);
     },
