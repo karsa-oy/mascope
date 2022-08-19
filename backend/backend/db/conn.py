@@ -8,7 +8,8 @@ current_version = get_current_db_version()
 con = duckdb.connect(
     database=os.path.join(
         db_dir, f'mascope.v{current_version}.duckdb'
-    )
+    ),
+    read_only=True
 )
 
 
