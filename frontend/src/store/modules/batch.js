@@ -9,6 +9,9 @@ const state = {
     targetCompounds: null,
     targetIons: null,
     targetIsotopes: null,
+    // matches
+    matchCompounds: null,
+    matchIons: null,
 }
 
 export default {
@@ -29,7 +32,7 @@ export default {
                     AS sample_peak_height_sum
             `;
             // load sample items
-            api.query(`--sql
+            await api.query(`--sql
                 SELECT
                     sample_item.*,
                     sample_file.* EXCLUDE (
@@ -48,7 +51,7 @@ export default {
                 commit('SET_SAMPLE_ITEMS', res);
             });
             // load target isotopes
-            const targetIsotopes = await api.query(`--sql
+            await api.query(`--sql
                 SELECT
                     target_isotope.*,
                     selection,
@@ -61,7 +64,7 @@ export default {
                 commit('SET_TARGET_ISOTOPES', res);
             });
             // load target ions
-            const targetIons = await api.query(`--sql
+            await api.query(`--sql
                 SELECT
                     target_ion.*,
                     config_mechanism.* EXCLUDE (
@@ -79,7 +82,7 @@ export default {
                 commit('SET_TARGET_IONS', res);
             });
             // load target compounds
-            api.query(`--sql
+            await api.query(`--sql
                 SELECT
                     target_compound.*,
                     target_collection_id,
@@ -96,7 +99,7 @@ export default {
                 commit('SET_TARGET_COMPOUNDS', res);
             });
             // load target collections
-            api.query(`--sql
+            await api.query(`--sql
                 SELECT
                     target_collection.*,
                     selection,
@@ -111,6 +114,29 @@ export default {
             `).then((res) => {
                 commit('SET_TARGET_COLLECTIONS', res);
             });
+            // load matches
+            await api.query(`--sql
+                SELECT
+                    sample_item_id,
+                    target_compound_id,
+                    target_ion_id,
+                    ${stats}
+                FROM match_filter
+                GROUP BY sample_item_id, target_compound_id, target_ion_id;
+            `).then((res) => {
+                commit('SET_MATCH_IONS', res.toArray().map((row) => ({...row})));
+            });
+            await api.query(`--sql
+                SELECT
+                    sample_item_id,
+                    target_compound_id,
+                    ${stats}
+                FROM match_filter
+                GROUP BY sample_item_id, target_compound_id;
+            `).then((res) => {
+                commit('SET_MATCH_COMPOUNDS', res.toArray().map((row) => ({...row})));
+            });
+            // set batch active
             await commit('SET_ACTIVE', batch);
         },
         async unload({ commit }) {
@@ -122,6 +148,9 @@ export default {
             commit('SET_TARGET_COMPOUNDS', null);
             commit('SET_TARGET_IONS', null);
             commit('SET_TARGET_ISOTOPES', null);
+            // matches
+            commit('SET_MATCH_COMPOUNDS', null);
+            commit('SET_MATCH_IONS', null);
         },
         async reload({ dispatch, state }) {
             if (state.active) {
@@ -190,6 +219,19 @@ export default {
                         ,2 as selection
                     FROM target_collection
                     NATURAL JOIN target_collection_in_sample_batch
+                    WHERE sample_batch_id == '${batchId}'
+                );
+                -- matches
+                CREATE OR REPLACE TEMPORARY TABLE match_filter AS (
+                    SELECT
+                        match.*,
+                        target_ion_id,
+                        target_compound_id
+                        ,2 as selection
+                    FROM sample_item
+                    NATURAL LEFT JOIN match
+                    NATURAL LEFT JOIN target_isotope
+                    NATURAL LEFT JOIN target_ion
                     WHERE sample_batch_id == '${batchId}'
                 );
             `);
@@ -489,22 +531,22 @@ export default {
         },
         targetCollection: (state, getters) => (targetCollectionId) => {
             const [targetCollection] = getters['targetCollections']
-                .filter((row) => (row.sample_item_id == targetCollectionId));
+                .filter((row) => (row.target_collection_id == targetCollectionId));
             return targetCollection ?? null;
         },
         targetCompound: (state, getters) => (targetCompoundId) => {
             const [targetCompound] = getters['targetCompounds']
-                .filter((row) => (row.sample_item_id == targetCompoundId));
+                .filter((row) => (row.target_compound_id == targetCompoundId));
             return targetCompound ?? null;
         },
         targetIon: (state, getters) => (targetIonId) => {
             const [targetIon] = getters['targetIons']
-                .filter((row) => (row.sample_item_id == targetIonId));
+                .filter((row) => (row.target_ion_id == targetIonId));
             return targetIon ?? null;
         },
         targetIsotope: (state, getters) => (targetIsotopeId) => {
             const [targetIsotope] = getters['targetIsotopes']
-                .filter((row) => (row.sample_item_id == targetIsotopeId));
+                .filter((row) => (row.target_isotope_id == targetIsotopeId));
             return targetIsotope ?? null;
         },
         // get selected
