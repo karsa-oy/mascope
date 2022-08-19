@@ -46,7 +46,7 @@
           :visible="!col.hidden"
           left
         >
-          <template v-if="col.field == 'matchScore'">
+          <template v-if="col.field == 'match_score'">
             <base-tag-match
               :match-score="props.row[col.field]"
               :tooltip="col.tooltip ? col.tooltip(props.row) : {}"

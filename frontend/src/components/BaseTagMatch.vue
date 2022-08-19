@@ -25,7 +25,7 @@
 </template>
 
 <script>
-import { mapState } from "vuex";
+import { get } from "vuex-pathify";
 
 export default {
   name: "BaseTagMatch",
@@ -48,9 +48,9 @@ export default {
     });
   },
   computed: {
-    ...mapState("match/param", {
-      probableMatchThreshold: "probableMatchThreshold",
-      possibleMatchThreshold: "possibleMatchThreshold",
+    ...get({
+      probableMatchThreshold: "param/probableMatchThreshold",
+      possibleMatchThreshold: "param/possibleMatchThreshold",
     }),
     tag: function () {
       if (this.matchScore >= this.probableMatchThreshold) {

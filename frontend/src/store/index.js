@@ -6,20 +6,24 @@ import logger from "./plugins/logger";
 import api from "./plugins/api";
 
 import app from './modules/app';
-import workspace from './modules/workspace';
 import batch from './modules/batch';
+import calibration from './modules/calibration';
 import key from './modules/key';
 import modal from './modules/modal';
+import param from './modules/param';
+import workspace from './modules/workspace';
 
 Vue.use(Vuex)
 
 export default new Vuex.Store({
 	modules: {
 		app,
-		workspace,
 		batch,
+		calibration,
 		key,
-		modal
+		modal,
+		param,
+		workspace,
 	},
 	plugins: [ // plugin order matters!
 		logger, // logging first, so that next plugins log

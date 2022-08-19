@@ -16,17 +16,13 @@ import { get } from "vuex-pathify";
 export default {
   name: "ThePaneChartSampleMatchCount",
   components: { BaseChartPlotly },
-  data: function() {
-    return {
-      possibleMatchThreshold: .5,
-      probableMatchThreshold: .8,
-    }
-  },
   computed: {
     ...get({
       sampleItems: "batch/sampleItems",
       targetCompounds: "batch/targetCompounds",
       matchCompounds: "batch/matchCompounds",
+      possibleMatchThreshold: "param/possibleMatchThreshold",
+      probableMatchThreshold: "param/probableMatchThreshold",
     }),
     data: function () {
       if (!(this.sampleItems && this.matchCompounds)) return [];
