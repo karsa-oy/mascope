@@ -54,7 +54,7 @@
           <base-table
             :key="sampleFileTableDataKey"
             :rows="sampleFiles"
-            :cols="sampleFileCols"
+            :cols="sampleFileCols ? sampleFileCols : []"
             :checkable="false"
             :searchable="true"
             :height="sampleFileTableHeight"
@@ -90,7 +90,7 @@ import BaseTable from "./BaseTable.vue";
 import BaseWorkspaceTile from "./BaseWorkspaceTile.vue";
 
 import { mapMutations } from "vuex";
-import { sync, call, get } from "vuex-pathify";
+import { sync, get } from "vuex-pathify";
 
 export default {
   name: "ThePageHome",
@@ -129,9 +129,6 @@ export default {
     this.getRecentAcquisitions();
   },
   methods: {
-    ...call({
-      listSampleFiles: "sample/file/listFiles",
-    }),
     ...mapMutations({
       activateModal: "modal/activate",
     }),
