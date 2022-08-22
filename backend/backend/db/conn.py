@@ -15,3 +15,33 @@ con = duckdb.connect(
 
 def init_cursor():
     return con.cursor()
+
+
+# app
+# workspace
+# batch
+
+def init_conn(batches):
+    app_tables = [
+        'workspace',
+        'target_collection',
+        'attribute_template',
+        'config_mechanism'
+    ]
+    workspace_tables = [
+        'batches'
+    ]
+    batch_tables = [
+        'sample_item',
+        'sample_file',
+        'match_compound',
+        'match_ion'
+    ]
+    target_tables = [
+        'target_collection',
+        'target_compound',
+        'target_ion',
+        'target_isotope'
+    ]
+    conn = duckdb.connect(':memory:')
+

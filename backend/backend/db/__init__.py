@@ -43,7 +43,7 @@ def run():
             with open(wal_path, 'w') as fp:  # noqa
                 pass
             # note - this is needed because duckdb-wasm tries to find the file
-            # this can be removed once read-only mode is available in 
+            # this can be removed once read-only mode is available in
             # duckdb-wasm
     except Exception as error:  # noqa
         traceback.print_exc()
@@ -106,14 +106,15 @@ def get_available_db_version():
 def get_current_db_version():
     v = 0
     if os.path.exists(db_dir):
-        files = os.listdir(db_dir)
-        databases = [
-            f for f in files
-            if re.search('mascope.v[0-9]+.duckdb', f)
+        paths = os.listdir(db_dir)
+        database_dirs = [
+            path for path in paths
+            if re.search('mascope.v[0-9]+', path)
+            and os.isdir(path)
         ]
         versions = [
-            int(re.search('[0-9]+', database).group())
-            for database in databases
+            int(re.search('[0-9]+', database_dirs).group())
+            for database_dir in database_dirs
         ]
         if len(versions) > 0:
             v = max(versions)
