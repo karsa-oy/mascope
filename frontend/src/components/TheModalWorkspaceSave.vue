@@ -86,7 +86,7 @@
 
 <script>
 import { mapMutations } from "vuex";
-import { sync, call, get } from "vuex-pathify";
+import { sync, get } from "vuex-pathify";
 
 import table from "$lib/table";
 
@@ -150,19 +150,14 @@ export default {
     ...mapMutations({
       deactivateModal: "modal/deactivate",
     }),
-    ...call({
-      deleteWorkspace: "workspace/delete",
-      updateWorkspace: "workspace/update",
-      createWorkspace: "workspace/create",
-    }),
     actionIs(...actions) {
       return actions.includes(this.action);
     },
     createWorkspace(newWorkspace) {
       this.$api.emit('workspace_create', newWorkspace);
     },
-    deleteWorkspace(workspace) {
-      this.$api.emit('workspace_delete', workspace);
+    deleteWorkspace(workspaces) {
+      this.$api.emit('workspace_delete', workspaces);
     },
     loadWorkspace() {
       if (this.oldWorkspace) {
