@@ -1,30 +1,28 @@
-from backend.db.conn import init_cursor
+import pandas as pd
+
+from backend.db.conn import conn
 from backend.server import sio
 
-cur = init_cursor()
 
 
 @sio.event(namespace='/api')
 async def schema_read(sid):
-    def zip_cols(row):
-        table = row['table_name']
-        columns = [{
+    with conn:
+        schema = {}
+        tables = pd.read_sql_query("""
+            SELECT name FROM sqlite_master WHERE type='table'
+            """,
+            conn
+            )['name'].tolist()
+        for table_name in tables:
+            table_info = conn.cursor().execute(
+                "PRAGMA table_info('%s')" % table_name
+                ).fetchall()
+            columns = [{
                 'field': col_name,
                 'label': col_name.replace("_", " ").title(),
                 'type': col_type
-            } for col_name, col_type
-            in zip(row['column_names'], row['column_types'])
-        ]
-        return [table, columns]
-
-    return {
-        table: columns
-        for table, columns
-        in map(zip_cols, (
-            cur.execute("""--sql
-                describe;
-            """)
-            .fetchdf()
-            .to_dict('records')
-        ))
-    }
+                } for _, col_name, col_type, _, _, _ in table_info
+            ]
+            schema.update({table_name: columns})
+    return schema
