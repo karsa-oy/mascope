@@ -155,6 +155,9 @@ export default {
         async initFilters({ rootState }, batchId) {
             const api = rootState.api;
             await api.query(`--sql
+                DROP TABLE IF EXISTS sample_item_filter;
+            `);
+            await api.query(`--sql
                 -- samples
                 CREATE TEMPORARY TABLE sample_item_filter AS
                     SELECT
@@ -162,6 +165,47 @@ export default {
                         ,2 as selection
                     FROM sample_item
                     WHERE sample_batch_id == '${batchId}'
+            `);
+            await api.query(`--sql
+                DROP TABLE IF EXISTS target_collection_filter;
+            `);
+            await api.query(`--sql
+                CREATE TEMPORARY TABLE target_collection_filter AS
+                    SELECT
+                        target_collection_id
+                        ,2 as selection
+                    FROM target_collection
+                    NATURAL JOIN target_collection_in_sample_batch
+                    WHERE sample_batch_id == '${batchId}'
+            `);
+            await api.query(`--sql
+                DROP TABLE IF EXISTS target_compound_filter;
+            `);
+            await api.query(`--sql
+                CREATE TEMPORARY TABLE target_compound_filter AS
+                    SELECT
+                        target_compound_id
+                        ,2 as selection
+                    FROM target_compound
+                    NATURAL JOIN target_compound_in_target_collection
+                    NATURAL JOIN target_collection_in_sample_batch
+                    WHERE sample_batch_id == '${batchId}'
+            `);
+            await api.query(`--sql
+                DROP TABLE IF EXISTS target_ion_filter;
+            `);
+            await api.query(`--sql
+                CREATE TEMPORARY TABLE target_ion_filter AS
+                    SELECT
+                        target_ion_id
+                        ,2 as selection
+                    FROM target_ion
+                    NATURAL JOIN target_compound_in_target_collection
+                    NATURAL JOIN target_collection_in_sample_batch
+                    WHERE sample_batch_id == '${batchId}'
+            `);
+            await api.query(`--sql
+                DROP TABLE IF EXISTS target_isotope_filter;
             `);
             await api.query(`--sql
                 -- targets
@@ -176,33 +220,7 @@ export default {
                     WHERE sample_batch_id == '${batchId}'
             `);
             await api.query(`--sql
-                CREATE TEMPORARY TABLE target_ion_filter AS
-                    SELECT
-                        target_ion_id
-                        ,2 as selection
-                    FROM target_ion
-                    NATURAL JOIN target_compound_in_target_collection
-                    NATURAL JOIN target_collection_in_sample_batch
-                    WHERE sample_batch_id == '${batchId}'
-            `);
-            await api.query(`--sql
-                CREATE TEMPORARY TABLE target_compound_filter AS
-                    SELECT
-                        target_compound_id
-                        ,2 as selection
-                    FROM target_compound
-                    NATURAL JOIN target_compound_in_target_collection
-                    NATURAL JOIN target_collection_in_sample_batch
-                    WHERE sample_batch_id == '${batchId}'
-            `);
-            await api.query(`--sql
-                CREATE TEMPORARY TABLE target_collection_filter AS
-                    SELECT
-                        target_collection_id
-                        ,2 as selection
-                    FROM target_collection
-                    NATURAL JOIN target_collection_in_sample_batch
-                    WHERE sample_batch_id == '${batchId}'
+                DROP TABLE IF EXISTS match_filter;
             `);
             await api.query(`--sql
                 -- matches
@@ -221,45 +239,55 @@ export default {
         },
         // Sample selection toggling
         // Directly updates the sample filter
-        async sampleItemToggle({ rootState, dispatch, getters }, sampleItem) {
+        async sampleItemToggle({ rootState, dispatch, getters, state }, sampleItemToggled) {
             const api = rootState.api;
-            const sampleItemId = sampleItem.sample_item_id;
+            const sampleItemToggledId = sampleItemToggled.sample_item_id;
             // get updated selection
             const {
                 nextOwnSelection,
                 nextPeerSelection
-            } = getters['sampleItemNextSelection'](sampleItemId);
-            // update sample item filter directly
-            if (nextPeerSelection == null) {
-                await api.query(`--sql
-                    CREATE OR REPLACE TEMPORARY TABLE sample_item_filter AS (
-                        SELECT
-                            sample_item_id,
-                            CASE
-                                WHEN (
-                                    sample_item_id == '${sampleItemId}'
-                                ) THEN ${nextOwnSelection}
-                                ELSE current.selection
-                            END AS next_selection
-                        FROM sample_item_filter current
-                    );
-                `);
-            } else {
-                await api.query(`--sql
-                    CREATE OR REPLACE TEMPORARY TABLE sample_item_filter AS (
-                        SELECT
-                            sample_item_id,
-                            CASE
-                                WHEN (
-                                    sample_item_id == '${sampleItemId}'
-                                ) THEN ${nextOwnSelection}
-                                ELSE ${nextPeerSelection}
-                            END AS next_selection
-                        FROM sample_item_filter
-                    );
-                `);
+            } = getters['sampleItemNextSelection'](sampleItemToggledId);
+            if (nextOwnSelection == 3) {
+                // Clear previous focus if any
+                state.sampleItems.filter(
+                    (item) => (item.sample_item_id != sampleItemToggledId
+                        && item.selection == 3)
+                    ).forEach((prevFocusedItem) => { prevFocusedItem.selection = 2 });
+                // Set new focused item
+                getters['sampleItem'](sampleItemToggledId).selection = 3;
+            } else if(getters['selectionMode'] == 'focus') {
+                // Unfocus
+                getters['sampleItem'](sampleItemToggledId).selection = 2;
             }
-            dispatch('reload');
+            // // update sample item filter directly
+            // if (nextPeerSelection == null) {
+            //     await api.query(`--sql
+            //         CREATE TEMPORARY TABLE sample_item_filter AS
+            //             SELECT
+            //                 sample_item_id,
+            //                 CASE
+            //                     WHEN (
+            //                         sample_item_id == '${sampleItemId}'
+            //                     ) THEN ${nextOwnSelection}
+            //                     ELSE current.selection
+            //                 END AS next_selection
+            //             FROM sample_item_filter current
+            //     `);
+            // } else {
+            //     await api.query(`--sql
+            //         CREATE TEMPORARY TABLE sample_item_filter AS
+            //             SELECT
+            //                 sample_item_id,
+            //                 CASE
+            //                     WHEN (
+            //                         sample_item_id == '${sampleItemId}'
+            //                     ) THEN ${nextOwnSelection}
+            //                     ELSE ${nextPeerSelection}
+            //                 END AS next_selection
+            //             FROM sample_item_filter
+            //     `);
+            // }
+            // dispatch('reload');
         },
         // Target selection toggling actions
         // these retrieve toggled isotope selections and trigger the updateTargetFilter 
@@ -276,7 +304,7 @@ export default {
             // save toggled isotopes and next selection in temp table
             if (nextPeerSelection == null) {
                 await api.query(`--sql
-                    CREATE OR REPLACE TEMPORARY TABLE toggled_target_collection AS (
+                    CREATE TEMPORARY TABLE toggled_target_collection AS
                         SELECT
                             target_collection_id,
                             ${nextChildSelection} AS next_selection
@@ -284,11 +312,10 @@ export default {
                         NATURAL JOIN target_ion
                         NATURAL JOIN target_compound_in_target_collection
                         WHERE target_collection_id == '${targetCollectionId}'
-                    );
                 `);
             } else {
                 await api.query(`--sql
-                    CREATE OR REPLACE TEMPORARY TABLE toggled_target_collection AS (
+                    CREATE TEMPORARY TABLE toggled_target_collection AS
                         SELECT
                             target_isotope_id,
                             CASE
@@ -298,7 +325,6 @@ export default {
                         FROM target_isotope_filter
                         NATURAL JOIN target_ion
                         NATURAL JOIN target_compound_in_target_collection
-                    );
                 `);
             }
             // create focus clause
@@ -319,18 +345,17 @@ export default {
             // save toggled isotopes and next selection in temp table
             if (nextPeerSelection == null) {
                 await api.query(`--sql
-                    CREATE OR REPLACE TEMPORARY TABLE toggled_target_compound AS (
+                    CREATE TEMPORARY TABLE toggled_target_compound AS
                         SELECT
                             target_compound_id,
                             ${nextChildSelection} AS next_selection
                         FROM target_compound_filter
                         NATURAL JOIN target_ion
                         WHERE target_compound_id == '${targetCompoundId}'
-                    );
                 `);
             } else {
                 await api.query(`--sql
-                    CREATE OR REPLACE TEMPORARY TABLE toggled_target_compound AS (
+                    CREATE TEMPORARY TABLE toggled_target_compound AS
                         SELECT
                             target_compound_id,
                             CASE
@@ -339,7 +364,6 @@ export default {
                             END AS next_selection
                         FROM target_compound_filter
                         NATURAL JOIN target_ion
-                    );
                 `);
             }
             // create focus clause
@@ -360,17 +384,16 @@ export default {
             // save toggled isotopes and next selection in temp table
             if (nextPeerSelection == null) {
                 await api.query(`--sql
-                    CREATE OR REPLACE TEMPORARY TABLE toggled_target_ion AS (
+                    CREATE TEMPORARY TABLE toggled_target_ion AS
                         SELECT
                             target_ion_id,
                             ${nextChildSelection} AS next_selection
                         FROM target_ion_filter
                         WHERE target_ion_id == '${targetIonId}'
-                    );
                 `);
             } else {
                 await api.query(`--sql
-                    CREATE OR REPLACE TEMPORARY TABLE toggled_target_ion AS (
+                    CREATE TEMPORARY TABLE toggled_target_ion AS
                         SELECT
                         target_ion_id,
                             CASE
@@ -378,7 +401,6 @@ export default {
                                 ELSE ${nextPeerSelection}
                             END AS next_selection
                         FROM target_ion_filter
-                    );
                 `);
             }
             // create focus clause
@@ -397,15 +419,14 @@ export default {
             // save toggled isotopes and next selection in temp table
             if (nextPeerSelection == null) {
                 await api.query(`--sql
-                    CREATE OR REPLACE TEMPORARY TABLE toggled_target_isotope AS (
+                    CREATE TEMPORARY TABLE toggled_target_isotope AS
                         SELECT
                             '${targetIsotopeId}' AS target_isotope_id
                             ${nextOwnSelection} AS next_selection
-                    );
                 `);
             } else {
                 await api.query(`--sql
-                    CREATE OR REPLACE TEMPORARY TABLE toggled_target_isotope AS (
+                    CREATE TEMPORARY TABLE toggled_target_isotope AS
                         SELECT
                             target_isotope_id,
                             CASE
@@ -413,7 +434,6 @@ export default {
                                 ELSE ${nextPeerSelection}
                             END AS next_selection
                         FROM target_isotope_filter
-                    );
                 `);
             }
             dispatch('updateTargetFilters');
@@ -427,7 +447,7 @@ export default {
             const api = rootState.api;
             // Iterate filter state using temporary tables
             await api.query(`--sql
-                CREATE OR REPLACE TEMPORARY TABLE target_isotope_filter AS (
+                CREATE TEMPORARY TABLE target_isotope_filter AS
                     SELECT
                         target_isotope_id,
                     CASE
@@ -436,8 +456,7 @@ export default {
                         END AS selection
                     FROM target_isotope_filter current
                     NATURAL JOIN toggled_target_isotope toggled
-                );
-                CREATE OR REPLACE TEMPORARY TABLE target_ion_filter AS (
+                CREATE TEMPORARY TABLE target_ion_filter AS
                     SELECT
                         target_ion_id,
                         CASE
@@ -449,8 +468,7 @@ export default {
                     FROM target_isotope_selection isotope
                     NATURAL JOIN target_ion
                     GROUP BY ALL
-                );
-                CREATE OR REPLACE TEMPORARY TABLE target_compound_filter AS (
+                CREATE TEMPORARY TABLE target_compound_filter AS
                     SELECT
                         target_compound_id,
                         CASE
@@ -462,8 +480,7 @@ export default {
                     FROM target_ion_filter ion
                     NATURAL JOIN target_compound_in_target_collection
                     GROUP BY ALL
-                );
-                CREATE OR REPLACE TEMPORARY TABLE target_collection_filter AS (
+                CREATE TEMPORARY TABLE target_collection_filter AS
                     SELECT
                         target_collection_id,
                         CASE
@@ -474,7 +491,6 @@ export default {
                         END AS selection
                     FROM target_compound_filter compound
                     GROUP BY ALL
-                );
                 `);
             dispatch('reload')
         },
