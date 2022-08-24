@@ -35,18 +35,16 @@ export default {
             await api.query(`--sql
                 SELECT
                     sample_item.*,
-                    sample_file.* EXCLUDE (
-                        filename,
-                        title,
-                        description,
-                        attributes),
-                    selection,
-                    ${stats}
+                    sample_file_id,
+                    datetime,
+                    datetime_utc,
+                    length,
+                    range,
+                    mz_calibration,
+                    selection
                 FROM sample_item_filter
                 NATURAL LEFT JOIN sample_item
                 NATURAL LEFT JOIN sample_file
-                NATURAL LEFT JOIN match
-                GROUP BY ALL;
             `).then((res) => {
                 commit('SET_SAMPLE_ITEMS', res);
             });
@@ -54,12 +52,9 @@ export default {
             await api.query(`--sql
                 SELECT
                     target_isotope.*,
-                    selection,
-                    ${stats}
+                    selection
                 FROM target_isotope_filter
                 NATURAL LEFT JOIN target_isotope
-                NATURAL LEFT JOIN match
-                GROUP BY ALL;
             `).then((res) => {
                 commit('SET_TARGET_ISOTOPES', res);
             });
@@ -67,17 +62,11 @@ export default {
             await api.query(`--sql
                 SELECT
                     target_ion.*,
-                    config_mechanism.* EXCLUDE (
-                        mechanism_id
-                    ),
-                    selection,
-                    ${stats}
+                    config_mechanism.*,
+                    selection
                 FROM target_ion_filter
                 NATURAL LEFT JOIN target_ion
                 NATURAL LEFT JOIN config_mechanism
-                NATURAL LEFT JOIN target_isotope
-                NATURAL LEFT JOIN match
-                GROUP BY ALL;
             `).then((res) => {
                 commit('SET_TARGET_IONS', res);
             });
@@ -86,15 +75,10 @@ export default {
                 SELECT
                     target_compound.*,
                     target_collection_id,
-                    selection,
-                    ${stats}
+                    selection
                 FROM target_compound_filter
                 NATURAL LEFT JOIN target_compound
                 NATURAL LEFT JOIN target_compound_in_target_collection
-                NATURAL LEFT JOIN target_ion
-                NATURAL LEFT JOIN target_isotope
-                NATURAL LEFT JOIN match
-                GROUP BY ALL;
             `).then((res) => {
                 commit('SET_TARGET_COMPOUNDS', res);
             });
@@ -102,15 +86,9 @@ export default {
             await api.query(`--sql
                 SELECT
                     target_collection.*,
-                    selection,
-                    ${stats}
+                    selection
                 FROM target_collection_filter
                 NATURAL LEFT JOIN target_collection
-                NATURAL LEFT JOIN target_compound_in_target_collection
-                NATURAL LEFT JOIN target_ion
-                NATURAL LEFT JOIN target_isotope
-                NATURAL LEFT JOIN match
-                GROUP BY ALL;
             `).then((res) => {
                 commit('SET_TARGET_COLLECTIONS', res);
             });
@@ -119,22 +97,23 @@ export default {
                 SELECT
                     sample_item_id,
                     target_compound_id,
-                    target_ion_id,
-                    ${stats}
+                    AVG(match_score) AS match_score,
+                    SUM(sample_peak_height) AS sample_peak_height_sum
                 FROM match_filter
                 GROUP BY sample_item_id, target_compound_id, target_ion_id;
             `).then((res) => {
-                commit('SET_MATCH_IONS', res.toArray().map((row) => ({...row})));
+                commit('SET_MATCH_IONS', res);
             });
             await api.query(`--sql
                 SELECT
                     sample_item_id,
                     target_compound_id,
-                    ${stats}
+                    AVG(match_score) AS match_score,
+                    SUM(sample_peak_height) AS sample_peak_height_sum
                 FROM match_filter
                 GROUP BY sample_item_id, target_compound_id;
             `).then((res) => {
-                commit('SET_MATCH_COMPOUNDS', res.toArray().map((row) => ({...row})));
+                commit('SET_MATCH_COMPOUNDS', res);
             });
             // set batch active
             await commit('SET_ACTIVE', batch);
@@ -177,15 +156,16 @@ export default {
             const api = rootState.api;
             await api.query(`--sql
                 -- samples
-                CREATE OR REPLACE TEMPORARY TABLE sample_item_filter AS (
+                CREATE TEMPORARY TABLE sample_item_filter AS
                     SELECT
                         sample_item_id
                         ,2 as selection
                     FROM sample_item
                     WHERE sample_batch_id == '${batchId}'
-                );
+            `);
+            await api.query(`--sql
                 -- targets
-                CREATE OR REPLACE TEMPORARY TABLE target_isotope_filter AS (
+                CREATE TEMPORARY TABLE target_isotope_filter AS
                     SELECT
                         target_isotope_id
                         ,2 as selection
@@ -194,8 +174,9 @@ export default {
                     NATURAL JOIN target_compound_in_target_collection
                     NATURAL JOIN target_collection_in_sample_batch
                     WHERE sample_batch_id == '${batchId}'
-                );
-                CREATE OR REPLACE TEMPORARY TABLE target_ion_filter AS (
+            `);
+            await api.query(`--sql
+                CREATE TEMPORARY TABLE target_ion_filter AS
                     SELECT
                         target_ion_id
                         ,2 as selection
@@ -203,8 +184,9 @@ export default {
                     NATURAL JOIN target_compound_in_target_collection
                     NATURAL JOIN target_collection_in_sample_batch
                     WHERE sample_batch_id == '${batchId}'
-                );
-                CREATE OR REPLACE TEMPORARY TABLE target_compound_filter AS (
+            `);
+            await api.query(`--sql
+                CREATE TEMPORARY TABLE target_compound_filter AS
                     SELECT
                         target_compound_id
                         ,2 as selection
@@ -212,17 +194,19 @@ export default {
                     NATURAL JOIN target_compound_in_target_collection
                     NATURAL JOIN target_collection_in_sample_batch
                     WHERE sample_batch_id == '${batchId}'
-                );
-                CREATE OR REPLACE TEMPORARY TABLE target_collection_filter AS (
+            `);
+            await api.query(`--sql
+                CREATE TEMPORARY TABLE target_collection_filter AS
                     SELECT
                         target_collection_id
                         ,2 as selection
                     FROM target_collection
                     NATURAL JOIN target_collection_in_sample_batch
                     WHERE sample_batch_id == '${batchId}'
-                );
+            `);
+            await api.query(`--sql
                 -- matches
-                CREATE OR REPLACE TEMPORARY TABLE match_filter AS (
+                CREATE TEMPORARY TABLE match_filter AS
                     SELECT
                         match.*,
                         target_ion_id,
@@ -233,7 +217,6 @@ export default {
                     NATURAL LEFT JOIN target_isotope
                     NATURAL LEFT JOIN target_ion
                     WHERE sample_batch_id == '${batchId}'
-                );
             `);
         },
         // Sample selection toggling
@@ -500,27 +483,27 @@ export default {
         // get all rows as proxy array
         sampleItems: (state) => {
             return state.sampleItems
-                ? state.sampleItems.toArray()
+                ? state.sampleItems
                 : [];
         },
         targetCollections: (state) => {
             return state.targetCollections
-                ? state.targetCollections.toArray()
+                ? state.targetCollections
                 : [];
         },
         targetCompounds: (state) => {
             return state.targetCompounds
-                ? state.targetCompounds.toArray()
+                ? state.targetCompounds
                 : [];
         },
         targetIons: (state) => {
             return state.targetIons
-                ? state.targetIons.toArray()
+                ? state.targetIons
                 : []
         },
         targetIsotopes: (state) => {
             return state.targetIsotopes
-                ? state.targetIsotopes.toArray()
+                ? state.targetIsotopes
                 : [];
         },
         // get row from id
@@ -561,6 +544,22 @@ export default {
         sampleItemFocused: (state, getters) => {
             return getters['sampleItems']
                 .filter((sampleItem) => sampleItem.selection == 3);
+        },
+        targetCollectionsSelected: (state, getters) => {
+            return getters['targetCollections']
+                .filter((row) => row.selection >= 2);
+        },
+        targetCompoundsSelected: (state, getters) => {
+            return getters['targetCompounds']
+                .filter((row) => row.selection >= 2);
+        },
+        targetIonsSelected: (state, getters) => {
+            return getters['targetIonsSelected']
+                .filter((row) => row.selection >= 2);
+        },
+        targetIsotopesSelected: (state, getters) => {
+            return getters['targetIsotopes']
+                .filter((row) => row.selection >= 2);
         },
         // get selection mode
         selectionMode: (state, getters, rootState) => {
@@ -621,7 +620,7 @@ function nextSelection(mode, currentSelection) {
         0: 3,  // unselected => focused
         1: 3,  // semiselected => focused
         2: 3,  // selected => focused
-        3: 0   // focused => unselected
+        3: 2   // focused => selected
     };
     let nextOwnSelection, nextPeerSelection;
     switch (mode) {

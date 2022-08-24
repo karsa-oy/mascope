@@ -9,8 +9,6 @@ from importlib import import_module
 data_dir = os.environ.get('MASCOPE_PRIVATE_DATADIR')
 db_dir = os.path.join(data_dir, 'database')
 
-__all__ = ['init_cursor']
-
 
 def run():
     try:
@@ -28,10 +26,6 @@ def run():
         else:
             print(f"This version of mascope requires: v{target_version}")
             current_version = migrate(current_version, target_version)
-        # init database connection
-        globals()['init_cursor'] = (
-            getattr(import_module('backend.db.conn'), 'init_cursor')
-        )
         # load api
         import_module('backend.api')
         # check for write-ahead-log file
@@ -43,7 +37,7 @@ def run():
             with open(wal_path, 'w') as fp:  # noqa
                 pass
             # note - this is needed because duckdb-wasm tries to find the file
-            # this can be removed once read-only mode is available in
+            # this can be removed once read-only mode is available in 
             # duckdb-wasm
     except Exception as error:  # noqa
         traceback.print_exc()
@@ -106,15 +100,14 @@ def get_available_db_version():
 def get_current_db_version():
     v = 0
     if os.path.exists(db_dir):
-        paths = os.listdir(db_dir)
-        database_dirs = [
-            path for path in paths
-            if re.search('mascope.v[0-9]+', path)
-            and os.isdir(path)
+        files = os.listdir(db_dir)
+        databases = [
+            f for f in files
+            if re.search('mascope.v[0-9]+.db', f)
         ]
         versions = [
-            int(re.search('[0-9]+', database_dirs).group())
-            for database_dir in database_dirs
+            int(re.search('[0-9]+', database).group())
+            for database in databases
         ]
         if len(versions) > 0:
             v = max(versions)

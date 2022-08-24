@@ -14,7 +14,7 @@
             () => {
               modalProps = {
                 action: 'edit',
-                workspaceId: workspace.workspace_id,
+                workspace_id: workspace.workspace_id,
               };
               activateModal({
                 modal: 'workspaceSave',
@@ -30,7 +30,7 @@
             () => {
               modalProps = {
                 action: 'delete',
-                workspaceId: workspace.workspace_id,
+                workspace_id: workspace.workspace_id,
               };
               activateModal({
                 modal: 'workspaceSave',

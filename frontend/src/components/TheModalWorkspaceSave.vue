@@ -71,7 +71,7 @@
             expanded
             @click="
               () => {
-                deleteWorkspace([oldWorkspace.id]);
+                deleteWorkspace([oldWorkspace.workspace_id]);
                 deactivateModal();
               }
             "
@@ -113,7 +113,7 @@ export default {
     oldWorkspace() {
       if (this.actionIs("edit", "delete")) {
         return table.get(this.workspaces, {
-          id: this.modalProps.workspaceId,
+          workspace_id: this.modalProps.workspace_id,
         });
       } else {
         return null;
@@ -122,7 +122,7 @@ export default {
     newWorkspace() {
       if (this.actionIs("create", "edit")) {
         return {
-          id: this.oldWorkspace ? this.oldWorkspace.id : null,
+          workspace_id: this.oldWorkspace ? this.oldWorkspace.workspace_id : null,
           name: this.workspaceName,
           description: this.workspaceDesc,
         };
@@ -158,11 +158,20 @@ export default {
     actionIs(...actions) {
       return actions.includes(this.action);
     },
+    createWorkspace(newWorkspace) {
+      this.$api.emit('workspace_create', newWorkspace);
+    },
+    deleteWorkspace(workspace) {
+      this.$api.emit('workspace_delete', workspace);
+    },
     loadWorkspace() {
       if (this.oldWorkspace) {
         this.workspaceName = this.oldWorkspace.name;
         this.workspaceDesc = this.oldWorkspace.description;
       }
+    },
+    updateWorkspace(workspaces) {
+      this.$api.emit('workspace_update', workspaces);
     },
   },
 };

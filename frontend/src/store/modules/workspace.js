@@ -11,13 +11,13 @@ export default {
     mutations: make.mutations(state),
     actions: {
         async load({ commit, rootState }, workspace) {
-            const dbcon = rootState.api.dbcon;
+            const query = rootState.api.query;
             // reload sample batches
-            const batches = await dbcon.query(`--sql
+            const batches = await query(`--sql
                 SELECT * FROM sample_batch
                 WHERE workspace_id == '${workspace.workspace_id}';
             `);
-            await commit('SET_BATCHES', batches.toArray());
+            await commit('SET_BATCHES', batches);
             await commit('SET_ACTIVE', workspace);
         },
         async unload({ commit }) {

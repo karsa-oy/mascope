@@ -39,6 +39,12 @@ export default {
                 state[activeState] = false;
             }
             state.active = null;
-        }
+        },
+        SET_SAMPLE_BATCH_OP_PROPS(state, value) {
+            state.sampleBatchOpProps = value;
+        },
+        SET_WORKSPACE_SAVE_PROPS(state, value) {
+            state.workspaceSaveProps = value;
+        },
     }
 }
