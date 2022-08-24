@@ -26,7 +26,7 @@ export default {
         },
         async onWorkspaceReload({ state, dispatch }, workspaceId) {
             if (state.active.workspace_id == workspaceId) {
-                dispatch('load', workspaceId);
+                dispatch('load', state.active);
             }
         }
     }

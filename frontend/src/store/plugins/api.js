@@ -13,9 +13,9 @@ export default async function apiPlugin(store) {
 
     // react to events using handlers if they exist
     api.socket.onAny((event, ...args) => {
-        apiLog(`${event} event detected`, args)
+        apiLog(`${event} event detected`, ...args)
         if (event in handlers) {
-            store.dispatch(handlers[event], args);
+            store.dispatch(handlers[event], ...args);
         }
 
     });
