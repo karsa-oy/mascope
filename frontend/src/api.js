@@ -37,14 +37,21 @@ async function initApi() {
     apiLog('registered database URL', path);
 
     // helpers
+    function tryJsonParse(value) {
+        try {
+            return JSON.parse(value);
+        } catch {
+            return value;
+        }
+    }
+
     async function asObject(resp) {
-        console.log(resp)
         if (!resp.length) return resp;
         let fields = resp[0].columns;
         let rows = resp[0].values;
         return rows.map(
             (row) => Object.fromEntries(
-                fields.map((field, index) => [field, row[index]])
+                fields.map((field, index) => [field, tryJsonParse(row[index])])
                 )
             )
     }
