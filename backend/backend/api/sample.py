@@ -72,7 +72,6 @@ async def sample_batch_update(sid, sample_batches):
                 lambda x: json.dumps(x)
             )
         )
-        # return
         with conn:
             # Delete existing sample batch records
             conn.cursor().execute(f"""
@@ -168,11 +167,17 @@ async def sample_item_create(sid, sample_items):
                 'sample items created must be in exactly one sample batch'
             )
         else:
+            sample_item_df = sample_item_df.assign(
+                attributes=sample_item_df[['attributes']].applymap(
+                    lambda x: json.dumps(x)
+                    ),
+                )
             sample_item_df.to_sql(
                 'sample_item',
                 conn,
                 if_exists='append',
-                index=False)
+                index=False
+                )
             [sample_batch_id] = sample_batch_ids
             await sio.emit('batch_reload', sample_batch_id, namespace='/api')
 
@@ -186,48 +191,78 @@ async def sample_item_update(sid, sample_items):
             'sample items updated must be in exactly one workspace'
         )
     else:
-        cur.execute(f"""
-            UPDATE sample_item
-            SET {", ".join([
-                f"{col}=sample_item_df.{col}"
-                for col in sample_item_df.columns
-                if col != 'sample_item_id'
-            ])}
-            WHERE
-                sample_item.sample_item_id
-                    == sample_item_df.sample_item_id;
-        """)
+        sample_item_ids = sample_item_df['sample_item_id'].tolist()
+        sample_item_id_refs = ','.join('?'*len(sample_item_ids))
+        sample_item_df = sample_item_df.assign(
+            attributes=sample_item_df[['attributes']].applymap(
+                lambda x: json.dumps(x)
+                ),
+            )
+        with conn:
+            # Delete existing sample item records
+            conn.cursor().execute(f"""
+                DELETE FROM sample_item
+                WHERE sample_item_id IN ({sample_item_id_refs})
+                """,
+                sample_item_ids
+                )
+            # Create new records with updated data
+            sample_item_df[[
+                'sample_item_id',
+                'sample_batch_id',
+                'filename',
+                'title',
+                'description',
+                'attributes'
+                ]].to_sql(
+                    'sample_item',
+                    conn,
+                    if_exists='append',
+                    index=False
+                    )
         [sample_batch_id] = sample_batch_ids
-        sio.emit('batch_reload', sample_batch_id, namespace='/api')
+        await sio.emit('batch_reload', sample_batch_id, namespace='/api')
 
 
 @sio.event(namespace='/api')
 async def sample_item_delete(sid, sample_item_ids):
-    sample_item_df = pd.DataFrame.from_dict({
-        'sample_item_id': sample_item_ids
-    })
-    sample_batch_ids = pd.unique(sample_item_df['sample_batch_id']).tolist()
-    if len(sample_batch_ids) != 1:
-        raise ValueError(
-            'sample items deleted must be in exactly one workspace'
-        )
-    else:
-        cur.execute("""--sql
-            DELETE FROM target_collection_in_sample_item
+    sample_item_id_refs = ','.join('?'*len(sample_item_ids))
+    with conn:
+        sample_batch_ids = pd.read_sql(f"""--sql
+            SELECT DISTINCT sample_batch_id
+            FROM sample_item
             WHERE sample_item_id IN (
-                SELECT sample_item_id FROM sample_item_df
-            );
-            DELETE FROM sample_item
-            WHERE sample_item_id IN (
-                SELECT sample_item_id FROM sample_item_df
-            );
-            DELETE FROM sample_item
-            WHERE sample_item_id IN (
-                SELECT sample_item_id FROM sample_item_df
-            );
-        """)
-        [sample_batch_id] = sample_batch_ids
-        sio.emit('batch_reload', sample_batch_id, namespace='/api')
+                {sample_item_id_refs}
+            )
+            """,
+            conn,
+            params=sample_item_ids
+            )['sample_batch_id'].tolist()
+        sample_batch_id_refs = ','.join('?'*len(sample_batch_ids))
+        workspace_ids = pd.read_sql(f"""--sql
+            SELECT DISTINCT workspace_id
+            FROM sample_batch
+            WHERE sample_batch_id IN (
+                {sample_batch_id_refs}
+            )
+            """,
+            conn,
+            params=sample_batch_ids
+            )['workspace_id'].tolist()
+        if len(workspace_ids) != 1:
+            raise ValueError(
+                'sample items deleted must be in exactly one workspace'
+            )
+        else:
+            # Delete existing sample item records
+            conn.cursor().execute(f"""
+                DELETE FROM sample_item
+                WHERE sample_item_id IN ({sample_item_id_refs})
+                """,
+                sample_item_ids
+                )
+            [sample_batch_id] = sample_batch_ids
+            await sio.emit('batch_reload', sample_batch_id, namespace='/api')
 
 
 # === sample files === #

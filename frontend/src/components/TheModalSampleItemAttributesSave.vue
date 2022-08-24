@@ -26,7 +26,7 @@
 <script>
 import BaseAttributesForm from "./BaseAttributesForm.vue";
 import { mapMutations } from "vuex";
-import { sync, call, get } from "vuex-pathify";
+import { get, sync } from "vuex-pathify";
 
 export default {
   name: "TheModalSampleItemAttributesSave",
@@ -36,7 +36,7 @@ export default {
   props: {},
   data: function () {
     return {
-      templateType: "sampleItem",
+      templateType: "sample_item",
       sampleItemRecordToLoad: {},
       defaultTemplate: {
         name: "default",
@@ -63,60 +63,66 @@ export default {
   },
   computed: {
     ...get({
-      modalActive: "modal/sampleItemAttributesSaveActive",
-      templateRows: "app/attributeTemplates",
       batchActive: "batch/active",
       itemsSelected: "batch/sampleItemsSelected",
+      allTemplates: "app/attributeTemplates",
+    }),
+    ...sync({
+      modalActive: "modal/sampleItemAttributesSaveActive",
     }),
     availableTemplates() {
-      return [this.defaultTemplate, ...this.templateRows];
+      return [this.defaultTemplate, ...this.savedTemplates];
     },
     itemSelected() {
       return this.itemsSelected.length == 1 ? this.itemsSelected[0] : null;
+    },
+    savedTemplates() {
+      return this.allTemplates.filter(
+        (template) => template.type == this.templateType
+        );
+    },
+    itemSelectedTemplate() {
+      return {
+        template: this.defaultTemplate.template,
+        row: this.itemSelected,
+      };
     },
   },
   methods: {
     ...mapMutations({
       deactivateModal: "modal/deactivate",
     }),
-    ...call({
-      sampleItemUpdate: "sample/item/update",
-      templateListRequest: "template/requestTemplates",
-      templateSaveRequest: "template/save",
-      templateDeleteRequest: "template/delete",
-    }),
-    saveTemplate(newValue) {
-      newValue["type"] = this.templateType;
-      this.templateSaveRequest(newValue);
+    saveTemplate(newTemplate) {
+      newTemplate["type"] = this.templateType;
+      this.$api.emit('template_create', newTemplate);
     },
-    deleteTemplate(newValue) {
-      this.templateDeleteRequest(newValue.name);
+    deleteTemplate(templates) {
+      this.$api.emit('template_delete', templates);
     },
-    saveAttributes(newValue) {
+    saveAttributes(attributeTemplate) {
       // convert [{label, value...}, ...] to object
-      let row = {};
-      newValue.forEach((field) => (row[field.label] = field.value || ""));
-      row.id = this.itemSelected.id;
-      row.sampleBatchId = this.itemSelected.sampleBatchId;
-      this.sampleItemUpdate([row]);
-      this.deactivateModal();
+      let props = {};
+      let attributes = {};
+      attributeTemplate.forEach(
+        (field) => {
+          if (field.required) props[field.label] = field.value;
+          else attributes[field.label] = field.value;
+          }
+        );
+      let newSampleItem = {
+        ...this.itemSelected,
+        ...props,
+        attributes
+        };
+      this.$api.emit('sample_item_update', newSampleItem);
     },
   },
   watch: {
-    itemSelected: function () {
-      if (!this.itemSelected) {
-        this.sampleItemRecordToLoad = {};
-        return;
-      }
-    },
     modalActive: async function (active) {
       if (active) {
-        this.templateListRequest({ type: this.templateType });
+        this.sampleItemRecordToLoad = {};
         await this.$nextTick();
-        this.sampleItemRecordToLoad = {
-          template: this.defaultTemplate.template,
-          row: this.itemSelected,
-        };
+        this.sampleItemRecordToLoad = this.itemSelectedTemplate;
       }
     },
   },
