@@ -39,7 +39,6 @@
                 </b-table>
               </b-tab-item>
               <b-tab-item label="Ionization mechanisms">
-                {{ ionMechanisms }}
                 <b-table
                   :data="allIonMechanisms"
                   :columns="[
@@ -104,7 +103,7 @@
               expanded
               @click="
                 () => {
-                  deleteBatch([oldBatch.id]);
+                  deleteBatch([oldBatch.sample_batch_id]);
                   deactivateModal();
                 }
               "
@@ -132,10 +131,10 @@ export default {
       defaultConfig: {
         // target params
         targetCollections: [],
-        ionMechanisms: [
+        ionMechanisms:  [
           "fVuWwQ82sJI", // +Br-
-          "5rm2sP6epAs", // +H+
-        ],
+          "SbcztiBgxHg"  // -H-
+          ],
         isotopeAbundanceMin: 10, // %
         // match params
         mzTolerance: 10, // ppm
@@ -157,8 +156,10 @@ export default {
       allTargetCollections: "app/targetCollections",
     }),
     ...get({
-      workspaceActive: "workspace/active",
       batches: "workspace/batches",
+      probableMatchThreshold: "param/probableMatchThreshold",
+      possibleMatchThreshold: "param/possibleMatchThreshold",
+      workspaceActive: "workspace/active",
     }),
     action() {
       return this.modalProps.action;
@@ -171,15 +172,45 @@ export default {
         return {
           name: this.batchName,
           description: this.batchDesc,
-          workspaceId: this.workspaceActive.id,
+          workspace_id: this.workspaceActive.workspace_id,
+          attributes: null,
+          build_params: {
+            ion_mechanisms: this.ionMechanismIds,
+            },
+          filter_params: {
+            mz_tolerance: this.mzTolerance,
+            probable_match_threshold: this.probableMatchThreshold,
+            possible_match_threshold: this.possibleMatchThreshold,
+            iso_ratio_tolerance: this.isotopeRatioTolerance,
+            peak_min_intensity: this.peakIntensityMin,
+            peak_min_separation: this.peakSeperationMin,
+            mz_range: null,
+            t_range: null
+            },
+          target_collection_id: this.targetCollectionIds,
         };
       } else if (this.actionIs("update")) {
         return {
-          id: this.oldBatch.id,
+          sample_batch_id: this.oldBatch.sample_batch_id,
           name: this.batchName,
           description: this.batchDesc,
-          workspaceId: this.workspaceActive.id,
-        };
+          workspace_id: this.workspaceActive.workspace_id,
+          attributes: null,
+          build_params: {
+            ion_mechanisms: this.ionMechanismIds,
+          },
+          filter_params: {
+            mz_tolerance: this.mzTolerance,
+            probable_match_threshold: this.probableMatchThreshold,
+            possible_match_threshold: this.possibleMatchThreshold,
+            iso_ratio_tolerance: this.isotopeRatioTolerance,
+            peak_min_intensity: this.peakIntensityMin,
+            peak_min_separation: this.peakSeperationMin,
+            mz_range: null,
+            t_range: null
+            },
+          target_collection_id: this.targetCollectionIds,
+          };
       } else {
         return null;
       }
@@ -199,6 +230,20 @@ export default {
       }
       return title;
     },
+    ionMechanismIds() {
+      return this.ionMechanisms
+        ? this.ionMechanisms.map(
+            (row) => row.mechanism_id
+          )
+        : []
+    },
+    targetCollectionIds() {
+      return this.targetCollections
+        ? this.targetCollections.map(
+            (row) => row.target_collection_id
+          )
+        : []
+    },
   },
   methods: {
     ...mapMutations({
@@ -207,11 +252,20 @@ export default {
     actionIs(...actions) {
       return actions.includes(this.action);
     },
+    createBatch(newBatch) {
+      this.$api.emit('sample_batch_create', newBatch);
+    },
+    deleteBatch(batches) {
+      this.$api.emit('sample_batch_delete', batches);
+    },
     initData() {
       if (this.oldBatch) {
         this.batchName = this.oldBatch.name;
         this.batchDesc = this.oldBatch.description;
       }
+    },
+    updateBatch(batches) {
+      this.$api.emit('sample_batch_update', batches);
     },
   },
 };
