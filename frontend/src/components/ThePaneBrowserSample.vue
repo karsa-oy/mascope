@@ -160,8 +160,8 @@ export default {
         message: `Delete ${this.itemsSelected.length} item(s) from ${this.batchActive.name}?`,
         confirmText: "Delete",
         onConfirm: () => {
-          let itemIds = this.itemsSelected.map((item) => item.id);
-          this.sampleItemDelete(itemIds);
+          let itemIds = this.itemsSelected.map((item) => item.sample_item_id);
+          this.$api.emit('sample_item_delete', itemIds);
         },
       });
     },
