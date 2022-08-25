@@ -270,32 +270,60 @@ async def sample_item_delete(sid, sample_item_ids):
 @sio.event(namespace='/api')
 async def sample_file_create(sid, sample_files):
     sample_files = [
-        {'id': gen_id(), **sample_file}
+        {**sample_file, 'sample_file_id': gen_id()}
         for sample_file in sample_files
-    ]
+        ]
     sample_file_df = pd.DataFrame.from_records(sample_files)
-    cur.execute("""--sql
-        INSERT INTO sample_file (
-            SELECT * FROM sample_file_df
-        );
-    """)
+    sample_file_df = sample_file_df.assign(
+        attributes=sample_file_df[['attributes']].applymap(
+            lambda x: json.dumps(x)
+            ) if 'attributes' in sample_file_df else [None]*len(sample_files),
+        mz_calibration=sample_file_df[['mz_calibration']].applymap(
+            lambda x: json.dumps(x)
+            ) if 'mz_calibration' in sample_file_df else [None]*len(sample_files),
+        range=sample_file_df[['range']].applymap(
+            lambda x: json.dumps(x)
+            ) if 'range' in sample_file_df else [None]*len(sample_files),
+        )
+    sample_file_df.to_sql(
+        'sample_file',
+        conn,
+        if_exists='append',
+        index=False
+        )
 
 
 @sio.event(namespace='/api')
 async def sample_file_update(sid, sample_files):
     sample_file_df = pd.DataFrame.from_records(sample_files)
-    cur.execute(f"""
-        UPDATE sample_file
-        SET {", ".join([
-            f"{col}=sample_file_df.{col}"
-            for col in sample_file_df.columns
-            if col != 'sample_file_id'
-        ])}
-        WHERE
-            sample_file.sample_file_id
-                == sample_file_df.sample_file_id;
-    """)
-
+    sample_file_df = sample_file_df.assign(
+        attributes=sample_file_df[['attributes']].applymap(
+            lambda x: json.dumps(x)
+            ),
+        mz_calibration=sample_file_df[['mz_calibration']].applymap(
+            lambda x: json.dumps(x)
+            ),
+        range=sample_file_df[['range']].applymap(
+            lambda x: json.dumps(x)
+            ),
+        )
+    with conn:
+        sample_file_ids = sample_file_df['sample_file_id'].tolist()
+        sample_file_id_refs = ','.join('?'*len(sample_file_ids))
+        # Delete existing sample item records
+        conn.cursor().execute(f"""
+            DELETE FROM sample_file
+            WHERE sample_file_id IN ({sample_file_id_refs})
+            """,
+            sample_file_ids
+            )
+        # Create new records with updated data
+        sample_file_df.to_sql(
+            'sample_file',
+            conn,
+            if_exists='append',
+            index=False
+            )
 
 @sio.event(namespace='/api')
 async def dataset_updated(sid, data):

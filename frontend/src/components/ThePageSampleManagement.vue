@@ -157,7 +157,7 @@ export default {
       this.sampleItemRows = [];
       // reset sampleFiles table to clean up internal static selection data
       this.sampleFileTableDataKey++;
-      // recalculate from UTC to local timezone
+      // Query files in set range
       let dt1 = new Date(this.sampleFileMinDateTime).toISOString();
       let dt2 = new Date(this.sampleFileMaxDateTime).toISOString();
       this.$api
@@ -167,7 +167,7 @@ export default {
           WHERE datetime_utc BETWEEN '${dt1}' AND '${dt2}'
         `)
         .then((res) => {
-          this.sampleFileRows = res.toArray().map((row) => ({...row}));
+          this.sampleFileRows = res;
         });
     },
   },

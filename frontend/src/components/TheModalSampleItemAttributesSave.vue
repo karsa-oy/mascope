@@ -94,10 +94,10 @@ export default {
     }),
     saveTemplate(newTemplate) {
       newTemplate["type"] = this.templateType;
-      this.$api.emit('template_create', newTemplate);
+      this.$api.emit('attribute_template_create', [newTemplate]);
     },
     deleteTemplate(templates) {
-      this.$api.emit('template_delete', templates);
+      this.$api.emit('attribute_template_delete', templates);
     },
     saveAttributes(attributeTemplate) {
       // convert [{label, value...}, ...] to object
@@ -114,7 +114,7 @@ export default {
         ...props,
         attributes
         };
-      this.$api.emit('sample_item_update', newSampleItem);
+      this.$api.emit('sample_item_update', [newSampleItem]);
     },
   },
   watch: {

@@ -43,6 +43,12 @@ export default {
         SET_SAMPLE_BATCH_OP_PROPS(state, value) {
             state.sampleBatchOpProps = value;
         },
+        SET_SAMPLE_FILE_ATTRIBUTES_SAVE_ACTIVE(state, value) {
+            state.sampleFileAttributesSaveActive = value;
+        },
+        SET_SAMPLE_FILE_ATTRIBUTES_SAVE_PROPS(state, value) {
+            state.sampleFileAttributesSaveProps = value;
+        },
         SET_SAMPLE_ITEM_ATTRIBUTES_SAVE_ACTIVE(state, value) {
             state.sampleItemAttributesSaveActive = value;
         },

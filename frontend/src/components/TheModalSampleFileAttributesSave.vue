@@ -27,7 +27,7 @@
 <script>
 import BaseAttributesForm from "./BaseAttributesForm.vue";
 import { mapMutations } from "vuex";
-import { call, get } from "vuex-pathify";
+import { get, sync } from "vuex-pathify";
 
 export default {
   name: "TheModalSampleFileAttributesSave",
@@ -35,19 +35,9 @@ export default {
     BaseAttributesForm,
   },
   props: {},
-  computed: {
-    ...get({
-      templateRows: "app/attributeTemplates",
-      modalActive: "modal/sampleFileAttributesSaveActive",
-    }),
-    availableTemplates() {
-      return [this.defaultTemplate, ...this.templateRows];
-    },
-  },
   data: function () {
     return {
-      templateType: "sampleFile",
-      sampleFiles: [],
+      templateType: "sample_file",
       sampleFileRecordToLoad: {},
       defaultTemplate: {
         name: "default",
@@ -72,30 +62,53 @@ export default {
       },
     };
   },
+  computed: {
+    ...get({
+      allTemplates: "app/attributeTemplates",
+    }),
+    ...sync({
+      modalActive: "modal/sampleFileAttributesSaveActive",
+    }),
+    availableTemplates() {
+      return [this.defaultTemplate, ...this.savedTemplates];
+    },
+    savedTemplates() {
+      return this.allTemplates.filter(
+        (template) => template.type == this.templateType
+        );
+    },
+  },
   methods: {
     ...mapMutations({
       deactivateModal: "modal/deactivate",
-      sampleFileUpdate: "sample/file/UPDATE",
     }),
-    ...call({
-      getSampleFile: "sample/file/listFiles",
-      templateListRequest: "template/requestTemplates",
-      templateSaveRequest: "template/save",
-      templateDeleteRequest: "template/delete",
-    }),
-    saveTemplate(newValue) {
-      newValue["type"] = this.templateType;
-      this.templateSaveRequest(newValue);
+    saveTemplate(newTemplate) {
+      newTemplate["type"] = this.templateType;
+      this.$api.emit('attribute_template_create', [newTemplate]);
     },
-    deleteTemplate(newValue) {
-      this.templateDeleteRequest(newValue.name);
+    deleteTemplate(templates) {
+      this.$api.emit('attribute_template_delete', templates);
     },
-    saveAttributes(newValue) {
+    saveAttributes(attributeTemplate) {
       // convert [{label, value...}, ...] to object
-      let row = {};
-      newValue.forEach((field) => (row[field.label] = field.value || ""));
-      this.sampleFileUpdate(row);
-      this.deactivateModal();
+      let props = {};
+      let attributes = {};
+      attributeTemplate.forEach(
+        (field) => {
+          if (field.required) props[field.label] = field.value;
+          else attributes[field.label] = field.value;
+          }
+        );
+      let newSampleFile = {
+        ...this.sampleFileRecordToLoad.row,
+        ...props,
+        attributes
+        };
+      if (newSampleFile.sample_file_id) {
+        this.$api.emit('sample_file_update', [newSampleFile]);
+      } else {
+        this.$api.emit('sample_file_create', [newSampleFile]);
+      }
     },
     loadAttributes(filters) {
       const filename = filters.filename;
@@ -109,7 +122,7 @@ export default {
         .then((res) => {
           this.sampleFileRecordToLoad = {
             template: this.defaultTemplate.template,
-            row: res.toArray()[0],
+            row: res[0],
           };
         });
     },

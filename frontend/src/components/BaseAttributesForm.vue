@@ -228,14 +228,10 @@ export default {
     },
     removeField(event) {
       // Field to remove label is in button element id, find it from the event data
-      let fieldToRemove = "";
-      for (let i in event.path) {
-        fieldToRemove = event.path[i].id;
-        if (fieldToRemove) break;
-      }
-      if (!fieldToRemove) {
+      let fieldToRemove = event.target.id;
+      if (!fieldToRemove.length) {
         // Failed to find the button id
-        console.log("fieldToRemove not found at event.path[1].id: ", event);
+        console.log("fieldToRemove not found at event.target.id: ", event);
         return;
       }
       for (let i = 0; i < this.loadedTemplate.template.length; ++i) {
@@ -260,18 +256,12 @@ export default {
           "</b>?",
         confirmText: "Delete",
         onConfirm: () => {
-          for (let i = 0; i < this.availableTemplates.length; ++i) {
-            if (this.loadedTemplate.name === this.availableTemplates[i].name) {
-              this.$emit("deleteTemplate", this.availableTemplates[i]);
-              this.availableTemplates.splice(i, 1);
-              break;
-            }
-          }
-          this.loadedTemplate =
-            this.availableTemplates.length > 0
-              ? this.clone(this.availableTemplates[0])
-              : null;
-        },
+          this.$emit("deleteTemplate", this.availableTemplates.filter(
+            (template) => 
+            (template.attribute_template_id == this.loadedTemplate.attribute_template_id)
+            ).map((template) => template.attribute_template_id)
+          );
+        }
       });
     },
     saveTemplate() {
