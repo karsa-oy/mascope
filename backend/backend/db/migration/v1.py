@@ -1,4 +1,4 @@
-import duckdb
+import json
 import sqlite3
 import pandas as pd
 import os
@@ -23,17 +23,12 @@ nest_asyncio.apply()
 def run():
     data_path = os.environ.get('MASCOPE_PRIVATE_DATADIR')
 
-    # STEP 1 - setup new duckdb database
+    # STEP 1 - setup new database
 
-    duckdb_path = os.path.join(data_path, 'database', 'mascope.v1.duckdb')
-    duckdb_con = duckdb.connect(database=duckdb_path)
+    db_path = os.path.join(data_path, 'database', 'mascope.v1.db')
+    new_conn = sqlite3.new_connect(database=db_path)
 
-    duckdb_con.execute("""--sql
-        -- json extension
-
-        INSTALL 'json';
-        LOAD 'json';
-
+    new_conn.execute("""--sql
         -- workspaces
 
         CREATE TABLE IF NOT EXISTS workspace (
@@ -42,7 +37,8 @@ def run():
             ,description TEXT
             ,attributes JSON
         );
-
+    """)
+    new_conn.execute("""--sql
         -- ionization mechanisms
 
         CREATE TABLE IF NOT EXISTS config_mechanism (
@@ -51,7 +47,8 @@ def run():
             ,mechanism VARCHAR
             ,reagent VARCHAR
         );
-
+    """)
+    new_conn.execute("""--sql
         -- samples
 
         CREATE TABLE IF NOT EXISTS sample_batch (
@@ -64,7 +61,8 @@ def run():
             ,filter_params JSON
             ,attributes JSON
         );
-
+    """)
+    new_conn.execute("""--sql
         CREATE TABLE IF NOT EXISTS sample_item (
             sample_item_id VARCHAR(16) PRIMARY KEY
             ,sample_batch_id VARCHAR(16) NOT NULL
@@ -74,7 +72,8 @@ def run():
             ,description TEXT
             ,attributes JSON
         );
-
+    """)
+    new_conn.execute("""--sql
         CREATE TABLE IF NOT EXISTS sample_file (
             sample_file_id VARCHAR(256) PRIMARY KEY
             ,filename VARCHAR(256) NOT NULL
@@ -88,14 +87,16 @@ def run():
             ,mz_calibration JSON
             ,attributes JSON
         );
-
+    """)
+    new_conn.execute("""--sql
         CREATE TABLE IF NOT EXISTS attribute_template (
             attribute_template_id VARCHAR(256) PRIMARY KEY
             ,name VARCHAR(256) NOT NULL
             ,type VARCHAR(64)
             ,template JSON
         );
-
+    """)
+    new_conn.execute("""--sql
         -- targets
 
         CREATE TABLE IF NOT EXISTS target_collection (
@@ -103,14 +104,16 @@ def run():
             ,name VARCHAR(256) NOT NULL
             ,description TEXT
         );
-
+    """)
+    new_conn.execute("""--sql
         CREATE TABLE IF NOT EXISTS target_compound (
             target_compound_id VARCHAR(32) PRIMARY KEY
             ,name TEXT
             ,target_compound_formula VARCHAR(256) NOT NULL
             ,cas_number VARCHAR(12)
         );
-
+    """)
+    new_conn.execute("""--sql
         CREATE TABLE IF NOT EXISTS target_ion (
             target_ion_id VARCHAR(32) PRIMARY KEY
             ,target_compound_id VARCHAR(32) NOT NULL
@@ -119,7 +122,8 @@ def run():
                 REFERENCES config_mechanism(mechanism_id)
             ,target_ion_formula VARCHAR(256) NOT NULL
         );
-
+    """)
+    new_conn.execute("""--sql
         CREATE TABLE IF NOT EXISTS target_isotope (
             target_isotope_id VARCHAR(32) PRIMARY KEY
             ,target_ion_id VARCHAR(32) NOT NULL
@@ -128,14 +132,16 @@ def run():
             ,relative_abundance FLOAT NOT NULL
                 CHECK (relative_abundance BETWEEN 0 AND 1)
         );
-
+    """)
+    new_conn.execute("""--sql
         CREATE TABLE IF NOT EXISTS target_compound_in_target_collection (
             target_compound_id VARCHAR(32)
                 REFERENCES target_compound(target_compound_id)
             ,target_collection_id VARCHAR(16)
                 REFERENCES target_collection(target_collection_id)
         );
-
+    """)
+    new_conn.execute("""--sql
         CREATE TABLE IF NOT EXISTS target_collection_in_sample_batch (
             target_collection_id VARCHAR(16) NOT NULL
                 REFERENCES target_collection(target_collection_id)
@@ -144,7 +150,8 @@ def run():
             ,PRIMARY KEY
                 (target_collection_id, sample_batch_id)
         );
-
+    """)
+    new_conn.execute("""--sql
         -- matches
 
         CREATE TABLE IF NOT EXISTS match (
@@ -163,24 +170,23 @@ def run():
                 ,match_score FLOAT NOT NULL
                     CHECK (match_score BETWEEN 0 AND 1)
         );
-
-        -- selection
-
-        DROP FUNCTION IF EXISTS selected;
-
-        CREATE FUNCTION selected(col, selection, default_value := 0) AS
-            CASE
-                WHEN selection >= 2 THEN coalesce(col, default_value)
-                ELSE default_value
-            END;
     """)
+    # new_conn.execute("""--sql
+    #     -- selection
+
+    #     DROP FUNCTION IF EXISTS selected;
+
+    #     CREATE FUNCTION selected(col, selection, default_value := 0) AS
+    #         CASE
+    #             WHEN selection >= 2 THEN coalesce(col, default_value)
+    #             ELSE default_value
+    #         END;
+    # """)
 
     # STEP 2 - load sqlite3 tables into pandas dataframes
 
     sqlite_path = os.path.join(data_path, 'mascope.db')
-    sqlite_con = sqlite3.connect(sqlite_path)
-
-    print("Transfering data from SQLite to DuckDB")
+    old_conn = sqlite3.connect(sqlite_path)
 
     print("Transfering workspaces")
 
@@ -191,17 +197,10 @@ def run():
             ,description
             ,attributes
         FROM workspaces;
-    """, sqlite_con)
+    """,
+    old_conn)
 
-    duckdb_con.execute("""--sql
-        INSERT INTO workspace (
-            workspace_id
-            ,name
-            ,description
-            ,attributes
-        )
-        (SELECT * FROM workspace_df)
-    """)
+    workspace_df.to_sql('workspace', new_conn, if_exists='append', index=False)
 
     print("Transfering samples and attributes templates")
 
@@ -213,17 +212,17 @@ def run():
             ,description
             ,attributes
         FROM sample_batches;
-    """, sqlite_con)
+    """, old_conn)
 
     num_batches = len(sample_batch_df)
     sample_batch_df = sample_batch_df.assign(
-        build_params=[{
+        build_params=[json.dumps({
             'ion_mechanisms': [
                 'fVuWwQ82sJI',  # +Br-
                 'SbcztiBgxHg',  # -H-
             ]
-        }]*num_batches,
-        filter_params=[{
+        })]*num_batches,
+        filter_params=[json.dumps({
             # match params
             'mz_tolerance': 10,
             'probable_match_threshold': 0.9,
@@ -234,21 +233,10 @@ def run():
             'peak_min_separation': 3,
             'mz_range': None,
             't_range': None,
-        }]*num_batches
+        })]*num_batches
     )
 
-    duckdb_con.execute("""--sql
-        INSERT INTO sample_batch (
-            sample_batch_id
-            ,workspace_id
-            ,name
-            ,description
-            ,attributes
-            ,build_params
-            ,filter_params
-        )
-        (SELECT * FROM sample_batch_df)
-    """)
+    sample_batch_df.to_sql('sample_batch', new_conn, if_exists='append', index=False)
 
     sample_item_df = pd.read_sql("""--sql
         SELECT
@@ -259,19 +247,8 @@ def run():
             ,description
             ,attributes
         FROM sample_items;
-    """, sqlite_con)
-
-    duckdb_con.execute("""--sql
-        INSERT INTO sample_item (
-            sample_item_id
-            ,sample_batch_id
-            ,filename
-            ,title
-            ,description
-            ,attributes
-        )
-        (SELECT * FROM sample_item_df)
-    """)
+    """, old_conn)
+    sample_item_df.to_sql('sample_item', new_conn, if_exists='append', index=False)
 
     sample_file_df = pd.read_sql("""--sql
         SELECT
@@ -286,23 +263,8 @@ def run():
             ,range
             ,attributes
         FROM sample_files;
-    """, sqlite_con)
-
-    duckdb_con.execute("""--sql
-        INSERT INTO sample_file (
-            sample_file_id
-            ,filename
-            ,title
-            ,description
-            ,instrument
-            ,datetime
-            ,datetime_utc
-            ,length
-            ,range
-            ,attributes
-        )
-        (SELECT * FROM sample_file_df)
-    """)
+    """, old_conn)
+    sample_file_df.to_sql('sample_file', new_conn, if_exists='append', index=False)
 
     attribute_template_df = pd.read_sql("""--sql
         SELECT
@@ -311,21 +273,12 @@ def run():
             ,type
             ,template
         FROM attribute_templates;
-    """, sqlite_con)
-
-    duckdb_con.execute("""--sql
-        INSERT INTO attribute_template (
-            attribute_template_id
-            ,name
-            ,type
-            ,template
-        )
-        (SELECT * FROM attribute_template_df)
-    """)
+    """, old_conn)
+    attribute_template_df.to_sql('attribute_template', new_conn, if_exists='append', index=False)
 
     print("Transfering targets and recreating ionization mechanisms")
 
-    duckdb_con.execute("""--sql
+    new_conn.execute("""--sql
         INSERT INTO config_mechanism VALUES
             ( 'SbcztiBgxHg', '-', '-H-',  NULL),
             ( 'fVuWwQ82sJI', '-', '+Br-', 'CH2Br2'),
@@ -345,16 +298,8 @@ def run():
             ,name
             ,description
         FROM target_collections;
-    """, sqlite_con)
-
-    duckdb_con.execute("""--sql
-        INSERT INTO target_collection (
-            target_collection_id
-            ,name
-            ,description
-        )
-        (SELECT * FROM target_collection_df)
-    """)
+    """, old_conn)
+    target_collection_df.to_sql('target_collection', new_conn, if_exists='append', index=False)
 
     target_compound_df = pd.read_sql("""--sql
         SELECT
@@ -363,20 +308,12 @@ def run():
             ,formula
             ,cas_number
         FROM target_compounds;
-    """, sqlite_con)
+    """, old_conn)
     target_compound_df.rename(
         columns={'formula':'target_compound_formula'},
         inplace=True
         )
-    duckdb_con.execute("""--sql
-        INSERT INTO target_compound (
-            target_compound_id
-            ,name
-            ,target_compound_formula
-            ,cas_number
-        )
-        (SELECT * FROM target_compound_df)
-    """)
+    target_compound_df.to_sql('target_compound', new_conn, if_exists='append', index=False)
 
     target_ion_df = pd.read_sql("""--sql
         SELECT
@@ -385,21 +322,12 @@ def run():
             ,mechanism_id
             ,formula
         FROM target_ions;
-    """, sqlite_con)
+    """, old_conn)
     target_ion_df.rename(
         columns={'formula':'target_ion_formula'},
         inplace=True
         )
-
-    duckdb_con.execute("""--sql
-        INSERT INTO target_ion (
-            target_ion_id
-            ,target_compound_id
-            ,mechanism_id
-            ,target_ion_formula
-        )
-        (SELECT * FROM target_ion_df)
-    """)
+    target_ion_df.to_sql('target_ion', new_conn, if_exists='append', index=False)
 
     target_isotope_df = pd.read_sql("""--sql
         SELECT
@@ -408,75 +336,53 @@ def run():
             ,mz
             ,relative_abundance
         FROM target_isotopes;
-    """, sqlite_con)
-
-    duckdb_con.execute("""--sql
-        INSERT INTO target_isotope (
-            target_isotope_id
-            ,target_ion_id
-            ,mz
-            ,relative_abundance
-        )
-        (SELECT * FROM target_isotope_df)
-    """)
+    """, old_conn)
+    target_isotope_df.to_sql('target_isotope', new_conn, if_exists='append', index=False)
 
     target_compound_in_target_collection_df = pd.read_sql("""--sql
         SELECT
             target_compound_id
             ,target_collection_id
         FROM target_compound_in_target_collection;
-    """, sqlite_con)
-
-    duckdb_con.execute("""--sql
-        INSERT INTO target_compound_in_target_collection (
-            target_compound_id
-            ,target_collection_id
-        )
-        (SELECT * FROM target_compound_in_target_collection_df)
-    """)
+    """, old_conn)
+    target_compound_in_target_collection_df.to_sql('target_compound_in_target_collection', new_conn, if_exists='append', index=False)
 
     target_collection_in_sample_batch_df = pd.read_sql("""--sql
         SELECT
             target_collection_id
             ,sample_batch_id
         FROM target_collection_in_sample_batch;
-    """, sqlite_con)
-
-    duckdb_con.execute("""--sql
-        INSERT INTO target_collection_in_sample_batch (
-            target_collection_id
-            ,sample_batch_id
-        )
-        (SELECT * FROM target_collection_in_sample_batch_df)
-    """)
+    """, old_conn)
+    target_collection_in_sample_batch_df.to_sql('target_collection_in_sample_batch', new_conn, if_exists='append', index=False)
 
     # compute matches
 
     print('Computing matches for all sample batches')
     asyncio.get_event_loop().run_until_complete(
-        compute_all_matches(duckdb_con)
+        compute_all_matches(new_conn)
     )
 
 
-async def compute_all_matches(duckdb_con):
-    cur = duckdb_con.cursor()
+async def compute_all_matches(new_conn):
+    cur = new_conn.cursor()
     # get sample batches
-    sample_batches = duckdb_con.execute("""--sql
+    sample_batches = pd.read_sql("""--sql
         SELECT * FROM sample_batch
-    """).fetchdf().to_dict('records')
+    """, new_conn).to_dict('records')
 
     for sample_batch in sample_batches:
         print(f"Matching {sample_batch['name']}")
         # get ionization mechanisms
-        build_params = hack.load_json_field(
+        build_params = json.loads(
             sample_batch['build_params']
         )
         ion_mechanism_df = pd.DataFrame.from_dict({
             'mechanism_id': build_params['ion_mechanisms']
         })
-
+        mechanism_ids = ion_mechanism_df['mechanism_id'].tolist()
+        mechanism_id_refs = ','.join('?'*len(mechanism_ids))
         # load target isotopes in the batch
-        target_isotope_df = cur.execute(f"""--sql
+        target_isotope_df = pd.read_sql(f"""--sql
             SELECT
                 target_isotope.*
             FROM
@@ -486,26 +392,27 @@ async def compute_all_matches(duckdb_con):
                 NATURAL JOIN target_isotope
             WHERE
                 sample_batch_id == '{sample_batch['sample_batch_id']}'
-                AND mechanism_id IN (
-                    SELECT mechanism_id FROM ion_mechanism_df
-                )
-        """).fetchdf()
-
+                AND mechanism_id IN ({mechanism_id_refs})
+            """,
+            new_conn,
+            params=mechanism_ids
+            )
+        
         # fetch item ids
-        sample_item_ids = duckdb_con.execute("""
+        sample_item_ids = pd.read_sql("""
             SELECT sample_item_id FROM sample_item
             WHERE sample_batch_id == ?
-        """, [
-            sample_batch['sample_batch_id']
-        ]).fetchdf()['sample_item_id'].tolist()
-
+            """,
+            new_conn,
+            params=[sample_batch['sample_batch_id']]
+            )['sample_item_id'].tolist()
         # concurrently perform matching
         match_item_tasks = []
         for sample_item_id in sample_item_ids:
             match_item_tasks.append(
                 asyncio.create_task(
                     match_item_compute(
-                        duckdb_con,
+                        new_conn, 
                         sample_item_id,
                         target_isotope_df
                     )
@@ -515,12 +422,10 @@ async def compute_all_matches(duckdb_con):
 
 
 async def match_item_compute(
-        duckdb_con,
+        new_conn,
         sample_item_id,
         target_isotope_df
         ):
-
-    cur = duckdb_con.cursor()
 
     mz_tolerance = 0.5
 
@@ -531,12 +436,13 @@ async def match_item_compute(
     #   batch store module for this aggregation.
 
     # get sample item
-    [sample_item] = cur.execute("""--sql
+    [sample_item] = pd.read_sql("""--sql
         SELECT * FROM sample_item
         WHERE sample_item_id == ?
-    """, [
-        sample_item_id
-    ]).fetchdf().to_dict('records')
+        """,
+        new_conn,
+        params=[sample_item_id]
+        ).to_dict('records')
     filename = sample_item['filename']
 
     ######################
@@ -675,22 +581,19 @@ async def match_item_compute(
 
     print(match_isotope_df.iloc[0])
 
+    match_isotope_df = match_isotope_df[[
+        "match_id"
+        ,"target_isotope_id"
+        ,"sample_item_id"
+        ,"sample_peak_id"
+        ,"sample_peak_mz"
+        ,"sample_peak_height"
+        ,"sample_peak_height_relative"
+        ,"sample_peak_tof"
+        ,"match_abundance_error"
+        ,"match_mz_error"
+        ,"match_score"
+    ]]
     # save to database
-    cur.execute("""--sql
-        INSERT INTO match (
-            SELECT
-                match_id
-                ,target_isotope_id
-                ,sample_item_id
-                ,sample_peak_id
-                ,sample_peak_mz
-                ,sample_peak_height
-                ,sample_peak_height_relative
-                ,sample_peak_tof
-                ,match_abundance_error
-                ,match_mz_error
-                ,match_score
-            FROM match_isotope_df
-        );
-    """)
+    match_isotope_df.to_sql('match', new_conn, if_exists='append', index=False)
 
