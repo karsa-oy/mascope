@@ -67,6 +67,7 @@ async def target_collection_create(sid, target_collections):
 
 @sio.event(namespace='/api')
 async def target_collection_update(sid, target_collections):
+    return
     # TODO:
     # update target collection records
     # target_collection_df = pd.DataFrame.from_records(target_collections)
