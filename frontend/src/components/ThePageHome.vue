@@ -138,7 +138,7 @@ export default {
           `--sql
           SELECT *
           FROM sample_file
-          WHERE datetime_utc - JulianDay('now') <= 24;`
+          WHERE (JulianDay('now') - JulianDay(datetime_utc) ) * 24 <= 24;`
         )
         .then((res) => {
           this.sampleFiles = res;
