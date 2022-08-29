@@ -28,7 +28,6 @@
     "@vue/compiler-sfc": "^3.2.37",
     "alasql": "^1.7.3",
     "buefy": "^0.9.4",
-    "dotenv": "^16.0.1",
     "jquery-csv": "^1.0.21",
     "json2csv": "^5.0.6",
     "lodash.clonedeep": "^4.5.0",
