@@ -42,10 +42,10 @@
                 () => {
                   updateTargetCollection([
                     {
-                      id: oldCollection.id,
+                      target_collection_id: oldCollection.target_collection_id,
                       name: newCollectionName,
                       description: newCollectionDesc,
-                      sampleBatches: batchesToAddTo,
+                      sample_batches: batchesToAddTo,
                     },
                   ]);
                   deactivateModal();
@@ -100,8 +100,8 @@
                     {
                       name: newCollectionName,
                       description: newCollectionDesc,
-                      targetCompounds: newTargetCompounds,
-                      sampleBatches:
+                      target_compounds: newTargetCompounds,
+                      sample_batches:
                         addToSampleBatch && sampleBatchSelected
                           ? [sampleBatchSelected]
                           : [],
@@ -149,10 +149,10 @@
                 () => {
                   updateTargetCollection([
                     {
-                      id: oldCollection.id,
+                      target_collection_id: oldCollection.target_collection_id,
                       name: newCollectionName,
                       description: newCollectionDesc,
-                      targetCompounds: newTargetCompounds,
+                      target_compounds: newTargetCompounds,
                     },
                   ]);
                   deactivateModal();
@@ -200,7 +200,7 @@
             expanded
             @click="
               () => {
-                deleteTargetCollection([oldCollection.id]);
+                deleteTargetCollection([oldCollection.target_collection_id]);
                 deactivateModal();
               }
             "
@@ -235,11 +235,11 @@ export default {
   },
   computed: {
     ...sync({
+      modalActive: "modal/targetCollectionOpActive",
       modalProps: "modal/targetCollectionOpProps",
     }),
     ...get({
       sampleBatches: "workspace/batches",
-      modalActive: "modal/targetCollectionOpActive",
     }),
     fields() {
       return this.cols.map((col) => col.field);
@@ -253,8 +253,8 @@ export default {
     targetCompoundCols() {
       return [
         { field: "name", label: "Name" },
-        { field: "formula", label: "Formula" },
-        { field: "casNumber", label: "CAS Number" },
+        { field: "target_compound_formula", label: "Formula" },
+        { field: "cas_number", label: "CAS Number" },
       ];
     },
     sampleBatchSelected() {
@@ -265,13 +265,14 @@ export default {
     ...mapMutations({
       deactivateModal: "modal/deactivate",
     }),
-    ...call({
-      createTargetCollection: "target/collection/create",
-      updateTargetCollection: "target/collection/update",
-      deleteTargetCollection: "target/collection/delete",
-    }),
     actionIs(...actions) {
       return actions.includes(this.action);
+    },
+    createTargetCollection(target_collections) {
+      this.$api.emit('target_collection_create', target_collections);
+    },
+    deleteTargetCollection(target_collection_ids) {
+      this.$api.emit('target_collection_delete', target_collection_ids);
     },
     initData() {
       if (this.oldCollection) {
@@ -283,7 +284,10 @@ export default {
       this.newTargetCompounds = rows;
     },
     selectBatchesToAddTo(rows) {
-      this.batchesToAddTo = rows.map((row) => row.id);
+      this.batchesToAddTo = rows.map((row) => row.sample_batch_id);
+    },
+    updateTargetCollection(target_collections) {
+      this.$api.emit('target_collection_update', target_collections);
     },
   },
 };

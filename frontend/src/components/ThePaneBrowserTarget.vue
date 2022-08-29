@@ -29,11 +29,10 @@ export default {
       batchActive: "batch/active",
       // sampleItemFocused: "sample/item/focusedRow",
       targetCollections: "batch/targetCollections",
+      targetCollectionsSelected: "batch/targetCollectionsSelected",
       targetCompounds: "batch/targetCompounds",
       targetIons: "batch/targetIons",
       targetIsotopes: "batch/targetIsotopes",
-      // targetCollectionsSelected: "target/collection/selectedRows",
-      // uniqueTargetCollection: "target/collection/uniqueRow",
     }),
     targetLevels: function () {
       let hidden = false;
@@ -152,11 +151,11 @@ export default {
         label: "Add target collection to batch",
         onClick: this.collectionAddToBatch,
       };
-      if (this.uniqueTargetCollection) {
+      if (this.targetCollectionsSelected.length == 1) {
         return [
           addCollectionToBatchButton,
           createCollectionButton,
-          updateCollectionButton,
+          // updateCollectionButton,
           deleteCollectionButton,
         ];
       } else {
