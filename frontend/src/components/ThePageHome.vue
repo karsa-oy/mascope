@@ -138,10 +138,10 @@ export default {
           `--sql
           SELECT *
           FROM sample_file
-          WHERE date_diff('hours', datetime_utc, now()) <= 24;`
+          WHERE datetime_utc - JulianDay('now') <= 24;`
         )
         .then((res) => {
-          this.sampleFiles = res.toArray();
+          this.sampleFiles = res;
         });
     },
   },
