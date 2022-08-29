@@ -27,15 +27,29 @@ export default {
     }),
     ...get({
       batchActive: "batch/active",
-      // sampleItemFocused: "sample/item/focusedRow",
+      matchCompounds: "batch/matchCompounds",
+      matchIons: "batch/matchIons",
+      sampleItemFocused: "batch/sampleItemFocused",
       targetCollections: "batch/targetCollections",
       targetCollectionsSelected: "batch/targetCollectionsSelected",
       targetCompounds: "batch/targetCompounds",
       targetIons: "batch/targetIons",
       targetIsotopes: "batch/targetIsotopes",
     }),
+    targetCollectionRows: function() {
+      return this.targetCollections;
+    },
+    targetCompoundRows: function() {
+      return this.targetCompounds;
+    },
+    targetIonRows: function() {
+      return this.targetIons;
+    },
+    targetIsotopeRows: function() {
+      return this.targetIsotopes;
+    },
     targetLevels: function () {
-      let hidden = false;
+      let hidden = true;
       return [
         {
           name: "Collection",
@@ -54,7 +68,7 @@ export default {
               },
             },
           ],
-          rows: this.targetCollections,
+          rows: this.targetCollectionRows,
           defaultSort: ["match_score", "desc"],
           detailsIcon: "default",
           rowClick: this.targetCollectionToggle,
@@ -77,7 +91,7 @@ export default {
               },
             },
           ],
-          rows: this.targetCompounds,
+          rows: this.targetCompoundRows,
           defaultSort: ["match_score", "desc"],
           detailsIcon: "default",
           rowClick: this.targetCompoundToggle,
@@ -100,7 +114,7 @@ export default {
               },
             },
           ],
-          rows: this.targetIons,
+          rows: this.targetIonRows,
           defaultSort: ["match_score", "desc"],
           detailsIcon: "default",
           rowClick: this.targetIonToggle,
@@ -126,7 +140,7 @@ export default {
               },
             },
           ],
-          rows: this.targetIsotopes,
+          rows: this.targetIsotopeRows,
           defaultSort: ["mz", "asc"],
           detailsIcon: null,
           rowClick: this.targetIsotopeToggle,
