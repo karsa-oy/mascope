@@ -101,10 +101,10 @@ export default {
   },
   computed: {
     ...get({
-      modalActive: "modal/workspaceSaveActive",
       workspaces: "app/workspaces",
     }),
     ...sync({
+      modalActive: "modal/workspaceSaveActive",
       modalProps: "modal/workspaceSaveProps",
     }),
     action() {
