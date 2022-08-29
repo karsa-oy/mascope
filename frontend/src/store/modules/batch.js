@@ -250,15 +250,10 @@ export default {
             if (nextOwnSelection == 3) {
                 // Clear previous focus if any
                 state.sampleItems.filter(
-                    (item) => (item.sample_item_id != sampleItemToggledId
-                        && item.selection == 3)
+                    (item) => (item.selection == 3)
                     ).forEach((prevFocusedItem) => { prevFocusedItem.selection = 2 });
-                // Set new focused item
-                getters['sampleItem'](sampleItemToggledId).selection = 3;
-            } else if(getters['selectionMode'] == 'focus') {
-                // Unfocus
-                getters['sampleItem'](sampleItemToggledId).selection = 2;
             }
+            getters['sampleItem'](sampleItemToggledId).selection = nextOwnSelection;
             // // update sample item filter directly
             // if (nextPeerSelection == null) {
             //     await api.query(`--sql
