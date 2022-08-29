@@ -55,6 +55,7 @@ export default {
   },
   methods: {
     parseClipboard: async function () {
+      navigator.permissions.query({ name: "clipboard-read" });
       let clipboardText = await navigator.clipboard.readText();
       this.rows = table.fromSpreadsheet(clipboardText, this.fields);
       this.$emit("rowsPasted", this.rows);
