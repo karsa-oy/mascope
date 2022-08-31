@@ -204,8 +204,6 @@ def parse_cmd_args():
         action='store_true', required=False
     )
 
-    default_args = dict(url='localhost', port=5010, ns='/')
-
     all_args = parser.parse_args()
     cmdline_args = {}
     for arg in vars(all_args):
@@ -219,7 +217,6 @@ def parse_cmd_args():
             file_args = yaml.safe_load(f)
     return AttrDict(
         **{
-            **default_args,
             **file_args,
             **cmdline_args
         }

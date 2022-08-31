@@ -86,7 +86,7 @@ class FileIoNamespace(BaseClientNamespace):
             await sio.emit('dataset_updated', {
                 'data_type': 'signal',
                 **cache_item['props']
-            }, namespace='/api')
+            }, namespace='/')
         return data['callback_data']
 
     async def on_acquired_tps_data(self, data):
@@ -114,7 +114,7 @@ class FileIoNamespace(BaseClientNamespace):
         await sio.emit('dataset_updated', {
             'data_type': 'signal',
             **cache_item['props']
-        }, namespace='/api')
+        }, namespace='/')
 
     async def on_tps_parameter_info(self, data):
         global cache

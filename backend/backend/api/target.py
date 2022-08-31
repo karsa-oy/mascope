@@ -11,7 +11,7 @@ from backend.server import sio
 
 # target collections
 
-@sio.event(namespace='/api')
+@sio.event(namespace='/')
 async def target_collection_create(sid, target_collections):
     print(target_collections)
     target_collections = [
@@ -61,11 +61,11 @@ async def target_collection_create(sid, target_collections):
                     target_collection['target_collection_id'],
                     sample_batch_id
                 ])
-                await sio.emit('batch_reload', sample_batch_id, namespace='/api')
-    await sio.emit('org_reload', namespace='/api')
+                await sio.emit('batch_reload', sample_batch_id, namespace='/')
+    await sio.emit('org_reload', namespace='/')
 
 
-@sio.event(namespace='/api')
+@sio.event(namespace='/')
 async def target_collection_update(sid, target_collections):
     return
     # TODO:
@@ -164,11 +164,11 @@ async def target_collection_update(sid, target_collections):
     #                 batches_to_add + batches_to_remove
     #                 ))
     #             for sample_batch_id in batches_changed:
-    #                 await sio.emit('batch_reload', sample_batch_id, namespace='/api')
-    # await sio.emit('org_reload', namespace='/api')
+    #                 await sio.emit('batch_reload', sample_batch_id, namespace='/')
+    # await sio.emit('org_reload', namespace='/')
 
 
-@sio.event(namespace='/api')
+@sio.event(namespace='/')
 async def target_collection_delete(sid, target_collection_ids):
     target_collection_id_refs = ','.join('?'*len(target_collection_ids))
     with conn:
@@ -205,12 +205,12 @@ async def target_collection_delete(sid, target_collection_ids):
     # could be implemented.
     #
     #                * see target_collection_create
-    await sio.emit('org_reload', namespace='/api')
+    await sio.emit('org_reload', namespace='/')
 
 
 # target compounds
 
-@sio.event(namespace='/api')
+@sio.event(namespace='/')
 async def target_compound_create(sid, target_compounds):
     # helper functions
     def norm(name, lower=False):

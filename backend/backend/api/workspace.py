@@ -5,7 +5,7 @@ from backend.db.id import gen_id
 from backend.server import sio
 
 
-@sio.event(namespace='/api')
+@sio.event(namespace='/')
 async def workspace_create(sid, workspaces):
     workspaces = [
         {**workspace, 'workspace_id': gen_id()}
@@ -19,10 +19,10 @@ async def workspace_create(sid, workspaces):
             if_exists='append',
             index=False
             )
-    await sio.emit('org_reload', namespace='/api')
+    await sio.emit('org_reload', namespace='/')
 
 
-@sio.event(namespace='/api')
+@sio.event(namespace='/')
 async def workspace_update(sid, workspaces):
     workspace_df = pd.DataFrame.from_records(workspaces)
     workspace_ids = workspace_df['workspace_id'].tolist()
@@ -42,10 +42,10 @@ async def workspace_update(sid, workspaces):
             if_exists='append',
             index=False
             )
-    await sio.emit('org_reload', namespace='/api')
+    await sio.emit('org_reload', namespace='/')
 
 
-@sio.event(namespace='/api')
+@sio.event(namespace='/')
 async def workspace_delete(sid, workspace_ids):
     with conn:
         workspace_id_refs = ','.join('?'*len(workspace_ids))
@@ -82,4 +82,4 @@ async def workspace_delete(sid, workspace_ids):
             )""",
             workspace_ids
         )
-    await sio.emit('org_reload', namespace='/api')
+    await sio.emit('org_reload', namespace='/')

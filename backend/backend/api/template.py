@@ -7,7 +7,7 @@ from backend.server import sio
 
 
 
-@sio.event(namespace='/api')
+@sio.event(namespace='/')
 async def attribute_template_create(sid, attribute_templates):
     attribute_templates = [
         {**attribute_template, 'attribute_template_id': gen_id()}
@@ -26,10 +26,10 @@ async def attribute_template_create(sid, attribute_templates):
             if_exists='append',
             index=False
             )
-    await sio.emit('org_reload', namespace='/api')
+    await sio.emit('org_reload', namespace='/')
 
 
-@sio.event(namespace='/api')
+@sio.event(namespace='/')
 async def attribute_template_update(sid, attribute_templates):
     attribute_template_df = pd.DataFrame.from_records(attribute_templates)
     with conn:
@@ -51,10 +51,10 @@ async def attribute_template_update(sid, attribute_templates):
             if_exists='append',
             index=False
             )
-    await sio.emit('org_reload', namespace='/api')
+    await sio.emit('org_reload', namespace='/')
 
 
-@sio.event(namespace='/api')
+@sio.event(namespace='/')
 async def attribute_template_delete(sid, attribute_template_ids):
     with conn:
         attribute_template_id_refs = ','.join('?'*len(attribute_template_ids))
@@ -66,4 +66,4 @@ async def attribute_template_delete(sid, attribute_template_ids):
             """,
             attribute_template_ids
             )
-    await sio.emit('org_reload', namespace='/api')
+    await sio.emit('org_reload', namespace='/')

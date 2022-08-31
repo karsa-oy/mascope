@@ -22,7 +22,7 @@ cache = LRUDict(10)
 #   match items individually.
 
 
-@sio.event(namespace='/api')
+@sio.event(namespace='/')
 async def match_batch_compute(sid, sample_batch_id):
 
     # clear previous matches
@@ -84,10 +84,10 @@ async def match_batch_compute(sid, sample_batch_id):
     await asyncio.gather(*match_item_tasks)
 
     # reload batch
-    sio.emit('batch_reload', sample_batch_id, namespace='/api')
+    sio.emit('batch_reload', sample_batch_id, namespace='/')
 
 
-@sio.event(namespace='/api')
+@sio.event(namespace='/')
 async def match_batch_remove(sid, sample_batch_id):
     with conn:
         # get workspace id
@@ -108,7 +108,7 @@ async def match_batch_remove(sid, sample_batch_id):
         """)
 
     # reload workspace
-    sio.emit('workspace_reload', workspace_id, namespace='/api')
+    sio.emit('workspace_reload', workspace_id, namespace='/')
 
 
 # this is not an endpoint

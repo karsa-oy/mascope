@@ -5,7 +5,7 @@ from backend.server import sio
 
 
 
-@sio.event(namespace='/api')
+@sio.event(namespace='/')
 async def schema_read(sid):
     with conn:
         schema = {}

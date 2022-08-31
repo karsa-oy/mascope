@@ -11,7 +11,7 @@ from backend.server import sio
 cache = LRUDict(10)
 
 
-@sio.event(namespace='/api')
+@sio.event(namespace='/')
 async def visualization_ion_focus(
         sid,
         filename,
@@ -164,7 +164,7 @@ async def visualization_ion_focus(
     }, room=sid)
 
 
-@sio.event(namespace='/api')
+@sio.event(namespace='/')
 async def dataset_coord_updated(sid, filename, var, coord):
     global cache
     cache_item = cache.get(filename)

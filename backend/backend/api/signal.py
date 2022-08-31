@@ -18,7 +18,7 @@ from backend.server import sio
 cache = {}
 
 
-@sio.event(namespace='/api')
+@sio.event(namespace='/')
 async def calibration_mz_fit(sid, peak_tofs, peak_mzs, exact_mzs):
     mz_calib, stats = mz_calibrate_tof(
         peak_tofs,
@@ -36,7 +36,7 @@ async def calibration_mz_fit(sid, peak_tofs, peak_mzs, exact_mzs):
     }
 
 
-@sio.event(namespace='/api')
+@sio.event(namespace='/')
 async def calibration_mz_apply(sid, fit, filenames):
     global cache
 

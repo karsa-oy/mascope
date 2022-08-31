@@ -11,7 +11,7 @@ from backend.server import sio
 
 # === sample batches === #
 
-@sio.event(namespace='/api')
+@sio.event(namespace='/')
 async def sample_batch_create(sid, sample_batches):
     sample_batches = [
         {**sample_batch, 'sample_batch_id': gen_id()}
@@ -49,10 +49,10 @@ async def sample_batch_create(sid, sample_batches):
                 index=False
                 )
             [workspace_id] = workspace_ids
-            await sio.emit('workspace_reload', workspace_id, namespace='/api')
+            await sio.emit('workspace_reload', workspace_id, namespace='/')
 
 
-@sio.event(namespace='/api')
+@sio.event(namespace='/')
 async def sample_batch_update(sid, sample_batches):
     sample_batch_df = pd.DataFrame.from_records(sample_batches)
     print(sample_batch_df.to_string())
@@ -103,10 +103,10 @@ async def sample_batch_update(sid, sample_batches):
                 index=False
                 )
         [workspace_id] = workspace_ids
-        await sio.emit('workspace_reload', workspace_id, namespace='/api')
+        await sio.emit('workspace_reload', workspace_id, namespace='/')
 
 
-@sio.event(namespace='/api')
+@sio.event(namespace='/')
 async def sample_batch_delete(sid, sample_batch_ids):
     with conn:
         sample_batch_id_refs = ','.join('?'*len(sample_batch_ids))
@@ -148,12 +148,12 @@ async def sample_batch_delete(sid, sample_batch_ids):
                 sample_batch_ids
             )
             [workspace_id] = workspace_ids
-            await sio.emit('workspace_reload', workspace_id, namespace='/api')
+            await sio.emit('workspace_reload', workspace_id, namespace='/')
 
 
 # === sample items === #
 
-@sio.event(namespace='/api')
+@sio.event(namespace='/')
 async def sample_item_create(sid, sample_items):
     sample_items = [
         {**sample_item, 'sample_item_id': gen_id()}
@@ -179,10 +179,10 @@ async def sample_item_create(sid, sample_items):
                 index=False
                 )
             [sample_batch_id] = sample_batch_ids
-            await sio.emit('batch_reload', sample_batch_id, namespace='/api')
+            await sio.emit('batch_reload', sample_batch_id, namespace='/')
 
 
-@sio.event(namespace='/api')
+@sio.event(namespace='/')
 async def sample_item_update(sid, sample_items):
     sample_item_df = pd.DataFrame.from_records(sample_items)
     sample_batch_ids = pd.unique(sample_item_df['sample_batch_id']).tolist()
@@ -221,10 +221,10 @@ async def sample_item_update(sid, sample_items):
                     index=False
                     )
         [sample_batch_id] = sample_batch_ids
-        await sio.emit('batch_reload', sample_batch_id, namespace='/api')
+        await sio.emit('batch_reload', sample_batch_id, namespace='/')
 
 
-@sio.event(namespace='/api')
+@sio.event(namespace='/')
 async def sample_item_delete(sid, sample_item_ids):
     sample_item_id_refs = ','.join('?'*len(sample_item_ids))
     with conn:
@@ -262,12 +262,12 @@ async def sample_item_delete(sid, sample_item_ids):
                 sample_item_ids
                 )
             [sample_batch_id] = sample_batch_ids
-            await sio.emit('batch_reload', sample_batch_id, namespace='/api')
+            await sio.emit('batch_reload', sample_batch_id, namespace='/')
 
 
 # === sample files === #
 
-@sio.event(namespace='/api')
+@sio.event(namespace='/')
 async def sample_file_create(sid, sample_files):
     sample_files = [
         {**sample_file, 'sample_file_id': gen_id()}
@@ -285,15 +285,17 @@ async def sample_file_create(sid, sample_files):
             lambda x: json.dumps(x)
             ) if 'range' in sample_file_df else [None]*len(sample_files),
         )
-    sample_file_df.to_sql(
-        'sample_file',
-        conn,
-        if_exists='append',
-        index=False
-        )
+    with conn:
+        sample_file_df.to_sql(
+            'sample_file',
+            conn,
+            if_exists='append',
+            index=False
+            )
+    await sio.emit('org_reload', namespace='/')
 
 
-@sio.event(namespace='/api')
+@sio.event(namespace='/')
 async def sample_file_update(sid, sample_files):
     sample_file_df = pd.DataFrame.from_records(sample_files)
     sample_file_df = sample_file_df.assign(
@@ -325,7 +327,7 @@ async def sample_file_update(sid, sample_files):
             index=False
             )
 
-@sio.event(namespace='/api')
+@sio.event(namespace='/')
 async def dataset_updated(sid, data):
     filename = data['filename']
     full_length = data['length']
