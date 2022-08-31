@@ -1,14 +1,18 @@
 import asyncio
 import inspect
 import os
+import socketio
 
-from backend.api.sample import dataset_updated
+from backend.api.match import match_item_compute
+from backend.api.sample import sample_file_create
 from backend.lib.file import zarr_sdk
 from backend.lib.hardware.tofwerk.generator import H5Streamer
 from backend.lib.hardware.orbitrap.generator import RawStreamer
 from backend.lib.struct import AttrDict, LRUDict
-from backend.lib.util import parse_cmd_args
+from backend.lib.util import parse_cmd_args, timestamp_from_filename
 
+from datetime import timedelta
+from dotenv import load_dotenv
 from multiprocessing import Event, Queue, Lock
 from queue import Empty
 from threading import Thread
@@ -83,71 +87,110 @@ class FSWatcher:
         Thread(target=self.run).start()
 
 
-def handle_spec_data(data):
+async def create_sample_file_db_record(data):
     filename = data['filename']
-    spec_i = data['i']
-    cache_item = cache.get(filename)
-    if spec_i is None:
-        # File finished
-        zarr_sdk.finalize_signal_dataset({'value': data}, cache_item)
-        asyncio.run(
-            dataset_updated(None, cache_item.props)
+    committed_length = data['committed_length']
+    instrument = filename.split('_')[0]
+    date = timestamp_from_filename(filename)
+    utc_offset = timedelta(seconds=int(data['utc_offset']))
+    title = data.get('title')
+    description = data.get('description')
+    mz_calibration = data.get('mz_calibration', {})
+    attributes = data.get('attributes', {})
+    await sio.emit(
+            'sample_file_create',
+            [{
+                "filename": filename,
+                "title": title,
+                "description": description,
+                "instrument": instrument,
+                "datetime": date.isoformat(),
+                "datetime_utc": (date - utc_offset).isoformat(),
+                "length": committed_length,
+                "range": data['range'],
+                "mz_calibration": mz_calibration,
+                "attributes": attributes,
+            }]
         )
-    elif spec_i < 0:
-        # New file
-        try:
-            cache_item = zarr_sdk.init_signal_dataset({'value': data})
-        except FileExistsError:
-            print("File exists: %s" %filename)
-            return
-        cache_item = AttrDict(cache_item)
-        cache[data['filename']] = cache_item
-    else:
-        # New data to existing file
-        zarr_sdk.update_signal_dataset({'value': data}, cache_item)
-        
-def handle_tps_data(data):
-    filename = data['filename']
-    spec_i = data['i']
-    cache_item = cache.get(filename)
-    if spec_i is None:
-        # File finished
-        pass
-    elif spec_i < 0:
-        # New file
-        try:
-            zarr_sdk.init_tps_dataset({'value': data}, cache_item)
-        except FileExistsError:
-            print("File exists: %s" %filename)
-            return
-    else:
-        # New data to existing file
-        zarr_sdk.update_tps_dataset({'value': data}, cache_item)
 
-def streamer_processor(streamer):
+
+async def streamer_processor(streamer):
+    # Handlers
+    async def handle_spec_data(data):
+        filename = data['filename']
+        spec_i = data['i']
+        cache_item = cache.get(filename)
+        if spec_i is None:
+            # File finished
+            zarr_sdk.finalize_signal_dataset({'value': data}, cache_item)
+            data.update({
+                'committed_length': cache_item.props['committed_length'],
+                'range': cache_item.props['range'],
+                'utc_offset': cache_item.props['utc_offset']
+                })
+            await create_sample_file_db_record(data)
+        elif spec_i < 0:
+            # New file
+            try:
+                cache_item = zarr_sdk.init_signal_dataset({'value': data})
+            except FileExistsError:
+                print("File exists: %s" %filename)
+                return
+            cache_item = AttrDict(cache_item)
+            cache[data['filename']] = cache_item
+        else:
+            # New data to existing file
+            zarr_sdk.update_signal_dataset({'value': data}, cache_item)
+            
+    async def handle_tps_data(data):
+        filename = data['filename']
+        spec_i = data['i']
+        cache_item = cache.get(filename)
+        if spec_i is None:
+            # File finished
+            pass
+        elif spec_i < 0:
+            # New file
+            try:
+                zarr_sdk.init_tps_dataset({'value': data}, cache_item)
+            except FileExistsError:
+                print("File exists: %s" %filename)
+                return
+        else:
+            # New data to existing file
+            zarr_sdk.update_tps_dataset({'value': data}, cache_item)
+
+    # Main loop
     while not streamer.shutdown_event.is_set():
         try:
-            spec_data = streamer.spec_queue.get(timeout=None)
-            handle_spec_data(spec_data)
+            spec_data = streamer.spec_queue.get_nowait()
+            await handle_spec_data(spec_data)
             if hasattr(streamer, 'tps_queue'):
                 tps_data = streamer.tps_queue.get()
-                handle_tps_data(tps_data)
+                await handle_tps_data(tps_data)
         except Empty:
-            sleep(.1)
+            await asyncio.sleep(.1)
 
 
-def run():
+async def run():
+    host = os.environ['MASCOPE_PUBLIC_API_HOST']
+    port = os.environ['MASCOPE_PUBLIC_API_PORT']
+    url = f"http://{host}:{port}"
+    await sio.connect(url)
     while not shutdown_event.is_set():
-        sleep(1)
+        await asyncio.sleep(1)
 
+
+load_dotenv()
 
 cache = None
 file_queue = Queue()
 shutdown_event = Event()
+sio = socketio.AsyncClient(logger=True)
+
 
 if __name__ == '__main__':
     args = parse_cmd_args()
-    print(args)
 
     streamer_type = args['streamer_type']
     if streamer_type == 'H5':
@@ -168,10 +211,10 @@ if __name__ == '__main__':
         )
         for _ in range(n_jobs)
     ]
-    
+    loop = asyncio.get_event_loop()
     for streamer in streamers:
         streamer.start()
-        Thread(target=streamer_processor, args=(streamer,)).start()
+        loop.create_task(streamer_processor(streamer))
 
     source_path = args.get('data_pool_path', '.')
     fs_watcher = FSWatcher(
@@ -180,8 +223,9 @@ if __name__ == '__main__':
         shutdown_event=shutdown_event,
         )
     fs_watcher.run_as_daemon()
-    
+
+
     try:
-        run()
+        loop.run_until_complete(run())
     except KeyboardInterrupt:
-        streamer.shutdown_event.set()
+        shutdown_event.set()

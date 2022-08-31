@@ -132,6 +132,14 @@ numpy = "*"
 doc = ["gitpython", "sphinx", "numpydoc"]
 
 [[package]]
+name = "certifi"
+version = "2022.6.15"
+description = "Python package for providing Mozilla's CA Bundle."
+category = "main"
+optional = false
+python-versions = ">=3.6"
+
+[[package]]
 name = "charset-normalizer"
 version = "2.1.1"
 description = "The Real First Universal Charset Detector. Open, modern and actively maintained alternative to Chardet."
@@ -777,6 +785,24 @@ optional = false
 python-versions = ">=3.6"
 
 [[package]]
+name = "requests"
+version = "2.28.1"
+description = "Python HTTP for Humans."
+category = "main"
+optional = false
+python-versions = ">=3.7, <4"
+
+[package.dependencies]
+certifi = ">=2017.4.17"
+charset-normalizer = ">=2,<3"
+idna = ">=2.5,<4"
+urllib3 = ">=1.21.1,<1.27"
+
+[package.extras]
+socks = ["PySocks (>=1.5.6,!=1.5.7)"]
+use_chardet_on_py3 = ["chardet (>=3.0.2,<6)"]
+
+[[package]]
 name = "scikit-learn"
 version = "1.1.1"
 description = "A set of python modules for machine learning and data mining"
@@ -939,6 +965,19 @@ python-versions = ">=3.6"
 watchmedo = ["PyYAML (>=3.10)"]
 
 [[package]]
+name = "websocket-client"
+version = "1.4.0"
+description = "WebSocket client for Python with low level API options"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[package.extras]
+test = ["websockets"]
+optional = ["wsaccel", "python-socks"]
+docs = ["sphinx-rtd-theme (>=0.5)", "Sphinx (>=3.4)"]
+
+[[package]]
 name = "websockets"
 version = "10.3"
 description = "An implementation of the WebSocket Protocol (RFC 6455 & 7692)"
@@ -1010,7 +1049,7 @@ heapdict = "*"
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.8,<3.11"
-content-hash = "2684eb4fdca6d48f5ed50ab32faf9a92c85d8edab94247db5078089dde774dbf"
+content-hash = "a3390f1c912a2e5be70ea82ef82d910d040325cb91b09afed37f55faff24c1af"
 
 [metadata.files]
 aiohttp = []
@@ -1024,6 +1063,7 @@ attrs = []
 bidict = []
 bokeh = []
 bottleneck = []
+certifi = []
 charset-normalizer = []
 click = []
 cloudpickle = []
@@ -1077,6 +1117,7 @@ python-socketio = []
 pythonnet = []
 pytz = []
 pyyaml = []
+requests = []
 scikit-learn = []
 scipy = []
 six = []
@@ -1091,6 +1132,7 @@ uncertainties = []
 urllib3 = []
 uvicorn = []
 watchdog = []
+websocket-client = []
 websockets = []
 xarray = []
 yarl = []
