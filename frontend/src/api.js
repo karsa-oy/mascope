@@ -27,8 +27,8 @@ async function initDb() {
     const dbcon = new SQL.Database(new Uint8Array(buf));
 
     apiLog('registered database URL', path);
-
-    return dbcon;
+    const query = (text) => asObject( dbcon.exec(text) );
+    return [dbcon, query];
 }
 
 async function initSocket() {
@@ -38,7 +38,8 @@ async function initSocket() {
     const url = `${protocol}://${host}:${port}`;
     const socket = io(url);
     apiLog('initialized socket', socket);
-    return socket;
+    const emit = (ev, ...args) => socket.emit(ev, ...args);
+    return [socket, emit];
 }
 
 // helpers
@@ -62,13 +63,8 @@ async function asObject(resp) {
 }
 
 async function initApi() {
-
-    const socket = await initSocket();
-    const dbcon = await initDb();
-    
-    // helpers
-    const emit = (ev, ...args) => socket.emit(ev, ...args);
-    const query = (text) => asObject( dbcon.exec(text) );
+    const [socket, emit] = await initSocket();
+    const [dbcon, query] = await initDb();
 
     const api = {
         socket,
