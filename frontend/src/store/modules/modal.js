@@ -41,8 +41,11 @@ export default {
             state[modal + 'Active'] = true;
         },
         deactivate(state) {
-            for (let activeState in state) {
-                state[activeState] = false;
+            let activeState = Object.keys(state).filter(
+                (prop) => prop.endsWith("Active")
+            );
+            for (let prop of activeState) {
+                state[prop] = false;
             }
             state.active = null;
         },
