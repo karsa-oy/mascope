@@ -18,11 +18,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/karsa-dev/karsa-electron.git"
+    "url": "https://gitlab.com/karsa_dev/karsa_msview"
   },
   "autoDownload": true,
   "dependencies": {
-    "@duckdb/duckdb-wasm": "^1.15.0",
     "@mdi/font": "^6.5.95",
     "@mdi/js": "^6.5.95",
     "@vue/compiler-sfc": "^3.2.37",
