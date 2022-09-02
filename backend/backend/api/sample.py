@@ -2,6 +2,7 @@ import json
 import pandas as pd
 from datetime import timedelta
 
+from backend.api.match import match_item_compute
 from backend.db.conn import conn
 from backend.db.id import gen_id
 from backend.lib.util import (
@@ -166,20 +167,20 @@ async def sample_item_create(sid, sample_items):
             raise ValueError(
                 'sample items created must be in exactly one sample batch'
             )
-        else:
-            sample_item_df = sample_item_df.assign(
-                attributes=sample_item_df[['attributes']].applymap(
-                    lambda x: json.dumps(x)
-                    ),
-                )
-            sample_item_df.to_sql(
-                'sample_item',
-                conn,
-                if_exists='append',
-                index=False
-                )
-            [sample_batch_id] = sample_batch_ids
-            await sio.emit('batch_reload', sample_batch_id, namespace='/')
+        sample_item_df = sample_item_df.assign(
+            attributes=sample_item_df[['attributes']].applymap(
+                lambda x: json.dumps(x)
+                ),
+            )
+        sample_item_df.to_sql(
+            'sample_item',
+            conn,
+            if_exists='append',
+            index=False
+            )
+        sample_item_ids = sample_item_df['sample_item_id'].tolist()
+    for sample_item_id in sample_item_ids:
+        await match_item_compute(sid, sample_item_id)
 
 
 @sio.event(namespace='/')
@@ -292,7 +293,8 @@ async def sample_file_create(sid, sample_files):
             if_exists='append',
             index=False
             )
-    await sio.emit('org_reload', namespace='/')
+    for instrument in pd.unique(sample_file_df['instrument']).tolist():
+        await sio.emit('sample_file_created', room=instrument, namespace='/')
 
 
 @sio.event(namespace='/')
