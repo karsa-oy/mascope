@@ -280,7 +280,7 @@ async def sample_file_create(sid, sample_files):
             lambda x: json.dumps(x)
             ) if 'attributes' in sample_file_df else [None]*len(sample_files),
         mz_calibration=sample_file_df[['mz_calibration']].applymap(
-            lambda x: json.dumps(x)
+            lambda x: json.dumps(x) if x is not None else x
             ) if 'mz_calibration' in sample_file_df else [None]*len(sample_files),
         range=sample_file_df[['range']].applymap(
             lambda x: json.dumps(x)
@@ -305,7 +305,7 @@ async def sample_file_update(sid, sample_files):
             lambda x: json.dumps(x)
             ),
         mz_calibration=sample_file_df[['mz_calibration']].applymap(
-            lambda x: json.dumps(x)
+            lambda x: json.dumps(x) if x is not None else x
             ),
         range=sample_file_df[['range']].applymap(
             lambda x: json.dumps(x)

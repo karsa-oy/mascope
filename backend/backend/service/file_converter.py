@@ -95,7 +95,7 @@ async def create_sample_file_db_record(data):
     utc_offset = timedelta(seconds=int(data['utc_offset']))
     title = data.get('title')
     description = data.get('description')
-    mz_calibration = data.get('mz_calibration', {})
+    mz_calibration = data.get('mz_calibration')
     attributes = data.get('attributes', {})
     await sio.emit(
             'sample_file_create',
