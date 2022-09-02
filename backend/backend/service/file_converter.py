@@ -174,7 +174,7 @@ async def streamer_processor(streamer):
 
 async def run():
     host = os.environ['MASCOPE_PUBLIC_API_HOST']
-    port = os.environ['MASCOPE_PUBLIC_API_PORT']
+    port = os.environ['MASCOPE_PROXY_API_PORT']
     url = f"http://{host}:{port}"
     await sio.connect(url)
     while not shutdown_event.is_set():
