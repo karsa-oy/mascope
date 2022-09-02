@@ -38,7 +38,7 @@ class FSWatcher:
                 sleep(.1)
             path = os.path.dirname(filepath)
             filename = os.path.basename(filepath)
-            instrument_name = 'instrument'
+            global instrument_name
             new_filename = '_'.join([instrument_name, filename])
             new_filepath = os.path.join(path, new_filename)
             try:
@@ -191,6 +191,8 @@ sio = socketio.AsyncClient(logger=True)
 
 if __name__ == '__main__':
     args = parse_cmd_args()
+
+    instrument_name = args.get('instrument', 'unknown')
 
     streamer_type = args['streamer_type']
     if streamer_type == 'H5':
