@@ -24,9 +24,9 @@ export default {
                 );
             `).then((res) => { commit('SET_RECENT_ACQUISITIONS', res) });
         },
-        async getMzCalibration({ state, rootState, commit }) {
+        async getMzCalibration({ rootState, state, commit }) {
             await rootState.api.query(`--sql
-                SELECT filename, mz_calibration
+                SELECT mz_calibration
                 FROM sample_file
                 WHERE (
                     datetime_utc = (
@@ -42,18 +42,19 @@ export default {
                     )
                 );
             `).then((res) => {
-                console.log(res)
                 const mz_calibration = res.length ? res[0].mz_calibration : null;
                 commit('SET_MZ_CALIBRATION', mz_calibration)
                 });
         },
         async load({ rootState, commit, dispatch }, instrument) {
-            const api = rootState.api;
+            if (state.active) await dispatch('unload');
+            rootState.api.emit('subscribe', instrument);
             await commit('SET_ACTIVE', instrument);
             await dispatch('getMzCalibration');
             await dispatch('getRecentAcquisitions');
         },
-        async unload({ commit }) {
+        async unload({ rootState, state, commit }) {
+            rootState.api.emit('unsubscribe', state.active);
             commit('SET_ACTIVE', null);
             commit('SET_MZ_CALIBRATION', null);
             commit('SET_RECENT_ACQUISITIONS', null)

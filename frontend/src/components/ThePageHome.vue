@@ -15,7 +15,7 @@
               :cols="[{ field: 'instrument', label: 'Instrument' }]"
               :checkable="true"
               :checkSingle="true"
-              @selectRows="selectInstruments"
+              @selectRows="selectInstrument"
             >
             </base-table>
           </b-field>
@@ -181,13 +181,7 @@ export default {
       }
       this.batchToAddTo = newRows.map((row) => row.sample_batch_id);
     },
-    selectInstruments(newRows, oldRows) {
-      for (let row of oldRows.filter((row) => !newRows.includes(row))) {
-        this.$api.emit('unsubscribe', row.instrument);
-      }
-      for (let row of newRows.filter((row) => !oldRows.includes(row))) {
-        this.$api.emit('subscribe', row.instrument);
-      }
+    selectInstrument(newRows, oldRows) {
       const instrument = newRows.length ? newRows[0].instrument : null;
       if (instrument) {
         this.loadInstrument(instrument);

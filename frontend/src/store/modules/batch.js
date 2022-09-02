@@ -19,10 +19,9 @@ export default {
     state,
     mutations: make.mutations(state),
     actions: {
-        async load({ rootState, commit, dispatch }, batch) {
-            const api = rootState.api;
+        async load({ state, commit, dispatch }, batch) {
+            if (state.active) await dispatch('unload');
             const batchId = batch.sample_batch_id;
-            await commit('SET_ACTIVE', null);
             await dispatch('initFilters', batchId);
             // load data w/ statistical aggregates
             const stats = `--sql
@@ -31,8 +30,15 @@ export default {
                 sum(selected(sample_peak_height, selection))
                     AS sample_peak_height_sum
             `;
+            await dispatch('loadSamples');
+            await dispatch('loadTargets');
+            await dispatch('loadMatches');
+            // set batch active
+            await commit('SET_ACTIVE', batch);
+        },
+        async loadSamples({ rootState, commit }) {
             // load sample items
-            await api.query(`--sql
+            await rootState.api.query(`--sql
                 SELECT
                     sample_item.*,
                     sample_file_id,
@@ -48,8 +54,10 @@ export default {
             `).then((res) => {
                 commit('SET_SAMPLE_ITEMS', res);
             });
+        },
+        async loadTargets({ rootState, commit }) {
             // load target isotopes
-            await api.query(`--sql
+            await rootState.api.query(`--sql
                 SELECT
                     target_isotope.*,
                     selection
@@ -59,7 +67,7 @@ export default {
                 commit('SET_TARGET_ISOTOPES', res);
             });
             // load target ions
-            await api.query(`--sql
+            await rootState.api.query(`--sql
                 SELECT
                     target_ion.*,
                     config_mechanism.*,
@@ -71,7 +79,7 @@ export default {
                 commit('SET_TARGET_IONS', res);
             });
             // load target compounds
-            await api.query(`--sql
+            await rootState.api.query(`--sql
                 SELECT
                     target_compound.*,
                     target_collection_id,
@@ -83,7 +91,7 @@ export default {
                 commit('SET_TARGET_COMPOUNDS', res);
             });
             // load target collections
-            await api.query(`--sql
+            await rootState.api.query(`--sql
                 SELECT
                     target_collection.*,
                     selection
@@ -92,8 +100,10 @@ export default {
             `).then((res) => {
                 commit('SET_TARGET_COLLECTIONS', res);
             });
+        },
+        async loadMatches({ rootState, commit }) {
             // load matches
-            await api.query(`--sql
+            await rootState.api.query(`--sql
                 SELECT
                     sample_item_id,
                     target_compound_id,
@@ -104,7 +114,7 @@ export default {
             `).then((res) => {
                 commit('SET_MATCH_IONS', res);
             });
-            await api.query(`--sql
+            await rootState.api.query(`--sql
                 SELECT
                     sample_item_id,
                     target_compound_id,
@@ -115,8 +125,6 @@ export default {
             `).then((res) => {
                 commit('SET_MATCH_COMPOUNDS', res);
             });
-            // set batch active
-            await commit('SET_ACTIVE', batch);
         },
         async unload({ commit }) {
             commit('SET_ACTIVE', null);
