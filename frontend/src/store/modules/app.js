@@ -1,13 +1,13 @@
-import { api } from '$api';
 import { make } from 'vuex-pathify';
 
 const state = {
-    workspaces: [],
-    targetCollections: [],
     attributeTemplates: [],
+    instruments: [],
     ionMechanisms: [],
-    schema: {},
     ready: false,
+    schema: {},
+    targetCollections: [],
+    workspaces: [],
 }
 export default {
     namespaced: true,
@@ -16,26 +16,33 @@ export default {
     actions: {
         async load({ commit, rootState }) {
             const api = rootState.api;
-            // reload workspaces
-            const workspaces = await api.query(`--sql
-                SELECT * FROM workspace;
-            `);
-            commit('SET_WORKSPACES', workspaces);
-            // reload target collections
-            const collections = await api.query(`--sql
-                SELECT * FROM target_collection;
-            `);
-            commit('SET_TARGET_COLLECTIONS', collections);
-            // reload attribute templates
+            // load attribute templates
             const attributeTemplates = await api.query(`--sql
                 SELECT * FROM attribute_template;
             `);
             commit('SET_ATTRIBUTE_TEMPLATES', attributeTemplates);
-            // reload ionization mechanisms
+            // load target collections
+            const collections = await api.query(`--sql
+                SELECT * FROM target_collection;
+            `);
+            commit('SET_TARGET_COLLECTIONS', collections);
+            // load instruments
+            const instruments = await api.query(`--sql
+                SELECT DISTINCT instrument
+                FROM sample_file;
+            `);
+            commit('SET_INSTRUMENTS', instruments);
+            // load ionization mechanisms
             const ionMechanisms = await api.query(`--sql
                 SELECT * FROM config_mechanism;
             `);
             commit('SET_ION_MECHANISMS', ionMechanisms);
+            // load workspaces
+            const workspaces = await api.query(`--sql
+                SELECT * FROM workspace;
+            `);
+            commit('SET_WORKSPACES', workspaces);
+            // get schema
             api.emit('schema_read', (resp) => {
                 commit('SET_SCHEMA', resp);
                 commit('SET_READY', true);
@@ -43,11 +50,6 @@ export default {
         },
         async reload({ dispatch }) {
             dispatch('load');
-        },
-        async reloadDb() {
-            const [dbcon, query] = await api.initDb();
-            api.dbcon = dbcon;
-            api.query = query;
         },
         async onOrgReload({ dispatch }) {
             dispatch('reload');

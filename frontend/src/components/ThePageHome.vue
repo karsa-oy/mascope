@@ -6,30 +6,31 @@
       </section>
       <div class="columns">
         <div class="column is-half">
-          <section style="padding: 1em 0em 2em 0em">
+          <section style="padding: 2em 2em 2em 2em">
             <h1 class="title is-4">Instruments:</h1>
           </section>
-          <b-field label="Select instruments to monitor">
+          <b-field label="Select instrument to monitor">
             <base-table
-              :rows="instrumentRows"
+              :rows="instruments"
               :cols="[{ field: 'instrument', label: 'Instrument' }]"
               :checkable="true"
+              :checkSingle="true"
               @selectRows="selectInstruments"
             >
             </base-table>
           </b-field>
-          <div v-if="instrumentsSelected.length > 0">
-            <section style="padding: 1em 0em 2em 0em">
+          <div v-if="instrumentActive">
+            <section style="padding: 2em 2em 2em 2em">
               <h1 class="title is-4">Recent acquisitions:</h1>
             </section>
             <section>
-              <b-button type="is-primary" @click="getRecentAcquisitions">
+              <b-button type="is-primary" @click=";">
                 <b-icon icon="reload"></b-icon>
               </b-button>
             </section>
             <base-table
               :key="sampleFileTableDataKey"
-              :rows="sampleFiles"
+              :rows="recentAcquisitions ? recentAcquisitions : []"
               :cols="sampleFileCols ? sampleFileCols : []"
               :checkable="true"
               :checkSingle="true"
@@ -42,7 +43,7 @@
               <b-button
                 type="is-primary"
                 style="position: fixed; left: 5em; bottom: 2em"
-                :disabled="!workspaceActive || !batchToAddTo.length || sampleFilesSelected.length != 1"
+                :disabled="!workspaceActive || !batchToAddTo || sampleFilesSelected.length != 1"
                 @click="
                   () => {
                     sampleItemAttributesSaveProps = {
@@ -94,7 +95,7 @@
           </template>
           <template v-else>
             <section style="padding: 2em 2em 2em 2em">
-              <h1 class="title is-3">{{ workspaceHomeText }}</h1>
+              <h1 class="title is-4">{{ workspaceHomeText }}</h1>
             </section>
             <b-field label="Sample batches">
               <base-table
@@ -131,10 +132,7 @@ export default {
   data: function () {
     return {
       batchToAddTo: [],
-      instrumentRows: [],
-      instrumentsSelected: [],
       sampleFileTableDataKey: 0,
-      sampleFiles: [],
       sampleFilesSelected: [],
     };
   },
@@ -144,79 +142,61 @@ export default {
       workspaceModalProps: "modal/workspaceSaveProps",
     }),
     ...get({
-      workspaces: "app/workspaces",
-      workspaceActive: "workspace/active",
+      instrumentActive: "instrument/active",
+      instruments: "app/instruments",
+      recentAcquisitions: "instrument/recentAcquisitions",
       sampleBatches: "workspace/batches",
       sampleFileCols: "app/schema@sample_file",
+      workspaceActive: "workspace/active",
+      workspaces: "app/workspaces",
     }),
     sampleFileTableHeight() {
       return "calc(75vh)";
     },
     workspaceHomeText() {
       if (this.workspaceActive) {
-        return `Welcome to workspace ${this.workspaceActive.name}!`;
+        return `${this.workspaceActive.name}`;
       } else {
         return `Loading workspace...`;
       }
     },
   },
   created: function () {
-    this.getRecentAcquisitions();
-    this.listInstruments();
   },
   methods: {
     ...call({
-      reloadDb: "app/reloadDb",
+      loadInstrument: "instrument/load",
+      unloadInstrument: "instrument/unload",
     }),
     ...mapMutations({
       activateModal: "modal/activate",
     }),
-    async getRecentAcquisitions() {
-      await this.reloadDb();
-      if (this.instrumentsSelected.length == 0) {
-        this.sampleFiles = [];
-        return
+    selectBatchToAddTo(newRows, oldRows) {
+      // single selection
+      for (let row of oldRows.filter((row) => !newRows.includes(row))) {
+        this.$api.emit('unsubscribe', row.sample_batch_id);
       }
-      this.$api
-        .query(`--sql
-          SELECT *
-          FROM sample_file
-          WHERE (
-            (JulianDay('now') - JulianDay(datetime_utc) ) * 24 <= 24
-          AND
-            instrument IN (
-              '${this.instrumentsSelected.join(`','`)}'
-            )
-          );
-        `)
-        .then((res) => {
-          this.sampleFiles = res;
-        });
+      for (let row of newRows.filter((row) => !oldRows.includes(row))) {
+        this.$api.emit('subscribe', row.sample_batch_id);
+      }
+      this.batchToAddTo = newRows.map((row) => row.sample_batch_id);
     },
-    listInstruments() {
-      this.$api.query(`--sql
-        SELECT DISTINCT instrument
-        FROM sample_file;
-      `)
-      .then((res) => {
-        this.instrumentRows = res;
-      });
-    },
-    selectBatchToAddTo(rows) {
-      this.batchToAddTo = rows[0].sample_batch_id;
-    },
-    selectInstruments(rows) {
-      for (let row of this.instrumentRows) {
+    selectInstruments(newRows, oldRows) {
+      for (let row of oldRows.filter((row) => !newRows.includes(row))) {
         this.$api.emit('unsubscribe', row.instrument);
       }
-      for (let row of rows) {
+      for (let row of newRows.filter((row) => !oldRows.includes(row))) {
         this.$api.emit('subscribe', row.instrument);
       }
-      this.instrumentsSelected = rows.map((row) => row.instrument);
-      this.getRecentAcquisitions();
+      const instrument = newRows.length ? newRows[0].instrument : null;
+      if (instrument) {
+        this.loadInstrument(instrument);
+      } else {
+        this.unloadInstrument();
+      }
     },
-    selectSampleFiles(rows) {
-      this.sampleFilesSelected = rows;
+    selectSampleFiles(newRows, oldRows) {
+      this.sampleFilesSelected = newRows;
     },
   },
 };

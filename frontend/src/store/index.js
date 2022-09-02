@@ -8,6 +8,7 @@ import api from "./plugins/api";
 import app from './modules/app';
 import batch from './modules/batch';
 import calibration from './modules/calibration';
+import instrument from './modules/instrument';
 import key from './modules/key';
 import modal from './modules/modal';
 import param from './modules/param';
@@ -20,6 +21,7 @@ export default new Vuex.Store({
 		app,
 		batch,
 		calibration,
+		instrument,
 		key,
 		modal,
 		param,

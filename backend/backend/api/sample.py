@@ -167,6 +167,7 @@ async def sample_item_create(sid, sample_items):
             raise ValueError(
                 'sample items created must be in exactly one sample batch'
             )
+        [sample_batch_id] = sample_batch_ids
         sample_item_df = sample_item_df.assign(
             attributes=sample_item_df[['attributes']].applymap(
                 lambda x: json.dumps(x)
@@ -181,6 +182,12 @@ async def sample_item_create(sid, sample_items):
         sample_item_ids = sample_item_df['sample_item_id'].tolist()
     for sample_item_id in sample_item_ids:
         await match_item_compute(sid, sample_item_id)
+        await sio.emit(
+            'sample_item_created',
+            sample_item_id,
+            room=sample_batch_id,
+            namespace='/'
+            )
 
 
 @sio.event(namespace='/')
@@ -328,30 +335,3 @@ async def sample_file_update(sid, sample_files):
             if_exists='append',
             index=False
             )
-
-@sio.event(namespace='/')
-async def dataset_updated(sid, data):
-    filename = data['filename']
-    full_length = data['length']
-    committed_length = data['committed_length']
-    if committed_length >= full_length:
-        instrument = filename.split('_')[0]
-        date = timestamp_from_filename(filename)
-        title = data.get('title', "")
-        description = data.get('description', "")
-        utc_offset = timedelta(seconds=int(data['utc_offset']))
-        await sample_file_create(
-            None,
-            [{
-                "filename": filename,
-                "title": title,
-                "description": description,
-                "instrument": instrument,
-                "datetime": date.isoformat(),
-                "datetime_utc": (date - utc_offset).isoformat(),
-                "length": committed_length,
-                "range": data['range'],
-                "mz_calibration": {},
-                "attributes": {},
-            }]
-        )

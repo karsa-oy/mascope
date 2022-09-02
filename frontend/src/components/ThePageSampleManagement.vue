@@ -121,11 +121,11 @@ export default {
     sampleItemCreate(items) {
       this.$api.emit('sample_item_create', items);
     },
-    selectSampleFiles(selectedFiles) {
+    selectSampleFiles(newRows, oldRows) {
       let fields = this.sampleItemCols
         .map((col) => col.field
       );
-      this.sampleItemRows = selectedFiles.map((file) =>
+      this.sampleItemRows = newRows.map((file) =>
         fields
           .map((field) => ({ [field]: file[field] }))
           .reduce((i, j) => ({ ...i, ...j }), {})

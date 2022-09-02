@@ -283,8 +283,8 @@ export default {
     loadTargetCompounds(rows) {
       this.newTargetCompounds = rows;
     },
-    selectBatchesToAddTo(rows) {
-      this.batchesToAddTo = rows.map((row) => row.sample_batch_id);
+    selectBatchesToAddTo(newRows, oldRows) {
+      this.batchesToAddTo = newRows.map((row) => row.sample_batch_id);
     },
     updateTargetCollection(target_collections) {
       this.$api.emit('target_collection_update', target_collections);

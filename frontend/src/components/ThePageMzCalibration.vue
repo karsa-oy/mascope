@@ -165,13 +165,13 @@ export default {
         },
       });
     },
-    selectCandidates(rows) {
+    selectCandidates(newRows, oldRows) {
       this.mzFit = null;
-      this.selectedTableRows = rows;
+      this.selectedTableRows = newRows;
       if (rows.length > 3) {
-        let peakTofs = rows.map((row) => row.sample_peak_tof);
-        let peakMzs = rows.map((row) => row.sample_peak_mz);
-        let exactMzs = rows.map((row) => row.mz);
+        let peakTofs = newRows.map((row) => row.sample_peak_tof);
+        let peakMzs = newRows.map((row) => row.sample_peak_mz);
+        let exactMzs = newRows.map((row) => row.mz);
         this.$mzFitRequest({
           peakTofs,
           peakMzs,

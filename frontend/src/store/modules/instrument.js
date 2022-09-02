@@ -1,0 +1,68 @@
+import { make } from 'vuex-pathify';
+
+const state = {
+    active: null,
+    mzCalibration: null,
+    recentAcquisitions: null,
+}
+
+export default {
+    namespaced: true,
+    state,
+    mutations: make.mutations(state),
+    actions: {
+        async getRecentAcquisitions({ state, rootState, commit }) {
+            await rootState.api.query(`--sql
+                SELECT *
+                FROM sample_file
+                WHERE (
+                    (JulianDay('now') - JulianDay(datetime_utc) ) * 24 <= 240
+                AND
+                    instrument IN (
+                    '${state.active}'
+                    )
+                );
+            `).then((res) => { commit('SET_RECENT_ACQUISITIONS', res) });
+        },
+        async getMzCalibration({ state, rootState, commit }) {
+            await rootState.api.query(`--sql
+                SELECT filename, mz_calibration
+                FROM sample_file
+                WHERE (
+                    datetime_utc = (
+                        SELECT MAX(datetime_utc)
+                        FROM sample_file
+                        WHERE (
+                            instrument IN (
+                                '${state.active}'
+                                )
+                        AND
+                            mz_calibration NOT NULL
+                        )
+                    )
+                );
+            `).then((res) => {
+                console.log(res)
+                const mz_calibration = res.length ? res[0].mz_calibration : null;
+                commit('SET_MZ_CALIBRATION', mz_calibration)
+                });
+        },
+        async load({ rootState, commit, dispatch }, instrument) {
+            const api = rootState.api;
+            await commit('SET_ACTIVE', instrument);
+            await dispatch('getMzCalibration');
+            await dispatch('getRecentAcquisitions');
+        },
+        async unload({ commit }) {
+            commit('SET_ACTIVE', null);
+            commit('SET_MZ_CALIBRATION', null);
+            commit('SET_RECENT_ACQUISITIONS', null)
+        },
+        // notifications
+        async onSampleFileCreated({ dispatch }) {
+            await dispatch('api/reloadDb', null, {root:true});
+            await dispatch('getRecentAcquisitions');
+        },
+    },
+    getters: {}
+}

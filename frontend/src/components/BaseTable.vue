@@ -94,7 +94,7 @@ export default {
         this.selected = newRows.filter((row) => !oldRows.includes(row));
         return
       }
-      this.$emit("selectRows", newRows);
+      this.$emit("selectRows", newRows, oldRows);
     },
   },
 };
