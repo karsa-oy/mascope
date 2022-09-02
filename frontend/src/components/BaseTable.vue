@@ -8,6 +8,7 @@
     show-header
     sticky-header
     :height="height"
+    :header-checkable="checkable && !checkSingle"
     :checkable="checkable"
     :checked-rows.sync="selected"
   >
@@ -56,6 +57,11 @@ export default {
       required: false,
       default: false,
     },
+    checkSingle: {
+      type: Boolean,
+      required: false,
+      default: false,
+    },
     searchable: {
       type: Boolean,
       required: false,
@@ -83,8 +89,12 @@ export default {
     rows() {
       this.selected = [];
     },
-    selected(rows) {
-      this.$emit("selectRows", rows);
+    selected(newRows, oldRows) {
+      if (this.checkSingle && newRows.length > 1) {
+        this.selected = newRows.filter((row) => !oldRows.includes(row));
+        return
+      }
+      this.$emit("selectRows", newRows);
     },
   },
 };
