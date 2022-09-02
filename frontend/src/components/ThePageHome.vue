@@ -6,6 +6,62 @@
       </section>
       <div class="columns">
         <div class="column is-half">
+          <section style="padding: 1em 0em 2em 0em">
+            <h1 class="title is-4">Instruments:</h1>
+          </section>
+          <b-field label="Select instruments to monitor">
+            <base-table
+              :rows="instrumentRows"
+              :cols="[{ field: 'instrument', label: 'Instrument' }]"
+              :checkable="true"
+              @selectRows="selectInstruments"
+            >
+            </base-table>
+          </b-field>
+          <div v-if="instrumentsSelected.length > 0">
+            <section style="padding: 1em 0em 2em 0em">
+              <h1 class="title is-4">Recent acquisitions:</h1>
+            </section>
+            <section>
+              <b-button type="is-primary" @click="getRecentAcquisitions">
+                <b-icon icon="reload"></b-icon>
+              </b-button>
+            </section>
+            <base-table
+              :key="sampleFileTableDataKey"
+              :rows="sampleFiles"
+              :cols="sampleFileCols ? sampleFileCols : []"
+              :checkable="true"
+              :checkSingle="true"
+              @selectRows="selectSampleFiles"
+              :searchable="true"
+              :height="sampleFileTableHeight"
+            >
+            </base-table>
+            <section style="padding: 0.5em">
+              <b-button
+                type="is-primary"
+                style="position: fixed; left: 5em; bottom: 2em"
+                :disabled="!workspaceActive || !batchToAddTo.length || sampleFilesSelected.length != 1"
+                @click="
+                  () => {
+                    sampleItemAttributesSaveProps = {
+                      action: 'create',
+                      batchToAddTo: batchToAddTo,
+                      sampleItemRecordToLoad: sampleFilesSelected[0],
+                    };
+                    activateModal({
+                      modal: 'sampleItemAttributesSave',
+                    });
+                  }
+                "
+              >
+                Process
+              </b-button>
+            </section>
+          </div>
+        </div>
+        <div class="column is-half">
           <template v-if="!workspaceActive">
             <section style="padding: 1em 0em 2em 0em">
               <h1 class="title is-4">Workspaces:</h1>
@@ -20,10 +76,10 @@
             <section style="padding: 0.5em">
               <b-button
                 type="is-primary"
-                style="position: fixed; left: 5em; bottom: 2em"
+                style="position: fixed; right: 5em; bottom: 2em"
                 @click="
                   () => {
-                    modalProps = {
+                    workspaceModalProps = {
                       action: 'create',
                     };
                     activateModal({
@@ -40,44 +96,17 @@
             <section style="padding: 2em 2em 2em 2em">
               <h1 class="title is-3">{{ workspaceHomeText }}</h1>
             </section>
+            <b-field label="Sample batches">
+              <base-table
+                :rows="sampleBatches"
+                :cols="[{ field: 'name', label: 'Batch' }]"
+                :checkable="true"
+                :checkSingle="true"
+                @selectRows="selectBatchToAddTo"
+              >
+              </base-table>
+            </b-field>
           </template>
-        </div>
-        <div class="column is-half">
-          <section style="padding: 1em 0em 2em 0em">
-            <h1 class="title is-4">Recent acquisitions:</h1>
-          </section>
-          <section>
-            <b-button type="is-primary" @click="getRecentAcquisitions">
-              <b-icon icon="reload"></b-icon>
-            </b-button>
-          </section>
-          <base-table
-            :key="sampleFileTableDataKey"
-            :rows="sampleFiles"
-            :cols="sampleFileCols ? sampleFileCols : []"
-            :checkable="false"
-            :searchable="true"
-            :height="sampleFileTableHeight"
-          >
-          </base-table>
-          <section style="padding: 0.5em">
-            <b-button
-              type="is-primary"
-              style="position: fixed; right: 5em; bottom: 2em"
-              @click="
-                () => {
-                  modalProps = {
-                    action: 'create',
-                  };
-                  activateModal({
-                    modal: 'sampleFileAttributesSave',
-                  });
-                }
-              "
-            >
-              Save Sample File Attributes
-            </b-button>
-          </section>
         </div>
       </div>
     </the-layout-sidebar>
@@ -90,7 +119,7 @@ import BaseTable from "./BaseTable.vue";
 import BaseWorkspaceTile from "./BaseWorkspaceTile.vue";
 
 import { mapMutations } from "vuex";
-import { sync, get } from "vuex-pathify";
+import { call, get, sync } from "vuex-pathify";
 
 export default {
   name: "ThePageHome",
@@ -101,17 +130,23 @@ export default {
   },
   data: function () {
     return {
+      batchToAddTo: [],
+      instrumentRows: [],
+      instrumentsSelected: [],
       sampleFileTableDataKey: 0,
       sampleFiles: [],
+      sampleFilesSelected: [],
     };
   },
   computed: {
     ...sync({
-      modalProps: "modal/workspaceSaveProps",
+      sampleItemAttributesSaveProps: "modal/sampleItemAttributesSaveProps",
+      workspaceModalProps: "modal/workspaceSaveProps",
     }),
     ...get({
       workspaces: "app/workspaces",
       workspaceActive: "workspace/active",
+      sampleBatches: "workspace/batches",
       sampleFileCols: "app/schema@sample_file",
     }),
     sampleFileTableHeight() {
@@ -127,22 +162,61 @@ export default {
   },
   created: function () {
     this.getRecentAcquisitions();
+    this.listInstruments();
   },
   methods: {
+    ...call({
+      reloadDb: "app/reloadDb",
+    }),
     ...mapMutations({
       activateModal: "modal/activate",
     }),
-    getRecentAcquisitions() {
+    async getRecentAcquisitions() {
+      await this.reloadDb();
+      if (this.instrumentsSelected.length == 0) {
+        this.sampleFiles = [];
+        return
+      }
       this.$api
-        .query(
-          `--sql
+        .query(`--sql
           SELECT *
           FROM sample_file
-          WHERE (JulianDay('now') - JulianDay(datetime_utc) ) * 24 <= 24;`
-        )
+          WHERE (
+            (JulianDay('now') - JulianDay(datetime_utc) ) * 24 <= 24
+          AND
+            instrument IN (
+              '${this.instrumentsSelected.join(`','`)}'
+            )
+          );
+        `)
         .then((res) => {
           this.sampleFiles = res;
         });
+    },
+    listInstruments() {
+      this.$api.query(`--sql
+        SELECT DISTINCT instrument
+        FROM sample_file;
+      `)
+      .then((res) => {
+        this.instrumentRows = res;
+      });
+    },
+    selectBatchToAddTo(rows) {
+      this.batchToAddTo = rows[0].sample_batch_id;
+    },
+    selectInstruments(rows) {
+      for (let row of this.instrumentRows) {
+        this.$api.emit('unsubscribe', row.instrument);
+      }
+      for (let row of rows) {
+        this.$api.emit('subscribe', row.instrument);
+      }
+      this.instrumentsSelected = rows.map((row) => row.instrument);
+      this.getRecentAcquisitions();
+    },
+    selectSampleFiles(rows) {
+      this.sampleFilesSelected = rows;
     },
   },
 };

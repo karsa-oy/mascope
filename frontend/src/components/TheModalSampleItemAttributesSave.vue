@@ -36,7 +36,9 @@ export default {
   props: {},
   data: function () {
     return {
+      action: null,
       templateType: "sample_item",
+      batchToAddTo: [],
       sampleItemRecordToLoad: {},
       defaultTemplate: {
         name: "default",
@@ -63,9 +65,8 @@ export default {
   },
   computed: {
     ...get({
-      batchActive: "batch/active",
-      itemsSelected: "batch/sampleItemsSelected",
       allTemplates: "app/attributeTemplates",
+      modalProps: "modal/sampleItemAttributesSaveProps",
     }),
     ...sync({
       modalActive: "modal/sampleItemAttributesSaveActive",
@@ -73,19 +74,10 @@ export default {
     availableTemplates() {
       return [this.defaultTemplate, ...this.savedTemplates];
     },
-    itemSelected() {
-      return this.itemsSelected.length == 1 ? this.itemsSelected[0] : null;
-    },
     savedTemplates() {
       return this.allTemplates.filter(
         (template) => template.type == this.templateType
         );
-    },
-    itemSelectedTemplate() {
-      return {
-        template: this.defaultTemplate.template,
-        row: this.itemSelected,
-      };
     },
   },
   methods: {
@@ -110,20 +102,28 @@ export default {
           }
         );
       let newSampleItem = {
-        ...this.itemSelected,
         ...props,
-        attributes
+        attributes,
+        sample_batch_id: this.batchToAddTo,
         };
-      this.$api.emit('sample_item_update', [newSampleItem]);
+      if (this.action == 'create') {
+        this.$api.emit('sample_item_create', [newSampleItem]);
+      } else if(this.action == 'update') {
+        this.$api.emit('sample_item_update', [newSampleItem]);
+      }
+      this.deactivateModal();
     },
   },
   watch: {
-    modalActive: async function (active) {
-      if (active) {
-        this.sampleItemRecordToLoad = {};
-        await this.$nextTick();
-        this.sampleItemRecordToLoad = this.itemSelectedTemplate;
-      }
+    modalProps: async function (data) {
+      this.sampleItemRecordToLoad = {};
+      await this.$nextTick();
+      this.action = data.action;
+      this.batchToAddTo = data.batchToAddTo;
+      this.sampleItemRecordToLoad = {
+        template: this.defaultTemplate.template,
+        row: data.sampleItemRecordToLoad
+      };
     },
   },
 };
