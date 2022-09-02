@@ -137,7 +137,10 @@ export default {
             }
         },
         async onBatchReload({ state, dispatch }, batch) {
-            if (state.active.sample_batch_id == batch.sample_batch_id) {
+            const active_batch_id = state.active
+                ? state.active.sample_batch_id
+                : null;
+            if (active_batch_id == batch.sample_batch_id) {
                 dispatch('reload');
             }
         },
