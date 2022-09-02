@@ -5,3 +5,11 @@ from backend.api.signal import *
 from backend.api.target import *
 from backend.api.template import *
 from backend.api.workspace import *
+
+@sio.event(namespace='/')
+async def subscribe(sid, room):
+    sio.enter_room(sid, room)
+
+@sio.event(namespace='/')
+async def unsubscribe(sid, room):
+    sio.leave_room(sid, room)
