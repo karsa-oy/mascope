@@ -109,6 +109,7 @@ export default {
       } else {
         this.$api.emit('sample_file_create', [newSampleFile]);
       }
+      this.deactivateModal();
     },
     loadAttributes(filters) {
       const filename = filters.filename;
