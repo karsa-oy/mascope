@@ -70,7 +70,8 @@ async function initApi() {
         socket,
         dbcon,
         emit,
-        query
+        query,
+        initDb
     };
 
     return api;

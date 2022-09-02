@@ -1,3 +1,4 @@
+import { api } from '$api';
 import { make } from 'vuex-pathify';
 
 const state = {
@@ -42,6 +43,11 @@ export default {
         },
         async reload({ dispatch }) {
             dispatch('load');
+        },
+        async reloadDb() {
+            const [dbcon, query] = await api.initDb();
+            api.dbcon = dbcon;
+            api.query = query;
         },
         async onOrgReload({ dispatch }) {
             dispatch('reload');
