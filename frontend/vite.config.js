@@ -21,7 +21,9 @@ export default ({ mode }) => {
             },
             proxy: {
                 '/socket.io': {
-                    target: process.env.MASCOPE_PUBLIC_API_PROTOCOL+'://'+process.env.MASCOPE_PUBLIC_API_HOST+':'+process.env.MASCOPE_PUBLIC_PROXY_API_PORT,
+                    target: process.env.MASCOPE_PUBLIC_API_PROTOCOL+'://'+
+                            process.env.MASCOPE_PUBLIC_API_HOST+':'+
+                            process.env.MASCOPE_PUBLIC_PROXY_API_PORT,
                     changeOrigin: true,
                     ws: true,
                 }
