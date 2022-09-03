@@ -8,7 +8,7 @@ const dbVersion = import.meta.env.MASCOPE_PUBLIC_DB_VERSION;
 const protocol = import.meta.env.MASCOPE_PUBLIC_API_PROTOCOL;
 const host = import.meta.env.MASCOPE_PUBLIC_API_HOST;
 const port = import.meta.env.MASCOPE_PUBLIC_API_PORT;
-const proxy_port = import.meta.env.MASCOPE_PROXY_API_PORT;
+const proxy_port = import.meta.env.MASCOPE_PUBLIC_PROXY_API_PORT;
 
 
 export const api = await initApi();

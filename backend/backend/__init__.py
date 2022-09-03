@@ -6,7 +6,7 @@ import os
 
 load_dotenv()
 
-api_port = int(os.environ.get('MASCOPE_PROXY_API_PORT'))
+api_port = int(os.environ.get('MASCOPE_PUBLIC_PROXY_API_PORT'))
 mode = os.environ.get('MASCOPE_PUBLIC_MODE')
 
 
