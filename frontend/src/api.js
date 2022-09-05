@@ -8,6 +8,7 @@ const dbVersion = import.meta.env.MASCOPE_PUBLIC_DB_VERSION;
 const protocol = import.meta.env.MASCOPE_PUBLIC_API_PROTOCOL;
 const host = import.meta.env.MASCOPE_PUBLIC_API_HOST;
 const port = import.meta.env.MASCOPE_PUBLIC_API_PORT;
+const proxy_port = import.meta.env.MASCOPE_PUBLIC_PROXY_API_PORT;
 
 
 export const api = await initApi();
@@ -17,7 +18,7 @@ async function initDb() {
     // INIT DATABASE
 
     // open db file served from backend
-    const path = "http://localhost:8080/@fs/data/database"
+    const path = `http://${host}:${port}/@fs/data/database`
     const file = `mascope.v${dbVersion}.db`
     const sqlPromise = initSqlJs({
         locateFile: file => `./node_modules/sql.js/dist/${file}`
@@ -35,7 +36,7 @@ async function initSocket() {
     // INIT SOCKET
 
     // create the socket in `/` namespace
-    const url = `${protocol}://${host}:${port}`;
+    const url = `${protocol}://${host}:${proxy_port}`;
     const socket = io(url);
     apiLog('initialized socket', socket);
     const emit = (ev, ...args) => socket.emit(ev, ...args);
