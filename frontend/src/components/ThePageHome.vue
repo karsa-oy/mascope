@@ -1,9 +1,6 @@
 <template>
   <section>
     <the-layout-sidebar>
-      <section style="padding: 1em 0em 2em 0em">
-        <h1 class="title is-3">Karsa Mascope</h1>
-      </section>
       <div class="columns">
         <div class="column is-half">
           <section style="padding: 2em 2em 2em 2em">
@@ -22,11 +19,6 @@
           <div v-if="instrumentActive">
             <section style="padding: 2em 2em 2em 2em">
               <h1 class="title is-4">Recent acquisitions:</h1>
-            </section>
-            <section>
-              <b-button type="is-primary" @click=";">
-                <b-icon icon="reload"></b-icon>
-              </b-button>
             </section>
             <base-table
               :key="sampleFileTableDataKey"
@@ -64,7 +56,7 @@
         </div>
         <div class="column is-half">
           <template v-if="!workspaceActive">
-            <section style="padding: 1em 0em 2em 0em">
+            <section style="padding: 2em 2em 2em 2em">
               <h1 class="title is-4">Workspaces:</h1>
             </section>
             <section class="base-tile-container">
