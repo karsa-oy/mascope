@@ -249,51 +249,50 @@ export default {
             `);
         },
         // Sample selection toggling
-        // Directly updates the sample filter
+        async sampleItemFocus({ rootState, dispatch, getters, state }, sampleItemFocused) {
+            const sampleItemFocusedId = sampleItemFocused.sample_item_id;
+            state.sampleItems.filter(
+                (row) => row.sample_item_id != sampleItemFocusedId
+                    && row.selection == 3
+                )
+                .forEach((item) => item.selection = 0);
+            sampleItemFocused = getters['sampleItem'](sampleItemFocusedId);
+            switch (sampleItemFocused.selection) {
+                case 0:
+                case 2:
+                    // Focus
+                    sampleItemFocused.selection = 3;
+                    await dispatch("sample/load", sampleItemFocused, {root:true})
+                    break;
+                case 3:
+                    // Unfocus
+                    sampleItemFocused.selection = 0;
+                    await dispatch("sample/unload", null, {root:true})
+                    break;
+                }
+        },
         async sampleItemToggle({ rootState, dispatch, getters, state }, sampleItemToggled) {
-            const api = rootState.api;
             const sampleItemToggledId = sampleItemToggled.sample_item_id;
-            // get updated selection
-            const {
-                nextOwnSelection,
-                nextPeerSelection
-            } = getters['sampleItemNextSelection'](sampleItemToggledId);
-            if (nextOwnSelection == 3) {
-                // Clear previous focus if any
-                state.sampleItems.filter(
-                    (item) => (item.selection == 3)
-                    ).forEach((prevFocusedItem) => { prevFocusedItem.selection = 2 });
-            }
-            getters['sampleItem'](sampleItemToggledId).selection = nextOwnSelection;
-            // // update sample item filter directly
-            // if (nextPeerSelection == null) {
-            //     await api.query(`--sql
-            //         CREATE TEMPORARY TABLE sample_item_filter AS
-            //             SELECT
-            //                 sample_item_id,
-            //                 CASE
-            //                     WHEN (
-            //                         sample_item_id == '${sampleItemId}'
-            //                     ) THEN ${nextOwnSelection}
-            //                     ELSE current.selection
-            //                 END AS next_selection
-            //             FROM sample_item_filter current
-            //     `);
-            // } else {
-            //     await api.query(`--sql
-            //         CREATE TEMPORARY TABLE sample_item_filter AS
-            //             SELECT
-            //                 sample_item_id,
-            //                 CASE
-            //                     WHEN (
-            //                         sample_item_id == '${sampleItemId}'
-            //                     ) THEN ${nextOwnSelection}
-            //                     ELSE ${nextPeerSelection}
-            //                 END AS next_selection
-            //             FROM sample_item_filter
-            //     `);
-            // }
-            // dispatch('reload');
+            state.sampleItems.filter(
+                (row) => row.sample_item_id != sampleItemToggledId
+                    && row.selection == 2
+                )
+                .forEach((item) => item.selection = 0);
+            sampleItemToggled = getters['sampleItem'](sampleItemToggledId);
+            switch (sampleItemToggled.selection) {
+                case 0:
+                    // Select
+                    sampleItemToggled.selection = 2;
+                    break;
+                case 2:
+                    // Unselect
+                    sampleItemToggled.selection = 0;
+                    break;
+                case 3:
+                    // Stay focused
+                    sampleItemToggled.selection = 3;
+                    break;
+                }
         },
         // Target selection toggling actions
         // these retrieve toggled isotope selections and trigger the updateTargetFilter 

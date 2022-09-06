@@ -36,15 +36,17 @@ export default {
           cols: [{ field: "sample_batch_name", label: "Batch", width: "90%" }],
           rows: this.batches,
           rowClick: this.batchToggle,
-          opened: this.opened,
+          opened: this.openedBatch,
         },
         {
           name: "Item",
           slug: "sample_item",
           cols: [{ field: "sample_item_name", label: "Item", width: "90%" }],
           rows: this.items,
-          detailsIcon: null,
-          rowClick: this.itemToggle,
+          detailsIcon: 'magnify',
+          detailsOpen: this.itemShow,
+          rowClick: this.itemSelect,
+          opened: this.openedItem,
         },
       ];
     },
@@ -97,9 +99,14 @@ export default {
       // menu
       return [...batchButtons, ...itemButtons, ...calibrateButtons];
     },
-    opened() {
+    openedBatch() {
       return this.batchActive && this.items.length > 0
         ? [this.batchActive]
+        : [];
+    },
+    openedItem() {
+      return this.sampleItemOverviewModalActive
+        ? this.items.filter((row) => row.selection == 2)
         : [];
     },
   },
@@ -110,6 +117,7 @@ export default {
     ...call({
       calibrateItems: "calibration/calibrateItems",
       batchLoad: "batch/load",
+      itemFocus: "batch/sampleItemFocus",
       itemToggle: "batch/sampleItemToggle",
       batchToggle: "batch/batchToggle",
     }),
@@ -164,6 +172,12 @@ export default {
           this.$api.emit('sample_item_delete', itemIds);
         },
       });
+    },
+    itemSelect(row) {
+      this.itemToggle(row);
+    },
+    itemShow(row) {
+      this.itemFocus(row);
     },
   },
 };
