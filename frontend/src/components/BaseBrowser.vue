@@ -34,6 +34,7 @@
         :show-header="showHeader"
         :row-class="rowClass"
         @click="rowClick"
+        @details-open="detailsOpen"
       >
         <b-table-column
           v-for="col in cols"
@@ -159,6 +160,14 @@ export default {
       }
       return icon;
     },
+    detailsOpen: function () {
+      if (!this.currentLevel.detailsOpen) return doNothing;
+      let handleDetailsOpen = (row) => {
+        this.currentLevel.detailsOpen(row);
+        this.refresh();
+      };
+      return handleDetailsOpen
+    },
     rowClick: function () {
       let handleClick = (row) => {
         this.currentLevel.rowClick(row);
@@ -262,7 +271,7 @@ export default {
   flex: 1 1 50% !important;
   display: flex !important;
   flex-direction: column !important;
-  min-height: 400px;
+  min-height: 100px;
   max-height: 50vh;
 }
 
