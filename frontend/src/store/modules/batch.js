@@ -195,10 +195,8 @@ export default {
         async initFilters({ rootState }, batchId) {
             const api = rootState.api;
             await api.query(`--sql
-                DROP TABLE IF EXISTS sample_item_filter;
-            `);
-            await api.query(`--sql
                 -- samples
+                DROP TABLE IF EXISTS sample_item_filter;
                 CREATE TEMPORARY TABLE sample_item_filter AS
                     SELECT
                         sample_item_id
@@ -208,8 +206,6 @@ export default {
             `);
             await api.query(`--sql
                 DROP TABLE IF EXISTS target_collection_filter;
-            `);
-            await api.query(`--sql
                 CREATE TEMPORARY TABLE target_collection_filter AS
                     SELECT
                         target_collection_id
@@ -220,8 +216,6 @@ export default {
             `);
             await api.query(`--sql
                 DROP TABLE IF EXISTS target_compound_filter;
-            `);
-            await api.query(`--sql
                 CREATE TEMPORARY TABLE target_compound_filter AS
                     SELECT
                         target_compound_id
@@ -233,8 +227,6 @@ export default {
             `);
             await api.query(`--sql
                 DROP TABLE IF EXISTS target_ion_filter;
-            `);
-            await api.query(`--sql
                 CREATE TEMPORARY TABLE target_ion_filter AS
                     SELECT
                         target_ion_id
@@ -245,10 +237,8 @@ export default {
                     WHERE sample_batch_id == '${batchId}'
             `);
             await api.query(`--sql
-                DROP TABLE IF EXISTS target_isotope_filter;
-            `);
-            await api.query(`--sql
                 -- targets
+                DROP TABLE IF EXISTS target_isotope_filter;
                 CREATE TEMPORARY TABLE target_isotope_filter AS
                     SELECT
                         target_isotope_id
@@ -260,10 +250,8 @@ export default {
                     WHERE sample_batch_id == '${batchId}'
             `);
             await api.query(`--sql
-                DROP TABLE IF EXISTS batch_match_filter;
-            `);
-            await api.query(`--sql
                 -- matches
+                DROP TABLE IF EXISTS batch_match_filter;
                 CREATE TEMPORARY TABLE batch_match_filter AS
                     SELECT
                         match_score,

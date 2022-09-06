@@ -76,10 +76,8 @@ export default {
         async initFilters({ rootState }, sampleId) {
             const api = rootState.api;
             await api.query(`--sql
-                DROP TABLE IF EXISTS sample_match_filter;
-            `);
-            await api.query(`--sql
                 -- matches
+                DROP TABLE IF EXISTS sample_match_filter;
                 CREATE TEMPORARY TABLE sample_match_filter AS
                     SELECT
                         match.*,
