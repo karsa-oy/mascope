@@ -20,9 +20,10 @@ export default {
             await commit('SET_BATCHES', batches);
             await commit('SET_ACTIVE', workspace);
         },
-        async unload({ commit }) {
+        async unload({ commit, dispatch }) {
             commit('SET_ACTIVE', null);
             commit('SET_BATCHES', []);
+            dispatch("batch/unload", null, {root:true})
         },
         async onWorkspaceReload({ state, dispatch }, workspaceId) {
             if (state.active.workspace_id == workspaceId) {

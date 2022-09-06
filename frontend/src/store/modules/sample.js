@@ -25,7 +25,7 @@ export default {
                     target_collection_name,
                     MAX(match_score) AS match_score,
                     SUM(sample_peak_height) AS sample_peak_height_sum
-                FROM match_filter
+                FROM sample_match_filter
                 GROUP BY sample_item_id, target_collection_id;
             `).then((res) => {
                 commit('SET_MATCH_COLLECTIONS', res);
@@ -39,7 +39,7 @@ export default {
                     target_compound_name,
                     MAX(match_score) AS match_score,
                     SUM(sample_peak_height) AS sample_peak_height_sum
-                FROM match_filter
+                FROM sample_match_filter
                 GROUP BY sample_item_id, target_compound_id;
             `).then((res) => {
                 commit('SET_MATCH_COMPOUNDS', res);
@@ -52,7 +52,7 @@ export default {
                     target_compound_id,
                     MAX(match_score) AS match_score,
                     SUM(sample_peak_height) AS sample_peak_height_sum
-                FROM match_filter
+                FROM sample_match_filter
                 GROUP BY sample_item_id, target_compound_id, target_ion_id;
             `).then((res) => {
                 commit('SET_MATCH_IONS', res);
@@ -76,11 +76,11 @@ export default {
         async initFilters({ rootState }, sampleId) {
             const api = rootState.api;
             await api.query(`--sql
-                DROP TABLE IF EXISTS match_filter;
+                DROP TABLE IF EXISTS sample_match_filter;
             `);
             await api.query(`--sql
                 -- matches
-                CREATE TEMPORARY TABLE match_filter AS
+                CREATE TEMPORARY TABLE sample_match_filter AS
                     SELECT
                         match.*,
                         target_collection_id,
