@@ -5,6 +5,8 @@
     <the-modal-sample-batch-op></the-modal-sample-batch-op>
     <the-modal-sample-file-attributes-save></the-modal-sample-file-attributes-save>
     <the-modal-sample-item-attributes-save></the-modal-sample-item-attributes-save>
+    <the-modal-sample-item-overview></the-modal-sample-item-overview>
+    <the-modal-sample-item-target-ion></the-modal-sample-item-target-ion>
   </div>
 </template>
 
@@ -14,6 +16,8 @@ import TheModalWorkspaceSave from "./TheModalWorkspaceSave.vue";
 import TheModalSampleBatchOp from "./TheModalSampleBatchOp.vue";
 import TheModalSampleFileAttributesSave from "./TheModalSampleFileAttributesSave.vue";
 import TheModalSampleItemAttributesSave from "./TheModalSampleItemAttributesSave.vue";
+import TheModalSampleItemOverview from "./TheModalSampleItemOverview.vue";
+import TheModalSampleItemTargetIon from "./TheModalSampleItemTargetIon.vue";
 
 export default {
   name: "TheModalAggregator",
@@ -23,6 +27,8 @@ export default {
     TheModalSampleBatchOp,
     TheModalSampleFileAttributesSave,
     TheModalSampleItemAttributesSave,
+    TheModalSampleItemOverview,
+    TheModalSampleItemTargetIon,
   },
 };
 </script>

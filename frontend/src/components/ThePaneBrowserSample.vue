@@ -27,13 +27,17 @@ export default {
     ...sync({
       modalSampleBatchOpProps: "modal/sampleBatchOpProps",
       modalSampleItemAttributesSaveProps: "modal/sampleItemAttributesSaveProps",
+      modalSampleItemOverviewProps: "modal/sampleItemOverviewProps",
     }),
     sampleLevels() {
+      let hidden = this.batchActive ? false : true;
       return [
         {
           name: "Batch",
           slug: "sample_batch",
-          cols: [{ field: "sample_batch_name", label: "Batch", width: "90%" }],
+          cols: [
+            { field: "sample_batch_name", label: "Batch", width: "90%" },
+          ],
           rows: this.batches,
           rowClick: this.batchToggle,
           opened: this.openedBatch,
@@ -41,12 +45,27 @@ export default {
         {
           name: "Item",
           slug: "sample_item",
-          cols: [{ field: "sample_item_name", label: "Item", width: "90%" }],
+          cols: [
+            { field: "sample_item_name", label: "Item", width: "90%" },
+            { field: "datetime", label: "Datetime", width: "0%", hidden:true },
+            {
+              field: "match_score",
+              label: "Score",
+              width: "10%",
+              hidden,
+              tooltip: (row) => {
+                return {
+                  "Peak intensity": this.formatter.format(row.sample_peak_height_sum),
+                };
+              },
+            },
+          ],
           rows: this.items,
+          defaultSort: ["datetime", "asc"],
           detailsIcon: 'magnify',
           detailsOpen: this.itemShow,
           rowClick: this.itemSelect,
-          opened: this.openedItem,
+          opened: [],
         },
       ];
     },
@@ -104,11 +123,12 @@ export default {
         ? [this.batchActive]
         : [];
     },
-    openedItem() {
-      return this.sampleItemOverviewModalActive
-        ? this.items.filter((row) => row.selection == 2)
-        : [];
-    },
+  },
+  created: function () {
+    this.formatter = new Intl.NumberFormat("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
   },
   methods: {
     ...mapMutations({
@@ -175,9 +195,21 @@ export default {
     },
     itemSelect(row) {
       this.itemToggle(row);
+      this.itemFocus(row);
     },
     itemShow(row) {
-      this.itemFocus(row);
+      if (!this.itemFocused
+        || !(this.itemFocused.sample_item_id == row.sample_item_id)) {
+        this.itemSelect(row);
+      }
+      if (this.itemFocused) {
+        this.modalSampleItemOverviewProps = {
+          sampleItemRecordToLoad: row,
+        };
+        this.activateModal({
+          modal: "sampleItemOverview",
+        });
+      }
     },
   },
 };

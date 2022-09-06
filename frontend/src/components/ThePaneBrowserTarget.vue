@@ -11,6 +11,8 @@ import { sync, get, call } from "vuex-pathify";
 
 import BaseBrowser from "./BaseBrowser.vue";
 
+let doNothing = () => ({});
+
 export default {
   name: "ThePaneBrowserTarget",
   components: {
@@ -23,6 +25,7 @@ export default {
   },
   computed: {
     ...sync({
+      modalSampleItemTargetIonProps: "modal/sampleItemTargetIonProps",
       modalTargetCollectionOpProps: "modal/targetCollectionOpProps",
     }),
     ...get({
@@ -124,8 +127,10 @@ export default {
           ],
           rows: this.targetIonRows,
           defaultSort: ["match_score", "desc"],
-          detailsIcon: "default",
+          detailsIcon: this.sampleItemFocused ? "magnify" : null,
+          detailsOpen: this.sampleItemFocused ? this.ionShow : doNothing,
           rowClick: this.targetIonToggle,
+          opened: [],
         },
         {
           name: "Isotope",
@@ -237,6 +242,12 @@ export default {
       };
       this.activateModal({
         modal: "targetCollectionOp",
+      });
+    },
+    ionShow(row) {
+      this.modalSampleItemTargetIonProps = row;
+      this.activateModal({
+        modal: "sampleItemTargetIon",
       });
     },
   },

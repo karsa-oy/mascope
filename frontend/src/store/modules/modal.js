@@ -27,7 +27,13 @@ const state = {
     sampleItemAttributesSaveProps: {
         // action ('create', 'edit' or 'delete')
         // sampleItemId (required for edit or delete)
-    }
+    },
+    sampleItemOverviewActive: false,
+    sampleItemOverviewProps: {
+    },
+    sampleItemTargetIonActive: false,
+    sampleItemTargetIonProps: {
+    },
 };
 
 export default {
