@@ -25,18 +25,11 @@ export default {
             const batchId = batch.sample_batch_id;
             rootState.api.emit('subscribe', batchId);
             await dispatch('initFilters', batchId);
-            // load data w/ statistical aggregates
-            const stats = `--sql
-                max(selected(match_score, selection))
-                    AS match_score,
-                sum(selected(sample_peak_height, selection))
-                    AS sample_peak_height_sum
-            `;
+            // set batch active
+            await commit('SET_ACTIVE', batch);
             await dispatch('loadSamples');
             await dispatch('loadTargets');
             await dispatch('loadMatches');
-            // set batch active
-            await commit('SET_ACTIVE', batch);
         },
         async loadSamples({ rootState, commit }) {
             // load sample items
@@ -61,7 +54,7 @@ export default {
                 commit('SET_SAMPLE_ITEMS', res);
             });
         },
-        async loadTargets({ rootState, commit }) {
+        async loadTargets({ rootState, state, commit }) {
             // load target collections
             await rootState.api.query(`--sql
                 SELECT
@@ -98,6 +91,9 @@ export default {
                 FROM target_ion_filter
                 NATURAL LEFT JOIN target_ion
                 NATURAL LEFT JOIN config_mechanism
+                WHERE mechanism_id IN (
+                    ${`'`+state.active.build_params.ion_mechanisms.join(`','`)+`'`}
+                    )
             `).then((res) => {
                 commit('SET_TARGET_IONS', res);
             });
