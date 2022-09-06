@@ -27,9 +27,10 @@ export default {
     }),
     ...get({
       batchActive: "batch/active",
-      matchCompounds: "batch/matchCompounds",
-      matchIons: "batch/matchIons",
-      sampleItemFocused: "batch/sampleItemFocused",
+      matchCollections: "sample/matchCollections",
+      matchCompounds: "sample/matchCompounds",
+      matchIons: "sample/matchIons",
+      sampleItemFocused: "sample/active",
       targetCollections: "batch/targetCollections",
       targetCollectionsSelected: "batch/targetCollectionsSelected",
       targetCompounds: "batch/targetCompounds",
@@ -37,19 +38,26 @@ export default {
       targetIsotopes: "batch/targetIsotopes",
     }),
     targetCollectionRows: function() {
-      return this.targetCollections;
+      return this.sampleItemFocused
+      ? this.matchCollections
+      : this.targetCollections;
     },
     targetCompoundRows: function() {
-      return this.targetCompounds;
+      return this.sampleItemFocused
+      ? this.matchCompounds
+      : this.targetCompounds;
+
     },
     targetIonRows: function() {
-      return this.targetIons;
+      return this.sampleItemFocused
+      ? this.matchIons
+      : this.targetIons;
     },
     targetIsotopeRows: function() {
       return this.targetIsotopes;
     },
     targetLevels: function () {
-      let hidden = true;
+      let hidden = this.sampleItemFocused ? false : true;
       return [
         {
           name: "Collection",
