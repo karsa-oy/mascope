@@ -50,10 +50,10 @@ def migrate(current_version, target_version):
         except Exception as error:
             print(f"Migration {migration_label} failed!")
             failed_db_path = os.path.join(
-                db_dir, f"mascope.v{next_version}.duckdb"
+                db_dir, f"mascope.v{next_version}.db"
             )
             debug_db_path = os.path.join(
-                db_dir, "mascope.debug.duckdb"
+                db_dir, "mascope.debug.db"
             )
             if os.path.exists(failed_db_path):
                 os.rename(failed_db_path, debug_db_path)
