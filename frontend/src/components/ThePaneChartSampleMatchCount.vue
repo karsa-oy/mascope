@@ -55,7 +55,7 @@ export default {
           showgrid: true,
           tickmode: "array",
           tickvals: this.sampleItems.map((item) => item.sample_item_id),
-          ticktext: this.sampleItems.map((item) => item.title),
+          ticktext: this.sampleItems.map((item) => item.sample_item_name),
           gridcolor: "#757575",
         },
         yaxis: {

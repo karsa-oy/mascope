@@ -49,12 +49,12 @@ export default {
             key: true, // the field is a key to load data from db
           },
           {
-            label: "title",
+            label: "sample_item_name",
             required: true,
             placeholder: "visible title of the file in batches",
           },
           {
-            label: "description",
+            label: "sample_item_description",
             required: true,
             placeholder: "description",
           },
@@ -92,17 +92,17 @@ export default {
     saveAttributes(attributeTemplate) {
       // convert [{label, value...}, ...] to object
       let props = {};
-      let attributes = {};
+      let sample_file_attributes = {};
       attributeTemplate.forEach(
         (field) => {
           if (field.required) props[field.label] = field.value;
-          else attributes[field.label] = field.value;
+          else sample_file_attributes[field.label] = field.value;
           }
         );
       let newSampleFile = {
         ...this.sampleFileRecordToLoad.row,
         ...props,
-        attributes
+        sample_file_attributes
         };
       if (newSampleFile.sample_file_id) {
         this.$api.emit('sample_file_update', [newSampleFile]);

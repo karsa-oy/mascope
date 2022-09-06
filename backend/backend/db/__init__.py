@@ -28,17 +28,6 @@ def run():
             current_version = migrate(current_version, target_version)
         # load api
         import_module('backend.api')
-        # check for write-ahead-log file
-        wal_path = os.path.join(
-            db_dir, f"mascope.v{current_version}.duckdb.wal"
-        )
-        if not os.path.exists(wal_path):
-            # create an empty wal file
-            with open(wal_path, 'w') as fp:  # noqa
-                pass
-            # note - this is needed because duckdb-wasm tries to find the file
-            # this can be removed once read-only mode is available in 
-            # duckdb-wasm
     except Exception as error:  # noqa
         traceback.print_exc()
 

@@ -33,7 +33,7 @@ export default {
         {
           name: "Batch",
           slug: "sample_batch",
-          cols: [{ field: "name", label: "Batch", width: "90%" }],
+          cols: [{ field: "sample_batch_name", label: "Batch", width: "90%" }],
           rows: this.batches,
           rowClick: this.batchToggle,
           opened: this.opened,
@@ -41,7 +41,7 @@ export default {
         {
           name: "Item",
           slug: "sample_item",
-          cols: [{ field: "title", label: "Item", width: "90%" }],
+          cols: [{ field: "sample_item_name", label: "Item", width: "90%" }],
           rows: this.items,
           detailsIcon: null,
           rowClick: this.itemToggle,
@@ -157,7 +157,7 @@ export default {
     itemDelete() {
       this.$buefy.dialog.confirm({
         title: "Deleting items",
-        message: `Delete ${this.itemsSelected.length} item(s) from ${this.batchActive.name}?`,
+        message: `Delete ${this.itemsSelected.length} item(s) from ${this.batchActive.sample_batch_name}?`,
         confirmText: "Delete",
         onConfirm: () => {
           let itemIds = this.itemsSelected.map((item) => item.sample_item_id);

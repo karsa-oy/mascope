@@ -130,7 +130,7 @@ export default {
       return this.currentLevel.slug;
     },
     levelName: function () {
-      return this.currentLevel.name;
+      return this.currentLevel[this.currentLevel.slug + "_name"];
     },
     rows: function () {
       return this.currentLevel.rows;

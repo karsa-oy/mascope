@@ -55,7 +55,7 @@ export default {
           name: "Collection",
           slug: "target_collection",
           cols: [
-            { field: "name", label: "Collection", width: "90%" },
+            { field: "target_collection_name", label: "Collection", width: "90%" },
             {
               field: "match_score",
               label: "Score",
@@ -78,7 +78,7 @@ export default {
           slug: "target_compound",
           cols: [
             { field: "target_compound_formula", label: "Compound", width: "45%" },
-            { field: "name", label: "", width: "45%" },
+            { field: "target_compound_name", label: "", width: "45%" },
             {
               field: "match_score",
               label: "Score",

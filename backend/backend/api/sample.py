@@ -169,7 +169,7 @@ async def sample_item_create(sid, sample_items):
             )
         [sample_batch_id] = sample_batch_ids
         sample_item_df = sample_item_df.assign(
-            attributes=sample_item_df[['attributes']].applymap(
+            sample_item_attributes=sample_item_df[['sample_item_attributes']].applymap(
                 lambda x: json.dumps(x)
                 ),
             )
@@ -202,7 +202,7 @@ async def sample_item_update(sid, sample_items):
         sample_item_ids = sample_item_df['sample_item_id'].tolist()
         sample_item_id_refs = ','.join('?'*len(sample_item_ids))
         sample_item_df = sample_item_df.assign(
-            attributes=sample_item_df[['attributes']].applymap(
+            sample_item_attributes=sample_item_df[['sample_item_attributes']].applymap(
                 lambda x: json.dumps(x)
                 ),
             )
@@ -219,9 +219,9 @@ async def sample_item_update(sid, sample_items):
                 'sample_item_id',
                 'sample_batch_id',
                 'filename',
-                'title',
-                'description',
-                'attributes'
+                'sample_item_name',
+                'sample_item_description',
+                'sample_item_attributes'
                 ]].to_sql(
                     'sample_item',
                     conn,
@@ -283,9 +283,9 @@ async def sample_file_create(sid, sample_files):
         ]
     sample_file_df = pd.DataFrame.from_records(sample_files)
     sample_file_df = sample_file_df.assign(
-        attributes=sample_file_df[['attributes']].applymap(
+        sample_file_attributes=sample_file_df[['sample_file_attributes']].applymap(
             lambda x: json.dumps(x)
-            ) if 'attributes' in sample_file_df else [None]*len(sample_files),
+            ) if 'sample_file_attributes' in sample_file_df else [None]*len(sample_files),
         mz_calibration=sample_file_df[['mz_calibration']].applymap(
             lambda x: json.dumps(x) if x is not None else x
             ) if 'mz_calibration' in sample_file_df else [None]*len(sample_files),
@@ -308,7 +308,7 @@ async def sample_file_create(sid, sample_files):
 async def sample_file_update(sid, sample_files):
     sample_file_df = pd.DataFrame.from_records(sample_files)
     sample_file_df = sample_file_df.assign(
-        attributes=sample_file_df[['attributes']].applymap(
+        sample_file_attributes=sample_file_df[['sample_file_attributes']].applymap(
             lambda x: json.dumps(x)
             ),
         mz_calibration=sample_file_df[['mz_calibration']].applymap(

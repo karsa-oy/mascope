@@ -2,7 +2,7 @@
   <div class="card base-tile">
     <header class="card-header">
       <p class="card-header-title" @click="onClick">
-        {{ workspace.name }}
+        {{ workspace.workspace_name }}
       </p>
       <b-dropdown aria-role="list">
         <template #trigger>
@@ -43,7 +43,7 @@
       </b-dropdown>
     </header>
     <div class="card-content">
-      {{ workspace.description }}
+      {{ workspace.workspace_description }}
     </div>
   </div>
 </template>

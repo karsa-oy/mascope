@@ -44,7 +44,7 @@ export default {
         name: "default",
         template: [
           {
-            label: "title",
+            label: "sample_item_name",
             required: true,
             placeholder: "visible title of the item in batches",
           },
@@ -55,7 +55,7 @@ export default {
             disabled: true,
           },
           {
-            label: "description",
+            label: "sample_item_description",
             required: true,
             placeholder: "description",
           },
@@ -94,16 +94,16 @@ export default {
     saveAttributes(attributeTemplate) {
       // convert [{label, value...}, ...] to object
       let props = {};
-      let attributes = {};
+      let sample_item_attributes = {};
       attributeTemplate.forEach(
         (field) => {
           if (field.required) props[field.label] = field.value;
-          else attributes[field.label] = field.value;
+          else sample_item_attributes[field.label] = field.value;
           }
         );
       let newSampleItem = {
         ...props,
-        attributes,
+        sample_item_attributes,
         sample_batch_id: this.batchToAddTo,
         };
       if (this.action == 'create') {

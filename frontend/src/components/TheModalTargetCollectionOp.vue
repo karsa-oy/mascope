@@ -26,7 +26,7 @@
             <b-field label="Add to sample batch">
               <base-table
                 :rows="sampleBatches"
-                :cols="[{ field: 'name', label: 'Batch' }]"
+                :cols="[{ field: 'sample_batch_name', label: 'Batch' }]"
                 :checkable="true"
                 @selectRows="selectBatchesToAddTo"
               >
@@ -43,8 +43,8 @@
                   updateTargetCollection([
                     {
                       target_collection_id: oldCollection.target_collection_id,
-                      name: newCollectionName,
-                      description: newCollectionDesc,
+                      target_collection_name: newCollectionName,
+                      target_collection_description: newCollectionDesc,
                       sample_batches: batchesToAddTo,
                     },
                   ]);
@@ -80,7 +80,7 @@
               label="Add to selected sample batch"
             >
               <b-checkbox v-model="addToSampleBatch">
-                Add to {{ sampleBatchSelected.name }}
+                Add to {{ sampleBatchSelected.sample_batch_name }}
               </b-checkbox>
             </b-field>
             <base-spreadsheet-input
@@ -98,8 +98,8 @@
                 () => {
                   createTargetCollection([
                     {
-                      name: newCollectionName,
-                      description: newCollectionDesc,
+                      target_collection_name: newCollectionName,
+                      target_collection_description: newCollectionDesc,
                       target_compounds: newTargetCompounds,
                       sample_batches:
                         addToSampleBatch && sampleBatchSelected
@@ -150,8 +150,8 @@
                   updateTargetCollection([
                     {
                       target_collection_id: oldCollection.target_collection_id,
-                      name: newCollectionName,
-                      description: newCollectionDesc,
+                      target_collection_name: newCollectionName,
+                      target_collection_description: newCollectionDesc,
                       target_compounds: newTargetCompounds,
                     },
                   ]);
@@ -252,7 +252,7 @@ export default {
     },
     targetCompoundCols() {
       return [
-        { field: "name", label: "Name" },
+        { field: "target_compound_name", label: "Name" },
         { field: "target_compound_formula", label: "Formula" },
         { field: "cas_number", label: "CAS Number" },
       ];
@@ -276,8 +276,8 @@ export default {
     },
     initData() {
       if (this.oldCollection) {
-        this.newCollectionName = this.oldCollection.name;
-        this.newCollectionDesc = this.oldCollection.description;
+        this.newCollectionName = this.oldCollection.target_collection_name;
+        this.newCollectionDesc = this.oldCollection.target_collection_description;
       }
     },
     loadTargetCompounds(rows) {

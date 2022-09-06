@@ -48,7 +48,7 @@
                   () => {
                     sampleItemAttributesSaveProps = {
                       action: 'create',
-                      batchToAddTo: batchToAddTo,
+                      batchToAddTo: batchToAddTo.sample_batch_id,
                       sampleItemRecordToLoad: sampleFilesSelected[0],
                     };
                     activateModal({
@@ -97,16 +97,8 @@
             <section style="padding: 2em 2em 2em 2em">
               <h1 class="title is-4">{{ workspaceHomeText }}</h1>
             </section>
-            <b-field label="Sample batches">
-              <base-table
-                :rows="sampleBatches"
-                :cols="[{ field: 'name', label: 'Batch' }]"
-                :checkable="true"
-                :checkSingle="true"
-                @selectRows="selectBatchToAddTo"
-              >
-              </base-table>
-            </b-field>
+            <the-pane-browser-sample></the-pane-browser-sample>
+            <the-pane-browser-target></the-pane-browser-target>
           </template>
         </div>
       </div>
@@ -116,6 +108,8 @@
 
 <script>
 import TheLayoutSidebar from "./TheLayoutSidebar.vue";
+import ThePaneBrowserSample from "./ThePaneBrowserSample.vue";
+import ThePaneBrowserTarget from "./ThePaneBrowserTarget.vue";
 import BaseTable from "./BaseTable.vue";
 import BaseWorkspaceTile from "./BaseWorkspaceTile.vue";
 
@@ -128,10 +122,11 @@ export default {
     BaseTable,
     BaseWorkspaceTile,
     TheLayoutSidebar,
+    ThePaneBrowserTarget,
+    ThePaneBrowserSample,
   },
   data: function () {
     return {
-      batchToAddTo: [],
       sampleFileTableDataKey: 0,
       sampleFilesSelected: [],
     };
@@ -142,6 +137,7 @@ export default {
       workspaceModalProps: "modal/workspaceSaveProps",
     }),
     ...get({
+      batchToAddTo: "batch/active",
       instrumentActive: "instrument/active",
       instruments: "app/instruments",
       recentAcquisitions: "instrument/recentAcquisitions",
@@ -155,7 +151,7 @@ export default {
     },
     workspaceHomeText() {
       if (this.workspaceActive) {
-        return `${this.workspaceActive.name}`;
+        return `${this.workspaceActive.workspace_name}`;
       } else {
         return `Loading workspace...`;
       }
@@ -171,16 +167,6 @@ export default {
     ...mapMutations({
       activateModal: "modal/activate",
     }),
-    selectBatchToAddTo(newRows, oldRows) {
-      // single selection
-      for (let row of oldRows.filter((row) => !newRows.includes(row))) {
-        this.$api.emit('unsubscribe', row.sample_batch_id);
-      }
-      for (let row of newRows.filter((row) => !oldRows.includes(row))) {
-        this.$api.emit('subscribe', row.sample_batch_id);
-      }
-      this.batchToAddTo = newRows.map((row) => row.sample_batch_id);
-    },
     selectInstrument(newRows, oldRows) {
       const instrument = newRows.length ? newRows[0].instrument : null;
       if (instrument) {

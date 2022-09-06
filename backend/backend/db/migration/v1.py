@@ -26,16 +26,16 @@ def run():
     # STEP 1 - setup new database
 
     db_path = os.path.join(data_path, 'database', 'mascope.v1.db')
-    new_conn = sqlite3.new_connect(database=db_path)
+    new_conn = sqlite3.connect(database=db_path)
 
     new_conn.execute("""--sql
         -- workspaces
 
         CREATE TABLE IF NOT EXISTS workspace (
             workspace_id VARCHAR(16) PRIMARY KEY
-            ,name VARCHAR(256) NOT NULL
-            ,description TEXT
-            ,attributes JSON
+            ,workspace_name VARCHAR(256) NOT NULL
+            ,workspace_description TEXT
+            ,workspace_attributes JSON
         );
     """)
     new_conn.execute("""--sql
@@ -55,11 +55,11 @@ def run():
             sample_batch_id VARCHAR(16) PRIMARY KEY
             ,workspace_id VARCHAR(16) NOT NULL
                 REFERENCES workspace(workspace_id)
-            ,name VARCHAR NOT NULL
-            ,description TEXT
+            ,sample_batch_name VARCHAR NOT NULL
+            ,sample_batch_description TEXT
             ,build_params JSON
             ,filter_params JSON
-            ,attributes JSON
+            ,sample_batch_attributes JSON
         );
     """)
     new_conn.execute("""--sql
@@ -68,24 +68,24 @@ def run():
             ,sample_batch_id VARCHAR(16) NOT NULL
                 REFERENCES sample_batch(sample_batch_id)
             ,filename VARCHAR(256) NOT NULL
-            ,title VARCHAR(256) NOT NULL
-            ,description TEXT
-            ,attributes JSON
+            ,sample_item_name VARCHAR(256) NOT NULL
+            ,sample_item_description TEXT
+            ,sample_item_attributes JSON
         );
     """)
     new_conn.execute("""--sql
         CREATE TABLE IF NOT EXISTS sample_file (
             sample_file_id VARCHAR(256) PRIMARY KEY
             ,filename VARCHAR(256) NOT NULL
-            ,title VARCHAR(256)
-            ,description TEXT
+            ,sample_file_name VARCHAR(256)
+            ,sample_file_description TEXT
             ,instrument VARCHAR(64)
             ,datetime TIMESTAMP WITH TIME ZONE
             ,datetime_utc TIMESTAMP
             ,length FLOAT
             ,range JSON
             ,mz_calibration JSON
-            ,attributes JSON
+            ,sample_file_attributes JSON
         );
     """)
     new_conn.execute("""--sql
@@ -101,14 +101,14 @@ def run():
 
         CREATE TABLE IF NOT EXISTS target_collection (
             target_collection_id VARCHAR(16) PRIMARY KEY
-            ,name VARCHAR(256) NOT NULL
-            ,description TEXT
+            ,target_collection_name VARCHAR(256) NOT NULL
+            ,target_collection_description TEXT
         );
     """)
     new_conn.execute("""--sql
         CREATE TABLE IF NOT EXISTS target_compound (
             target_compound_id VARCHAR(32) PRIMARY KEY
-            ,name TEXT
+            ,target_compound_name TEXT
             ,target_compound_formula VARCHAR(256) NOT NULL
             ,cas_number VARCHAR(12)
         );
@@ -193,9 +193,9 @@ def run():
     workspace_df = pd.read_sql("""--sql
         SELECT
             id as workspace_id
-            ,name
-            ,description
-            ,attributes
+            ,name as workspace_name
+            ,description as workspace_description
+            ,attributes as workspace_attributes
         FROM workspaces;
     """,
     old_conn)
@@ -208,9 +208,9 @@ def run():
         SELECT
             id as sample_batch_id
             ,workspace_id
-            ,name
-            ,description
-            ,attributes
+            ,name as sample_batch_name
+            ,description as sample_batch_description
+            ,attributes as sample_batch_attributes
         FROM sample_batches;
     """, old_conn)
 
@@ -243,9 +243,9 @@ def run():
             id as sample_item_id
             ,sample_batch_id
             ,filename
-            ,title
-            ,description
-            ,attributes
+            ,title as sample_item_name
+            ,description as sample_item_description
+            ,attributes as sample_item_attributes
         FROM sample_items;
     """, old_conn)
     sample_item_df.to_sql('sample_item', new_conn, if_exists='append', index=False)
@@ -254,14 +254,14 @@ def run():
         SELECT
             id as sample_file_id
             ,filename
-            ,title
-            ,description
+            ,title as sample_file_name
+            ,description as sample_file_description
             ,instrument
             ,datetime
             ,datetime_utc
             ,length
             ,range
-            ,attributes
+            ,attributes as sample_file_attributes
         FROM sample_files;
     """, old_conn)
     sample_file_df.to_sql('sample_file', new_conn, if_exists='append', index=False)
@@ -295,8 +295,8 @@ def run():
     target_collection_df = pd.read_sql("""--sql
         SELECT
             id as target_collection_id
-            ,name
-            ,description
+            ,name as target_collection_name
+            ,description as target_collection_description
         FROM target_collections;
     """, old_conn)
     target_collection_df.to_sql('target_collection', new_conn, if_exists='append', index=False)
@@ -304,15 +304,11 @@ def run():
     target_compound_df = pd.read_sql("""--sql
         SELECT
             id as target_compound_id
-            ,name
-            ,formula
+            ,name as target_compound_name
+            ,formula as target_compound_formula
             ,cas_number
         FROM target_compounds;
     """, old_conn)
-    target_compound_df.rename(
-        columns={'formula':'target_compound_formula'},
-        inplace=True
-        )
     target_compound_df.to_sql('target_compound', new_conn, if_exists='append', index=False)
 
     target_ion_df = pd.read_sql("""--sql
@@ -320,13 +316,10 @@ def run():
             id as target_ion_id
             ,target_compound_id
             ,mechanism_id
-            ,formula
+            ,formula as target_ion_formula
         FROM target_ions;
     """, old_conn)
-    target_ion_df.rename(
-        columns={'formula':'target_ion_formula'},
-        inplace=True
-        )
+
     target_ion_df.to_sql('target_ion', new_conn, if_exists='append', index=False)
 
     target_isotope_df = pd.read_sql("""--sql
@@ -371,7 +364,7 @@ async def compute_all_matches(new_conn):
     """, new_conn).to_dict('records')
 
     for sample_batch in sample_batches:
-        print(f"Matching {sample_batch['name']}")
+        print(f"Matching {sample_batch['sample_batch_name']}")
         # get ionization mechanisms
         build_params = json.loads(
             sample_batch['build_params']

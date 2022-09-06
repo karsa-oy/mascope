@@ -45,7 +45,7 @@
                 <b>
                   {{
                     batchActive
-                      ? "Items to add to batch: " + batchActive.name
+                      ? "Items to add to batch: " + batchActive.sample_batch_name
                       : "Please select a batch"
                   }}
                 </b>
@@ -134,8 +134,8 @@ export default {
     itemsAdd() {
       let n = this.sampleItemRows.length;
       let s = n > 1 ? "s" : "";
-      let w = this.workspaceActive.name;
-      let b = this.batchActive.name;
+      let w = this.workspaceActive.workspace_name;
+      let b = this.batchActive.sample_batch_name;
       this.$buefy.dialog.confirm({
         title: "Batch Items",
         message: `

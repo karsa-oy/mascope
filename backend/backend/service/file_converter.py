@@ -101,15 +101,15 @@ async def create_sample_file_db_record(data):
             'sample_file_create',
             [{
                 "filename": filename,
-                "title": title,
-                "description": description,
+                "sample_file_name": title,
+                "sample_file_description": description,
                 "instrument": instrument,
                 "datetime": date.isoformat(),
                 "datetime_utc": (date - utc_offset).isoformat(),
                 "length": committed_length,
                 "range": data['range'],
                 "mz_calibration": mz_calibration,
-                "attributes": attributes,
+                "sample_file_attributes": attributes,
             }]
         )
 

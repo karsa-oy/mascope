@@ -361,11 +361,12 @@ export default {
             });
           }
         }
-        if (data.row.attributes) {
-          Object.keys(data.row.attributes).forEach((attr) =>
+        const attributesField = this.templateType + '_attributes';
+        if (data.row[attributesField]) {
+          Object.keys(data.row[attributesField]).forEach((attr) =>
             newTemplate.template.push({
               label: attr,
-              value: data.row.attributes[attr],
+              value: data.row[attributesField][attr],
             })
           );
         }

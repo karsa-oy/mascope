@@ -30,8 +30,8 @@
                 <b-table
                   :data="allTargetCollections"
                   :columns="[
-                    { field: 'name', label: 'Name' },
-                    { field: 'description', label: 'Description' },
+                    { field: 'target_collection_name', label: 'Name' },
+                    { field: 'target_collection_description', label: 'Description' },
                   ]"
                   checkable
                   :checked-rows.sync="targetCollections"
@@ -170,10 +170,10 @@ export default {
     newBatch() {
       if (this.actionIs("create")) {
         return {
-          name: this.batchName,
-          description: this.batchDesc,
+          sample_batch_name: this.batchName,
+          sample_batch_description: this.batchDesc,
           workspace_id: this.workspaceActive.workspace_id,
-          attributes: null,
+          sample_batch_attributes: null,
           build_params: {
             ion_mechanisms: this.ionMechanismIds,
             },
@@ -192,10 +192,10 @@ export default {
       } else if (this.actionIs("update")) {
         return {
           sample_batch_id: this.oldBatch.sample_batch_id,
-          name: this.batchName,
-          description: this.batchDesc,
+          sample_batch_name: this.batchName,
+          sample_batch_description: this.batchDesc,
           workspace_id: this.workspaceActive.workspace_id,
-          attributes: null,
+          sample_batch_attributes: null,
           build_params: {
             ion_mechanisms: this.ionMechanismIds,
           },
@@ -222,10 +222,10 @@ export default {
           title = `Create a new sample batch`;
           break;
         case "update":
-          title = `Update sample batch ${this.oldBatch.name}`;
+          title = `Update sample batch ${this.oldBatch.sample_batch_name}`;
           break;
         case "delete":
-          title = `Delete sample batch ${this.oldBatch.name}`;
+          title = `Delete sample batch ${this.oldBatch.sample_batch_name}`;
           break;
       }
       return title;
@@ -260,8 +260,8 @@ export default {
     },
     initData() {
       if (this.oldBatch) {
-        this.batchName = this.oldBatch.name;
-        this.batchDesc = this.oldBatch.description;
+        this.batchName = this.oldBatch.sample_batch_name;
+        this.batchDesc = this.oldBatch.sample_batch_description;
       }
     },
     updateBatch(batches) {

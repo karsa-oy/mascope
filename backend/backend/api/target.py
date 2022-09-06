@@ -31,13 +31,13 @@ async def target_collection_create(sid, target_collections):
             conn.cursor().execute("""
                 INSERT INTO target_collection (
                     target_collection_id,
-                    name,
-                    description
+                    target_collection_name,
+                    target_collection_description
                 ) VALUES (?, ?, ?);
                 """, [
                 target_collection['target_collection_id'],
-                target_collection['name'],
-                target_collection['description']
+                target_collection['target_collection_name'],
+                target_collection['target_collection_description']
                 ])
             # add compounds to collection
             for collection_compound_id in collection_compound_ids:

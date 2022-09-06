@@ -123,8 +123,8 @@ export default {
       if (this.actionIs("create", "edit")) {
         return {
           workspace_id: this.oldWorkspace ? this.oldWorkspace.workspace_id : null,
-          name: this.workspaceName,
-          description: this.workspaceDesc,
+          workspace_name: this.workspaceName,
+          workspace_description: this.workspaceDesc,
         };
       } else {
         return null;
@@ -137,10 +137,10 @@ export default {
           title = `Create a new workspace`;
           break;
         case "edit":
-          title = `Edit workspace ${this.oldWorkspace.name}`;
+          title = `Edit workspace ${this.oldWorkspace.workspace_name}`;
           break;
         case "delete":
-          title = `Delete workspace ${this.oldWorkspace.name}`;
+          title = `Delete workspace ${this.oldWorkspace.workspace_name}`;
           break;
       }
       return title;
@@ -161,8 +161,8 @@ export default {
     },
     loadWorkspace() {
       if (this.oldWorkspace) {
-        this.workspaceName = this.oldWorkspace.name;
-        this.workspaceDesc = this.oldWorkspace.description;
+        this.workspaceName = this.oldWorkspace.workspace_name;
+        this.workspaceDesc = this.oldWorkspace.workspace_description;
       }
     },
     updateWorkspace(workspaces) {

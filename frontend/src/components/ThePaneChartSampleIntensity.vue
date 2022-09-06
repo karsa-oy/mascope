@@ -58,8 +58,8 @@ export default {
             ? "square"
             : "square-open";
           data.push({
-            name: compound.name.trim()
-              ? compound.name
+            name: compound.target_compound_name.trim()
+              ? compound.target_compound_name
               : compound.target_compound_formula,
             x,
             y,
@@ -83,7 +83,7 @@ export default {
           showgrid: true,
           tickmode: "array",
           tickvals: this.sampleItems.map((item) => item.sample_item_id),
-          ticktext: this.sampleItems.map((item) => item.title),
+          ticktext: this.sampleItems.map((item) => item.sample_item_name),
           gridcolor: "#757575",
         },
         yaxis: {

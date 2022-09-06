@@ -25,8 +25,6 @@ python-socketio = "5.6.0"
 # router
 aiohttp = "3.8.1"
 aiohttp_cors = "0.7.0"
-# database
-duckdb = "^0.4.0"
 # data science
 datashader = "0.14.1"
 numpy = "1.23.0"
