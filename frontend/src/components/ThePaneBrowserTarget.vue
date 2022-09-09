@@ -212,6 +212,7 @@ export default {
       activateModal: "modal/activate",
     }),
     ...call({
+      resetIonVisualization: "visualization/reset",
       targetCollectionToggle: "batch/targetCollectionToggle",
       targetCompoundToggle: "batch/targetCompoundToggle",
       targetIonToggle: "batch/targetIonToggle",
@@ -256,7 +257,19 @@ export default {
       });
     },
     ionShow(row) {
-      this.modalSampleItemTargetIonProps = row;
+      this.resetIonVisualization();
+      this.$api.emit(
+        'visualization_ion_focus',
+        this.sampleItemFocused.sample_item_id,
+        row.target_ion_id
+        )
+      const targetIon = this.targetIons.filter(
+        (ion) => ion.target_ion_id == row.target_ion_id
+        )[0];
+      this.modalSampleItemTargetIonProps = {
+        ...row,
+        target_ion_formula: targetIon.target_ion_formula
+        };
       this.activateModal({
         modal: "sampleItemTargetIon",
       });

@@ -12,6 +12,7 @@ import instrument from './modules/instrument';
 import key from './modules/key';
 import modal from './modules/modal';
 import sample from './modules/sample';
+import visualization from './modules/visualization';
 import workspace from './modules/workspace';
 
 Vue.use(Vuex)
@@ -25,6 +26,7 @@ export default new Vuex.Store({
 		key,
 		modal,
 		sample,
+		visualization,
 		workspace,
 	},
 	plugins: [ // plugin order matters!

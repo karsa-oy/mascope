@@ -1,92 +1,39 @@
+import { commit, dispatch, make } from 'vuex-pathify';
+
+const state = {
+    // chart data
+    tracesSignalTimeseries: null,
+    tracesSignalSumSpectrum: null,
+};
+
 export default {
     namespaced: true,
-    state: {
-        // chart data
-        tracesProfile: [],
-        tracesSpectrum: [],
-        // api
-        $ionFocusResponse: null,
-        $ionFocusRequest: null,
-    },
+    state,
     mutations: {
-        // Visualization
-        SET_TRACES_PROFILE(state, data) {
-            state.tracesProfile = data;
-        },
-        SET_TRACES_SPECTRUM(state, data) {
-            state.tracesSpectrum = data;
-        },
-        REQUEST_ION_FOCUS(state, { sampleItemId, filename, parameters }) {
-            state.$ionFocusRequest = {
-                sampleItemId,
-                filename,
-                ...parameters
-            }
-        },
+        ...make.mutations(state),
     },
     actions: {
-        focusIon({ rootGetters, getters, commit }) {
-            if (!getters['readyToFocusIon']) return;
-            let itemFocused = rootGetters['sample/item/focusedRow'];
-            let targetFocused = rootGetters['target/ion/focusedRow'];
-            let isotopesSelected = rootGetters['target/isotope/selectedRows'];
-            let ionId = targetFocused.id;
-            let mzs = isotopesSelected.filter(
-                isotope => isotope.targetIonId == ionId
-            ).map(isotope => isotope.mz);
-            let relAbus = isotopesSelected.filter(
-                isotope => isotope.targetIonId == ionId
-            ).map(isotope => isotope.relativeAbundance);
-            let tRange = null;
-            commit('REQUEST_ION_FOCUS', {
-                sampleItemId: itemFocused.id,
-                filename: itemFocused.filename,
-                parameters: {
-                    mzs,
-                    relAbus,
-                    tRange,
-                }
-            });
-            // Clear existing traces
-            commit('SET_TRACES_PROFILE', []);
-            commit('SET_TRACES_SPECTRUM', []);
+        async reset({ commit }) {
+            await commit('SET_TRACES_SIGNAL_SUM_SPECTRUM', null)
+            await commit('SET_TRACES_SIGNAL_TIMESERIES', null)
         },
-        // responses
-        handleIonFocusResponse({ state, commit }) {
-            if (state.$ionFocusResponse.spectra) {
-                let tracesSpectrum = state.tracesSpectrum;
-                for (let trace of state.$ionFocusResponse.spectra) {
-                    trace.x = new Float32Array(trace.x);
-                    trace.y = new Float32Array(trace.y);
-                    tracesSpectrum.push(trace);
-                }
-                commit('SET_TRACES_SPECTRUM', tracesSpectrum);
+        async onVisualizationSignalSumSpectrum({ state, commit }, traces) {
+            for (let trace of traces) {
+                trace.x = new Float32Array(trace.x);
+                trace.y = new Float32Array(trace.y);
             }
-            if (state.$ionFocusResponse.profiles) {
-                let tracesProfile = state.tracesProfile;
-                for (let trace of state.$ionFocusResponse.profiles) {
-                    trace.x = new Float32Array(trace.x);
-                    trace.y = new Float32Array(trace.y);
-                    tracesProfile.push(trace);
-                }
-                commit('SET_TRACES_PROFILE', tracesProfile);
+            const existingTraces = state.tracesSignalSumSpectrum;
+            if (existingTraces) traces = [...existingTraces, ...traces];
+            await commit('SET_TRACES_SIGNAL_SUM_SPECTRUM', traces);
+        },
+        async onVisualizationSignalTimeseries({ commit }, traces) {
+            for (let trace of traces) {
+                trace.x = new Float32Array(trace.x);
+                trace.y = new Float32Array(trace.y);
             }
+            const existingTraces = state.tracesSignalTimeseries;
+            if (existingTraces) traces = [...existingTraces, ...traces];
+            await commit('SET_TRACES_SIGNAL_TIMESERIES', traces);
         },
     },
-    getters: {
-        readyToFocusIon(state, getters, rootState, rootGetters) {
-            if (rootGetters['sample/item/focusedRow'] &&
-                rootGetters['target/ion/focusedRow'] &&
-                rootGetters['target/isotope/selectedRows'].length
-            ) {
-                return true;
-            }
-            return false;
-        },
-    },
-    watchers: {
-        'sample/item/focusedRow': 'visualization/focusIon',
-        'target/ion/focusedRow': 'visualization/focusIon',
-        'visualization/$ionFocusResponse': 'visualization/handleIonFocusResponse',
-    }
 }

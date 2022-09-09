@@ -8,11 +8,12 @@
       aria-modal
       @close="deactivateModal"
     >
-      <div class="modal-card" style="width: 500px">
+      <div class="modal-card" style="width: 85vh">
         <header class="modal-card-head">
           <h2 class="subtitle">{{ modalTitle }}</h2>
         </header>
         <section class="modal-card-body" style="min-height: 250px">
+          <the-pane-sample-signal></the-pane-sample-signal>
         </section>
         <footer class="modal-card-foot">
 
@@ -23,12 +24,16 @@
 </template>
 
 <script>
+import ThePaneSampleSignal from "./ThePaneSampleSignal.vue";
+
 import { mapMutations } from "vuex";
 import { get, sync } from "vuex-pathify";
 
 export default {
   name: "TheModalSampleItemTargetIon",
-  components: {},
+  components: {
+    ThePaneSampleSignal,
+  },
   props: {},
   data: function () {
     return {
@@ -45,7 +50,7 @@ export default {
     }),
     modalTitle() {
       return this.sampleItem
-      ? this.modalProps.target_ion_formula
+      ? this.sampleItem.sample_item_name + ": " + this.modalProps.target_ion_formula
       : "";
     },
   },

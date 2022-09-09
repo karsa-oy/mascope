@@ -1,8 +1,10 @@
 import asyncio
 import numpy as np
+import pandas as pd
 
 from colorcet import glasbey_hv as colormap
 
+from backend.db.conn import conn
 from backend.lib.struct import LRUDict
 from backend.lib.file import load_coord, load_file
 from backend.server import sio
@@ -14,11 +16,32 @@ cache = LRUDict(10)
 @sio.event(namespace='/')
 async def visualization_ion_focus(
         sid,
-        filename,
-        mzs,
-        rel_abus,
-        t_range,
-        dmz_ppm):
+        sample_item_id,
+        target_ion_id
+        ):
+    dmz_ppm = 500
+    t_range = None
+    with conn:
+        # Get filename
+        filename = pd.read_sql(f"""--sql
+            SELECT filename
+            FROM sample_item
+            WHERE sample_item_id == ?
+        """,
+        conn,
+        params=[sample_item_id]
+        )['filename'].tolist()[0]
+        # Get ion data
+        target_ion_df = pd.read_sql(f"""--sql
+            SELECT mz, relative_abundance
+            FROM target_isotope
+            WHERE target_ion_id == ?
+            """,
+            conn,
+            params=[target_ion_id]
+            )
+        mzs = target_ion_df['mz'].tolist()
+        rel_abus = target_ion_df['relative_abundance'].tolist()
 
     # Check if file is cached
     cache_item = cache.get(filename, None)
@@ -117,6 +140,11 @@ async def visualization_ion_focus(
             'xaxis': 'x{:d}'.format(i+1),
             'yaxis': 'y{:d}'.format(i+1),
         })
+        await sio.emit(
+            'visualization_signal_sum_spectrum',
+            spectrum_traces,
+            room=sid
+            )
         # Timeseries traces
         timeseries_time = isotope_timeseries.time.values.astype(
             np.float32
@@ -138,10 +166,11 @@ async def visualization_ion_focus(
         else:
             sum_timeseries = sum_timeseries + isotope_timeseries
 
-        await sio.emit('visualization_ion_focus_response', {
-            'spectra': spectrum_traces,
-            'profiles': timeseries_traces,
-        }, room=sid)
+        await sio.emit(
+            'visualization_signal_timeseries',
+            timeseries_traces,
+            room=sid
+            )
         # Sleep 0 to let other tasks be scheduled before next iteration
         await asyncio.sleep(0)
 
@@ -159,9 +188,11 @@ async def visualization_ion_focus(
          'y': timeseries_y.tobytes(),
          },
     ]
-    await sio.emit('visualization_ion_focus_response', {
-        'profiles': timeseries_traces,
-    }, room=sid)
+    await sio.emit(
+        'visualization_signal_timeseries',
+        timeseries_traces,
+        room=sid
+        )
 
 
 @sio.event(namespace='/')

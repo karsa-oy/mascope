@@ -1,35 +1,20 @@
 <template>
   <the-layout-sidebar>
     <section>
-      <div class="columns">
-        <div class="column is-3 base-browser-sidebar">
-          <the-pane-browser-target></the-pane-browser-target>
-          <the-pane-browser-sample></the-pane-browser-sample>
-        </div>
-        <div class="column is-9">
-          <the-pane-chart-sample-signal-sum-spectrum></the-pane-chart-sample-signal-sum-spectrum>
-          <the-pane-chart-sample-signal-timeseries></the-pane-chart-sample-signal-timeseries>
-        </div>
-      </div>
+      <the-pane-sample-signal></the-pane-sample-signal>
     </section>
   </the-layout-sidebar>
 </template>
 
 <script>
 import TheLayoutSidebar from "./TheLayoutSidebar.vue";
-import ThePaneBrowserSample from "./ThePaneBrowserSample.vue";
-import ThePaneBrowserTarget from "./ThePaneBrowserTarget.vue";
-import ThePaneChartSampleSignalSumSpectrum from "./ThePaneChartSampleSignalSumSpectrum.vue";
-import ThePaneChartSampleSignalTimeseries from "./ThePaneChartSampleSignalTimeseries.vue";
+import ThePaneSampleSignal from "./ThePaneSampleSignal.vue";
 
 export default {
   name: "ThePageSampleSignal",
   components: {
     TheLayoutSidebar,
-    ThePaneBrowserTarget,
-    ThePaneBrowserSample,
-    ThePaneChartSampleSignalSumSpectrum,
-    ThePaneChartSampleSignalTimeseries,
+    ThePaneSampleSignal,
   },
 };
 </script>

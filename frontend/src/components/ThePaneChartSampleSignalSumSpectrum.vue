@@ -8,19 +8,22 @@
 </template>
 
 <script>
-import { bindState } from "$lib/store";
-
 import BaseChartPlotly from "./BaseChartPlotly.vue";
+
+import { get } from "vuex-pathify";
 
 export default {
   name: "ThePaneChartSampleSignalSumSpectrum",
   components: { BaseChartPlotly },
   computed: {
-    ...bindState({
-      tracesSpectrum: "visualization/tracesSpectrum",
+    ...get({
+      sampleFocused: "sample/active",
+      traces: "visualization/tracesSignalSumSpectrum",
     }),
     data: function () {
-      return this.tracesSpectrum;
+      return this.traces
+        ? this.traces
+        : [];
     },
     layout: function () {
       return {

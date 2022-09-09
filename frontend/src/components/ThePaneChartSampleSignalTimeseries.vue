@@ -8,19 +8,22 @@
 </template>
 
 <script>
-import { bindState } from "$lib/store";
-
 import BaseChartPlotly from "./BaseChartPlotly.vue";
+
+import { get } from "vuex-pathify";
 
 export default {
   name: "ThePaneChartSampleSignalTimeseries",
   components: { BaseChartPlotly },
   computed: {
-    ...bindState({
-      tracesProfile: "visualization/tracesProfile",
+    ...get({
+      sampleFocused: "sample/active",
+      traces: "visualization/tracesSignalTimeseries",
     }),
     data: function () {
-      return this.tracesProfile;
+      return this.traces
+        ? this.traces
+        : [];
     },
     layout: function () {
       return {
