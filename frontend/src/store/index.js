@@ -11,7 +11,6 @@ import calibration from './modules/calibration';
 import instrument from './modules/instrument';
 import key from './modules/key';
 import modal from './modules/modal';
-import param from './modules/param';
 import sample from './modules/sample';
 import workspace from './modules/workspace';
 
@@ -25,7 +24,6 @@ export default new Vuex.Store({
 		instrument,
 		key,
 		modal,
-		param,
 		sample,
 		workspace,
 	},

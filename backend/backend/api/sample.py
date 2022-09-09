@@ -1,13 +1,9 @@
 import json
 import pandas as pd
-from datetime import timedelta
 
-from backend.api.match import match_item_compute
+from backend.api.match import match_batch_compute, match_item_compute
 from backend.db.conn import conn
 from backend.db.id import gen_id
-from backend.lib.util import (
-    timestamp_from_filename,
-)
 from backend.server import sio
 
 # === sample batches === #
@@ -55,39 +51,77 @@ async def sample_batch_create(sid, sample_batches):
 
 @sio.event(namespace='/')
 async def sample_batch_update(sid, sample_batches):
-    sample_batch_df = pd.DataFrame.from_records(sample_batches)
-    print(sample_batch_df.to_string())
-    workspace_ids = pd.unique(sample_batch_df['workspace_id']).tolist()
-    if len(workspace_ids) != 1:
-        raise ValueError(
-            'sample batches updated must be in exactly one workspace'
-        )
-    else:
-        sample_batch_ids = sample_batch_df['sample_batch_id'].tolist()
-        sample_batch_id_refs = ','.join('?'*len(sample_batch_ids))
-        sample_batch_df = sample_batch_df.assign(
-            build_params=sample_batch_df[['build_params']].applymap(
-                lambda x: json.dumps(x)
-            ),
-            filter_params=sample_batch_df[['filter_params']].applymap(
-                lambda x: json.dumps(x)
+    for sample_batch in sample_batches:
+        sample_batch_df = pd.DataFrame.from_records([sample_batch])
+        print(sample_batch_df.to_string())
+        workspace_ids = pd.unique(sample_batch_df['workspace_id']).tolist()
+        if len(workspace_ids) != 1:
+            raise ValueError(
+                'sample batches updated must be in exactly one workspace'
             )
-        )
+        [sample_batch_id] = sample_batch_df['sample_batch_id'].tolist()
         with conn:
+            def need_for_rematch():
+                # Get difference in target collections
+                target_collection_ids_old = pd.read_sql(f"""--sql
+                    SELECT target_collection_id
+                    FROM target_collection_in_sample_batch
+                    WHERE sample_batch_id == ?
+                    """,
+                    conn,
+                    params=[sample_batch_id]
+                    )['target_collection_id'].tolist()
+                target_collection_ids_new = sample_batch_df['target_collection_id'].tolist()[0]
+                target_collections_to_match = [
+                    id for id in target_collection_ids_new 
+                    if id not in target_collection_ids_old
+                    ]
+                ion_mechanism_ids_new = sample_batch_df['build_params'].tolist()[0]['ion_mechanisms']
+                if len(target_collections_to_match) > 0:
+                    ion_mechanisms_to_match = ion_mechanism_ids_new
+                else:
+                    # Get difference in ionization mechanisms
+                    ion_mechanism_ids_old = json.loads(
+                        pd.read_sql(f"""--sql
+                            SELECT build_params
+                            FROM sample_batch
+                            WHERE sample_batch_id == ?
+                            """,
+                            conn,
+                            params=[sample_batch_id]
+                            )['build_params'].tolist()[0]
+                        )['ion_mechanisms']
+                    ion_mechanisms_to_match = [
+                        id for id in ion_mechanism_ids_new 
+                        if id not in ion_mechanism_ids_old
+                        ]
+                print("target_collections_to_match: %s" %target_collections_to_match)
+                print("ion_mechanisms_to_match: %s" %ion_mechanisms_to_match)
+                # Return true if either new target collections or new ionization mechanisms
+                return len(target_collections_to_match) or len(ion_mechanisms_to_match)
+            rematch = need_for_rematch()
             # Delete existing sample batch records
             conn.cursor().execute(f"""
                 DELETE FROM sample_batch
-                WHERE sample_batch_id IN ({sample_batch_id_refs})
+                WHERE sample_batch_id == ?
                 """,
-                sample_batch_ids
+                [sample_batch_id]
                 )
             conn.cursor().execute(f"""
                 DELETE FROM target_collection_in_sample_batch
-                WHERE sample_batch_id IN ({sample_batch_id_refs})
+                WHERE sample_batch_id == ?
                 """,
-                sample_batch_ids
+                [sample_batch_id]
                 )
             # Create new records with updated data
+            sample_batch_df = sample_batch_df.assign(
+                build_params=sample_batch_df[['build_params']].applymap(
+                    lambda x: json.dumps(x)
+                ),
+                filter_params=sample_batch_df[['filter_params']].applymap(
+                    lambda x: json.dumps(x)
+                )
+            )
             sample_batch_df.drop(columns=['target_collection_id']).to_sql(
                 'sample_batch',
                 conn,
@@ -103,8 +137,14 @@ async def sample_batch_update(sid, sample_batches):
                 if_exists='append',
                 index=False
                 )
-        [workspace_id] = workspace_ids
-        await sio.emit('workspace_reload', workspace_id, namespace='/')
+            if rematch:
+                await match_batch_compute(sid, sample_batch_id)
+            else:
+                await sio.emit(
+                    'sample_batch_updated',
+                    room=sample_batch_id,
+                    namespace='/'
+                    )
 
 
 @sio.event(namespace='/')
@@ -229,7 +269,7 @@ async def sample_item_update(sid, sample_items):
                     index=False
                     )
         [sample_batch_id] = sample_batch_ids
-        await sio.emit('batch_reload', sample_batch_id, namespace='/')
+        await sio.emit('sample_batch_updated', room=sample_batch_id, namespace='/')
 
 
 @sio.event(namespace='/')
@@ -270,7 +310,7 @@ async def sample_item_delete(sid, sample_item_ids):
                 sample_item_ids
                 )
             [sample_batch_id] = sample_batch_ids
-            await sio.emit('batch_reload', sample_batch_id, namespace='/')
+            await sio.emit('sample_batch_updated', room=sample_batch_id, namespace='/')
 
 
 # === sample files === #

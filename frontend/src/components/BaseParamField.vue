@@ -8,6 +8,7 @@
       size="is-small"
       controls-alignment="right"
       style="margin-right: 15px"
+      lazy
     >
     </b-numberinput>
     <b-slider
@@ -24,6 +25,9 @@
 </template>
 
 <script>
+
+import { sync } from "vuex-pathify";
+
 export default {
   name: "BaseParamField",
   props: {
@@ -59,13 +63,13 @@ export default {
     },
   },
   computed: {
-    param: {
-      get() {
-        return this.$store.getters.getPath(this.path);
-      },
-      set(value) {
-        this.$store.commit("setPath", { path: this.path, value });
-      },
+    ...sync({
+      param: ":path",
+    }),
+  },
+  watch: {
+    param: function() {
+      this.$emit("paramChange");
     },
   },
 };

@@ -227,7 +227,8 @@ def run():
             'mz_tolerance': 10,
             'probable_match_threshold': 0.9,
             'possible_match_threshold': 0.5,
-            'iso_ratio_tolerance': 10,  # %
+            'isotope_ratio_tolerance': 10,
+            'min_isotope_abundance': 0,
             # peak params
             'peak_min_intensity': 1,
             'peak_min_separation': 3,

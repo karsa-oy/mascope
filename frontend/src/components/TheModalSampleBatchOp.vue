@@ -28,29 +28,31 @@
               </b-tab-item>
               <b-tab-item label="Target collections">
                 <b-table
-                  :data="allTargetCollections"
+                  :data="targetCollectionsAll"
                   :columns="[
                     { field: 'target_collection_name', label: 'Name' },
                     { field: 'target_collection_description', label: 'Description' },
                   ]"
                   checkable
-                  :checked-rows.sync="targetCollections"
+                  :checked-rows.sync="targetCollectionsSelected"
                 >
                 </b-table>
               </b-tab-item>
               <b-tab-item label="Ionization mechanisms">
                 <b-table
-                  :data="allIonMechanisms"
+                  :data="ionMechanismsAll"
                   :columns="[
                     { field: 'mechanism', label: 'Mechanism' },
                     { field: 'polarity', label: 'Polarity' },
                   ]"
                   checkable
-                  :checked-rows.sync="ionMechanisms"
+                  :checked-rows.sync="ionMechanismsSelected"
                 >
                 </b-table>
               </b-tab-item>
-              <b-tab-item label="Settings"> MATCHP - todo </b-tab-item>
+              <b-tab-item label="Settings">
+                <the-pane-settings-batch></the-pane-settings-batch>
+              </b-tab-item>
             </b-tabs>
           </section>
           <footer class="modal-card-foot">
@@ -103,7 +105,7 @@
               expanded
               @click="
                 () => {
-                  deleteBatch([oldBatch.sample_batch_id]);
+                  deleteBatch([batchActive.sample_batch_id]);
                   deactivateModal();
                 }
               "
@@ -118,12 +120,15 @@
 </template>
 
 <script>
+import ThePaneSettingsBatch from "./ThePaneSettingsBatch.vue";
 import { mapMutations } from "vuex";
 import { get, sync } from "vuex-pathify";
 
 export default {
   name: "TheModalSampleBatchOp",
-  components: {},
+  components: {
+    ThePaneSettingsBatch,
+  },
   data: function () {
     return {
       batchName: null,
@@ -143,29 +148,36 @@ export default {
         peakIntensityMin: 1,
         peakSeperationMin: 3,
       },
-      ionMechanisms: [],
-      targetCollections: [],
+      ionMechanismsSelected: [],
+      targetCollectionsSelected: [],
     };
   },
-  created() {},
+  created() {
+    
+  },
   computed: {
     ...sync({
       modalActive: "modal/sampleBatchOpActive",
       modalProps: "modal/sampleBatchOpProps",
-      allIonMechanisms: "app/ionMechanisms",
-      allTargetCollections: "app/targetCollections",
     }),
     ...get({
+      batchActive: "batch/active",
       batches: "workspace/batches",
-      probableMatchThreshold: "param/probableMatchThreshold",
-      possibleMatchThreshold: "param/possibleMatchThreshold",
+      batchIonMechanismIds: "batch/active@build_params.ion_mechanisms",
+      batchTargetCollections: "batch/targetCollections",
+      ionMechanismsAll: "app/ionMechanisms",
+      mzTolerance: "batch/active@filter_params.mz_tolerance",
+      minIsotopeAbundance: "batch/active@filter_params.min_isotope_abundance",
+      isotopeRatioTolerance: "batch/active@filter_params.isotope_ratio_tolerance",
+      peakIntensityMin: "batch/active@filter_params.peak_min_intensity",
+      peakSeperationMin: "batch/active@filter_params.peak_min_separation",
+      probableMatchThreshold: "batch/active@filter_params.probable_match_threshold",
+      possibleMatchThreshold: "batch/active@filter_params.possible_match_threshold",
+      targetCollectionsAll: "app/targetCollections",
       workspaceActive: "workspace/active",
     }),
     action() {
       return this.modalProps.action;
-    },
-    oldBatch() {
-      return this.modalProps.batch ?? null;
     },
     newBatch() {
       if (this.actionIs("create")) {
@@ -181,7 +193,8 @@ export default {
             mz_tolerance: this.mzTolerance,
             probable_match_threshold: this.probableMatchThreshold,
             possible_match_threshold: this.possibleMatchThreshold,
-            iso_ratio_tolerance: this.isotopeRatioTolerance,
+            min_isotope_abundance: this.minIsotopeAbundance,
+            isotope_ratio_tolerance: this.isotopeRatioTolerance,
             peak_min_intensity: this.peakIntensityMin,
             peak_min_separation: this.peakSeperationMin,
             mz_range: null,
@@ -191,7 +204,7 @@ export default {
         };
       } else if (this.actionIs("update")) {
         return {
-          sample_batch_id: this.oldBatch.sample_batch_id,
+          sample_batch_id: this.batchActive.sample_batch_id,
           sample_batch_name: this.batchName,
           sample_batch_description: this.batchDesc,
           workspace_id: this.workspaceActive.workspace_id,
@@ -203,7 +216,8 @@ export default {
             mz_tolerance: this.mzTolerance,
             probable_match_threshold: this.probableMatchThreshold,
             possible_match_threshold: this.possibleMatchThreshold,
-            iso_ratio_tolerance: this.isotopeRatioTolerance,
+            min_isotope_abundance: this.minIsotopeAbundance,
+            isotope_ratio_tolerance: this.isotopeRatioTolerance,
             peak_min_intensity: this.peakIntensityMin,
             peak_min_separation: this.peakSeperationMin,
             mz_range: null,
@@ -222,27 +236,23 @@ export default {
           title = `Create a new sample batch`;
           break;
         case "update":
-          title = `Update sample batch ${this.oldBatch.sample_batch_name}`;
+          title = `Update sample batch ${this.batchName}`;
           break;
         case "delete":
-          title = `Delete sample batch ${this.oldBatch.sample_batch_name}`;
+          title = `Delete sample batch ${this.batchName}`;
           break;
       }
       return title;
     },
     ionMechanismIds() {
-      return this.ionMechanisms
-        ? this.ionMechanisms.map(
+      return this.ionMechanismsSelected.map(
             (row) => row.mechanism_id
           )
-        : []
     },
     targetCollectionIds() {
-      return this.targetCollections
-        ? this.targetCollections.map(
-            (row) => row.target_collection_id
-          )
-        : []
+      return this.targetCollectionsSelected.map(
+        (row) => row.target_collection_id
+      );
     },
   },
   methods: {
@@ -259,10 +269,30 @@ export default {
       this.$api.emit('sample_batch_delete', batches);
     },
     initData() {
-      if (this.oldBatch) {
-        this.batchName = this.oldBatch.sample_batch_name;
-        this.batchDesc = this.oldBatch.sample_batch_description;
+      if (this.batchActive) {
+        this.batchName = this.batchActive.sample_batch_name;
+        this.batchDesc = this.batchActive.sample_batch_description;
       }
+      this.initIonMechanismsSelected();
+      this.initTargetCollectionsSelected();
+    },
+    initIonMechanismsSelected() {
+      const ids = this.batchActive
+        ? this.batchIonMechanismIds
+        : this.defaultConfig.ionMechanisms;
+      this.ionMechanismsSelected = this.ionMechanismsAll.filter(
+        (row) => ids.includes(row.mechanism_id)
+      );
+    },
+    initTargetCollectionsSelected() {
+      const ids = this.batchActive
+        ? this.batchTargetCollections.map(
+            (row) => row.target_collection_id
+            )
+        : this.defaultConfig.targetCollections;
+      this.targetCollectionsSelected = this.targetCollectionsAll.filter(
+        (row) => ids.includes(row.target_collection_id)
+      );
     },
     updateBatch(batches) {
       this.$api.emit('sample_batch_update', batches);

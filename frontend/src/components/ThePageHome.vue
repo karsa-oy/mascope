@@ -90,6 +90,23 @@
               <h1 class="title is-4">{{ workspaceHomeText }}</h1>
             </section>
             <the-pane-browser-sample></the-pane-browser-sample>
+            <b-collapse :open="false" animation="slide">
+              <template #trigger>
+                <section style="padding: 0.5em">
+                  <b-button
+                    icon-left="wrench"
+                    size="is-small"
+                    @click="
+                      (props) => {
+                        props.open = !props.open;
+                      }
+                    "
+                  >
+                  </b-button>
+                </section>
+              </template>
+              <the-pane-settings-batch></the-pane-settings-batch>
+            </b-collapse>
             <the-pane-browser-target></the-pane-browser-target>
           </template>
         </div>
@@ -99,11 +116,13 @@
 </template>
 
 <script>
+import BaseTable from "./BaseTable.vue";
+import BaseWorkspaceTile from "./BaseWorkspaceTile.vue";
 import TheLayoutSidebar from "./TheLayoutSidebar.vue";
 import ThePaneBrowserSample from "./ThePaneBrowserSample.vue";
 import ThePaneBrowserTarget from "./ThePaneBrowserTarget.vue";
-import BaseTable from "./BaseTable.vue";
-import BaseWorkspaceTile from "./BaseWorkspaceTile.vue";
+import ThePaneSettingsBatch from "./ThePaneSettingsBatch.vue";
+
 
 import { mapMutations } from "vuex";
 import { call, get, sync } from "vuex-pathify";
@@ -116,6 +135,7 @@ export default {
     TheLayoutSidebar,
     ThePaneBrowserTarget,
     ThePaneBrowserSample,
+    ThePaneSettingsBatch,
   },
   data: function () {
     return {

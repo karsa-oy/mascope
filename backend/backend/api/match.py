@@ -33,22 +33,24 @@ async def match_batch_compute(sid, sample_batch_id):
         sample_item_ids = pd.read_sql(f"""
             SELECT sample_item_id
             FROM sample_item
-            WHERE sample_batch_id == '{sample_batch_id}'
-            """
-            ).tolist()
+            WHERE sample_batch_id == ?
+            """,
+            conn,
+            params=[sample_batch_id]
+            )['sample_item_id'].tolist()
 
     # concurrently perform matching
     match_item_tasks = []
     for sample_item_id in sample_item_ids:
         match_item_tasks.append(
             asyncio.create_task(
-                match_item_compute(sample_item_id)
+                match_item_compute(sid, sample_item_id)
             )
         )
     await asyncio.gather(*match_item_tasks)
 
     # reload batch
-    sio.emit('batch_reload', sample_batch_id, namespace='/')
+    await sio.emit('sample_batch_updated', room=sample_batch_id, namespace='/')
 
 
 @sio.event(namespace='/')
@@ -72,7 +74,7 @@ async def match_batch_remove(sid, sample_batch_id):
         """)
 
     # reload workspace
-    sio.emit('workspace_reload', workspace_id, namespace='/')
+    # await sio.emit('workspace_reload', workspace_id, namespace='/')
 
 
 @sio.event(namespace='/')
@@ -307,4 +309,4 @@ async def match_item_remove(sid, sample_item_id):
             WHERE sample_item_id == '{sample_item_id}'
         """)
     # reload batch
-    sio.emit('batch_reload', sample_batch_id, namespace='/')
+    sio.emit('sample_batch_updated', roomn=sample_batch_id, namespace='/')

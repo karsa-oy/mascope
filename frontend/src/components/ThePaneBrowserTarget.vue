@@ -33,6 +33,7 @@ export default {
       matchCollections: "sample/matchCollections",
       matchCompounds: "sample/matchCompounds",
       matchIons: "sample/matchIons",
+      matchIsotopes: "sample/matchIsotopes",
       sampleItemFocused: "sample/active",
       targetCollections: "batch/targetCollections",
       targetCollectionsSelected: "batch/targetCollectionsSelected",
@@ -41,23 +42,25 @@ export default {
       targetIsotopes: "batch/targetIsotopes",
     }),
     targetCollectionRows: function() {
-      return this.sampleItemFocused
+      return this.sampleItemFocused && this.matchCollections
       ? this.matchCollections
       : this.targetCollections;
     },
     targetCompoundRows: function() {
-      return this.sampleItemFocused
+      return this.sampleItemFocused && this.matchCompounds
       ? this.matchCompounds
       : this.targetCompounds;
 
     },
     targetIonRows: function() {
-      return this.sampleItemFocused
+      return this.sampleItemFocused && this.matchIons
       ? this.matchIons
       : this.targetIons;
     },
     targetIsotopeRows: function() {
-      return this.targetIsotopes;
+      return this.sampleItemFocused && this.matchIsotopes
+        ? this.matchIsotopes
+        : this.targetIsotopes;
     },
     targetLevels: function () {
       let hidden = this.sampleItemFocused ? false : true;
@@ -74,7 +77,9 @@ export default {
               hidden,
               tooltip: (row) => {
                 return {
-                  "Peak intensity": this.formatter.format(row.sample_peak_height_sum),
+                  "Peak intensity": this.formatter.format(
+                    row.sample_peak_height_sum
+                  ),
                 };
               },
             },
@@ -97,7 +102,9 @@ export default {
               hidden,
               tooltip: (row) => {
                 return {
-                  "Peak intensity": this.formatter.format(row.sample_peak_height_sum),
+                  "Peak intensity": this.formatter.format(
+                    row.sample_peak_height_sum
+                  ),
                 };
               },
             },
@@ -120,15 +127,16 @@ export default {
               hidden,
               tooltip: (row) => {
                 return {
-                  "Peak intensity": this.formatter.format(row.sample_peak_height_sum),
+                  "Peak intensity": this.formatter.format(
+                    row.sample_peak_height_sum
+                  ),
                 };
               },
             },
           ],
           rows: this.targetIonRows,
           defaultSort: ["match_score", "desc"],
-          detailsIcon: this.sampleItemFocused ? "magnify" : null,
-          detailsOpen: this.sampleItemFocused ? this.ionShow : doNothing,
+          detailsIcon: "default",
           rowClick: this.targetIonToggle,
           opened: [],
         },
@@ -137,7 +145,7 @@ export default {
           slug: "target_isotope",
           cols: [
             { field: "mz", label: "Isotope", width: "45%" },
-            { field: "relativeAbundance", label: "", width: "45%" },
+            { field: "relative_abundance", label: "Fraction", width: "45%" },
             {
               field: "match_score",
               label: "Score",
@@ -145,7 +153,9 @@ export default {
               hidden,
               tooltip: (row) => {
                 return {
-                  "Peak intensity": this.formatter.format(row.sample_peak_height_sum),
+                  "Peak intensity": this.formatter.format(
+                    row.sample_peak_height
+                  ),
                   "Rel. abundance": this.formatter.format(
                     row.relative_abundance
                   ),
@@ -155,7 +165,8 @@ export default {
           ],
           rows: this.targetIsotopeRows,
           defaultSort: ["mz", "asc"],
-          detailsIcon: null,
+          detailsIcon: this.sampleItemFocused ? "magnify" : null,
+          detailsOpen: this.sampleItemFocused ? this.ionShow : null,
           rowClick: this.targetIsotopeToggle,
         },
       ];

@@ -61,7 +61,7 @@ async def target_collection_create(sid, target_collections):
                     target_collection['target_collection_id'],
                     sample_batch_id
                 ])
-                await sio.emit('batch_reload', sample_batch_id, namespace='/')
+                await sio.emit('sample_batch_updated', room=sample_batch_id, namespace='/')
     await sio.emit('org_reload', namespace='/')
 
 
@@ -164,7 +164,7 @@ async def target_collection_update(sid, target_collections):
     #                 batches_to_add + batches_to_remove
     #                 ))
     #             for sample_batch_id in batches_changed:
-    #                 await sio.emit('batch_reload', sample_batch_id, namespace='/')
+    #                 await sio.emit('sample_batch_updated', room=sample_batch_id, namespace='/')
     # await sio.emit('org_reload', namespace='/')
 
 

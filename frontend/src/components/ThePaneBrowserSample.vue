@@ -20,7 +20,7 @@ export default {
       batchActive: "batch/active",
       items: "batch/sampleItems",
       itemsSelected: "batch/sampleItemsSelected",
-      itemsToCalibrate: "batch/sampleItemsToCalibrate",
+      itemsToCalibrate: "batch/sampleItemsSelected",
       itemFocused: "batch/sampleItemFocused",
       targetCollections: "batch/targetCollections",
     }),
@@ -119,8 +119,10 @@ export default {
       return [...batchButtons, ...itemButtons, ...calibrateButtons];
     },
     openedBatch() {
-      return this.batchActive && this.items.length > 0
-        ? [this.batchActive]
+      return this.batchActive
+        ? this.batches.filter((batch) => 
+            batch.sample_batch_id == this.batchActive.sample_batch_id
+            )
         : [];
     },
   },
