@@ -3,6 +3,7 @@ import { make } from 'vuex-pathify';
 const state = {
     active: null,
     mzCalibration: null,
+    acquisitions: null,
     recentAcquisitions: null,
 }
 
@@ -11,6 +12,24 @@ export default {
     state,
     mutations: make.mutations(state),
     actions: {
+        async getAcquisitions({ state, rootState, commit }, datetimeRange) {
+            const minDatetime = datetimeRange.min.toISOString();
+            const maxDatetime = datetimeRange.max.toISOString();
+            await rootState.api.query(`--sql
+                SELECT *
+                FROM sample_file
+                WHERE (
+                    (
+                        JulianDay(datetime_utc) >= JulianDay('${minDatetime}') AND
+                        JulianDay(datetime_utc) <= JulianDay('${maxDatetime}')
+                    )
+                AND
+                    instrument IN (
+                    '${state.active}'
+                    )
+                );
+            `).then((res) => { commit('SET_ACQUISITIONS', res) });
+        },
         async getRecentAcquisitions({ state, rootState, commit }) {
             await rootState.api.query(`--sql
                 SELECT *
@@ -58,6 +77,7 @@ export default {
             rootState.api.emit('unsubscribe', state.active);
             commit('SET_ACTIVE', null);
             commit('SET_MZ_CALIBRATION', null);
+            commit('SET_ACQUISITIONS', null)
             commit('SET_RECENT_ACQUISITIONS', null)
         },
         // notifications

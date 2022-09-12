@@ -18,11 +18,46 @@
           </b-field>
           <div v-if="instrumentActive">
             <section style="padding: 2em 2em 2em 2em">
-              <h1 class="title is-4">Recent acquisitions:</h1>
+              <h1 class="title is-4">Acquisitions:</h1>
             </section>
+            <b-collapse
+              :open.sync="browseAcquisitions"
+              animation="slide"
+            >
+              <template #trigger>
+                <section style="padding: 0.5em">
+                  <b-button
+                    icon-left="calendar"
+                    size="is-small"
+                    @click="
+                      (props) => {
+                        props.open = !props.open;
+                      }
+                    "
+                  >
+                  </b-button>
+                </section>
+              </template>
+              <div class="columns">
+                <div class="column is-half">
+                  <b-datetimepicker
+                    placeholder="Starting from..."
+                    v-model="sampleFileMinDatetime"
+                  >
+                  </b-datetimepicker>
+                </div>
+                <div class="column is-half">
+                  <b-datetimepicker
+                    placeholder="Until..."
+                    v-model="sampleFileMaxDatetime"
+                  >
+                  </b-datetimepicker>
+                </div>
+              </div>
+            </b-collapse>
             <base-table
               :key="sampleFileTableDataKey"
-              :rows="recentAcquisitions ? recentAcquisitions : []"
+              :rows="acquisitions ? acquisitions : []"
               :cols="sampleFileCols ? sampleFileCols : []"
               :checkable="true"
               :checkSingle="true"
@@ -40,7 +75,7 @@
                   () => {
                     sampleItemAttributesSaveProps = {
                       action: 'create',
-                      batchActive: batchActive.sample_batch_id,
+                      batchToAddTo: batchActive.sample_batch_id,
                       sampleItemRecordToLoad: sampleFilesSelected[0],
                     };
                     activateModal({
@@ -143,8 +178,13 @@ export default {
   },
   data: function () {
     return {
-      sampleFileTableDataKey: 0,
+      browseAcquisitions: false,
+      sampleFileMinDatetime: new Date(
+        new Date().getTime() - (24 * 60 * 60 * 1000)
+        ), // now - 24h
+      sampleFileMaxDatetime: new Date(), // now
       sampleFilesSelected: [],
+      sampleFileTableDataKey: 0,
     };
   },
   computed: {
@@ -156,12 +196,18 @@ export default {
       batchActive: "batch/active",
       instrumentActive: "instrument/active",
       instruments: "app/instruments",
+      acquisitionsInRange: "instrument/acquisitions",
       recentAcquisitions: "instrument/recentAcquisitions",
       sampleBatches: "workspace/batches",
       sampleFileCols: "app/schema@sample_file",
       workspaceActive: "workspace/active",
       workspaces: "app/workspaces",
     }),
+    acquisitions() {
+      return this.browseAcquisitions
+        ? this.acquisitionsInRange
+        : this.recentAcquisitions;
+    },
     sampleFileTableHeight() {
       return "calc(75vh)";
     },
@@ -174,25 +220,42 @@ export default {
     },
   },
   created: function () {
+    this.getAcquisitionsInRange();
   },
   methods: {
     ...call({
+      getAcquisitions: "instrument/getAcquisitions",
       loadInstrument: "instrument/load",
       unloadInstrument: "instrument/unload",
     }),
     ...mapMutations({
       activateModal: "modal/activate",
     }),
+    getAcquisitionsInRange() {
+      this.getAcquisitions({
+        min: this.sampleFileMinDatetime,
+        max: this.sampleFileMaxDatetime
+      });
+    },
     selectInstrument(newRows, oldRows) {
       const instrument = newRows.length ? newRows[0].instrument : null;
       if (instrument) {
         this.loadInstrument(instrument);
+        this.getAcquisitionsInRange();
       } else {
         this.unloadInstrument();
       }
     },
     selectSampleFiles(newRows, oldRows) {
       this.sampleFilesSelected = newRows;
+    },
+  },
+  watch: {
+    sampleFileMinDatetime: function () {
+      this.getAcquisitionsInRange();
+    },
+    sampleFileMaxDatetime: function () {
+      this.getAcquisitionsInRange();
     },
   },
 };
