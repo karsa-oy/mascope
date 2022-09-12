@@ -3,7 +3,7 @@
     <section :class="dynamic('base-browser-header')">
       <h2>{{ name }}</h2>
       <slot name="header"></slot>
-      <b-dropdown v-if="menu" aria-role="list" append-to-body>
+      <b-dropdown v-if="menu" aria-role="list" position="is-bottom-left">
         <template #trigger>
           <b-button icon-left="dots-horizontal" size="is-small" />
         </template>
