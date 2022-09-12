@@ -35,12 +35,12 @@
               <b-button
                 type="is-primary"
                 style="position: fixed; left: 5em; bottom: 2em"
-                :disabled="!workspaceActive || !batchToAddTo || sampleFilesSelected.length != 1"
+                :disabled="!workspaceActive || !batchActive || sampleFilesSelected.length != 1"
                 @click="
                   () => {
                     sampleItemAttributesSaveProps = {
                       action: 'create',
-                      batchToAddTo: batchToAddTo.sample_batch_id,
+                      batchActive: batchActive.sample_batch_id,
                       sampleItemRecordToLoad: sampleFilesSelected[0],
                     };
                     activateModal({
@@ -90,7 +90,11 @@
               <h1 class="title is-4">{{ workspaceHomeText }}</h1>
             </section>
             <the-pane-browser-sample></the-pane-browser-sample>
-            <b-collapse :open="false" animation="slide">
+            <b-collapse
+              v-if="batchActive"
+              :open="false"
+              animation="slide"
+            >
               <template #trigger>
                 <section style="padding: 0.5em">
                   <b-button
@@ -149,7 +153,7 @@ export default {
       workspaceModalProps: "modal/workspaceSaveProps",
     }),
     ...get({
-      batchToAddTo: "batch/active",
+      batchActive: "batch/active",
       instrumentActive: "instrument/active",
       instruments: "app/instruments",
       recentAcquisitions: "instrument/recentAcquisitions",

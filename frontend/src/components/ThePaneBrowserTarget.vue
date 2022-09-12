@@ -63,7 +63,7 @@ export default {
         : this.targetIsotopes;
     },
     targetLevels: function () {
-      let hidden = this.sampleItemFocused ? false : true;
+      let hidden = this.matchIsotopes ? false : true;
       return [
         {
           name: "Collection",
