@@ -63,7 +63,7 @@ export default {
           icon: "tune",
           label: "Settings",
           path: "/settings",
-          visible: true,
+          visible: false,
         },
         {
           icon: "logout-variant",

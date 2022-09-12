@@ -6,7 +6,6 @@
         style="padding-right: 5em; padding-left: 3em"
       >
         <h1 class="title">Settings</h1>
-        <!-- <the-pane-settings-connection></the-pane-settings-connection> -->
       </div>
     </div>
   </the-layout-sidebar>
@@ -14,13 +13,11 @@
 
 <script>
 import TheLayoutSidebar from "./TheLayoutSidebar.vue";
-import ThePaneSettingsConnection from "./ThePaneSettingsConnection.vue";
 
 export default {
   name: "ThePageSettings",
   components: {
     TheLayoutSidebar,
-    ThePaneSettingsConnection,
   },
 };
 </script>
