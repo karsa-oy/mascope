@@ -247,6 +247,7 @@ export default {
             });
         },
         async unload({ rootState, commit, dispatch }) {
+            if (!state.active) return;
             rootState.api.emit('unsubscribe', state.active.sample_batch_id);
             commit('SET_ACTIVE', null);
             // samples
@@ -265,10 +266,12 @@ export default {
         },
         async reload({ dispatch, state }) {
             if (state.active) {
-                dispatch('load', state.active);
+                const activeBatch = {...state.active};
+                await dispatch('unload');
+                dispatch('load', activeBatch);
             }
         },
-        async onSampleBatchUpdated({ state, dispatch }) {
+        async onSampleBatchUpdated({ dispatch }) {
             await dispatch('api/reloadDb', null, {root:true});
             dispatch('reload');
         },

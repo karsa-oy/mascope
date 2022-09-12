@@ -52,6 +52,7 @@ export default {
             dispatch('load');
         },
         async onOrgReload({ dispatch }) {
+            await dispatch('api/reloadDb', null, {root:true});
             dispatch('reload');
         }
     }

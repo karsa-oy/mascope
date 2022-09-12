@@ -54,6 +54,7 @@ export default {
             await dispatch('getRecentAcquisitions');
         },
         async unload({ rootState, state, commit }) {
+            if (!state.active) return;
             rootState.api.emit('unsubscribe', state.active);
             commit('SET_ACTIVE', null);
             commit('SET_MZ_CALIBRATION', null);

@@ -46,7 +46,7 @@ async def sample_batch_create(sid, sample_batches):
                 index=False
                 )
             [workspace_id] = workspace_ids
-            await sio.emit('workspace_reload', workspace_id, namespace='/')
+            await sio.emit('workspace_reload', room=workspace_id, namespace='/')
 
 
 @sio.event(namespace='/')
@@ -137,14 +137,14 @@ async def sample_batch_update(sid, sample_batches):
                 if_exists='append',
                 index=False
                 )
-            if rematch:
-                await match_batch_compute(sid, sample_batch_id)
-            else:
-                await sio.emit(
-                    'sample_batch_updated',
-                    room=sample_batch_id,
-                    namespace='/'
-                    )
+        if rematch:
+            await match_batch_compute(sid, sample_batch_id)
+        else:
+            await sio.emit(
+                'sample_batch_updated',
+                room=sample_batch_id,
+                namespace='/'
+                )
 
 
 @sio.event(namespace='/')
@@ -189,7 +189,7 @@ async def sample_batch_delete(sid, sample_batch_ids):
                 sample_batch_ids
             )
             [workspace_id] = workspace_ids
-            await sio.emit('workspace_reload', workspace_id, namespace='/')
+            await sio.emit('workspace_reload', room=workspace_id, namespace='/')
 
 
 # === sample items === #
@@ -223,8 +223,7 @@ async def sample_item_create(sid, sample_items):
     for sample_item_id in sample_item_ids:
         await match_item_compute(sid, sample_item_id)
         await sio.emit(
-            'sample_item_created',
-            sample_item_id,
+            'sample_batch_updated',
             room=sample_batch_id,
             namespace='/'
             )
@@ -269,8 +268,11 @@ async def sample_item_update(sid, sample_items):
                     index=False
                     )
         [sample_batch_id] = sample_batch_ids
-        await sio.emit('sample_batch_updated', room=sample_batch_id, namespace='/')
-
+        await sio.emit(
+            'sample_batch_updated',
+            room=sample_batch_id,
+            namespace='/'
+            )
 
 @sio.event(namespace='/')
 async def sample_item_delete(sid, sample_item_ids):
@@ -310,7 +312,11 @@ async def sample_item_delete(sid, sample_item_ids):
                 sample_item_ids
                 )
             [sample_batch_id] = sample_batch_ids
-            await sio.emit('sample_batch_updated', room=sample_batch_id, namespace='/')
+            await sio.emit(
+                'sample_batch_updated',
+                room=sample_batch_id,
+                namespace='/'
+                )
 
 
 # === sample files === #
@@ -375,3 +381,5 @@ async def sample_file_update(sid, sample_files):
             if_exists='append',
             index=False
             )
+    for instrument in pd.unique(sample_file_df['instrument']).tolist():
+        await sio.emit('sample_file_created', room=instrument, namespace='/')

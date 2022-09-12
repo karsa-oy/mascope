@@ -132,15 +132,18 @@ export default {
     },
     modalTitle() {
       let title;
+      const workspaceName = this.oldWorkspace
+        ? this.oldWorkspace.workspace_name
+        : "";
       switch (this.action) {
         case "create":
           title = `Create a new workspace`;
           break;
         case "edit":
-          title = `Edit workspace ${this.oldWorkspace.workspace_name}`;
+          title = `Edit workspace ${workspaceName}`;
           break;
         case "delete":
-          title = `Delete workspace ${this.oldWorkspace.workspace_name}`;
+          title = `Delete workspace ${workspaceName}`;
           break;
       }
       return title;
