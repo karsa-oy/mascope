@@ -66,7 +66,9 @@ export default {
   computed: {
     ...get({
       allTemplates: "app/attributeTemplates",
+      batchActive: "batch/active",
       modalProps: "modal/sampleItemAttributesSaveProps",
+      sampleActive: "sample/active",
     }),
     ...sync({
       modalActive: "modal/sampleItemAttributesSaveActive",
@@ -104,11 +106,12 @@ export default {
       let newSampleItem = {
         ...props,
         sample_item_attributes,
-        sample_batch_id: this.batchToAddTo,
+        sample_batch_id: this.batchActive.sample_batch_id,
         };
       if (this.action == 'create') {
         this.$api.emit('sample_item_create', [newSampleItem]);
       } else if(this.action == 'update') {
+        newSampleItem.sample_item_id = this.sampleActive.sample_item_id;
         this.$api.emit('sample_item_update', [newSampleItem]);
       }
       this.deactivateModal();
@@ -119,7 +122,6 @@ export default {
       this.sampleItemRecordToLoad = {};
       await this.$nextTick();
       this.action = data.action;
-      this.batchToAddTo = data.batchToAddTo;
       this.sampleItemRecordToLoad = {
         template: this.defaultTemplate.template,
         row: data.sampleItemRecordToLoad

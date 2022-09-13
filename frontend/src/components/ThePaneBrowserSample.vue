@@ -181,7 +181,10 @@ export default {
       });
     },
     async itemUpdate() {
-      this.modalSampleItemAttributesSaveProps = { action: "create" };
+      this.modalSampleItemAttributesSaveProps = {
+        action: "update",
+        sampleItemRecordToLoad: this.itemFocused,
+      };
       this.activateModal({ modal: "sampleItemAttributesSave" });
     },
     itemDelete() {

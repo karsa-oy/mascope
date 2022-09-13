@@ -199,7 +199,7 @@ export default {
       acquisitionsInRange: "instrument/acquisitions",
       recentAcquisitions: "instrument/recentAcquisitions",
       sampleBatches: "workspace/batches",
-      sampleFileCols: "app/schema@sample_file",
+      sampleFileSchema: "app/schema@sample_file",
       workspaceActive: "workspace/active",
       workspaces: "app/workspaces",
     }),
@@ -208,8 +208,13 @@ export default {
         ? this.acquisitionsInRange
         : this.recentAcquisitions;
     },
+    sampleFileCols() {
+      return [
+        {field: 'filename', label: 'Filename'}
+      ];
+    },
     sampleFileTableHeight() {
-      return "calc(75vh)";
+      return "calc(50vh)";
     },
     workspaceHomeText() {
       if (this.workspaceActive) {
