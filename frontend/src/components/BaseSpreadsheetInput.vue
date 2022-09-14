@@ -32,6 +32,11 @@ export default {
       type: Array,
       required: true,
     },
+    colsFromHeader: {
+      type: Boolean,
+      required: false,
+      default: false,
+    },
     info: {
       type: String,
       required: false,
@@ -57,7 +62,21 @@ export default {
     parseClipboard: async function () {
       navigator.permissions.query({ name: "clipboard-read" });
       let clipboardText = await navigator.clipboard.readText();
-      this.rows = table.fromSpreadsheet(clipboardText, this.fields);
+      if (this.colsFromHeader) {
+        let fields = table.readHeader(clipboardText);
+        let cols = fields.map(
+          (field) => ({
+            field: field.toLowerCase().replace(/ /g,"_").trim(),
+            label: field
+          }));
+        this.$emit("colsPasted", cols);
+        await this.$nextTick();
+      }
+      this.rows = table.fromSpreadsheet(
+        clipboardText,
+        this.fields,
+        true
+        );
       this.$emit("rowsPasted", this.rows);
     },
   },

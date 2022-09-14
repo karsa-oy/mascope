@@ -66,9 +66,11 @@ export default {
             })
         }
     },
-    fromSpreadsheet(clipboardText, fields) {
+    fromSpreadsheet(clipboardText, fields, skipHeader=false) {
         // Split full text to rows
         let clipboardLines = clipboardText.split(String.fromCharCode(10));
+        // Skip header row
+        if (skipHeader) clipboardLines.splice(0, 1);
         // Remove last line if empty
         if (!clipboardLines[clipboardLines.length - 1].length) clipboardLines.pop();
         let spreadsheet = []
@@ -78,15 +80,22 @@ export default {
             );
         }
         let parsedRows = [];
-        for (let i in spreadsheet) {
+        for (let row of spreadsheet) {
             let parsedRow = {};
-            for (let j in spreadsheet[i]) {
-                let field = fields[j];
-                parsedRow[field] = spreadsheet[i][j];
+            for (let i in row) {
+                let field = fields[i];
+                parsedRow[field] = row[i].trim();
             }
             parsedRows.push(parsedRow);
         }
         return parsedRows;
+    },
+    readHeader(clipboardText) {
+        let fields = clipboardText.split(
+            String.fromCharCode(10))[0]
+            .split(String.fromCharCode(9)
+            );
+        return fields
     },
     toSpreadsheet(filename, sheets) {
         var workbook = xlsx.utils.book_new();
