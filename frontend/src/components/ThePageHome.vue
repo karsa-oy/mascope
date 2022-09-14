@@ -71,20 +71,17 @@
                 type="is-primary"
                 style="position: fixed; left: 5em; bottom: 2em"
                 :disabled="!workspaceActive || !batchActive || sampleFilesSelected.length != 1"
-                @click="
-                  () => {
-                    sampleItemAttributesSaveProps = {
-                      action: 'create',
-                      batchToAddTo: batchActive.sample_batch_id,
-                      sampleItemRecordToLoad: sampleFilesSelected[0],
-                    };
-                    activateModal({
-                      modal: 'sampleItemAttributesSave',
-                    });
-                  }
-                "
+                @click="launchProcessSelectedModal"
               >
-                Process
+                Process selected
+              </b-button>
+              <b-button
+                type="is-primary"
+                style="position: fixed; left: 15em; bottom: 2em"
+                :disabled="!workspaceActive || !batchActive || sampleFilesSelected.length > 0"
+                @click="launchProcessBatchModal"
+              >
+                Process batch
               </b-button>
             </section>
           </div>
@@ -180,7 +177,7 @@ export default {
     return {
       browseAcquisitions: false,
       sampleFileMinDatetime: new Date(
-        new Date().getTime() - (24 * 60 * 60 * 1000)
+        new Date().getTime() - (24*60*60*1000)
         ), // now - 24h
       sampleFileMaxDatetime: new Date(), // now
       sampleFilesSelected: [],
@@ -189,6 +186,7 @@ export default {
   },
   computed: {
     ...sync({
+      sampleBatchImportProps: "modal/sampleBatchImportProps",
       sampleItemAttributesSaveProps: "modal/sampleItemAttributesSaveProps",
       workspaceModalProps: "modal/workspaceSaveProps",
     }),
@@ -240,6 +238,20 @@ export default {
       this.getAcquisitions({
         min: this.sampleFileMinDatetime,
         max: this.sampleFileMaxDatetime
+      });
+    },
+    launchProcessBatchModal() {
+      this.activateModal({
+        modal: 'sampleBatchImport',
+      });
+    },
+    launchProcessSelectedModal() {
+      this.sampleItemAttributesSaveProps = {
+        action: 'create',
+        sampleItemRecordToLoad: this.sampleFilesSelected[0],
+      };
+      this.activateModal({
+        modal: 'sampleItemAttributesSave',
       });
     },
     selectInstrument(newRows, oldRows) {
