@@ -6,7 +6,8 @@ export default ({ mode }) => {
     const dotEnvPath = path.resolve(process.cwd() + '/..');
     process.env = Object.assign(
         process.env,
-        loadEnv(mode, dotEnvPath, 'MASCOPE_PUBLIC_')
+        // loadEnv(mode, dotEnvPath, 'MASCOPE_PUBLIC_')
+        loadEnv(mode, dotEnvPath, 'MASCOPE_')
         );
     
     return defineConfig({
@@ -46,6 +47,7 @@ export default ({ mode }) => {
             cssCodeSplit: false,
             target: "esnext"
         },
-        envPrefix: 'MASCOPE_PUBLIC_'
+        // envPrefix: 'MASCOPE_PUBLIC_'
+        envPrefix: 'MASCOPE_'
     });
 }

@@ -1,2 +1,4 @@
 testdata
-notes.md
+notes.*
+.vagrant
+__pycache__

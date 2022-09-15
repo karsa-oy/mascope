@@ -9,6 +9,12 @@ const protocol = import.meta.env.MASCOPE_PUBLIC_API_PROTOCOL;
 const host = import.meta.env.MASCOPE_PUBLIC_API_HOST;
 const port = import.meta.env.MASCOPE_PUBLIC_API_PORT;
 const proxy_port = import.meta.env.MASCOPE_PUBLIC_PROXY_API_PORT;
+const platform = import.meta.env.MASCOPE_PRIVATE_ENV
+// const platform = navigator.platform
+var dbpath = import.meta.env.MASCOPE_PRIVATE_DATADIR;
+
+//TODO: tmp solution - sql.db must be linked to the frontend root with the same name
+dbpath = dbpath.split('\\').pop().split('/').pop();
 
 
 export const api = await initApi();
@@ -18,7 +24,13 @@ async function initDb() {
     // INIT DATABASE
 
     // open db file served from backend
-    const path = `http://${host}:${port}/@fs/data/database`
+    let path = '';
+    if ( platform.includes('inux') ) {
+        path = `${dbpath}/database`;                               // works for linux
+    } else {
+        path = `http://${host}:${port}/@fs/${dbpath}/database`;    // works for win (mac?)
+    }
+
     const file = `mascope.v${dbVersion}.db`
     const sqlPromise = initSqlJs({
         locateFile: file => `./node_modules/sql.js/dist/${file}`
