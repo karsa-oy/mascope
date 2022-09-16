@@ -28,6 +28,10 @@ function install_prerequisites() {
 
     echo AAA setting up mascope backend
 
+    # use corresponding .env
+    cp -f $MY_PATH/.env $MASCOPE_PROJECT/.env
+    source $MASCOPE_PROJECT/.env
+
     # backend
     pushd $MASCOPE_PROJECT/backend
     pip install --user poetry
@@ -42,8 +46,7 @@ function install_prerequisites() {
     # frontend web server
     rm -r -f $MASCOPE_UI || true
     cp -r -f $MASCOPE_PROJECT/frontend/dist $MASCOPE_UI
-    # create mascope db link
-    source $MASCOPE_PROJECT/.env
+    # create mascope db link (MASCOPE_PRIVATE_DATADIR may be relative to backend)
     pushd $MASCOPE_PROJECT/backend
     ln -s -f $(realpath $MASCOPE_PRIVATE_DATADIR) $MASCOPE_UI
     popd 

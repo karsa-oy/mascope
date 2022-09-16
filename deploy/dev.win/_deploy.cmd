@@ -7,6 +7,7 @@ cd %project_path%
 call %mypath%\_kill.cmd
 
 echo ** Installing latest version...
+cp -f %mypath%\.env %project_path%\.env
 cd %project_path%
 call %mypath%\_install.cmd
 
