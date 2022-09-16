@@ -37,6 +37,7 @@ function install_prerequisites() {
     pip install --user poetry
     export PATH="$HOME/.local/bin:$PATH"
     echo "export PATH=\"$HOME/.local/bin:$PATH\"" >> ~/.bashrc
+    poetry update
     poetry lock --no-update
     poetry install --no-interaction --no-root
     popd

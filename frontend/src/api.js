@@ -10,7 +10,6 @@ const host = import.meta.env.MASCOPE_PUBLIC_API_HOST;
 const port = import.meta.env.MASCOPE_PUBLIC_API_PORT;
 const proxy_port = import.meta.env.MASCOPE_PUBLIC_PROXY_API_PORT;
 const platform = import.meta.env.MASCOPE_PRIVATE_ENV
-// const platform = navigator.platform
 var dbpath = import.meta.env.MASCOPE_PRIVATE_DATADIR;
 
 //TODO: tmp solution - sql.db must be linked to the frontend root with the same name

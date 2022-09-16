@@ -1,7 +1,7 @@
 ### Deployment instructions
 
 This module contains scripts for development and production deployments.
-IMPORTANT: tmp solution: when deploying, store corresponding .env file to project root
+When deploying, corresponding .env file will be copied to project root
 
 ### Development version for Windows
 
@@ -17,9 +17,11 @@ IMPORTANT: tmp solution: when deploying, store corresponding .env file to projec
 
 #### Vagrant box:
  1. cd production.linux.vbox
- 2. vagrant up
+ 2. build_dist.cmd
+ 3. vagrant up
 
 #### Native linux (Ubuntu):
  1. cd production.linux.vbox
- 2. provision_box.sh
- 
+ 2. build_dist.cmd
+ 3. provision_box.sh
+
