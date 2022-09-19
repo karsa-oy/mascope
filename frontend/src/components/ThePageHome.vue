@@ -273,6 +273,10 @@ export default {
     sampleFileMaxDatetime: function () {
       this.getAcquisitionsInRange();
     },
+    recentAcquisitions: function() {
+      // This watcher triggers on database reload
+      if (this.browseAcquisitions) this.getAcquisitionsInRange();
+    },
   },
 };
 </script>
