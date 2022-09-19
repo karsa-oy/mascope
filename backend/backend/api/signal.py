@@ -91,20 +91,19 @@ async def calibration_mz_apply(sid, fit, sample_file_ids):
     for _, sample_file in sample_file_df.iterrows():
         filename = sample_file['filename']
         print("Calibrating file: %s" % filename)
-        print(sample_file.to_string())
         if nbr_samples != get_zarr_var_shape(filename, 'signal')[0]:
             raise Exception("Number of TOF samples does not match")
         # Write new mz coordinates to zarr file
-        # update_zarr_array_coord(filename, 'signal', 'mz', new_mz)
-        # peak_tofs = load_coord(filename, 'peaks', 'tof')
-        # new_peak_mzs = new_mz[peak_tofs.astype(int)]
-        # update_zarr_array_coord(filename, 'peaks', 'mz', new_peak_mzs)
-        # update_props(filename, {'range': new_range})
-        # cache_item = cache.get(filename)
-        # if cache_item:
-        #     cache_item['mz'] = new_mz
-        #     cache_item.attrs['props'].update({'range': new_range})
-        #     cache[filename] = cache_item
+        update_zarr_array_coord(filename, 'signal', 'mz', new_mz)
+        peak_tofs = load_coord(filename, 'peaks', 'tof')
+        new_peak_mzs = new_mz[peak_tofs.astype(int)]
+        update_zarr_array_coord(filename, 'peaks', 'mz', new_peak_mzs)
+        update_props(filename, {'range': new_range})
+        cache_item = cache.get(filename)
+        if cache_item:
+            cache_item['mz'] = new_mz
+            cache_item.attrs['props'].update({'range': new_range})
+            cache[filename] = cache_item
         # Update database record
         sample_file['mz_calibration'] = fit
         sample_file['range'] = new_range
@@ -123,6 +122,7 @@ async def calibration_mz_apply(sid, fit, sample_file_ids):
                 conn,
                 params=[sample_file['sample_file_id']]
                 )['sample_item_id'].tolist()
+        # Update matches
         for sample_item_id in sample_item_ids:
             await match_item_remove(sid, sample_item_id)
             await match_item_compute(sid, sample_item_id)
