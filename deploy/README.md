@@ -5,6 +5,9 @@ When deploying, corresponding .env file will be copied to project root
 
 ### Development version for Windows
 
+#### Get build environment ready:
+ Make sure corresponding .env contains required values
+
 #### Manual deployment:
  1. cd dev.win
  2. deploy.cmd

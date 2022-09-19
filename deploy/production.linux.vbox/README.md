@@ -1,5 +1,8 @@
 ### Deploy production version of Mascope application (backend + frontend)
 
+#### Get build environment ready:
+ Make sure Vagrantfile and corresponding .env contain required values
+
 #### Build new distribution package for mascope UI
 
 Normally you do it in your dev.environment (here: Windows). This will build frontend/dist folder with a code for static web server:
