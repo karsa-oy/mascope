@@ -174,13 +174,8 @@ def parse_cmd_args():
         type=str, required=False
     )
     parser.add_argument(
-        "-nj", "--n_jobs",
-        help="number of job processors",
-        type=int, required=False
-    )
-    parser.add_argument(
-        "-st", "--streamer_type",
-        help="streamer type (H5/Raw)",
+        "-i", "--instrument",
+        help="instrument name",
         type=str, required=False
     )
     parser.add_argument(
@@ -189,8 +184,18 @@ def parse_cmd_args():
         type=str, required=False
     )
     parser.add_argument(
+        "-nj", "--n_jobs",
+        help="number of job processors",
+        type=int, required=False
+    )
+    parser.add_argument(
         "-s", "--data_pool_path",
         help="source data pool path for streaming (before date dirs)",
+        type=str, required=False
+    )
+    parser.add_argument(
+        "-st", "--streamer_type",
+        help="streamer type (H5/Raw)",
         type=str, required=False
     )
     parser.add_argument(

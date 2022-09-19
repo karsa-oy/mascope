@@ -3,8 +3,6 @@ import inspect
 import os
 import socketio
 
-from backend.api.match import match_item_compute
-from backend.api.sample import sample_file_create
 from backend.lib.file import zarr_sdk
 from backend.lib.hardware.tofwerk.generator import H5Streamer
 from backend.lib.hardware.orbitrap.generator import RawStreamer
@@ -35,7 +33,7 @@ class FSWatcher:
             filesize = -1
             while filesize != os.path.getsize(filepath):
                 filesize = os.path.getsize(filepath)
-                sleep(.1)
+                sleep(1)
             path = os.path.dirname(filepath)
             filename = os.path.basename(filepath)
             global instrument_name
