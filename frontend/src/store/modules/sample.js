@@ -44,8 +44,7 @@ export default {
                         target_ion_formula,
                         target_ion_id
                         ,2 as selection
-                    FROM sample_item
-                    NATURAL LEFT JOIN match
+                    FROM match
                     NATURAL LEFT JOIN target_isotope
                     NATURAL LEFT JOIN target_ion
                     NATURAL LEFT JOIN target_compound
@@ -63,23 +62,54 @@ export default {
                 SELECT
                     target_collection_id,
                     target_collection_name,
-                    MAX(match_score) AS match_score,
-                    SUM(sample_peak_height) AS sample_peak_height_sum
-                FROM sample_match_filter
+                    IFNULL(MAX(match_score), 0) AS match_score,
+                    IFNULL(SUM(sample_peak_height_sum), 0) AS sample_peak_height_sum
+                FROM (
+                    SELECT
+                    sample_item_id,
+                    target_collection_id,
+                    target_collection_name,
+                    MAX(match_score) as match_score,
+                    SUM(sample_peak_height_sum) AS sample_peak_height_sum
+                    FROM (
+                        SELECT
+                            sample_item_id,
+                            target_ion_id,
+                            target_compound_id,
+                            target_collection_id,
+                            target_collection_name,
+                            SUM(match_score*relative_abundance) AS match_score,
+                            SUM(sample_peak_height) AS sample_peak_height_sum
+                        FROM sample_match_filter
+                        GROUP BY sample_item_id, target_compound_id, target_ion_id
+                    )
+                )
                 GROUP BY sample_item_id, target_collection_id;
             `).then((res) => {
                 commit('SET_MATCH_COLLECTIONS', res);
             });
             await rootState.api.query(`--sql
                 SELECT
-                    target_compound_formula,
                     sample_item_id,
-                    target_collection_id,
                     target_compound_id,
+                    target_compound_formula,
                     target_compound_name,
-                    MAX(match_score) AS match_score,
-                    SUM(sample_peak_height) AS sample_peak_height_sum
-                FROM sample_match_filter
+                    target_collection_id,
+                    IFNULL(MAX(match_score), 0) as match_score,
+                    IFNULL(SUM(sample_peak_height_sum), 0) AS sample_peak_height_sum
+                FROM (
+                    SELECT
+                        sample_item_id,
+                        target_ion_id,
+                        target_compound_id,
+                        target_compound_formula,
+                        target_compound_name,
+                        target_collection_id,
+                        SUM(match_score*relative_abundance) AS match_score,
+                        SUM(sample_peak_height) AS sample_peak_height_sum
+                    FROM sample_match_filter
+                    GROUP BY sample_item_id, target_compound_id, target_ion_id
+                )
                 GROUP BY sample_item_id, target_compound_id;
             `).then((res) => {
                 commit('SET_MATCH_COMPOUNDS', res);
@@ -90,8 +120,8 @@ export default {
                     target_ion_formula,
                     target_ion_id,
                     target_compound_id,
-                    MAX(match_score) AS match_score,
-                    SUM(sample_peak_height) AS sample_peak_height_sum
+                    IFNULL(SUM(match_score*relative_abundance), 0) AS match_score,
+                    IFNULL(SUM(sample_peak_height), 0) AS sample_peak_height_sum
                 FROM sample_match_filter
                 GROUP BY sample_item_id, target_compound_id, target_ion_id;
             `).then((res) => {
@@ -100,13 +130,20 @@ export default {
             await rootState.api.query(`--sql
                 SELECT
                     match_score,
+                    match_mz_error,
                     mz,
                     relative_abundance,
                     sample_item_id,
                     sample_peak_height,
+                    sample_peak_height_relative,
+                    sample_peak_mz,
+                    sample_peak_tof,
                     target_isotope_id,
                     target_ion_id,
-                    target_compound_id
+                    target_ion_formula,
+                    target_compound_id,
+                    target_compound_name,
+                    target_compound_formula
                 FROM sample_match_filter
             `).then((res) => {
                 commit('SET_MATCH_ISOTOPES', res);

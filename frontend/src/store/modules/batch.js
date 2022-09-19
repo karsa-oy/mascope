@@ -50,20 +50,48 @@ export default {
             // load sample items
             await rootState.api.query(`--sql
                 SELECT
-                    sample_item.*,
+                    sample_item_id,
+                    sample_item_name,
+                    sample_item_description,
+                    sample_item_attributes,
+                    sample_item_type,
+                    sample_batch_id,
                     sample_file_id,
                     datetime,
                     datetime_utc,
+                    filename,
                     length,
                     range,
                     mz_calibration,
-                    selection,
-                    MAX(match_score) AS match_score,
-                    SUM(sample_peak_height) AS sample_peak_height_sum
-                FROM sample_item_filter
+                    IFNULL(MAX(match_score), 0) AS match_score,
+                    IFNULL(SUM(sample_peak_height_sum), 0) AS sample_peak_height_sum,
+                    0 AS selection
+                FROM (
+                    -- ion level
+                    SELECT
+                        sample_item_id,
+                        target_ion_id,
+                        target_compound_id,
+                        SUM(match_score*relative_abundance) AS match_score,
+                        SUM(sample_peak_height) AS sample_peak_height_sum
+                    FROM (
+                        -- isotope level
+                        SELECT
+                            sample_item_id,
+                            match_score,
+                            relative_abundance,
+                            sample_peak_height,
+                            target_isotope_id,
+                            target_ion_id,
+                            target_compound_id
+                        FROM
+                            sample_item_filter
+                        NATURAL LEFT JOIN batch_match_filter
+                    )
+                    GROUP BY sample_item_id, target_compound_id, target_ion_id
+                )
                 NATURAL LEFT JOIN sample_item
                 NATURAL LEFT JOIN sample_file
-                NATURAL LEFT JOIN batch_match_filter
                 GROUP BY sample_item_id
             `).then((res) => {
                 commit('SET_SAMPLE_ITEMS', res);
@@ -191,10 +219,14 @@ export default {
                 CREATE TEMPORARY TABLE batch_match_filter AS
                     SELECT
                         match_score,
+                        relative_abundance,
                         sample_item_id,
                         sample_peak_height,
                         target_collection_id,
-                        target_collection_name
+                        target_collection_name,
+                        target_compound_id,
+                        target_ion_id,
+                        target_isotope_id
                     FROM sample_item
                     NATURAL LEFT JOIN match
                     NATURAL LEFT JOIN target_isotope
