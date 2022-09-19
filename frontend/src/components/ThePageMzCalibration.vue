@@ -2,7 +2,7 @@
   <the-layout-sidebar>
     <section>
       <div class="columns">
-        <div class="column is-3 base-browser-sidebar">
+        <div class="column is-4 base-browser-sidebar">
           <the-pane-browser-target></the-pane-browser-target>
           <the-pane-browser-sample></the-pane-browser-sample>
         </div>
@@ -70,7 +70,7 @@
         :disabled="false"
         rounded
       >
-        Apply Calibration
+        Apply to batch
       </b-button>
     </section>
   </the-layout-sidebar>
@@ -82,7 +82,7 @@ import ThePaneBrowserSample from "./ThePaneBrowserSample.vue";
 import ThePaneBrowserTarget from "./ThePaneBrowserTarget.vue";
 import BaseTable from "./BaseTable.vue";
 
-import { sync, get } from "vuex-pathify";
+import { sync, get, call } from "vuex-pathify";
 
 export default {
   name: "ThePageMassCalibration",
@@ -95,29 +95,28 @@ export default {
   data: function () {
     return {
       candidateTableCols: [
-        { field: "targetCompoundName", label: "Compound name" },
-        { field: "targetCompoundFormula", label: "Compound formula" },
-        { field: "targetIonMech", label: "Ionization mechanism" },
-        { field: "targetIonFormula", label: "Ion formula" },
+        { field: "target_compound_name", label: "Compound name" },
+        { field: "target_compound_formula", label: "Compound formula" },
+        { field: "target_ion_formula", label: "Ion formula" },
         { field: "mz", label: "Isotope m/z" },
-        { field: "samplePeakMz", label: "Sample m/z" },
-        { field: "mzError", label: "m/z error [ppm]" },
-        { field: "relativeAbundance", label: "Relative abundance" },
-        { field: "relPeakHeight", label: "Relative peak height" },
-        { field: "samplePeakHeight", label: "Sample peak intensity" },
-        { field: "matchScore", label: "Match score" },
+        { field: "sample_peak_mz", label: "Sample m/z" },
+        { field: "match_mz_error", label: "m/z error [ppm]" },
+        { field: "relative_abundance", label: "Relative abundance" },
+        { field: "sample_peak_height_relative", label: "Relative peak height" },
+        { field: "sample_peak_height", label: "Sample peak intensity" },
+        { field: "match_score", label: "Match score" },
       ],
       selectedTableCols: [
         { field: "mz", label: "Isotope m/z" },
-        { field: "samplePeakMz", label: "Pre peak m/z" },
-        { field: "mzError", label: "Pre m/z error [ppm]", subheading: null },
-        { field: "fitMz", label: "Post peak m/z" },
+        { field: "sample_peak_mz", label: "Pre peak m/z" },
+        { field: "match_mz_error", label: "Pre m/z error [ppm]", subheading: null },
+        { field: "post_mz", label: "Post peak m/z" },
         {
-          field: "fitMzError",
+          field: "post_dmz",
           label: "Post m/z error [ppm]",
           subheading: null,
         },
-        { field: "mzErrorDiff", label: "m/z error diff", subheading: null },
+        { field: "mz_error_diff", label: "m/z error diff", subheading: null },
       ],
       selectedTableKey: 0,
       selectedTableRows: [],
@@ -126,9 +125,11 @@ export default {
   created: function () {},
   computed: {
     ...get({
+      batchActive: "batch/active",
+      matchIsotopes: "sample/matchIsotopes",
       mzFitStats: "calibration/mzFitStats",
-      sampleItemFocused: "batch/sampleItemFocused",
-      sampleItemsSelected: "batch/sampleItemsSelected",
+      sampleItemFocused: "sample/active",
+      sampleItems: "batch/sampleItems",
     }),
     ...sync({
       mzFit: "calibration/mzFit",
@@ -137,66 +138,60 @@ export default {
       return "calc(30vh)";
     },
     candidateTableRows() {
-      return [];
-      // if (!this.sampleItemFocused) return [];
-      // return this.$store.getters["match/rating/rows"]({
-      //   level: "isotope",
-      //   selected: true,
-      // }).filter((row) => row.sampleItemId === this.sampleItemFocused.id);
+      return this.matchIsotopes ?? [];
     },
     selectedTableHeight() {
       return "calc(30vh)";
     },
   },
   methods: {
-    // ...mapActions({
-    //   calibrateItems: "calibration/calibrateItems",
-    // }),
-    // ...mapMutations({
-    //   $mzFitRequest: "calibration/MZ_FIT_REQUEST",
-    // }),
     applyCalibration() {
       this.$buefy.dialog.confirm({
         title: "Calibrate items",
-        message: `Apply calibration to ${this.sampleItemsSelected.length} selected items?`,
+        message: `Apply calibration to batch ${this.batchActive.sample_batch_name}?`,
         confirmText: "Apply",
         onConfirm: () => {
-          this.calibrateItems({ items: this.sampleItemsSelected, fit: this.mzFit });
+          this.$api.emit(
+            'calibration_mz_apply',  
+            this.mzFit,
+            this.sampleItems.map((item) => item.sample_file_id)
+            );
         },
       });
     },
-    selectCandidates(newRows, oldRows) {
+    async selectCandidates(newRows, oldRows) {
       this.mzFit = null;
       this.selectedTableRows = newRows;
-      if (rows.length > 3) {
+      if (newRows.length > 3) {
         let peakTofs = newRows.map((row) => row.sample_peak_tof);
         let peakMzs = newRows.map((row) => row.sample_peak_mz);
         let exactMzs = newRows.map((row) => row.mz);
-        this.$mzFitRequest({
+        await this.$api.emit(
+          'calibration_mz_fit',
           peakTofs,
           peakMzs,
           exactMzs,
-        });
+        );
       }
     },
   },
   watch: {
     mzFitStats: function () {
       this.selectedTableRows.forEach((row, i) => {
-        row.fitMz = this.mzFitStats.fitMz[i];
-        row.fitMzError = this.mzFitStats.fitMzError[i];
-        row.mzErrorDiff = Math.abs(row.fitMzError) - Math.abs(row.mzError);
+        row.post_mz = this.mzFitStats.post_mz[i];
+        row.post_dmz = this.mzFitStats.post_dmz[i];
+        row.mz_error_diff = Math.abs(row.post_dmz) - Math.abs(row.match_mz_error);
       });
       this.selectedTableCols.filter(
-        (col) => col.field == "mzError"
-      )[0].subheading = this.mzFitStats.preDmzNorm;
+        (col) => col.field == "match_mz_error"
+      )[0].subheading = this.mzFitStats.pre_dmz_norm;
       this.selectedTableCols.filter(
-        (col) => col.field == "fitMzError"
-      )[0].subheading = this.mzFitStats.postDmzNorm;
+        (col) => col.field == "post_dmz"
+      )[0].subheading = this.mzFitStats.post_dmz_norm;
       this.selectedTableCols.filter(
-        (col) => col.field == "mzErrorDiff"
+        (col) => col.field == "mz_error_diff"
       )[0].subheading =
-        this.mzFitStats.postDmzNorm - this.mzFitStats.preDmzNorm;
+        this.mzFitStats.post_dmz_norm - this.mzFitStats.pre_dmz_norm;
       this.selectedTableKey++;
     },
   },

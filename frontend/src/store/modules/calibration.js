@@ -1,51 +1,28 @@
+import { make } from 'vuex-pathify';
+
+const state = {
+    active: null,
+    mzFit: null,
+    mzFitStats: null,
+};
+
 export default {
     namespaced: true,
-    state: {
-        mzFit: null,
-        mzFitStats: null,
-
-        $mzApplyRequest: null,
-        $mzApplyResponse: null,
-        $mzFitRequest: null,
-        $mzFitResponse: null,
-    },
+    state,
     mutations: {
-        // mz calibration
-        MZ_APPLY_REQUEST(state, requestObject) {
-            state.$mzApplyRequest = requestObject;
-        },
-        MZ_FIT(state, fit) {
-            state.mzFit = fit;
-        },
-        MZ_FIT_REQUEST(state, requestObject) {
-            state.$mzFitRequest = requestObject;
-        },
-        MZ_FIT_STATS(state, fitStats) {
-            state.mzFitStats = fitStats;
-        },
+        ...make.mutations(state),
     },
     actions: {
-        calibrateItems: function ({ commit }, { items, fit }) {
-            let requestObject = {
-                filenames: items.map(item => item.filename),
-                fit,
-            };
-            commit('MZ_APPLY_REQUEST', requestObject);
-        },
-        handleMzFitResponse: function ({ state, commit }) {
-            let response = state.$mzFitResponse;
+        async onCalibrationMzFitStats({ commit }, response) {
             let fit = response.fit;
             let fitStats = {
-                fitMz: new Float32Array(response.stats.postMz),
-                fitMzError: new Float32Array(response.stats.postDmz),
-                preDmzNorm: response.stats.preDmzNorm,
-                postDmzNorm: response.stats.postDmzNorm
+                post_mz: new Float32Array(response.stats.post_mz),
+                post_dmz: new Float32Array(response.stats.post_dmz),
+                pre_dmz_norm: response.stats.pre_dmz_norm,
+                post_dmz_norm: response.stats.post_dmz_norm
             };
-            commit('MZ_FIT', fit);
-            commit('MZ_FIT_STATS', fitStats);
+            await commit('SET_MZ_FIT', fit);
+            await commit('SET_MZ_FIT_STATS', fitStats);
         },
-    },
-    watchers: {
-        'calibration/$mzFitResponse': 'calibration/handleMzFitResponse',
     }
 }

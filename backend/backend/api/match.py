@@ -57,11 +57,14 @@ async def match_batch_compute(sid, sample_batch_id):
 async def match_batch_remove(sid, sample_batch_id):
     with conn:
         # get workspace id
-        workspace_id = pd.read_sql(f"""--sql
+        workspace_id = pd.read_sql(f"""--sql'
             SELECT workspace_id
             FROM sample_batch
-            WHERE sample_batch_id == '{sample_batch_id}'
-        """, conn).to_dict('records')
+            WHERE sample_batch_id == ?
+        """,
+        conn,
+        params=sample_batch_id
+        ).to_dict('records')
 
         # delete record
         conn.cursor().execute(f"""--sql
@@ -69,12 +72,13 @@ async def match_batch_remove(sid, sample_batch_id):
             WHERE sample_item_id IN (
                 SELECT sample_item_id
                 FROM sample_item
-                WHERE sample_batch_id == '{sample_batch_id}'
+                WHERE sample_batch_id == ?
             )
-        """)
-
+        """,
+        [sample_batch_id]
+        )
     # reload workspace
-    # await sio.emit('workspace_reload', workspace_id, namespace='/')
+    await sio.emit('workspace_reload', workspace_id, namespace='/')
 
 
 @sio.event(namespace='/')
@@ -300,13 +304,17 @@ async def match_item_remove(sid, sample_item_id):
         sample_batch_id = pd.read_sql(f"""
             SELECT sample_batch_id
             FROM sample_item
-            WHERE sample_item_id == '{sample_item_id}'
-            """
-            ).tolist()[0]
+            WHERE sample_item_id == ?
+            """,
+            conn,
+            params=[sample_item_id]
+            )['sample_batch_id'].tolist()[0]
         # delete record
         conn.cursor().execute(f"""--sql
             DELETE FROM match
-            WHERE sample_item_id == '{sample_item_id}'
-        """)
+            WHERE sample_item_id == ?
+            """,
+            [sample_item_id]
+            )
     # reload batch
-    sio.emit('sample_batch_updated', roomn=sample_batch_id, namespace='/')
+    await sio.emit('sample_batch_updated', roomn=sample_batch_id, namespace='/')

@@ -382,4 +382,4 @@ async def sample_file_update(sid, sample_files):
             index=False
             )
     for instrument in pd.unique(sample_file_df['instrument']).tolist():
-        await sio.emit('sample_file_created', room=instrument, namespace='/')
+        await sio.emit('sample_file_updated', room=instrument, namespace='/')
