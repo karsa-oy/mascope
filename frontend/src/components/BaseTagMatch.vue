@@ -3,7 +3,7 @@
     <b-tooltip
       :active="tooltipActive"
       :delay="200"
-      position="is-right"
+      position="is-left"
       type="is-white"
       append-to-body
       size="is-small"

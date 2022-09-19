@@ -120,7 +120,7 @@ async def visualization_ion_focus(
                 'type': 'scatter',
                 'mode': 'lines+markers',
                 'line': {
-                    'color': 'rgb({},{},{})'.format(*colormap[i])
+                    'color': 'white'
                     },
                 'x': [peak_mz, peak_mz],
                 'y': [0, peak_height],
