@@ -10,7 +10,6 @@ import nest_asyncio
 from backend.db import gen_id
 from backend.lib.peak import detect_peaks, get_peaks
 from backend.lib.chemistry import match_mz
-import backend.lib.hack as hack
 
 from backend.lib.file import load_file
 
@@ -69,6 +68,7 @@ def run():
                 REFERENCES sample_batch(sample_batch_id)
             ,filename VARCHAR(256) NOT NULL
             ,sample_item_name VARCHAR(256) NOT NULL
+            ,sample_item_type VARCHAR(64) NOT NULL
             ,sample_item_description TEXT
             ,sample_item_attributes JSON
         );
@@ -249,6 +249,7 @@ def run():
             ,attributes as sample_item_attributes
         FROM sample_items;
     """, old_conn)
+    sample_item_df['sample_item_type'] = ['SAMPLE']*len(sample_item_df)
     sample_item_df.to_sql('sample_item', new_conn, if_exists='append', index=False)
 
     sample_file_df = pd.read_sql("""--sql
