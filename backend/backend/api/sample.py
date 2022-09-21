@@ -2,6 +2,7 @@ import json
 import pandas as pd
 
 from backend.api.match import match_batch_compute, match_item_compute
+from backend.api.signal import signal_mz_calibration_update
 from backend.db.conn import conn
 from backend.db.id import gen_id
 from backend.server import sio
@@ -21,32 +22,31 @@ async def sample_batch_create(sid, sample_batches):
             raise ValueError(
                 'sample batches created must be in exactly one workspace'
             )
-        else:
-            sample_batch_df = sample_batch_df.assign(
-                build_params=sample_batch_df[['build_params']].applymap(
-                    lambda x: json.dumps(x)
-                ),
-                filter_params=sample_batch_df[['filter_params']].applymap(
-                    lambda x: json.dumps(x)
-                )
+        sample_batch_df = sample_batch_df.assign(
+            build_params=sample_batch_df[['build_params']].applymap(
+                lambda x: json.dumps(x)
+            ),
+            filter_params=sample_batch_df[['filter_params']].applymap(
+                lambda x: json.dumps(x)
             )
-            sample_batch_df.drop(columns=['target_collection_id']).to_sql(
-                'sample_batch',
-                conn,
-                if_exists='append',
-                index=False
-                )
-            target_collection_in_sample_batch_df = sample_batch_df[
-                ['target_collection_id', 'sample_batch_id']
-                ].explode('target_collection_id', ignore_index=True).dropna()
-            target_collection_in_sample_batch_df.to_sql(
-                'target_collection_in_sample_batch',
-                conn,
-                if_exists='append',
-                index=False
-                )
-            [workspace_id] = workspace_ids
-            await sio.emit('workspace_reload', room=workspace_id, namespace='/')
+        )
+        sample_batch_df.drop(columns=['target_collection_id']).to_sql(
+            'sample_batch',
+            conn,
+            if_exists='append',
+            index=False
+            )
+        target_collection_in_sample_batch_df = sample_batch_df[
+            ['target_collection_id', 'sample_batch_id']
+            ].explode('target_collection_id', ignore_index=True).dropna()
+        target_collection_in_sample_batch_df.to_sql(
+            'target_collection_in_sample_batch',
+            conn,
+            if_exists='append',
+            index=False
+            )
+        [workspace_id] = workspace_ids
+        await sio.emit('workspace_reload', room=workspace_id, namespace='/')
 
 
 @sio.event(namespace='/')
@@ -258,9 +258,10 @@ async def sample_item_update(sid, sample_items):
                 'sample_item_id',
                 'sample_batch_id',
                 'filename',
-                'sample_item_name',
+                'sample_item_attributes',
                 'sample_item_description',
-                'sample_item_attributes'
+                'sample_item_name',
+                'sample_item_type'
                 ]].to_sql(
                     'sample_item',
                     conn,
@@ -328,6 +329,13 @@ async def sample_file_create(sid, sample_files):
         for sample_file in sample_files
         ]
     sample_file_df = pd.DataFrame.from_records(sample_files)
+
+    instruments = pd.unique(sample_file_df['instrument']).tolist()
+    if len(instruments) != 1:
+        raise ValueError(
+            'sample files created must be from exactly one instrument'
+        )
+
     sample_file_df = sample_file_df.assign(
         sample_file_attributes=sample_file_df[['sample_file_attributes']].applymap(
             lambda x: json.dumps(x)
