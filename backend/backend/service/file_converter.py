@@ -29,21 +29,27 @@ class FSWatcher:
         def on_created(self, event):
             filepath = event.src_path
             print("New file to be converted: %s" %filepath)
-            # Wait until the file is ready
-            filesize = -1
-            while filesize != os.path.getsize(filepath):
-                filesize = os.path.getsize(filepath)
-                sleep(1)
             path = os.path.dirname(filepath)
             filename = os.path.basename(filepath)
             global instrument_name
             new_filename = '_'.join([instrument_name, filename])
             new_filepath = os.path.join(path, new_filename)
-            try:
-                os.rename(filepath, new_filepath)
-            except FileExistsError:
-                print("File exists: %s" %new_filepath)
-                return
+
+            # Wait until the file is ready
+            filesize = -1
+            while True:
+                while filesize != os.path.getsize(filepath):
+                    filesize = os.path.getsize(filepath)
+                    sleep(1)
+                try:
+                    os.rename(filepath, new_filepath)
+                    break
+                except FileExistsError:
+                    print("File exists: %s" %new_filepath)
+                    return
+                except PermissionError:
+                    print("Cannot access file, retrying...")
+                    sleep(1)
             filepath = new_filepath
             global file_queue
             file_queue.put(filepath)
@@ -124,6 +130,7 @@ async def streamer_processor(streamer):
             data.update({
                 'committed_length': cache_item.props['committed_length'],
                 'range': cache_item.props['range'],
+                'mz_calibration': cache_item.props['mz_calibration'],
                 'utc_offset': cache_item.props['utc_offset']
                 })
             await create_sample_file_db_record(data)
@@ -174,7 +181,12 @@ async def run():
     host = os.environ['MASCOPE_PUBLIC_API_HOST']
     port = os.environ['MASCOPE_PUBLIC_PROXY_API_PORT']
     url = f"http://{host}:{port}"
-    await sio.connect(url)
+    while True:
+        try:
+            await sio.connect(url)
+            break
+        except:
+            await asyncio.sleep(1)
     while not shutdown_event.is_set():
         await asyncio.sleep(1)
 
