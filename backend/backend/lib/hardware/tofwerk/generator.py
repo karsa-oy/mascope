@@ -99,6 +99,7 @@ class BaseStreamer(Thread):
             'filename': self.filename,
             'i': -1,
             'mz': self.mz.tobytes(),
+            'mz_calibration': self.mz_calibration,
             't_range': [0, self.length],
         }
         self.spec_queue.put(coordinates)
@@ -245,6 +246,13 @@ class TofDaqStreamer(BaseStreamer):
                                                None
                                                )
         return mz.astype(np.float32)
+
+    @property
+    def mz_calibration(self):
+        return {
+            'mode': self.desc.massCalibMode,
+            'par': self.desc.p[:self.desc.nbrCalibParams]
+        }
 
     def _get_and_feed_data(self):
         """Read data from the shared memory and put to queues
@@ -461,6 +469,13 @@ class H5Streamer(BaseStreamer, KInstrument):
                 0
                 )
         return mz.astype(np.float32)
+
+    @property
+    def mz_calibration(self):
+        return {
+            'mode': self.desc.massCalibMode,
+            'par': self.desc.p[:self.desc.nbrCalibParams]
+        }
 
     @property
     def tps_info(self):

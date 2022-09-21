@@ -70,6 +70,7 @@ class zarr_sdk:
         filename = value.get('filename')
         mz = np.frombuffer(value['mz'], dtype=np.float32)
         t_range = value['t_range']
+        mz_calibration = value['mz_calibration']
 
         base_path = get_base_path()
         data_path = parse_path_from_item_filename(filename, base_path)
@@ -110,6 +111,7 @@ class zarr_sdk:
             'length': float(t_range[1]),
             'committed_length': 0.,
             'range': [float(mz[0]), float(mz[-1])],
+            'mz_calibration': mz_calibration,
             'utc_offset': utc_offset,
         }
         write_props(filename, properties)
