@@ -63,7 +63,7 @@ async def match_batch_remove(sid, sample_batch_id):
             WHERE sample_batch_id == ?
         """,
         conn,
-        params=sample_batch_id
+        params=[sample_batch_id]
         ).to_dict('records')
 
         # delete record
