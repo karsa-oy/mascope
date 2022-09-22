@@ -29,12 +29,6 @@ class FSWatcher:
         def on_created(self, event):
             filepath = event.src_path
             print("New file to be converted: %s" %filepath)
-            path = os.path.dirname(filepath)
-            filename = os.path.basename(filepath)
-            global instrument_name
-            new_filename = '_'.join([instrument_name, filename])
-            new_filepath = os.path.join(path, new_filename)
-
             # Wait until the file is ready
             filesize = -1
             while True:
@@ -42,15 +36,12 @@ class FSWatcher:
                     filesize = os.path.getsize(filepath)
                     sleep(1)
                 try:
-                    os.rename(filepath, new_filepath)
+                    os.rename(filepath, filepath)
                     break
-                except FileExistsError:
-                    print("File exists: %s" %new_filepath)
-                    return
                 except PermissionError:
                     print("Cannot access file, retrying...")
                     sleep(1)
-            filepath = new_filepath
+                    continue
             global file_queue
             file_queue.put(filepath)
 
@@ -93,8 +84,8 @@ class FSWatcher:
 
 async def create_sample_file_db_record(data):
     filename = data['filename']
+    global instrument_name
     committed_length = data['committed_length']
-    instrument = filename.split('_')[0]
     date = timestamp_from_filename(filename)
     utc_offset = timedelta(seconds=int(data['utc_offset']))
     title = data.get('title')
@@ -107,7 +98,7 @@ async def create_sample_file_db_record(data):
                 "filename": filename,
                 "sample_file_name": title,
                 "sample_file_description": description,
-                "instrument": instrument,
+                "instrument": instrument_name,
                 "datetime": date.isoformat(),
                 "datetime_utc": (date - utc_offset).isoformat(),
                 "length": committed_length,
@@ -121,9 +112,12 @@ async def create_sample_file_db_record(data):
 async def streamer_processor(streamer):
     # Handlers
     async def handle_spec_data(data):
+        global instrument_name
         filename = data['filename']
         spec_i = data['i']
         cache_item = cache.get(filename)
+        zarr_filename = '_'.join([instrument_name, filename])
+        data.update({'filename': zarr_filename})
         if spec_i is None:
             # File finished
             zarr_sdk.finalize_signal_dataset({'value': data}, cache_item)
@@ -142,21 +136,27 @@ async def streamer_processor(streamer):
                 print("File exists: %s" %filename)
                 return
             cache_item = AttrDict(cache_item)
-            cache[data['filename']] = cache_item
+            cache[filename] = cache_item
         else:
             # New data to existing file
             zarr_sdk.update_signal_dataset({'value': data}, cache_item)
             
     async def handle_tps_data(data):
+        global instrument_name
         filename = data['filename']
         spec_i = data['i']
         cache_item = cache.get(filename)
+        if not cache_item:
+            print("handle_tps_data failed!")
+            return
         if spec_i is None:
             # File finished
             pass
         elif spec_i < 0:
             # New file
             try:
+                zarr_filename = '_'.join([instrument_name, filename])
+                data.update({'filename': zarr_filename})
                 zarr_sdk.init_tps_dataset({'value': data}, cache_item)
             except FileExistsError:
                 print("File exists: %s" %filename)
@@ -232,6 +232,7 @@ if __name__ == '__main__':
     fs_watcher = FSWatcher(
         path=source_path,
         mask=file_mask,
+        recursive=True,
         shutdown_event=shutdown_event,
         )
     fs_watcher.run_as_daemon()
