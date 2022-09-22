@@ -56,8 +56,8 @@ export default {
       if (this.matchScore >= this.probableMatchThreshold) {
         return {
           category: "probable",
-          class: "is-success",
-          icon: "check-bold",
+          class: "is-danger",
+          icon: "close",
           weight: "font-size: bold",
         };
       } else if (this.matchScore >= this.possibleMatchThreshold) {
@@ -70,8 +70,8 @@ export default {
       } else {
         return {
           category: "improbable",
-          class: "",
-          icon: "close",
+          class: "is-success",
+          icon: "check-bold",
           weight: "",
         };
       }

@@ -29,7 +29,7 @@ export default {
           icon: "file-plus",
           label: "Sample management",
           path: "/sample-management",
-          visible: this.workspaceActive,
+          visible: false//this.workspaceActive,
         },
         {
           icon: "format-horizontal-align-center",
@@ -41,19 +41,19 @@ export default {
           icon: "flask",
           label: "Batch overview",
           path: "/batch-overview",
-          visible: this.workspaceActive,
+          visible: false//this.workspaceActive,
         },
         {
           icon: "sine-wave",
           label: "Sample signal",
           path: "/sample-signal",
-          visible: this.workspaceActive,
+          visible: false//this.workspaceActive,
         },
         {
           icon: "table-multiple",
           label: "Data management",
           path: "/data-management",
-          visible: this.workspaceActive,
+          visible: false//this.workspaceActive,
         },
       ].filter((b) => b.visible);
     },

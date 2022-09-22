@@ -1,7 +1,7 @@
 <template>
   <section>
     <the-layout-sidebar>
-      <div class="columns">
+      <div class="columns" style="margin: 0 auto; width: 70vw;">
         <div class="column is-half">
           <section style="padding: 2em 2em 2em 2em">
             <h1 class="title is-4">Instruments:</h1>

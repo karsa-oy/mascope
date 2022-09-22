@@ -349,35 +349,27 @@ export default {
       });
     },
     saveAttributes() {
-      this.$buefy.dialog.confirm({
-        title: this.formTitle,
-        message:
-          `${this.formTitle} for <b>` + this.formFields[0].value + "</b>?",
-        confirmText: "Save",
-        onConfirm: () => {
-          // convert [{label, value...}, ...] to object
-          let props = {};
-          let sample_item_attributes = {};
-          this.formFields.forEach(
-            (field) => {
-              if (field.required) props[field.label] = field.value;
-              else sample_item_attributes[field.label] = field.value;
-              }
-            );
-          let newSampleItem = {
-            ...props,
-            sample_item_attributes,
-            sample_item_type: this.sampleItemType,
-            sample_batch_id: this.batchActive.sample_batch_id,
-            };
-          if (this.action == 'create') {
-            this.$api.emit('sample_item_create', [newSampleItem]);
-          } else if(this.action == 'update') {
-            newSampleItem.sample_item_id = this.sampleActive.sample_item_id;
-            this.$api.emit('sample_item_update', [newSampleItem]);
-          }
-        },
-      });
+      // convert [{label, value...}, ...] to object
+        let props = {};
+        let sample_item_attributes = {};
+        this.formFields.forEach(
+          (field) => {
+            if (field.required) props[field.label] = field.value;
+            else sample_item_attributes[field.label] = field.value;
+            }
+          );
+        let newSampleItem = {
+          ...props,
+          sample_item_attributes,
+          sample_item_type: this.sampleItemType,
+          sample_batch_id: this.batchActive.sample_batch_id,
+          };
+        if (this.action == 'create') {
+          this.$api.emit('sample_item_create', [newSampleItem]);
+        } else if(this.action == 'update') {
+          newSampleItem.sample_item_id = this.sampleActive.sample_item_id;
+          this.$api.emit('sample_item_update', [newSampleItem]);
+        }
       this.deactivateModal();
     },
   },
