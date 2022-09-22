@@ -5,8 +5,9 @@ import pandas as pd
 from colorcet import glasbey_hv as colormap
 
 from backend.db.conn import conn
-from backend.lib.struct import LRUDict
 from backend.lib.file import load_coord, load_file
+from backend.lib.peak import filter_peaks
+from backend.lib.struct import LRUDict
 from backend.server import sio
 
 # Cache for data arrays
@@ -17,9 +18,10 @@ cache = LRUDict(10)
 async def visualization_ion_focus(
         sid,
         sample_item_id,
-        target_ion_id
+        target_ion_id,
+        min_isotope_abundance,
+        peak_min_intensity
         ):
-    dmz_ppm = 500
     t_range = None
     with conn:
         # Get filename
@@ -36,9 +38,10 @@ async def visualization_ion_focus(
             SELECT mz, relative_abundance
             FROM target_isotope
             WHERE target_ion_id == ?
+            AND relative_abundance >= ?
             """,
             conn,
-            params=[target_ion_id]
+            params=[target_ion_id, min_isotope_abundance]
             )
         mzs = target_ion_df['mz'].tolist()
         rel_abus = target_ion_df['relative_abundance'].tolist()
@@ -64,7 +67,7 @@ async def visualization_ion_focus(
         print("{:d}/{:d}: {:3f}".format(i+1, len(mzs), mz))
         spectrum_traces = []
         timeseries_traces = []
-        dmz = 1e-6 * dmz_ppm * mz
+        dmz = .5
         mz_range = (mz-dmz, mz+dmz)
         rel_abu = rel_abus[i]
 
@@ -109,9 +112,7 @@ async def visualization_ion_focus(
             'yaxis': 'y{:d}'.format(i+1),
         })
         # Peak traces (vertical lines)
-        peaks = isotope_sum_spectrum.peaks[np.logical_not(
-                    isotope_sum_spectrum.peaks.tof.isnull()
-                    )]
+        peaks = filter_peaks(isotope_sum_spectrum, height=peak_min_intensity)
         for peak in peaks:
             peak_mz = peak.mz.item()
             peak_height = peak.values.item()

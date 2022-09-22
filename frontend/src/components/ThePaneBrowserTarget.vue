@@ -34,6 +34,8 @@ export default {
       matchCompounds: "sample/matchCompounds",
       matchIons: "sample/matchIons",
       matchIsotopes: "sample/matchIsotopes",
+      minIsotopeAbundance: "batch/active@filter_params.min_isotope_abundance",
+      peakMinIntensity: "batch/active@filter_params.peak_min_intensity",
       sampleItemFocused: "sample/active",
       targetCollections: "batch/targetCollections",
       targetCollectionsSelected: "batch/targetCollectionsSelected",
@@ -69,7 +71,8 @@ export default {
           name: "Collection",
           slug: "target_collection",
           cols: [
-            { field: "target_collection_name", label: "Collection", width: "90%" },
+            { field: "target_collection_name", label: "Collection", width: "30%" },
+            { field: "target_collection_description", label: "Description", width: "60%" },
             {
               field: "match_score",
               label: "Score",
@@ -261,7 +264,9 @@ export default {
       this.$api.emit(
         'visualization_ion_focus',
         this.sampleItemFocused.sample_item_id,
-        row.target_ion_id
+        row.target_ion_id,
+        this.minIsotopeAbundance,
+        this.peakMinIntensity
         )
       const targetIon = this.targetIons.filter(
         (ion) => ion.target_ion_id == row.target_ion_id

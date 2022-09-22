@@ -9,7 +9,12 @@ from scipy.signal._peak_finding_utils import (
 )
 
 
-def detect_peaks(cache_item):
+def detect_peaks(
+    cache_item,
+    peak_height=None,
+    peak_distance=None,
+    peak_width=None,
+    ):
     if 'signal' not in cache_item:
         # Signal not in cache, load
         cache_item = load_file(
@@ -29,9 +34,9 @@ def detect_peaks(cache_item):
     )
     peaks, peak_props = find_peaks(
         sum_spectrum,
-        height=0,
-        distance=None,
-        width=None
+        height=peak_height,
+        distance=peak_distance,
+        width=peak_width
     )
     cache_item = (
         cache_item
@@ -62,19 +67,26 @@ def get_peaks(
 
 def filter_peaks(
         cache_item,
-        mz_range,
-        t_range,
+        mz_range=None,
+        t_range=None,
         height=None,
         distance=None,
-        width=None
         ):
 
-    peaks = cache_item.peaks.sel(
-        mz=slice(*mz_range),
-        time=slice(*t_range)
-    )
+    peaks = cache_item.peaks
+    if mz_range is not None:
+        peaks = peaks.sel(
+            mz=slice(*mz_range)
+            )
+    if t_range is not None:
+        peaks = peaks.sel(
+            time=slice(*t_range)
+            )
     peaks = peaks.dropna(dim='mz', how='all')
-    peak_heights = peaks.sum(dim='time').values
+    if 'time' in peaks.dims:
+        peak_heights = peaks.sum(dim='time').values
+    else:
+        peak_heights = peaks.values
 
     keep = np.array([True]*len(peaks))
 
