@@ -1,4 +1,5 @@
 from backend.lib.file import load_file, zarr_sdk
+from backend.lib.signal.filter import smooth
 from .hardware.tofwerk.lib.TwTool import TwMassCalibrate, TwTof2Mass
 
 import numpy as np
@@ -11,6 +12,7 @@ from scipy.signal._peak_finding_utils import (
 
 def detect_peaks(
     cache_item,
+    smooth_window=None,
     peak_height=None,
     peak_distance=None,
     peak_width=None,
@@ -32,6 +34,10 @@ def detect_peaks(
             max_gap=2,
         )
     )
+
+    if smooth_window:
+        sum_spectrum = smooth(sum_spectrum, window_len=smooth_window)
+    
     peaks, peak_props = find_peaks(
         sum_spectrum,
         height=peak_height,
@@ -44,7 +50,9 @@ def detect_peaks(
             tof=('mz', np.arange(len(cache_item.mz)).astype(np.float32))
         )
     )
+
     peak_profiles = cache_item.signal[peaks]
+
     zarr_sdk.write_peak_dataset(peak_profiles, cache_item)
 
     cache_item = load_file(
