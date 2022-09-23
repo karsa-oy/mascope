@@ -33,7 +33,22 @@ export default {
                 DROP TABLE IF EXISTS sample_match_filter;
                 CREATE TEMPORARY TABLE sample_match_filter AS
                     SELECT
-                        match.*,
+                        CASE
+                        -- set match_score to 0 if not within set tolerances
+                            WHEN (
+                                ABS(match_mz_error) <= ${mzTolerance}
+                                AND ABS(match_abundance_error) <= ${isotopeRatioTolerance}
+                                AND sample_peak_height >= ${peakMinIntensity}
+                                ) THEN match_score
+                            ELSE 0
+                        END AS match_score,
+                        match_mz_error,
+                        match_abundance_error,
+                        sample_item_id,
+                        sample_peak_height,
+                        sample_peak_height_relative,
+                        sample_peak_mz,
+                        sample_peak_tof,
                         mz,
                         relative_abundance,
                         target_collection_id,
@@ -42,7 +57,8 @@ export default {
                         target_compound_id,
                         target_compound_name,
                         target_ion_formula,
-                        target_ion_id
+                        target_ion_id,
+                        target_isotope_id
                         ,2 as selection
                     FROM match
                     NATURAL LEFT JOIN target_isotope
@@ -50,10 +66,8 @@ export default {
                     NATURAL LEFT JOIN target_compound
                     NATURAL LEFT JOIN target_compound_in_target_collection
                     NATURAL LEFT JOIN target_collection
-                    WHERE (sample_item_id == '${sampleId}'
-                        AND ABS(match_mz_error) <= ${mzTolerance}
-                        AND ABS(match_abundance_error) <= ${isotopeRatioTolerance}
-                        AND sample_peak_height >= ${peakMinIntensity}
+                    WHERE (
+                        sample_item_id == '${sampleId}'
                         AND relative_abundance >= ${minIsotopeAbundance}
                     )
             `);
