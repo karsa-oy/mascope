@@ -52,9 +52,7 @@ export default {
                         SELECT MAX(datetime_utc)
                         FROM sample_file
                         WHERE (
-                            instrument IN (
-                                '${state.active}'
-                                )
+                            instrument == '${state.active}'
                         AND
                             mz_calibration NOT NULL
                         )
