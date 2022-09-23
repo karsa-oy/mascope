@@ -92,6 +92,7 @@ class ExtendableDataArray():
                  sparse=False,
                  chunk_size=10,
                  persist=False,
+                 overwrite=False,
                  ):
         """Initialize self
 
@@ -116,6 +117,7 @@ class ExtendableDataArray():
         self.sparse = sparse
         self.chunk_size = chunk_size
         self.persist = persist
+        self.overwrite = overwrite
 
         self.data_array = xarray.DataArray()
         
@@ -174,7 +176,7 @@ class ExtendableDataArray():
         if self.path is not None:
             self.data_array.to_dataset().to_zarr(
                                             self.path,
-                                            mode='w-' # Create
+                                            mode='w' if self.overwrite else 'w-'
                                             )
 
     def combine_first(self, data, coords):
