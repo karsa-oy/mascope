@@ -53,6 +53,7 @@ export default {
                         relative_abundance,
                         target_collection_id,
                         target_collection_name,
+                        target_collection_description,
                         target_compound_formula,
                         target_compound_id,
                         target_compound_name,
@@ -76,6 +77,7 @@ export default {
                 SELECT
                     target_collection_id,
                     target_collection_name,
+                    target_collection_description,
                     IFNULL(MAX(match_score), 0) AS match_score,
                     IFNULL(SUM(sample_peak_height_sum), 0) AS sample_peak_height_sum
                 FROM (
@@ -83,6 +85,7 @@ export default {
                     sample_item_id,
                     target_collection_id,
                     target_collection_name,
+                    target_collection_description,
                     MAX(match_score) as match_score,
                     SUM(sample_peak_height_sum) AS sample_peak_height_sum
                     FROM (
@@ -92,6 +95,7 @@ export default {
                             target_compound_id,
                             target_collection_id,
                             target_collection_name,
+                            target_collection_description,
                             SUM(match_score*relative_abundance) AS match_score,
                             SUM(sample_peak_height) AS sample_peak_height_sum
                         FROM sample_match_filter
