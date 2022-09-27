@@ -118,7 +118,7 @@ async def streamer_processor(streamer):
         filename = data['filename']
         spec_i = data['i']
         cache_item = cache.get(filename)
-        zarr_filename = '_'.join([instrument_name, filename])
+        zarr_filename = '_'.join([instrument_name, filename]).replace(' ', '_')
         data.update({'filename': zarr_filename})
         if spec_i is None:
             # File finished
@@ -157,7 +157,7 @@ async def streamer_processor(streamer):
         elif spec_i < 0:
             # New file
             try:
-                zarr_filename = '_'.join([instrument_name, filename])
+                zarr_filename = '_'.join([instrument_name, filename]).replace(' ', '_')
                 data.update({'filename': zarr_filename})
                 zarr_sdk.init_tps_dataset({'value': data}, cache_item)
             except FileExistsError:
