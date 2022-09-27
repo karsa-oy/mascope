@@ -129,13 +129,15 @@ async def streamer_processor(streamer):
                 'mz_calibration': cache_item.props['mz_calibration'],
                 'utc_offset': cache_item.props['utc_offset']
                 })
+            filepath = data.pop('source_filepath')
+            os.remove(filepath)
             await create_sample_file_db_record(data)
         elif spec_i < 0:
             # New file
             try:
                 cache_item = zarr_sdk.init_signal_dataset({'value': data})
             except FileExistsError:
-                print("File exists: %s" %filename)
+                print("File exists: %s" %data['filename'])
                 return
             cache_item = AttrDict(cache_item)
             cache[filename] = cache_item
