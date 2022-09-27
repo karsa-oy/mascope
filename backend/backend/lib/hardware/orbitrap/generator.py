@@ -116,7 +116,8 @@ class RawStreamer(Thread):
         # Feed poison pill
         self.spec_queue.put({
             'filename': self.filename,
-            'i': None
+            'i': None,
+            'source_filepath': self.raw.FileName
         })
         # Reset self
         self._reset()
@@ -236,10 +237,10 @@ class RawStreamer(Thread):
                     # Shutdown
                     break
             # Out of stream loop
+            self._finalize()
             self.raw.Dispose()
             self.active.clear()
             self.cancel_event.clear()
-            self._finalize()
             print("RawStream finished")
         # Out of main loop
         print('RawStreamer exiting')

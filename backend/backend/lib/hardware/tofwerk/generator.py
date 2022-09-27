@@ -117,7 +117,8 @@ class BaseStreamer(Thread):
         # Feed poison pill
         self.spec_queue.put({
             'filename': self.filename,
-            'i': None
+            'i': None,
+            'source_filepath': self.desc.currentDataFileName.decode()
         })
         self.tps_queue.put({
             'filename': self.filename,
