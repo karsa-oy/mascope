@@ -70,7 +70,7 @@ class zarr_sdk:
         filename = value.get('filename')
         mz = np.frombuffer(value['mz'], dtype=np.float32)
         t_range = value['t_range']
-        mz_calibration = value['mz_calibration']
+        mz_calibration = value.get('mz_calibration')
 
         base_path = get_base_path()
         data_path = parse_path_from_item_filename(filename, base_path)
