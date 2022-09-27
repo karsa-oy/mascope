@@ -1,7 +1,9 @@
+import argparse
 import asyncio
 import inspect
 import os
 import socketio
+import yaml
 
 from backend.lib.file import zarr_sdk
 from backend.lib.hardware.tofwerk.generator import H5Streamer
@@ -176,6 +178,56 @@ async def streamer_processor(streamer):
         except Empty:
             await asyncio.sleep(.1)
 
+def parse_cmd_args():
+    """
+    Parse command line arguments
+    ------------------------------
+    Return dict
+    Default argument values: see default_args.
+    """
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "-c", "--config",
+        help="path to yaml config file",
+        type=str, required=False
+    )
+    parser.add_argument(
+        "-i", "--instrument",
+        help="instrument name",
+        type=str, required=False
+    )
+    parser.add_argument(
+        "-nj", "--n_jobs",
+        help="number of job processors",
+        type=int, required=False
+    )
+    parser.add_argument(
+        "-s", "--source_dir",
+        help="source directory for streaming (before date dirs)",
+        type=str, required=False
+    )
+    parser.add_argument(
+        "-st", "--streamer_type",
+        help="streamer type (H5/Raw)",
+        type=str, required=False
+    )
+
+    all_args = parser.parse_args()
+    cmdline_args = {}
+    for arg in vars(all_args):
+        if vars(all_args)[arg] is None:
+            continue
+        cmdline_args[arg] = vars(all_args)[arg]
+    file_args = {}
+    if all_args.config:
+        # service config may be defined in yaml file
+        with open(all_args.config, 'r') as f:
+            file_args = yaml.safe_load(f)
+    return {
+        **file_args,
+        **cmdline_args
+        }
 
 async def run():
     host = os.environ['MASCOPE_PUBLIC_API_HOST']
@@ -228,11 +280,11 @@ if __name__ == '__main__':
         streamer.start()
         loop.create_task(streamer_processor(streamer))
 
-    source_path = args.get('data_pool_path', '.')
+    source_path = args.get('source_dir', '.')
     fs_watcher = FSWatcher(
         path=source_path,
         mask=file_mask,
-        recursive=True,
+        recursive=False,
         shutdown_event=shutdown_event,
         )
     fs_watcher.run_as_daemon()
