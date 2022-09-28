@@ -112,9 +112,10 @@ async def create_sample_file_db_record(data):
 
 
 async def streamer_processor(streamer):
+    global cache
+    global instrument_name
     # Handlers
     async def handle_spec_data(data):
-        global instrument_name
         filename = data['filename']
         spec_i = data['i']
         cache_item = cache.get(filename)
@@ -146,7 +147,6 @@ async def streamer_processor(streamer):
             zarr_sdk.update_signal_dataset({'value': data}, cache_item)
             
     async def handle_tps_data(data):
-        global instrument_name
         filename = data['filename']
         spec_i = data['i']
         cache_item = cache.get(filename)
@@ -232,6 +232,7 @@ def parse_cmd_args():
         }
 
 async def main():
+    global sio
     host = os.environ['MASCOPE_PUBLIC_API_HOST']
     port = os.environ['MASCOPE_PUBLIC_PROXY_API_PORT']
     url = f"http://{host}:{port}"
@@ -250,11 +251,17 @@ load_dotenv()
 
 cache = None
 file_queue = Queue()
+instrument_name = None
 shutdown_event = Event()
 sio = socketio.AsyncClient(logger=True)
 
 
 def run():
+    global cache
+    global file_queue
+    global instrument_name
+    global shutdown_event
+
     args = parse_cmd_args()
 
     instrument_name = args.get('instrument', 'unknown')
