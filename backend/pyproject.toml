@@ -13,7 +13,7 @@ build-backend = "poetry.core.masonry.api"
 [tool.poetry.scripts]
 server = 'backend:run'
 router = 'backend.router:run'
-file-streaming-service = 'backend.service.file_streaming:run'
+file-converter = 'backend.service.file_converter:run'
 file-io-service = 'backend.service.file_io:run'
 
 [tool.poetry.dependencies]
@@ -42,7 +42,7 @@ h5sparse = "0.1.0"
 lmfit = "1.0.3"
 nanoid = "2.0.0"
 Pillow = "9.1.1"
-#pythonnet = "2.5.2"
+pythonnet = "2.5.2"
 PyYAML = "6.0"
 setuptools = "62.6.0"
 sparse = "0.13.0"

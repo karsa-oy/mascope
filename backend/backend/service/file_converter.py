@@ -231,7 +231,7 @@ def parse_cmd_args():
         **cmdline_args
         }
 
-async def run():
+async def main():
     host = os.environ['MASCOPE_PUBLIC_API_HOST']
     port = os.environ['MASCOPE_PUBLIC_PROXY_API_PORT']
     url = f"http://{host}:{port}"
@@ -245,6 +245,7 @@ async def run():
         await asyncio.sleep(1)
 
 
+
 load_dotenv()
 
 cache = None
@@ -253,7 +254,7 @@ shutdown_event = Event()
 sio = socketio.AsyncClient(logger=True)
 
 
-if __name__ == '__main__':
+def run():
     args = parse_cmd_args()
 
     instrument_name = args.get('instrument', 'unknown')
@@ -291,8 +292,11 @@ if __name__ == '__main__':
         )
     fs_watcher.run_as_daemon()
 
-
     try:
-        loop.run_until_complete(run())
+        loop.run_until_complete(main())
     except KeyboardInterrupt:
         shutdown_event.set()
+
+
+if __name__ == '__main__':
+    run()
