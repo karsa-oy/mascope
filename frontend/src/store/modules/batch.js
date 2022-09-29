@@ -87,6 +87,7 @@ export default {
                         FROM
                             sample_item_filter
                         NATURAL LEFT JOIN batch_match_filter
+                        GROUP BY target_isotope_id
                     )
                     GROUP BY sample_item_id, target_compound_id, target_ion_id
                 )
