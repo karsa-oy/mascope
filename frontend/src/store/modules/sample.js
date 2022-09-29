@@ -21,6 +21,7 @@ export default {
         },
         async loadMatches({ rootState, state, commit }) {
             const sampleId = state.active.sample_item_id;
+            const sampleBatchId = state.active.sample_batch_id;
             // initialize match filter
             const filterParams = rootState.batch.active.filter_params;
             const mzTolerance = filterParams.mz_tolerance;
@@ -67,8 +68,10 @@ export default {
                     NATURAL LEFT JOIN target_compound
                     NATURAL LEFT JOIN target_compound_in_target_collection
                     NATURAL LEFT JOIN target_collection
+                    NATURAL LEFT JOIN target_collection_in_sample_batch
                     WHERE (
-                        sample_item_id == '${sampleId}'
+                        sample_batch_id == '${sampleBatchId}' 
+                        AND sample_item_id == '${sampleId}'
                         AND relative_abundance >= ${minIsotopeAbundance}
                     )
             `);
