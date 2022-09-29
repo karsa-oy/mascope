@@ -87,7 +87,6 @@ export default {
                         FROM
                             sample_item_filter
                         NATURAL LEFT JOIN batch_match_filter
-                        GROUP BY target_isotope_id
                     )
                     GROUP BY sample_item_id, target_compound_id, target_ion_id
                 )
@@ -229,13 +228,14 @@ export default {
                         target_ion_id,
                         target_isotope_id
                     FROM sample_item
-                    NATURAL LEFT JOIN match
-                    NATURAL LEFT JOIN target_isotope
-                    NATURAL LEFT JOIN target_ion
-                    NATURAL LEFT JOIN target_compound
-                    NATURAL LEFT JOIN target_compound_in_target_collection
-                    NATURAL LEFT JOIN target_collection
+                    NATURAL LEFT JOIN sample_batch
                     NATURAL LEFT JOIN target_collection_in_sample_batch
+                    NATURAL LEFT JOIN target_collection
+                    NATURAL LEFT JOIN target_compound_in_target_collection
+                    NATURAL LEFT JOIN target_compound
+                    NATURAL LEFT JOIN target_ion
+                    NATURAL LEFT JOIN target_isotope
+                    NATURAL LEFT JOIN match
                     WHERE (
                         sample_batch_id == '${batchId}'
                         AND ABS(match_mz_error) <= ${mzTolerance}
