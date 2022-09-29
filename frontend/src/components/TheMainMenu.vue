@@ -35,7 +35,7 @@ export default {
           icon: "format-horizontal-align-center",
           label: "m/z calibration",
           path: "/mz-calibration",
-          visible: this.workspaceActive,
+          visible: false//this.workspaceActive,
         },
         {
           icon: "flask",

@@ -75,7 +75,7 @@ export default {
       this.rows = table.fromSpreadsheet(
         clipboardText,
         this.fields,
-        true
+        this.colsFromHeader
         );
       this.$emit("rowsPasted", this.rows);
     },
