@@ -59,6 +59,8 @@ def run():
             ,build_params JSON
             ,filter_params JSON
             ,sample_batch_attributes JSON
+            ,calibration_sample_filename VARCHAR(256)
+                REFERENCES sample_file(filename)
         );
     """)
     new_conn.execute("""--sql

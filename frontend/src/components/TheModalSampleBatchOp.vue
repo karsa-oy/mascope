@@ -26,6 +26,17 @@
                   <b-input v-model="batchDesc"></b-input>
                 </b-field>
               </b-tab-item>
+              <b-tab-item label="Calibration">
+                <b-table
+                  :data="targetCollectionsAll"
+                  :columns="[
+                    { field: 'target_collection_name', label: 'Name' },
+                    { field: 'target_collection_description', label: 'Description' },
+                  ]"
+                  :selected.sync="calibrationCollectionSelected"
+                >
+                </b-table>
+              </b-tab-item>
               <b-tab-item label="Target collections">
                 <b-table
                   :data="targetCollectionsAll"
@@ -148,6 +159,7 @@ export default {
         peakIntensityMin: 1,
         peakSeperationMin: 3,
       },
+      calibrationCollectionSelected: null,
       ionMechanismsSelected: [],
       targetCollectionsSelected: [],
     };
@@ -187,6 +199,7 @@ export default {
           workspace_id: this.workspaceActive.workspace_id,
           sample_batch_attributes: null,
           build_params: {
+            calibration_collection: this.calibrationCollectionSelected.target_collection_id,
             ion_mechanisms: this.ionMechanismIds,
             },
           filter_params: {
@@ -210,6 +223,7 @@ export default {
           workspace_id: this.workspaceActive.workspace_id,
           sample_batch_attributes: null,
           build_params: {
+            calibration_collection: this.calibrationCollectionSelected.target_collection_id,
             ion_mechanisms: this.ionMechanismIds,
           },
           filter_params: {

@@ -21,7 +21,7 @@
         <div style="padding-bottom: 1.5em">
           <h1 style="font-size: 16px; text-align: center">
             <p>
-              <b>{{ formTitle }}</b>
+              <b>Sample information</b>
             </p>
           </h1>
         </div>
@@ -71,7 +71,7 @@
               </template>
               <b-dropdown-item aria-role="listitem" value="SAMPLE">Sample</b-dropdown-item>
               <b-dropdown-item aria-role="listitem" value="BLANK">Blank</b-dropdown-item>
-              <b-dropdown-item aria-role="listitem" value="CALIBRATION">Calibration</b-dropdown-item>
+              <b-dropdown-item v-if="!batchMzCalibration" aria-role="listitem" value="CALIBRATION">Calibration</b-dropdown-item>
             </b-dropdown>
           </b-field>
         </div>
@@ -149,9 +149,9 @@
                     "
                     type="is-success"
                     icon-left="content-save"
-                    @click="saveAttributes"
+                    @click="processSample"
                   >
-                    Save sample
+                    Process
                   </b-button>
                 </div>
               </div>
@@ -186,12 +186,12 @@ export default {
           {
             label: "sample_item_name",
             required: true,
-            placeholder: "visible title of the item in batches",
+            placeholder: "Sample title",
           },
           {
             label: "filename",
             required: true,
-            placeholder: "filename",
+            placeholder: "",
             disabled: true,
           },
           {
@@ -212,6 +212,7 @@ export default {
     ...get({
       allTemplates: "app/attributeTemplates",
       batchActive: "batch/active",
+      batchMzCalibration: "batch/mz_calibration",
       modalProps: "modal/sampleItemAttributesSaveProps",
       sampleActive: "sample/active",
     }),
@@ -226,9 +227,6 @@ export default {
     },
     fillable() {
       return ['create', 'update'].includes(this.action);
-    },
-    formTitle() {
-      return "Sample information";
     },
     savedTemplates() {
       return this.allTemplates.filter(
@@ -263,6 +261,25 @@ export default {
         },
       });
     },
+    deleteTemplate() {
+      this.$buefy.dialog.confirm({
+        title: "Deleting template",
+        message:
+          "Are you sure you want to delete template <b>" +
+          this.loadedTemplate.name +
+          "</b>?",
+        confirmText: "Delete",
+        onConfirm: () => {
+          this.$api.emit(
+            'attribute_template_delete',
+            this.availableTemplates.filter(
+              (template) => 
+              (template.attribute_template_id == this.loadedTemplate.attribute_template_id)
+            ).map((template) => template.attribute_template_id)
+          );
+        }
+      });
+    },
     removeField(event) {
       // Field to remove label is in button element id, find it from the event data
       let fieldToRemove = event.target.id;
@@ -284,24 +301,28 @@ export default {
         }
       }
     },
-    deleteTemplate() {
-      this.$buefy.dialog.confirm({
-        title: "Deleting template",
-        message:
-          "Are you sure you want to delete template <b>" +
-          this.loadedTemplate.name +
-          "</b>?",
-        confirmText: "Delete",
-        onConfirm: () => {
-          this.$api.emit(
-            'attribute_template_delete',
-            this.availableTemplates.filter(
-              (template) => 
-              (template.attribute_template_id == this.loadedTemplate.attribute_template_id)
-            ).map((template) => template.attribute_template_id)
-          );
-        }
-      });
+    async processSample() {
+      const filename = this.formFields.filter((field) => field.label=='filename')[0].value;
+      switch (this.sampleItemType) {
+        case 'CALIBRATION':
+          await this.$api.emit(
+            'calibration_mz_calibrate_batch',
+            this.batchActive.sample_batch_id,
+            filename,
+            )
+          break;
+        case 'BLANK':
+        case 'SAMPLE':
+          if (this.batchMzCalibration) {
+            this.$api.emit(
+              'calibration_mz_apply',
+              this.batchMzCalibration,
+              [filename]
+              )
+          }
+          break;
+      }
+      this.saveAttributes();
     },
     saveTemplate() {
       this.$buefy.dialog.prompt({

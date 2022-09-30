@@ -2,6 +2,8 @@ import { dispatch, make } from 'vuex-pathify';
 
 const state = {
     active: null,
+    // calibration
+    mz_calibration: null,
     // samples
     sampleItems: null,
     // targets
@@ -28,22 +30,35 @@ export default {
             rootState.api.emit('subscribe', batchId);
             // set batch active
             await commit('SET_ACTIVE', batch);
+            await dispatch('loadCalibration');
             await dispatch('loadTargets');
             // await dispatch('loadMatches');
             await dispatch('loadSamples');
+        },
+        async loadCalibration({ rootState, commit }) {
+            const calibrationFilename = state.active.calibration_sample_filename;
+            await rootState.api.query(`--sql
+                -- calibration
+                SELECT
+                    mz_calibration
+                FROM sample_file
+                WHERE filename == '${calibrationFilename}'
+            `).then((res) => {
+                if (res.length) commit('SET_MZ_CALIBRATION', res[0].mz_calibration);
+            });
         },
         async loadSamples({ rootState, commit }) {
             const batchId = state.active.sample_batch_id;
             // initialize sample filter
             await rootState.api.query(`--sql
-            -- samples
-            DROP TABLE IF EXISTS sample_item_filter;
-            CREATE TEMPORARY TABLE sample_item_filter AS
-                SELECT
-                    sample_item_id
-                    ,0 as selection
-                FROM sample_item
-                WHERE sample_batch_id == '${batchId}'
+                -- samples
+                DROP TABLE IF EXISTS sample_item_filter;
+                CREATE TEMPORARY TABLE sample_item_filter AS
+                    SELECT
+                        sample_item_id
+                        ,0 as selection
+                    FROM sample_item
+                    WHERE sample_batch_id == '${batchId}'
             `);
             // initialize match filter
             await dispatch('batch/initMatchFilter', null, {root:true});
@@ -283,6 +298,8 @@ export default {
             if (!state.active) return;
             rootState.api.emit('unsubscribe', state.active.sample_batch_id);
             commit('SET_ACTIVE', null);
+            // calibration
+            commit('SET_MZ_CALIBRATION', null);
             // samples
             commit('SET_SAMPLE_ITEMS', null);
             // targets

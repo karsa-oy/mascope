@@ -154,7 +154,7 @@ export default {
           this.$api.emit(
             'calibration_mz_apply',  
             this.mzFit,
-            this.sampleItems.map((item) => item.sample_file_id)
+            this.sampleItems.map((item) => item.filename)
             );
         },
       });
