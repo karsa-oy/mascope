@@ -5,138 +5,41 @@ import asyncio
 
 from backend.db.conn import conn
 from backend.db.id import gen_id
+from backend.lib.file import load_file
 from backend.lib.peak import detect_peaks, get_peaks
 from backend.lib.struct import LRUDict
 from backend.lib.chemistry import match_mz
-
-from backend.lib.file import load_file
-
 from backend.server import sio
 
 # File cache
 cache = LRUDict(10)
 
-# Note:
-#   The match API performs computations on a batch level
-#   not endpoints are provided for creating / removing
-#   match items individually.
-
-
-@sio.event(namespace='/')
-async def match_batch_compute(sid, sample_batch_id):
-
-    # clear previous matches
-    await match_batch_remove(sid, sample_batch_id)
-
-    with conn:
-        # fetch item ids
-        sample_item_ids = pd.read_sql(f"""
-            SELECT sample_item_id
-            FROM sample_item
-            WHERE sample_batch_id == ?
-            """,
-            conn,
-            params=[sample_batch_id]
-            )['sample_item_id'].tolist()
-
-    # concurrently perform matching
-    match_item_tasks = []
-    for sample_item_id in sample_item_ids:
-        match_item_tasks.append(
-            asyncio.create_task(
-                match_item_compute(sid, sample_item_id)
-            )
-        )
-    await asyncio.gather(*match_item_tasks)
-
-    # reload batch
-    await sio.emit('sample_batch_updated', room=sample_batch_id, namespace='/')
-
-
-@sio.event(namespace='/')
-async def match_batch_remove(sid, sample_batch_id):
-    with conn:
-        # get workspace id
-        workspace_id = pd.read_sql(f"""--sql'
-            SELECT workspace_id
-            FROM sample_batch
-            WHERE sample_batch_id == ?
-        """,
-        conn,
-        params=[sample_batch_id]
-        ).to_dict('records')
-
-        # delete record
-        conn.cursor().execute(f"""--sql
-            DELETE FROM match
-            WHERE sample_item_id IN (
-                SELECT sample_item_id
-                FROM sample_item
-                WHERE sample_batch_id == ?
-            )
-        """,
-        [sample_batch_id]
-        )
-    # reload workspace
-    await sio.emit('workspace_reload', workspace_id, namespace='/')
-
-
-@sio.event(namespace='/')
-async def match_item_compute(sid, sample_item_id):
-    print("computing matches for %s" %sample_item_id)
-    with conn:
-        # fetch filename and batch id
-        sample_item_df = pd.read_sql(f"""
-            SELECT filename, sample_batch_id
-            FROM sample_item
-            WHERE sample_item_id == '{sample_item_id}'
-            """,
-            conn
-            )
-        filename = sample_item_df['filename'].tolist()[0]
-        print("filename %s" %filename)
-        sample_batch_id = sample_item_df['sample_batch_id'].tolist()[0]
-        # get sample batch
-        sample_batch = pd.read_sql(
-            f"""--sql
-            SELECT * FROM sample_batch
-            WHERE sample_batch_id == '{sample_batch_id}'
-            """,
-            conn,
-            ).to_dict('records')[0]
-        print("of batch: %s" %sample_batch)
-        # get ionization mechanisms
-        ion_mechanisms = json.loads(sample_batch['build_params'])['ion_mechanisms']
-        ion_mechanism_df = pd.DataFrame.from_dict({
-            'mechanism_id': ion_mechanisms
-        })
-        mechanism_ids = ion_mechanism_df['mechanism_id'].tolist()
-        mechanism_id_refs = ','.join('?'*len(mechanism_ids))
-        # load target isotopes in the batch
-        target_isotope_df = pd.read_sql(
-            f"""
-            SELECT
-                target_isotope.*
-            FROM
-                target_collection_in_sample_batch batch
-                NATURAL JOIN target_compound_in_target_collection
-                NATURAL JOIN target_ion
-                NATURAL JOIN target_isotope
-            WHERE
-                sample_batch_id == '{sample_batch_id}'
-                AND mechanism_id IN ({mechanism_id_refs})
-            """,
-            conn,
-            params=mechanism_ids
-            )
-
-    mz_tolerance = 0.5
-
+def compute_matches(filename, target_collection_ids, ionization_mechanism_ids):
     # Note:
     #   Matching is done on isotope-level. Ion, compound
     #   and collection level matches are aggregated from
     #   isotope-level matches on read; see the frontend
-    #   batch store module for this aggregation.
+    #   sample store module for this aggregation.
+
+    collection_id_refs = ','.join('?'*len(target_collection_ids))
+    mechanism_id_refs = ','.join('?'*len(ionization_mechanism_ids))
+    # load target isotopes
+    target_isotope_df = pd.read_sql(
+        f"""
+        SELECT
+            target_isotope.*
+        FROM
+            target_collection
+            NATURAL JOIN target_compound_in_target_collection
+            NATURAL JOIN target_ion
+            NATURAL JOIN target_isotope
+        WHERE
+            target_collection_id IN ({collection_id_refs})
+            AND ionization_mechanism_id IN ({mechanism_id_refs})
+        """,
+        conn,
+        params=[*target_collection_ids, *ionization_mechanism_ids]
+        )
 
     ######################
     # STEP 1 - Get peaks #
@@ -166,7 +69,6 @@ async def match_item_compute(sid, sample_item_id):
         target_isotope_df.copy()
         .assign(
             match_id=np.nan,
-            sample_item_id=sample_item_id,
             sample_peak_id=np.nan,
             sample_peak_mz=np.nan,
             sample_peak_height=np.nan,
@@ -188,6 +90,8 @@ async def match_item_compute(sid, sample_item_id):
     #############################
 
     def match(row):
+        mz_tolerance = 0.5
+
         target_mz = row.mz
         match_indeces, match_mzs = match_mz(
             target_mz,
@@ -199,7 +103,7 @@ async def match_item_compute(sid, sample_item_id):
             peak_index = peak_sorting[match_index]
             peak_mz = peak_mzs[peak_index]
             peak_height = peak_heights[peak_index]
-            # check current betch match
+            # check current best match
             best_match = row.sample_peak_id
             if not np.isnan(best_match):
                 prev_mz_err = np.abs(row.sample_peak_mz - target_mz)
@@ -274,9 +178,117 @@ async def match_item_compute(sid, sample_item_id):
         axis=1,
         result_type='broadcast'
     )
+    return match_isotope_df
+
+
+@sio.event(namespace='/')
+async def match_batch_compute(sid, sample_batch_id):
+
+    # clear previous matches
+    await match_batch_remove(sid, sample_batch_id)
+
+    with conn:
+        # fetch item ids
+        sample_item_ids = pd.read_sql(f"""
+            SELECT sample_item_id
+            FROM sample_item
+            WHERE sample_batch_id == ?
+            """,
+            conn,
+            params=[sample_batch_id]
+            )['sample_item_id'].tolist()
+
+    # concurrently perform matching
+    match_item_tasks = []
+    for sample_item_id in sample_item_ids:
+        match_item_tasks.append(
+            asyncio.create_task(
+                match_item_compute(sid, sample_item_id)
+            )
+        )
+    await asyncio.gather(*match_item_tasks)
+
+    # reload batch
+    await sio.emit('sample_batch_updated', room=sample_batch_id, namespace='/')
+
+@sio.event(namespace='/')
+async def match_batch_remove(sid, sample_batch_id):
+    with conn:
+        # get workspace id
+        workspace_id = pd.read_sql(f"""--sql'
+            SELECT workspace_id
+            FROM sample_batch
+            WHERE sample_batch_id == ?
+        """,
+        conn,
+        params=[sample_batch_id]
+        ).to_dict('records')
+
+        # delete record
+        conn.cursor().execute(f"""--sql
+            DELETE FROM match
+            WHERE sample_item_id IN (
+                SELECT sample_item_id
+                FROM sample_item
+                WHERE sample_batch_id == ?
+            )
+        """,
+        [sample_batch_id]
+        )
+    # reload workspace
+    await sio.emit('workspace_reload', workspace_id, namespace='/')
+
+@sio.event(namespace='/')
+async def match_item_compute(sid, sample_item_id):
+    print("computing matches for %s" %sample_item_id)
+    with conn:
+        # fetch filename and batch id
+        sample_item_df = pd.read_sql(f"""
+            SELECT filename, sample_batch_id
+            FROM sample_item
+            WHERE sample_item_id == ?
+            """,
+            conn,
+            params=[sample_item_id]
+            )
+        filename = sample_item_df['filename'].tolist()[0]
+        print("filename %s" %filename)
+        sample_batch_id = sample_item_df['sample_batch_id'].tolist()[0]
+        # get sample batch
+        sample_batch = pd.read_sql(
+            f"""--sql
+            SELECT build_params
+            FROM sample_batch
+            WHERE sample_batch_id == ?
+            """,
+            conn,
+            params=[sample_batch_id]
+            ).to_dict('records')[0]
+        print("of batch: %s" %sample_batch)
+        # get ionization mechanisms
+        ion_mechanisms = json.loads(sample_batch['build_params'])['ion_mechanisms']
+        ion_mechanism_df = pd.DataFrame.from_dict({
+            'ionization_mechanism_id': ion_mechanisms
+        })
+        ionization_mechanism_ids = ion_mechanism_df['ionization_mechanism_id'].tolist()
+        target_collection_ids = pd.read_sql(
+            f"""--sql
+            SELECT target_collection_id FROM target_collection_in_sample_batch
+            WHERE sample_batch_id == ?
+            """,
+            conn,
+            params=[sample_batch_id]
+            )['target_collection_id'].tolist()
+
+    match_isotope_df = compute_matches(
+        filename,
+        target_collection_ids,  
+        ionization_mechanism_ids
+        )
 
     with conn:
         # save to database
+        match_isotope_df = match_isotope_df.assign(sample_item_id=sample_item_id)
         match_isotope_df = match_isotope_df[[
             "match_id"
             ,"target_isotope_id"
