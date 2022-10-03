@@ -9,7 +9,7 @@ from backend.lib.file import zarr_sdk
 from backend.lib.hardware.tofwerk.generator import H5Streamer
 from backend.lib.hardware.orbitrap.generator import RawStreamer
 from backend.lib.struct import AttrDict, LRUDict
-from backend.lib.util import parse_cmd_args, timestamp_from_filename
+from backend.lib.util import timestamp_from_filename
 
 from datetime import timedelta
 from dotenv import load_dotenv
