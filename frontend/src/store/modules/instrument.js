@@ -35,7 +35,7 @@ export default {
                 SELECT *
                 FROM sample_file
                 WHERE (
-                    (JulianDay('now') - JulianDay(datetime_utc) ) * 24 <= 240
+                    (JulianDay('now') - JulianDay(datetime_utc) ) <= 1
                 AND
                     instrument IN (
                     '${state.active}'
