@@ -127,6 +127,8 @@ class zarr_sdk:
         value = data['value']
         filename = filename_to_zarr_path(value['filename'], 'tps')
         filename = os.path.join(item.get('data_root', ''), filename)
+        if os.path.exists(filename):
+            raise FileExistsError(filename)
         tps_info = value['tps_info']
         tps_array = ExtendableDataArray(
             path=filename,
@@ -246,36 +248,18 @@ class zarr_sdk:
         )
 
 
-def append_instrument_log(log_path, new_entry):
-    log_file = os.path.join(log_path, '.log')
-    if not os.path.exists(log_file):
-        # Log file does not yet exist, create
-        with open(log_file, 'w') as f:
-            json.dump([new_entry], f, indent=4)
-    else:
-        # Append log
-        with open(log_file, 'r+') as f:
-            instrument_log = json.load(f)
-            instrument_log.append(new_entry)
-            f.seek(0)
-            json.dump(instrument_log, f, indent=4)
-
-
-def read_instrument_log(log_path):
-    log_file = os.path.join(log_path, '.log')
-    try:
-        with open(log_file, 'r+') as f:
-            instrument_log = json.load(f)
-    except FileNotFoundError:
-        instrument_log = []
-    return instrument_log
-
 
 def filename_to_zarr_path(base_filename, variable):
     base_path = get_base_path()
     sample_data_path = parse_path_from_item_filename(base_filename, base_path)
     zarr_filename = variable + os.extsep + 'zarr'
     return os.path.join(sample_data_path, zarr_filename)
+
+
+def get_base_path():
+    data_path = os.environ.get('MASCOPE_PRIVATE_DATADIR', '.')
+    base_path = os.path.join(data_path, 'instrument')
+    return base_path
 
 
 def get_file_data_vars(filepath):
@@ -527,9 +511,3 @@ def write_zarr_attributes(filepath, attributes):
     sync = ExtendableDataArray.get_zarr_synchronizer(filepath)
     z = zarr.open(filepath, mode='a', synchronizer=sync)
     z.attrs.update(attributes)
-
-
-def get_base_path():
-    data_path = os.environ.get('MASCOPE_PRIVATE_DATADIR', '.')
-    base_path = os.path.join(data_path, 'instrument')
-    return base_path

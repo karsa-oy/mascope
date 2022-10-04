@@ -114,16 +114,17 @@ class BaseStreamer(Thread):
     def _finalize(self):
         """Finalize acquisition
         """
-        # Feed poison pill
-        self.spec_queue.put({
-            'filename': self.filename,
-            'i': None,
-            'source_filepath': self.desc.currentDataFileName.decode()
-        })
-        self.tps_queue.put({
-            'filename': self.filename,
-            'i': None
-        })
+        if not self.cancel_event.is_set():
+            # Feed poison pill
+            self.spec_queue.put({
+                'filename': self.filename,
+                'i': None,
+                'source_filepath': self.desc.currentDataFileName.decode()
+            })
+            self.tps_queue.put({
+                'filename': self.filename,
+                'i': None
+            })
         # Reset self
         self._reset()
 
@@ -617,20 +618,14 @@ class H5Streamer(BaseStreamer, KInstrument):
         bool
             True if ticked, False if cancel or shutdown
         """
-        while not self.shutdown_event.is_set():
+        while not (self.shutdown_event.is_set() or self.cancel_event.is_set()):
             if not (self.spec_queue.qsize() or self.tps_queue.qsize()):
                 # Queues empty
                 return True
-            elif self.cancel_event.is_set():
-                # Cancelled
-                while self.spec_queue.qsize():
-                    self.spec_queue.get_nowait()
-                while self.tps_queue.qsize():
-                    self.tps_queue.get_nowait()
             else:
                 # Wait for data to be consumed from queues
                 sleep(.01)
-        # Shutdown
+        # Shutdown or cancel
         return False
 
     def run(self):
@@ -695,8 +690,8 @@ class H5Streamer(BaseStreamer, KInstrument):
             with self.lock:
                 H5Streamer.TwCloseH5(file_to_stream.encode())
             self.active.clear()
-            self.cancel_event.clear()
             self._finalize()
+            self.cancel_event.clear()
             print("h5Stream finished")
         # Out of main loop
         print('H5Streamer exiting')

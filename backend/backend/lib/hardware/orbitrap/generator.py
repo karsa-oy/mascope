@@ -113,12 +113,13 @@ class RawStreamer(Thread):
     def _finalize(self):
         """Finalize acquisition
         """
-        # Feed poison pill
-        self.spec_queue.put({
-            'filename': self.filename,
-            'i': None,
-            'source_filepath': self.raw.FileName
-        })
+        if not self.cancel_event.is_set():
+            # Feed poison pill
+            self.spec_queue.put({
+                'filename': self.filename,
+                'i': None,
+                'source_filepath': self.raw.FileName
+            })
         # Reset self
         self._reset()
 
@@ -184,18 +185,14 @@ class RawStreamer(Thread):
         bool
             True if ticked, False if shutdown
         """
-        while not self.shutdown_event.is_set():
+        while not (self.shutdown_event.is_set() or self.cancel_event.is_set()):
             if not self.spec_queue.qsize():
                 # Queues empty
                 return True
-            elif self.cancel_event.is_set():
-                # Cancelled
-                while self.spec_queue.qsize():
-                    self.spec_queue.get_nowait()
             else:
                 # Wait for data to be consumed from queues
                 sleep(.01)
-        # Shutdown
+        # Shutdown or cancel
         return False
 
     def run(self):

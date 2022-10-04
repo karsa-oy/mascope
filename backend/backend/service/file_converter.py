@@ -139,19 +139,26 @@ async def streamer_processor(streamer):
                 cache_item = zarr_sdk.init_signal_dataset({'value': data})
             except FileExistsError:
                 print("File exists: %s" %data['filename'])
-                return
+                print("Canceling...")
+                streamer.cancel_event.set()
+                # Clear queues
+                streamer.spec_queue.get_nowait() # data
+                if hasattr(streamer, 'tps_queue'):
+                    streamer.tps_queue.get_nowait() # coordinates
+                    streamer.tps_queue.get_nowait() # data
+                return False
             cache_item = AttrDict(cache_item)
             cache[filename] = cache_item
         else:
             # New data to existing file
             zarr_sdk.update_signal_dataset({'value': data}, cache_item)
+        return True
             
     async def handle_tps_data(data):
         filename = data['filename']
         spec_i = data['i']
         cache_item = cache.get(filename)
-        if not cache_item:
-            print("handle_tps_data failed!")
+        if cache_item is None:
             return
         if spec_i is None:
             # File finished
@@ -163,7 +170,6 @@ async def streamer_processor(streamer):
                 data.update({'filename': zarr_filename})
                 zarr_sdk.init_tps_dataset({'value': data}, cache_item)
             except FileExistsError:
-                print("File exists: %s" %filename)
                 return
         else:
             # New data to existing file
@@ -173,8 +179,8 @@ async def streamer_processor(streamer):
     while not streamer.shutdown_event.is_set():
         try:
             spec_data = streamer.spec_queue.get_nowait()
-            await handle_spec_data(spec_data)
-            if hasattr(streamer, 'tps_queue'):
+            success = await handle_spec_data(spec_data)
+            if success and hasattr(streamer, 'tps_queue'):
                 tps_data = streamer.tps_queue.get()
                 await handle_tps_data(tps_data)
         except Empty:
