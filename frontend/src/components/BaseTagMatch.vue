@@ -10,7 +10,7 @@
       multilined
     >
       <b-tag :icon="tag.icon" :class="tag.class" style="font-size: small">
-        <span :style="tag.weight">
+        <span v-if="displayMatchScore" :style="tag.weight">
           {{ formatter.format(matchScore) }}
         </span>
       </b-tag>
@@ -30,6 +30,11 @@ import { get } from "vuex-pathify";
 export default {
   name: "BaseTagMatch",
   props: {
+    displayMatchScore: {
+      type: Boolean,
+      required: false,
+      default: true,
+    },
     matchScore: {
       type: Number,
       required: true,
