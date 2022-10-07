@@ -7,7 +7,8 @@ from backend.api.sample import sample_batch_update, sample_file_update
 from backend.api.signal import signal_mz_calibration_update
 from backend.db.conn import conn
 from backend.lib.file import load_file
-from backend.lib.peak import get_peaks, mz_calibrate_tof
+from backend.lib.hardware.tofwerk.calibration import mz_calibrate
+from backend.lib.peak import get_peaks
 from backend.server import sio
 
 
@@ -59,7 +60,7 @@ async def calibration_mz_calibrate_batch(
         )
     
     # Fit mz calibration
-    fit, stats = mz_calibrate_tof(
+    fit, stats = mz_calibrate(
         match_isotope_df['sample_peak_tof'],
         match_isotope_df['sample_peak_mz'],
         match_isotope_df['mz']
@@ -75,21 +76,51 @@ async def calibration_mz_calibrate_batch(
     await sample_batch_update(sid, sample_batch_df.to_dict('records'))
 
 @sio.event(namespace='/')
-async def calibration_mz_fit(sid, peak_tofs, peak_mzs, exact_mzs):
-    mz_calib, stats = mz_calibrate_tof(
-        peak_tofs,
-        peak_mzs,
-        exact_mzs
-    )
+async def calibration_mz_fit(
+    sid,
+    filename,
+    calibration_collection_ids,
+    ionization_mechanism_ids,
+    match_score_min,
+    refine_window
+    ):
+    # Compute matches for calibration compounds
+    match_isotope_df = compute_matches(
+        filename,
+        calibration_collection_ids,
+        ionization_mechanism_ids
+        )
+
+    # Filter matches
+    good_matches_df = match_isotope_df[
+        (abs(match_isotope_df.match_mz_error) <= refine_window)
+        & (match_isotope_df.match_score >= match_score_min)
+        ]
+    print(good_matches_df.to_string())
+
+    if len(good_matches_df) > 3:
+        # Fit mz calibration
+        fit, stats = mz_calibrate(
+            good_matches_df['sample_peak_tof'],
+            good_matches_df['sample_peak_mz'],
+            good_matches_df['mz']
+        )
+        print(fit, stats)
+        # TODO: Check calibration is ok
+        calibration_df = good_matches_df.copy().assign(
+            calibration_mz=stats['new_mz'],
+            calibration_mz_error=stats['post_dmz']
+            )
+        stats = calibration_df.to_dict('records')
+    else:
+        # Not enough calibration peaks
+        fit = None
+        stats = None
+
     await sio.emit('calibration_mz_fit_stats',
         {
-        'fit': mz_calib,
-        'stats': {
-            'post_mz': stats['new_mz'].astype(np.float32).tobytes(),
-            'post_dmz': stats['post_dmz'].astype(np.float32).tobytes(),
-            'post_dmz_norm': stats['post_dmz_norm'],
-            'pre_dmz_norm': stats['pre_dmz_norm'],
-            }
+        'fit': fit,
+        'stats': stats
         },
         room=sid
     )

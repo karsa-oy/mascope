@@ -11,8 +11,6 @@ import { sync, get, call } from "vuex-pathify";
 
 import BaseBrowser from "./BaseBrowser.vue";
 
-let doNothing = () => ({});
-
 export default {
   name: "ThePaneBrowserTarget",
   components: {

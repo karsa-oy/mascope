@@ -4,6 +4,8 @@ const state = {
     active: null,
     mzFit: null,
     mzFitStats: null,
+    paramRefineWindow: 10,
+    paramMatchScoreMin: 0.9,
 };
 
 export default {
@@ -13,14 +15,13 @@ export default {
         ...make.mutations(state),
     },
     actions: {
+        async unload({ commit }) {
+            await commit('SET_MZ_FIT', null);
+            await commit('SET_MZ_FIT_STATS', null);
+        },
         async onCalibrationMzFitStats({ commit }, response) {
             let fit = response.fit;
-            let fitStats = {
-                post_mz: new Float32Array(response.stats.post_mz),
-                post_dmz: new Float32Array(response.stats.post_dmz),
-                pre_dmz_norm: response.stats.pre_dmz_norm,
-                post_dmz_norm: response.stats.post_dmz_norm
-            };
+            let fitStats = response.stats;
             await commit('SET_MZ_FIT', fit);
             await commit('SET_MZ_FIT_STATS', fitStats);
         },

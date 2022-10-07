@@ -34,11 +34,17 @@ export default {
   name: "BaseTable",
   components: {},
   props: {
-    cols: {
-      type: Array,
-      required: true,
+    checkable: {
+      type: Boolean,
+      required: false,
+      default: false,
     },
-    rows: {
+    checkSingle: {
+      type: Boolean,
+      required: false,
+      default: false,
+    },
+    cols: {
       type: Array,
       required: true,
     },
@@ -52,15 +58,19 @@ export default {
       required: false,
       default: "100%",
     },
-    checkable: {
-      type: Boolean,
+    maxPrecision: {
+      type: Number,
       required: false,
-      default: false,
+      default: 2
     },
-    checkSingle: {
-      type: Boolean,
+    minPrecision: {
+      type: Number,
       required: false,
-      default: false,
+      default: 2
+    },
+    rows: {
+      type: Array,
+      required: true,
     },
     searchable: {
       type: Boolean,

@@ -1,4 +1,4 @@
-import { make } from 'vuex-pathify';
+import { dispatch, make } from 'vuex-pathify';
 
 const state = {
     active: null,
@@ -15,6 +15,10 @@ export default {
     mutations: make.mutations(state),
     actions: {
         async load({ commit, dispatch }, sample) {
+            // reset if previous sample loaded
+            if (state.active) {
+                dispatch('unload');
+            }
             // set sample active
             await commit('SET_ACTIVE', sample);
             await dispatch('loadMatches');
@@ -170,18 +174,23 @@ export default {
                 commit('SET_MATCH_ISOTOPES', res);
             });
         },
-        async unload({ commit }) {
+        async unload({ commit, dispatch }) {
             commit('SET_ACTIVE', null);
             // matches
             commit('SET_MATCH_COLLECTIONS', null);
             commit('SET_MATCH_COMPOUNDS', null);
             commit('SET_MATCH_IONS', null);
             commit('SET_MATCH_ISOTOPES', null);
+            // calibration
+            dispatch("calibration/unload", null, {root:true});
         },
         async reload({ dispatch, state }) {
             if (state.active) {
                 dispatch('load', state.active);
             }
+        },
+        onSampleItemCreated({ dispatch }, sample_item_id) {
+            dispatch("load", {sample_item_id});
         },
     },
     getters: {}

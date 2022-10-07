@@ -9,158 +9,219 @@
       @close="deactivateModal"
     >
       <div class="box" style="background-color: inherit">
-        <div style="text-align: right" v-if="editable">
-          <b-button
-            icon-right="cog"
-            type="is-primary"
-            size="is-small"
-            @click="showEditFunctions = !showEditFunctions"
-          >
-          </b-button>
-        </div>
-        <div style="padding-bottom: 1.5em">
-          <h1 style="font-size: 16px; text-align: center">
-            <p>
-              <b>Sample information</b>
-            </p>
-          </h1>
-        </div>
-        <div v-for="item in formFields" :key="item.label">
-          <template>
-            <b-field :label="item.label.replaceAll('_', ' ')">
-              <b-input
-                v-model="item.value"
-                :placeholder="
-                  showEditFunctions ? item.placeholder || 'default value' : ''
-                "
-                :required="fillable && item.required"
-                :disabled="!fillable || item.disabled"
-                lazy
-                expanded
-              >
-              </b-input>
-              <div v-if="showEditFunctions">
+        <b-steps
+            v-model="activeStep"
+            :has-navigation="false"
+            >
+
+            <b-step-item label="Sample information" :clickable="true">
+              <div style="text-align: right" v-if="editable">
                 <b-button
-                  :id="item.label"
-                  :disabled="item.required"
-                  @click="removeField"
-                  type="is-danger"
-                  icon-right="delete"
-                  hover
-                  title="Delete Field"
+                  icon-right="cog"
+                  type="is-primary"
+                  size="is-small"
+                  @click="showEditFunctions = !showEditFunctions"
                 >
                 </b-button>
               </div>
-            </b-field>
-          </template>
-        </div>
-        <div>
-          <b-field label="Sample type">
-            <b-dropdown
-              aria-role="list"
-              v-model="sampleItemType"
-              expanded
-              >
-              <template #trigger>
-                  <b-button
-                      :label="sampleItemType"
-                      icon-right="menu-down"
+              <div style="padding-bottom: 1.5em">
+                <h1 class="title has-text-centered">Sample information</h1>
+              </div>
+              <div v-for="item in formFields" :key="item.label">
+                <template>
+                  <b-field :label="item.label.replaceAll('_', ' ')">
+                    <b-input
+                      v-model="item.value"
+                      :placeholder="
+                        showEditFunctions ? item.placeholder || 'default value' : ''
+                      "
+                      :required="fillable && item.required"
+                      :disabled="!fillable || item.disabled"
+                      lazy
                       expanded
-                      style="align:left"
-                  />
-              </template>
-              <b-dropdown-item aria-role="listitem" value="SAMPLE">Sample</b-dropdown-item>
-              <b-dropdown-item aria-role="listitem" value="BLANK">Blank</b-dropdown-item>
-              <b-dropdown-item v-if="!batchMzCalibration" aria-role="listitem" value="CALIBRATION">Calibration</b-dropdown-item>
-            </b-dropdown>
-          </b-field>
-        </div>
-        <div v-if="showEditFunctions" style="padding-top: 2em">
-          <b-field>
-            <b-button @click="addField" expanded>
-              <b>Add new field</b>
-            </b-button>
-          </b-field>
-        </div>
-        <div><br /></div>
-        <b-field label="Reuse template">
-          <div class="container">
-            <div class="row">
-              <div class="columns">
-                <div class="column is-half" style="text-align: center">
-                  <b-select
-                    v-model="loadedTemplate"
-                    placeholder="Load template"
-                    expanded
-                  >
-                    <option
-                      v-for="t in availableTemplates"
-                      :value="t"
-                      :key="t.name"
                     >
-                      {{ t.name }}
-                    </option>
-                  </b-select>
-                </div>
-                <div
-                  class="column is-narrow"
-                  style="text-align: left"
-                  v-if="showEditFunctions"
-                >
-                  <b-button
-                    :disabled="
-                      !loadedTemplate ||
-                      !loadedTemplate.name ||
-                      loadedTemplate.name == 'default'
-                    "
-                    @click="deleteTemplate"
-                    type="is-danger"
-                    icon-right="delete"
-                    hover
-                    title="Delete Template"
-                  >
+                    </b-input>
+                    <div v-if="showEditFunctions">
+                      <b-button
+                        :id="item.label"
+                        :disabled="item.required"
+                        @click="removeField"
+                        type="is-danger"
+                        icon-right="delete"
+                        hover
+                        title="Delete Field"
+                      >
+                      </b-button>
+                    </div>
+                  </b-field>
+                </template>
+              </div>
+              <div>
+                <b-field label="Sample type">
+                  <b-dropdown
+                    aria-role="list"
+                    v-model="sampleItemType"
+                    expanded
+                    >
+                    <template #trigger>
+                        <b-button
+                            :label="sampleItemType"
+                            icon-right="menu-down"
+                            expanded
+                            style="align:left"
+                        />
+                    </template>
+                    <b-dropdown-item aria-role="listitem" value="SAMPLE">Sample</b-dropdown-item>
+                    <b-dropdown-item aria-role="listitem" value="BLANK">Blank</b-dropdown-item>
+                    <b-dropdown-item v-if="!batchMzCalibration" aria-role="listitem" value="CALIBRATION">Calibration</b-dropdown-item>
+                  </b-dropdown>
+                </b-field>
+              </div>
+              <div v-if="showEditFunctions" style="padding-top: 2em">
+                <b-field>
+                  <b-button @click="addField" expanded>
+                    <b>Add new field</b>
                   </b-button>
+                </b-field>
+              </div>
+              <div><br /></div>
+              <b-field label="Reuse template">
+                <div class="container">
+                  <div class="row">
+                    <div class="columns">
+                      <div class="column is-half" style="text-align: center">
+                        <b-select
+                          v-model="loadedTemplate"
+                          placeholder="Load template"
+                          expanded
+                        >
+                          <option
+                            v-for="t in availableTemplates"
+                            :value="t"
+                            :key="t.name"
+                          >
+                            {{ t.name }}
+                          </option>
+                        </b-select>
+                      </div>
+                      <div
+                        class="column is-narrow"
+                        style="text-align: left"
+                        v-if="showEditFunctions"
+                      >
+                        <b-button
+                          :disabled="
+                            !loadedTemplate ||
+                            !loadedTemplate.name ||
+                            loadedTemplate.name == 'default'
+                          "
+                          @click="deleteTemplate"
+                          type="is-danger"
+                          icon-right="delete"
+                          hover
+                          title="Delete Template"
+                        >
+                        </b-button>
+                      </div>
+                      <div
+                        class="column is-narrow"
+                        style="text-align: left"
+                        v-if="showEditFunctions"
+                      >
+                        <b-button
+                          @click="saveTemplate"
+                          :disabled="!formFields.length"
+                          type="is-success"
+                          icon-left="content-save"
+                          hover
+                          title="Save Template"
+                        >
+                        </b-button>
+                      </div>
+                      <div class="column is-one-half" style="text-align: right">
+                        <b-button
+                          :disabled="
+                            !this.sampleItemType
+                            || (
+                              this.formFields.filter((f) => f.required).length !=
+                              this.formFields
+                              .filter((f) => f.required)
+                              .filter((f) => f.value).length
+                            )
+                          "
+                          type="is-success"
+                          icon-left="content-save"
+                          @click="saveSampleItem"
+                        >
+                          Save sample info
+                        </b-button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div
-                  class="column is-narrow"
-                  style="text-align: left"
-                  v-if="showEditFunctions"
+              </b-field>
+            </b-step-item>
+
+            <b-step-item label="Calibration" :clickable="this.sampleActive ? true : false">
+                <h1 class="title has-text-centered">Calibration</h1>
+                <base-param-field
+                  label="Min. match score"
+                  path="calibration/paramMatchScoreMin"
+                  :range="{ min: 0, max: 1, step: .1 }"
+                  type="is-primary"
                 >
+                </base-param-field>
+                <base-param-field
+                  label="Refine window [ppm]"
+                  path="calibration/paramRefineWindow"
+                  :range="{ min: 0, max: 100, step: 1 }"
+                  type="is-primary"
+                >
+                </base-param-field>
+                <base-table
+                  :key="mzCalibrationTableKey"
+                  :rows="mzCalibrationTableRows"
+                  :cols="mzCalibrationTableCols"
+                  :checkable="false"
+                  :searchable="false"
+                  :minPrecision="4"
+                  :maxPrecision="4"
+                >
+                </base-table>
+                <div style="text-align: right">
                   <b-button
-                    @click="saveTemplate"
-                    :disabled="!formFields.length"
+                    :disabled="this.sampleActive ? false : true"
+                    type="is-primary"
+                    icon-left=""
+                    @click="mzCalibrationFit"
+                  >
+                    Fit
+                  </b-button>
+                  <b-button
+                    :disabled="this.mzFit ? false : true"
                     type="is-success"
                     icon-left="content-save"
-                    hover
-                    title="Save Template"
+                    @click="mzCalibrationApply"
                   >
+                    Apply calibration
                   </b-button>
                 </div>
-                <div class="column is-one-half" style="text-align: right">
+            </b-step-item>
+
+            <b-step-item label="Target search" :clickable="this.sampleActive ? true : false">
+                <h1 class="title has-text-centered">Target search</h1>
+                <div style="text-align: center">
                   <b-button
-                    :disabled="
-                      !this.sampleItemType
-                      || (
-                        this.formFields.filter((f) => f.required).length !=
-                        this.formFields
-                        .filter((f) => f.required)
-                        .filter((f) => f.value).length
-                      )
-                    "
+                    :disabled="this.sampleActive ? false : true"
                     type="is-success"
                     icon-left="content-save"
-                    @click="processSample"
+                    @click="sampleMatch"
                   >
                     Process
                   </b-button>
                 </div>
-              </div>
-            </div>
-            <div class="row">
-              <br />
-            </div>
-          </div>
-        </b-field>
+            </b-step-item>
+        </b-steps>
       </div>
     </b-modal>
   </section>
@@ -168,18 +229,24 @@
 
 <script>
 
+import BaseParamField from "./BaseParamField.vue";
+import BaseTable from "./BaseTable.vue";
+
 import * as _ from "underscore";
 import { mapMutations } from "vuex";
-import { get, sync } from "vuex-pathify";
+import { call, get, sync } from "vuex-pathify";
 
 export default {
   name: "TheModalSampleItemAttributesSave",
   components: {
+    BaseParamField,
+    BaseTable,
   },
   props: {},
   data: function () {
     return {
       action: null,
+      activeStep: 0,
       defaultTemplate: {
         name: "default",
         template: [
@@ -194,15 +261,24 @@ export default {
             placeholder: "",
             disabled: true,
           },
-          {
-            label: "sample_item_description",
-            required: true,
-            placeholder: "description",
-          },
         ],
       },
       formFields: [],
       loadedTemplate: null,
+      mzCalibrationTableCols: [
+        { field: "mz", label: "Isotope m/z" },
+        { field: "sample_peak_mz", label: "Pre peak m/z" },
+        { field: "match_mz_error", label: "Pre m/z error [ppm]", subheading: null },
+        { field: "calibration_mz", label: "Post peak m/z" },
+        {
+          field: "calibration_mz_error",
+          label: "Post m/z error [ppm]",
+          subheading: null,
+        },
+        { field: "mz_error_diff", label: "m/z error diff", subheading: null },
+      ],
+      mzCalibrationTableKey: 0,
+      sampleFilename: null,
       sampleItemType: null,
       showEditFunctions: false,
       templateType: "sample_item",
@@ -212,8 +288,13 @@ export default {
     ...get({
       allTemplates: "app/attributeTemplates",
       batchActive: "batch/active",
-      batchMzCalibration: "batch/mz_calibration",
+      batchMzCalibration: "batch/mzCalibration",
+      modalActive: "modal/sampleItemAttributesSaveActive",
       modalProps: "modal/sampleItemAttributesSaveProps",
+      mzCalibrationMatchScoreMin: "calibration/paramMatchScoreMin",
+      mzCalibrationRefineWindow: "calibration/paramRefineWindow",
+      mzFit: "calibration/mzFit",
+      mzFitStats: "calibration/mzFitStats",
       sampleActive: "sample/active",
     }),
     ...sync({
@@ -228,6 +309,9 @@ export default {
     fillable() {
       return ['create', 'update'].includes(this.action);
     },
+    mzCalibrationTableRows() {
+      return this.mzFitStats ?? [];
+    },
     savedTemplates() {
       return this.allTemplates.filter(
         (template) => template.type == this.templateType
@@ -238,6 +322,9 @@ export default {
     this.loadedTemplate = this.clone(this.availableTemplates[0]);
   },
   methods: {
+    ...call({
+      mzCalibrationReset: "calibration/unload",
+    }),
     ...mapMutations({
       deactivateModal: "modal/deactivate",
     }),
@@ -280,6 +367,26 @@ export default {
         }
       });
     },
+    mzCalibrationApply() {
+      this.$api.emit(
+        'calibration_mz_apply',
+        this.mzFit,
+        [this.sampleFilename]
+        )
+    },
+    mzCalibrationFit() {
+      this.mzCalibrationReset();
+      const calibrationCollectionId = this.batchActive.build_params.calibration_collection;
+      const ionizationMechanismIds = this.batchActive.build_params.ion_mechanisms;
+      this.$api.emit(
+        'calibration_mz_fit',
+        this.sampleFilename,
+        [calibrationCollectionId],
+        ionizationMechanismIds,
+        this.mzCalibrationMatchScoreMin,
+        this.mzCalibrationRefineWindow
+        );
+    },
     removeField(event) {
       // Field to remove label is in button element id, find it from the event data
       let fieldToRemove = event.target.id;
@@ -301,25 +408,17 @@ export default {
         }
       }
     },
-    async processSample() {
-      const filename = this.formFields.filter((field) => field.label=='filename')[0].value;
+    sampleMatch() {
+      this.$api.emit(
+        'match_item_compute',
+        this.sampleActive.sample_item_id
+      )
+    },
+    async saveSampleItem() {
       switch (this.sampleItemType) {
         case 'CALIBRATION':
-          await this.$api.emit(
-            'calibration_mz_calibrate_batch',
-            this.batchActive.sample_batch_id,
-            filename,
-            )
-          break;
         case 'BLANK':
         case 'SAMPLE':
-          if (this.batchMzCalibration) {
-            this.$api.emit(
-              'calibration_mz_apply',
-              this.batchMzCalibration,
-              [filename]
-              )
-          }
           break;
       }
       this.saveAttributes();
@@ -391,10 +490,19 @@ export default {
           newSampleItem.sample_item_id = this.sampleActive.sample_item_id;
           this.$api.emit('sample_item_update', [newSampleItem]);
         }
-      this.deactivateModal();
     },
   },
   watch: {
+    activeStep() {
+      switch (this.activeStep) {
+        case 0:
+          break;
+        case 1:
+          break;
+        case 2:
+          break;
+      }
+    },
     loadedTemplate: {
       handler(newValue) {
         if (newValue) {
@@ -403,6 +511,9 @@ export default {
         }
       },
       deep: true,
+    },
+    modalActive() {
+      if (this.modalActive) this.activeStep = 0;
     },
     modalProps: async function (data) {
       this.action = data.action;
@@ -432,6 +543,7 @@ export default {
           );
         }
         this.loadedTemplate = newTemplate;
+        this.sampleFilename = data.sampleItemRecordToLoad.filename;
         this.sampleItemType = data.sampleItemRecordToLoad.sample_item_type;
     },
   },

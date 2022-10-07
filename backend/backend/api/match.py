@@ -7,12 +7,9 @@ from backend.db.conn import conn
 from backend.db.id import gen_id
 from backend.lib.file import load_file
 from backend.lib.peak import detect_peaks, get_peaks
-from backend.lib.struct import LRUDict
 from backend.lib.chemistry import match_mz
 from backend.server import sio
 
-# File cache
-cache = LRUDict(10)
 
 def compute_matches(filename, target_collection_ids, ionization_mechanism_ids):
     # Note:
@@ -35,7 +32,7 @@ def compute_matches(filename, target_collection_ids, ionization_mechanism_ids):
             NATURAL JOIN target_isotope
         WHERE
             target_collection_id IN ({collection_id_refs})
-            AND ionization_mechanism_id IN ({mechanism_id_refs})
+            AND mechanism_id IN ({mechanism_id_refs})
         """,
         conn,
         params=[*target_collection_ids, *ionization_mechanism_ids]
@@ -45,20 +42,15 @@ def compute_matches(filename, target_collection_ids, ionization_mechanism_ids):
     # STEP 1 - Get peaks #
     ######################
 
-    # Check if file is cached
-    cache_item = cache.get(filename, None)
-    if not cache_item:
-        # File not in cache, load
-        print("Loading file: %s" % filename)
-        cache_item = load_file(filename, vars=['peaks'])
-        cache[filename] = cache_item
+    # Load file
+    print("Loading file: %s" % filename)
+    sample_file = load_file(filename, vars=['peaks'])
 
-    if 'peaks' not in cache_item:
+    if 'peaks' not in sample_file:
         # Find peaks and write to file
-        cache_item = detect_peaks(cache_item)
-        cache[filename] = cache_item
+        sample_file = detect_peaks(sample_file)
 
-    peaks = get_peaks(cache_item)
+    peaks = get_peaks(sample_file)
 
     #########################
     # STEP 2 - Prepare data #
@@ -268,9 +260,9 @@ async def match_item_compute(sid, sample_item_id):
         # get ionization mechanisms
         ion_mechanisms = json.loads(sample_batch['build_params'])['ion_mechanisms']
         ion_mechanism_df = pd.DataFrame.from_dict({
-            'ionization_mechanism_id': ion_mechanisms
+            'mechanism_id': ion_mechanisms
         })
-        ionization_mechanism_ids = ion_mechanism_df['ionization_mechanism_id'].tolist()
+        ionization_mechanism_ids = ion_mechanism_df['mechanism_id'].tolist()
         target_collection_ids = pd.read_sql(
             f"""--sql
             SELECT target_collection_id FROM target_collection_in_sample_batch
@@ -288,6 +280,7 @@ async def match_item_compute(sid, sample_item_id):
 
     with conn:
         # save to database
+        print("updating database")
         match_isotope_df = match_isotope_df.assign(sample_item_id=sample_item_id)
         match_isotope_df = match_isotope_df[[
             "match_id"
@@ -308,6 +301,7 @@ async def match_item_compute(sid, sample_item_id):
             if_exists='append',
             index=False
             )
+    print("complete")
 
 @sio.event(namespace='/')
 async def match_item_remove(sid, sample_item_id):

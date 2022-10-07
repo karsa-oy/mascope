@@ -29,7 +29,13 @@ async def signal_mz_calibration_update(fit, filenames):
         print("Calibrating file: %s" % filename)
         if nbr_samples != get_zarr_var_shape(filename, 'signal')[0]:
             raise Exception("Number of TOF samples does not match")
-        update_props(filename, {'range': new_range})
+        update_props(
+            filename,
+            {
+                'range': new_range,
+                'mz_calibration': fit    
+            }
+            )
         # Write new mz coordinates to zarr file
         update_zarr_array_coord(filename, 'signal', 'mz', new_mz)
         try:

@@ -3,7 +3,7 @@ import { dispatch, make } from 'vuex-pathify';
 const state = {
     active: null,
     // calibration
-    mz_calibration: null,
+    mzCalibration: null,
     // samples
     sampleItems: null,
     // targets
@@ -56,7 +56,6 @@ export default {
                 CREATE TEMPORARY TABLE sample_item_filter AS
                     SELECT
                         sample_item_id
-                        ,0 as selection
                     FROM sample_item
                     WHERE sample_batch_id == '${batchId}'
             `);
@@ -111,6 +110,10 @@ export default {
             `).then((res) => {
                 commit('SET_SAMPLE_ITEMS', res);
             });
+            const sampleItemFocused = rootState.sample.active;
+            if (sampleItemFocused) {
+                dispatch('batch/sampleItemFocus', sampleItemFocused);
+            }
         },
         async loadTargets({ rootState, state, commit }) {
             const batchId = state.active.sample_batch_id;
@@ -311,8 +314,8 @@ export default {
             commit('SET_MATCH_COLLECTIONS', null);
             commit('SET_MATCH_COMPOUNDS', null);
             commit('SET_MATCH_IONS', null);
-            // unload sample
-            dispatch("sample/unload", null, {root:true})
+            // // unload sample
+            // dispatch("sample/unload", null, {root:true})
         },
         async reload({ dispatch, state }) {
             if (state.active) {
@@ -322,8 +325,8 @@ export default {
             }
         },
         async onSampleBatchUpdated({ dispatch }) {
-            await dispatch('api/reloadDb', null, {root:true});
-            dispatch('reload');
+            await dispatch('api/reloadDb', null, {root:true})
+                .then(() => dispatch('reload'));
         },
         async batchToggle({ rootState, state, dispatch }, batch) {
             rootState.workspace.batches.forEach(

@@ -221,10 +221,16 @@ async def sample_item_create(sid, sample_items):
             )
         sample_item_ids = sample_item_df['sample_item_id'].tolist()
     for sample_item_id in sample_item_ids:
-        await match_item_compute(sid, sample_item_id)
+        # await match_item_compute(sid, sample_item_id)
         await sio.emit(
             'sample_batch_updated',
             room=sample_batch_id,
+            namespace='/'
+            )
+        await sio.emit(
+            'sample_item_created',
+            sample_item_id,
+            room=sid,
             namespace='/'
             )
 
