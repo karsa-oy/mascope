@@ -177,9 +177,8 @@ async def calibration_mz_apply(sid, fit, sample_filenames):
                 params=[sample_file['sample_file_id']]
                 )['sample_item_id'].tolist()
         for sample_item_id in sample_item_ids:
-        #     # Update matches
-        #     await match_item_remove(sid, sample_item_id)
-        #     await match_item_compute(sid, sample_item_id)
+            # Delete outdated matches
+            await match_item_remove(sid, sample_item_id)
             await sio.emit(
                 'calibration_mz_applied',
                 sample_item_id,
