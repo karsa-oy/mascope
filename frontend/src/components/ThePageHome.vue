@@ -226,6 +226,7 @@ export default {
   },
   methods: {
     ...call({
+      defocusSample: "sample/unload",
       getAcquisitions: "instrument/getAcquisitions",
       loadInstrument: "instrument/load",
       unloadInstrument: "instrument/unload",
@@ -245,6 +246,7 @@ export default {
       });
     },
     launchProcessSelectedModal() {
+      this.defocusSample();
       this.sampleItemAttributesSaveProps = {
         action: 'create',
         sampleItemRecordToLoad: this.sampleFilesSelected[0],

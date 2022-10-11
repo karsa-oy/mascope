@@ -14,7 +14,11 @@
             :has-navigation="false"
             >
 
-            <b-step-item label="Sample information" :clickable="true">
+            <b-step-item
+              label="Sample information"
+              :clickable="true"
+              :type="{'is-success': this.sampleActive ? true : false}"
+              >
               <div style="text-align: right" v-if="editable">
                 <b-button
                   icon-right="cog"
@@ -162,7 +166,11 @@
               </b-field>
             </b-step-item>
 
-            <b-step-item label="Calibration" :clickable="this.sampleActive ? true : false">
+            <b-step-item
+              label="Calibration"
+              :clickable="this.sampleActive ? true : false"
+              :type="{'is-success': this.sampleMzCalibrated}"
+              >
                 <h1 class="title has-text-centered">Calibration</h1>
                 <base-param-field
                   label="Min. match score"
@@ -208,8 +216,15 @@
                 </div>
             </b-step-item>
 
-            <b-step-item label="Target search" :clickable="this.sampleActive ? true : false">
+            <b-step-item
+              label="Target search"
+              :clickable="this.sampleMzCalibrated ? true : false"
+              :type="{'is-success': this.sampleMatched}"
+              >
                 <h1 class="title has-text-centered">Target search</h1>
+                <div v-if="this.sampleMatched">
+                  <the-pane-browser-target></the-pane-browser-target>
+                </div>
                 <div style="text-align: center">
                   <b-button
                     :disabled="this.sampleActive ? false : true"
@@ -231,6 +246,7 @@
 
 import BaseParamField from "./BaseParamField.vue";
 import BaseTable from "./BaseTable.vue";
+import ThePaneBrowserTarget from "./ThePaneBrowserTarget.vue";
 
 import * as _ from "underscore";
 import { mapMutations } from "vuex";
@@ -241,6 +257,7 @@ export default {
   components: {
     BaseParamField,
     BaseTable,
+    ThePaneBrowserTarget,
   },
   props: {},
   data: function () {
@@ -296,6 +313,8 @@ export default {
       mzFit: "calibration/mzFit",
       mzFitStats: "calibration/mzFitStats",
       sampleActive: "sample/active",
+      sampleMatched: "sample/matched",
+      sampleMzCalibrated: "sample/active@mz_calibration.verified",
     }),
     ...sync({
       modalActive: "modal/sampleItemAttributesSaveActive",

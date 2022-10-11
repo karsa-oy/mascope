@@ -302,6 +302,11 @@ async def match_item_compute(sid, sample_item_id):
             index=False
             )
     print("complete")
+    await sio.emit(
+        'sample_batch_updated',
+        room=sample_batch_id,
+        namespace='/'
+        )
 
 @sio.event(namespace='/')
 async def match_item_remove(sid, sample_item_id):

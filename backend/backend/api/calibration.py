@@ -96,7 +96,6 @@ async def calibration_mz_fit(
         (abs(match_isotope_df.match_mz_error) <= refine_window)
         & (match_isotope_df.match_score >= match_score_min)
         ]
-    print(good_matches_df.to_string())
 
     if len(good_matches_df) > 3:
         # Fit mz calibration
@@ -105,7 +104,6 @@ async def calibration_mz_fit(
             good_matches_df['sample_peak_mz'],
             good_matches_df['mz']
         )
-        print(fit, stats)
         # TODO: Check calibration is ok
         calibration_df = good_matches_df.copy().assign(
             calibration_mz=stats['new_mz'],
@@ -117,10 +115,11 @@ async def calibration_mz_fit(
         fit = None
         stats = None
 
-    await sio.emit('calibration_mz_fit_stats',
+    await sio.emit(
+        'calibration_mz_fit_stats',
         {
-        'fit': fit,
-        'stats': stats
+            'fit': fit,
+            'stats': stats
         },
         room=sid
     )
@@ -157,6 +156,7 @@ async def calibration_mz_apply(sid, fit, sample_filenames):
     new_mz = await signal_mz_calibration_update(fit, filenames)
     new_range = [new_mz[0], new_mz[-1]]
 
+    fit.update({'verified': True})
     for _, sample_file in sample_file_df.iterrows():
         # Update database record
         sample_file['mz_calibration'] = fit
@@ -165,7 +165,7 @@ async def calibration_mz_apply(sid, fit, sample_filenames):
             sid,
             [sample_file.to_dict()]
             )
-        # Read sample items
+        # Read affected sample items
         with conn:
             sample_item_ids = pd.read_sql(f"""--sql
                 SELECT sample_item_id
@@ -176,7 +176,13 @@ async def calibration_mz_apply(sid, fit, sample_filenames):
                 conn,
                 params=[sample_file['sample_file_id']]
                 )['sample_item_id'].tolist()
-        # Update matches
-        # for sample_item_id in sample_item_ids:
+        for sample_item_id in sample_item_ids:
+        #     # Update matches
         #     await match_item_remove(sid, sample_item_id)
         #     await match_item_compute(sid, sample_item_id)
+            await sio.emit(
+                'calibration_mz_applied',
+                sample_item_id,
+                room=sample_item_id,
+                namespace='/'
+                )

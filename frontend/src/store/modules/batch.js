@@ -297,7 +297,7 @@ export default {
                 commit('SET_MATCH_COMPOUNDS', res);
             });
         },
-        async unload({ rootState, commit, dispatch }) {
+        async unload({ rootState, commit }) {
             if (!state.active) return;
             rootState.api.emit('unsubscribe', state.active.sample_batch_id);
             commit('SET_ACTIVE', null);
@@ -317,11 +317,12 @@ export default {
             // // unload sample
             // dispatch("sample/unload", null, {root:true})
         },
-        async reload({ dispatch, state }) {
+        async reload({ state, dispatch }) {
             if (state.active) {
                 const activeBatch = {...state.active};
                 await dispatch('unload');
-                dispatch('load', activeBatch);
+                await dispatch('load', activeBatch);
+                await dispatch('sample/reload', null, {root:true});
             }
         },
         async onSampleBatchUpdated({ dispatch }) {

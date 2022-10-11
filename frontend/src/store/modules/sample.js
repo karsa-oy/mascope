@@ -3,6 +3,7 @@ import { dispatch, make } from 'vuex-pathify';
 const state = {
     active: null,
     // matches
+    matched: null,
     matchCollections: null,
     matchCompounds: null,
     matchIons: null,
@@ -14,17 +15,33 @@ export default {
     state,
     mutations: make.mutations(state),
     actions: {
-        async load({ commit, dispatch }, sample) {
+        async load({ rootState, commit, dispatch }, sample) {
             // reset if previous sample loaded
             if (state.active) {
                 dispatch('unload');
             }
+            const sampleItemId = sample.sample_item_id;
+            rootState.api.emit('subscribe', sampleItemId);
             // set sample active
             await commit('SET_ACTIVE', sample);
             await dispatch('loadMatches');
         },
         async loadMatches({ rootState, state, commit }) {
-            const sampleId = state.active.sample_item_id;
+            const sampleItemId = state.active.sample_item_id;
+            await rootState.api.query(`--sql
+                -- matches exist
+                SELECT
+                    CASE
+                        WHEN (
+                            COUNT(sample_item_id) > 0
+                        ) THEN True
+                        ELSE False
+                    END AS matched
+                FROM match
+                WHERE sample_item_id == '${sampleItemId}'
+            `).then((res) => {
+                commit('SET_MATCHED', res[0].matched);
+            });
             const sampleBatchId = state.active.sample_batch_id;
             // initialize match filter
             const filterParams = rootState.batch.active.filter_params;
@@ -75,7 +92,7 @@ export default {
                     NATURAL LEFT JOIN target_collection_in_sample_batch
                     WHERE (
                         sample_batch_id == '${sampleBatchId}' 
-                        AND sample_item_id == '${sampleId}'
+                        AND sample_item_id == '${sampleItemId}'
                         AND relative_abundance >= ${minIsotopeAbundance}
                     )
             `);
@@ -174,9 +191,11 @@ export default {
                 commit('SET_MATCH_ISOTOPES', res);
             });
         },
-        async unload({ commit, dispatch }) {
+        async unload({ rootState, commit, dispatch }) {
+            rootState.api.emit('unsubscribe', state.active.sample_item_id);
             commit('SET_ACTIVE', null);
             // matches
+            commit('SET_MATCHED', null);
             commit('SET_MATCH_COLLECTIONS', null);
             commit('SET_MATCH_COMPOUNDS', null);
             commit('SET_MATCH_IONS', null);
@@ -186,11 +205,14 @@ export default {
         },
         async reload({ dispatch, state }) {
             if (state.active) {
-                dispatch('load', state.active);
+                const activeSample = {...state.active};
+                await dispatch('unload');
+                dispatch('load', activeSample);
             }
         },
-        onSampleItemCreated({ dispatch }, sample_item_id) {
-            dispatch("load", {sample_item_id});
+        async onSampleItemCreated({ dispatch }, sample_item_id) {
+            await dispatch('api/reloadDb', null, {root:true})
+                .then(() => dispatch("load", {sample_item_id}));
         },
     },
     getters: {}
