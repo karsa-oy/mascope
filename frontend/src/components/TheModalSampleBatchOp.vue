@@ -175,6 +175,7 @@ export default {
     ...get({
       batchActive: "batch/active",
       batches: "workspace/batches",
+      batchCalibrationCollectionId: "batch/active@build_params.calibration_collection",
       batchIonMechanismIds: "batch/active@build_params.ion_mechanisms",
       batchTargetCollections: "batch/targetCollections",
       ionMechanismsAll: "app/ionMechanisms",
@@ -282,11 +283,22 @@ export default {
     deleteBatch(batches) {
       this.$api.emit('sample_batch_delete', batches);
     },
+    initCalibrationCollectionSelected() {
+      if (this.batchCalibrationCollectionId) {
+        this.calibrationCollectionSelected = this.targetCollectionsAll
+          .filter((collection) =>
+            collection.target_collection_id == this.batchCalibrationCollectionId
+          )[0];
+      } else {
+        this.calibrationCollectionSelected = null;
+      }
+    },
     initData() {
       if (this.batchActive) {
         this.batchName = this.batchActive.sample_batch_name;
         this.batchDesc = this.batchActive.sample_batch_description;
       }
+      this.initCalibrationCollectionSelected();
       this.initIonMechanismsSelected();
       this.initTargetCollectionsSelected();
     },
