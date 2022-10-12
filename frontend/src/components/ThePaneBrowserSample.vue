@@ -19,8 +19,6 @@ export default {
       batches: "workspace/batches",
       batchActive: "batch/active",
       items: "batch/sampleItems",
-      itemsSelected: "batch/sampleItemsSelected",
-      itemsToCalibrate: "batch/sampleItemsSelected",
       itemFocused: "batch/sampleItemFocused",
       targetCollections: "batch/targetCollections",
     }),
@@ -75,9 +73,6 @@ export default {
     batchActiveCount() {
       return this.batchActive ? 1 : 0;
     },
-    itemSelectedCount() {
-      return this.itemsSelected.length;
-    },
     menu() {
       // sample batch
       let createBatchButton = {
@@ -97,29 +92,20 @@ export default {
           ? [createBatchButton]
           : [createBatchButton, updateBatchButton, deleteBatchButton];
       // sample items
-      let s = this.itemSelectedCount > 1 ? "s" : "";
       let updateItemButton = {
-        label: `Update sample item${s}`,
+        label: `Update sample item`,
         onClick: this.itemUpdate,
       };
       let deleteItemButton = {
-        label: `Delete sample item${s}`,
+        label: `Delete sample item`,
         onClick: this.itemDelete,
       };
       let itemButtons =
-        this.itemSelectedCount == 0
-          ? []
-          : this.itemSelectedCount == 1
+        this.itemFocused
           ? [updateItemButton, deleteItemButton]
-          : [deleteItemButton];
-      //
-      let calibrateItemButton = {
-        label: `Calibrate sample item${s}`,
-        onClick: this.itemCalibrate,
-      };
-      let calibrateButtons = this.itemFocused ? [calibrateItemButton] : [];
+          : [];
       // menu
-      return [...batchButtons, ...itemButtons, ...calibrateButtons];
+      return [...batchButtons, ...itemButtons];
     },
     openedBatch() {
       return this.batchActive
@@ -140,7 +126,6 @@ export default {
       activateModal: "modal/activate",
     }),
     ...call({
-      calibrateItems: "calibration/calibrateItems",
       batchLoad: "batch/load",
       itemFocus: "batch/sampleItemFocus",
       itemToggle: "batch/sampleItemToggle",
@@ -172,17 +157,6 @@ export default {
         modal: "sampleBatchOp",
       });
     },
-    itemCalibrate() {
-      let fit = this.itemFocused.mzCalibration;
-      this.$buefy.dialog.confirm({
-        title: "Copy mass calibration",
-        message: `Copy calibration from ${this.itemFocused.title} to ${this.itemsToCalibrate.length} selected samples?`,
-        confirmText: "Copy",
-        onConfirm: () => {
-          this.calibrateItems({ items: itemsToCalibrate, fit });
-        },
-      });
-    },
     async itemUpdate() {
       this.modalSampleItemAttributesSaveProps = {
         action: "update",
@@ -192,12 +166,15 @@ export default {
     },
     itemDelete() {
       this.$buefy.dialog.confirm({
-        title: "Deleting items",
-        message: `Delete ${this.itemsSelected.length} item(s) from ${this.batchActive.sample_batch_name}?`,
+        title: "Deleting item",
+        message: `Delete sample "${this.itemFocused.sample_item_name}"
+          from batch "${this.batchActive.sample_batch_name}"?`,
         confirmText: "Delete",
         onConfirm: () => {
-          let itemIds = this.itemsSelected.map((item) => item.sample_item_id);
-          this.$api.emit('sample_item_delete', itemIds);
+          const itemId = this.itemFocused.sample_item_id;
+          // defocus
+          this.itemFocus(this.itemFocused);
+          this.$api.emit('sample_item_delete', [itemId]);
         },
       });
     },
