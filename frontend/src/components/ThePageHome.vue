@@ -77,7 +77,7 @@
               </b-button>
               <b-button
                 type="is-primary"
-                style="position: fixed; left: 15em; bottom: 2em"
+                style="position: fixed; left: 15em; bottom: 2em; display:none"
                 :disabled="!workspaceActive || !batchActive || sampleFilesSelected.length > 0"
                 @click="launchProcessBatchModal"
               >
@@ -190,13 +190,14 @@ export default {
       workspaceModalProps: "modal/workspaceSaveProps",
     }),
     ...get({
+      acquisitionsInRange: "instrument/acquisitions",
       batchActive: "batch/active",
       instrumentActive: "instrument/active",
       instruments: "app/instruments",
-      acquisitionsInRange: "instrument/acquisitions",
       recentAcquisitions: "instrument/recentAcquisitions",
       sampleBatches: "workspace/batches",
       sampleFileSchema: "app/schema@sample_file",
+      sampleItemFocused: "sample/active",
       workspaceActive: "workspace/active",
       workspaces: "app/workspaces",
     }),
@@ -226,7 +227,7 @@ export default {
   },
   methods: {
     ...call({
-      defocusSample: "sample/unload",
+      sampleItemFocus: "batch/sampleItemFocus",
       getAcquisitions: "instrument/getAcquisitions",
       loadInstrument: "instrument/load",
       unloadInstrument: "instrument/unload",
@@ -246,7 +247,10 @@ export default {
       });
     },
     launchProcessSelectedModal() {
-      this.defocusSample();
+      // defocus currently focused sample
+      if (this.sampleItemFocused) {
+        this.sampleItemFocus(this.sampleItemFocused);
+      }
       this.sampleItemAttributesSaveProps = {
         action: 'create',
         sampleItemRecordToLoad: this.sampleFilesSelected[0],
