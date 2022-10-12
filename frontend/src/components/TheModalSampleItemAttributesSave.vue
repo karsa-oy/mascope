@@ -168,6 +168,7 @@
 
             <b-step-item
               label="Calibration"
+              :visible="instrumentIsTof"
               :clickable="this.sampleActive ? true : false"
               :type="{'is-success': this.sampleMzCalibrated}"
               >
@@ -218,7 +219,12 @@
 
             <b-step-item
               label="Target search"
-              :clickable="this.sampleMzCalibrated ? true : false"
+              :clickable="this.sampleActive
+                ? !this.instrumentIsTof || this.sampleMzCalibrated
+                  ? true
+                  : false
+                : false
+                "
               :type="{'is-success': this.sampleMatched}"
               >
                 <h1 class="title has-text-centered">Target search</h1>
@@ -296,6 +302,7 @@ export default {
       ],
       mzCalibrationTableKey: 0,
       sampleFilename: null,
+      sampleInstrument: null,
       sampleItemType: null,
       showEditFunctions: false,
       templateType: "sample_item",
@@ -327,6 +334,11 @@ export default {
     },
     fillable() {
       return ['create', 'update'].includes(this.action);
+    },
+    instrumentIsTof() {
+      return this.sampleInstrument
+        ? this.sampleInstrument.indexOf('TOF') != -1
+        : false;
     },
     mzCalibrationTableRows() {
       return this.mzFitStats ?? [];
@@ -563,6 +575,7 @@ export default {
         }
         this.loadedTemplate = newTemplate;
         this.sampleFilename = data.sampleItemRecordToLoad.filename;
+        this.sampleInstrument = data.sampleItemRecordToLoad.instrument;
         this.sampleItemType = data.sampleItemRecordToLoad.sample_item_type;
     },
   },
