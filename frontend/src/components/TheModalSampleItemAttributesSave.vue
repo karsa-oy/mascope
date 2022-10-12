@@ -520,6 +520,7 @@ export default {
         } else if(this.action == 'update') {
           newSampleItem.sample_item_id = this.sampleActive.sample_item_id;
           this.$api.emit('sample_item_update', [newSampleItem]);
+          this.deactivateModal();
         }
     },
   },

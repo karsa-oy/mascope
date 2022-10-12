@@ -265,7 +265,6 @@ async def sample_item_update(sid, sample_items):
                 'sample_batch_id',
                 'filename',
                 'sample_item_attributes',
-                'sample_item_description',
                 'sample_item_name',
                 'sample_item_type'
                 ]].to_sql(
