@@ -74,6 +74,7 @@ export default {
                     datetime,
                     datetime_utc,
                     filename,
+                    instrument,
                     length,
                     range,
                     mz_calibration,
