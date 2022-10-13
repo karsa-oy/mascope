@@ -157,7 +157,7 @@ export default {
         isotopeRatioTolerance: 10, // %
         // peak params
         peakIntensityMin: 1,
-        peakSeperationMin: 3,
+        peakSeparationMin: 3,
       },
       calibrationCollectionSelected: null,
       ionMechanismsSelected: [],
@@ -183,7 +183,7 @@ export default {
       minIsotopeAbundance: "batch/active@filter_params.min_isotope_abundance",
       isotopeRatioTolerance: "batch/active@filter_params.isotope_ratio_tolerance",
       peakIntensityMin: "batch/active@filter_params.peak_min_intensity",
-      peakSeperationMin: "batch/active@filter_params.peak_min_separation",
+      peakSeparationMin: "batch/active@filter_params.peak_min_separation",
       probableMatchThreshold: "batch/active@filter_params.probable_match_threshold",
       possibleMatchThreshold: "batch/active@filter_params.possible_match_threshold",
       targetCollectionsAll: "app/targetCollections",
@@ -210,7 +210,7 @@ export default {
             min_isotope_abundance: this.minIsotopeAbundance,
             isotope_ratio_tolerance: this.isotopeRatioTolerance,
             peak_min_intensity: this.peakIntensityMin,
-            peak_min_separation: this.peakSeperationMin,
+            peak_min_separation: this.peakSeparationMin,
             mz_range: null,
             t_range: null
             },
@@ -234,7 +234,7 @@ export default {
             min_isotope_abundance: this.minIsotopeAbundance,
             isotope_ratio_tolerance: this.isotopeRatioTolerance,
             peak_min_intensity: this.peakIntensityMin,
-            peak_min_separation: this.peakSeperationMin,
+            peak_min_separation: this.peakSeparationMin,
             mz_range: null,
             t_range: null
             },
