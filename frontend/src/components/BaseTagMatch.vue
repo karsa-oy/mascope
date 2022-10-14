@@ -54,8 +54,8 @@ export default {
   },
   computed: {
     ...get({
-      probableMatchThreshold: "batch/active@filter_params.probable_match_threshold",
-      possibleMatchThreshold: "batch/active@filter_params.possible_match_threshold",
+      probableMatchThreshold: "batch/paramProbableMatchThreshold",
+      possibleMatchThreshold: "batch/paramPossibleMatchThreshold",
     }),
     tag: function () {
       if (this.matchScore >= this.probableMatchThreshold) {

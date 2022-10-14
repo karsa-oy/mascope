@@ -26,7 +26,7 @@ export default {
             await commit('SET_ACTIVE', sample);
             await dispatch('loadMatches');
         },
-        async loadMatches({ rootState, state, commit }) {
+        async loadMatches({ rootState, rootGetters, state, commit }) {
             const sampleItemId = state.active.sample_item_id;
             await rootState.api.query(`--sql
                 -- matches exist
@@ -44,7 +44,8 @@ export default {
             });
             const sampleBatchId = state.active.sample_batch_id;
             // initialize match filter
-            const filterParams = rootState.batch.active.filter_params;
+            
+            const filterParams = rootGetters["batch/filterParams"];
             const mzTolerance = filterParams.mz_tolerance;
             const isotopeRatioTolerance = filterParams.isotope_ratio_tolerance;
             const peakMinIntensity = filterParams.peak_min_intensity;

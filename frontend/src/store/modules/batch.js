@@ -1,4 +1,5 @@
 import { dispatch, make } from 'vuex-pathify';
+import camelToSnakeCase from '../../lib/util';
 
 const state = {
     active: null,
@@ -15,6 +16,38 @@ const state = {
     matchCollections: null,
     matchCompounds: null,
     matchIons: null,
+    // build parameters
+    paramCalibrationCollection: null,
+    paramIonMechanisms: null,
+    // filter parameters
+    paramIsotopeRatioTolerance: null,
+    paramMinIsotopeAbundance: null,
+    paramMzTolerance: null,
+    paramPeakMinIntensity: null,
+    paramPeakMinSeparation: null,
+    paramPossibleMatchThreshold: null,
+    paramProbableMatchThreshold: null,
+}
+
+const paramDefaults = {
+    // build parameters
+    paramCalibrationCollection: [],
+    paramIonMechanisms: [],
+    // filter parameters
+    paramIsotopeRatioTolerance: 0.1,
+    paramMinIsotopeAbundance: 0.05,
+    paramMzTolerance: 10,
+    paramPeakMinIntensity: null,
+    paramPeakMinSeparation: null,
+    paramPossibleMatchThreshold: 0.7,
+    paramProbableMatchThreshold: 0.9,
+}
+
+// initialize parameter values in state with defaults
+for (const field in state) {
+    if (field.startsWith('param')) {
+        state[field] = paramDefaults[field];
+    }
 }
 
 export default {
@@ -24,12 +57,90 @@ export default {
         ...make.mutations(state),
     },
     actions: {
+        // data loading
+        async initMatchFilter({ rootState, state, getters, commit }) {
+            const batchId = state.active.sample_batch_id;
+            // initialize match filter
+            const filterParams = getters['filterParams'];
+            const mzTolerance = filterParams.mz_tolerance;
+            const isotopeRatioTolerance = filterParams.isotope_ratio_tolerance;
+            const peakMinIntensity = filterParams.peak_min_intensity;
+            const peakMinSeparation = filterParams.peak_min_separation;
+            const minIsotopeAbundance = filterParams.min_isotope_abundance;
+            await rootState.api.query(`--sql
+                -- matches
+                DROP TABLE IF EXISTS batch_match_filter;
+                CREATE TEMPORARY TABLE batch_match_filter AS
+                    SELECT
+                        match_score,
+                        relative_abundance,
+                        sample_item_id,
+                        sample_peak_height,
+                        target_collection_id,
+                        target_collection_name,
+                        target_compound_id,
+                        target_ion_id,
+                        target_isotope_id
+                    FROM sample_item
+                    NATURAL LEFT JOIN sample_batch
+                    NATURAL LEFT JOIN target_collection_in_sample_batch
+                    NATURAL LEFT JOIN target_collection
+                    NATURAL LEFT JOIN target_compound_in_target_collection
+                    NATURAL LEFT JOIN target_compound
+                    NATURAL LEFT JOIN target_ion
+                    NATURAL LEFT JOIN target_isotope
+                    NATURAL LEFT JOIN match
+                    WHERE (
+                        sample_batch_id == '${batchId}'
+                        AND ABS(match_mz_error) <= ${mzTolerance}
+                        AND ABS(match_abundance_error) <= ${isotopeRatioTolerance}
+                        AND sample_peak_height >= ${peakMinIntensity}
+                        AND relative_abundance >= ${minIsotopeAbundance}
+                    )
+            `);
+            return
+            // load matches
+            await rootState.api.query(`--sql
+                SELECT
+                    sample_item_id,
+                    MAX(match_score) AS match_score,
+                    SUM(sample_peak_height) AS sample_peak_height_sum
+                FROM batch_match_filter
+                GROUP BY sample_item_id
+            `).then((res) => {
+                commit('SET_MATCH_COLLECTIONS', res);
+            });
+            await rootState.api.query(`--sql
+                SELECT
+                    sample_item_id,
+                    target_compound_id,
+                    AVG(match_score) AS match_score,
+                    SUM(sample_peak_height) AS sample_peak_height_sum
+                FROM batch_match_filter
+                GROUP BY sample_item_id, target_compound_id, target_ion_id;
+            `).then((res) => {
+                commit('SET_MATCH_IONS', res);
+            });
+            await rootState.api.query(`--sql
+                SELECT
+                    sample_item_id,
+                    target_compound_id,
+                    AVG(match_score) AS match_score,
+                    SUM(sample_peak_height) AS sample_peak_height_sum
+                FROM batch_match_filter
+                GROUP BY sample_item_id, target_compound_id;
+            `).then((res) => {
+                commit('SET_MATCH_COMPOUNDS', res);
+            });
+        },
         async load({ rootState, state, commit, dispatch }, batch) {
             if (state.active) await dispatch('unload');
             const batchId = batch.sample_batch_id;
             rootState.api.emit('subscribe', batchId);
             // set batch active
             await commit('SET_ACTIVE', batch);
+            // unpack parameters
+            await dispatch('unpackParams');
             await dispatch('loadCalibration');
             await dispatch('loadTargets');
             // await dispatch('loadMatches');
@@ -223,80 +334,6 @@ export default {
                 commit('SET_TARGET_ISOTOPES', res);
             });
         },
-        async initMatchFilter({ rootState, state, commit }) {
-            const batchId = state.active.sample_batch_id;
-            // initialize match filter
-            const filterParams = rootState.batch.active.filter_params;
-            const mzTolerance = filterParams.mz_tolerance;
-            const isotopeRatioTolerance = filterParams.isotope_ratio_tolerance;
-            const peakMinIntensity = filterParams.peak_min_intensity;
-            const peakMinSeparation = filterParams.peak_min_separation;
-            const minIsotopeAbundance = filterParams.min_isotope_abundance;
-            await rootState.api.query(`--sql
-                -- matches
-                DROP TABLE IF EXISTS batch_match_filter;
-                CREATE TEMPORARY TABLE batch_match_filter AS
-                    SELECT
-                        match_score,
-                        relative_abundance,
-                        sample_item_id,
-                        sample_peak_height,
-                        target_collection_id,
-                        target_collection_name,
-                        target_compound_id,
-                        target_ion_id,
-                        target_isotope_id
-                    FROM sample_item
-                    NATURAL LEFT JOIN sample_batch
-                    NATURAL LEFT JOIN target_collection_in_sample_batch
-                    NATURAL LEFT JOIN target_collection
-                    NATURAL LEFT JOIN target_compound_in_target_collection
-                    NATURAL LEFT JOIN target_compound
-                    NATURAL LEFT JOIN target_ion
-                    NATURAL LEFT JOIN target_isotope
-                    NATURAL LEFT JOIN match
-                    WHERE (
-                        sample_batch_id == '${batchId}'
-                        AND ABS(match_mz_error) <= ${mzTolerance}
-                        AND ABS(match_abundance_error) <= ${isotopeRatioTolerance}
-                        AND sample_peak_height >= ${peakMinIntensity}
-                        AND relative_abundance >= ${minIsotopeAbundance}
-                    )
-            `);
-            return
-            // load matches
-            await rootState.api.query(`--sql
-                SELECT
-                    sample_item_id,
-                    MAX(match_score) AS match_score,
-                    SUM(sample_peak_height) AS sample_peak_height_sum
-                FROM batch_match_filter
-                GROUP BY sample_item_id
-            `).then((res) => {
-                commit('SET_MATCH_COLLECTIONS', res);
-            });
-            await rootState.api.query(`--sql
-                SELECT
-                    sample_item_id,
-                    target_compound_id,
-                    AVG(match_score) AS match_score,
-                    SUM(sample_peak_height) AS sample_peak_height_sum
-                FROM batch_match_filter
-                GROUP BY sample_item_id, target_compound_id, target_ion_id;
-            `).then((res) => {
-                commit('SET_MATCH_IONS', res);
-            });
-            await rootState.api.query(`--sql
-                SELECT
-                    sample_item_id,
-                    target_compound_id,
-                    AVG(match_score) AS match_score,
-                    SUM(sample_peak_height) AS sample_peak_height_sum
-                FROM batch_match_filter
-                GROUP BY sample_item_id, target_compound_id;
-            `).then((res) => {
-                commit('SET_MATCH_COMPOUNDS', res);
-            });
         },
         async unload({ rootState, commit }) {
             if (!state.active) return;
@@ -304,6 +341,8 @@ export default {
             commit('SET_ACTIVE', null);
             // calibration
             commit('SET_MZ_CALIBRATION', null);
+            // parameters
+            dispatch('resetParams');
             // samples
             commit('SET_SAMPLE_ITEMS', null);
             // targets
@@ -324,6 +363,26 @@ export default {
                 await dispatch('unload');
                 await dispatch('load', activeBatch);
                 await dispatch('sample/reload', null, {root:true});
+
+        // parameters
+        async resetParams({ state, commit }) {
+            // reset parameters to default values
+            for (const field in state) {
+                if (field.startsWith('param')) {
+                    const defaultValue = paramDefaults[field];
+                    commit(`SET_${camelToSnakeCase(field).toUpperCase()}`, defaultValue);
+                }
+            }
+        },
+        async unpackParams({ state, commit }) {
+            // unpack parameters from batch object into state variables
+            const buildParams = state.active.build_params;
+            for (const param in buildParams) {
+                await commit(`SET_PARAM_${param.toUpperCase()}`, buildParams[param]);
+            }
+            const filterParams = state.active.filter_params;
+            for (const param in filterParams) {
+                await commit(`SET_PARAM_${param.toUpperCase()}`, filterParams[param]);
             }
         },
         async onSampleBatchUpdated({ dispatch }) {

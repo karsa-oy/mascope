@@ -144,21 +144,6 @@ export default {
     return {
       batchName: null,
       batchDesc: null,
-      defaultConfig: {
-        // target params
-        targetCollections: [],
-        ionMechanisms:  [
-          "fVuWwQ82sJI", // +Br-
-          "SbcztiBgxHg"  // -H-
-          ],
-        isotopeAbundanceMin: 10, // %
-        // match params
-        mzTolerance: 10, // ppm
-        isotopeRatioTolerance: 10, // %
-        // peak params
-        peakIntensityMin: 1,
-        peakSeparationMin: 3,
-      },
       calibrationCollectionSelected: null,
       ionMechanismsSelected: [],
       targetCollectionsSelected: [],
@@ -175,17 +160,11 @@ export default {
     ...get({
       batchActive: "batch/active",
       batches: "workspace/batches",
-      batchCalibrationCollectionId: "batch/active@build_params.calibration_collection",
-      batchIonMechanismIds: "batch/active@build_params.ion_mechanisms",
+      batchCalibrationCollectionId: "batch/paramCalibrationCollection",
+      batchFilterParams: "batch/filterParams",
+      batchIonMechanismIds: "batch/paramIonMechanisms",
       batchTargetCollections: "batch/targetCollections",
       ionMechanismsAll: "app/ionMechanisms",
-      mzTolerance: "batch/active@filter_params.mz_tolerance",
-      minIsotopeAbundance: "batch/active@filter_params.min_isotope_abundance",
-      isotopeRatioTolerance: "batch/active@filter_params.isotope_ratio_tolerance",
-      peakIntensityMin: "batch/active@filter_params.peak_min_intensity",
-      peakSeparationMin: "batch/active@filter_params.peak_min_separation",
-      probableMatchThreshold: "batch/active@filter_params.probable_match_threshold",
-      possibleMatchThreshold: "batch/active@filter_params.possible_match_threshold",
       targetCollectionsAll: "app/targetCollections",
       workspaceActive: "workspace/active",
     }),
@@ -203,17 +182,7 @@ export default {
             calibration_collection: this.calibrationCollectionSelected.target_collection_id,
             ion_mechanisms: this.ionMechanismIds,
             },
-          filter_params: {
-            mz_tolerance: this.mzTolerance,
-            probable_match_threshold: this.probableMatchThreshold,
-            possible_match_threshold: this.possibleMatchThreshold,
-            min_isotope_abundance: this.minIsotopeAbundance,
-            isotope_ratio_tolerance: this.isotopeRatioTolerance,
-            peak_min_intensity: this.peakIntensityMin,
-            peak_min_separation: this.peakSeparationMin,
-            mz_range: null,
-            t_range: null
-            },
+          filter_params: this.batchFilterParams,
           target_collection_id: this.targetCollectionIds,
         };
       } else if (this.actionIs("update")) {
@@ -227,17 +196,7 @@ export default {
             calibration_collection: this.calibrationCollectionSelected.target_collection_id,
             ion_mechanisms: this.ionMechanismIds,
           },
-          filter_params: {
-            mz_tolerance: this.mzTolerance,
-            probable_match_threshold: this.probableMatchThreshold,
-            possible_match_threshold: this.possibleMatchThreshold,
-            min_isotope_abundance: this.minIsotopeAbundance,
-            isotope_ratio_tolerance: this.isotopeRatioTolerance,
-            peak_min_intensity: this.peakIntensityMin,
-            peak_min_separation: this.peakSeparationMin,
-            mz_range: null,
-            t_range: null
-            },
+          filter_params: this.batchFilterParams,
           target_collection_id: this.targetCollectionIds,
           };
       } else {
@@ -285,10 +244,10 @@ export default {
     },
     initCalibrationCollectionSelected() {
       if (this.batchCalibrationCollectionId) {
-        this.calibrationCollectionSelected = this.targetCollectionsAll
+        [this.calibrationCollectionSelected] = this.targetCollectionsAll
           .filter((collection) =>
             collection.target_collection_id == this.batchCalibrationCollectionId
-          )[0];
+          );
       } else {
         this.calibrationCollectionSelected = null;
       }
@@ -303,9 +262,7 @@ export default {
       this.initTargetCollectionsSelected();
     },
     initIonMechanismsSelected() {
-      const ids = this.batchActive
-        ? this.batchIonMechanismIds
-        : this.defaultConfig.ionMechanisms;
+      const ids = this.batchIonMechanismIds;
       this.ionMechanismsSelected = this.ionMechanismsAll.filter(
         (row) => ids.includes(row.mechanism_id)
       );
@@ -315,7 +272,7 @@ export default {
         ? this.batchTargetCollections.map(
             (row) => row.target_collection_id
             )
-        : this.defaultConfig.targetCollections;
+        : [];
       this.targetCollectionsSelected = this.targetCollectionsAll.filter(
         (row) => ids.includes(row.target_collection_id)
       );
