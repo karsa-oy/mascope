@@ -192,7 +192,8 @@ export default {
                 commit('SET_MATCH_ISOTOPES', res);
             });
         },
-        async unload({ rootState, commit, dispatch }) {
+        async unload({ rootState, state, commit, dispatch }) {
+            if (!state.active) return;
             rootState.api.emit('unsubscribe', state.active.sample_item_id);
             commit('SET_ACTIVE', null);
             // matches
@@ -204,10 +205,12 @@ export default {
             // calibration
             dispatch("calibration/unload", null, {root:true});
         },
-        async reload({ dispatch, state }) {
-            if (state.active) {
-                const activeSample = {...state.active};
+        async reload({ rootGetters, dispatch, state }, sample=null) {
+            const sampleToLoad = sample ? sample : state.active;
+            if (sampleToLoad) {
+                const sampleToLoadId = sampleToLoad.sample_item_id;
                 await dispatch('unload');
+                const activeSample = rootGetters["batch/sampleItem"](sampleToLoadId);
                 dispatch('load', activeSample);
             }
         },

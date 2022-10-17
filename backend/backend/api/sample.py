@@ -140,9 +140,10 @@ async def sample_batch_update(sid, sample_batches):
         if rematch:
             await match_batch_compute(sid, sample_batch_id)
         else:
+            [workspace_id] = workspace_ids
             await sio.emit(
                 'sample_batch_updated',
-                room=sample_batch_id,
+                room=workspace_id,
                 namespace='/'
                 )
 

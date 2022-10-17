@@ -14,22 +14,53 @@ export default {
             rootState.api.emit('subscribe', workspace.workspace_id);
             // reload sample batches
             const batches = await rootState.api.query(`--sql
-                SELECT * FROM sample_batch
+                SELECT 
+                    sample_batch_id,
+                    sample_batch_name,
+                    sample_batch_description,
+                    sample_batch_attributes,
+                    workspace_id,
+                    build_params,
+                    filter_params
+                    ,0 as selection
+                FROM sample_batch
                 WHERE workspace_id == '${workspace.workspace_id}';
             `);
             await commit('SET_BATCHES', batches);
             await commit('SET_ACTIVE', workspace);
         },
-        async unload({ rootState, commit, dispatch }) {
+        async reload({ state, rootState, getters, dispatch }) {
+            if (state.active) {
+                const activeWorkspace = {...state.active};
+                const activeBatch = rootState.batch.active;
+                await dispatch('unload', false);
+                await dispatch('load', activeWorkspace);
+                if (activeBatch) {
+                    const batch = getters['sampleBatch'](activeBatch.sample_batch_id);
+                    batch.selection = 2;
+                    await dispatch('batch/reload', batch, {root:true});
+                }
+            }
+        },
+        async unload({ rootState, commit, dispatch }, propagate=true) {
             if (!state.active) return;
             rootState.api.emit('unsubscribe', state.active.workspace_id);
-            commit('SET_ACTIVE', null);
-            commit('SET_BATCHES', []);
-            dispatch("batch/unload", null, {root:true})
+            await commit('SET_ACTIVE', null);
+            await commit('SET_BATCHES', []);
+            if (propagate) await dispatch("batch/unload", null, {root:true});
         },
-        async onWorkspaceReload({ state, dispatch }) {
+        // backend notifications
+        async onSampleBatchUpdated({ dispatch }) {
             await dispatch('api/reloadDb', null, {root:true});
-            dispatch('load', state.active);
-        }
-    }
+            await dispatch('reload');
+        },
+    },
+    getters: {
+        sampleBatch: (state) => (sampleBatchId) => {
+            const [sampleBatch] = state.batches.filter(
+                (batch) => batch.sample_batch_id == sampleBatchId
+                );
+            return sampleBatch ?? null
+        },
+    },
 }
