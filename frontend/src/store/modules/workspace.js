@@ -50,7 +50,7 @@ export default {
             if (propagate) await dispatch("batch/unload", null, {root:true});
         },
         // backend notifications
-        async onSampleBatchUpdated({ dispatch }) {
+        async onWorkspaceReload({ dispatch }) {
             await dispatch('api/reloadDb', null, {root:true});
             await dispatch('reload');
         },

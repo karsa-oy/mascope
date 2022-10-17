@@ -61,7 +61,6 @@ async def target_collection_create(sid, target_collections):
                     target_collection['target_collection_id'],
                     sample_batch_id
                 ])
-                await sio.emit('sample_batch_updated', room=sample_batch_id, namespace='/')
     await sio.emit('org_reload', namespace='/')
 
 

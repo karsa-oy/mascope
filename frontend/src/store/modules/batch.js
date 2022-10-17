@@ -397,7 +397,7 @@ export default {
         },
 
         // backend notifications
-        async onSampleItemUpdated({ dispatch }) {
+        async onSampleBatchReload({ dispatch }) {
             await dispatch('api/reloadDb', null, {root:true})
                 .then(() => dispatch('reload'));
         },

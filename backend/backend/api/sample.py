@@ -142,7 +142,7 @@ async def sample_batch_update(sid, sample_batches):
         else:
             [workspace_id] = workspace_ids
             await sio.emit(
-                'sample_batch_updated',
+                'workspace_reload',
                 room=workspace_id,
                 namespace='/'
                 )
@@ -230,7 +230,7 @@ async def sample_item_create(sid, sample_items):
             namespace='/'
             )
     await sio.emit(
-        'sample_batch_updated',
+        'sample_batch_reload',
         room=sample_batch_id,
         namespace='/'
         )
@@ -276,7 +276,7 @@ async def sample_item_update(sid, sample_items):
                     )
         [sample_batch_id] = sample_batch_ids
         await sio.emit(
-            'sample_batch_updated',
+            'sample_batch_reload',
             room=sample_batch_id,
             namespace='/'
             )
@@ -320,7 +320,7 @@ async def sample_item_delete(sid, sample_item_ids):
                 )
             [sample_batch_id] = sample_batch_ids
             await sio.emit(
-                'sample_batch_updated',
+                'sample_batch_reload',
                 room=sample_batch_id,
                 namespace='/'
                 )

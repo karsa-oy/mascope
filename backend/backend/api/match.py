@@ -201,7 +201,7 @@ async def match_batch_compute(sid, sample_batch_id):
     await asyncio.gather(*match_item_tasks)
 
     # reload batch
-    await sio.emit('sample_batch_updated', room=sample_batch_id, namespace='/')
+    await sio.emit('sample_batch_reload', room=sample_batch_id, namespace='/')
 
 @sio.event(namespace='/')
 async def match_batch_remove(sid, sample_batch_id):
@@ -303,7 +303,7 @@ async def match_item_compute(sid, sample_item_id):
             )
     print("complete")
     await sio.emit(
-        'sample_batch_updated',
+        'sample_batch_reload',
         room=sample_batch_id,
         namespace='/'
         )
@@ -328,4 +328,4 @@ async def match_item_remove(sid, sample_item_id):
             [sample_item_id]
             )
     # reload batch
-    await sio.emit('sample_batch_updated', roomn=sample_batch_id, namespace='/')
+    await sio.emit('sample_batch_reload', roomn=sample_batch_id, namespace='/')
