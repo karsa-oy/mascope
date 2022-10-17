@@ -11,6 +11,8 @@ import { sync, get, call } from "vuex-pathify";
 
 import BaseBrowser from "./BaseBrowser.vue";
 
+const doNothing = () => {};
+
 export default {
   name: "ThePaneBrowserTarget",
   components: {
@@ -89,7 +91,7 @@ export default {
           rows: this.targetCollectionRows,
           defaultSort: ["match_score", "desc"],
           detailsIcon: "default",
-          rowClick: this.targetCollectionToggle,
+          rowClick: doNothing,
         },
         {
           name: "Compound",
@@ -114,7 +116,7 @@ export default {
           rows: this.targetCompoundRows,
           defaultSort: ["match_score", "desc"],
           detailsIcon: "default",
-          rowClick: this.targetCompoundToggle,
+          rowClick: doNothing,
         },
         {
           name: "Ion",
@@ -139,8 +141,7 @@ export default {
           rows: this.targetIonRows,
           defaultSort: ["match_score", "desc"],
           detailsIcon: "default",
-          rowClick: this.targetIonToggle,
-          opened: [],
+          rowClick: doNothing,
         },
         {
           name: "Isotope",
@@ -169,7 +170,7 @@ export default {
           defaultSort: ["mz", "asc"],
           detailsIcon: this.sampleItemFocused ? "magnify" : null,
           detailsOpen: this.sampleItemFocused ? this.ionShow : null,
-          rowClick: this.targetIsotopeToggle,
+          rowClick: doNothing,
         },
       ];
     },
@@ -215,10 +216,6 @@ export default {
     }),
     ...call({
       resetIonVisualization: "visualization/reset",
-      targetCollectionToggle: "batch/targetCollectionToggle",
-      targetCompoundToggle: "batch/targetCompoundToggle",
-      targetIonToggle: "batch/targetIonToggle",
-      targetIsotopeToggle: "batch/targetIsotopeToggle",
     }),
     collectionAddToBatch() {
       this.modalTargetCollectionOpProps = {

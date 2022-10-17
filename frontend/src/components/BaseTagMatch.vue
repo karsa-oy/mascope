@@ -36,8 +36,8 @@ export default {
       default: true,
     },
     matchScore: {
-      type: Number,
-      required: true,
+      type: [Number, null],
+      required: false,
     },
     tooltip: {
       type: Object,
