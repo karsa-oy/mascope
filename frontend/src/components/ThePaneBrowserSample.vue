@@ -6,6 +6,7 @@
 <script>
 import { mapMutations } from "vuex";
 import { sync, get, call } from "vuex-pathify";
+import table from "../lib/table";
 
 import BaseBrowser from "./BaseBrowser.vue";
 
@@ -18,8 +19,10 @@ export default {
     ...get({
       batches: "workspace/batches",
       batchActive: "batch/active",
-      items: "batch/sampleItems",
-      itemFocused: "batch/sampleItemFocused",
+      batchMatchCompounds: "batch/matchCompounds",
+      batchMatchIons: "batch/matchIons",
+      sampleItems: "batch/sampleItems",
+      sampleItemFocused: "batch/sampleItemFocused",
       targetCollections: "batch/targetCollections",
     }),
     ...sync({
@@ -60,7 +63,7 @@ export default {
               },
             },
           ],
-          rows: this.items,
+          rows: this.sampleItems,
           defaultSort: ["datetime", "asc"],
           // detailsIcon: 'magnify',
           // detailsOpen: this.itemShow,
@@ -79,18 +82,27 @@ export default {
         label: "Create sample batch",
         onClick: this.batchCreate,
       };
-      let updateBatchButton = {
-        label: "Update sample batch",
-        onClick: this.batchUpdate,
-      };
       let deleteBatchButton = {
         label: "Delete sample batch",
         onClick: this.batchDelete,
       };
+      let exportBatchButton = {
+        label: "Export sample batch",
+        onClick: this.batchExport,
+      };
+      let updateBatchButton = {
+        label: "Update sample batch",
+        onClick: this.batchUpdate,
+      };
       let batchButtons =
         this.batchActiveCount == 0
           ? [createBatchButton]
-          : [createBatchButton, updateBatchButton, deleteBatchButton];
+          : [
+            createBatchButton,
+            updateBatchButton,
+            deleteBatchButton,
+            exportBatchButton
+          ];
       // sample items
       let updateItemButton = {
         label: `Update sample item`,
@@ -101,7 +113,7 @@ export default {
         onClick: this.itemDelete,
       };
       let itemButtons =
-        this.itemFocused
+        this.sampleItemFocused
           ? [updateItemButton, deleteItemButton]
           : [];
       // menu
@@ -148,6 +160,57 @@ export default {
         modal: "sampleBatchOp",
       });
     },
+    batchExport() {
+      const sampleItemCols = [
+        {
+          field: "sample_item_name",
+          label: "Sample name",
+        },
+        {
+          field: "filename",
+          label: "Filename",
+        },
+        {
+          field: "datetime",
+          label: "Datetime",
+        },
+      ];
+      const matchCompoundCols = [
+        { field: "sample_item_name", label: "Sample name" },
+        { field: "filename", label: "Filename" },
+        { field: "target_compound_name", label: "Compound name" },
+        { field: "target_compound_formula", label: "Compound formula" },
+        { field: "sample_peak_height_sum", label: "Sample peak intensity" },
+        { field: "match_score", label: "Match score" },
+      ];
+      const matchIonCols = [
+        { field: "sample_item_name", label: "Sample name" },
+        { field: "filename", label: "Filename" },
+        { field: "target_compound_name", label: "Compound name" },
+        { field: "target_compound_formula", label: "Compound formula" },
+        { field: "target_ion_mechanism", label: "Ionization mechanism" },
+        { field: "target_ion_formula", label: "Ion formula" },
+        { field: "sample_peak_height_sum", label: "Sample peak intensity" },
+        { field: "match_score", label: "Match score" },
+      ];
+      table.toSpreadsheet("test.xlsx", [
+        {
+          name: "Samples",
+          rows: this.sampleItems,
+          cols: sampleItemCols
+        },
+        {
+          name: "Match compounds",
+          rows: this.batchMatchCompounds,
+          cols: matchCompoundCols
+        },
+        {
+          name: "Match ions",
+          rows: this.batchMatchIons,
+          cols: matchIonCols
+        },
+      ]);
+    },
     batchUpdate() {
       this.modalSampleBatchOpProps = {
         action: "update",
@@ -160,20 +223,20 @@ export default {
     async itemUpdate() {
       this.modalSampleItemAttributesSaveProps = {
         action: "update",
-        sampleItemRecordToLoad: this.itemFocused,
+        sampleItemRecordToLoad: this.sampleItemFocused,
       };
       this.activateModal({ modal: "sampleItemAttributesSave" });
     },
     itemDelete() {
       this.$buefy.dialog.confirm({
         title: "Deleting item",
-        message: `Delete sample "${this.itemFocused.sample_item_name}"
+        message: `Delete sample "${this.sampleItemFocused.sample_item_name}"
           from batch "${this.batchActive.sample_batch_name}"?`,
         confirmText: "Delete",
         onConfirm: () => {
-          const itemId = this.itemFocused.sample_item_id;
+          const itemId = this.sampleItemFocused.sample_item_id;
           // defocus
-          this.itemFocus(this.itemFocused);
+          this.itemFocus(this.sampleItemFocused);
           this.$api.emit('sample_item_delete', [itemId]);
         },
       });
@@ -183,11 +246,11 @@ export default {
       this.itemFocus(row);
     },
     itemShow(row) {
-      if (!this.itemFocused
-        || !(this.itemFocused.sample_item_id == row.sample_item_id)) {
+      if (!this.sampleItemFocused
+        || !(this.sampleItemFocused.sample_item_id == row.sample_item_id)) {
         this.itemSelect(row);
       }
-      if (this.itemFocused) {
+      if (this.sampleItemFocused) {
         this.modalSampleItemOverviewProps = {
           sampleItemRecordToLoad: row,
         };

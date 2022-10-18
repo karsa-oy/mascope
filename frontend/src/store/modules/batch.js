@@ -72,14 +72,20 @@ export default {
                 DROP TABLE IF EXISTS batch_match_filter;
                 CREATE TEMPORARY TABLE batch_match_filter AS
                     SELECT
+                        filename,
                         match_score,
                         relative_abundance,
                         sample_item_id,
+                        sample_item_name,
                         sample_peak_height,
                         target_collection_id,
                         target_collection_name,
+                        target_compound_formula,
                         target_compound_id,
+                        target_compound_name,
+                        target_ion_formula,
                         target_ion_id,
+                        mechanism AS target_ion_mechanism,
                         target_isotope_id
                     FROM sample_item
                     NATURAL LEFT JOIN sample_batch
@@ -88,6 +94,7 @@ export default {
                     NATURAL LEFT JOIN target_compound_in_target_collection
                     NATURAL LEFT JOIN target_compound
                     NATURAL LEFT JOIN target_ion
+                    NATURAL LEFT JOIN config_mechanism
                     NATURAL LEFT JOIN target_isotope
                     NATURAL LEFT JOIN match
                     WHERE (
@@ -98,40 +105,6 @@ export default {
                         AND relative_abundance >= ${minIsotopeAbundance}
                     )
             `);
-            return
-            // load matches
-            await rootState.api.query(`--sql
-                SELECT
-                    sample_item_id,
-                    MAX(match_score) AS match_score,
-                    SUM(sample_peak_height) AS sample_peak_height_sum
-                FROM batch_match_filter
-                GROUP BY sample_item_id
-            `).then((res) => {
-                commit('SET_MATCH_COLLECTIONS', res);
-            });
-            await rootState.api.query(`--sql
-                SELECT
-                    sample_item_id,
-                    target_compound_id,
-                    AVG(match_score) AS match_score,
-                    SUM(sample_peak_height) AS sample_peak_height_sum
-                FROM batch_match_filter
-                GROUP BY sample_item_id, target_compound_id, target_ion_id;
-            `).then((res) => {
-                commit('SET_MATCH_IONS', res);
-            });
-            await rootState.api.query(`--sql
-                SELECT
-                    sample_item_id,
-                    target_compound_id,
-                    AVG(match_score) AS match_score,
-                    SUM(sample_peak_height) AS sample_peak_height_sum
-                FROM batch_match_filter
-                GROUP BY sample_item_id, target_compound_id;
-            `).then((res) => {
-                commit('SET_MATCH_COMPOUNDS', res);
-            });
         },
         async load({ rootState, state, commit, dispatch }, batch) {
             if (state.active) await dispatch('unload');
@@ -143,7 +116,10 @@ export default {
             await dispatch('unpackParams');
             await dispatch('loadCalibration');
             await dispatch('loadTargets');
+            // initialize match filter
+            await dispatch('initMatchFilter');
             await dispatch('loadSamples');
+            await dispatch('loadMatches');
         },
         async loadCalibration({ rootState, commit }) {
             const calibrationFilename = state.active.calibration_sample_filename;
@@ -155,6 +131,55 @@ export default {
                 WHERE filename == '${calibrationFilename}'
             `).then((res) => {
                 if (res.length) commit('SET_MZ_CALIBRATION', res[0].mz_calibration);
+            });
+        },
+        async loadMatches({ rootState, commit }) {
+            // load matches
+            await rootState.api.query(`--sql
+                SELECT
+                    filename,
+                    sample_item_id,
+                    sample_item_name,
+                    MAX(match_score) AS match_score,
+                    SUM(sample_peak_height) AS sample_peak_height_sum
+                FROM batch_match_filter
+                GROUP BY sample_item_id
+            `).then((res) => {
+                commit('SET_MATCH_COLLECTIONS', res);
+            });
+            await rootState.api.query(`--sql
+                SELECT
+                    filename,
+                    sample_item_id,
+                    sample_item_name,
+                    target_collection_name,
+                    target_compound_formula,
+                    target_compound_id,
+                    target_compound_name,
+                    target_ion_formula,
+                    target_ion_mechanism,
+                    AVG(match_score) AS match_score,
+                    SUM(sample_peak_height) AS sample_peak_height_sum
+                FROM batch_match_filter
+                GROUP BY sample_item_id, target_compound_id, target_ion_id;
+            `).then((res) => {
+                commit('SET_MATCH_IONS', res);
+            });
+            await rootState.api.query(`--sql
+                SELECT
+                    filename,
+                    sample_item_id,
+                    sample_item_name,
+                    target_collection_name,
+                    target_compound_formula,
+                    target_compound_id,
+                    target_compound_name,
+                    AVG(match_score) AS match_score,
+                    SUM(sample_peak_height) AS sample_peak_height_sum
+                FROM batch_match_filter
+                GROUP BY sample_item_id, target_compound_id;
+            `).then((res) => {
+                commit('SET_MATCH_COMPOUNDS', res);
             });
         },
         async loadSamples({ rootState, commit }) {
@@ -169,8 +194,6 @@ export default {
                     FROM sample_item
                     WHERE sample_batch_id == '${batchId}'
             `);
-            // initialize match filter
-            await dispatch('batch/initMatchFilter', null, {root:true});
             // load sample items
             const sampleItemActiveId = rootState.sample.active
                 ? rootState.sample.active.sample_item_id
