@@ -1,43 +1,51 @@
 """Python bindings to Tofwerk's TwTool DLL
 """
 
-import ctypes as ct
-from numpy.ctypeslib import ndpointer
-import numpy as np
 import os
 import sys
 import platform 
+import ctypes as ct
+import numpy as np
+from numpy.ctypeslib import ndpointer
 
-libpath = ""
 
-if platform.architecture() == ('32bit', 'EPL'):
-    libpath = "linux_x86_64"
-if platform.architecture() == ('64bit', 'EPL'):
-    libpath = "linux_x86_64"
-if platform.architecture() == ('64bit', 'ELF'):
-    libpath = "linux_x86_64"
+def LoadLibrary():
+    arch2os = {
+        ('32bit', 'EPL'): "linux_x86_64",
+        ('64bit', 'EPL'): "linux_x86_64",
+        ('64bit', 'ELF'): "linux_x86_64",
+        ('32bit', ''): "macos_x86_64",
+        ('64bit', ''): "macos_x86_64",
+        ('32bit', 'WindowsPE'): "windows_x86",
+        ('64bit', 'WindowsPE'): "windows_x64",
+    }
+    libnames = {
+        'linux':'libtwtool.so',
+        'linux2':'libtwtool.so',
+        'darwin':'libtwtool.dylib',
+        'win32':'TwToolDll.dll'
+    }
+    the_os = arch2os.get(platform.architecture(), '')
 
-if platform.architecture() == ('32bit', ''):
-    libpath = "macos_x86_64"
-if platform.architecture() == ('64bit', ''):
-    libpath = "macos_x86_64"
+    # container overrides
+    is_docker = os.environ.get('MASCOPE_PRIVATE_ENV') == 'docker'
+    the_os = 'linux_x86_64' if is_docker else the_os
+    libname = 'libtwtool.so' if is_docker else libnames[sys.platform]
 
-if platform.architecture() == ('32bit', 'WindowsPE'):
-    libpath = "windows_x86"
-if platform.architecture() == ('64bit', 'WindowsPE'):
-    libpath = "windows_x64"
+    libpath = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        'dlls',
+        the_os,
+        libname
+    )
+    toollib = ct.cdll.LoadLibrary(libpath)
+    return toollib
 
-libnames = {'linux':'libtwtool.so', 'linux2':'libtwtool.so', 'darwin':'libtwtool.dylib', 'win32':'TwToolDll.dll'}
 
-# container overrides
-is_docker = os.environ.get('MASCOPE_PRIVATE_ENV') == 'docker'
-libpath = 'linux_x86_64' if is_docker else libpath
-libname = 'libtwtool.so' if is_docker else libnames[sys.platform]
-
-dll_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dlls", libpath, libname)
-toollib = ct.cdll.LoadLibrary(dll_path)
-
+toollib = LoadLibrary()
 tof2mass = toollib.TwTof2Mass if os.name=='posix' else toollib._TwTof2Mass
+
+
 def TwTof2Mass(tofSample, massCalibMode, p):
     tof2mass.restype = ct.c_double
     if isinstance(p, np.ndarray):

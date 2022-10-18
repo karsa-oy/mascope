@@ -1,16 +1,32 @@
 import numpy as np
 
+from zarr.errors import PathNotFoundError
+
 from backend.lib.hardware.tofwerk.lib.TwTool import TwTof2Mass
-from backend.lib.hardware.tofwerk.generator import remove_duplicate_mz_values
 from backend.lib.file import (
     get_zarr_var_shape,
     load_coord,
     update_props,
     update_zarr_array_coord,
 )
-from backend.server import sio
 
-from zarr.errors import PathNotFoundError
+
+def remove_duplicate_mz_values(mz):
+    # Sometimes TOF signal mz coordinate contains multiple zeros at the beginning
+    # This may cause duplicate coordinate value error in some functions
+    # This function fixes the coordinate vector by setting arbitrary small values for
+    # the zero coordinates
+    mz_unique = mz
+    mz_below_10_mask = mz < 10
+    if (np.diff(mz[mz_below_10_mask]) == 0).any():
+        mz_below_10_maxi = mz_below_10_mask.sum()
+        mz_unique[mz_below_10_mask] = np.linspace(
+                                            0,
+                                            mz[mz_below_10_maxi],
+                                            mz_below_10_maxi,
+                                            endpoint=False
+                                            )
+    return mz_unique
 
 async def signal_mz_calibration_update(fit, filenames):
     mode = fit['mode']

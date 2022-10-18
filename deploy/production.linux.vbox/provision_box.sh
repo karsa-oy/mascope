@@ -60,12 +60,14 @@ function install_prerequisites() {
     sudo mkdir /var/www/mascope.com
     sudo ln -s -f $MASCOPE_UI /var/www/mascope.com/production
     sudo cp -f $MY_PATH/mascope.nginx /etc/nginx/sites-available/mascope.com
+    sudo chmod -x  /etc/nginx/sites-available/mascope.com
     sudo ln -s -f /etc/nginx/sites-available/mascope.com /etc/nginx/sites-enabled/
     sudo rm -f /etc/nginx/sites-enabled/default
     sudo systemctl restart nginx
 
     echo AAA setting up mascope backend service...
     sudo cp -f $MY_PATH/mascope.service /etc/systemd/system/
+    sudo chmod -x  /etc/systemd/system/mascope.service
     sudo systemctl daemon-reload
     sudo systemctl enable mascope
     sudo systemctl start mascope
