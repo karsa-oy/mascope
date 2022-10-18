@@ -23,7 +23,6 @@ import VueRouter from 'vue-router';
 
 import ThePageHome from "./components/ThePageHome.vue";
 import ThePageBatchOverview from "./components/ThePageBatchOverview.vue";
-//import ThePageDataManagement from "./components/ThePageDataManagement.vue";
 //import ThePageSampleSignal from "./components/ThePageSampleSignal.vue";
 import ThePageMzCalibration from "./components/ThePageMzCalibration.vue";
 import ThePageSampleManagement from "./components/ThePageSampleManagement.vue";
@@ -39,9 +38,6 @@ const router = new VueRouter({
   }, {
     path: '/batch-overview',
     component: ThePageBatchOverview
-    //  }, {
-    //    path: '/data-management',
-    //    component: ThePageDataManagement
     //  }, {
     //    path: '/sample-signal',
     //    component: ThePageSampleSignal
