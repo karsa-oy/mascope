@@ -64,6 +64,7 @@
               @selectRows="selectSampleFiles"
               :searchable="true"
               :height="sampleFileTableHeight"
+              :default-sort="['filename', 'asc']"
             >
             </base-table>
             <section style="padding: 0.5em">
