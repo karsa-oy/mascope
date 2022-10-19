@@ -19,11 +19,14 @@ export default {
     ...get({
       batches: "workspace/batches",
       batchActive: "batch/active",
+      batchBuildParams: "batch/buildParams",
+      batchFilterParams: "batch/filterParams",
       batchMatchCompounds: "batch/matchCompounds",
       batchMatchIons: "batch/matchIons",
       sampleItems: "batch/sampleItems",
       sampleItemFocused: "batch/sampleItemFocused",
       targetCollections: "batch/targetCollections",
+      workspaceActive: "workspace/active",
     }),
     ...sync({
       modalSampleBatchOpProps: "modal/sampleBatchOpProps",
@@ -161,19 +164,30 @@ export default {
       });
     },
     batchExport() {
+      const batchCols = [
+        { field: 'field', label: 'Batch' },
+        { field: 'value', label: '' }
+      ];
+      let batchRows = [
+        { field: "Name", value: this.batchActive.sample_batch_name },
+        { field: "Description", value: this.batchActive.sample_batch_description },
+        { field: "Workspace", value: this.workspaceActive.workspace_name },
+        { field: "", value: '' },
+        { field: "Parameters", value: '' },
+      ];
+      const batchParams = {...this.batchBuildParams, ...this.batchFilterParams};
+      Object.entries(batchParams).forEach(
+        ([key, val]) => batchRows.push(
+          {
+            field: key.replaceAll("_", " "),
+            value: JSON.stringify(val)
+          }
+      ));
       const sampleItemCols = [
-        {
-          field: "sample_item_name",
-          label: "Sample name",
-        },
-        {
-          field: "filename",
-          label: "Filename",
-        },
-        {
-          field: "datetime",
-          label: "Datetime",
-        },
+        { field: "sample_item_name", label: "Sample name" },
+        { field: "filename", label: "Filename" },
+        { field: "datetime", label: "Datetime" },
+        { field: "sample_item_type", label: "Sample type" },
       ];
       const matchCompoundCols = [
         { field: "sample_item_name", label: "Sample name" },
@@ -193,7 +207,14 @@ export default {
         { field: "sample_peak_height_sum", label: "Sample peak intensity" },
         { field: "match_score", label: "Match score" },
       ];
-      table.toSpreadsheet("test.xlsx", [
+      const datetimestamp = (new Date).toJSON().slice(0, -5).replace(/[-:]/g, '');
+      const filename = `${datetimestamp}_${this.batchActive.sample_batch_name.replaceAll(' ', '_')}.xlsx`;
+      table.toSpreadsheet(filename, [
+        {
+          name: "Batch",
+          rows: batchRows,
+          cols: batchCols
+        },
         {
           name: "Samples",
           rows: this.sampleItems,
