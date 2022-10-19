@@ -66,6 +66,24 @@ export default {
             })
         }
     },
+    fitSpredsheetColumnWidths(worksheet) {
+        const data = xlsx.utils.sheet_to_json(worksheet)
+        const colLengths = Object.keys(data[0]).map((k) => k ? k.toString().length : 0)
+        for (const d of data) {
+            Object.values(d).forEach((element, index) => {
+            const length = element ? element.toString().length : 0
+            if (colLengths[index] < length) {
+                colLengths[index] = length
+            }
+            })
+        }
+        worksheet["!cols"] = colLengths.map((l) => {
+            return {
+            wch: l,
+            }
+        })
+        return worksheet
+    },
     fromSpreadsheet(clipboardText, fields, skipHeader=false) {
         // Split full text to rows
         let clipboardLines = clipboardText.split(String.fromCharCode(10));
@@ -118,6 +136,7 @@ export default {
                 // so we omit since we add our own header
                 skipHeader: true
             });
+            worksheet = this.fitSpredsheetColumnWidths(worksheet);
             xlsx.utils.book_append_sheet(workbook, worksheet, name);
         }
         try {
