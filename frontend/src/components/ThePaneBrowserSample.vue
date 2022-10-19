@@ -188,6 +188,7 @@ export default {
         { field: "filename", label: "Filename" },
         { field: "datetime", label: "Datetime" },
         { field: "sample_item_type", label: "Sample type" },
+        { field: "match_score", label: "Match score" },
       ];
       const matchCompoundCols = [
         { field: "sample_item_name", label: "Sample name" },
