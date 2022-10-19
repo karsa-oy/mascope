@@ -253,10 +253,12 @@ export default {
       }
     },
     initData() {
-      if (this.batchActive) {
-        this.batchName = this.batchActive.sample_batch_name;
-        this.batchDesc = this.batchActive.sample_batch_description;
-      }
+      this.batchName = this.action == 'update'
+        ? this.batchActive.sample_batch_name
+        : null;
+      this.batchDesc = this.action == 'update'
+        ? this.batchActive.sample_batch_description
+        : null;
       this.initCalibrationCollectionSelected();
       this.initIonMechanismsSelected();
       this.initTargetCollectionsSelected();
