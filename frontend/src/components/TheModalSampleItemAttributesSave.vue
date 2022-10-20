@@ -144,13 +144,18 @@
                       </div>
                       <div class="column is-one-half" style="text-align: right">
                         <b-button
-                          :disabled="
-                            !this.sampleItemType
-                            || (
-                              this.formFields.filter((f) => f.required).length !=
-                              this.formFields
-                              .filter((f) => f.required)
-                              .filter((f) => f.value).length
+                          :disabled="(
+                              !sampleItemType
+                              || (
+                                formFields.filter((f) => f.required).length !=
+                                  formFields
+                                  .filter((f) => f.required)
+                                  .filter((f) => f.value).length
+                              )
+                            )
+                            ||
+                            (
+                              action == 'create' && sampleActive
                             )
                           "
                           type="is-success"
@@ -237,8 +242,17 @@
                     type="is-success"
                     icon-left="content-save"
                     @click="sampleMatch"
+                    v-if="!sampleMatched"
                   >
                     Process
+                  </b-button>
+                  <b-button
+                    type="is-primary"
+                    icon-left="close"
+                    @click="deactivateModal"
+                    v-if="sampleMatched"
+                  >
+                    Close
                   </b-button>
                 </div>
             </b-step-item>

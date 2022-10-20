@@ -144,7 +144,10 @@
               </template>
               <the-pane-settings-batch></the-pane-settings-batch>
             </b-collapse>
-            <the-pane-browser-target></the-pane-browser-target>
+            <div v-if="!sampleActive || sampleMatched">
+              <!-- hide target browser if selected sample is not matched -->
+              <the-pane-browser-target></the-pane-browser-target>
+            </div>
           </template>
         </div>
       </div>
@@ -198,7 +201,8 @@ export default {
       recentAcquisitions: "instrument/recentAcquisitions",
       sampleBatches: "workspace/batches",
       sampleFileSchema: "app/schema@sample_file",
-      sampleItemFocused: "sample/active",
+      sampleActive: "sample/active",
+      sampleMatched: "sample/matched",
       workspaceActive: "workspace/active",
       workspaces: "app/workspaces",
     }),
@@ -249,8 +253,8 @@ export default {
     },
     launchProcessSelectedModal() {
       // defocus currently focused sample
-      if (this.sampleItemFocused) {
-        this.sampleItemFocus(this.sampleItemFocused);
+      if (this.sampleActive) {
+        this.sampleItemFocus(this.sampleActive);
       }
       this.sampleItemAttributesSaveProps = {
         action: 'create',
