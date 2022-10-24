@@ -1,5 +1,7 @@
 import pandas as pd
 
+from datetime import datetime
+
 from backend.db.conn import conn
 from backend.db.id import gen_id
 from backend.server import sio
@@ -12,6 +14,12 @@ async def workspace_create(sid, workspaces):
         for workspace in workspaces
     ]
     workspace_df = pd.DataFrame.from_records(workspaces)
+    workspace_df['workspace_utc_created'] = [
+        datetime.now().isoformat()
+        ]*len(workspace_df)
+    workspace_df['workspace_utc_modified'] = [
+        datetime.now().isoformat()
+        ]*len(workspace_df)
     with conn:
         workspace_df.to_sql(
             'workspace',
@@ -25,6 +33,9 @@ async def workspace_create(sid, workspaces):
 @sio.event(namespace='/')
 async def workspace_update(sid, workspaces):
     workspace_df = pd.DataFrame.from_records(workspaces)
+    workspace_df['workspace_utc_modified'] = [
+        datetime.now().isoformat()
+        ]*len(workspace_df)
     workspace_ids = workspace_df['workspace_id'].tolist()
     workspace_id_refs = ','.join('?'*len(workspace_ids))
     with conn:

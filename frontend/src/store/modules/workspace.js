@@ -20,7 +20,9 @@ export default {
                     sample_batch_description,
                     workspace_id,
                     build_params,
-                    filter_params
+                    filter_params,
+                    sample_batch_utc_created,
+                    sample_batch_utc_modified
                     ,0 as selection
                 FROM sample_batch
                 WHERE workspace_id == '${workspace.workspace_id}';

@@ -214,6 +214,8 @@ export default {
                     length,
                     range,
                     mz_calibration,
+                    sample_item_utc_created,
+                    sample_item_utc_modified,
                     IFNULL(MAX(match_score), 0) AS match_score,
                     IFNULL(SUM(sample_peak_height_sum), 0) AS sample_peak_height_sum,
                     CASE

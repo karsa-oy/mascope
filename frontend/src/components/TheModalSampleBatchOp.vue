@@ -196,6 +196,7 @@ export default {
           },
           filter_params: this.batchFilterParams,
           target_collection_id: this.targetCollectionIds,
+          sample_batch_utc_created: this.batchActive.sample_batch_utc_created,
           };
       } else {
         return null;

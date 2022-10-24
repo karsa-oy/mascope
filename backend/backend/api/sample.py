@@ -1,6 +1,8 @@
 import json
 import pandas as pd
 
+from datetime import datetime
+
 from backend.api.match import match_batch_compute, match_item_compute
 from backend.api.signal import signal_mz_calibration_update
 from backend.db.conn import conn
@@ -22,6 +24,12 @@ async def sample_batch_create(sid, sample_batches):
             raise ValueError(
                 'sample batches created must be in exactly one workspace'
             )
+        sample_batch_df['sample_batch_utc_created'] = [
+            datetime.now().isoformat()
+            ]*len(sample_batch_df)
+        sample_batch_df['sample_batch_utc_modified'] = [
+            datetime.now().isoformat()
+            ]*len(sample_batch_df)
         sample_batch_df = sample_batch_df.assign(
             build_params=sample_batch_df[['build_params']].applymap(
                 lambda x: json.dumps(x)
@@ -128,6 +136,9 @@ async def sample_batch_update(sid, sample_batches):
                 if_exists='append',
                 index=False
                 )
+            sample_batch_df['sample_batch_utc_modified'] = [
+                datetime.now().isoformat()
+                ]*len(sample_batch_df)
             target_collection_in_sample_batch_df = sample_batch_df[
                 ['target_collection_id', 'sample_batch_id']
                 ].explode('target_collection_id', ignore_index=True).dropna()
@@ -214,6 +225,12 @@ async def sample_item_create(sid, sample_items):
                 lambda x: json.dumps(x)
                 ),
             )
+        sample_item_df['sample_item_utc_created'] = [
+            datetime.now().isoformat()
+            ]*len(sample_item_df)
+        sample_item_df['sample_item_utc_modified'] = [
+            datetime.now().isoformat()
+            ]*len(sample_item_df)
         sample_item_df.to_sql(
             'sample_item',
             conn,
@@ -252,6 +269,9 @@ async def sample_item_update(sid, sample_items):
                 lambda x: json.dumps(x)
                 ),
             )
+        sample_item_df['sample_item_utc_modified'] = [
+            datetime.now().isoformat()
+            ]*len(sample_item_df)
         with conn:
             # Delete existing sample item records
             conn.cursor().execute(f"""
@@ -267,7 +287,9 @@ async def sample_item_update(sid, sample_items):
                 'filename',
                 'sample_item_attributes',
                 'sample_item_name',
-                'sample_item_type'
+                'sample_item_type',
+                'sample_item_utc_created',
+                'sample_item_utc_modified',
                 ]].to_sql(
                     'sample_item',
                     conn,
