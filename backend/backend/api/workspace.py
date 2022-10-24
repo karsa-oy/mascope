@@ -39,6 +39,8 @@ async def workspace_update(sid, workspaces):
     workspace_ids = workspace_df['workspace_id'].tolist()
     workspace_id_refs = ','.join('?'*len(workspace_ids))
     with conn:
+        # Make sure foreign keys is disabled to not cascade delete
+        conn.execute("PRAGMA foreign_keys = 0")
         # Delete existing workspace records
         conn.cursor().execute(f"""
             DELETE FROM workspace
@@ -59,38 +61,16 @@ async def workspace_update(sid, workspaces):
 @sio.event(namespace='/')
 async def workspace_delete(sid, workspace_ids):
     with conn:
+        # Enable foreign keys to properly cascade record deletes
+        conn.execute("PRAGMA foreign_keys = 1")
         workspace_id_refs = ','.join('?'*len(workspace_ids))
         conn.cursor().execute(f"""
-            DELETE FROM target_collection_in_sample_batch
-            WHERE sample_batch_id IN (
-                SELECT sample_batch_id
-                FROM sample_batch
-                WHERE workspace_id IN (
-                    {workspace_id_refs}
-                )
-            )""",
-            workspace_ids
-        )
-        conn.cursor().execute(f"""DELETE FROM sample_item
-            WHERE sample_batch_id IN (
-                SELECT sample_batch_id
-                FROM sample_batch
-                WHERE workspace_id IN (
-                    {workspace_id_refs}
-                )
-            )""",
-            workspace_ids
-        )
-        conn.cursor().execute(f"""DELETE FROM sample_batch
+            DELETE FROM workspace
             WHERE workspace_id IN (
                 {workspace_id_refs}
             )""",
             workspace_ids
         )
-        conn.cursor().execute(f"""DELETE FROM workspace
-            WHERE workspace_id IN (
-                {workspace_id_refs}
-            )""",
-            workspace_ids
-        )
+        # Disable foreign keys to not cascade delete when updating
+        conn.execute("PRAGMA foreign_keys = 0")
     await sio.emit('org_reload', namespace='/')

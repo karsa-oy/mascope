@@ -108,6 +108,8 @@ async def sample_batch_update(sid, sample_batches):
                 # Return true if either new target collections or new ionization mechanisms
                 return len(target_collections_to_match) or len(ion_mechanisms_to_match)
             rematch = need_for_rematch()
+            # Make sure foreign keys is disabled to not cascade delete
+            conn.execute("PRAGMA foreign_keys = 0")
             # Delete existing sample batch records
             conn.cursor().execute(f"""
                 DELETE FROM sample_batch
@@ -177,31 +179,20 @@ async def sample_batch_delete(sid, sample_batch_ids):
             raise ValueError(
                 'sample batches deleted must be in exactly one workspace'
             )
-        else:
-            conn.cursor().execute(f"""--sql
-                DELETE FROM target_collection_in_sample_batch
-                WHERE sample_batch_id IN (
-                    {sample_batch_id_refs}
-                )
-                """,
-                sample_batch_ids
+        # Enable foreign keys to properly cascade record deletes
+        conn.execute("PRAGMA foreign_keys = 1")
+        conn.cursor().execute(f"""
+            DELETE FROM sample_batch
+            WHERE sample_batch_id IN (
+                {sample_batch_id_refs}
             )
-            conn.cursor().execute(f"""DELETE FROM sample_item
-                WHERE sample_batch_id IN (
-                    {sample_batch_id_refs}
-                )
-                """,
-                sample_batch_ids
-            )
-            conn.cursor().execute(f"""DELETE FROM sample_batch
-                WHERE sample_batch_id IN (
-                    {sample_batch_id_refs}
-                )
-                """,
-                sample_batch_ids
-            )
-            [workspace_id] = workspace_ids
-            await sio.emit('workspace_reload', room=workspace_id, namespace='/')
+            """,
+            sample_batch_ids
+        )
+        # Disable foreign keys to not cascade delete when updating
+        conn.execute("PRAGMA foreign_keys = 0")
+        [workspace_id] = workspace_ids
+        await sio.emit('workspace_reload', room=workspace_id, namespace='/')
 
 
 # === sample items === #
@@ -273,6 +264,8 @@ async def sample_item_update(sid, sample_items):
             datetime.now().isoformat()
             ]*len(sample_item_df)
         with conn:
+            # Make sure foreign keys is disabled to not cascade delete
+            conn.execute("PRAGMA foreign_keys = 0")
             # Delete existing sample item records
             conn.cursor().execute(f"""
                 DELETE FROM sample_item
@@ -333,13 +326,18 @@ async def sample_item_delete(sid, sample_item_ids):
                 'sample items deleted must be in exactly one workspace'
             )
         else:
-            # Delete existing sample item records
+            # Enable foreign keys to properly cascade record deletes
+            conn.execute("PRAGMA foreign_keys = 1")
+            # Delete sample item records
             conn.cursor().execute(f"""
                 DELETE FROM sample_item
                 WHERE sample_item_id IN ({sample_item_id_refs})
                 """,
                 sample_item_ids
                 )
+            # Disable foreign keys to not cascade delete when updating
+            conn.execute("PRAGMA foreign_keys = 0")
+            # Notify batch subscribers
             [sample_batch_id] = sample_batch_ids
             await sio.emit(
                 'sample_batch_reload',

@@ -171,25 +171,9 @@ async def target_collection_update(sid, target_collections):
 async def target_collection_delete(sid, target_collection_ids):
     target_collection_id_refs = ','.join('?'*len(target_collection_ids))
     with conn:
-        # remove all compounds from the collections
-        conn.cursor().execute(f"""
-            DELETE FROM target_compound_in_target_collection
-            WHERE target_collection_id IN (
-                {target_collection_id_refs}
-            );
-            """,
-            target_collection_ids
-            )
-        # remove the target collections from all sample batches
-        conn.cursor().execute(f"""
-            DELETE FROM target_collection_in_sample_batch
-            WHERE target_collection_id IN (
-                {target_collection_id_refs}
-            );
-            """,
-            target_collection_ids
-            )
-        # finally delete the collection records
+        # Enable foreign keys to properly cascade record deletes
+        conn.execute("PRAGMA foreign_keys = 1")
+        # delete the collection records
         conn.cursor().execute(f"""
             DELETE FROM target_collection
             WHERE target_collection_id IN (
@@ -198,12 +182,8 @@ async def target_collection_delete(sid, target_collection_ids):
             """,
             target_collection_ids
             )
-    # N.B - target compounds are NOT deleted here!
-    # This is intentional, since dangling compounds are not
-    # a problem and can be reused*. Eventual garbage collection
-    # could be implemented.
-    #
-    #                * see target_collection_create
+        # Disable foreign keys to not cascade delete when updating
+        conn.execute("PRAGMA foreign_keys = 0")
     await sio.emit('org_reload', namespace='/')
 
 
