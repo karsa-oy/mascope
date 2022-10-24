@@ -90,15 +90,11 @@ async def create_sample_file_db_record(data):
     committed_length = data['committed_length']
     date = timestamp_from_filename(filename)
     utc_offset = timedelta(seconds=int(data['utc_offset']))
-    title = data.get('title')
-    description = data.get('description')
     mz_calibration = data.get('mz_calibration')
     await sio.emit(
             'sample_file_create',
             [{
                 "filename": filename,
-                "sample_file_name": title,
-                "sample_file_description": description,
                 "instrument": instrument_name,
                 "datetime": date.isoformat(),
                 "datetime_utc": (date - utc_offset).isoformat(),

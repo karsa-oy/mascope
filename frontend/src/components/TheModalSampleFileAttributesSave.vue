@@ -53,11 +53,6 @@ export default {
             required: true,
             placeholder: "visible title of the file in batches",
           },
-          {
-            label: "sample_item_description",
-            required: true,
-            placeholder: "description",
-          },
         ],
       },
     };
