@@ -177,7 +177,6 @@ export default {
           sample_batch_name: this.batchName,
           sample_batch_description: this.batchDesc,
           workspace_id: this.workspaceActive.workspace_id,
-          sample_batch_attributes: null,
           build_params: {
             calibration_collection: this.calibrationCollectionSelected.target_collection_id,
             ion_mechanisms: this.ionMechanismIds,
@@ -191,7 +190,6 @@ export default {
           sample_batch_name: this.batchName,
           sample_batch_description: this.batchDesc,
           workspace_id: this.workspaceActive.workspace_id,
-          sample_batch_attributes: null,
           build_params: {
             calibration_collection: this.calibrationCollectionSelected.target_collection_id,
             ion_mechanisms: this.ionMechanismIds,

@@ -18,7 +18,6 @@ export default {
                     sample_batch_id,
                     sample_batch_name,
                     sample_batch_description,
-                    sample_batch_attributes,
                     workspace_id,
                     build_params,
                     filter_params
