@@ -85,7 +85,7 @@ export default {
                         target_compound_name,
                         target_ion_formula,
                         target_ion_id,
-                        mechanism AS target_ion_mechanism,
+                        ionization_mechanism AS target_ion_mechanism,
                         target_isotope_id
                     FROM sample_item
                     NATURAL LEFT JOIN sample_batch
@@ -94,7 +94,7 @@ export default {
                     NATURAL LEFT JOIN target_compound_in_target_collection
                     NATURAL LEFT JOIN target_compound
                     NATURAL LEFT JOIN target_ion
-                    NATURAL LEFT JOIN config_mechanism
+                    NATURAL LEFT JOIN ionization_mechanism
                     NATURAL LEFT JOIN target_isotope
                     NATURAL LEFT JOIN match
                     WHERE (
@@ -321,12 +321,12 @@ export default {
             await rootState.api.query(`--sql
                 SELECT
                     target_ion.*,
-                    config_mechanism.*,
+                    ionization_mechanism.*,
                     selection
                 FROM target_ion_filter
                 NATURAL LEFT JOIN target_ion
-                NATURAL LEFT JOIN config_mechanism
-                WHERE mechanism_id IN (
+                NATURAL LEFT JOIN ionization_mechanism
+                WHERE ionization_mechanism_id IN (
                     ${`'`+state.active.build_params.ion_mechanisms.join(`','`)+`'`}
                     )
             `).then((res) => {

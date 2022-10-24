@@ -53,8 +53,8 @@
                 <b-table
                   :data="ionMechanismsAll"
                   :columns="[
-                    { field: 'mechanism', label: 'Mechanism' },
-                    { field: 'polarity', label: 'Polarity' },
+                    { field: 'ionization_mechanism', label: 'Mechanism' },
+                    { field: 'ionization_mechanism_polarity', label: 'Polarity' },
                   ]"
                   checkable
                   :checked-rows.sync="ionMechanismsSelected"
@@ -220,7 +220,7 @@ export default {
     },
     ionMechanismIds() {
       return this.ionMechanismsSelected.map(
-            (row) => row.mechanism_id
+            (row) => row.ionization_mechanism_id
           )
     },
     targetCollectionIds() {
@@ -266,7 +266,7 @@ export default {
     initIonMechanismsSelected() {
       const ids = this.batchIonMechanismIds;
       this.ionMechanismsSelected = this.ionMechanismsAll.filter(
-        (row) => ids.includes(row.mechanism_id)
+        (row) => ids.includes(row.ionization_mechanism_id)
       );
     },
     initTargetCollectionsSelected() {

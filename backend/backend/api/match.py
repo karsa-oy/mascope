@@ -32,7 +32,7 @@ def compute_matches(filename, target_collection_ids, ionization_mechanism_ids):
             NATURAL JOIN target_isotope
         WHERE
             target_collection_id IN ({collection_id_refs})
-            AND mechanism_id IN ({mechanism_id_refs})
+            AND ionization_mechanism_id IN ({mechanism_id_refs})
         """,
         conn,
         params=[*target_collection_ids, *ionization_mechanism_ids]
@@ -260,9 +260,9 @@ async def match_item_compute(sid, sample_item_id):
         # get ionization mechanisms
         ion_mechanisms = json.loads(sample_batch['build_params'])['ion_mechanisms']
         ion_mechanism_df = pd.DataFrame.from_dict({
-            'mechanism_id': ion_mechanisms
+            'ionization_mechanism_id': ion_mechanisms
         })
-        ionization_mechanism_ids = ion_mechanism_df['mechanism_id'].tolist()
+        ionization_mechanism_ids = ion_mechanism_df['ionization_mechanism_id'].tolist()
         target_collection_ids = pd.read_sql(
             f"""--sql
             SELECT target_collection_id FROM target_collection_in_sample_batch
