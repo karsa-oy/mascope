@@ -43,7 +43,7 @@
             expanded
             @click="
               () => {
-                updateWorkspace([newWorkspace]);
+                updateWorkspace();
                 deactivateModal();
               }
             "
@@ -57,7 +57,7 @@
             expanded
             @click="
               () => {
-                createWorkspace([newWorkspace]);
+                createWorkspace();
                 deactivateModal();
               }
             "
@@ -71,7 +71,7 @@
             expanded
             @click="
               () => {
-                deleteWorkspace([oldWorkspace.workspace_id]);
+                deleteWorkspace();
                 deactivateModal();
               }
             "
@@ -119,17 +119,6 @@ export default {
         return null;
       }
     },
-    newWorkspace() {
-      if (this.actionIs("create", "edit")) {
-        return {
-          workspace_id: this.oldWorkspace ? this.oldWorkspace.workspace_id : null,
-          workspace_name: this.workspaceName,
-          workspace_description: this.workspaceDesc,
-        };
-      } else {
-        return null;
-      }
-    },
     modalTitle() {
       let title;
       const workspaceName = this.oldWorkspace
@@ -156,20 +145,31 @@ export default {
     actionIs(...actions) {
       return actions.includes(this.action);
     },
-    createWorkspace(newWorkspace) {
-      this.$api.emit('workspace_create', newWorkspace);
+    createWorkspace() {
+      const newWorkspace = {
+        workspace_name: this.workspaceName,
+        workspace_description: this.workspaceDesc,
+      };
+      this.$api.emit('workspace_create', [newWorkspace]);
     },
-    deleteWorkspace(workspaces) {
-      this.$api.emit('workspace_delete', workspaces);
+    deleteWorkspace() {
+      this.$api.emit('workspace_delete', [this.oldWorkspace.workspace_id]);
     },
     loadWorkspace() {
-      if (this.oldWorkspace) {
-        this.workspaceName = this.oldWorkspace.workspace_name;
-        this.workspaceDesc = this.oldWorkspace.workspace_description;
-      }
+      this.workspaceName = this.oldWorkspace
+        ? this.oldWorkspace.workspace_name
+        : null;
+      this.workspaceDesc = this.oldWorkspace 
+        ? this.oldWorkspace.workspace_description
+        : null;
     },
-    updateWorkspace(workspaces) {
-      this.$api.emit('workspace_update', workspaces);
+    updateWorkspace() {
+      const updatedWorkspace = {
+        ...this.oldWorkspace,
+        workspace_name: this.workspaceName,
+        workspace_description: this.workspaceDesc,
+      };
+      this.$api.emit('workspace_update', [updatedWorkspace]);
     },
   },
 };

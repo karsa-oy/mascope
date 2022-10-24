@@ -523,16 +523,22 @@ export default {
             else sample_item_attributes[field.label] = field.value;
             }
           );
-        let newSampleItem = {
-          ...props,
-          sample_item_attributes,
-          sample_item_type: this.sampleItemType,
-          sample_batch_id: this.batchActive.sample_batch_id,
-          };
         if (this.action == 'create') {
+          let newSampleItem = {
+            ...props,
+            sample_item_attributes,
+            sample_item_type: this.sampleItemType,
+            sample_batch_id: this.batchActive.sample_batch_id,
+            };
           this.$api.emit('sample_item_create', [newSampleItem]);
         } else if(this.action == 'update') {
-          newSampleItem.sample_item_id = this.sampleActive.sample_item_id;
+          let newSampleItem = {
+            ...this.sampleActive,
+            ...props,
+            sample_item_attributes,
+            sample_item_type: this.sampleItemType,
+            sample_batch_id: this.batchActive.sample_batch_id,
+            };
           this.$api.emit('sample_item_update', [newSampleItem]);
           this.deactivateModal();
         }

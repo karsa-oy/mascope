@@ -48,7 +48,7 @@ export default {
             rootState.api.emit('unsubscribe', state.active.workspace_id);
             await commit('SET_ACTIVE', null);
             await commit('SET_BATCHES', []);
-            if (propagate) await dispatch("batch/unload", null, {root:true});
+            if (propagate) await dispatch("batch/unload", true, {root:true});
         },
         // backend notifications
         async onWorkspaceReload({ dispatch }) {
