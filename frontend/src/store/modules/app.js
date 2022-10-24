@@ -34,7 +34,7 @@ export default {
             commit('SET_INSTRUMENTS', instruments);
             // load ionization mechanisms
             const ionMechanisms = await api.query(`--sql
-                SELECT * FROM config_mechanism;
+                SELECT * FROM ionization_mechanism;
             `);
             commit('SET_ION_MECHANISMS', ionMechanisms);
             // load workspaces
