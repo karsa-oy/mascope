@@ -93,7 +93,6 @@ async def create_sample_file_db_record(data):
     title = data.get('title')
     description = data.get('description')
     mz_calibration = data.get('mz_calibration')
-    attributes = data.get('attributes', {})
     await sio.emit(
             'sample_file_create',
             [{
@@ -106,7 +105,6 @@ async def create_sample_file_db_record(data):
                 "length": committed_length,
                 "range": data['range'],
                 "mz_calibration": mz_calibration,
-                "sample_file_attributes": attributes,
             }]
         )
 

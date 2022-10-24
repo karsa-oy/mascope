@@ -141,9 +141,6 @@ async def calibration_mz_apply(sid, fit, sample_filenames):
             params=sample_filenames
             )
     sample_file_df = sample_file_df.assign(
-        sample_file_attributes=sample_file_df[['sample_file_attributes']].applymap(
-            lambda x: json.loads(x)
-            ),
         mz_calibration=sample_file_df[['mz_calibration']].applymap(
             lambda x: json.loads(x) if x is not None else x
             ),

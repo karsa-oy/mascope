@@ -92,17 +92,12 @@ export default {
     saveAttributes(attributeTemplate) {
       // convert [{label, value...}, ...] to object
       let props = {};
-      let sample_file_attributes = {};
       attributeTemplate.forEach(
-        (field) => {
-          if (field.required) props[field.label] = field.value;
-          else sample_file_attributes[field.label] = field.value;
-          }
+        (field) => props[field.label] = field.value
         );
       let newSampleFile = {
         ...this.sampleFileRecordToLoad.row,
         ...props,
-        sample_file_attributes
         };
       if (newSampleFile.sample_file_id) {
         this.$api.emit('sample_file_update', [newSampleFile]);
