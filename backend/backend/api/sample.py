@@ -79,12 +79,16 @@ async def sample_batch_update(sid, sample_batches):
                     conn,
                     params=[sample_batch_id]
                     )['target_collection_id'].tolist()
-                target_collection_ids_new = sample_batch_df['target_collection_id'].tolist()[0]
+                target_collection_ids_new = (
+                    sample_batch_df['target_collection_id'].tolist()[0]
+                )
                 target_collections_to_match = [
                     id for id in target_collection_ids_new 
                     if id not in target_collection_ids_old
                     ]
-                ion_mechanism_ids_new = sample_batch_df['build_params'].tolist()[0]['ion_mechanisms']
+                ion_mechanism_ids_new = (
+                    sample_batch_df['build_params'].tolist()[0]['ion_mechanisms']
+                )
                 if len(target_collections_to_match) > 0:
                     ion_mechanisms_to_match = ion_mechanism_ids_new
                 else:
@@ -132,15 +136,16 @@ async def sample_batch_update(sid, sample_batches):
                     lambda x: json.dumps(x)
                 )
             )
-            sample_batch_df.drop(columns=['target_collection_id']).to_sql(
-                'sample_batch',
-                conn,
-                if_exists='append',
-                index=False
-                )
             sample_batch_df['sample_batch_utc_modified'] = [
                 datetime.now().isoformat()
                 ]*len(sample_batch_df)
+            sample_batch_df.drop(columns=['target_collection_id']
+                ).to_sql(
+                    'sample_batch',
+                    conn,
+                    if_exists='append',
+                    index=False
+                    )
             target_collection_in_sample_batch_df = sample_batch_df[
                 ['target_collection_id', 'sample_batch_id']
                 ].explode('target_collection_id', ignore_index=True).dropna()

@@ -202,7 +202,6 @@ export default {
                 SELECT
                     sample_item_id,
                     sample_item_name,
-                    sample_item_description,
                     sample_item_attributes,
                     sample_item_type,
                     sample_batch_id,
