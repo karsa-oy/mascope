@@ -1,11 +1,12 @@
 from backend.db.id import *  # noqa
-
+from dotenv import load_dotenv
 import os
 import re
 import traceback
 from importlib import import_module
 
 # env vars
+load_dotenv()
 data_dir = os.environ.get('MASCOPE_PRIVATE_DATADIR')
 db_dir = os.path.join(data_dir, 'database')
 
