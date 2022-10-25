@@ -16,7 +16,15 @@ export default {
             const minDatetime = datetimeRange.min.toISOString();
             const maxDatetime = datetimeRange.max.toISOString();
             await rootState.api.query(`--sql
-                SELECT *
+                SELECT
+                    sample_file_id,
+                    filename,
+                    instrument,
+                    datetime,
+                    datetime_utc,
+                    length,
+                    range,
+                    mz_calibration
                 FROM sample_file
                 WHERE (
                     (
@@ -33,7 +41,15 @@ export default {
         },
         async getRecentAcquisitions({ state, rootState, commit }) {
             await rootState.api.query(`--sql
-                SELECT *
+                SELECT
+                    sample_file_id,
+                    filename,
+                    instrument,
+                    datetime,
+                    datetime_utc,
+                    length,
+                    range,
+                    mz_calibration
                 FROM sample_file
                 WHERE (
                     (JulianDay('now') - JulianDay(datetime_utc) ) <= 1
