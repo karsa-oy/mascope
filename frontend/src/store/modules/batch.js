@@ -1,5 +1,5 @@
 import { dispatch, make } from 'vuex-pathify';
-import camelToSnakeCase from '../../lib/util';
+import { camelToSnakeCase } from '../../lib/util';
 
 const state = {
     active: null,
