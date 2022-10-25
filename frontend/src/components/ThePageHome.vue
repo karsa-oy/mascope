@@ -76,9 +76,10 @@
                 Process selected
               </b-button>
               <b-button
+                v-if="browseAcquisitions"
                 type="is-primary"
-                style="position: fixed; left: 15em; bottom: 2em; display:none"
-                :disabled="!workspaceActive || !batchActive || sampleFilesSelected.length > 0"
+                style="position: fixed; left: 15em; bottom: 2em;"
+                :disabled="!workspaceActive || !batchActive || !acquisitions.length || sampleFilesSelected.length > 0"
                 @click="launchProcessBatchModal"
               >
                 Process batch

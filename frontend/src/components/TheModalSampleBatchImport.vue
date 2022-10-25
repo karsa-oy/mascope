@@ -50,6 +50,7 @@
 <script>
 import { mapMutations } from "vuex";
 import { get, sync } from "vuex-pathify";
+import { parseAutosamplerCsv } from "../lib/util";
 
 import BaseSpreadsheetInput from "./BaseSpreadsheetInput.vue";
 import BaseTable from "./BaseTable.vue";
@@ -66,10 +67,12 @@ export default {
       action: null,
       csvCols: [],
       csvRows: [],
+      parsedRows: null,
     };
   },
   computed: {
     ...get({
+      acquisitions: "instrument/acquisitions",
       batchActive: "batch/active",
       sampleItemSchema: "app/schema@sample_item",
     }),
@@ -77,50 +80,81 @@ export default {
       modalActive: "modal/sampleBatchImportActive",
     }),
     readyToProcess() {
-      return this.sampleItemsToCreate.length > 0
-        && this.sampleItemSchema.map((dbCol) => dbCol.field)
-          .every((field) => (
-            field == 'sample_item_id'
-            || Object.keys(this.sampleItemsToCreate[0]).includes(field)
-            )
-          )
-      },
-    sampleItemsToCreate() {
-      let items = [];
-      for (let row of this.csvRows) {
-        // convert [{label, value...}, ...] to object
-        let props = {};
-        let sample_item_attributes = {};
-        this.csvCols.forEach(
-          (col) => {
-            if (
-              this.sampleItemSchema.map((dbCol) => dbCol.field)
-              .includes(col.field)
-              ) {
-              props[col.field] = row[col.field];
-            } else {
-              sample_item_attributes[col.field] = row[col.field];
-            }
-        });
-        let newSampleItem = {
-          ...props,
-          sample_item_attributes,
-          sample_batch_id: this.batchActive.sample_batch_id,
-          };
-        items.push(newSampleItem);
-      }
-      return items;
+      return (
+        this.parsedRows
+        && this.acquisitions
+        && this.parsedRows.length == this.acquisitions.length
+      );
     },
+    // readyToProcess() {
+    //   return this.sampleItemsToCreate.length > 0
+    //     && this.sampleItemSchema.map((dbCol) => dbCol.field)
+    //       .every((field) => (
+    //         field == 'sample_item_id'
+    //         || Object.keys(this.sampleItemsToCreate[0]).includes(field)
+    //         )
+    //       )
+    //   },
+    // sampleItemsToCreate() {
+    //   let items = [];
+    //   for (let row of this.csvRows) {
+    //     // convert [{label, value...}, ...] to object
+    //     let props = {};
+    //     let sample_item_attributes = {};
+    //     this.csvCols.forEach(
+    //       (col) => {
+    //         if (
+    //           this.sampleItemSchema.map((dbCol) => dbCol.field)
+    //           .includes(col.field)
+    //           ) {
+    //           props[col.field] = row[col.field];
+    //         } else {
+    //           sample_item_attributes[col.field] = row[col.field];
+    //         }
+    //     });
+    //     let newSampleItem = {
+    //       ...props,
+    //       sample_item_attributes,
+    //       sample_batch_id: this.batchActive.sample_batch_id,
+    //       };
+    //     items.push(newSampleItem);
+    //   }
+    //   return items;
+    // },
   },
   methods: {
     ...mapMutations({
       deactivateModal: "modal/deactivate",
     }),
     processBatch() {
-      this.$api.emit('sample_item_create', this.sampleItemsToCreate);
+      let items = [];
+      for (let [i, row] of Object.entries(this.parsedRows)) {
+        let newSampleItem = {
+          filename: this.acquisitions[i].filename,
+          sample_batch_id: this.batchActive.sample_batch_id
+        };
+        let attributes = {};
+        for (const key in row) {
+          const attr = key.toLowerCase().replaceAll(/[\s-]/g, '_');
+          if (attr.startsWith('sample_')) {
+            // sampl_name or sample_type
+            const prop = attr.replace('sample', 'sample_item');
+            newSampleItem[prop] = row[key];
+          } else {
+            attributes[attr] = row[key];
+          }
+        }
+        newSampleItem.sample_item_attributes = attributes;
+        items.push(newSampleItem);
+      }
+      console.log(items);
+      this.$api.emit('sample_item_create', items);
     },
   },
   watch: {
+    csvRows() {
+      this.parsedRows = parseAutosamplerCsv(this.csvRows);
+    },
   },
 };
 </script>
