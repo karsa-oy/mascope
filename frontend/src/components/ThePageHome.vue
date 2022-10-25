@@ -62,9 +62,8 @@
               :checkable="true"
               :checkSingle="true"
               @selectRows="selectSampleFiles"
-              :searchable="true"
               :height="sampleFileTableHeight"
-              :default-sort="['filename', 'asc']"
+              :sortable="false"
             >
             </base-table>
             <section style="padding: 0.5em">

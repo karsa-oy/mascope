@@ -27,7 +27,8 @@ export default {
                     instrument IN (
                     '${state.active}'
                     )
-                );
+                )
+                ORDER BY datetime_utc ASC;
             `).then((res) => { commit('SET_ACQUISITIONS', res) });
         },
         async getRecentAcquisitions({ state, rootState, commit }) {
@@ -40,7 +41,8 @@ export default {
                     instrument IN (
                     '${state.active}'
                     )
-                );
+                )
+                ORDER BY datetime_utc ASC;
             `).then((res) => { commit('SET_RECENT_ACQUISITIONS', res) });
         },
         async getMzCalibration({ rootState, state, commit }) {

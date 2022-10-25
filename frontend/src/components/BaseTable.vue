@@ -21,7 +21,7 @@
       :width="col.width"
       :subheading="col.subheading"
       :searchable="searchable"
-      sortable
+      :sortable="sortable"
       left
     >
       {{ parseValue(props.row[col.field]) }}
@@ -76,6 +76,11 @@ export default {
       type: Boolean,
       required: false,
       default: false,
+    },
+    sortable: {
+      type: Boolean,
+      required: false,
+      default: true,
     },
   },
   data() {
