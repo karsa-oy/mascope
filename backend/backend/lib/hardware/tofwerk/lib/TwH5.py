@@ -4,7 +4,7 @@
 import ctypes as ct
 from numpy.ctypeslib import ndpointer
 import numpy as np
-from .TofDaq import TPeakPar
+# from .TofDaq import TPeakPar  #TODO: commented out since not used and not compatible with linux
 import platform
 import os
 import sys
@@ -14,6 +14,8 @@ libpath = ""
 if platform.architecture() == ('32bit', 'EPL'):
     libpath = "linux_x86_64"
 if platform.architecture() == ('64bit', 'EPL'):
+    libpath = "linux_x86_64"
+if platform.architecture() == ('64bit', 'ELF'):
     libpath = "linux_x86_64"
 
 if platform.architecture() == ('32bit', ''):
@@ -115,10 +117,10 @@ def TwGetStickSpectrumFromH5(filename, spectrum, segmentIndex, segmentEndIndex, 
     getstickspectrumfromh5.argtypes = [ct.c_char_p, _float_array, ct.c_int, ct.c_int, ct.c_int, ct.c_int, ct.c_int, ct.c_int, ct.c_int8, ct.c_int8]
     return getstickspectrumfromh5(filename, spectrum, segmentIndex, segmentEndIndex, bufIndex, bufEndIndex, writeIndex, writeEndIndex, bufWriteLinked, normalize)
 
-getpeakparametersfromh5 = h5lib.TwGetPeakParametersFromH5 if os.name=='posix' else h5lib._TwGetPeakParametersFromH5
-def TwGetPeakParametersFromH5(filename, peakPar, peakIndex):
-    getpeakparametersfromh5.argtypes = [ct.c_char_p, ct.POINTER(TPeakPar), ct.c_int]
-    return getpeakparametersfromh5(filename, ct.pointer(peakPar), peakIndex)
+# getpeakparametersfromh5 = h5lib.TwGetPeakParametersFromH5 if os.name=='posix' else h5lib._TwGetPeakParametersFromH5
+# def TwGetPeakParametersFromH5(filename, peakPar, peakIndex):
+#     getpeakparametersfromh5.argtypes = [ct.c_char_p, ct.POINTER(TPeakPar), ct.c_int]
+#     return getpeakparametersfromh5(filename, ct.pointer(peakPar), peakIndex)
 
 getspecxaxisfromh5 = h5lib.TwGetSpecXaxisFromH5 if os.name=='posix' else h5lib._TwGetSpecXaxisFromH5
 def TwGetSpecXaxisFromH5(filename, specAxis, axisType, unitLabel, maxMass, writeIndex):
@@ -230,13 +232,13 @@ def TwSetStringAttributeInH5(filename, location, name, attribute):
 
 TwProgressCallback = ct.CFUNCTYPE(ct.c_bool, ct.c_double)
 
-changepeaktable = h5lib.TwChangePeakTable if os.name=='posix' else h5lib._TwChangePeakTable
-def TwChangePeakTable(filename, newPeakPar, nbrNewPeakPar, compressionLevel, callback):
-    if callback is None:
-        changepeaktable.argtypes = [ct.c_char_p, ct.POINTER(TPeakPar), ct.c_int, ct.c_int, ct.c_void_p]
-    else:
-        changepeaktable.argtypes = [ct.c_char_p, ct.POINTER(TPeakPar), ct.c_int, ct.c_int, TwProgressCallback]
-    return changepeaktable(filename, newPeakPar, nbrNewPeakPar, compressionLevel, callback)
+# changepeaktable = h5lib.TwChangePeakTable if os.name=='posix' else h5lib._TwChangePeakTable
+# def TwChangePeakTable(filename, newPeakPar, nbrNewPeakPar, compressionLevel, callback):
+#     if callback is None:
+#         changepeaktable.argtypes = [ct.c_char_p, ct.POINTER(TPeakPar), ct.c_int, ct.c_int, ct.c_void_p]
+#     else:
+#         changepeaktable.argtypes = [ct.c_char_p, ct.POINTER(TPeakPar), ct.c_int, ct.c_int, TwProgressCallback]
+#     return changepeaktable(filename, newPeakPar, nbrNewPeakPar, compressionLevel, callback)
 
 changepeaktablefromfile = h5lib.TwChangePeakTableFromFile if os.name=='posix' else h5lib._TwChangePeakTableFromFile
 def TwChangePeakTableFromFile (filename, massTable, compressionLevel, callback):
