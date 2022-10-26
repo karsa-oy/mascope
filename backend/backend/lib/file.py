@@ -73,7 +73,10 @@ class zarr_sdk:
         mz_calibration = value.get('mz_calibration')
 
         base_path = get_base_path()
-        data_path = parse_path_from_item_filename(filename, base_path)
+        try:
+            data_path = parse_path_from_item_filename(filename, base_path)
+        except Exception as e:
+            raise Exception("Error parsing filename")
         data_path = os.path.join(data_root, data_path)
         if os.path.exists(data_path):
             if overwrite:

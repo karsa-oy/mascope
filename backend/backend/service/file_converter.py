@@ -1,7 +1,12 @@
+# TODO: TwTool must load library before H5Streamer;
+# can be fixed later by refactoring H5Streamer dependencies
+import os, sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
+from backend.lib.hardware.tofwerk.lib.TwTool import *
+
 import argparse
 import asyncio
 import inspect
-import os
 import socketio
 import yaml
 
@@ -110,6 +115,15 @@ async def streamer_processor(streamer):
     global instrument_name
     # Handlers
     async def handle_spec_data(data):
+        def cleanup():
+            print("Canceling...")
+            streamer.cancel_event.set()
+            # Clear queues
+            streamer.spec_queue.get() # data
+            if hasattr(streamer, 'tps_queue'):
+                streamer.tps_queue.get() # coordinates
+                streamer.tps_queue.get() # data
+
         filename = data['filename']
         spec_i = data['i']
         cache_item = cache.get(filename)
@@ -131,15 +145,9 @@ async def streamer_processor(streamer):
             # New file
             try:
                 cache_item = zarr_sdk.init_signal_dataset({'value': data})
-            except FileExistsError:
-                print("File exists: %s" %data['filename'])
-                print("Canceling...")
-                streamer.cancel_event.set()
-                # Clear queues
-                streamer.spec_queue.get_nowait() # data
-                if hasattr(streamer, 'tps_queue'):
-                    streamer.tps_queue.get_nowait() # coordinates
-                    streamer.tps_queue.get_nowait() # data
+            except Exception as e:
+                print(f"Error starting {data['filename']}: {e.__class__.__name__}({str(e)})")
+                cleanup()
                 return False
             cache_item = AttrDict(cache_item)
             cache[filename] = cache_item
@@ -209,10 +217,15 @@ def parse_cmd_args():
         help="source directory for streaming (before date dirs)",
         type=str, required=False
     )
+    def streamer_type(st):
+        streamer_types = ['H5', 'Raw']
+        if st not in streamer_types:
+            raise argparse.ArgumentTypeError(f"{st}; should be one of the {streamer_types}")
+        return st
     parser.add_argument(
         "-st", "--streamer_type",
         help="streamer type (H5/Raw)",
-        type=str, required=False
+        type=streamer_type, required=False
     )
 
     all_args = parser.parse_args()
@@ -236,7 +249,7 @@ async def main():
     host = os.environ['MASCOPE_PUBLIC_API_HOST']
     port = os.environ['MASCOPE_PUBLIC_PROXY_API_PORT']
     url = f"http://{host}:{port}"
-    while True:
+    while not shutdown_event.is_set():
         try:
             await sio.connect(url)
             break
@@ -270,9 +283,11 @@ def run():
     if streamer_type == 'H5':
         streamer_class = H5Streamer
         file_mask = '*.h5'
-    if streamer_type == 'Raw':
+    elif streamer_type == 'Raw':
         streamer_class = RawStreamer
         file_mask = '*.raw'
+    else:
+        raise Exception(f"Unknown streamer type: {streamer_type}")
 
     n_jobs = args.get('n_jobs', 1)
     cache = LRUDict(n_jobs)
@@ -302,6 +317,8 @@ def run():
     try:
         loop.run_until_complete(main())
     except KeyboardInterrupt:
+        shutdown_event.set()
+    except:
         shutdown_event.set()
 
 
