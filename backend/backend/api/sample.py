@@ -4,7 +4,6 @@ import pandas as pd
 from datetime import datetime
 
 from backend.api.match import match_batch_compute, match_item_compute
-from backend.api.signal import signal_mz_calibration_update
 from backend.db.conn import conn
 from backend.db.id import gen_id
 from backend.server import sio
@@ -247,7 +246,7 @@ async def sample_item_create(sid, sample_items):
         room=sample_batch_id,
         namespace='/'
         )
-
+    return sample_items
 
 @sio.event(namespace='/')
 async def sample_item_update(sid, sample_items):

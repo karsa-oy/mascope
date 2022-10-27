@@ -148,7 +148,7 @@ export default {
         items.push(newSampleItem);
       }
       console.log(items);
-      this.$api.emit('sample_item_create', items);
+      this.$api.emit('scenthound_process_samples', items);
     },
   },
   watch: {

@@ -5,6 +5,7 @@ from backend.api.calibration import *
 from backend.api.match import *
 from backend.api.sample import *
 
+from backend.api.scenthound import *
 from backend.api.schema import *
 from backend.api.signal import *
 from backend.api.target import *
