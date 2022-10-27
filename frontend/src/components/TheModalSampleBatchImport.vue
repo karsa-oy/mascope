@@ -6,7 +6,7 @@
       :can-cancel="true"
       aria-role="dialog"
       aria-modal
-      @close="deactivateModal"
+      @close="close"
     >
       <div class="modal-card" style="width: 100vw">
         <header class="modal-card-head">
@@ -35,7 +35,7 @@
             @click="
               () => {
                 processBatch();
-                deactivateModal();
+                close();
               }
             "
           >
@@ -126,6 +126,12 @@ export default {
     ...mapMutations({
       deactivateModal: "modal/deactivate",
     }),
+    close() {
+      this.csvCols = [];
+      this.csvRows = [];
+      this.parsedRows = [];
+      this.deactivateModal();
+    },
     processBatch() {
       let items = [];
       for (let [i, row] of Object.entries(this.parsedRows)) {
@@ -147,7 +153,6 @@ export default {
         newSampleItem.sample_item_attributes = attributes;
         items.push(newSampleItem);
       }
-      console.log(items);
       this.$api.emit('scenthound_process_samples', items);
     },
   },
