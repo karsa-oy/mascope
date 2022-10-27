@@ -252,10 +252,10 @@ export default {
       }
     },
     initData() {
-      this.batchName = this.action == 'update'
+      this.batchName = this.action != 'create'
         ? this.batchActive.sample_batch_name
         : null;
-      this.batchDesc = this.action == 'update'
+      this.batchDesc = this.action != 'create'
         ? this.batchActive.sample_batch_description
         : null;
       this.initCalibrationCollectionSelected();
