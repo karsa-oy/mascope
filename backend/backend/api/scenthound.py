@@ -21,3 +21,9 @@ async def scenthound_process_samples(sid, sample_items):
         match_item_compute(sample_item['sample_item_id'])
         for sample_item in sample_items
     ]
+    sample_batch_id = sample_item_df['sample_batch_id'].tolist()[0]
+    await sio.emit(
+        'sample_batch_reload',
+        room=sample_batch_id,
+        namespace='/'
+        )
