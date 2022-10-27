@@ -219,6 +219,12 @@ export default {
                     IFNULL(SUM(sample_peak_height_sum), 0) AS sample_peak_height_sum,
                     CASE
                         WHEN (
+                            match_score IS NULL
+                        ) THEN False
+                        ELSE True
+                    END AS matched,
+                    CASE
+                        WHEN (
                             sample_item_id == '${sampleItemActiveId}'
                         ) THEN 3
                         ELSE 0

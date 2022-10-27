@@ -50,7 +50,11 @@
           <template v-if="col.field == 'match_score'">
             <base-tag-match
               :display-match-score="col.displayMatchScore"
-              :match-score="props.row[col.field]"
+              :match-score="
+                props.row.matched === undefined || props.row.matched
+                ? props.row[col.field]
+                : null
+              "
               :tooltip="col.tooltip ? col.tooltip(props.row) : {}"
             ></base-tag-match>
           </template>

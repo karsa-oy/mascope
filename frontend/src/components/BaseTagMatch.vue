@@ -9,7 +9,7 @@
       size="is-small"
       multilined
     >
-      <b-tag :icon="tag.icon" :class="tag.class" style="font-size: small">
+      <b-tag v-if="!(matchScore === null)" :icon="tag.icon" :class="tag.class" style="font-size: small">
         <span v-if="displayMatchScore" :style="tag.weight">
           {{ formatter.format(matchScore) }}
         </span>
