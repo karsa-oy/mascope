@@ -1,28 +1,23 @@
 import asyncio
 
-from backend.api.calibration import calibration_mz_calibrate_sample
-from backend.api.match import match_item_compute
-from backend.api.sample import sample_item_create
+from backend.api.calibration import mz_calibrate_sample as calibration_mz_calibrate_sample
+from backend.api.match import item_compute as match_item_compute
+from backend.api.sample import item_create as sample_item_create
 from backend.server import sio
 
 
 @sio.event(namespace='/')
 async def scenthound_process_samples(sid, sample_items):
     # Create sample item records
-    sample_items = await sample_item_create(sid, sample_items)
+    sample_item_df = sample_item_create(sample_items)
+    sample_items = sample_item_df.to_dict('records')
     # m/z calibrate
-    calibration_tasks = [
-        asyncio.create_task(
-            calibration_mz_calibrate_sample(sid, sample_item)
-        )
+    [
+        calibration_mz_calibrate_sample(sample_item)
         for sample_item in sample_items
     ]
-    await asyncio.gather(*calibration_tasks)
     # match
-    match_item_tasks = [
-        asyncio.create_task(
-            match_item_compute(sid, sample_item['sample_item_id'])
-        )
+    [
+        match_item_compute(sample_item['sample_item_id'])
         for sample_item in sample_items
     ]
-    await asyncio.gather(*match_item_tasks)

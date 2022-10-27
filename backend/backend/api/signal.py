@@ -28,7 +28,7 @@ def remove_duplicate_mz_values(mz):
                                             )
     return mz_unique
 
-async def signal_mz_calibration_update(fit, filenames):
+def signal_mz_calibration_update(fit, filenames):
     mode = fit['mode']
     par = fit['par']
     # Calculate new mz axis

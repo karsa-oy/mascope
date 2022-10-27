@@ -201,8 +201,7 @@ async def sample_batch_delete(sid, sample_batch_ids):
 
 # === sample items === #
 
-@sio.event(namespace='/')
-async def sample_item_create(sid, sample_items):
+def item_create(sample_items):
     sample_items = [
         {**sample_item, 'sample_item_id': gen_id()}
         for sample_item in sample_items
@@ -232,9 +231,14 @@ async def sample_item_create(sid, sample_items):
             if_exists='append',
             index=False
             )
+    return sample_item_df
+
+@sio.event(namespace='/')
+async def sample_item_create(sid, sample_items):
+    sample_item_df = item_create(sample_items)
+    sample_batch_id = sample_item_df['sample_batch_id'].tolist()[0]
     sample_item_ids = sample_item_df['sample_item_id'].tolist()
     for sample_item_id in sample_item_ids:
-        # await match_item_compute(sid, sample_item_id)
         await sio.emit(
             'sample_item_created',
             sample_item_id,
@@ -246,7 +250,6 @@ async def sample_item_create(sid, sample_items):
         room=sample_batch_id,
         namespace='/'
         )
-    return sample_items
 
 @sio.event(namespace='/')
 async def sample_item_update(sid, sample_items):
@@ -385,8 +388,7 @@ async def sample_file_create(sid, sample_files):
         await sio.emit('sample_file_created', room=instrument, namespace='/')
 
 
-@sio.event(namespace='/')
-async def sample_file_update(sid, sample_files):
+def file_update(sample_files):
     sample_file_df = pd.DataFrame.from_records(sample_files)
     sample_file_df = sample_file_df.assign(
         mz_calibration=sample_file_df[['mz_calibration']].applymap(
@@ -413,5 +415,10 @@ async def sample_file_update(sid, sample_files):
             if_exists='append',
             index=False
             )
+
+@sio.event(namespace='/')
+async def sample_file_update(sid, sample_files):
+    file_update(sample_files)
+    sample_file_df = pd.DataFrame.from_records(sample_files)
     for instrument in pd.unique(sample_file_df['instrument']).tolist():
         await sio.emit('sample_file_updated', room=instrument, namespace='/')

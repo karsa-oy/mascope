@@ -230,9 +230,7 @@ async def match_batch_remove(sid, sample_batch_id):
     # reload workspace
     await sio.emit('workspace_reload', workspace_id, namespace='/')
 
-@sio.event(namespace='/')
-async def match_item_compute(sid, sample_item_id):
-    print("computing matches for %s" %sample_item_id)
+def item_compute(sample_item_id):
     with conn:
         # fetch filename and batch id
         sample_item_df = pd.read_sql(f"""
@@ -244,7 +242,6 @@ async def match_item_compute(sid, sample_item_id):
             params=[sample_item_id]
             )
         filename = sample_item_df['filename'].tolist()[0]
-        print("filename %s" %filename)
         sample_batch_id = sample_item_df['sample_batch_id'].tolist()[0]
         # get sample batch
         sample_batch = pd.read_sql(
@@ -256,7 +253,6 @@ async def match_item_compute(sid, sample_item_id):
             conn,
             params=[sample_batch_id]
             ).to_dict('records')[0]
-        print("of batch: %s" %sample_batch)
         # get ionization mechanisms
         ion_mechanisms = json.loads(sample_batch['build_params'])['ion_mechanisms']
         ion_mechanism_df = pd.DataFrame.from_dict({
@@ -280,7 +276,6 @@ async def match_item_compute(sid, sample_item_id):
 
     with conn:
         # save to database
-        print("updating database")
         match_isotope_df = match_isotope_df.assign(sample_item_id=sample_item_id)
         match_isotope_df = match_isotope_df[[
             "match_id"
@@ -301,15 +296,20 @@ async def match_item_compute(sid, sample_item_id):
             if_exists='append',
             index=False
             )
-    print("complete")
+    return sample_item_df
+
+@sio.event(namespace='/')
+async def match_item_compute(sid, sample_item_id):
+    sample_item_df = item_compute(sample_item_id)
+    sample_batch_id = sample_item_df['sample_batch_id'].tolist()[0]
     await sio.emit(
         'sample_batch_reload',
         room=sample_batch_id,
         namespace='/'
         )
 
-@sio.event(namespace='/')
-async def match_item_remove(sid, sample_item_id):
+
+def item_remove(sample_item_id):
     with conn:
         # fetch batch id
         sample_batch_id = pd.read_sql(f"""
@@ -327,5 +327,8 @@ async def match_item_remove(sid, sample_item_id):
             """,
             [sample_item_id]
             )
+@sio.event(namespace='/')
+async def match_item_remove(sid, sample_item_id):
+    item_remove(sample_item_id)
     # reload batch
     await sio.emit('sample_batch_reload', roomn=sample_batch_id, namespace='/')
