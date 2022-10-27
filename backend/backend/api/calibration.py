@@ -76,6 +76,32 @@ async def calibration_mz_calibrate_batch(
     await sample_batch_update(sid, sample_batch_df.to_dict('records'))
 
 @sio.event(namespace='/')
+async def calibration_mz_calibrate_sample(sid, sample_item):
+    # get sample batch
+    with conn:
+        [sample_batch] = pd.read_sql(f"""
+            SELECT build_params
+            FROM sample_batch
+            WHERE sample_batch_id == ?
+            """,
+            conn,
+            params=[sample_item['sample_batch_id']]
+            ).to_dict('records')
+    # get mz calibration parameters
+    build_params = json.loads(sample_batch['build_params'])
+    calibration_collection_id = build_params['calibration_collection']
+    ion_mechanism_ids = build_params['ion_mechanisms']
+    fit, stats = await calibration_mz_fit(
+        sid,
+        sample_item['filename'],
+        [calibration_collection_id],
+        ion_mechanism_ids,
+        match_score_min=0.9,
+        refine_window=10
+        )
+    await calibration_mz_apply(sid, fit, [sample_item['filename']])
+
+@sio.event(namespace='/')
 async def calibration_mz_fit(
     sid,
     filename,
@@ -123,7 +149,7 @@ async def calibration_mz_fit(
         },
         room=sid
     )
-
+    return fit, stats
 
 @sio.event(namespace='/')
 async def calibration_mz_apply(sid, fit, sample_filenames):
