@@ -22,6 +22,7 @@ function install_prerequisites() {
     echo AAA Install needed packages
     sudo apt-get update
     # sudo apt-get install -y firefox
+    sudo apt-get install -y patchelf
     sudo apt-get install -y nginx
     sudo apt-get install -y mono-complete
     sudo apt-get install -y python3-pip
@@ -35,11 +36,14 @@ function install_prerequisites() {
     # backend
     pushd $MASCOPE_PROJECT/backend
     pip install --user poetry
-    export PATH="$HOME/.local/bin:$PATH"
-    echo "export PATH=\"$HOME/.local/bin:$PATH\"" >> ~/.bashrc
+    echo $PATH | grep ~/.local/bin: || echo "export PATH=\"$HOME/.local/bin:$PATH\"" >> ~/.bashrc
+    echo $PATH | grep ~/.local/bin: || export PATH="$HOME/.local/bin:$PATH"
     poetry update
     poetry lock --no-update
     poetry install --no-interaction --no-root
+    # patch libtwh5.so RPATH for libtwtool.so dependency
+    TWLIBPATH=$(realpath ./backend/lib/hardware/tofwerk/lib/dlls/linux_x86_64)
+    patchelf --force-rpath --set-rpath "$TWLIBPATH" "$TWLIBPATH/libtwh5.so"
     popd
 
     echo AAA setting up mascope frontend...
