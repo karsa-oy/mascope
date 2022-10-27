@@ -11,16 +11,18 @@ async def scenthound_process_samples(sid, sample_items):
     # Create sample item records
     sample_item_df = sample_item_create(sample_items)
     sample_items = sample_item_df.to_dict('records')
-    # m/z calibrate
-    [
+
+    async def process(sample_item):
         calibration_mz_calibrate_sample(sample_item)
-        for sample_item in sample_items
-    ]
-    # match
-    [
         match_item_compute(sample_item['sample_item_id'])
+
+    process_tasks = [
+        asyncio.create_task(
+            process(sample_item)
+        )
         for sample_item in sample_items
     ]
+    await asyncio.gather(*process_tasks)
     sample_batch_id = sample_item_df['sample_batch_id'].tolist()[0]
     await sio.emit(
         'sample_batch_reload',
