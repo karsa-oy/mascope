@@ -14,7 +14,11 @@ class KOInstrument():
     def __init__(self, rawfile):
         try:
             self.raw = Business.RawFileReaderFactory.ReadFile(rawfile)
-            self.raw.SelectInstrument(0, 1)
+            # TODO: DEVICE.MS is supposed to be at 0; is it always the case?
+            i_type = self.raw.GetInstrumentType(0)
+            self.raw.SelectInstrument(i_type, 1)
+            i_data = self.raw.GetInstrumentData()
+            print(f"File: {rawfile}\nInstrument: {i_data.Name} #{i_data.SerialNumber}")
             self.filename = rawfile
         except:
             self.raw = None

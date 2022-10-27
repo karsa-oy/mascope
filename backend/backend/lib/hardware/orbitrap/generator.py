@@ -207,7 +207,11 @@ class RawStreamer(Thread):
                         self.raw = ThermoBusiness.RawFileReaderFactory.ReadFile(
                             file_to_stream
                         )
-                    self.raw.SelectInstrument(0, 1)
+                    # TODO: DEVICE.MS is supposed to be at 0; is it always the case?
+                    i_type = self.raw.GetInstrumentType(0)
+                    self.raw.SelectInstrument(i_type, 1)
+                    i_data = self.raw.GetInstrumentData()
+                    print(f"Instrument: {i_data.Name} #{i_data.SerialNumber}")
                 except Exception as e:
                     print("Error reading file %s: %s" %(file_to_stream, e))
                     continue
