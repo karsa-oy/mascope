@@ -13,8 +13,11 @@ async def scenthound_process_samples(sid, sample_items):
     sample_items = sample_item_df.to_dict('records')
 
     async def process(sample_item):
-        calibration_mz_calibrate_sample(sample_item)
-        match_item_compute(sample_item['sample_item_id'])
+        try:
+            calibration_mz_calibrate_sample(sample_item)
+            match_item_compute(sample_item['sample_item_id'])
+        except:
+            print("Failed to process sample %s" %sample_item['filename'])
 
     process_tasks = [
         asyncio.create_task(

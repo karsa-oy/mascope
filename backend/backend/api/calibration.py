@@ -99,11 +99,16 @@ def mz_calibrate_sample(sample_item):
         match_score_min=0.9,
         refine_window=10
         )
+    if not fit:
+        raise Exception("Failed to fit m/z calibration")
     mz_apply(fit, [sample_item['filename']])
 
 @sio.event(namespace='/')
 async def calibration_mz_calibrate_sample(sid, sample_item):
-    mz_calibrate_sample(sample_item)
+    try:
+        mz_calibrate_sample(sample_item)
+    except:
+        print("Failed to calibrate sample %s" %sample_item['filename'])
 
 
 def mz_fit(
