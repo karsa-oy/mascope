@@ -96,8 +96,8 @@ def mz_calibrate_sample(sample_item):
         sample_item['filename'],
         [calibration_collection_id],
         ion_mechanism_ids,
-        match_score_min=0.9,
-        refine_window=10
+        match_score_min=0.8,
+        refine_window=20
         )
     if not fit:
         raise Exception("Failed to fit m/z calibration")
