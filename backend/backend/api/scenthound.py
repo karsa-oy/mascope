@@ -20,8 +20,8 @@ async def scenthound_process_samples(sid, sample_items):
             print("Failed to process sample %s" %sample_item['filename'])
 
     process_tasks = [
-        asyncio.create_task(
-            process(sample_item)
+        sio.start_background_task(
+            process, sample_item
         )
         for sample_item in sample_items
     ]
