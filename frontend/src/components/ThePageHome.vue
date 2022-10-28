@@ -82,7 +82,7 @@
                 :disabled="!workspaceActive || !batchActive || !acquisitions.length || sampleFilesSelected.length > 0"
                 @click="launchProcessBatchModal"
               >
-                Process batch
+                Process batch ({{acquisitions.length}})
               </b-button>
             </section>
           </div>

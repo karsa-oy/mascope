@@ -39,7 +39,7 @@
               }
             "
           >
-            Process
+            Process ({{parsedRows.length}})
           </b-button>
         </footer>
       </div>
@@ -67,7 +67,7 @@ export default {
       action: null,
       csvCols: [],
       csvRows: [],
-      parsedRows: null,
+      parsedRows: [],
     };
   },
   computed: {
@@ -81,7 +81,7 @@ export default {
     }),
     readyToProcess() {
       return (
-        this.parsedRows
+        this.parsedRows.length
         && this.acquisitions
         && this.parsedRows.length == this.acquisitions.length
       );
