@@ -57,7 +57,7 @@ export default {
               field: "match_score",
               label: "Score",
               width: "10%",
-              displayMatchScore: false,
+              displayMatchScore: true,
               hidden,
               tooltip: (row) => {
                 return {

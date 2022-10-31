@@ -5,7 +5,7 @@
       label="m/z tolerance [ppm]"
       path="batch/paramMzTolerance"
       @paramChange="reloadMatches"
-      :range="{ min: 0, max: 1000, step: 1 }"
+      :range="{ min: 0, max: 100, step: 1 }"
     >
     </base-param-field>
     <base-param-field
