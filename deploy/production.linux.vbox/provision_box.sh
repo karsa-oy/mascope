@@ -58,18 +58,24 @@ function install_prerequisites() {
     # add sql.js library
     mkdir $MASCOPE_UI/node_modules
     cp -r -f $MASCOPE_PROJECT/frontend/node_modules/sql.js $MASCOPE_UI/node_modules
-
-    # set up nginx configuration for the static frontend
-    sudo rm -r -f /var/www/mascope.com || true
-    sudo mkdir /var/www/mascope.com
-    sudo ln -s -f $MASCOPE_UI /var/www/mascope.com/production
-    sudo cp -f $MY_PATH/mascope.nginx /etc/nginx/sites-available/mascope.com
-    sudo chmod -x  /etc/nginx/sites-available/mascope.com
-    sudo ln -s -f /etc/nginx/sites-available/mascope.com /etc/nginx/sites-enabled/
+    # (re)set up nginx configuration for the static mascope frontend
+    sudo systemctl stop nginx
+    sudo rm -r -f /var/www/mascope.site || true
+    sudo mkdir /var/www/mascope.site
+    sudo ln -s -f $MASCOPE_UI /var/www/mascope.site/production
+    sudo cp -f $MY_PATH/nginx/mascope_site.conf /etc/nginx/sites-available/mascope_site.conf
+    sudo chmod -x /etc/nginx/sites-available/mascope_site.conf
+    # create and deploy self-signed ssl certificate for https access to nginx
+    sudo openssl req -config $MY_PATH/nginx/ssl.params -x509 -nodes -days 3650 -newkey rsa:2048 -keyout /etc/ssl/private/nginx.key -out /etc/ssl/certs/nginx.crt
+    sudo cp -f $MY_PATH/nginx/self-signed.conf /etc/nginx/snippets/self-signed.conf
+    sudo chmod 644 /etc/nginx/snippets/self-signed.conf
+    # enable mascope site
+    sudo ln -s -f /etc/nginx/sites-available/mascope_site.conf /etc/nginx/sites-enabled/
     sudo rm -f /etc/nginx/sites-enabled/default
     sudo systemctl restart nginx
 
     echo AAA setting up mascope backend service...
+
     sudo cp -f $MY_PATH/mascope.service /etc/systemd/system/
     sudo chmod -x  /etc/systemd/system/mascope.service
     sudo systemctl daemon-reload
