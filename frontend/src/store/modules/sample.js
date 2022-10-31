@@ -32,10 +32,8 @@ export default {
                 -- matches exist
                 SELECT
                     CASE
-                        WHEN (
-                            COUNT(sample_item_id) > 0
-                        ) THEN True
-                        ELSE False
+                        WHEN COUNT(sample_item_id) > 0 THEN 1
+                        ELSE 0
                     END AS matched
                 FROM match
                 WHERE sample_item_id == '${sampleItemId}'

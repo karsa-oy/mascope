@@ -58,7 +58,7 @@ export default {
     },
     actions: {
         // data loading
-        async initMatchFilter({ rootState, state, getters, commit }) {
+        async initMatchFilter({ rootState, state, getters }) {
             const batchId = state.active.sample_batch_id;
             // initialize match filter
             const filterParams = getters['filterParams'];
@@ -73,11 +73,9 @@ export default {
                 CREATE TEMPORARY TABLE batch_match_filter AS
                     SELECT
                         filename,
-                        match_score,
                         relative_abundance,
                         sample_item_id,
                         sample_item_name,
-                        sample_peak_height,
                         target_collection_id,
                         target_collection_name,
                         target_compound_formula,
@@ -86,23 +84,37 @@ export default {
                         target_ion_formula,
                         target_ion_id,
                         ionization_mechanism AS target_ion_mechanism,
-                        target_isotope_id
+                        target_isotope_id,
+                        CASE
+                            WHEN (
+                            --    ABS(match_mz_error) <= ${mzTolerance}
+                            --    AND ABS(match_abundance_error) <= ${isotopeRatioTolerance}
+                            --    AND sample_peak_height >= ${peakMinIntensity}
+                            --    AND relative_abundance >= ${minIsotopeAbundance}
+                            True
+                            ) THEN sample_peak_height
+                            ELSE 0
+                        END AS sample_peak_height,
+                        CASE
+                            WHEN (
+                                ABS(match_mz_error) <= ${mzTolerance}
+                                AND ABS(match_abundance_error) <= ${isotopeRatioTolerance}
+                                AND sample_peak_height >= ${peakMinIntensity}
+                                AND relative_abundance >= ${minIsotopeAbundance}
+                                ) THEN match_score
+                            ELSE 0
+                        END AS match_score
                     FROM sample_item
                     NATURAL LEFT JOIN sample_batch
-                    NATURAL LEFT JOIN target_collection_in_sample_batch
-                    NATURAL LEFT JOIN target_collection
-                    NATURAL LEFT JOIN target_compound_in_target_collection
-                    NATURAL LEFT JOIN target_compound
+                    NATURAL LEFT JOIN match
+                    NATURAL LEFT JOIN target_isotope
                     NATURAL LEFT JOIN target_ion
                     NATURAL LEFT JOIN ionization_mechanism
-                    NATURAL LEFT JOIN target_isotope
-                    NATURAL LEFT JOIN match
+                    NATURAL LEFT JOIN target_compound
+                    NATURAL LEFT JOIN target_collection_in_sample_batch
+                    NATURAL LEFT JOIN target_collection
                     WHERE (
                         sample_batch_id == '${batchId}'
-                        AND ABS(match_mz_error) <= ${mzTolerance}
-                        AND ABS(match_abundance_error) <= ${isotopeRatioTolerance}
-                        AND sample_peak_height >= ${peakMinIntensity}
-                        AND relative_abundance >= ${minIsotopeAbundance}
                     )
             `);
         },
@@ -116,8 +128,6 @@ export default {
             await dispatch('unpackParams');
             await dispatch('loadCalibration');
             await dispatch('loadTargets');
-            // initialize match filter
-            await dispatch('initMatchFilter');
             await dispatch('loadSamples');
             await dispatch('loadMatches');
         },
@@ -141,8 +151,19 @@ export default {
                     sample_item_id,
                     sample_item_name,
                     MAX(match_score) AS match_score,
-                    SUM(sample_peak_height) AS sample_peak_height_sum
-                FROM batch_match_filter
+                    SUM(sample_peak_height_sum) AS sample_peak_height_sum
+                FROM (
+                    SELECT
+                        filename,
+                        sample_item_id,
+                        sample_item_name,
+                        target_ion_id,
+                        target_compound_id,
+                        SUM(match_score*relative_abundance) AS match_score,
+                        SUM(sample_peak_height) AS sample_peak_height_sum
+                    FROM batch_match_filter
+                    GROUP BY sample_item_id, target_compound_id, target_ion_id
+                )
                 GROUP BY sample_item_id
             `).then((res) => {
                 commit('SET_MATCH_COLLECTIONS', res);
@@ -156,14 +177,27 @@ export default {
                     target_compound_formula,
                     target_compound_id,
                     target_compound_name,
-                    target_ion_formula,
-                    target_ion_mechanism,
-                    AVG(match_score) AS match_score,
-                    SUM(sample_peak_height) AS sample_peak_height_sum
-                FROM batch_match_filter
-                GROUP BY sample_item_id, target_compound_id, target_ion_id;
+                    IFNULL(MAX(match_score), 0) as match_score,
+                    IFNULL(SUM(sample_peak_height_sum), 0) AS sample_peak_height_sum
+                FROM (
+                    SELECT
+                        filename,
+                        sample_item_id,
+                        sample_item_name,
+                        target_compound_formula,
+                        target_compound_id,
+                        target_compound_name,
+                        target_collection_id,
+                        target_collection_name,
+                        target_ion_id,
+                        SUM(match_score*relative_abundance) AS match_score,
+                        SUM(sample_peak_height) AS sample_peak_height_sum
+                    FROM batch_match_filter
+                    GROUP BY sample_item_id, target_compound_id, target_ion_id
+                )
+                GROUP BY sample_item_id, target_compound_id;
             `).then((res) => {
-                commit('SET_MATCH_IONS', res);
+                commit('SET_MATCH_COMPOUNDS', res);
             });
             await rootState.api.query(`--sql
                 SELECT
@@ -174,15 +208,19 @@ export default {
                     target_compound_formula,
                     target_compound_id,
                     target_compound_name,
-                    AVG(match_score) AS match_score,
-                    SUM(sample_peak_height) AS sample_peak_height_sum
+                    target_ion_formula,
+                    target_ion_mechanism,
+                    IFNULL(SUM(match_score*relative_abundance), 0) AS match_score,
+                    IFNULL(SUM(sample_peak_height), 0) AS sample_peak_height_sum
                 FROM batch_match_filter
-                GROUP BY sample_item_id, target_compound_id;
+                GROUP BY sample_item_id, target_compound_id, target_ion_id;
             `).then((res) => {
-                commit('SET_MATCH_COMPOUNDS', res);
+                commit('SET_MATCH_IONS', res);
             });
         },
-        async loadSamples({ rootState, commit }) {
+        async loadSamples({ rootState, commit, dispatch }) {
+            // initialize match filter
+            await dispatch('initMatchFilter');
             const batchId = state.active.sample_batch_id;
             // initialize sample filter
             await rootState.api.query(`--sql
@@ -215,14 +253,14 @@ export default {
                     mz_calibration,
                     sample_item_utc_created,
                     sample_item_utc_modified,
-                    IFNULL(MAX(match_score), 0) AS match_score,
-                    IFNULL(SUM(sample_peak_height_sum), 0) AS sample_peak_height_sum,
                     CASE
                         WHEN (
                             match_score IS NULL
-                        ) THEN False
-                        ELSE True
+                        ) THEN 0
+                        ELSE 1
                     END AS matched,
+                    IFNULL(MAX(match_score), 0) AS match_score,
+                    IFNULL(SUM(sample_peak_height_sum), 0) AS sample_peak_height_sum,
                     CASE
                         WHEN (
                             sample_item_id == '${sampleItemActiveId}'
