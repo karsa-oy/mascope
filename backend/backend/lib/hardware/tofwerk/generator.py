@@ -402,17 +402,28 @@ class H5Streamer(BaseStreamer, KInstrument):
                         file_to_stream.encode(),
                         self.desc
                     )
-                if ret != 4:
-                    print("Error reading file: %s" %ret)
-                    continue
-                # Add fields to comply with TW shared memory descriptor
-                self.desc.currentDataFileName = file_to_stream.encode()
-                self.desc.iBuf = 0
-                self.desc.iWrite = 0
+                    if ret != 4:
+                        print("Error reading file: %s" %ret)
+                        continue
                 if not (self.desc.nbrWrites and self.desc.nbrBufs):
                     # Empty file, skip
                     print("Skipping empty file: %s" %self.desc.currentDataFileName)
                     continue
+                # Test read to check for corrupt file
+                with self.lock:
+                    ret = H5Streamer.TwGetTofSpectrumFromH5(
+                        file_to_stream.encode(),
+                        np.zeros((self.desc.nbrSamples, ), dtype=np.float32),
+                        0, 0, 0, 0, 0, 0, True, True
+                    )
+                    if ret != 4:
+                        print("Error reading file: %s" %ret)
+                        H5Streamer.TwCloseH5(file_to_stream.encode())
+                        continue
+                # Add fields to comply with TW shared memory descriptor
+                self.desc.currentDataFileName = file_to_stream.encode()
+                self.desc.iBuf = 0
+                self.desc.iWrite = 0
             except Empty:
                 continue
             # Start streaming
