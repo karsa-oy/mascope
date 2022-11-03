@@ -125,14 +125,14 @@ def fit_peaks(
             posmin = 0
             posmax = np.inf
         params.add(
-            'p%spos' %
+            'peak%spos' %
             p,
             value=ppos[p],
             min=posmin,
             max=posmax,
             vary=fit_pos)
-        params.add('p%shei' % p, value=phei[p] / ymax, min=0, vary=fit_hei)
-        params.add('p%sres' % p, value=pres[p], min=0, vary=fit_res)
+        params.add('peak%shei' % p, value=phei[p] / ymax, min=0, vary=fit_hei)
+        params.add('peak%sres' % p, value=pres[p], min=0, vary=fit_res)
     # Fit
     minner = lmfit.Minimizer(
         peak_kernel_residual,
@@ -141,7 +141,7 @@ def fit_peaks(
             x,
             yn,
             ps))
-    fit = minner.leastsq(maxfev=max_iter)
+    fit = minner.leastsq(max_nfev=max_iter)
     # Rescale fit results
     fit.residual *= ymax
     for par in fit.params:
@@ -149,7 +149,12 @@ def fit_peaks(
             fit.params[par].value *= ymax
             if fit.params[par].stderr is not None:
                 fit.params[par].stderr *= ymax
-    return fit
+    peaks = [
+        fit.params[par].value
+        for par in fit.params if par.startswith('peak')
+        ]
+    peaks = [ tuple(peaks[i:i+3]) for i in range(0, len(peaks), 3) ]
+    return fit, peaks
 
 def gen_peak(x, ppos, phei, pres, ps, trim_borders=False):
     """Generate a peak of certain height and with and shape in domain 'x'.
@@ -261,10 +266,10 @@ def gen_peak_kernel(params, x, ps):
 
     kernel = np.zeros((len(x),))
     npeaks = params['npeaks']
-    for p in range(npeaks):
-        ppos = params['p%spos' %p]
-        phei = params['p%shei' %p]
-        pres = params['p%sres' %p]
+    for p in range(int(npeaks)):
+        ppos = params['peak%spos' %p]
+        phei = params['peak%shei' %p]
+        pres = params['peak%sres' %p]
         peak = gen_peak(x, ppos, phei, pres, ps)
         kernel += peak
     return kernel
@@ -393,346 +398,6 @@ def write_peak_dict(D, filename):
     with h5sparse.File(filename, 'w') as h5f:
         h5f.create_dataset('sparse/matrix', data=D)
     return
-
-
-#XXX --------- Deprecated stuff down from here ---------
-
-from backend.lib.hardware.tofwerk.util import (
-    read_peaklist, 
-    peaklist_to_df
-)
-
-def score_peak_id(kevent, peaklist, found_peaks, corr_avg_s=10, cache=False):
-    """[summary]
-
-    NOTE: !!! Deprecated !!!
-
-    Parameters
-    ----------
-    kevent : [type]
-        [description]
-    peaklist : [type]
-        [description]
-    found_peaks : [type]
-        [description]
-    corr_avg_s : int, optional
-        [description], by default 10
-    cache : bool, optional
-        [description], by default False
-
-    Returns
-    -------
-    [type]
-        [description]
-    """
-
-    if isinstance(peaklist, str) or isinstance(peaklist, bytes):
-        peaklist = read_peaklist(peaklist, .1)
-    if isinstance(peaklist, dict):
-        peaklist = peaklist_to_df(peaklist)
-    peak_df = peaklist.copy()
-    peak_df['peak id'] = [np.array([])] * len(peak_df)
-    peak_df['snos'] = [np.array([])] * len(peak_df)
-    peak_df['mass error'] = [np.array([])] * len(peak_df)
-    peak_df['abundance score'] = [None] * len(peak_df)
-    peak_df['isotope r2'] = [None] * len(peak_df)
-    peak_df['signal'] = [None] * len(peak_df)
-
-    spectra = kevent.get_avg_spectra(corr_avg_s)
-    if cache:
-        kevent.spectra = spectra
-
-    found_ppos = np.asarray(list(zip(*found_peaks))[0])
-    found_phei = np.asarray(list(zip(*found_peaks))[1])  # NOTE: should be area
-    # Temporary fix to make it a bit better when "peaks"==code
-    found_phei = np.asarray(
-        [np.mean(spectra[int(round(p)), :]) for p in found_ppos])
-
-    for comp, row in peak_df.iterrows():
-        true_mzs = row['mass']
-        true_abus = row['abundance']
-        match_ind = []
-        match_snos = []
-        match_mzs = []
-        mz_err = []
-        match_heis = []
-        for mz in true_mzs:
-            true_ppos = kevent.mz2sno(mz)
-            ind = np.argmin(np.abs(true_ppos - found_ppos))
-            match_ind.append(ind)
-            match_sno = found_ppos[ind]
-            match_mz = kevent.sno2mz(match_sno)
-            match_snos.append(match_sno)
-            match_mzs.append(match_mz)
-            mz_err.append((mz - match_mz) / mz)
-            match_heis.append(found_phei[ind])
-
-        # Isotope matching
-        if len(true_mzs) > 1:
-            # Check isotope height match
-            match_abus = normalize(
-                np.array(match_heis).reshape(1, -1)).reshape(-1,)
-            true_abus = normalize(
-                np.array(true_abus).reshape(1, -1)).reshape(-1,)
-            abu_match = np.dot(match_abus, true_abus)
-            if spectra.shape[1] > 1:
-                # Check isotope signal correlation
-                signals = []
-                for ind in match_ind:
-                    si = int(round(found_ppos[ind]))
-                    signals.append(spectra[si, :])
-                signals = np.asarray(signals)
-                pearr = np.min(np.corrcoef(signals))
-                r2 = pearr**2
-            else:
-                r2 = 1.0
-        else:
-            abu_match = 1.0
-            r2 = 1.0
-
-        peak_df.loc[comp, 'signal'] = np.sum(match_heis)
-        peak_df.at[comp, 'peak id'] = np.array(match_ind)
-        peak_df.at[comp, 'snos'] = np.array(match_snos)
-        peak_df.at[comp, 'mass error'] = np.array(mz_err) * 1e6
-        peak_df.loc[comp, 'abundance score'] = abu_match
-        peak_df.loc[comp, 'isotope r2'] = r2
-
-    return peak_df
-
-
-
-def identify_peaks(
-        kevent,
-        peaklist,
-        mz_tol=15,
-        res_tol=.2,
-        max_resid=.2,
-        abu_tol=.05,
-        min_corr=.9):
-    """[summary]
-
-    NOTE: !!! Deprecated !!!
-
-    Parameters
-    ----------
-    kevent : [type]
-        [description]
-    peaklist : [type]
-        [description]
-    mz_tol : int, optional
-        [description], by default 15
-    res_tol : float, optional
-        [description], by default .2
-    max_resid : float, optional
-        [description], by default .2
-    abu_tol : float, optional
-        [description], by default .05
-    min_corr : float, optional
-        [description], by default .9
-
-    Returns
-    -------
-    [type]
-        [description]
-    """
-    if isinstance(peaklist, str):
-        peaklist = read_peaklist(peaklist, .1)
-    if isinstance(peaklist, dict):
-        peaklist = peaklist_to_df(peaklist)
-    identified = peaklist.copy()
-    identified['mz error'] = [np.array([])] * len(identified)
-    identified['R2'] = [None] * len(identified)
-
-    spec = kevent.get_spec()
-    # Loop through peaklist
-    for key, row in peaklist.iterrows():
-        allok = True
-        dmzs = []
-        row_sis = []
-        for m in row['mass']:
-            psno = kevent.mz2sno(m)
-            # Fit a peak around the given position
-            sigma = kevent.r_at_3p(psno, mode='sigma')
-            si0 = int(round(psno - 3. * sigma))
-            si1 = int(round(psno + 3. * sigma))
-            partsnos = np.arange(si0, si1)
-            partspec = spec[si0:si1]
-            ppos, pres, resid = fit_single_peak(
-                partsnos, partspec, kevent.ps, True)
-            plt.show()
-            if ppos is None:
-                print('Peak fitting failed')
-                identified.drop(key, inplace=True)
-                allok = False
-                break
-
-            # Check that peak position is within tolerance
-            dmz = abs(kevent.sno2mz(psno) - kevent.sno2mz(ppos)) / \
-                kevent.sno2mz(psno)
-            dmzs.append(dmz)
-            if dmz > mz_tol * 1e-6:
-                print('M/z error too large')
-                identified.drop(key, inplace=True)
-                allok = False
-                break
-
-            # Check that the width of the fitted peak is ok
-            true_res = kevent.r_at_3p(ppos, mode='R')
-            dres = abs(true_res - pres) / true_res
-            if dres > res_tol:
-                print('Resolution of the fitted peak not right')
-                identified.drop(key, inplace=True)
-                allok = False
-                break
-
-            # Check that residual is not too big (likely multiple peaks)
-            if resid > max_resid:
-                print('Residual of the fitted peak not right')
-                identified.drop(key, inplace=True)
-                allok = False
-                break
-
-            print(
-                'm/z error: %.2f, resolution error: %.2f, residual: %.2f' %
-                (dmz * 1e6, dres, resid))
-            row_sis.append(int(round(ppos)))
-
-        if not allok:
-            continue
-        # More than one significant isotope
-        if len(row_sis) > 1:
-            # Match abundances
-            spec_abus = np.array([spec[si] for si in row_sis]).reshape(1, -1)
-            true_abus = row['abundance'].reshape(1, -1)
-            abu_dot = np.dot(normalize(spec_abus).reshape(-1,),
-                             normalize(true_abus).reshape(-1,))
-            print('Isotope abundance dot product: %s' % abu_dot)
-            if (1.0 - abu_dot) > abu_tol:
-                print('Isotope abundaces do not match well enough')
-                identified.drop(key, inplace=True)
-                continue
-
-            # Calculate correlation
-            signals = []
-            for si in row_sis:
-                signals.append(kevent.get_avg_spectra(
-                    10, si0=si, si1=si + 1).reshape(-1,))
-            signals = np.asarray(signals)
-            pearr = np.corrcoef(signals)[0, 1]
-            print('Correlation coefficient: %s' % pearr)
-            plt.figure()
-            plt.plot(signals.T)
-            plt.show()
-            if pearr < min_corr:
-                print('Correlation of isotopes not good enough')
-                identified.drop(key, inplace=True)
-                continue
-        else:
-            pearr = 1.0
-            abu_dot = 1.0
-        print('Peak identified as %s' % key)
-        identified.at[key, 'mz error'] = np.array(dmzs)
-        identified.loc[key, 'R2'] = pearr
-    return identified
-
-from scipy.optimize import curve_fit
-from scipy.linalg import norm
-
-def fit_hat(x, y, pos, points=5):
-    """[summary]
-
-    NOTE: !!! Deprecated !!!
-
-    Parameters
-    ----------
-    x : [type]
-        [description]
-    y : [type]
-        [description]
-    pos : [type]
-        [description]
-    points : int, optional
-        [description], by default 5
-
-    Returns
-    -------
-    [type]
-        [description]
-    """
-    # Fit parabola to the top of a peak to find exact position
-    hat_ind = np.arange(pos-int(points/2), pos+int(points/2))
-    a, b, c = np.polyfit(x[hat_ind], y[hat_ind], 2)
-    x_vertex = -b / (2*a)
-    y_vertex = c - b**2 / (4*a)
-    return x_vertex, y_vertex # Peak position and height
-
-def peak_fwhm(y, peak_pos, peak_hei):
-    """[summary]
-
-    NOTE: !!! Deprecated !!!
-
-    Parameters
-    ----------
-    y : [type]
-        [description]
-    peak_pos : [type]
-        [description]
-    peak_hei : [type]
-        [description]
-
-    Returns
-    -------
-    [type]
-        [description]
-    """
-    # Find the width of a given peak
-    baseline = 5e-4
-    # Find half maximum on rising edge
-    i0 = int(np.floor(peak_pos))
-    li = 1
-    while y[i0-li] < y[i0-(li-1)]:
-        li += 1
-    lbl = y[i0-li]
-    if lbl > baseline:
-        return None, (None, None)
-    ind = np.arange(i0-li, i0, dtype='int')
-    lhmi = np.interp(peak_hei/2., y[ind], ind)
-    # Find half maximum on falling edge
-    i0 = int(np.ceil(peak_pos))
-    ri = 1
-    while y[i0+ri] < y[i0+(ri-1)]:
-        ri += 1
-    rbl = y[i0+ri]
-    if rbl > baseline:
-        return None, (None, None)
-    ind = np.arange(i0, i0+ri, dtype='int')
-    rhmi = np.interp(peak_hei/2., np.flip(y[ind]), np.flip(ind))
-    if abs((rhmi-peak_pos) - (peak_pos-lhmi)) > 1:
-        return None, (None, None)
-    fwhm = rhmi - lhmi
-    return fwhm, (lhmi, rhmi)
-
-class peakshape_spline():
-    """
-    
-    NOTE: !!! Deprecated !!!
-
-    Returns
-    -------
-    [type]
-        [description]
-    """
-    # Fit a spline to peakshape and return a kernel for a given peak
-    def __init__(self, ps):
-        self.ps = ps
-
-    def spline(self, x, ppos, phei, pres):
-        sigma = 0.4246609 * (ppos / pres)
-        xi = (self.ps['x'] * sigma) + ppos
-        spline = CubicSpline(xi, self.ps['y']*phei)
-        return spline(x)
-
-def fit_single_peak(x, y, ps, plot=False):
     """[summary]
 
     NOTE: !!! Deprecated !!!
