@@ -1,19 +1,20 @@
-### Deploy production version of Mascope application (backend + frontend)
+### Deploy production version of Mascope application (backend + frontend) 
 
 #### Get build environment ready:
  Make sure Vagrantfile and corresponding .env contain required values
 
-#### Build new distribution package for mascope UI
+#### Deploy Mascope app (linux VirtualBox on Windows host):
 
-Normally you do it in your dev.environment (here: Windows). This will build frontend/dist folder with a code for static web server:
-    build_dist.cmd
+First build new mascope UI distribution package by running build_dist.cmd.
+Then mascope services are started in a linux VirtualBox: vagrant up.
+All this can be done on Windows host by running:
 
-#### Deploy Mascope app:
+    deploy.cmd
 
-For setting up Mascope application from Windows:
-    vagrant up
-- will set it up in Ubuntu VirtualBox;
+#### Or on native linux environment:
 
-or in native Ubuntu linux environment
+1. Have  mascope UI dist package ready
+2. Roll out mascope services on native Ubuntu
+
     provision_box.sh
 
