@@ -41,6 +41,18 @@ R = lambda m: m / (p1 * m + p2)
 #%%
 from backend.lib.signal.peak import fit_peaks
 
+def calculate_peak_areas(x, y, peakshape, peaks):
+    kernel = np.zeros((len(x), len(peaks)))
+    for i, (pos, hei, res) in enumerate(peaks):
+        peak_kernel = gen_peak(x, pos, hei, res, peakshape)
+        kernel[:, i] = peak_kernel
+    _, _, _, peak_areas = np.linalg.lstsq(kernel, y, rcond=None)
+    peaks = [
+        (pos, hei, res, peak_areas[i])
+        for i, (pos, hei, res) in enumerate(peaks)
+        ]
+    return peaks
+
 def fit_um(
     mz,
     spec,
@@ -100,14 +112,14 @@ def fit_um(
         init_pos.append(max_residual_mz)
         init_hei.append(max_residual)
         init_res.append(R(max_residual_mz))
-    return fit
+    return fit, peaks
     
 um = 169
 umz = mz.sel(mz=slice(um-.5, um+.5)).compute().values
 uspec = spec.sel(mz=slice(um-.5, um+.5)).compute().values
 max_n_peaks = 10
 
-fit = fit_um(
+fit, peaks = fit_um(
     umz,
     uspec,
     max_n_peaks,
@@ -119,7 +131,6 @@ from backend.lib.signal.peak import gen_peak
 from matplotlib import pyplot as plt
 
 plt.plot(umz, uspec)
-for i in range(1, int(fit.params['npeaks'])*3, 3):
-    pos, hei, _ = list(fit.params.values())[i:i+3]
-    plt.plot(umz, gen_peak(umz, pos.value, hei.value, R(pos.value), peakshape))
+for pos, hei, res in peaks:
+    plt.plot(umz, gen_peak(umz, pos, hei, res, peakshape))
 plt.plot(umz, fit.residual)
