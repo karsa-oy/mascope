@@ -29,9 +29,10 @@ function install_prerequisites() {
 
     echo AAA setting up mascope backend
 
-    # use corresponding .env
+    # use production .env
+    # .env should be in project root, when restarting mascope be service
     cp -f $MY_PATH/.env $MASCOPE_PROJECT/.env
-    source $MASCOPE_PROJECT/.env
+    source $MY_PATH/.env
 
     # backend
     pushd $MASCOPE_PROJECT/backend
@@ -63,7 +64,8 @@ function install_prerequisites() {
     sudo rm -r -f /var/www/mascope.site || true
     sudo mkdir /var/www/mascope.site
     sudo ln -s -f $MASCOPE_UI /var/www/mascope.site/production
-    sudo cp -f $MY_PATH/nginx/mascope_site.conf /etc/nginx/sites-available/mascope_site.conf
+    sed "s/MASCOPE_PUBLIC_PROXY_API_PORT/`echo $MASCOPE_PUBLIC_PROXY_API_PORT`/" $MY_PATH/nginx/mascope_site.conf > $MY_PATH/nginx/mascope_site.conf.1
+    sudo mv -f $MY_PATH/nginx/mascope_site.conf.1 /etc/nginx/sites-available/mascope_site.conf
     sudo chmod -x /etc/nginx/sites-available/mascope_site.conf
     # create and deploy self-signed ssl certificate for https access to nginx
     sudo openssl req -config $MY_PATH/nginx/ssl.params -x509 -nodes -days 3650 -newkey rsa:2048 -keyout /etc/ssl/private/nginx.key -out /etc/ssl/certs/nginx.crt
