@@ -140,7 +140,9 @@ def fit_peaks(
         fcn_args=(
             x,
             yn,
-            ps))
+            ps
+        )
+    )
     fit = minner.leastsq(max_nfev=max_iter)
     # Rescale fit results
     fit.residual *= ymax

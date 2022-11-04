@@ -48,9 +48,9 @@ def fit_um(
     threshold=0.9
     ):
     spec_norm = np.linalg.norm(spec)
-    residual = spec_norm
+    residual_norm = spec_norm
     for i in range(max_n_peaks):
-        print(i)
+        print(f"fitting peak #{i+1}".format(i))
         if i == 0:
             # Initialize first peak
             max_ind = np.argmax(spec)
@@ -72,12 +72,11 @@ def fit_um(
             dpos=0.1,
             max_iter=1000
             )
-        new_residual = np.linalg.norm(fit.residual)
+        new_residual_norm = np.linalg.norm(fit.residual)
         # Check for add new peak condition
-        if new_residual > threshold * residual:
-            print("breaking")
+        if new_residual_norm > threshold * residual_norm:
             break
-        residual = new_residual
+        residual_norm = new_residual_norm
         # Find the place to add next peak
         # Loop through already fitted peaks
         max_residual_ind = np.argmax(fit.residual)
@@ -91,7 +90,7 @@ def fit_um(
                 if (max_residual_mz > (peak_pos - hwhm)
                     and max_residual_mz < (peak_pos + hwhm)
                     ):
-                    residual[max_residual_ind] = 0
+                    fit.residual[max_residual_ind] = 0
                     max_residual_ind = np.argmax(fit.residual)
                     max_residual = fit.residual[max_residual_ind]
                     max_residual_mz = mz[max_residual_ind]
@@ -103,16 +102,16 @@ def fit_um(
         init_res.append(R(max_residual_mz))
     return fit
     
-um = 301
+um = 169
 umz = mz.sel(mz=slice(um-.5, um+.5)).compute().values
 uspec = spec.sel(mz=slice(um-.5, um+.5)).compute().values
-max_n_peaks = 8
+max_n_peaks = 10
 
 fit = fit_um(
     umz,
     uspec,
     max_n_peaks,
-    threshold=0.85
+    threshold=.9
     )
 
 #%
