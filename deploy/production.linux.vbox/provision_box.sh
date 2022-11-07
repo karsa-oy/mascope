@@ -64,15 +64,15 @@ function install_prerequisites() {
     sudo rm -r -f /var/www/mascope.site || true
     sudo mkdir /var/www/mascope.site
     sudo ln -s -f $MASCOPE_UI /var/www/mascope.site/production
-    sed "s/MASCOPE_PUBLIC_PROXY_API_PORT/`echo $MASCOPE_PUBLIC_PROXY_API_PORT`/" $MY_PATH/nginx/mascope_site.conf > $MY_PATH/nginx/mascope_site.conf.1
-    sudo mv -f $MY_PATH/nginx/mascope_site.conf.1 /etc/nginx/sites-available/mascope_site.conf
-    sudo chmod -x /etc/nginx/sites-available/mascope_site.conf
+    sed "s/MASCOPE_PUBLIC_PROXY_API_PORT/$MASCOPE_PUBLIC_PROXY_API_PORT/" $MY_PATH/nginx/mascope_site.conf > $MY_PATH/nginx/mascope.com
+    sudo mv -f $MY_PATH/nginx/mascope.com /etc/nginx/sites-available/mascope.com
+    sudo chmod -x /etc/nginx/sites-available/mascope.com
     # create and deploy self-signed ssl certificate for https access to nginx
     sudo openssl req -config $MY_PATH/nginx/ssl.params -x509 -nodes -days 3650 -newkey rsa:2048 -keyout /etc/ssl/private/nginx.key -out /etc/ssl/certs/nginx.crt
     sudo cp -f $MY_PATH/nginx/self-signed.conf /etc/nginx/snippets/self-signed.conf
     sudo chmod 644 /etc/nginx/snippets/self-signed.conf
     # enable mascope site
-    sudo ln -s -f /etc/nginx/sites-available/mascope_site.conf /etc/nginx/sites-enabled/
+    sudo ln -s -f /etc/nginx/sites-available/mascope.com /etc/nginx/sites-enabled/mascope.com
     sudo rm -f /etc/nginx/sites-enabled/default
     sudo systemctl restart nginx
 
@@ -83,6 +83,22 @@ function install_prerequisites() {
     sudo systemctl daemon-reload
     sudo systemctl enable mascope
     sudo systemctl start mascope
+
+    echo AAA start file convertor for KLTOF1...
+    pushd $MASCOPE_PROJECT/backend
+    poetry run file-converter --config ./backend/service/file_converter_config/kltof1.yaml &
+    popd
+
+    echo AAA start file convertor for KLTOF2...
+    pushd $MASCOPE_PROJECT/backend
+    poetry run file-converter --config ./backend/service/file_converter_config/kltof2.yaml &
+    popd
+
+    echo AAA start file convertor for KORBI1...
+    pushd $MASCOPE_PROJECT/backend
+    poetry run file-converter --config ./backend/service/file_converter_config/korbi1.yaml &
+    popd
+
 }
 
 
