@@ -1,0 +1,3 @@
+file_mask: "*.h5"
+source_dir: V:/Data/to_mascope/KLTOF1
+target_dir: D:/to_mascope/KLTOF1

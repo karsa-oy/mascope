@@ -1,8 +1,8 @@
-import os
-
 import argparse
 import asyncio
 import inspect
+import os
+import shutil
 import yaml
 
 from multiprocessing import Event, Queue
@@ -94,7 +94,7 @@ def parse_cmd_args():
         type=str, required=False
     )
     parser.add_argument(
-        "-m", "--mask",
+        "-m", "--file_mask",
         help="filename mask",
         type=str, required=False
     )
@@ -137,7 +137,7 @@ async def main():
         try:
             file_to_download = file_queue.get_nowait()
             filename = os.path.basename(file_to_download)
-            os.rename(file_to_download, os.path.join(target_path, filename))
+            shutil.move(file_to_download, os.path.join(target_path, filename))
         except Empty:
             await asyncio.sleep(1)
 
@@ -150,7 +150,7 @@ def run():
     loop = asyncio.get_event_loop()
 
 
-    file_mask = args.get('mask', '*')
+    file_mask = args.get('file_mask', '*')
     recursive = args.get('recursive', False)
     source_path = args['source_dir']
     target_path = args['target_dir']
@@ -167,7 +167,8 @@ def run():
         loop.run_until_complete(main())
     except KeyboardInterrupt:
         shutdown_event.set()
-    except:
+    except Exception as e:
+        print(e)
         shutdown_event.set()
 
 

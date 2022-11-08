@@ -1,0 +1,3 @@
+file_mask: "*.raw"
+source_dir: V:/Data/to_mascope/KORBI1
+target_dir: D:/to_mascope/KORBI1
