@@ -15,6 +15,7 @@ server = 'backend:run'
 router = 'backend.router:run'
 file-converter = 'backend.service.file_converter:run'
 file-io-service = 'backend.service.file_io:run'
+file-downloader = 'backend.service.file_downloader:run'
 
 [tool.poetry.dependencies]
 python = ">=3.8,<3.11"
