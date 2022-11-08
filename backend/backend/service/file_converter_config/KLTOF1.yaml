@@ -1,4 +1,4 @@
 instrument: KLTOF1
 streamer_type: H5
-# source_dir: Y:\Data\to_mascope
-source_dir: /to_mascope
+# source_dir: D:\Data\to_mascope\KLTOF1
+source_dir: /to_mascope/KLTOF1

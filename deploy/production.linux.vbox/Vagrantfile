@@ -6,7 +6,7 @@
 #vagrant up      
 
 # expose mascope frontend http and https ports; 
-MASCOPE_HTTP = 80
+MASCOPE_HTTP = 8081
 MASCOPE_HTTPS = 443
 MASCOPE_API = 8091
  
@@ -34,8 +34,8 @@ Vagrant.configure("2") do |config|
   
   config.vm.synced_folder ".", "/vagrant", disabled: true
   config.vm.synced_folder "../..", "/vagrant"
-  config.vm.synced_folder "D:/Data", "/mascope_data"
-  config.vm.synced_folder "Y:/Data/to_mascope", "/to_mascope"
+  config.vm.synced_folder "D:/dev_Data", "/mascope_data"
+  config.vm.synced_folder "D:/dev_Data/to_mascope", "/to_mascope"
   # config.vm.synced_folder "../../data", "/mascope_data"
   # config.vm.synced_folder "../../to_mascope", "/to_mascope"
 
