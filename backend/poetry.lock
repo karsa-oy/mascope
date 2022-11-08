@@ -140,6 +140,17 @@ optional = false
 python-versions = ">=3.6"
 
 [[package]]
+name = "cffi"
+version = "1.15.1"
+description = "Foreign Function Interface for Python calling C code."
+category = "main"
+optional = false
+python-versions = "*"
+
+[package.dependencies]
+pycparser = "*"
+
+[[package]]
 name = "charset-normalizer"
 version = "2.1.1"
 description = "The Real First Universal Charset Detector. Open, modern and actively maintained alternative to Chardet."
@@ -168,6 +179,17 @@ description = "Extended pickling support for Python objects"
 category = "main"
 optional = false
 python-versions = ">=3.6"
+
+[[package]]
+name = "clr-loader"
+version = "0.2.4"
+description = "Generic pure Python loader for .NET runtimes"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[package.dependencies]
+cffi = ">=1.13"
 
 [[package]]
 name = "colorama"
@@ -765,14 +787,14 @@ client = ["requests (>=2.21.0)", "websocket-client (>=0.54.0)"]
 
 [[package]]
 name = "pythonnet"
-version = "2.5.2"
-description = ".Net and Mono integration for Python"
+version = "3.0.1"
+description = ".NET and Mono integration for Python"
 category = "main"
 optional = false
-python-versions = "*"
+python-versions = "<3.12,>=3.7"
 
 [package.dependencies]
-pycparser = "*"
+clr-loader = ">=0.2.2,<0.3.0"
 
 [[package]]
 name = "pytz"
@@ -1067,7 +1089,7 @@ testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytest-
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.8,<3.11"
-content-hash = "fa20253871fe83ab1a06c7e2551b94d1570da6bd7f11b0785c63e34bb89c711c"
+content-hash = "93c560ad35cdc423ec7dc644a59d90117865e545a1ad7a531133005fbda4ec9e"
 
 [metadata.files]
 aiohttp = []
@@ -1082,9 +1104,11 @@ bidict = []
 bokeh = []
 bottleneck = []
 certifi = []
+cffi = []
 charset-normalizer = []
 click = []
 cloudpickle = []
+clr-loader = []
 colorama = []
 colorcet = []
 dask = []
