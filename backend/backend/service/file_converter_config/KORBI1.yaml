@@ -1,4 +1,3 @@
 instrument: KORBI1
 streamer_type: Raw
-# source_dir: D:\Data\to_mascope\KORBI1
-source_dir: /to_mascope/KORBI1
+source_dir: D:/to_mascope/KORBI1
