@@ -140,7 +140,10 @@ async def streamer_processor(streamer):
                 })
             filepath = data.pop('source_filepath')
             os.remove(filepath)
-            await create_sample_file_db_record(data)
+            try:
+                await create_sample_file_db_record(data)
+            except socketio.exceptions.BadNamespaceError:
+                print("Failed to create database record! No connection to server.")
         elif spec_i < 0:
             # New file
             try:
