@@ -73,14 +73,13 @@ def get_peaks(
 
 
 def filter_peaks(
-        cache_item,
+        peaks,
         mz_range=None,
         t_range=None,
         height=None,
         distance=None,
         ):
 
-    peaks = cache_item.peaks
     if mz_range is not None:
         peaks = peaks.sel(
             mz=slice(*mz_range)

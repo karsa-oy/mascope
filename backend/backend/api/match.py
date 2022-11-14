@@ -6,12 +6,17 @@ import asyncio
 from backend.db.conn import conn
 from backend.db.id import gen_id
 from backend.lib.file import load_file
-from backend.lib.peak import detect_peaks, get_peaks
+from backend.lib.peak import detect_peaks, get_peaks, filter_peaks
 from backend.lib.chemistry import match_mz
 from backend.server import sio
 
 
-def compute_matches(filename, target_collection_ids, ionization_mechanism_ids):
+def compute_matches(
+    filename,
+    target_collection_ids,
+    ionization_mechanism_ids,
+    peak_filter_params={},
+    ):
     # Note:
     #   Matching is done on isotope-level. Ion, compound
     #   and collection level matches are aggregated from
@@ -51,6 +56,7 @@ def compute_matches(filename, target_collection_ids, ionization_mechanism_ids):
         sample_file = detect_peaks(sample_file)
 
     peaks = get_peaks(sample_file)
+    peaks = filter_peaks(peaks, **peak_filter_params)
 
     #########################
     # STEP 2 - Prepare data #

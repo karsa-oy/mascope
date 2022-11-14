@@ -93,8 +93,8 @@ def mz_calibrate_sample(sample_item):
         sample_item['filename'],
         [calibration_collection_id],
         ion_mechanism_ids,
-        match_score_min=0.8,
-        refine_window=20
+        match_score_min=0,
+        refine_window=500
         )
     if not fit:
         raise Exception("Failed to fit m/z calibration")
@@ -119,9 +119,12 @@ def mz_fit(
     match_isotope_df = compute_matches(
         filename,
         calibration_collection_ids,
-        ionization_mechanism_ids
+        ionization_mechanism_ids,
+        peak_filter_params={
+            'height': 10,
+            'distance': 50,
+        }
         )
-
     # Filter matches
     good_matches_df = match_isotope_df[
         (abs(match_isotope_df.match_mz_error) <= refine_window)
