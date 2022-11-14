@@ -7,55 +7,16 @@ Created on Wed Apr 17 13:45:17 2019
 """
 
 import numpy as np
-
-import h5sparse
 import lmfit
 
-# from matplotlib import pyplot as plt
-
-from scipy.signal._peak_finding import _identify_ridge_lines as find_ridges
-from scipy.stats import mode
-from scipy.sparse import lil_matrix
 from scipy.interpolate import CubicSpline
-from sklearn.preprocessing import normalize
+from scipy.io import loadmat
+from scipy.stats import norm
 
 
-def find_peaks_from_code(code, max_dist=1, max_gap=1, min_len=10):
-    """Find peaks by detecting ridges from the code. Return peak positions 
-
-    Parameters
-    ----------
-    code : array_like
-        KSignalProcessor result sparse matrix
-    max_dist : int, optional
-        Peak maximum distance in sample numbers between consecutive spectra,
-        by default 1
-    max_gap : int, optional
-        Maximum allowed length of time-wise gap for a peak, by default 1
-    min_len : int, optional
-        Minimum length of a ridge ti be considered a peak, by default 10
-
-    Returns
-    -------
-    list
-        List of peaks (sample numbers)
-    """
-
-    # Select non-zero columns
-    coden = np.array( [code[:, i].toarray().reshape(-1)
-                        for i in range(code.shape[1]) 
-                        if code[:, i].sum()>0] )
-    # Find ridges
-    max_dist = [max_dist]*coden.shape[1]
-    ridges = find_ridges(coden, max_dist, max_gap)
-    # Filter ridges
-    good_ridges = []
-    for r in ridges:
-        if len(r[0]) >= min_len:
-            good_ridges.append(r)
-    # Choose the mode sample number of a ridge line to be the peak position
-    peaks = [ mode(r[1])[0][0] for r in good_ridges ]
-    return peaks
+def calculate_peak_area(x, peakshape, peak):
+    pos, hei, res = peak
+    return sum(gen_peak(x, pos, hei, res, peakshape))
 
 def fit_peaks(
         x,
@@ -158,6 +119,92 @@ def fit_peaks(
     peaks = [ tuple(peaks[i:i+3]) for i in range(0, len(peaks), 3) ]
     return fit, peaks
 
+def fit_n_peaks(
+    x,
+    y,
+    peak_shape,
+    resolution_function,
+    max_n_peaks=5,
+    threshold=0.9,
+    fit_pos=True,
+    fit_hei=True,
+    fit_res=False,
+    ):
+    spec_norm = np.linalg.norm(y)
+    residual_norm = spec_norm
+    prev_fit = None
+    prev_peaks = []
+    for i in range(max_n_peaks):
+        if i == 0:
+            # Initialize first peak
+            max_ind = np.argmax(y)
+            init_pos = [ x[max_ind] ]
+            init_hei = [ y[max_ind] ]
+            init_res = [ resolution_function(x[max_ind]) ]
+            
+        fit, peaks = fit_peaks(
+            x,
+            y,
+            peak_shape,
+            i+1,
+            init_pos,
+            init_hei,
+            init_res,
+            fit_pos,
+            fit_hei,
+            fit_res,
+            dpos=0.1,
+            max_iter=1000
+            )
+        new_residual_norm = np.linalg.norm(fit.residual)
+        # Check for add new peak condition
+        if new_residual_norm > threshold * residual_norm:
+            fit = prev_fit
+            peaks = prev_peaks
+            break
+        residual_norm = new_residual_norm
+        prev_fit = fit
+        prev_peaks = peaks
+        # Find the place to add next peak
+        # Loop through already fitted peaks
+        max_residual_ind = np.argmax(fit.residual)
+        max_residual = fit.residual[max_residual_ind]
+        max_residual_mz = x[max_residual_ind]
+        for peak_pos, peak_hei, peak_res in peaks:
+            while max_residual > 0:
+                hwhm = (peak_pos / peak_res) / 2
+                # If the maximum of the residual is within the fitted peak, set
+                # it to 0 in order to ignore it
+                if (max_residual_mz > (peak_pos - hwhm)
+                    and max_residual_mz < (peak_pos + hwhm)
+                    ):
+                    fit.residual[max_residual_ind] = 0
+                    max_residual_ind = np.argmax(fit.residual)
+                    max_residual = fit.residual[max_residual_ind]
+                    max_residual_mz = x[max_residual_ind]
+                else:
+                    break
+        # Set the position of next peak to the maximum of residual
+        init_pos.append(max_residual_mz)
+        init_hei.append(max_residual)
+        init_res.append(resolution_function(max_residual_mz))
+    # Calculate peak areas
+    peaks = [ (*peak, calculate_peak_area(x, peak_shape, peak)) for peak in peaks ]
+    return fit, peaks
+
+def fwhm_to_sigma(fwhm):
+    return 0.4246609 * fwhm
+
+def gen_gaussian_peakshape():
+    x = np.linspace(-30, 30, 601)
+    y = norm.pdf(x, 0, 1)
+    y_norm = y / max(y)
+    
+    return {
+        'x': x,
+        'y': y_norm
+        }
+
 def gen_peak(x, ppos, phei, pres, ps, trim_borders=False):
     """Generate a peak of certain height and with and shape in domain 'x'.
 
@@ -183,7 +230,7 @@ def gen_peak(x, ppos, phei, pres, ps, trim_borders=False):
         input parameter 'x'. Otherwise returns tuple with new x and the peak.
     """
 
-    sigma = 0.4246609 * (ppos / pres)
+    sigma = fwhm_to_sigma(ppos / pres)
     xi = (ps['x'] * sigma) + ppos
     yi = ps['y'] / np.max(ps['y']) * phei
     spline = CubicSpline(xi, yi, extrapolate=False)
@@ -203,49 +250,6 @@ def gen_peak(x, ppos, phei, pres, ps, trim_borders=False):
         return x[i:j + 1], peak[i:j + 1]
     else:
         return peak
-
-def gen_peak_dict(kinstrument, u0=None, u1=None, subsampling=1.):
-    """Generate peak dictionary.
-
-    Generates a dictionary of peaks (as a sparse matrix) to be utilized
-    by the SparseCoder algorithm. It uses the peakshape and resolution
-    information from the 'kinstrument' instance and generates a peak
-    for every (1 * 'subsampling') sample number.
-
-    Parameters
-    ----------
-    kinstrument : KInstrument
-        KInstrument instance for which to generate the dictionary.
-    u0 : int, optional
-        First unit mass to include, by default None
-    u1 : int, optional
-        Last unit mass to include, by default None
-    subsampling : float, optional
-        Sub-/Supersampling factor, by default 1. Values below 1
-        lead to supersampling, whereas above 1 to subsampling.
-
-    Returns
-    -------
-    csr
-        Sparse matrix where each row represents a peak at a certain position.
-        The peak position at row 'i' (in sample numbers) is 'i' * 'subsampling'.
-    """
-
-    if u0 is None or u1 is None:
-        u0 = 32
-        u1 = kinstrument.desc.nbrPeaks + 1
-    si0 = kinstrument.mz2sno(u0 - 0.5, roundit=True)
-    si1 = min(kinstrument.mz2sno(u1 + 0.5, roundit=True), kinstrument.desc.nbrSamples)
-    dshape = (int(kinstrument.desc.nbrSamples/subsampling), kinstrument.desc.nbrSamples)
-    D = lil_matrix(dshape)
-    for s in np.arange(si0, si1, subsampling):
-        ps = kinstrument.get_ps(s)
-        x = ps['x']
-        x, y = gen_peak(x + s, s, 1.0, kinstrument.r_at_3p(s), ps, True)
-        ind = x < si1 - 1
-        dind = int(s / subsampling)
-        D[dind, (x + 1)[ind]] = y[ind]
-    return D.tocsr()
 
 def gen_peak_kernel(params, x, ps):
     """Return a kernel for a set of peaks in domain 'x'.
@@ -276,89 +280,17 @@ def gen_peak_kernel(params, x, ps):
         kernel += peak
     return kernel
 
-def load_peak_dict(filename):
-    """Load peak dictionary (sparse matrix) from h5 file.
-
-    Parameters
-    ----------
-    filename : str
-        Full file path
-
-    Returns
-    -------
-    csr
-        Peak dictionary (sparse matrix)
+def load_peakshape_mat(peakshape_file):
+    """Load peakshape from a file generated by tofTools
     """
-
-    # Load peak dinctionary D in Scipy sparse CSR format from a h5 file
-    with h5sparse.File(filename, 'r') as h5f:
-        D = h5f['sparse/matrix'].value
-    return D
-
-def match_peaks(
-        peak_df,
-        threshold=0.0,
-        mz_err_tol=10,
-        min_abu_match=0.99,
-        min_iso_corr=0.8,
-        apply_params_filter=False):
-    """[summary]
-
-    Parameters
-    ----------
-    peak_df : [type]
-        [description]
-    threshold : float, optional
-        [description], by default 0.0
-    mz_err_tol : int, optional
-        [description], by default 10
-    min_abu_match : float, optional
-        [description], by default 0.99
-    min_iso_corr : float, optional
-        [description], by default 0.8
-    apply_params_filter : bool, optional
-        [description], by default False
-
-    Returns
-    -------
-    [type]
-        [description]
-    """
-
-    peak_df = peak_df.copy()
-    peak_df['match'] = [None] * len(peak_df)
-    for comp, row in peak_df.iterrows():
-        match = True
-        # Check signal level
-        if apply_params_filter == True:
-            print("Filtering with parameters")
-            if row['signal'] < threshold:
-                match = False
-            
-            if (np.array(np.abs(row['mass error'])) > mz_err_tol).any():
-                match = False
-            
-            if row['abundance score'] < min_abu_match:
-                match = False
-
-            if row['isotope r2'] < min_iso_corr:
-                match = False
-
-        else:
-            if row['signal'] < row["idPar"][0]:
-                match = False
-
-            if (np.array(np.abs(row['mass error'])) > row["idPar"][1]).any():
-                match = False
-
-            if row['abundance score'] < row["idPar"][2]:
-                match = False
-        
-            if row['isotope r2'] < row["idPar"][3]:
-                match = False
-        
-        row['match'] = match
-    return peak_df
+    ps_mat = loadmat(peakshape_file)
+    ps_struct = ps_mat['peakShape']
+    ps = ps_struct['dat'][0]
+    ps = ps[0]
+    x = ps[:, 0]
+    y = ps[:, 1]
+    y = y / max(y)
+    return {'x': x, 'y': y}
 
 def peak_kernel_residual(params, x, y, ps):
     """Generate a kernel of peaks and calculate the residual with regards
@@ -384,67 +316,3 @@ def peak_kernel_residual(params, x, y, ps):
 
     kernel = gen_peak_kernel(params, x, ps)
     return y - kernel
-
-def write_peak_dict(D, filename):
-    """Write peak dictionary (sparse matrix) to h5 file.
-
-    Parameters
-    ----------
-    D : csr
-        Peak dictionary (sparse matrix)
-    filename : str
-        Full file path
-    """
-
-    # Write peak dictionary D in Scipy sparse CSR format into a h5 file
-    with h5sparse.File(filename, 'w') as h5f:
-        h5f.create_dataset('sparse/matrix', data=D)
-    return
-    """[summary]
-
-    NOTE: !!! Deprecated !!!
-
-    Parameters
-    ----------
-    x : [type]
-        [description]
-    y : [type]
-        [description]
-    ps : [type]
-        [description]
-    plot : bool, optional
-        [description], by default False
-
-    Returns
-    -------
-    [type]
-        [description]
-    """
-    print('Warning: You are calling depreacated function: ''fit_single_peak''')
-    # Fit peak position and resolution
-    yn = y / np.max(y)
-    pss = peakshape_spline(ps)
-    ppos0 = x[ np.argmax(y) ]
-    pres0 = 10000
-    try:
-        popt, _ = curve_fit( pss.spline,
-                             x,
-                             yn,
-                             p0=[ppos0, pres0],
-                             bounds=(0, np.inf) )
-        ppos, pres = popt
-        yhat = pss.spline(x, ppos, pres)
-        residual = yn - yhat
-        resn = norm(residual)
-    except:
-        print('Peak fit failed')
-        ppos = pres = None
-        yhat = np.zeros((len(x),))
-        residual = yn
-        resn = norm(yhat)
-    if plot:
-        plt.figure()
-        plt.plot(x, yn)
-        plt.plot(x, yhat)
-        plt.plot(x, residual)
-    return ppos, pres, resn
