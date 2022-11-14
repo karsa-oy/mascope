@@ -47,11 +47,20 @@ class BaseStreamer(Thread):
         self.filename = None                    # Filename base from TW h5 file
         self.interval = None                    # TofDaqStreamer interval [s]
         self.length = None                      # TofDaqStreamer length [s]
+        self.sample_interval = None             # Tof sample interval [ns]
+        self.single_ion_signal = None           # Single ion signal [mV*ns/ion]
+        self.tof_frequency = None               # Tof frequency [Hz]
         self.progress = 0                       # TofDaqStreamer progress [%]
         self.speci = -1                         # Index of last received spectrum,
                                                 # -1 when there is no active acquisition
         Thread.__init__(self)
         
+    @property
+    def conversion_coefficient(self):
+        """Coefficient to convert signal intensity from [mV/ext] -> [ions/sec]
+        """
+        return (self.sample_interval * self.tof_frequency) / self.single_ion_signal
+
     @property
     def tps_info(self):
         """List of TPS  names
@@ -84,6 +93,7 @@ class BaseStreamer(Thread):
             'mz': self.mz.tobytes(),
             'mz_calibration': self.mz_calibration,
             't_range': [0, self.length],
+            'single_ion_signal': self.single_ion_signal,
         }
         self.spec_queue.put(coordinates)
         tps_info = {
@@ -117,6 +127,9 @@ class BaseStreamer(Thread):
         self.filename = None
         self.progress = 0
         self.speci = -1
+        self.sample_interval = None
+        self.single_ion_signal = None
+        self.tof_frequency = None
 
     def _update(self):
         """Update per acquisition attributes. If new data is available, feed into queues.
@@ -135,6 +148,9 @@ class BaseStreamer(Thread):
             if tof_period_s > 1:
                 # Convert [ns]->[s] if needed
                 tof_period_s *= 1e-9 
+            self.sample_interval = self.desc.sampleInterval * 1e9 # [s]->[ns]
+            self.single_ion_signal = self.desc.singleIonSignal
+            self.tof_frequency = 1.0 / tof_period_s
             self.interval = tof_period_s * self.desc.nbrWaveforms # [s]
             self.length = (self.desc.nbrWrites * self.desc.nbrBufs) * self.interval # [s]
             # Feed coordinates
@@ -270,6 +286,8 @@ class H5Streamer(BaseStreamer, KInstrument):
                 True                # Normalize to
             )                   # [mV/ext]
         if ret == 4: # Success
+            # Convert spec from [mV/ext] -> [ions/sec]
+            spec *= self.conversion_coefficient
             # Combine data for output
             spec_data = {
                     'filename': self.filename,  # Current file basename
@@ -386,9 +404,6 @@ class H5Streamer(BaseStreamer, KInstrument):
 
     def run(self):
         """Main loop
-
-        Poll TW API for new data at interval set by 'self.timeout'. 
-        Loop until 'self.shutdown_event' is set.
         """
 
         print("H5Streamer running")
@@ -556,6 +571,8 @@ class H5Streamer(BaseStreamer, KInstrument):
 #         spec = np.zeros((self.desc.nbrSamples, ), dtype=np.float32)
 #         ret = TofDaqStreamer.TwGetTofSpectrumFromShMem(spec, 0, 0, self.desc.iBuf, True)  # [mV/ext]
 #         if ret == 4: # Success
+#             # Convert spec from [mV/ext] -> [ions/sec]
+#             spec *= self.conversion_coefficient
 #             # Combine data for output
 #             spec_data = {
 #                     'filename': self.filename,  # Current file basename

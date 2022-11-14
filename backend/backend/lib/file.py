@@ -69,6 +69,7 @@ class zarr_sdk:
         value = data['value']
         filename = value.get('filename')
         mz = np.frombuffer(value['mz'], dtype=np.float32)
+        single_ion_signal = value.get('single_ion_signal')
         t_range = value['t_range']
         mz_calibration = value.get('mz_calibration')
 
@@ -115,6 +116,7 @@ class zarr_sdk:
             'committed_length': 0.,
             'range': [float(mz[0]), float(mz[-1])],
             'mz_calibration': mz_calibration,
+            'single_ion_signal': single_ion_signal,
             'utc_offset': utc_offset,
         }
         write_props(filename, properties)
