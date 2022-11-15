@@ -124,6 +124,7 @@ export default {
                         FROM sample_match_filter
                         GROUP BY sample_item_id, target_compound_id, target_ion_id
                     )
+                    GROUP BY sample_item_id, target_collection_id
                 )
                 GROUP BY sample_item_id, target_collection_id;
             `).then((res) => {
