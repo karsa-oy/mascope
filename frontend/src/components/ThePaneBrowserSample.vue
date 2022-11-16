@@ -23,6 +23,7 @@ export default {
       batchFilterParams: "batch/filterParams",
       batchMatchCompounds: "batch/matchCompounds",
       batchMatchIons: "batch/matchIons",
+      batchTargetCollections: "batch/targetCollections",
       sampleItems: "batch/sampleItems",
       sampleItemFocused: "batch/sampleItemFocused",
       targetCollections: "batch/targetCollections",
@@ -172,6 +173,12 @@ export default {
         { field: "Name", value: this.batchActive.sample_batch_name },
         { field: "Description", value: this.batchActive.sample_batch_description },
         { field: "Workspace", value: this.workspaceActive.workspace_name },
+        { field: "", value: '' },
+        { field: "Target collections",
+          value: this.batchTargetCollections.map(
+            (row) => row.target_collection_name
+            ).join(', ')
+        },
         { field: "", value: '' },
         { field: "Parameters", value: '' },
       ];
