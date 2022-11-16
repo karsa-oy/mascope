@@ -1,4 +1,4 @@
-import createLogger from 'vuex/dist/logger';
+import createLogger from 'vuex/dist/logger'
 
 export default createLogger({
     filter(mutation) {
