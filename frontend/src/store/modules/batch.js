@@ -76,8 +76,6 @@ export default {
                         relative_abundance,
                         sample_item_id,
                         sample_item_name,
-                        target_collection_id,
-                        target_collection_name,
                         target_compound_formula,
                         target_compound_id,
                         target_compound_name,
@@ -111,8 +109,6 @@ export default {
                     NATURAL LEFT JOIN target_ion
                     NATURAL LEFT JOIN ionization_mechanism
                     NATURAL LEFT JOIN target_compound
-                    NATURAL LEFT JOIN target_collection_in_sample_batch
-                    NATURAL LEFT JOIN target_collection
                     WHERE (
                         sample_batch_id == '${batchId}'
                     )
@@ -173,7 +169,6 @@ export default {
                     filename,
                     sample_item_id,
                     sample_item_name,
-                    target_collection_name,
                     target_compound_formula,
                     target_compound_id,
                     target_compound_name,
@@ -187,8 +182,6 @@ export default {
                         target_compound_formula,
                         target_compound_id,
                         target_compound_name,
-                        target_collection_id,
-                        target_collection_name,
                         target_ion_id,
                         SUM(match_score*relative_abundance) AS match_score,
                         SUM(sample_peak_height) AS sample_peak_height_sum
@@ -204,7 +197,6 @@ export default {
                     filename,
                     sample_item_id,
                     sample_item_name,
-                    target_collection_name,
                     target_compound_formula,
                     target_compound_id,
                     target_compound_name,
