@@ -77,7 +77,8 @@
                     </template>
                     <b-dropdown-item aria-role="listitem" value="SAMPLE">Sample</b-dropdown-item>
                     <b-dropdown-item aria-role="listitem" value="BLANK">Blank</b-dropdown-item>
-                    <b-dropdown-item v-if="!batchMzCalibration" aria-role="listitem" value="CALIBRATION">Calibration</b-dropdown-item>
+                    <b-dropdown-item aria-role="listitem" value="CALIBRATION">Calibration</b-dropdown-item>
+                    <b-dropdown-item aria-role="listitem" value="UNKNOWN">Unknown</b-dropdown-item>
                   </b-dropdown>
                 </b-field>
               </div>
@@ -464,6 +465,7 @@ export default {
         case 'CALIBRATION':
         case 'BLANK':
         case 'SAMPLE':
+        case 'UNKNOWN':
           break;
       }
       this.saveAttributes();
