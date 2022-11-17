@@ -3,12 +3,12 @@ import { io } from "socket.io-client";
 import initSqlJs from "sql.js";
 
 // LOAD ENV VARS
-
+const mode = import.meta.env.MASCOPE_PUBLIC_MODE;
 const dbVersion = import.meta.env.MASCOPE_PUBLIC_DB_VERSION;
-const protocol = import.meta.env.MASCOPE_PUBLIC_API_PROTOCOL;
-const host = import.meta.env.MASCOPE_PUBLIC_API_HOST;
-const port = import.meta.env.MASCOPE_PUBLIC_API_PORT;
-const proxy_port = import.meta.env.MASCOPE_PUBLIC_PROXY_API_PORT;
+const protocol = import.meta.env.MASCOPE_PUBLIC_PROTOCOL;
+const host = import.meta.env.MASCOPE_PUBLIC_HOST;
+const port = import.meta.env.MASCOPE_PUBLIC_PORT;
+const api_port = import.meta.env.MASCOPE_PUBLIC_API_PORT;
 const platform = import.meta.env.MASCOPE_PRIVATE_ENV
 var dbpath = import.meta.env.MASCOPE_PRIVATE_DATADIR;
 
@@ -44,12 +44,16 @@ async function initDb() {
 }
 
 async function initSocket() {
-    // INIT SOCKET
+    // INIT API SOCKET
 
     // create the socket in `/` namespace
-    const url = `${protocol}://${host}:${proxy_port}`;
+    let url = `${protocol}://${host}:${api_port}`;
+    if ( mode === 'production' ) {
+        // production api server is routed to api_port via nginx reverse proxy
+        url = `${protocol}://${host}`;
+    };
     const socket = io(url);
-    apiLog('initialized socket', socket);
+    apiLog('initialized socket for', mode, ':', url, socket);
     const emit = (ev, ...args) => socket.emit(ev, ...args);
     return [socket, emit];
 }

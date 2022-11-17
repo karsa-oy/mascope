@@ -6,7 +6,7 @@ from colorcet import glasbey_hv as colormap
 
 from backend.db.conn import conn
 from backend.lib.file import load_coord, load_file
-from backend.lib.peak import filter_peaks
+from backend.lib.peak import get_peaks, filter_peaks
 from backend.lib.struct import LRUDict
 from backend.server import sio
 
@@ -112,7 +112,8 @@ async def visualization_ion_focus(
             'yaxis': 'y{:d}'.format(i+1),
         })
         # Peak traces (vertical lines)
-        peaks = filter_peaks(isotope_sum_spectrum, height=peak_min_intensity)
+        peaks = get_peaks(isotope_sum_spectrum)
+        peaks = filter_peaks(peaks, height=peak_min_intensity)
         for peak in peaks:
             peak_mz = peak.mz.item()
             peak_height = peak.values.item()

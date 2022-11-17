@@ -1,16 +1,13 @@
 import json
-import numpy as np
 import pandas as pd
 
-from backend.api.match import compute_matches, match_item_compute, match_item_remove
+from backend.api.match import compute_matches, match_item_remove
 from backend.api.match import item_remove as match_item_remove
 from backend.api.sample import sample_batch_update
 from backend.api.sample import file_update as sample_file_update
 from backend.api.signal import signal_mz_calibration_update
 from backend.db.conn import conn
-from backend.lib.file import load_file
 from backend.lib.hardware.tofwerk.calibration import mz_calibrate
-from backend.lib.peak import get_peaks
 from backend.server import sio
 
 
@@ -96,8 +93,8 @@ def mz_calibrate_sample(sample_item):
         sample_item['filename'],
         [calibration_collection_id],
         ion_mechanism_ids,
-        match_score_min=0.8,
-        refine_window=20
+        match_score_min=0,
+        refine_window=500
         )
     if not fit:
         raise Exception("Failed to fit m/z calibration")
@@ -122,9 +119,12 @@ def mz_fit(
     match_isotope_df = compute_matches(
         filename,
         calibration_collection_ids,
-        ionization_mechanism_ids
+        ionization_mechanism_ids,
+        peak_filter_params={
+            'height': 10,
+            'distance': 50,
+        }
         )
-
     # Filter matches
     good_matches_df = match_isotope_df[
         (abs(match_isotope_df.match_mz_error) <= refine_window)
