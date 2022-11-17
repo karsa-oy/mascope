@@ -14,7 +14,7 @@ ST = Uusimaa
 L = Helsinki
 O = Karsa
 OU = Karsa
-CN = *.mascope.com
+CN = mascope.com
 
 [x509_extensions]
 subjectAltName = @alternate_names
@@ -22,6 +22,7 @@ subjectAltName = @alternate_names
 [alternate_names]
 DNS.1 = localhost
 DNS.2 = 127.0.0.1
+DNS.3 = 192.168.1.127
 # Etc.
 # See:
 # - https://www.openssl.org/docs/man1.1.1/man5/x509v3_config.html#Subject-Alternative-Name

@@ -18,7 +18,7 @@ file-downloader = 'backend.service.file_downloader:run'
 [tool.poetry.dependencies]
 python = ">=3.8,<3.11"
 # server and api
-uvicorn = "^0.18.2"
+uvicorn = "^0.19.0"
 websockets = "^10.3"
 python-socketio = "5.6.0"
 # router

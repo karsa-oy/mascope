@@ -63,9 +63,13 @@ class FSWatcher:
         self.handler = self.FSEventHandler(mask)
 
     def start(self):
-        self.observer.schedule(self.handler, self.path, recursive=self.recursive)
-        self.observer.start()
-        self.log('started watching', self.path)
+        try:
+            self.observer.schedule(self.handler, self.path, recursive=self.recursive)
+            self.observer.start()
+            self.log('started watching', self.path)
+        except Exception as e:
+            self.log(f'Failed on watching {self.path}: {e.__class__.__name__}({str(e)})')
+            self.shutdown_event.set()
 
     def stop(self):
         self.observer.stop()
@@ -249,8 +253,9 @@ def parse_cmd_args():
 
 async def main():
     global sio
-    host = os.environ['MASCOPE_PUBLIC_API_HOST']
-    port = os.environ['MASCOPE_PUBLIC_PROXY_API_PORT']
+    # service connects to API server via loopback, otherwise use MASCOPE_PUBLIC_HOST
+    host = '127.0.0.1'
+    port = os.environ['MASCOPE_PUBLIC_API_PORT']
     url = f"http://{host}:{port}"
     while not shutdown_event.is_set():
         try:
