@@ -6,22 +6,22 @@ from backend.api.sample import item_create as sample_item_create
 from backend.server import sio
 
 
+async def process_sample(sample_item):
+    try:
+        calibration_mz_calibrate_sample(sample_item)
+        match_item_compute(sample_item['sample_item_id'])
+    except:
+        print("Failed to process sample %s" %sample_item['filename'])
+
 @sio.event(namespace='/')
 async def scenthound_process_samples(sid, sample_items):
     # Create sample item records
     sample_item_df = sample_item_create(sample_items)
     sample_items = sample_item_df.to_dict('records')
 
-    async def process(sample_item):
-        try:
-            calibration_mz_calibrate_sample(sample_item)
-            match_item_compute(sample_item['sample_item_id'])
-        except:
-            print("Failed to process sample %s" %sample_item['filename'])
-
     process_tasks = [
         sio.start_background_task(
-            process, sample_item
+            process_sample, sample_item
         )
         for sample_item in sample_items
     ]
