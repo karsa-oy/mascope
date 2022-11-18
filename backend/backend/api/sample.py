@@ -1,7 +1,9 @@
 import json
+import os
 import pandas as pd
 
 from datetime import datetime
+from dotenv import load_dotenv
 
 from backend.api.match import match_batch_compute
 from backend.db.conn import conn
@@ -9,6 +11,8 @@ from backend.db.id import gen_id
 from backend.lib.file import load_file
 from backend.lib.peak import get_peaks, filter_peaks
 from backend.server import sio
+
+load_dotenv()
 
 # === sample batches === #
 
@@ -116,8 +120,14 @@ async def sample_batch_export_peaks(sid, sample_batch_id, filter_params):
 
     dt_str = datetime.now().isoformat().replace('-', '').replace(':', '').split('.')[0]
     [sample_batch_name] = sample_batch_df['sample_batch_name'].tolist()
-    spreadsheet_filename = dt_str + '_' + sample_batch_name.replace(' ', '_') + '.xlsx'
-    with pd.ExcelWriter(spreadsheet_filename) as writer:
+    spreadsheet_path = os.environ.get('MASCOPE_PRIVATE_DOWNLOADER_DIR', '.')
+    spreadsheet_filename = (
+        dt_str
+        + '_peaks_'
+        + sample_batch_name.replace(' ', '_')
+        + '.xlsx'
+    )
+    with pd.ExcelWriter(os.path.join(spreadsheet_path, spreadsheet_filename)) as writer:
         sample_batch_df.to_excel(
             writer,
             sheet_name='Batch',

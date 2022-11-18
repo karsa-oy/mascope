@@ -294,7 +294,6 @@ export default {
       }
     },
     peakExport() {
-      console.log("export peaks:");
       this.$api.emit(
         'sample_batch_export_peaks',
         this.batchActive.sample_batch_id,
