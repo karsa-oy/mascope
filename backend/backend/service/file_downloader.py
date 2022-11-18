@@ -4,7 +4,9 @@ import inspect
 import os
 import shutil
 import yaml
+import re
 
+from dotenv import load_dotenv
 from multiprocessing import Event, Queue
 from queue import Empty
 from threading import Thread
@@ -79,6 +81,20 @@ class FSWatcher:
         Thread(target=self.run).start()
 
 
+def load_env_yaml(fname):
+    env_pattern = re.compile(r".*?\${(.*?)}.*?")
+    def env_constructor(loader, node):
+        value = loader.construct_scalar(node)
+        for group in env_pattern.findall(value):
+            value = value.replace(f"${{{group}}}", os.environ.get(group))
+        return value
+    yaml.add_implicit_resolver("!pathex", env_pattern)
+    yaml.add_constructor("!pathex", env_constructor)
+    with open(fname, 'r') as f:
+        res = yaml.load(f.read(), Loader=yaml.FullLoader)
+    return res
+
+
 def parse_cmd_args():
     """
     Parse command line arguments
@@ -122,12 +138,12 @@ def parse_cmd_args():
     file_args = {}
     if all_args.config:
         # service config may be defined in yaml file
-        with open(all_args.config, 'r') as f:
-            file_args = yaml.safe_load(f)
+        file_args = load_env_yaml(all_args.config)
     return {
         **file_args,
         **cmdline_args
         }
+
 
 async def main():
     global file_queue
@@ -141,6 +157,7 @@ async def main():
         except Empty:
             await asyncio.sleep(1)
 
+
 def run():
     global file_queue
     global shutdown_event
@@ -148,7 +165,6 @@ def run():
 
     args = parse_cmd_args()
     loop = asyncio.get_event_loop()
-
 
     file_mask = args.get('file_mask', '*')
     recursive = args.get('recursive', False)
@@ -173,4 +189,5 @@ def run():
 
 
 if __name__ == '__main__':
+    load_dotenv()
     run()

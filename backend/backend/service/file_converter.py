@@ -9,6 +9,7 @@ import asyncio
 import inspect
 import socketio
 import yaml
+import re
 
 from backend.lib.file import zarr_sdk
 from backend.lib.hardware.tofwerk.generator import H5Streamer
@@ -195,6 +196,21 @@ async def streamer_processor(streamer):
         except Empty:
             await asyncio.sleep(.1)
 
+
+def load_env_yaml(fname):
+    env_pattern = re.compile(r".*?\${(.*?)}.*?")
+    def env_constructor(loader, node):
+        value = loader.construct_scalar(node)
+        for group in env_pattern.findall(value):
+            value = value.replace(f"${{{group}}}", os.environ.get(group))
+        return value
+    yaml.add_implicit_resolver("!pathex", env_pattern)
+    yaml.add_constructor("!pathex", env_constructor)
+    with open(fname, 'r') as f:
+        res = yaml.load(f.read(), Loader=yaml.FullLoader)
+    return res
+
+
 def parse_cmd_args():
     """
     Parse command line arguments
@@ -244,8 +260,7 @@ def parse_cmd_args():
     file_args = {}
     if all_args.config:
         # service config may be defined in yaml file
-        with open(all_args.config, 'r') as f:
-            file_args = yaml.safe_load(f)
+        file_args = load_env_yaml(all_args.config)
     return {
         **file_args,
         **cmdline_args
