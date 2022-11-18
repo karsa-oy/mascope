@@ -84,22 +84,40 @@ function install_prerequisites() {
     sudo systemctl enable mascope
     sudo systemctl start mascope
 
-    # # kill file converters from prev.sessions if any
+    # kill file converters from prev.sessions if any
     pkill -f file_converter || true
 
     echo AAA start file convertor for KLTOF1...
     pushd $MASCOPE_PROJECT/backend
-    poetry run file-converter --config ./backend/service/file_converter_config/kltof1.yaml &
+    poetry run file-converter --config ./backend/service/file_converter_config/KLTOF1.yaml &
     popd
 
     echo AAA start file convertor for KLTOF2...
     pushd $MASCOPE_PROJECT/backend
-    poetry run file-converter --config ./backend/service/file_converter_config/kltof2.yaml &
+    poetry run file-converter --config ./backend/service/file_converter_config/KLTOF2.yaml &
     popd
 
     echo AAA start file convertor for KORBI1...
     pushd $MASCOPE_PROJECT/backend
-    poetry run file-converter --config ./backend/service/file_converter_config/korbi1.yaml &
+    poetry run file-converter --config ./backend/service/file_converter_config/KORBI1.yaml &
+    popd
+
+    # kill file downloaders from prev.sessions if any
+    pkill -f file_downloader || true
+
+    echo AAA start file downloader for KLTOF1...
+    pushd $MASCOPE_PROJECT/backend
+    poetry run file-downloader --config ./backend/service/file_downloader_config/KLTOF1.yaml &
+    popd
+
+    echo AAA start file downloader for KLTOF2...
+    pushd $MASCOPE_PROJECT/backend
+    poetry run file-downloader --config ./backend/service/file_downloader_config/KLTOF2.yaml &
+    popd
+
+    echo AAA start file downloader for KORBI1...
+    pushd $MASCOPE_PROJECT/backend
+    poetry run file-downloader --config ./backend/service/file_downloader_config/KORBI1.yaml &
     popd
 
 }
