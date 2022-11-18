@@ -94,6 +94,10 @@ export default {
         label: "Export sample batch",
         onClick: this.batchExport,
       };
+      let exportBatchPeaksButton = {
+        label: "Export peak data",
+        onClick: this.peakExport,
+      };
       let updateBatchButton = {
         label: "Update sample batch",
         onClick: this.batchUpdate,
@@ -105,7 +109,8 @@ export default {
             createBatchButton,
             updateBatchButton,
             deleteBatchButton,
-            exportBatchButton
+            exportBatchButton,
+            exportBatchPeaksButton,
           ];
       // sample items
       let updateItemButton = {
@@ -287,6 +292,14 @@ export default {
           modal: "sampleItemOverview",
         });
       }
+    },
+    peakExport() {
+      console.log("export peaks:");
+      this.$api.emit(
+        'sample_batch_export_peaks',
+        this.batchActive.sample_batch_id,
+        this.batchActive.filter_params,
+        );
     },
   },
 };
