@@ -77,10 +77,15 @@ async def streamer_processor(streamer):
             global target_path
             mailbox_path = os.path.join(
                 target_path,
-                instrument_name,
-                os.path.basename(raw_filename)
+                instrument_name
                 )
-            shutil.copyfile(raw_filename, mailbox_path)
+            if not os.path.exists(mailbox_path):
+                print("Creating mailbox: %s" %mailbox_path)
+                os.mkdir(mailbox_path)
+            shutil.copyfile(
+                raw_filename,
+                os.path.join(mailbox_path, os.path.basename(raw_filename))
+                )
         elif spec_i < 0:
             # New file
             print("New file: %s" %filename)
