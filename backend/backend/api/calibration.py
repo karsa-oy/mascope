@@ -7,7 +7,7 @@ from backend.api.sample import sample_batch_update
 from backend.api.sample import file_update as sample_file_update
 from backend.api.signal import signal_mz_calibration_update
 from backend.db.conn import conn
-from backend.lib.hardware.tofwerk.calibration import mz_calibrate
+from hardware.tofwerk.calibration import mz_calibrate
 from backend.server import sio
 
 

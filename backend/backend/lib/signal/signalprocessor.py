@@ -26,8 +26,8 @@ from .collector import KCollector
 from .worker import init_encoders
 from .segment import KSegmentSequence
 
-from backend.lib.hardware.tofwerk.generator import KAcquisition
-from backend.lib.hardware.tofwerk.util import (
+from hardware.tofwerk.generator import KAcquisition
+from hardware.tofwerk.util import (
                         read_peaklist,
                         peaklist_to_df,
                         load_peak_dict,

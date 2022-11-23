@@ -7,7 +7,7 @@ import socketio
 from multiprocessing import Event
 from queue import Empty
 
-from backend.lib.hardware.tofwerk.tof_streamer import TofDaqStreamer
+from hardware.tofwerk.tof_streamer import TofDaqStreamer
 from lib.util import load_env_yaml
 
 
@@ -137,9 +137,8 @@ def run():
     global target_path
 
     args = parse_cmd_args()
-
-    host = args.get('host', os.environ['MASCOPE_PUBLIC_HOST'])
-    port = args.get('port', os.environ['MASCOPE_PUBLIC_API_PORT'])
+    host = args.get('host', os.environ.get('MASCOPE_PUBLIC_HOST'))
+    port = args.get('port', os.environ.get('MASCOPE_PUBLIC_API_PORT'))
     instrument_name = args.get('instrument', 'unknown')
     target_path = args.get(
         'target',
