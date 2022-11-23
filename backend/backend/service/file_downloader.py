@@ -3,8 +3,6 @@ import asyncio
 import inspect
 import os
 import shutil
-import yaml
-import re
 
 from dotenv import load_dotenv
 from multiprocessing import Event, Queue
@@ -13,6 +11,9 @@ from threading import Thread
 from time import sleep
 from watchdog.observers import Observer
 from watchdog.events import PatternMatchingEventHandler
+
+from lib.util import load_env_yaml
+
 
 file_queue = Queue()
 shutdown_event = Event()
@@ -79,20 +80,6 @@ class FSWatcher:
 
     def run_as_daemon(self):
         Thread(target=self.run).start()
-
-
-def load_env_yaml(fname):
-    env_pattern = re.compile(r".*?\${(.*?)}.*?")
-    def env_constructor(loader, node):
-        value = loader.construct_scalar(node)
-        for group in env_pattern.findall(value):
-            value = value.replace(f"${{{group}}}", os.environ.get(group))
-        return value
-    yaml.add_implicit_resolver("!pathex", env_pattern)
-    yaml.add_constructor("!pathex", env_constructor)
-    with open(fname, 'r') as f:
-        res = yaml.load(f.read(), Loader=yaml.FullLoader)
-    return res
 
 
 def parse_cmd_args():

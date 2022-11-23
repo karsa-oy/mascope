@@ -8,14 +8,13 @@ import argparse
 import asyncio
 import inspect
 import socketio
-import yaml
-import re
 
 from backend.lib.file import zarr_sdk
-from backend.lib.hardware.tofwerk.generator import H5Streamer
+from backend.lib.hardware.tofwerk.h5_streamer import H5Streamer
 from backend.lib.hardware.orbitrap.generator import RawStreamer
 from backend.lib.struct import AttrDict, LRUDict
 from backend.lib.util import timestamp_from_filename
+from lib.util import load_env_yaml
 
 from datetime import timedelta
 from dotenv import load_dotenv
@@ -195,20 +194,6 @@ async def streamer_processor(streamer):
                 await handle_tps_data(tps_data)
         except Empty:
             await asyncio.sleep(.1)
-
-
-def load_env_yaml(fname):
-    env_pattern = re.compile(r".*?\${(.*?)}.*?")
-    def env_constructor(loader, node):
-        value = loader.construct_scalar(node)
-        for group in env_pattern.findall(value):
-            value = value.replace(f"${{{group}}}", os.environ.get(group))
-        return value
-    yaml.add_implicit_resolver("!pathex", env_pattern)
-    yaml.add_constructor("!pathex", env_constructor)
-    with open(fname, 'r') as f:
-        res = yaml.load(f.read(), Loader=yaml.FullLoader)
-    return res
 
 
 def parse_cmd_args():
