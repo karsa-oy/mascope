@@ -115,6 +115,8 @@ class H5Streamer(BaseGenerator, KInstrument):
                 True                # Normalize to
             )                   # [mV/ext]
         if ret == 4: # Success
+            # Convert spec from [mV/ext] -> [ions/sec]
+            spec *= self.conversion_coefficient
             # Combine data for output
             spec_data = {
                     'filename': self.filename,  # Current file basename

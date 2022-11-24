@@ -99,6 +99,8 @@ class TofDaqStreamer(BaseGenerator):
         spec = np.zeros((self.desc.nbrSamples, ), dtype=np.float32)
         ret = TwGetTofSpectrumFromShMem(spec, 0, 0, self.desc.iBuf, True)  # [mV/ext]
         if ret == 4: # Success
+            # Convert spec from [mV/ext] -> [ions/sec]
+            spec *= self.conversion_coefficient
             # Combine data for output
             spec_data = {
                     'filename': self.filename,  # Current file basename
