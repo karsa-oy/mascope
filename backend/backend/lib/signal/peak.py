@@ -397,7 +397,7 @@ def write_peak_dict(D, filename):
 
 #XXX --------- Deprecated stuff down from here ---------
 
-from backend.lib.hardware.tofwerk.util import (
+from hardware.tofwerk.util import (
     read_peaklist, 
     peaklist_to_df
 )

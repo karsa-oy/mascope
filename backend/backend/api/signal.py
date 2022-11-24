@@ -2,7 +2,7 @@ import numpy as np
 
 from zarr.errors import PathNotFoundError
 
-from backend.lib.hardware.tofwerk.lib.TwTool import TwTof2Mass
+from hardware.tofwerk.lib.TwTool import TwTof2Mass
 from backend.lib.file import (
     get_zarr_var_shape,
     load_coord,
