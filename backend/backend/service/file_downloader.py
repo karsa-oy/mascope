@@ -3,14 +3,17 @@ import asyncio
 import inspect
 import os
 import shutil
-import yaml
 
+from dotenv import load_dotenv
 from multiprocessing import Event, Queue
 from queue import Empty
 from threading import Thread
 from time import sleep
 from watchdog.observers import Observer
 from watchdog.events import PatternMatchingEventHandler
+
+from lib.util import load_env_yaml
+
 
 file_queue = Queue()
 shutdown_event = Event()
@@ -122,12 +125,12 @@ def parse_cmd_args():
     file_args = {}
     if all_args.config:
         # service config may be defined in yaml file
-        with open(all_args.config, 'r') as f:
-            file_args = yaml.safe_load(f)
+        file_args = load_env_yaml(all_args.config)
     return {
         **file_args,
         **cmdline_args
         }
+
 
 async def main():
     global file_queue
@@ -141,6 +144,7 @@ async def main():
         except Empty:
             await asyncio.sleep(1)
 
+
 def run():
     global file_queue
     global shutdown_event
@@ -148,7 +152,6 @@ def run():
 
     args = parse_cmd_args()
     loop = asyncio.get_event_loop()
-
 
     file_mask = args.get('file_mask', '*')
     recursive = args.get('recursive', False)
@@ -173,4 +176,5 @@ def run():
 
 
 if __name__ == '__main__':
+    load_dotenv()
     run()

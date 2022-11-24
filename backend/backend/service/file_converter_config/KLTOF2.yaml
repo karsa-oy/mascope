@@ -1,3 +1,3 @@
 instrument: KLTOF2
 streamer_type: H5
-source_dir: D:/to_mascope/KLTOF2
+source_dir: ${MASCOPE_PRIVATE_CONVERTER_DIR}/KLTOF2

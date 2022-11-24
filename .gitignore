@@ -1,4 +1,5 @@
 testdata
+log
 notes.*
 .vagrant
 __pycache__

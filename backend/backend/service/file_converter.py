@@ -1,20 +1,15 @@
-# TODO: TwTool must load library before H5Streamer;
-# can be fixed later by refactoring H5Streamer dependencies
-import os, sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
-from backend.lib.hardware.tofwerk.lib.TwTool import *
-
 import argparse
 import asyncio
 import inspect
+import os
 import socketio
-import yaml
 
 from backend.lib.file import zarr_sdk
-from backend.lib.hardware.tofwerk.generator import H5Streamer
-from backend.lib.hardware.orbitrap.generator import RawStreamer
+from hardware.tofwerk.h5_streamer import H5Streamer
+from hardware.orbitrap.generator import RawStreamer
 from backend.lib.struct import AttrDict, LRUDict
 from backend.lib.util import timestamp_from_filename
+from lib.util import load_env_yaml
 
 from datetime import timedelta
 from dotenv import load_dotenv
@@ -195,6 +190,7 @@ async def streamer_processor(streamer):
         except Empty:
             await asyncio.sleep(.1)
 
+
 def parse_cmd_args():
     """
     Parse command line arguments
@@ -244,8 +240,7 @@ def parse_cmd_args():
     file_args = {}
     if all_args.config:
         # service config may be defined in yaml file
-        with open(all_args.config, 'r') as f:
-            file_args = yaml.safe_load(f)
+        file_args = load_env_yaml(all_args.config)
     return {
         **file_args,
         **cmdline_args
