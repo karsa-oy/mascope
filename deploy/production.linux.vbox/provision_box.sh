@@ -89,17 +89,17 @@ function install_prerequisites() {
 
     echo AAA start file convertor for KLTOF1...
     pushd $MASCOPE_PROJECT/backend
-    poetry run python -u backend/service/file_converter.py --config ./backend/service/file_converter_config/KLTOF1.yaml |& poetry run python backend/service/log_rotate.py -n=5000 -l=$MASCOPE_PRIVATE_LOG_DIR/converter_KLTOF1.log &
+    poetry run python -u backend/service/file_converter.py --config ./backend/service/file_converter_config/KLTOF1.yaml --ping |& poetry run python backend/service/log_rotate.py -n=5000 -l=$MASCOPE_PRIVATE_LOG_DIR/converter_KLTOF1.log &
     popd
 
     echo AAA start file convertor for KLTOF2...
     pushd $MASCOPE_PROJECT/backend
-    poetry run python -u backend/service/file_converter.py --config ./backend/service/file_converter_config/KLTOF2.yaml |& poetry run python backend/service/log_rotate.py -n=5000 -l=$MASCOPE_PRIVATE_LOG_DIR/converter_KLTOF2.log &
+    poetry run python -u backend/service/file_converter.py --config ./backend/service/file_converter_config/KLTOF2.yaml --ping |& poetry run python backend/service/log_rotate.py -n=5000 -l=$MASCOPE_PRIVATE_LOG_DIR/converter_KLTOF2.log &
     popd
 
     echo AAA start file convertor for KORBI1...
     pushd $MASCOPE_PROJECT/backend
-    poetry run python -u backend/service/file_converter.py --config ./backend/service/file_converter_config/KORBI1.yaml |& poetry run python backend/service/log_rotate.py -n=5000 -l=$MASCOPE_PRIVATE_LOG_DIR/converter_KORBI1.log &
+    poetry run python -u backend/service/file_converter.py --config ./backend/service/file_converter_config/KORBI1.yaml --ping |& poetry run python backend/service/log_rotate.py -n=5000 -l=$MASCOPE_PRIVATE_LOG_DIR/converter_KORBI1.log &
     popd
 
     # kill file downloaders from prev.sessions if any
@@ -107,17 +107,17 @@ function install_prerequisites() {
 
     echo AAA start file downloader for KLTOF1...
     pushd $MASCOPE_PROJECT/backend
-    poetry run python -u backend/service/file_downloader.py --config ./backend/service/file_downloader_config/KLTOF1.yaml |& poetry run python backend/service/log_rotate.py -n=1000 -l=$MASCOPE_PRIVATE_LOG_DIR/downloader_KLTOF1.log &
+    poetry run python -u backend/service/file_downloader.py --config ./backend/service/file_downloader_config/KLTOF1.yaml --ping |& poetry run python backend/service/log_rotate.py -n=1000 -l=$MASCOPE_PRIVATE_LOG_DIR/downloader_KLTOF1.log &
     popd
 
     echo AAA start file downloader for KLTOF2...
     pushd $MASCOPE_PROJECT/backend
-    poetry run python -u backend/service/file_downloader.py --config ./backend/service/file_downloader_config/KLTOF2.yaml |& poetry run python backend/service/log_rotate.py -n=1000 -l=$MASCOPE_PRIVATE_LOG_DIR/downloader_KLTOF2.log &
+    poetry run python -u backend/service/file_downloader.py --config ./backend/service/file_downloader_config/KLTOF2.yaml --ping |& poetry run python backend/service/log_rotate.py -n=1000 -l=$MASCOPE_PRIVATE_LOG_DIR/downloader_KLTOF2.log &
     popd
 
     echo AAA start file downloader for KORBI1...
     pushd $MASCOPE_PROJECT/backend
-    poetry run python -u backend/service/file_downloader.py --config ./backend/service/file_downloader_config/KORBI1.yaml |& poetry run python backend/service/log_rotate.py -n=1000 -l=$MASCOPE_PRIVATE_LOG_DIR/downloader_KORBI1.log &
+    poetry run python -u backend/service/file_downloader.py --config ./backend/service/file_downloader_config/KORBI1.yaml --ping |& poetry run python backend/service/log_rotate.py -n=1000 -l=$MASCOPE_PRIVATE_LOG_DIR/downloader_KORBI1.log &
     popd
 
 }

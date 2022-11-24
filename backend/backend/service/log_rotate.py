@@ -2,6 +2,7 @@ import argparse
 import os
 import sys
 import shutil
+import time
 
 def parse_cmd_args():
     """
@@ -55,17 +56,20 @@ class RotationLogger:
         else:
             print(*arg)
 
+def line_prefix():
+    t = time.localtime(time.time())
+    return f"{t.tm_hour}:{t.tm_min}:{t.tm_sec} {t.tm_mday}.{t.tm_mon}"
 
 if __name__ == '__main__':
-    # Log piped stdout to log_rotate;
-    # Use 'src |& log_rotate' to pipe both stdout and stderr.
+    # Log piped stdin to log_rotate;
+    # Use 'src |& log_rotate' to pipe both stdout and stderr to stdin.
     kwargs = parse_cmd_args()
     logger = RotationLogger(**kwargs)
     exc_cnt = 0
     while exc_cnt < 2:
         try:
             for line in sys.stdin:
-                logger.log(line)
+                logger.log(line_prefix(), line)
         except KeyboardInterrupt:
             # at 1st Ctrl-C don't quit - let input provider finish
             exc_cnt += 1
