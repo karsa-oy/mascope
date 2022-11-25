@@ -75,6 +75,19 @@ class FSWatcher:
                 global file_queue
                 file_queue.put(filepath)
 
+        def run(self):
+            self.start()
+            while not self.parent.shutdown_event.is_set():
+                try:
+                    sleep(.5)
+                except KeyboardInterrupt:
+                    self.log('KeyboardInterrupt')
+                    self.parent.shutdown_event.set()
+                except Exception as e:
+                    self.log(f"Exception {e.__class__.__name__}({str(e)})")
+                    pass
+            self.stop()
+
 
     class FSPingHandler():
         PING_INTERVAL = 3
