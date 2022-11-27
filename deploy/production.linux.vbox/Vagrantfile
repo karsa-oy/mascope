@@ -54,9 +54,10 @@ Vagrant.configure("2") do |config|
   config.vm.provider :virtualbox do |vb|
     vb.name = "mascope"
     vb.gui = true
-    vb.memory = "8192"
+    # for production
+    # vb.memory = "8192"
     # for local tests
-    # vb.memory = "2048"
+    vb.memory = "2048"
     vb.cpus = 2
     # to enable proper links functionality in Windows shared folders
     vb.customize ["setextradata", :id,

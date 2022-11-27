@@ -2,7 +2,7 @@
 # can be fixed later by refactoring H5Streamer dependencies
 import os, sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
-from backend.lib.hardware.tofwerk.lib.TwTool import *
+from hardware.tofwerk.lib.TwTool import *
 
 import argparse
 import asyncio
@@ -12,8 +12,8 @@ import yaml
 import re
 
 from backend.lib.file import zarr_sdk
-from backend.lib.hardware.tofwerk.generator import H5Streamer
-from backend.lib.hardware.orbitrap.generator import RawStreamer
+from hardware.tofwerk.generator import H5Streamer
+from hardware.orbitrap.generator import RawStreamer
 from backend.lib.struct import AttrDict, LRUDict
 from backend.lib.util import timestamp_from_filename
 

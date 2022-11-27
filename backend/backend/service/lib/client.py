@@ -21,15 +21,15 @@ SERVICE_RESPONSE_TIMEOUT = 10
 
 streamer_info = {
     'H5': {
-        'package': 'backend.lib.hardware.tofwerk',
+        'package': 'hardware.tofwerk',
         'module': '.generator'
     },
     'Raw': {
-        'package': 'backend.lib.hardware.orbitrap',
+        'package': 'hardware.orbitrap',
         'module': '.generator'
     },
     'TofDaq': {
-        'package': 'backend.lib.hardware.tofwerk',
+        'package': 'hardware.tofwerk',
         'module': '.generator'
     },
 }

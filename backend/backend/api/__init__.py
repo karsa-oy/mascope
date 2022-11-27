@@ -1,4 +1,4 @@
-from backend.lib.hardware.tofwerk.lib.TwTool import *
+from hardware.tofwerk.lib.TwTool import *
 
 # these 3 imports require loaded library from TwTool
 from backend.api.calibration import *

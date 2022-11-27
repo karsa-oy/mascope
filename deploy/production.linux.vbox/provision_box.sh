@@ -43,7 +43,7 @@ function install_prerequisites() {
     poetry lock --no-update
     poetry install --no-interaction --no-root
     # patch libtwh5.so RPATH for libtwtool.so dependency
-    TWLIBPATH=$(realpath ./backend/lib/hardware/tofwerk/lib/dlls/linux_x86_64)
+    TWLIBPATH=$(realpath ./hardware/tofwerk/lib/dlls/linux_x86_64)
     patchelf --force-rpath --set-rpath "$TWLIBPATH" "$TWLIBPATH/libtwh5.so"
     popd
 
