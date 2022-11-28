@@ -73,6 +73,5 @@ if __name__ == '__main__':
         except KeyboardInterrupt:
             # at 1st Ctrl-C don't quit - let input provider finish
             exc_cnt += 1
-    sys.stderr.write(f'BBBB: quitting {os.path.basename(sys.argv[0])}\n')
 
 
