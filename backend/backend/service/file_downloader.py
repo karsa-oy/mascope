@@ -14,7 +14,8 @@ from watchdog.observers import Observer
 from watchdog.events import PatternMatchingEventHandler
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
-from backend.lib.util import load_env_yaml
+from .lib.util import load_env_yaml
+
 
 file_queue = Queue()
 shutdown_event = Event()

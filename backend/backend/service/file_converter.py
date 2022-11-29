@@ -11,10 +11,11 @@ import socketio
 import glob
 
 from backend.lib.file import zarr_sdk
+from backend.lib.struct import AttrDict, LRUDict
+from backend.lib.util import timestamp_from_filename
 from hardware.tofwerk.h5_streamer import H5Streamer
 from hardware.orbitrap.generator import RawStreamer
-from backend.lib.struct import AttrDict, LRUDict
-from backend.lib.util import timestamp_from_filename, load_env_yaml
+from .lib.util import load_env_yaml
 
 from datetime import timedelta
 from dotenv import load_dotenv

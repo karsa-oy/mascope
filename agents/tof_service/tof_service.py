@@ -114,8 +114,13 @@ async def main():
     global port
     global sio
 
-    url = f"http://{host}:{port}"
-    while not shutdown_event.is_set():
+    url = None
+    if host and port:
+        url = f"http://{host}:{port}"
+    elif host:
+        url = f"http://{host}"
+
+    while url and not shutdown_event.is_set():
         try:
             print("Connecting to %s" %url)
             await sio.connect(url)
@@ -142,8 +147,8 @@ def run():
 
     args = parse_cmd_args()
 
-    host = args.get('host', os.environ['MASCOPE_PUBLIC_HOST'])
-    port = args.get('port', os.environ['MASCOPE_PUBLIC_API_PORT'])
+    host = args.get('host', os.environ.get('MASCOPE_PUBLIC_HOST'))
+    port = args.get('port', os.environ.get('MASCOPE_PUBLIC_API_PORT'))
     instrument_name = args.get('instrument', 'unknown')
     target_path = args.get(
         'target',

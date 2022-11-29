@@ -6,7 +6,7 @@ authors = ["Karsa Oy <support@karsa.fi>"]
 license = "Proprietary"
 packages = [
     { include = "hardware", from = "../../backend" },
-    { include = "lib", from = "../../backend/backend" },
+    { include = "lib", from = "../../backend/backend/service" },
     ]
 
 [build-system]
