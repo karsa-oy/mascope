@@ -3,7 +3,6 @@ import asyncio
 import os
 import shutil
 import socketio
-
 from multiprocessing import Event
 from queue import Empty
 
