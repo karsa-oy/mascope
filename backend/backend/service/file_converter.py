@@ -11,7 +11,7 @@ import socketio
 import glob
 
 from backend.lib.file import zarr_sdk
-from hardware.tofwerk.generator import H5Streamer
+from hardware.tofwerk.h5_streamer import H5Streamer
 from hardware.orbitrap.generator import RawStreamer
 from backend.lib.struct import AttrDict, LRUDict
 from backend.lib.util import timestamp_from_filename, load_env_yaml
