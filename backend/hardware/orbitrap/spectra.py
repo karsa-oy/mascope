@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 
 from ThermoFisher.CommonCore.Data import Business
 
-from backend.hardware.lib.util import net2np_array
+from hardware.orbitrap.util import net2np_array
 from .instrument import KOInstrument
 
 

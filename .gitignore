@@ -1,4 +1,6 @@
-testdata
+agents/tof_service/build/
+frontend/dist
+log
 notes.*
 .vagrant
 __pycache__

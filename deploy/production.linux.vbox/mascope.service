@@ -1,12 +1,12 @@
-[Unit]
-Description=Mascope backend service
-
-[Service]
-Restart=on-failure  
-User=vagrant  
-WorkingDirectory=/vagrant/backend
-ExecStartPre=/bin/sleep 5
-ExecStart=/home/vagrant/.local/bin/poetry run server  
-
-[Install]
+[Unit]
+Description=Mascope backend service
+
+[Service]
+Restart=on-failure
+User=vagrant
+WorkingDirectory=/vagrant/backend
+ExecStartPre=/bin/sleep 5
+ExecStart=/home/vagrant/.local/bin/poetry run server
+
+[Install]
 WantedBy=multi-user.target
