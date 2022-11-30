@@ -141,3 +141,68 @@ max_res = max(list(zip(*all_peaks))[2])
 ok_peaks = [peak for peak in all_peaks if peak[2] >= 0.5*max_res]
 
 plt.scatter(list(zip(*ok_peaks))[0], list(zip(*ok_peaks))[2])
+
+#%%
+import asyncio
+from concurrent.futures import ProcessPoolExecutor
+from time import time, sleep
+
+from backend.lib.signal.peak import fit_n_peaks, todo
+
+
+
+async def fit_peaks(sid, mz, spec, u_list, peakshape, R):
+    dmz = .3
+    print("init executor")
+    t0 = time()
+    n_jobs = 4
+    executor = ProcessPoolExecutor(max_workers=n_jobs)
+    loop = asyncio.get_event_loop()
+    print("init futures")
+    futures = [
+        loop.run_in_executor(
+            executor,
+            fit_n_peaks,
+            mz.sel(mz=slice(u-dmz, u+dmz)).compute().values,
+            spec.sel(mz=slice(u-dmz, u+dmz)).compute().values,
+            peakshape,
+            R(u),
+            10,
+            .9
+        )
+        for u in u_list
+    ]
+    # await sio.emit("long_running_task_started", room=sid)
+    t1 = time()
+    print("took %.2f s total to initialize; %.2f per process, %.2f per u" %((t1-t0), (t1-t0)/n_jobs, (t1-t0)/len(u_list)))
+    print("wait for futures")
+    for future in asyncio.as_completed(futures):
+        result = await future
+        print("task completed")
+        # print(result)
+    t2 = time()
+    print("took %.2f s" %(t2-t1))
+    print("took %.2f s total to perform tasks; %.2f per process, %.2f per u" %((t2-t1), (t2-t1)/n_jobs, (t2-t1)/len(u_list)))
+    print("shutdown executor")
+    executor.shutdown()
+    # await sio.emit("long_running_task_completed", room=sid)
+    t3 = time()
+    print("all done in %.2f s" %(t3-t0))
+
+#%%
+from backend.lib.file import load_file
+from backend.lib.signal.peak import load_peakshape_mat
+
+filename = r'C:\Data\instrument\unknown\2021.08.19\unknown_Comissioning-C4Q-xxx-L_2021.08.19-17h59m16s'
+cache_item = load_file(filename, vars=['signal'])
+
+mz = cache_item.mz
+spec = cache_item.signal.sum(dim='time').compute()
+
+peakshape_file = r'C:\Users\Oskari Kausiala\Documents\Repositories\labbis\parameters\peakShapes\peakshape.mat'    
+peakshape = load_peakshape_mat(peakshape_file)
+
+p1 = 0.000125
+p2 = 0.002545
+R = lambda m: m / (p1 * m + p2)
+u_list = range(125, 400)

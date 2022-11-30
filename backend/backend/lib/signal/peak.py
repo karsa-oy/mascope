@@ -140,7 +140,11 @@ def fit_n_peaks(
             max_ind = np.argmax(y)
             init_pos = [ x[max_ind] ]
             init_hei = [ y[max_ind] ]
-            init_res = [ resolution_function(x[max_ind]) ]
+            init_res = [ 
+                resolution_function(x[max_ind])
+                if callable(resolution_function)
+                else resolution_function
+                ]
             
         fit, peaks = fit_peaks(
             x,
@@ -187,7 +191,11 @@ def fit_n_peaks(
         # Set the position of next peak to the maximum of residual
         init_pos.append(max_residual_mz)
         init_hei.append(max_residual)
-        init_res.append(resolution_function(max_residual_mz))
+        init_res.append(
+            resolution_function(max_residual_mz)
+            if callable(resolution_function)
+            else resolution_function
+            )
     # Calculate peak areas
     peaks = [ (*peak, calculate_peak_area(x, peak_shape, peak)) for peak in peaks ]
     return fit, peaks
@@ -285,8 +293,7 @@ def load_peakshape_mat(peakshape_file):
     """
     ps_mat = loadmat(peakshape_file)
     ps_struct = ps_mat['peakShape']
-    ps = ps_struct['dat'][0]
-    ps = ps[0]
+    ps = ps_struct['dat'][0][0]
     x = ps[:, 0]
     y = ps[:, 1]
     y = y / max(y)
