@@ -32,7 +32,7 @@ from hardware.tofwerk.util import (
                         peaklist_to_df,
                         load_peak_dict,
                         )
-from .struct import QueueSubscription
+from lib.struct import QueueSubscription
 
 
 class KSignalProcessor(Thread):

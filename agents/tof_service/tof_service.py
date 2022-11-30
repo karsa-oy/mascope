@@ -3,7 +3,6 @@ import asyncio
 import os
 import shutil
 import socketio
-
 from multiprocessing import Event
 from queue import Empty
 
@@ -115,8 +114,13 @@ async def main():
     global port
     global sio
 
-    url = f"http://{host}:{port}"
-    while not shutdown_event.is_set():
+    url = None
+    if host and port:
+        url = f"http://{host}:{port}"
+    elif host:
+        url = f"http://{host}"
+
+    while url and not shutdown_event.is_set():
         try:
             print("Connecting to %s" %url)
             await sio.connect(url)
