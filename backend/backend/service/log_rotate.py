@@ -60,9 +60,7 @@ def line_prefix():
     t = time.localtime(time.time())
     return f"{t.tm_hour}:{t.tm_min}:{t.tm_sec} {t.tm_mday}.{t.tm_mon}"
 
-if __name__ == '__main__':
-    # Log piped stdin to log_rotate;
-    # Use 'src |& log_rotate' to pipe both stdout and stderr to stdin.
+def run():
     kwargs = parse_cmd_args()
     logger = RotationLogger(**kwargs)
     exc_cnt = 0
@@ -74,4 +72,7 @@ if __name__ == '__main__':
             # at 1st Ctrl-C don't quit - let input provider finish
             exc_cnt += 1
 
-
+if __name__ == '__main__':
+    # Log piped stdin to log_rotate;
+    # Use 'src |& log_rotate' to pipe both stdout and stderr to stdin.
+    run()
