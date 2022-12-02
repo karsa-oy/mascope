@@ -6,16 +6,15 @@ import asyncio
 from backend.db.conn import conn
 from backend.db.id import gen_id
 from backend.lib.file import load_file
-from backend.lib.peak import detect_peaks, get_peaks, filter_peaks
+from backend.lib.peak import detect_peaks_old, get_peaks, filter_peaks
 from backend.lib.chemistry import match_mz
 from backend.server import sio
 
 
 def compute_matches(
-    filename,
+    peaks,
     target_collection_ids,
     ionization_mechanism_ids,
-    peak_filter_params={},
     ):
     # Note:
     #   Matching is done on isotope-level. Ion, compound
@@ -47,16 +46,7 @@ def compute_matches(
     # STEP 1 - Get peaks #
     ######################
 
-    # Load file
-    print("Loading file: %s" % filename)
-    sample_file = load_file(filename, vars=['peaks'])
-
-    if 'peaks' not in sample_file:
-        # Find peaks and write to file
-        sample_file = detect_peaks(sample_file)
-
-    peaks = get_peaks(sample_file)
-    peaks = filter_peaks(peaks, **peak_filter_params)
+    peaks = peaks
 
     #########################
     # STEP 2 - Prepare data #
@@ -236,7 +226,8 @@ async def match_batch_remove(sid, sample_batch_id):
     # reload workspace
     await sio.emit('workspace_reload', workspace_id, namespace='/')
 
-def item_compute(sample_item_id):
+
+def item_compute(sample_item_id, peak_filter_params={}):
     with conn:
         # fetch filename and batch id
         sample_item_df = pd.read_sql(f"""
@@ -274,8 +265,19 @@ def item_compute(sample_item_id):
             params=[sample_batch_id]
             )['target_collection_id'].tolist()
 
+    # Load file
+    print("Loading file: %s" % filename)
+    sample_file = load_file(filename, vars=['peaks'])
+
+    if 'peaks' not in sample_file:
+        # Find peaks and write to file
+        sample_file = detect_peaks_old(sample_file)
+
+    peaks = get_peaks(sample_file)
+    peaks = filter_peaks(peaks, **peak_filter_params)
+
     match_isotope_df = compute_matches(
-        filename,
+        peaks,
         target_collection_ids,  
         ionization_mechanism_ids
         )
@@ -333,8 +335,9 @@ def item_remove(sample_item_id):
             """,
             [sample_item_id]
             )
+
 @sio.event(namespace='/')
 async def match_item_remove(sid, sample_item_id):
     item_remove(sample_item_id)
     # reload batch
-    await sio.emit('sample_batch_reload', roomn=sample_batch_id, namespace='/')
+    await sio.emit('sample_batch_reload', room=sample_batch_id, namespace='/')
