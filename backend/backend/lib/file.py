@@ -47,7 +47,6 @@ class zarr_sdk:
     def init_centroid_dataset(data, item):
         value = data['value']
         filename = filename_to_zarr_path(value['filename'], 'centroids')
-        filename = os.path.join(item.get('data_root', ''), filename)
         centroid_array = ExtendableDataArray(
             path=filename,
             array_module=da
@@ -60,7 +59,7 @@ class zarr_sdk:
         item.update({'centroids': centroid_array})
 
     @staticmethod
-    def init_signal_dataset(data, data_root='', overwrite=False):
+    def init_signal_dataset(data, overwrite=False):
         # First filesystem operation in acquisition api sequence:
         #   init_signal_dataset - init_tps_dataset - init_viz_dataset -
         #   update_signal_dataset - update_tps_dataset
@@ -78,14 +77,12 @@ class zarr_sdk:
             data_path = parse_path_from_item_filename(filename, base_path)
         except Exception as e:
             raise Exception("Error parsing filename")
-        data_path = os.path.join(data_root, data_path)
         if os.path.exists(data_path):
             if overwrite:
                 rmtree(data_path)
             else:
                 raise FileExistsError(data_path)
         filename_signal = filename_to_zarr_path(filename, 'signal')
-        filename_signal = os.path.join(data_root, filename_signal)
         signal_array = ExtendableDataArray(
             path=filename_signal,
             array_module=da
@@ -96,7 +93,6 @@ class zarr_sdk:
             name='signal'
         )
         filename_period = filename_to_zarr_path(filename, 'signal_period')
-        filename_period = os.path.join(data_root, filename_period)
         period_array = ExtendableDataArray(
             path=filename_period,
             array_module=np
@@ -121,8 +117,7 @@ class zarr_sdk:
         }
         write_props(filename, properties)
 
-        return {'data_root': data_root,
-                'signal': signal_array,
+        return {'signal': signal_array,
                 'signal_period': period_array,
                 'props': properties,
                 }
@@ -131,7 +126,6 @@ class zarr_sdk:
     def init_tps_dataset(data, item):
         value = data['value']
         filename = filename_to_zarr_path(value['filename'], 'tps')
-        filename = os.path.join(item.get('data_root', ''), filename)
         if os.path.exists(filename):
             raise FileExistsError(filename)
         tps_info = value['tps_info']
@@ -150,7 +144,6 @@ class zarr_sdk:
     def init_viz_dataset(filename_base, viz_type, item):
         # initialize viz_type mfzarr
         filename_viz = filename_to_zarr_path(filename_base, viz_type)
-        filename_viz = os.path.join(item.get('data_root', ''), filename_viz)
         viz_array = ExtendableDataArray(
             path=filename_viz,
             array_module=np,
@@ -164,10 +157,6 @@ class zarr_sdk:
         )
         viz_period = viz_type + '_period'
         filename_viz_period = filename_to_zarr_path(filename_base, viz_period)
-        filename_viz_period = os.path.join(
-            item.get('data_root', ''),
-            filename_viz_period
-        )
         viz_period_array = ExtendableDataArray(
             path=filename_viz_period,
             array_module=np,
@@ -220,7 +209,6 @@ class zarr_sdk:
             )
             item['props'].update({'committed_length': committed_length})
             prop_path = os.path.join(
-                item.get('data_root', ''),
                 parse_path_from_item_filename(value['filename'], base_path),
                 '.props'
             )
@@ -237,10 +225,17 @@ class zarr_sdk:
         item['tps'].extend_array(tps_data, [tps_info, ti], 'time')
 
     @staticmethod
-    def write_peak_dataset(peak_profiles, item):
+    def write_peak_dataset(peak_profiles, item, overwrite=False):
         filename_base = item.props['filename']
-        filename = filename_to_zarr_path(filename_base, 'peaks')
-        peaks_array = ExtendableDataArray(path=filename)
+        filename_peaks = filename_to_zarr_path(filename_base, 'peaks')
+
+        if os.path.exists(filename_peaks):
+            if overwrite:
+                rmtree(filename_peaks)
+            else:
+                raise FileExistsError(filename_peaks)
+
+        peaks_array = ExtendableDataArray(path=filename_peaks)
         peaks_array.init_array(
             dims=('mz', 'time'),
             data=peak_profiles.values,
@@ -251,7 +246,6 @@ class zarr_sdk:
                 },
             name='peaks'
         )
-
 
 
 def filename_to_zarr_path(base_filename, variable):

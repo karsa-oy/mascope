@@ -147,12 +147,12 @@ import asyncio
 from concurrent.futures import ProcessPoolExecutor
 from time import time, sleep
 
-from backend.lib.signal.peak import fit_n_peaks, todo
+from backend.lib.signal.peak import fit_n_peaks
 
 
 
-async def fit_peaks(sid, mz, spec, u_list, peakshape, R):
-    dmz = .3
+async def sample_deconvolve(sid, mz, spec, u_list, peakshape, R):
+    dmz = .5
     print("init executor")
     t0 = time()
     n_jobs = 4
@@ -190,19 +190,123 @@ async def fit_peaks(sid, mz, spec, u_list, peakshape, R):
     print("all done in %.2f s" %(t3-t0))
 
 #%%
+import json
+import numpy as np
+import pandas as pd
+
+from backend.db.conn import conn
 from backend.lib.file import load_file
 from backend.lib.signal.peak import load_peakshape_mat
 
-filename = r'C:\Data\instrument\unknown\2021.08.19\unknown_Comissioning-C4Q-xxx-L_2021.08.19-17h59m16s'
-cache_item = load_file(filename, vars=['signal'])
+def read_instrument_functions(filename):
+    with conn:
+        sample_file_df = pd.read_sql(f"""
+            SELECT
+                datetime_utc,
+                instrument
+            FROM
+                sample_file
+            WHERE
+                filename = ?
+            """,
+            conn,
+            params=[filename]
+            )
+        [instrument] = sample_file_df.instrument
+        [file_timestamp] = sample_file_df.datetime_utc
+        instrument_function_df = pd.read_sql(f"""
+            SELECT
+                peakshape,
+                resolution_function
+            FROM
+                instrument_function
+            WHERE
+                instrument = ?
+                AND
+                datetime_utc = (
+                    SELECT
+                         MAX(datetime_utc)
+                    FROM
+                        instrument_function
+                    WHERE datetime_utc < ?
+                    LIMIT 1
+                )
+            """,
+            conn,
+            params=[instrument, file_timestamp]
+            )
+    peakshape = json.loads(instrument_function_df.peakshape[0])
+    p1, p2 = json.loads(instrument_function_df.resolution_function[0])
+    R = lambda m: m / (p1 * m + p2)
+    return peakshape, R
 
+def get_u_list(sample_batch_id):
+    # get sample batch
+    with conn:
+        [sample_batch] = pd.read_sql(f"""
+            SELECT build_params
+            FROM sample_batch
+            WHERE sample_batch_id == ?
+            """,
+            conn,
+            params=[sample_batch_id]
+            ).to_dict('records')
+    build_params = json.loads(sample_batch['build_params'])
+    calibration_collection_id = build_params['calibration_collection']
+    ion_mechanism_ids = build_params['ion_mechanisms']
+    with conn:
+        target_collection_ids = pd.read_sql(f"""
+            SELECT target_collection_id
+            FROM target_collection_in_sample_batch
+            WHERE sample_batch_id == ?
+            """,
+            conn,
+            params=[sample_batch_id]
+            )['target_collection_id'].tolist()
+    target_collection_ids.append(calibration_collection_id)
+    with conn:
+        target_collection_id_refs = ','.join('?'*len(target_collection_ids))
+        ion_mechanism_id_refs = ','.join('?'*len(ion_mechanism_ids))
+        target_isotope_mzs = pd.read_sql(f"""
+            SELECT mz
+            FROM target_compound_in_target_collection
+            NATURAL JOIN target_compound
+            NATURAL JOIN target_ion
+            NATURAL JOIN target_isotope
+            WHERE target_collection_id IN ({target_collection_id_refs})
+            AND ionization_mechanism_id IN ({ion_mechanism_id_refs})
+            """,
+            conn,
+            params=[*target_collection_ids, *ion_mechanism_ids]
+            )['mz'].tolist()
+    return np.unique(np.round(target_isotope_mzs))
+    
+
+async def on_sample_item_process(sid, sample_items):
+    # Create sample item records
+    sample_item_df = sample_item_create(sample_items)
+    [sample_batch_id} = np.unique(sample_item_df['sample_batch_id'].tolist())
+    
+    # deconvolve
+    u_list = get_u_list(sample_batch_id)
+    filenames = sample_item_df['filename'].tolist()
+    for filename in filenames:
+        peakshape, R = read_instrument_functions(filename)
+        sample_file = load_file(filename, vars=['signal'])
+        mz = sample_file.mz
+        sum_spec = sample_file.signal.sum(dim='time').compute()
+        sio.start_background_task(
+            sample_deconvolve,
+            sid,
+            mz,
+            spec,
+            u_list,
+            peakshape,
+            R
+        )
+filename = 'KLTOF2_Comissioning-C4Q-xxx-L_2021.08.19-17h59m16s'
+sample_batch_id = 'nYfhf5AngZLXisfh'
+
+cache_item = load_file(filename, vars=['signal'])
 mz = cache_item.mz
 spec = cache_item.signal.sum(dim='time').compute()
-
-peakshape_file = r'C:\Users\Oskari Kausiala\Documents\Repositories\labbis\parameters\peakShapes\peakshape.mat'    
-peakshape = load_peakshape_mat(peakshape_file)
-
-p1 = 0.000125
-p2 = 0.002545
-R = lambda m: m / (p1 * m + p2)
-u_list = range(125, 400)

@@ -1,6 +1,13 @@
 <template>
   <section>
     <the-layout-sidebar>
+      <b-button
+        type="is-primary"
+        style="position: fixed; left: 5em; top: 2em"
+        @click="launchLongTask"
+      >
+        Long processing task
+      </b-button>
       <div class="columns" style="margin: 0 auto; width: 70vw;">
         <div class="column is-half">
           <section style="padding: 2em 2em 2em 2em">
@@ -245,6 +252,9 @@ export default {
         min: this.sampleFileMinDatetime,
         max: this.sampleFileMaxDatetime
       });
+    },
+    launchLongTask() {
+      this.$api.emit('test_long_running_task');
     },
     launchProcessBatchModal() {
       this.activateModal({

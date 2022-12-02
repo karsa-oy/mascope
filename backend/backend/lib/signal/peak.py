@@ -130,6 +130,35 @@ def fit_n_peaks(
     fit_hei=True,
     fit_res=False,
     ):
+    """Fit a priori unknown number of peaks of known shape and width into signal y.
+
+    Parameters
+    ----------
+    x : array
+        y coordinates
+    y : array
+        signal to deconvolve
+    peak_shape : dict
+        peak shape {x: array, y: array}
+    resolution_function : callable or float
+        function to calculate the width of the peak
+    max_n_peaks : int, optional
+        maximum number of peaks to fit, by default 5
+    threshold : float, optional
+        to add a new peak, the fit must improve at least by this factor,
+        by default 0.9
+    fit_pos : bool, optional
+        fit peak positions, by default True
+    fit_hei : bool, optional
+        fit peak heights, by default True
+    fit_res : bool, optional
+        fit peak widths, by default False
+
+    Returns
+    -------
+    tuple
+        returns (lmfit result, peaks)
+    """
     spec_norm = np.linalg.norm(y)
     residual_norm = spec_norm
     prev_fit = None
@@ -239,7 +268,7 @@ def gen_peak(x, ppos, phei, pres, ps, trim_borders=False):
     """
 
     sigma = fwhm_to_sigma(ppos / pres)
-    xi = (ps['x'] * sigma) + ppos
+    xi = (np.array(ps['x']) * sigma) + ppos
     yi = ps['y'] / np.max(ps['y']) * phei
     spline = CubicSpline(xi, yi, extrapolate=False)
     peak = spline(x)
