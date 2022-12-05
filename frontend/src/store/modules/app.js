@@ -1,9 +1,12 @@
 import { make } from 'vuex-pathify';
 
+const mode = import.meta.env.MASCOPE_PUBLIC_MODE;
+
 const state = {
     attributeTemplates: [],
     instruments: [],
     ionMechanisms: [],
+    mode: mode,
     ready: false,
     schema: {},
     targetCollections: [],
