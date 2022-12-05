@@ -13,7 +13,7 @@ mode = os.environ.get('MASCOPE_PUBLIC_MODE')
 def run():
     uvicorn.run(
         'backend.server:app',
-        host='127.0.0.1',
+        host='0.0.0.0' if mode=='development' else '127.0.0.1',
         port=api_port,
         reload=(mode == 'development')
     )
