@@ -14,6 +14,7 @@ build-backend = "poetry.core.masonry.api"
 server = 'backend:run'
 file-converter = 'backend.service.file_converter:run'
 file-downloader = 'backend.service.file_downloader:run'
+log-rotate = 'backend.service.log_rotate:run'
 
 [tool.poetry.dependencies]
 python = ">=3.8,<3.11"
