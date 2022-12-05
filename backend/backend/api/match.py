@@ -42,14 +42,8 @@ def compute_matches(
         params=[*target_collection_ids, *ionization_mechanism_ids]
         )
 
-    ######################
-    # STEP 1 - Get peaks #
-    ######################
-
-    peaks = peaks
-
     #########################
-    # STEP 2 - Prepare data #
+    # STEP 1 - Prepare data #
     #########################
 
     # init match df from target isotopes
@@ -74,7 +68,7 @@ def compute_matches(
     peak_sorting = np.argsort(peak_mzs)
 
     #############################
-    # STEP 3 - Perform matching #
+    # STEP 2 - Perform matching #
     #############################
 
     def match(row):
@@ -114,7 +108,7 @@ def compute_matches(
     )
 
     ##################################
-    # STEP 4 - Calculate match stats #
+    # STEP 3 - Calculate match stats #
     ##################################
 
     # calculate isotope ratios

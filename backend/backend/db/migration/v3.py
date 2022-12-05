@@ -35,7 +35,7 @@ def run():
     """)
 
     # Populate
-    from backend.lib.signal.peak import load_peakshape_mat
+    from backend.lib.peak import load_peakshape_mat
     instrument_function_data = []
     
     # KLTOF2
@@ -99,3 +99,6 @@ def run():
         if_exists='append',
         index=False
     )
+
+    # TODO: Delete all peak datasets
+    # TODO: Delete files which are missing from db

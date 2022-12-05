@@ -1,18 +1,16 @@
 from hardware.tofwerk.lib.TwTool import *
 
 # these 3 imports require loaded library from TwTool
-from backend.api.calibration import *
-from backend.api.match import *
-from backend.api.sample import *
+import backend.api.calibration
+import backend.api.match
+import backend.api.sample
 
-from backend.api.scenthound import *
-from backend.api.schema import *
-from backend.api.signal import *
-from backend.api.target import *
-from backend.api.template import *
-from backend.api.test import *
-from backend.api.visualization import *
-from backend.api.workspace import *
+import backend.api.scenthound
+import backend.api.schema
+import backend.api.target
+import backend.api.template
+import backend.api.visualization
+import backend.api.workspace
 from backend.server import sio
 
 @sio.event(namespace='/')

@@ -5,9 +5,13 @@ Created on Wed Apr 17 13:45:17 2019
 
 @author: Oskari Kausiala
 """
-
-import numpy as np
+import asyncio
+import json
 import lmfit
+import numpy as np
+import pandas as pd
+
+from concurrent.futures import ProcessPoolExecutor
 
 from scipy.interpolate import CubicSpline
 from scipy.io import loadmat
@@ -17,6 +21,8 @@ from scipy.signal._peak_finding_utils import (
 )
 from scipy.stats import norm
 
+from backend.db.conn import conn
+
 from backend.lib.file import load_file, zarr_sdk
 from backend.lib.filter import smooth
 
@@ -25,6 +31,56 @@ from backend.lib.filter import smooth
 def calculate_peak_area(x, peakshape, peak):
     pos, hei, res = peak
     return sum(gen_peak(x, pos, hei, res, peakshape))
+
+async def detect_peaks(
+    filename,
+    u_list=None,
+    max_n_peaks=5,
+    add_peak_threshold=.9,
+    overwrite_peak_dataset=False,
+    ):
+    dmz = .5
+    peakshape, R = read_instrument_functions(filename)
+    sample_file_data = load_file(filename, vars=['signal'])
+    mz = sample_file_data.mz
+    sum_spec = sample_file_data.signal.sum(dim='time').compute()
+    if not u_list:
+        # Fit all peaks
+        u_list = range(10, int(np.floor(mz[-1].item()))+1)
+    executor = ProcessPoolExecutor()
+    loop = asyncio.get_event_loop()
+    futures = [
+        loop.run_in_executor(
+            executor,
+            fit_n_peaks,
+            mz.sel(mz=slice(u-dmz, u+dmz)).compute().values,
+            sum_spec.sel(mz=slice(u-dmz, u+dmz)).compute().values,
+            peakshape,
+            R(u),
+            max_n_peaks,
+            add_peak_threshold
+        )
+        for u in u_list
+    ]
+    all_peaks = []
+    for i, future in enumerate(asyncio.as_completed(futures, loop=loop)):
+        fit, peaks = await future
+        all_peaks.extend(peaks)
+        print(peaks)
+    executor.shutdown()
+    peak_mzs = np.sort(list(zip(*all_peaks))[0])
+    sample_file_data = sample_file_data.assign_coords(
+            tof=('mz', np.arange(len(sample_file_data.mz)).astype(np.float32))
+        )
+    peak_mz_coord = np.unique(sample_file_data.mz.sel(
+        mz=peak_mzs,
+        method='nearest'
+    ))
+    peak_profiles = sample_file_data.signal.sel(
+        mz=peak_mz_coord,
+        method='nearest'
+    )
+    zarr_sdk.write_peak_dataset(peak_profiles, sample_file_data, overwrite_peak_dataset)
 
 def detect_peaks_old(
     cache_item,
@@ -178,6 +234,8 @@ def fit_peaks(
 
     # Normalize y
     ymax = max(y)
+    if ymax == 0:
+        return None, None
     yn = y / ymax
     # Initialize parameters
     params = lmfit.Parameters()
@@ -293,6 +351,8 @@ def fit_n_peaks(
             dpos=0.1,
             max_iter=1000
             )
+        if not fit:
+            return None, []
         new_residual_norm = np.linalg.norm(fit.residual)
         # Check for add new peak condition
         if new_residual_norm > threshold * residual_norm:
@@ -421,6 +481,47 @@ def gen_peak_kernel(params, x, ps):
         kernel += peak
     return kernel
 
+def get_batch_u_list(sample_batch_id):
+    # get sample batch
+    with conn:
+        [sample_batch] = pd.read_sql(f"""
+            SELECT build_params
+            FROM sample_batch
+            WHERE sample_batch_id == ?
+            """,
+            conn,
+            params=[sample_batch_id]
+            ).to_dict('records')
+    build_params = json.loads(sample_batch['build_params'])
+    calibration_collection_id = build_params['calibration_collection']
+    ion_mechanism_ids = build_params['ion_mechanisms']
+    with conn:
+        target_collection_ids = pd.read_sql(f"""
+            SELECT target_collection_id
+            FROM target_collection_in_sample_batch
+            WHERE sample_batch_id == ?
+            """,
+            conn,
+            params=[sample_batch_id]
+            )['target_collection_id'].tolist()
+    target_collection_ids.append(calibration_collection_id)
+    with conn:
+        target_collection_id_refs = ','.join('?'*len(target_collection_ids))
+        ion_mechanism_id_refs = ','.join('?'*len(ion_mechanism_ids))
+        target_isotope_mzs = pd.read_sql(f"""
+            SELECT mz
+            FROM target_compound_in_target_collection
+            NATURAL JOIN target_compound
+            NATURAL JOIN target_ion
+            NATURAL JOIN target_isotope
+            WHERE target_collection_id IN ({target_collection_id_refs})
+            AND ionization_mechanism_id IN ({ion_mechanism_id_refs})
+            """,
+            conn,
+            params=[*target_collection_ids, *ion_mechanism_ids]
+            )['mz'].tolist()
+    return np.unique(np.round(target_isotope_mzs))
+
 def get_peaks(cache_item):
     peaks = cache_item.peaks
     peaks = peaks.dropna(dim='mz', how='all')
@@ -461,3 +562,52 @@ def peak_kernel_residual(params, x, y, ps):
 
     kernel = gen_peak_kernel(params, x, ps)
     return y - kernel
+
+def read_instrument_functions(filename):
+    with conn:
+        sample_file_df = pd.read_sql(f"""
+            SELECT
+                datetime_utc,
+                instrument
+            FROM
+                sample_file
+            WHERE
+                filename = ?
+            """,
+            conn,
+            params=[filename]
+            )
+        [instrument] = sample_file_df.instrument
+        [file_timestamp] = sample_file_df.datetime_utc
+        instrument_function_df = pd.read_sql(f"""
+            SELECT
+                peakshape,
+                resolution_function
+            FROM
+                instrument_function
+            WHERE
+                instrument = ?
+                AND
+                datetime_utc = (
+                    SELECT
+                         MAX(datetime_utc)
+                    FROM
+                        instrument_function
+                    WHERE datetime_utc < ?
+                    AND instrument = ?
+                    LIMIT 1
+                )
+            """,
+            conn,
+            params=[instrument, file_timestamp, instrument]
+        )
+    if not len(instrument_function_df):
+        raise ValueError(f"""
+            Instrument functions not found for instrument {instrument}
+            before date {file_timestamp}.
+            """
+            )
+    peakshape = json.loads(instrument_function_df.peakshape[0])
+    p1, p2 = json.loads(instrument_function_df.resolution_function[0])
+    R = lambda m: m / (p1 * m + p2)
+    return peakshape, R
