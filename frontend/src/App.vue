@@ -1,5 +1,8 @@
 <template>
   <div id="app">
+    <b-message v-if="isDevelopmentMode" type="is-danger" has-icon>
+      NOTE: You are running the development version of Mascope. Any changes are not persisted.
+    </b-message>
     <div v-if="appReady">
       <router-view></router-view>
     </div>
@@ -21,8 +24,12 @@ export default {
   },
   computed: {
     ...get({
+      appMode: "app/mode",
       appReady: "app/ready",
     }),
+    isDevelopmentMode() {
+      return this.appMode === "development";
+    }
   },
   created() {
     // add event listeners
