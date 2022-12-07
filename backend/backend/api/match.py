@@ -275,7 +275,9 @@ async def item_compute(sample_item_id, peak_filter_params={}):
         target_collection_ids,  
         ionization_mechanism_ids
         )
-
+    if len(match_isotope_df) == 0:
+        print("No matches found")
+        return sample_item_df
     with conn:
         # save to database
         match_isotope_df = match_isotope_df.assign(sample_item_id=sample_item_id)

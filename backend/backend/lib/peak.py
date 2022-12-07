@@ -46,9 +46,9 @@ async def detect_peaks(
     dmz = .5
     peakshape, R = read_instrument_functions(filename)
     old_peak_mzs = []
-    if u_list:
+    sample_file_data = load_file(filename, vars=['peaks'])
+    if u_list is not None:
         # Fit peaks to given unit masses
-        sample_file_data = load_file(filename, vars=['peaks'])
         if 'peaks' in sample_file_data:
             if if_exists == 'fail':
                 raise FileExistsError("Peak data exists!")
@@ -61,12 +61,13 @@ async def detect_peaks(
             u_list = [u for u in u_list if u not in u_list_fitted]
         if len(u_list) == 0:
             return sample_file_data
-    elif u_list is None:
+
+    sample_file_data = load_file(filename, vars=['signal'], prev_dataset=sample_file_data)
+    if u_list is None:
         # Fit all peaks
         mz_top = sample_file_data.props['range'][1]
         u_list = range(10, int(np.floor(mz_top))+1)
     print("Fitting unit masses: %s" %u_list)
-    sample_file_data = load_file(filename, vars=['signal'], prev_dataset=sample_file_data)
     mz = sample_file_data.mz
     sum_spec = sample_file_data.signal.sum(dim='time').compute()
     executor = ProcessPoolExecutor()
