@@ -53,7 +53,7 @@ if __name__ == '__main__':
         ).filename.tolist()
 
     loop = asyncio.get_event_loop()
-    for i, filename in enumerate(filenames[2:]):
+    for i, filename in enumerate(filenames):
         print(f"Processing {((i)/len(filenames)):.2f}")
         loop.run_until_complete(
             detect_peaks(
