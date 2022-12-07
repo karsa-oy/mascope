@@ -37,16 +37,38 @@ async def detect_peaks(
     u_list=None,
     max_n_peaks=5,
     add_peak_threshold=.9,
-    overwrite_peak_dataset=False,
+    if_exists='fail', # 'fail', 'append', 'replace'
     ):
+    if if_exists not in ['fail', 'append', 'replace']:
+        raise ValueError("""
+            Argument 'if_exists' must be one of 'fail', 'append', 'replace'
+        """)
     dmz = .5
     peakshape, R = read_instrument_functions(filename)
-    sample_file_data = load_file(filename, vars=['signal'])
+    old_peak_mzs = []
+    if u_list:
+        # Fit peaks to given unit masses
+        sample_file_data = load_file(filename, vars=['peaks'])
+        if 'peaks' in sample_file_data:
+            if if_exists == 'fail':
+                raise FileExistsError("Peak data exists!")
+            old_peak_mzs = list(sample_file_data.peaks.mz.values)
+            u_list_fitted = list(np.unique(np.round(old_peak_mzs)))
+        else:
+            u_list_fitted = []
+        if if_exists == 'append':
+            # Only fit unit masses not already fitted
+            u_list = [u for u in u_list if u not in u_list_fitted]
+        if len(u_list) == 0:
+            return sample_file_data
+    elif u_list is None:
+        # Fit all peaks
+        mz_top = sample_file_data.props['range'][1]
+        u_list = range(10, int(np.floor(mz_top))+1)
+    print("Fitting unit masses: %s" %u_list)
+    sample_file_data = load_file(filename, vars=['signal'], prev_dataset=sample_file_data)
     mz = sample_file_data.mz
     sum_spec = sample_file_data.signal.sum(dim='time').compute()
-    if not u_list:
-        # Fit all peaks
-        u_list = range(10, int(np.floor(mz[-1].item()))+1)
     executor = ProcessPoolExecutor()
     loop = asyncio.get_event_loop()
     futures = [
@@ -62,25 +84,40 @@ async def detect_peaks(
         )
         for u in u_list
     ]
-    all_peaks = []
+    new_peaks = []
     for i, future in enumerate(asyncio.as_completed(futures, loop=loop)):
         fit, peaks = await future
-        all_peaks.extend(peaks)
+        if fit:
+            new_peaks.extend(peaks)
         print(peaks)
     executor.shutdown()
-    peak_mzs = np.sort(list(zip(*all_peaks))[0])
     sample_file_data = sample_file_data.assign_coords(
             tof=('mz', np.arange(len(sample_file_data.mz)).astype(np.float32))
         )
+    if len(new_peaks): 
+        new_peak_mzs = list(zip(*new_peaks))[0]
+    else:
+        new_peak_mzs = []
+    if if_exists == 'append':
+        all_peak_mzs = np.sort([*old_peak_mzs, *new_peak_mzs])
+    else:
+        all_peak_mzs = np.sort(new_peak_mzs)
     peak_mz_coord = np.unique(sample_file_data.mz.sel(
-        mz=peak_mzs,
+        mz=all_peak_mzs,
         method='nearest'
     ))
     peak_profiles = sample_file_data.signal.sel(
         mz=peak_mz_coord,
         method='nearest'
     )
+    overwrite_peak_dataset = (if_exists == 'append' or if_exists == 'replace')
     zarr_sdk.write_peak_dataset(peak_profiles, sample_file_data, overwrite_peak_dataset)
+    
+    return load_file(
+        filename,
+        vars=['peaks'],
+        prev_dataset=sample_file_data
+    )
 
 def detect_peaks_old(
     cache_item,

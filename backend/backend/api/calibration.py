@@ -108,7 +108,7 @@ async def calibration_mz_calibrate_sample(sid, sample_item):
         print("Failed to calibrate sample %s" %sample_item['filename'])
 
 
-def mz_fit(
+async def mz_fit(
     filename,
     calibration_collection_ids,
     ionization_mechanism_ids,
@@ -116,15 +116,11 @@ def mz_fit(
     refine_window
     ):
     # Compute matches for calibration compounds
-    match_isotope_df = compute_matches(
+    match_isotope_df = await compute_matches(
         filename,
         calibration_collection_ids,
-        ionization_mechanism_ids,
-        peak_filter_params={
-            'height': 10,
-            'distance': 50,
-        }
-        )
+        ionization_mechanism_ids
+    )
     # Filter matches
     good_matches_df = match_isotope_df[
         (abs(match_isotope_df.match_mz_error) <= refine_window)
@@ -159,8 +155,7 @@ async def calibration_mz_fit(
     match_score_min,
     refine_window
     ):
-    
-    fit, stats = mz_fit(
+    fit, stats = await mz_fit(
         filename,
         calibration_collection_ids,
         ionization_mechanism_ids,
