@@ -230,7 +230,7 @@ async def match_batch_remove(sid, sample_batch_id):
     await sio.emit('workspace_reload', workspace_id, namespace='/')
 
 
-async def item_compute(sample_item_id, peak_filter_params={}):
+async def item_compute(sample_item_id):
     with conn:
         # fetch filename and batch id
         sample_item_df = pd.read_sql(f"""
@@ -269,7 +269,7 @@ async def item_compute(sample_item_id, peak_filter_params={}):
             )['target_collection_id'].tolist()
 
     # Load file
-    print("Loading file: %s" % filename)
+    print("Computing matches for file: %s" % filename)
     match_isotope_df = await compute_matches(
         filename,
         target_collection_ids,  
