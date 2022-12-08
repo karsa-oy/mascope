@@ -106,7 +106,6 @@ export default {
         this.batchActiveCount == 0
           ? [createBatchButton]
           : [
-            createBatchButton,
             updateBatchButton,
             deleteBatchButton,
             exportBatchButton,
@@ -126,7 +125,9 @@ export default {
           ? [updateItemButton, deleteItemButton]
           : [];
       // menu
-      return [...batchButtons, ...itemButtons];
+      return this.sampleItemFocused
+        ? itemButtons
+        : batchButtons;
     },
     openedBatch() {
       return this.batchActive
