@@ -8,6 +8,7 @@ import sqlite3
 import shutil
 
 from backend.db import gen_id
+from backend.lib.file import filename_to_zarr_path, load_file
 
 # patch asyncio to supported run_until_complete
 # when an event loop is already running
@@ -99,6 +100,39 @@ def run():
         if_exists='append',
         index=False
     )
+    # 
 
-    # TODO: Delete all peak datasets
-    # TODO: Delete files which are missing from db
+    # Delete sample file records without file
+    filenames = pd.read_sql("""--sql
+        SELECT
+            filename
+        FROM sample_file
+        """,
+        new_conn
+    ).filename.tolist()
+    sample_files_to_delete = []
+    for filename in filenames:
+        try:
+            load_file(filename, vars=[])
+        except FileNotFoundError:
+            sample_files_to_delete.append(filename)
+    sample_filename_refs = ','.join('?'*len(sample_files_to_delete))
+    new_conn.cursor().execute(f"""--sql
+        DELETE FROM sample_file
+        WHERE filename IN ({sample_filename_refs})
+    """,
+    sample_files_to_delete
+    )
+
+    # Delete all peak datasets
+    for filename in filenames:
+        peaks_path = filename_to_zarr_path(filename, 'peaks')
+        try:
+            shutil.rmtree(peaks_path)
+        except Exception as e:
+            print(e)
+
+    # Delete all matches
+    new_conn.cursor().execute(f"""--sql
+        DELETE FROM match
+    """)
