@@ -243,7 +243,9 @@ async def sample_batch_update(sid, sample_batches):
                 index=False
                 )
         if rematch:
-            await match_batch_compute(sid, sample_batch_id)
+            sio.start_background_task(
+                match_batch_compute, sid, sample_batch_id
+            )
         else:
             [workspace_id] = workspace_ids
             await sio.emit(
