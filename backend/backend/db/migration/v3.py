@@ -9,6 +9,7 @@ import shutil
 
 from backend.db import gen_id
 from backend.lib.file import filename_to_zarr_path, load_file
+from backend.lib.peak import load_peakshape_mat
 
 # patch asyncio to supported run_until_complete
 # when an event loop is already running
@@ -36,12 +37,28 @@ def run():
     """)
 
     # Populate
-    from backend.lib.peak import load_peakshape_mat
+    peakshape_path = './/backend//db//migration//peakshapes'
     instrument_function_data = []
     
-    # KLTOF2
+    # TODO KLTOF2
     instrument = "KLTOF2"
-    peakshape_file = os.path.join(data_path, 'database', '20221129T135120.mat')
+    peakshape_file = os.path.join(peakshape_path, '20221129T135120.mat')
+    peakshape = load_peakshape_mat(peakshape_file)
+    R_p1 = 0.0001097
+    R_p2 = 0.002287
+    timestamp = datetime.datetime(1970, 1, 1)
+    instrument_function_data.append((
+        gen_id(length=32),
+        instrument,
+        timestamp.isoformat(),
+        json.dumps({'x': list(peakshape['x']), 'y': list(peakshape['y'])}),
+        json.dumps([R_p1, R_p2])
+    ))
+    # 
+    # KLTOF2
+    # 20210831-DannyExplosivesBr
+    instrument = "KLTOF2"
+    peakshape_file = os.path.join(peakshape_path, '20221129T135120.mat')
     peakshape = load_peakshape_mat(peakshape_file)
     R_p1 = 0.0001097
     R_p2 = 0.002287
@@ -53,9 +70,9 @@ def run():
         json.dumps({'x': list(peakshape['x']), 'y': list(peakshape['y'])}),
         json.dumps([R_p1, R_p2])
     ))
-    # 
+    # 20220127_Danny_DMNB_UN
     instrument = "KLTOF2"
-    peakshape_file = os.path.join(data_path, 'database', '20221202T102104.mat')
+    peakshape_file = os.path.join(peakshape_path, '20221202T102104.mat')
     peakshape = load_peakshape_mat(peakshape_file)
     R_p1 = 0.0001258
     R_p2 = 0.001769
@@ -67,10 +84,53 @@ def run():
         json.dumps({'x': list(peakshape['x']), 'y': list(peakshape['y'])}),
         json.dumps([R_p1, R_p2])
     ))
+    # 20220329_DannyMix_ng1-100_pLCVAR_pg1
+    instrument = "KLTOF2"
+    peakshape_file = os.path.join(peakshape_path, '20221205T111017.mat')
+    peakshape = load_peakshape_mat(peakshape_file)
+    R_p1 = 0.0001397
+    R_p2 = 8.97E-05
+    timestamp = datetime.datetime(2022, 1, 27)
+    instrument_function_data.append((
+        gen_id(length=32),
+        instrument,
+        timestamp.isoformat(),
+        json.dumps({'x': list(peakshape['x']), 'y': list(peakshape['y'])}),
+        json.dumps([R_p1, R_p2])
+    ))
+    # 20220714_CBS_TDG_DBrMe_LOD-MeOH			
+    instrument = "KLTOF2"
+    peakshape_file = os.path.join(peakshape_path, '20221205T140252.mat')
+    peakshape = load_peakshape_mat(peakshape_file)
+    R_p1 = 0.0001497
+    R_p2 = 0.0003698
+    timestamp = datetime.datetime(2022, 1, 27)
+    instrument_function_data.append((
+        gen_id(length=32),
+        instrument,
+        timestamp.isoformat(),
+        json.dumps({'x': list(peakshape['x']), 'y': list(peakshape['y'])}),
+        json.dumps([R_p1, R_p2])
+    ))
     # 
+
+    # TODO: KLTOF1
+    instrument = "KLTOF1"
+    peakshape_file = os.path.join(peakshape_path, '20221202T101822.mat')
+    peakshape = load_peakshape_mat(peakshape_file)
+    R_p1 = 9.01e-05
+    R_p2 = 0.0006993
+    timestamp = datetime.datetime(1970, 1, 1)
+    instrument_function_data.append((
+        gen_id(length=32),
+        instrument,
+        timestamp.isoformat(),
+        json.dumps({'x': list(peakshape['x']), 'y': list(peakshape['y'])}),
+        json.dumps([R_p1, R_p2])
+    ))
     # KLTOF1
     instrument = "KLTOF1"
-    peakshape_file = os.path.join(data_path, 'database', '20221202T101822.mat')
+    peakshape_file = os.path.join(peakshape_path, '20221202T101822.mat')
     peakshape = load_peakshape_mat(peakshape_file)
     R_p1 = 9.01e-05
     R_p2 = 0.0006993
@@ -100,7 +160,6 @@ def run():
         if_exists='append',
         index=False
     )
-    # 
 
     # Delete sample file records without file
     filenames = pd.read_sql("""--sql
@@ -136,3 +195,8 @@ def run():
     new_conn.cursor().execute(f"""--sql
         DELETE FROM match
     """)
+    new_conn.cursor().execute(f"""--sql
+        VACUUM
+    """)
+    new_conn.commit()
+    new_conn.close()

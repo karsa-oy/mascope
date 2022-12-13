@@ -39,6 +39,7 @@ async def detect_peaks(
     add_peak_threshold=.9,
     if_exists='fail', # 'fail', 'append', 'replace'
     ):
+    print(f"Detecting peaks for file {filename}")
     if if_exists not in ['fail', 'append', 'replace']:
         raise ValueError("""
             Argument 'if_exists' must be one of 'fail', 'append', 'replace'
@@ -62,7 +63,7 @@ async def detect_peaks(
         if len(u_list) == 0:
             return sample_file_data
 
-    sample_file_data = load_file(filename, vars=['signal'], prev_dataset=sample_file_data)
+    sample_file_data = load_file(filename, vars=['signal'])
     if u_list is None:
         # Fit all peaks
         mz_top = sample_file_data.props['range'][1]
@@ -90,7 +91,7 @@ async def detect_peaks(
         fit, peaks = await future
         if fit:
             new_peaks.extend(peaks)
-        print(peaks)
+        print(f"Peak detection progress: {(i+1)/len(futures):.2f}")
     executor.shutdown()
     sample_file_data = sample_file_data.assign_coords(
             tof=('mz', np.arange(len(sample_file_data.mz)).astype(np.float32))
@@ -111,14 +112,16 @@ async def detect_peaks(
         mz=peak_mz_coord,
         method='nearest'
     )
+    print(f"Writing peaks to file {filename}")
     overwrite_peak_dataset = (if_exists == 'append' or if_exists == 'replace')
     zarr_sdk.write_peak_dataset(peak_profiles, sample_file_data, overwrite_peak_dataset)
-    
-    return load_file(
+    print("Complete")
+    sample_file_data = load_file(
         filename,
         vars=['peaks'],
         prev_dataset=sample_file_data
     )
+    return sample_file_data
 
 def detect_peaks_old(
     cache_item,
