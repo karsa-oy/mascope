@@ -1,0 +1,40 @@
+import asyncio
+import datetime
+import json
+import nest_asyncio
+import os
+import pandas as pd
+import sqlite3
+import shutil
+
+from backend.db import gen_id
+from backend.lib.file import filename_to_zarr_path, load_file
+from backend.lib.peak import load_peakshape_mat
+
+# patch asyncio to supported run_until_complete
+# when an event loop is already running
+nest_asyncio.apply()
+
+
+def run():
+    data_path = os.environ.get('MASCOPE_PRIVATE_DATADIR')
+
+    # STEP 1 - setup new database
+    old_db_path = os.path.join(data_path, 'database', 'mascope.v3.db')
+    new_db_path = os.path.join(data_path, 'database', 'mascope.v4.db')
+    shutil.copyfile(old_db_path, new_db_path)
+    new_conn = sqlite3.connect(database=new_db_path)
+
+    # Create match interference table
+    new_conn.execute("""--sql
+        CREATE TABLE match_interference (
+            match_interference_id VARCHAR(32) PRIMARY KEY
+            ,target_isotope_id VARCHAR(32) NOT NULL
+                REFERENCES target_isotope(target_isotope_id)
+            ,sample_item_id VARCHAR(16) NOT NULL
+                    REFERENCES sample_item(sample_item_id)
+            ,sample_raw_intensity FLOAT NOT NULL
+        );
+    """)
+    new_conn.commit()
+    new_conn.close()

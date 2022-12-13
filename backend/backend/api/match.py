@@ -6,7 +6,11 @@ import asyncio
 from backend.db.conn import conn
 from backend.db.id import gen_id
 from backend.lib.file import load_file
-from backend.lib.peak import detect_peaks, get_peaks, filter_peaks
+from backend.lib.peak import (
+    detect_peaks,
+    get_peaks,
+    read_instrument_functions,
+)
 from backend.lib.chemistry import match_mz
 from backend.server import sio
 
@@ -81,14 +85,15 @@ async def compute_matches(
     #############################
 
     def match(row):
+        # Get all peaks within unit mass window
         mz_tolerance = 0.5
-
         target_mz = row.mz
         match_indeces, match_mzs = match_mz(
             target_mz,
             peak_mzs[peak_sorting],
             tolerance=mz_tolerance
         )
+        # Find closest match
         for match_index in match_indeces:
             # get match peak
             peak_index = peak_sorting[match_index]
@@ -171,6 +176,59 @@ async def compute_matches(
     )
     return match_isotope_df
 
+async def compute_raw_intensities(
+    filename,
+    target_collection_ids,
+    ionization_mechanism_ids,
+    ):
+    collection_id_refs = ','.join('?'*len(target_collection_ids))
+    mechanism_id_refs = ','.join('?'*len(ionization_mechanism_ids))
+    # load target isotopes
+    target_isotope_df = pd.read_sql(
+        f"""
+        SELECT
+            target_isotope.*
+        FROM
+            target_collection
+            NATURAL JOIN target_compound_in_target_collection
+            NATURAL JOIN target_ion
+            NATURAL JOIN target_isotope
+        WHERE
+            target_collection_id IN ({collection_id_refs})
+            AND ionization_mechanism_id IN ({mechanism_id_refs})
+        """,
+        conn,
+        params=[*target_collection_ids, *ionization_mechanism_ids]
+        )
+
+    sample_file_data = load_file(filename, vars=['signal'])
+    sum_spectrum = sample_file_data.signal.sum(dim='time').compute()
+
+    _, R = read_instrument_functions(filename)
+
+    # init interference df from target isotopes
+    isotope_interference_df = (
+        target_isotope_df.copy()
+        .assign(
+            sample_raw_intensity=np.nan,
+        )
+    )
+
+    def calc_raw_intensity(row):
+        target_mz = row.mz
+        dmz = (R(row.mz) / target_mz) / 2 # hwhm
+        target_raw_intensity = sum_spectrum.sel(
+            mz=slice(target_mz-dmz, target_mz+dmz)
+        ).sum(dim='mz')
+        row['sample_raw_intensity'] = target_raw_intensity.compute().item()
+        return row
+
+    isotope_interference_df = (
+        isotope_interference_df
+        .apply(calc_raw_intensity, axis=1)
+    )
+
+    return isotope_interference_df
 
 @sio.event(namespace='/')
 async def match_batch_compute(sid, sample_batch_id):
