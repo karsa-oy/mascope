@@ -220,6 +220,7 @@ async def compute_raw_intensities(
         target_raw_intensity = sum_spectrum.sel(
             mz=slice(target_mz-dmz, target_mz+dmz)
         ).sum(dim='mz')
+        row['match_interference_id'] = gen_id(length=32)
         row['sample_raw_intensity'] = target_raw_intensity.compute().item()
         return row
 
@@ -326,7 +327,13 @@ async def item_compute(sample_item_id):
             params=[sample_batch_id]
             )['target_collection_id'].tolist()
 
-    # Load file
+    # Compute
+    print("Computing interferences for file: %s" % filename)
+    match_interference_df = await compute_raw_intensities(
+        filename,
+        target_collection_ids,  
+        ionization_mechanism_ids
+        )
     print("Computing matches for file: %s" % filename)
     match_isotope_df = await compute_matches(
         filename,
@@ -338,6 +345,21 @@ async def item_compute(sample_item_id):
         return sample_item_df
     with conn:
         # save to database
+        # interferences
+        match_interference_df = match_interference_df.assign(sample_item_id=sample_item_id)
+        match_interference_df = match_interference_df[[
+            "match_interference_id"
+            ,"target_isotope_id"
+            ,"sample_item_id"
+            ,"sample_raw_intensity"
+        ]]
+        match_interference_df.to_sql(
+            'match_interference',
+            conn,
+            if_exists='append',
+            index=False
+            )
+        # matches
         match_isotope_df = match_isotope_df.assign(sample_item_id=sample_item_id)
         match_isotope_df = match_isotope_df[[
             "match_id"
