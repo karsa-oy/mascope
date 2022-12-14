@@ -210,7 +210,7 @@ async def compute_raw_intensities(
     isotope_interference_df = (
         target_isotope_df.copy()
         .assign(
-            sample_raw_intensity=np.nan,
+            sample_peak_interference=np.nan,
         )
     )
 
@@ -221,7 +221,7 @@ async def compute_raw_intensities(
             mz=slice(target_mz-dmz, target_mz+dmz)
         ).sum(dim='mz')
         row['match_interference_id'] = gen_id(length=32)
-        row['sample_raw_intensity'] = target_raw_intensity.compute().item()
+        row['sample_peak_interference'] = target_raw_intensity.compute().item()
         return row
 
     isotope_interference_df = (
@@ -351,7 +351,7 @@ async def item_compute(sample_item_id):
             "match_interference_id"
             ,"target_isotope_id"
             ,"sample_item_id"
-            ,"sample_raw_intensity"
+            ,"sample_peak_interference"
         ]]
         match_interference_df.to_sql(
             'match_interference',

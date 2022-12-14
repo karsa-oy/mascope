@@ -25,7 +25,7 @@ def run():
                 REFERENCES target_isotope(target_isotope_id)
             ,sample_item_id VARCHAR(16) NOT NULL
                     REFERENCES sample_item(sample_item_id)
-            ,sample_raw_intensity FLOAT NOT NULL
+            ,sample_peak_interference FLOAT NOT NULL
         );
     """)
     new_conn.commit()
