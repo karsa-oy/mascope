@@ -8,6 +8,10 @@ const state = {
     matchCompounds: null,
     matchIons: null,
     matchIsotopes: null,
+    matchInterferenceCollections: null,
+    matchInterferenceCompounds: null,
+    matchInterferenceIons: null,
+    matchInterferenceIsotopes: null,
 }
 
 export default {
@@ -42,7 +46,6 @@ export default {
             });
             const sampleBatchId = state.active.sample_batch_id;
             // initialize match filter
-            
             const filterParams = rootGetters["batch/filterParams"];
             const mzTolerance = filterParams.mz_tolerance;
             const isotopeRatioTolerance = filterParams.isotope_ratio_tolerance;
@@ -70,6 +73,7 @@ export default {
                         sample_peak_height_relative,
                         sample_peak_mz,
                         sample_peak_tof,
+                        sample_peak_interference,
                         mz,
                         relative_abundance,
                         target_collection_id,
@@ -83,6 +87,7 @@ export default {
                         target_isotope_id
                         ,2 as selection
                     FROM match
+                    NATURAL LEFT JOIN match_interference
                     NATURAL LEFT JOIN target_isotope
                     NATURAL LEFT JOIN target_ion
                     NATURAL LEFT JOIN target_compound
@@ -102,7 +107,8 @@ export default {
                     target_collection_name,
                     target_collection_description,
                     IFNULL(MAX(match_score), 0) AS match_score,
-                    IFNULL(SUM(sample_peak_height_sum), 0) AS sample_peak_height_sum
+                    IFNULL(SUM(sample_peak_height_sum), 0) AS sample_peak_height_sum,
+                    MAX(sample_peak_interference_max) AS sample_peak_interference_max
                 FROM (
                     SELECT
                     sample_item_id,
@@ -110,7 +116,8 @@ export default {
                     target_collection_name,
                     target_collection_description,
                     MAX(match_score) as match_score,
-                    SUM(sample_peak_height_sum) AS sample_peak_height_sum
+                    SUM(sample_peak_height_sum) AS sample_peak_height_sum,
+                    MAX(sample_peak_interference_sum) AS sample_peak_interference_max
                     FROM (
                         SELECT
                             sample_item_id,
@@ -120,7 +127,8 @@ export default {
                             target_collection_name,
                             target_collection_description,
                             SUM(match_score*relative_abundance) AS match_score,
-                            SUM(sample_peak_height) AS sample_peak_height_sum
+                            SUM(sample_peak_height) AS sample_peak_height_sum,
+                            SUM(sample_peak_interference) AS sample_peak_interference_sum
                         FROM sample_match_filter
                         GROUP BY sample_item_id, target_compound_id, target_ion_id
                     )
@@ -138,7 +146,8 @@ export default {
                     target_compound_name,
                     target_collection_id,
                     IFNULL(MAX(match_score), 0) as match_score,
-                    IFNULL(SUM(sample_peak_height_sum), 0) AS sample_peak_height_sum
+                    IFNULL(SUM(sample_peak_height_sum), 0) AS sample_peak_height_sum,
+                    MAX(sample_peak_interference_sum) AS sample_peak_interference_max
                 FROM (
                     SELECT
                         sample_item_id,
@@ -148,7 +157,8 @@ export default {
                         target_compound_name,
                         target_collection_id,
                         SUM(match_score*relative_abundance) AS match_score,
-                        SUM(sample_peak_height) AS sample_peak_height_sum
+                        SUM(sample_peak_height) AS sample_peak_height_sum,
+                        SUM(sample_peak_interference) AS sample_peak_interference_sum
                     FROM sample_match_filter
                     GROUP BY sample_item_id, target_compound_id, target_ion_id
                 )
@@ -163,7 +173,8 @@ export default {
                     target_ion_id,
                     target_compound_id,
                     IFNULL(SUM(match_score*relative_abundance), 0) AS match_score,
-                    IFNULL(SUM(sample_peak_height), 0) AS sample_peak_height_sum
+                    IFNULL(SUM(sample_peak_height), 0) AS sample_peak_height_sum,
+                    SUM(sample_peak_interference) AS sample_peak_interference_sum
                 FROM sample_match_filter
                 GROUP BY sample_item_id, target_compound_id, target_ion_id;
             `).then((res) => {
@@ -180,6 +191,7 @@ export default {
                     sample_peak_height_relative,
                     sample_peak_mz,
                     sample_peak_tof,
+                    sample_peak_interference,
                     target_isotope_id,
                     target_ion_id,
                     target_ion_formula,

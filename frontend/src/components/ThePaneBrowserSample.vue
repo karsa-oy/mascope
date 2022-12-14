@@ -209,6 +209,7 @@ export default {
         { field: "target_compound_name", label: "Compound name" },
         { field: "target_compound_formula", label: "Compound formula" },
         { field: "sample_peak_height_sum", label: "Sample peak intensity" },
+        { field: "sample_peak_interference_max", label: "Sample peak interference" },
         { field: "match_score", label: "Match score" },
       ];
       const matchIonCols = [
@@ -219,6 +220,7 @@ export default {
         { field: "target_ion_mechanism", label: "Ionization mechanism" },
         { field: "target_ion_formula", label: "Ion formula" },
         { field: "sample_peak_height_sum", label: "Sample peak intensity" },
+        { field: "sample_peak_interference_sum", label: "Sample peak interference" },
         { field: "match_score", label: "Match score" },
       ];
       const datetimestamp = (new Date).toJSON().slice(0, -5).replace(/[-:]/g, '');
