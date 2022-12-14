@@ -47,6 +47,7 @@ async def detect_peaks(
     dmz = .5
     peakshape, R = read_instrument_functions(filename)
     old_peak_mzs = []
+    old_peak_heights = []
     sample_file_data = load_file(filename, vars=['peaks'])
     if u_list is not None:
         # Fit peaks to given unit masses
@@ -54,6 +55,7 @@ async def detect_peaks(
             if if_exists == 'fail':
                 raise FileExistsError("Peak data exists!")
             old_peak_mzs = list(sample_file_data.peaks.mz.values)
+            old_peak_heights = list(sample_file_data.peaks.sum(dim='time').values)
             u_list_fitted = list(np.unique(np.round(old_peak_mzs)))
         else:
             u_list_fitted = []
@@ -98,23 +100,41 @@ async def detect_peaks(
         )
     if len(new_peaks): 
         new_peak_mzs = list(zip(*new_peaks))[0]
+        new_peak_heights = list(zip(*new_peaks))[1]
+        # new_peak_areas = list(zip(*new_peaks))[3]
     else:
         new_peak_mzs = []
+        new_peak_heights = []
+
     if if_exists == 'append':
-        all_peak_mzs = np.sort([*old_peak_mzs, *new_peak_mzs])
+        all_peak_mzs = [*old_peak_mzs, *new_peak_mzs]
+        all_peak_heights = [*old_peak_heights, *new_peak_heights]
     else:
-        all_peak_mzs = np.sort(new_peak_mzs)
-    peak_mz_coord = np.unique(sample_file_data.mz.sel(
+        all_peak_mzs = new_peak_mzs
+        all_peak_heights = new_peak_heights
+
+    all_peak_ind = np.argsort(all_peak_mzs)
+    all_peak_mzs = np.array(all_peak_mzs)[all_peak_ind]
+    all_peak_heights = np.array(all_peak_heights)[all_peak_ind]
+
+    peak_mz_coord = sample_file_data.mz.sel(
         mz=all_peak_mzs,
-        method='nearest'
-    ))
+        method='nearest',
+        )
+    peak_mzs, unique_peak_index = np.unique(
+        peak_mz_coord,
+        return_index=True
+    )
+    peak_heights = all_peak_heights[unique_peak_index]
     peak_profiles = sample_file_data.signal.sel(
-        mz=peak_mz_coord,
+        mz=peak_mzs,
         method='nearest'
     )
+    peak_profiles_norm = peak_profiles / peak_profiles.sum(dim='time')
+    peak_profiles_scaled = peak_profiles_norm * peak_heights.reshape(-1,1)
     print(f"Writing peaks to file {filename}")
     overwrite_peak_dataset = (if_exists == 'append' or if_exists == 'replace')
-    zarr_sdk.write_peak_dataset(peak_profiles, sample_file_data, overwrite_peak_dataset)
+    zarr_sdk.write_peak_dataset(peak_profiles_scaled, sample_file_data, overwrite_peak_dataset)
     print("Complete")
     sample_file_data = load_file(
         filename,
