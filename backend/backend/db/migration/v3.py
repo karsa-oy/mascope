@@ -175,13 +175,15 @@ def run():
             load_file(filename, vars=[])
         except FileNotFoundError:
             sample_files_to_delete.append(filename)
-    sample_filename_refs = ','.join('?'*len(sample_files_to_delete))
-    new_conn.cursor().execute(f"""--sql
-        DELETE FROM sample_file
-        WHERE filename IN ({sample_filename_refs})
-    """,
-    sample_files_to_delete
-    )
+    for i in range(0, len(sample_files_to_delete), 100):
+        to_delete_now = sample_files_to_delete[i:i+100]
+        sample_filename_refs = ','.join('?'*len(to_delete_now))
+        new_conn.cursor().execute(f"""--sql
+            DELETE FROM sample_file
+            WHERE filename IN ({sample_filename_refs})
+            """,
+            to_delete_now
+        )
 
     # Delete all peak datasets
     for filename in filenames:
