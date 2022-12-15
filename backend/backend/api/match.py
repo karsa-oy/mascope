@@ -216,7 +216,7 @@ async def compute_raw_intensities(
 
     def calc_raw_intensity(row):
         target_mz = row.mz
-        dmz = (R(row.mz) / target_mz) / 2 # hwhm
+        dmz = (target_mz / R(target_mz)) / 2 # hwhm
         target_raw_intensity = sum_spectrum.sel(
             mz=slice(target_mz-dmz, target_mz+dmz)
         ).sum(dim='mz')
