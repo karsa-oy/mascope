@@ -285,6 +285,16 @@ async def match_batch_remove(sid, sample_batch_id):
         """,
         [sample_batch_id]
         )
+        conn.cursor().execute(f"""--sql
+            DELETE FROM match_interference
+            WHERE sample_item_id IN (
+                SELECT sample_item_id
+                FROM sample_item
+                WHERE sample_batch_id == ?
+            )
+        """,
+        [sample_batch_id]
+        )
     # reload workspace
     await sio.emit('workspace_reload', workspace_id, namespace='/')
 
@@ -407,6 +417,12 @@ def item_remove(sample_item_id):
         # delete record
         conn.cursor().execute(f"""--sql
             DELETE FROM match
+            WHERE sample_item_id == ?
+            """,
+            [sample_item_id]
+            )
+        conn.cursor().execute(f"""--sql
+            DELETE FROM match_interference
             WHERE sample_item_id == ?
             """,
             [sample_item_id]
