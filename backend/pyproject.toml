@@ -4,14 +4,18 @@ version = "1.0"
 description = "User-friendly chemical detection platform"
 authors = ["Karsa Oy <support@karsa.fi>"]
 license = "Proprietary"
-include = ["backend", "hardware"]
+include = ["backend","hardware"]
+packages = [
+    {include = "backend", from ="."},
+    {include = "hardware", from ="."},
+]
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
-server = 'backend:run'
+mascope-api = 'backend:run'
 file-converter = 'backend.service.file_converter:run'
 file-downloader = 'backend.service.file_downloader:run'
 log-rotate = 'backend.service.log_rotate:run'
