@@ -1,1 +1,0 @@
-_deploy_loop.cmd ..\..
