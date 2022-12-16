@@ -248,15 +248,7 @@ async def match_batch_compute(sid, sample_batch_id):
             params=[sample_batch_id]
             )['sample_item_id'].tolist()
 
-    # concurrently perform matching
-    match_item_tasks = []
-    for sample_item_id in sample_item_ids:
-        match_item_tasks.append(
-            asyncio.create_task(
-                match_item_compute(sid, sample_item_id)
-            )
-        )
-    await asyncio.gather(*match_item_tasks)
+    await match_item_compute(sid, sample_item_id)
 
     # reload batch
     await sio.emit('sample_batch_reload', room=sample_batch_id, namespace='/')
