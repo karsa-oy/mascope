@@ -247,9 +247,11 @@ async def match_batch_compute(sid, sample_batch_id):
             conn,
             params=[sample_batch_id]
             )['sample_item_id'].tolist()
-
-    await match_item_compute(sid, sample_item_id)
-
+    for sample_item_id in sample_item_ids:
+        try:
+            await item_compute(sample_item_id)
+        except Exception as e:
+            print("Processing sample %s failed: %s" %(sample_item_id, e))
     # reload batch
     await sio.emit('sample_batch_reload', room=sample_batch_id, namespace='/')
 
