@@ -4,7 +4,6 @@ from backend.db.conn import conn
 from backend.db.id import gen_id
 
 from backend.lib.molmass import Formula
-from backend.lib.chemistry import get_exact_isotope_mzs
 
 from backend.server import sio
 
@@ -206,12 +205,90 @@ async def target_compound_create(sid, target_compounds):
             charge_string = ""
         return charge_string
 
+    def generate_target_ions_from_composition():
+        # generate and create ion records
+        for ionization_mechanism in ionization_mechanisms:
+            mechanism = ionization_mechanism['ionization_mechanism']
+            try:
+                # get and save ions
+                raw_ion = Formula(
+                    '(' +
+                    target_compound['target_compound_formula'].rstrip() +
+                    mechanism[:-1] +
+                    ')' + mechanism[-1]
+                    )
+            except ValueError as e:
+                print("Failed to parse ion formula: %s" %e)
+            else:
+                # construct and save ion row
+                ion = {
+                    'target_ion_id': gen_id(),
+                    'target_compound_id': target_compound['target_compound_id'],
+                    'ionization_mechanism_id': ionization_mechanism['ionization_mechanism_id'],
+                    'target_ion_formula': raw_ion.formula + charge_string(raw_ion),
+                }
+                nonlocal target_ions
+                target_ions.append(ion)
+                # construct and save isotope rows
+                raw_isotopes = (
+                    raw_ion.mz_spectrum()
+                    .values()
+                )
+                nonlocal target_isotopes
+                target_isotopes += [{
+                    'target_isotope_id': gen_id(),
+                    'target_ion_id': ion['target_ion_id'],
+                    'mz': mz,
+                    'relative_abundance': rel_abu
+                    } for [mz, rel_abu] in raw_isotopes
+                ]
+
+    def generate_target_ions_from_mass(target_compound_mass):
+        # generate and create ion records
+        for ionization_mechanism in ionization_mechanisms:
+            mechanism = ionization_mechanism['ionization_mechanism']
+            # construct and save ion row
+            ion = {
+                'target_ion_id': gen_id(),
+                'target_compound_id': target_compound['target_compound_id'],
+                'ionization_mechanism_id': ionization_mechanism['ionization_mechanism_id'],
+                'target_ion_formula': (
+                    f"{target_compound_mass:.4f}" + mechanism
+                ),
+            }
+            nonlocal target_ions
+            target_ions.append(ion)
+            # construct and save isotope rows
+            raw_ion = Formula(
+                '(' +
+                mechanism[1:-1] +
+                ')' +
+                mechanism[-1]
+            )
+            is_adduct = mechanism[0] == '+'
+            if is_adduct:
+                raw_isotopes = (
+                    raw_ion.mz_spectrum()
+                    .values()
+                )
+            else:
+                raw_isotopes = [(-raw_ion.mz, 1.0)]
+            nonlocal target_isotopes
+            target_isotopes += [{
+                'target_isotope_id': gen_id(),
+                'target_ion_id': ion['target_ion_id'],
+                'mz': (target_compound_mass + reagent_mz),
+                'relative_abundance': reagent_rel_abu
+                } for [reagent_mz, reagent_rel_abu] in raw_isotopes
+            ]
+        
     # fetch ionization mechanisms
     with conn:
         ionization_mechanisms = pd.read_sql("""
             SELECT * FROM ionization_mechanism;
             """,
-            conn).to_dict('records')
+            conn
+        ).to_dict('records')
 
         # initialize list of targets to return
         target_compound_ids = []
@@ -249,40 +326,14 @@ async def target_compound_create(sid, target_compounds):
                 # the database is inconsistent
                 raise RuntimeError('Duplicate target compound in database')
 
-            # generate and create ion records
-            for ionization_mechanism in ionization_mechanisms:
-                mechanism = ionization_mechanism['ionization_mechanism']
-                try:
-                    # get and save ions
-                    raw_ion = Formula(
-                        '(' +
-                        target_compound['target_compound_formula'].rstrip() +
-                        mechanism[:-1] +
-                        ')' + mechanism[-1]
-                        )
-                except ValueError as e:
-                    print("Failed to parse ion formula: %s" %e)
-                else:
-                    # construct and save ion row
-                    ion = {
-                        'target_ion_id': gen_id(),
-                        'target_compound_id': target_compound['target_compound_id'],
-                        'ionization_mechanism_id': ionization_mechanism['ionization_mechanism_id'],
-                        'target_ion_formula': raw_ion.formula + charge_string(raw_ion),
-                    }
-                    target_ions.append(ion)
-                    # construct and save isotope rows
-                    raw_isotopes = (
-                        get_exact_isotope_mzs(raw_ion.formula)
-                        .values()
-                    )
-                    target_isotopes += [{
-                        'target_isotope_id': gen_id(),
-                        'target_ion_id': ion['target_ion_id'],
-                        'mz': mz,
-                        'relative_abundance': rel_abu
-                        } for [mz, rel_abu] in raw_isotopes
-                    ]
+            try:
+                # Target compound given by mass
+                target_compound_mass = float(target_compound['target_compound_formula'])
+                generate_target_ions_from_mass(target_compound_mass)
+            except ValueError:
+                # Target compound given by composition
+                generate_target_ions_from_composition()
+
         # create the targets
         target_compound_df = pd.DataFrame.from_records(target_compounds_to_create)
         target_compound_df.to_sql(
