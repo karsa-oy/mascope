@@ -25,7 +25,7 @@ function run_mascope_backend() {
 
   # kill mascope_api from prev.session if any
   pkill -f mascope_api || true
-  sudo kill -9 $(sudo lsof -t -i:$MASCOPE_PUBLIC_API_PORT) || true
+  sudo lsof -t -i:$MASCOPE_PUBLIC_API_PORT && sudo kill -9 $(sudo lsof -t -i:$MASCOPE_PUBLIC_API_PORT) || true
 
   echo AAA start mascope api server...
   PYTHONUNBUFFERED=1 mascope-api |& log-rotate -n=7000 -l=$MASCOPE_PRIVATE_LOG_DIR/mascope_api.log &

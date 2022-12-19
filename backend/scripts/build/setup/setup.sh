@@ -34,8 +34,8 @@ function install_prerequisites() {
     chmod +x $MY_PATH/mascope-run-backend
     cp -f $MY_PATH/mascope-run-backend ~/.local/bin
     cp -f $MY_PATH/.env ~/.local/bin
-    # TODO: patch libtwh5.so header - how to replace the hardcoded path?
-    TWLIBPATH=$(realpath $HOME/.local/lib/python3.8/site-packages/hardware/tofwerk/lib/dlls/linux_x86_64/)
+    USER_SITE_PACKAGES=$(python3 -m site --user-site)
+    TWLIBPATH=$USER_SITE_PACKAGES/hardware/tofwerk/lib/dlls/linux_x86_64/
     patchelf --force-rpath --set-rpath "$TWLIBPATH" "$TWLIBPATH/libtwh5.so"
 }
 
