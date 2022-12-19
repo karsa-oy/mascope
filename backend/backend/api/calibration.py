@@ -74,7 +74,7 @@ async def calibration_mz_calibrate_batch(
     sample_batch_df['calibration_sample_filename'] = filename
     await sample_batch_update(sid, sample_batch_df.to_dict('records'))
 
-def mz_calibrate_sample(sample_item):
+async def mz_calibrate_sample(sample_item):
     # get sample batch
     with conn:
         [sample_batch] = pd.read_sql(f"""
@@ -89,7 +89,7 @@ def mz_calibrate_sample(sample_item):
     build_params = json.loads(sample_batch['build_params'])
     calibration_collection_id = build_params['calibration_collection']
     ion_mechanism_ids = build_params['ion_mechanisms']
-    fit, stats = mz_fit(
+    fit, stats = await mz_fit(
         sample_item['filename'],
         [calibration_collection_id],
         ion_mechanism_ids,
@@ -103,7 +103,7 @@ def mz_calibrate_sample(sample_item):
 @sio.event(namespace='/')
 async def calibration_mz_calibrate_sample(sid, sample_item):
     try:
-        mz_calibrate_sample(sample_item)
+        await mz_calibrate_sample(sample_item)
     except:
         print("Failed to calibrate sample %s" %sample_item['filename'])
 
