@@ -8,10 +8,6 @@ const state = {
     matchCompounds: null,
     matchIons: null,
     matchIsotopes: null,
-    matchInterferenceCollections: null,
-    matchInterferenceCompounds: null,
-    matchInterferenceIons: null,
-    matchInterferenceIsotopes: null,
 }
 
 export default {

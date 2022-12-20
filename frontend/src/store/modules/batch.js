@@ -72,47 +72,42 @@ export default {
                 DROP TABLE IF EXISTS batch_match_filter;
                 CREATE TEMPORARY TABLE batch_match_filter AS
                     SELECT
-                        filename,
-                        relative_abundance,
-                        sample_item_id,
-                        sample_item_name,
-                        target_compound_formula,
-                        target_compound_id,
-                        target_compound_name,
-                        target_ion_formula,
-                        target_ion_id,
-                        ionization_mechanism AS target_ion_mechanism,
-                        target_isotope_id,
-                        CASE
-                            WHEN (
-                            --    ABS(match_mz_error) <= ${mzTolerance}
-                            --    AND ABS(match_abundance_error) <= ${isotopeRatioTolerance}
-                            --    AND sample_peak_height >= ${peakMinIntensity}
-                            --    AND relative_abundance >= ${minIsotopeAbundance}
-                            True
-                            ) THEN sample_peak_height
-                            ELSE 0
-                        END AS sample_peak_height,
-                        sample_peak_interference,
-                        CASE
-                            WHEN (
-                                ABS(match_mz_error) <= ${mzTolerance}
-                                AND ABS(match_abundance_error) <= ${isotopeRatioTolerance}
-                                AND sample_peak_height >= ${peakMinIntensity}
-                                AND relative_abundance >= ${minIsotopeAbundance}
-                                ) THEN match_score
-                            ELSE 0
-                        END AS match_score
-                    FROM sample_item
-                    NATURAL LEFT JOIN sample_batch
-                    NATURAL LEFT JOIN match
-                    NATURAL LEFT JOIN match_interference
-                    NATURAL LEFT JOIN target_isotope
-                    NATURAL LEFT JOIN target_ion
-                    NATURAL LEFT JOIN ionization_mechanism
-                    NATURAL LEFT JOIN target_compound
-                    WHERE (
-                        sample_batch_id == '${batchId}'
+                    *
+                    FROM (
+                        SELECT
+                            filename,
+                            relative_abundance,
+                            sample_item_id,
+                            sample_item_name,
+                            target_compound_formula,
+                            target_compound_id,
+                            target_compound_name,
+                            target_ion_formula,
+                            target_ion_id,
+                            ionization_mechanism AS target_ion_mechanism,
+                            target_isotope_id,
+                            sample_peak_height,
+                            sample_peak_interference,
+                            CASE
+                                WHEN (
+                                    ABS(match_mz_error) <= ${mzTolerance}
+                                    AND ABS(match_abundance_error) <= ${isotopeRatioTolerance}
+                                    AND sample_peak_height >= ${peakMinIntensity}
+                                    AND relative_abundance >= ${minIsotopeAbundance}
+                                    ) THEN match_score
+                                ELSE 0
+                            END AS match_score
+                        FROM sample_item
+                        NATURAL LEFT JOIN sample_batch
+                        NATURAL LEFT JOIN match
+                        NATURAL LEFT JOIN match_interference
+                        NATURAL LEFT JOIN target_isotope
+                        NATURAL LEFT JOIN target_ion
+                        NATURAL LEFT JOIN ionization_mechanism
+                        NATURAL LEFT JOIN target_compound
+                        WHERE (
+                            sample_batch_id == '${batchId}'
+                        )
                     )
             `);
         },
@@ -328,7 +323,8 @@ export default {
                 DROP TABLE IF EXISTS target_compound_filter;
                 CREATE TEMPORARY TABLE target_compound_filter AS
                     SELECT
-                        target_compound_id
+                        target_compound_id,
+                        target_collection_id
                         ,0 as selection
                     FROM target_compound
                     NATURAL JOIN target_compound_in_target_collection
@@ -346,7 +342,6 @@ export default {
                     selection
                 FROM target_compound_filter
                 NATURAL LEFT JOIN target_compound
-                NATURAL LEFT JOIN target_compound_in_target_collection
             `).then((res) => {
                 commit('SET_TARGET_COMPOUNDS', res);
             });
@@ -354,53 +349,42 @@ export default {
             await rootState.api.query(`--sql
                 DROP TABLE IF EXISTS target_ion_filter;
                 CREATE TEMPORARY TABLE target_ion_filter AS
+                SELECT
+                    target_ion_id,
+                    target_ion_formula,
+                    target_compound_id,
+                    target_collection_id,
+                    ionization_mechanism_id,
+                    ionization_mechanism
+                    ,0 as selection
+                FROM (
                     SELECT
-                        target_ion_id
-                        ,0 as selection
-                    FROM target_ion
-                    NATURAL JOIN target_compound_in_target_collection
-                    NATURAL JOIN target_collection_in_sample_batch
-                    WHERE sample_batch_id == '${batchId}'
+                    *
+                    FROM
+                        target_ion
+                    NATURAL LEFT JOIN ionization_mechanism
+                    WHERE ionization_mechanism_id IN (
+                        ${`'`+state.active.build_params.ion_mechanisms.join(`','`)+`'`}
+                    )
+                )
+                NATURAL JOIN target_compound_filter;
             `);
             // load target ions
             await rootState.api.query(`--sql
                 SELECT
-                    target_ion.*,
-                    ionization_mechanism.*,
-                    selection
+                    *
                 FROM target_ion_filter
-                NATURAL LEFT JOIN target_ion
-                NATURAL LEFT JOIN ionization_mechanism
-                WHERE ionization_mechanism_id IN (
-                    ${`'`+state.active.build_params.ion_mechanisms.join(`','`)+`'`}
-                    )
             `).then((res) => {
                 commit('SET_TARGET_IONS', res);
             });
             
-            // initialize target isotope filter
-            await rootState.api.query(`--sql
-                -- targets
-                DROP TABLE IF EXISTS target_isotope_filter;
-                CREATE TEMPORARY TABLE target_isotope_filter AS
-                    SELECT
-                        target_isotope_id
-                        ,0 as selection
-                    FROM target_isotope
-                    NATURAL JOIN target_ion
-                    NATURAL JOIN target_compound_in_target_collection
-                    NATURAL JOIN target_collection_in_sample_batch
-                    WHERE (
-                        sample_batch_id == '${batchId}'
-                    )
-            `);
             // load target isotopes
             await rootState.api.query(`--sql
                 SELECT
                     target_isotope.*,
                     selection
-                FROM target_isotope_filter
-                NATURAL LEFT JOIN target_isotope
+                FROM target_isotope
+                NATURAL JOIN target_ion_filter
             `).then((res) => {
                 commit('SET_TARGET_ISOTOPES', res);
             });
@@ -488,7 +472,7 @@ export default {
             }
         },
         // Sample selection toggling
-        async sampleItemFocus({ rootState, dispatch, getters, state }, sampleItemFocused) {
+        async sampleItemFocus({ dispatch, getters, state }, sampleItemFocused) {
             const sampleItemFocusedId = sampleItemFocused.sample_item_id;
             state.sampleItems.filter(
                 (row) => row.sample_item_id != sampleItemFocusedId
@@ -510,7 +494,7 @@ export default {
                     break;
                 }
         },
-        async sampleItemToggle({ rootState, dispatch, getters, state }, sampleItemToggled) {
+        async sampleItemToggle({ getters, state }, sampleItemToggled) {
             const sampleItemToggledId = sampleItemToggled.sample_item_id;
             state.sampleItems.filter(
                 (row) => row.sample_item_id != sampleItemToggledId
@@ -530,6 +514,29 @@ export default {
                 case 3:
                     // Stay focused
                     sampleItemToggled.selection = 3;
+                    break;
+                }
+        },
+        async targetCollectionToggle({ getters, state }, targetCollectionToggled) {
+            const targetCollectionToggledId = targetCollectionToggled.target_collection_id;
+            state.targetCollections.filter(
+                (row) => row.target_collection_id != targetCollectionToggledId
+                    && row.selection == 2
+                )
+                .forEach((collection) => collection.selection = 0);
+                targetCollectionToggled = getters['targetCollection'](targetCollectionToggledId);
+            switch (targetCollectionToggled.selection) {
+                case 0:
+                    // Select
+                    targetCollectionToggled.selection = 2;
+                    break;
+                case 2:
+                    // Unselect
+                    targetCollectionToggled.selection = 0;
+                    break;
+                case 3:
+                    // Stay focused
+                    targetCollectionToggled.selection = 3;
                     break;
                 }
         },
