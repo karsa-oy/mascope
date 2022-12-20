@@ -29,7 +29,7 @@ function install_prerequisites() {
     echo AAA setting up mascope backend
 
     source $MY_PATH/.env
-    pip install --upgrade $MY_PATH/backend*.whl
+    pip install --upgrade --force-reinstall $MY_PATH/backend*.whl
     cp -rf $MY_PATH/config/* $MASCOPE_PRIVATE_CONFIG_DIR
     chmod +x $MY_PATH/mascope-run-backend
     cp -f $MY_PATH/mascope-run-backend ~/.local/bin
