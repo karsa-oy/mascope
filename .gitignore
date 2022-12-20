@@ -5,3 +5,4 @@ notes.*
 .vagrant
 __pycache__
 /.env
+*.tar.gz
