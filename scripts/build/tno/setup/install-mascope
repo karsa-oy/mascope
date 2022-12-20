@@ -1,0 +1,18 @@
+#!/bin/bash
+# ================================================================
+# Helper script to install mascope bundle
+#
+set -eu -o pipefail
+
+#set -x
+#trap read debug
+
+cp -f ~/shared/mascope_bundle.tar.gz ~
+cd ~
+tar -xvf mascope_bundle.tar.gz
+pushd mascope_bundle
+chmod +x ./setup.sh
+./setup.sh
+popd
+
+exit 0
