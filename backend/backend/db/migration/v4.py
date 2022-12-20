@@ -16,17 +16,17 @@ def run():
     new_db_path = os.path.join(data_path, 'database', 'mascope.v4.db')
     shutil.copyfile(old_db_path, new_db_path)
     new_conn = sqlite3.connect(database=new_db_path)
-
-    # Create match interference table
-    new_conn.execute("""--sql
-        CREATE TABLE match_interference (
-            match_interference_id VARCHAR(32) PRIMARY KEY
-            ,target_isotope_id VARCHAR(32) NOT NULL
-                REFERENCES target_isotope(target_isotope_id)
-            ,sample_item_id VARCHAR(16) NOT NULL
-                    REFERENCES sample_item(sample_item_id)
-            ,sample_peak_interference FLOAT NOT NULL
-        );
-    """)
-    new_conn.commit()
+    with new_conn:
+        # Create match interference table
+        new_conn.execute("""--sql
+            CREATE TABLE match_interference (
+                match_interference_id VARCHAR(32) PRIMARY KEY
+                ,target_isotope_id VARCHAR(32) NOT NULL
+                    REFERENCES target_isotope(target_isotope_id)
+                ,sample_item_id VARCHAR(16) NOT NULL
+                        REFERENCES sample_item(sample_item_id)
+                ,sample_peak_interference FLOAT NOT NULL
+            );
+        """)
+        new_conn.commit()
     new_conn.close()
