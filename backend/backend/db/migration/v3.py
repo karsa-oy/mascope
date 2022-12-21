@@ -211,8 +211,5 @@ def run():
         new_conn.cursor().execute(f"""--sql
             DELETE FROM match
         """)
-        new_conn.cursor().execute(f"""--sql
-            VACUUM
-        """)
-        new_conn.commit()
+    new_conn.commit()
     new_conn.close()
