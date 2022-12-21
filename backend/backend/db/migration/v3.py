@@ -48,7 +48,10 @@ def run():
         """)
 
         # Populate
-        peakshape_path = './/backend//db//migration//peakshapes'
+        peakshape_path = os.path.join(
+            os.path.dirname(os.path.realpath(__file__)),
+            'peakshapes'
+        )
         instrument_function_data = []
         
         # TODO KLTOF2
