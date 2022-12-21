@@ -27,7 +27,9 @@ function install_prerequisites() {
   echo AAA Install MASCOPE bundle...
 
   pushd $MY_PATH
+  set -a
   source .env
+  set +a
 
   # make sure needed folders exist
   [ ! -d "$MASCOPE_PRIVATE_DATADIR" ] && mkdir -p $MASCOPE_PRIVATE_DATADIR
