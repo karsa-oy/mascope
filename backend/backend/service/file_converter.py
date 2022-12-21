@@ -255,6 +255,11 @@ def run():
 
     source_path = args.get('source_dir', '.')
     ping = args['ping']
+
+    if not os.path.exists(source_path):
+        print(f"Creating missing source directory {source_path}")
+        os.makedirs(source_path)
+
     fs_watcher = FSWatcher(
         path=source_path,
         mask=file_mask,

@@ -101,6 +101,14 @@ def run():
     recursive = args['recursive']
     ping = args['ping']
 
+    if not os.path.exists(source_path):
+        print(f"Creating missing source directory {source_path}")
+        os.makedirs(source_path)
+
+    if not os.path.exists(target_path):
+        print(f"Creating missing target directory {target_path}")
+        os.makedirs(target_path)
+
     fs_watcher = FSWatcher(
         path=source_path,
         mask=file_mask,
