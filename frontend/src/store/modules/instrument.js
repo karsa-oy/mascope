@@ -97,9 +97,16 @@ export default {
             commit('SET_RECENT_ACQUISITIONS', null)
         },
         // notifications
-        async onSampleFileCreated({ dispatch }) {
+        async onSampleFileCreated({ rootState, dispatch }, filename) {
             await dispatch('api/reloadDb', null, {root:true});
             await dispatch('getRecentAcquisitions');
+            rootState.api.emit(
+                'scenthound_process_samples',
+                {
+                    filename,
+                    'sample_batch_id': rootState.batch.active.sample_batch_id
+                }
+            ); 
         },
     },
     getters: {}

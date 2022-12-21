@@ -474,8 +474,11 @@ async def sample_file_create(sid, sample_files):
             if_exists='append',
             index=False
             )
-    for instrument in pd.unique(sample_file_df['instrument']).tolist():
-        await sio.emit('sample_file_created', room=instrument, namespace='/')
+
+    for _, row in sample_file_df.iterrows():
+        filename = row['filename']
+        instrument = row['instrument']
+        await sio.emit('sample_file_created', filename, room=instrument, namespace='/')
 
 
 def file_update(sample_files):
