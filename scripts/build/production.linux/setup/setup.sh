@@ -45,8 +45,8 @@ function install_prerequisites() {
   chmod +x mascope_ui/setup.sh
   ./mascope_ui/setup.sh
   # drop mascope install helper to home bin dir
-  cp -f install-mascope ~/.local/bin
-  chmod +x ~/.local/bin/install-mascope
+  cp -f mascope-install ~/.local/bin
+  chmod +x ~/.local/bin/mascope-install
   # cleanup
   rm -rf mascope_backend
   rm -rf mascope_ui

@@ -19,4 +19,4 @@
 
  - deliver the bundle tar to a target (supposed to be put to the target ~/shared directory);
  - in the first installation, untar the bundle archive and run ./setup.sh
- - next time use install-mascope script to deploy next versions, delivered to the same place;
+ - next time use mascope-install script to deploy next versions, delivered to the same place;

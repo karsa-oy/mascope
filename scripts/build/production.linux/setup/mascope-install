@@ -14,5 +14,6 @@ pushd mascope_bundle
 chmod +x ./setup.sh
 ./setup.sh
 popd
+rm -rf mascope_bundle
 
 exit 0
