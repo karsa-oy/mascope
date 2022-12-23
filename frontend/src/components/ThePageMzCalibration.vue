@@ -102,8 +102,8 @@ export default {
         { field: "sample_peak_mz", label: "Sample m/z" },
         { field: "match_mz_error", label: "m/z error [ppm]" },
         { field: "relative_abundance", label: "Relative abundance" },
-        { field: "sample_peak_height_relative", label: "Relative peak height" },
-        { field: "sample_peak_height", label: "Sample peak intensity" },
+        { field: "sample_peak_area_relative", label: "Relative peak intensity" },
+        { field: "sample_peak_area", label: "Sample peak intensity" },
         { field: "match_score", label: "Match score" },
       ],
       selectedTableCols: [

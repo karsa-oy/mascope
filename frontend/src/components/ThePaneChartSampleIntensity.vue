@@ -51,7 +51,7 @@ export default {
           let y = itemMatches
             .filter(
               (match) => match.target_compound_id === compound.target_compound_id)
-            .map(compoundMatch => compoundMatch.sample_peak_height_sum);
+            .map(compoundMatch => compoundMatch.sample_peak_area_sum);
           let compoundColor = compoundColors[compound.target_compound_id];
           let markerSymbol =
             compound.rating === "probable"
