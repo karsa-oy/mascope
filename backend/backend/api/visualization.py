@@ -51,7 +51,7 @@ async def visualization_ion_focus(
     if not cache_item:
         # File not in cache, load
         print("Loading file: %s" % filename)
-        cache_item = load_file(filename, vars=['signal', 'peaks'])
+        cache_item = load_file(filename, vars=['signal', 'peak_heights'])
         cache[filename] = cache_item
 
     if t_range is None or t_range == [None, None]:
@@ -112,8 +112,8 @@ async def visualization_ion_focus(
             'yaxis': 'y{:d}'.format(i+1),
         })
         # Peak traces (vertical lines)
-        peaks = get_peaks(isotope_sum_spectrum)
-        peaks = filter_peaks(peaks, height=peak_min_intensity)
+        peaks = get_peaks(isotope_sum_spectrum, 'height')
+        peaks = filter_peaks(peaks, intensity=peak_min_intensity)
         for peak in peaks:
             peak_mz = peak.mz.item()
             peak_height = peak.values.item()

@@ -53,7 +53,7 @@ async def compute_matches(
     # Find peaks and write to file
     u_list = list( np.unique(np.round(target_isotope_df.mz)) )
     sample_file = await detect_peaks(filename, u_list, if_exists='append')
-    peaks = get_peaks(sample_file)
+    peaks = get_peaks(sample_file, 'area')
 
     #########################
     # STEP 2 - Prepare data #
@@ -76,7 +76,7 @@ async def compute_matches(
 
     # parse peak data
     peak_mzs = peaks.mz.values
-    peak_heights = peaks.sum(dim='time').values
+    peak_areas = peaks.sum(dim='time').values
     peak_tofs = peaks.tof.values
     peak_sorting = np.argsort(peak_mzs)
 
@@ -98,7 +98,7 @@ async def compute_matches(
             # get match peak
             peak_index = peak_sorting[match_index]
             peak_mz = peak_mzs[peak_index]
-            peak_height = peak_heights[peak_index]
+            peak_area = peak_areas[peak_index]
             # check current best match
             best_match = row.sample_peak_id
             if not np.isnan(best_match):
