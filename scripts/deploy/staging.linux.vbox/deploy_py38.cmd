@@ -3,7 +3,10 @@ set mypath=%~dp0
 
 pushd %mypath%
 call build_dist.cmd
-set VAGRANT_VAGRANTFILE=Vagrantfile_py38 && vagrant reload --provision
+pushd py38
+vagrant halt
+vagrant up --provision
+popd
 popd
 
 exit /b 0

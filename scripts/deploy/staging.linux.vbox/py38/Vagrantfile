@@ -16,10 +16,11 @@ Vagrant.configure("2") do |config|
     end
   end
 
-  config.vm.box = "ubuntu/jammy64"
+  config.vm.box = "ubuntu/focal64"
   config.env.enable
 
   # expose mascope frontend http and https ports;
+  MASCOPE_HOST = ENV['MASCOPE_PUBLIC_HOST']
   MASCOPE_HTTP = ENV['MASCOPE_PUBLIC_PORT']
   MASCOPE_HTTPS = 443
   MASCOPE_API = ENV['MASCOPE_PUBLIC_API_PORT']
@@ -36,22 +37,22 @@ Vagrant.configure("2") do |config|
   config.vm.network "forwarded_port", guest: MASCOPE_HTTPS, host: MASCOPE_HTTPS, id: "mascope-https"
   
   config.vm.synced_folder ".", "/vagrant", disabled: true
-  config.vm.synced_folder "../../..", "/vagrant"
+  config.vm.synced_folder "../../../..", "/vagrant"
   # for production
   config.vm.synced_folder "D:/Data", MASCOPE_PRIVATE_DATADIR
   config.vm.synced_folder "D:/to_mascope", MASCOPE_PRIVATE_CONVERTER_DIR
   config.vm.synced_folder "V:/Data/to_mascope", MASCOPE_PRIVATE_DOWNLOADER_DIR
-  config.vm.synced_folder "../../../log", MASCOPE_PRIVATE_LOG_DIR
+  config.vm.synced_folder "../../../../log", MASCOPE_PRIVATE_LOG_DIR
   # for local tests
-  # config.vm.synced_folder "../../../data", MASCOPE_PRIVATE_DATADIR
-  # config.vm.synced_folder "../../../to_mascope", MASCOPE_PRIVATE_CONVERTER_DIR
-  # config.vm.synced_folder "../../../from_instrument", MASCOPE_PRIVATE_DOWNLOADER_DIR
-  # config.vm.synced_folder "../../../log", MASCOPE_PRIVATE_LOG_DIR
+  # config.vm.synced_folder "../../../../data", MASCOPE_PRIVATE_DATADIR
+  # config.vm.synced_folder "../../../../to_mascope", MASCOPE_PRIVATE_CONVERTER_DIR
+  # config.vm.synced_folder "../../../../from_instrument", MASCOPE_PRIVATE_DOWNLOADER_DIR
+  # config.vm.synced_folder "../../../../log", MASCOPE_PRIVATE_LOG_DIR
 
-  config.vm.hostname = "mascope-py310"
+  config.vm.hostname = "mascope-py38-" + MASCOPE_HOST.gsub(".", "-")
   
   config.vm.provider :virtualbox do |vb|
-    vb.name = "mascope-py310"
+    vb.name = config.vm.hostname
     vb.gui = true
     # for production
     vb.memory = "8192"
