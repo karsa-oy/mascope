@@ -38,15 +38,15 @@ Vagrant.configure("2") do |config|
   config.vm.synced_folder ".", "/vagrant", disabled: true
   config.vm.synced_folder "../../..", "/vagrant"
   # for production
-  # config.vm.synced_folder "D:/Data", MASCOPE_PRIVATE_DATADIR
-  # config.vm.synced_folder "D:/to_mascope", MASCOPE_PRIVATE_CONVERTER_DIR
-  # config.vm.synced_folder "V:/Data/to_mascope", MASCOPE_PRIVATE_DOWNLOADER_DIR
-  # config.vm.synced_folder "../../../log", MASCOPE_PRIVATE_LOG_DIR
-  # for local tests
-  config.vm.synced_folder "../../../data", MASCOPE_PRIVATE_DATADIR
-  config.vm.synced_folder "../../../to_mascope", MASCOPE_PRIVATE_CONVERTER_DIR
-  config.vm.synced_folder "../../../from_instrument", MASCOPE_PRIVATE_DOWNLOADER_DIR
+  config.vm.synced_folder "D:/Data", MASCOPE_PRIVATE_DATADIR
+  config.vm.synced_folder "D:/to_mascope", MASCOPE_PRIVATE_CONVERTER_DIR
+  config.vm.synced_folder "V:/Data/to_mascope", MASCOPE_PRIVATE_DOWNLOADER_DIR
   config.vm.synced_folder "../../../log", MASCOPE_PRIVATE_LOG_DIR
+  # for local tests
+  # config.vm.synced_folder "../../../data", MASCOPE_PRIVATE_DATADIR
+  # config.vm.synced_folder "../../../to_mascope", MASCOPE_PRIVATE_CONVERTER_DIR
+  # config.vm.synced_folder "../../../from_instrument", MASCOPE_PRIVATE_DOWNLOADER_DIR
+  # config.vm.synced_folder "../../../log", MASCOPE_PRIVATE_LOG_DIR
 
   config.vm.hostname = "mascope-py310"
   
@@ -54,9 +54,9 @@ Vagrant.configure("2") do |config|
     vb.name = "mascope-py310"
     vb.gui = true
     # for production
-    # vb.memory = "8192"
+    vb.memory = "8192"
     # for local tests
-    vb.memory = "2048"
+    # vb.memory = "2048"
     vb.cpus = 2
     # to enable proper links functionality in Windows shared folders
     vb.customize ["setextradata", :id,
