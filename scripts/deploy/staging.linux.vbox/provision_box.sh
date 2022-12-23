@@ -74,6 +74,7 @@ function install_prerequisites() {
     # enable mascope site
     sudo ln -s -f /etc/nginx/sites-available/mascope.com /etc/nginx/sites-enabled/mascope.com
     sudo rm -f /etc/nginx/sites-enabled/default
+    sudo gpasswd -a www-data $USER
     sudo systemctl restart nginx
 
     echo AAA setting up mascope backend service...
