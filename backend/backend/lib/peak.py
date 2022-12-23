@@ -90,7 +90,7 @@ async def detect_peaks(
         for u in u_list
     ]
     new_peaks = []
-    for i, future in enumerate(asyncio.as_completed(futures, loop=loop)):
+    for i, future in enumerate(asyncio.as_completed(futures)):
         fit, peaks = await future
         if fit:
             new_peaks.extend(peaks)
