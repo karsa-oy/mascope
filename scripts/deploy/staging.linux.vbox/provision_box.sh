@@ -18,6 +18,20 @@ if [[ $os_name != "Ubuntu" || $os_version < "18" ]]; then
 fi
 
 
+function source_project_env() {
+    # use production .env
+    # .env should be in project root, when restarting mascope be service
+    # if .debug_env is present, concatenate
+    cp -f $MY_PATH/.env $MASCOPE_PROJECT/.env
+    if [ -f $MY_PATH/.debug_env ]; then
+        echo AAA Overlay $MY_PATH/.debug_env
+        echo >> $MASCOPE_PROJECT/.env
+        cat $MY_PATH/.debug_env >> $MASCOPE_PROJECT/.env
+    fi
+    source $MASCOPE_PROJECT/.env
+}
+
+
 function install_prerequisites() {
     echo AAA Install needed packages
     sudo apt-get update
@@ -29,10 +43,7 @@ function install_prerequisites() {
 
     echo AAA setting up mascope backend
 
-    # use production .env
-    # .env should be in project root, when restarting mascope be service
-    cp -f $MY_PATH/.env $MASCOPE_PROJECT/.env
-    source $MY_PATH/.env
+    source_project_env
 
     # backend
     pushd $MASCOPE_PROJECT/backend
@@ -86,7 +97,7 @@ function install_prerequisites() {
     sudo systemctl start mascope
 
     # kill file converters from prev.sessions if any
-    pkill -f file_converter || true
+    pkill -f file-converter || true
 
     echo AAA start file convertor for KLTOF1...
     pushd $MASCOPE_PROJECT/backend
@@ -104,7 +115,7 @@ function install_prerequisites() {
     popd
 
     # kill file downloaders from prev.sessions if any
-    pkill -f file_downloader || true
+    pkill -f file-downloader || true
 
     echo AAA start file downloader for KLTOF1...
     pushd $MASCOPE_PROJECT/backend

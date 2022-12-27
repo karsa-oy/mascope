@@ -6,3 +6,4 @@ notes.*
 __pycache__
 /.env
 *.tar.gz
+.debug_env

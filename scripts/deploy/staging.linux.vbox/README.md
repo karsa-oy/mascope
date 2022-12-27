@@ -2,6 +2,9 @@
 
 #### Get build environment ready:
  Make sure Vagrantfile and corresponding .env contain required values
+ 
+ Values from .debug_env override those from .env (used for local debugging).
+ 
 
 #### Deploy Mascope app (linux VirtualBox on Windows host):
 
@@ -14,6 +17,7 @@ All this can be done on Windows host by running corresponding deploy.cmd:
 
  - Ubuntu 2204 with python 3.10:
     deploy_py310.cmd
+    
 
 #### Or on native linux environment:
 
