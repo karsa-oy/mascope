@@ -46,16 +46,22 @@ async def detect_peaks(
     dmz = .5
     peakshape, R = read_instrument_functions(filename)
     old_peak_mzs = []
+    old_peak_areas = []
     old_peak_heights = []
-    sample_file_data = load_file(filename, vars=['peaks'])
+    sample_file_data = load_file(filename, vars=['peak_areas', 'peak_heights'])
     mz_top = sample_file_data.props['range'][1]
     if u_list is not None:
         # Fit peaks to given unit masses
-        if 'peaks' in sample_file_data:
+        if 'peak_areas' in sample_file_data:
             if if_exists == 'fail':
                 raise FileExistsError("Peak data exists!")
-            old_peak_mzs = list(sample_file_data.peaks.mz.values)
-            old_peak_heights = list(sample_file_data.peaks.sum(dim='time').values)
+            old_peak_mzs = list(sample_file_data.peak_areas.mz.values)
+            old_peak_areas = list(
+                sample_file_data.peak_areas.sum(dim='time').values
+            )
+            old_peak_heights = list(
+                sample_file_data.peak_heights.sum(dim='time').values
+            )
             u_list_fitted = list(np.unique(np.round(old_peak_mzs)))
         else:
             u_list_fitted = []
@@ -97,25 +103,31 @@ async def detect_peaks(
         print(f"Peak detection progress: {(i+1)/len(futures):.2f}")
     executor.shutdown()
     sample_file_data = sample_file_data.assign_coords(
-            tof=('mz', np.arange(len(sample_file_data.mz)).astype(np.float32))
+        tof=(
+            'mz',
+            np.arange(len(sample_file_data.mz)).astype(np.float32)
         )
+    )
     if len(new_peaks): 
         new_peak_mzs = list(zip(*new_peaks))[0]
         new_peak_heights = list(zip(*new_peaks))[1]
-        # new_peak_areas = list(zip(*new_peaks))[3]
+        new_peak_areas = list(zip(*new_peaks))[3]
     else:
         new_peak_mzs = []
         new_peak_heights = []
 
     if if_exists == 'append':
         all_peak_mzs = [*old_peak_mzs, *new_peak_mzs]
+        all_peak_areas = [*old_peak_areas, *new_peak_areas]
         all_peak_heights = [*old_peak_heights, *new_peak_heights]
     else:
         all_peak_mzs = new_peak_mzs
+        all_peak_areas = new_peak_areas
         all_peak_heights = new_peak_heights
 
     all_peak_ind = np.argsort(all_peak_mzs)
     all_peak_mzs = np.array(all_peak_mzs)[all_peak_ind]
+    all_peak_areas = np.array(all_peak_areas)[all_peak_ind]
     all_peak_heights = np.array(all_peak_heights)[all_peak_ind]
 
     peak_mz_coord = sample_file_data.mz.sel(
@@ -126,84 +138,36 @@ async def detect_peaks(
         peak_mz_coord,
         return_index=True
     )
+    peak_areas = all_peak_areas[unique_peak_index]
     peak_heights = all_peak_heights[unique_peak_index]
     peak_profiles = sample_file_data.signal.sel(
         mz=peak_mzs,
         method='nearest'
     )
     peak_profiles_norm = peak_profiles / peak_profiles.sum(dim='time')
-    peak_profiles_scaled = peak_profiles_norm * peak_heights.reshape(-1,1)
+    peak_profiles_area = peak_profiles_norm * peak_areas.reshape(-1,1)
+    peak_profiles_height = peak_profiles_norm * peak_heights.reshape(-1,1)
     print(f"Writing peaks to file {filename}")
     overwrite_peak_dataset = (if_exists == 'append' or if_exists == 'replace')
-    zarr_sdk.write_peak_dataset(peak_profiles_scaled, sample_file_data, overwrite_peak_dataset)
+    zarr_sdk.write_peaks(
+        peak_profiles_area,
+        peak_profiles_height,
+        sample_file_data,
+        overwrite_peak_dataset
+    )
     print("Complete")
     sample_file_data = load_file(
         filename,
-        vars=['peaks'],
+        vars=['peak_areas'],
         prev_dataset=sample_file_data
     )
     return sample_file_data
-
-def detect_peaks_old(
-    cache_item,
-    smooth_window=None,
-    peak_height=None,
-    peak_distance=None,
-    peak_width=None,
-    ):
-    """NOTE: Deprecated, left here for reference.
-    TODO: Remove
-    """
-    if 'signal' not in cache_item:
-        # Signal not in cache, load
-        cache_item = load_file(
-            cache_item.props['filename'],
-            vars=['signal'],
-            prev_dataset=cache_item
-        )
-    sum_spectrum = (
-        cache_item
-        .signal.sum(dim='time').compute()
-        .interpolate_na(  # Interpolate NaNs for smoothing
-            dim='mz',
-            method='linear',
-            limit=None,
-            max_gap=2,
-        )
-    )
-
-    if smooth_window:
-        sum_spectrum = smooth(sum_spectrum, window_len=smooth_window)
-    
-    peaks, peak_props = find_peaks(
-        sum_spectrum,
-        height=peak_height,
-        distance=peak_distance,
-        width=peak_width
-    )
-    cache_item = (
-        cache_item
-        .assign_coords(
-            tof=('mz', np.arange(len(cache_item.mz)).astype(np.float32))
-        )
-    )
-
-    peak_profiles = cache_item.signal[peaks]
-
-    zarr_sdk.write_peak_dataset(peak_profiles, cache_item)
-
-    cache_item = load_file(
-        cache_item.props['filename'],
-        vars=['peaks'],
-        prev_dataset=cache_item
-    )
-    return cache_item
 
 def filter_peaks(
         peaks,
         mz_range=None,
         t_range=None,
-        height=None,
+        intensity=None,
         distance=None,
         ):
 
@@ -217,23 +181,23 @@ def filter_peaks(
             )
     peaks = peaks.dropna(dim='mz', how='all')
     if 'time' in peaks.dims:
-        peak_heights = peaks.sum(dim='time').values
+        peak_intensities = peaks.sum(dim='time').values
     else:
-        peak_heights = peaks.values
+        peak_intensities = peaks.values
 
     keep = np.array([True]*len(peaks))
 
-    if height is not None:
+    if intensity is not None:
         # Evaluate height condition
-        keep_height = peak_heights > height
-        keep = np.logical_and(keep, keep_height)
+        keep_intensity = peak_intensities > intensity
+        keep = np.logical_and(keep, keep_intensity)
 
     if distance is not None:
         peak_indices = peaks.tof.values
         # Evaluate distance condition
         keep_distance = _select_by_peak_distance(
             peak_indices.astype(np.intp),
-            peak_heights.astype(np.float64),
+            peak_intensities.astype(np.float64),
             distance
         )
         keep = np.logical_and(keep, keep_distance)
@@ -452,7 +416,10 @@ def fit_n_peaks(
             else resolution_function
             )
     # Calculate peak areas
-    peaks = [ (*peak, calculate_peak_area(x, peak_shape, peak)) for peak in peaks ]
+    peaks = [
+        (*peak, calculate_peak_area(x, peak_shape, peak))
+        for peak in peaks
+    ]
     return fit, peaks
 
 def fwhm_to_sigma(fwhm):
@@ -584,8 +551,13 @@ def get_batch_u_list(sample_batch_id):
             )['mz'].tolist()
     return np.unique(np.round(target_isotope_mzs))
 
-def get_peaks(cache_item):
-    peaks = cache_item.peaks
+def get_peaks(cache_item, intensity_mode='area'):
+    if intensity_mode == 'area':
+        peaks = cache_item.peak_areas
+    elif intensity_mode == 'height':
+        peaks = cache_item.peak_heights
+    else:
+        raise ValueError("intensity_mode must be either 'height' or 'area'")
     peaks = peaks.dropna(dim='mz', how='all')
     return peaks.compute()
 

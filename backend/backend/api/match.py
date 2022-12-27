@@ -53,7 +53,7 @@ async def compute_matches(
     # Find peaks and write to file
     u_list = list( np.unique(np.round(target_isotope_df.mz)) )
     sample_file = await detect_peaks(filename, u_list, if_exists='append')
-    peaks = get_peaks(sample_file)
+    peaks = get_peaks(sample_file, 'area')
 
     #########################
     # STEP 2 - Prepare data #
@@ -66,8 +66,8 @@ async def compute_matches(
             match_id=np.nan,
             sample_peak_id=np.nan,
             sample_peak_mz=np.nan,
-            sample_peak_height=np.nan,
-            sample_peak_height_relative=np.nan,
+            sample_peak_area=np.nan,
+            sample_peak_area_relative=np.nan,
             match_abundance_error=np.nan,
             match_mz_error=np.nan,
             match_score=np.nan,
@@ -76,7 +76,7 @@ async def compute_matches(
 
     # parse peak data
     peak_mzs = peaks.mz.values
-    peak_heights = peaks.sum(dim='time').values
+    peak_areas = peaks.sum(dim='time').values
     peak_tofs = peaks.tof.values
     peak_sorting = np.argsort(peak_mzs)
 
@@ -98,7 +98,7 @@ async def compute_matches(
             # get match peak
             peak_index = peak_sorting[match_index]
             peak_mz = peak_mzs[peak_index]
-            peak_height = peak_heights[peak_index]
+            peak_area = peak_areas[peak_index]
             # check current best match
             best_match = row.sample_peak_id
             if not np.isnan(best_match):
@@ -111,7 +111,7 @@ async def compute_matches(
             row['sample_peak_id'] = peak_index
             row['sample_peak_mz'] = peak_mz
             row['sample_peak_tof'] = peak_tofs[int(peak_index)]
-            row['sample_peak_height'] = peak_height
+            row['sample_peak_area'] = peak_area
         return row
 
     match_isotope_df = (
@@ -130,28 +130,28 @@ async def compute_matches(
     # sum matched sample peak heights for each ion
     ion_level_peak_sums = (
         match_isotope_df
-        .groupby(['target_ion_id'], as_index=False)['sample_peak_height']
+        .groupby(['target_ion_id'], as_index=False)['sample_peak_area']
         .sum()
     )
     # join sums back to the isotope level
     isotope_level_peak_sums = pd.merge(
         match_isotope_df,
         ion_level_peak_sums.rename(
-            columns={'sample_peak_height': 'sample_peak_height_sum'}
+            columns={'sample_peak_area': 'sample_peak_area_sum'}
         ),
         on=['target_ion_id'], how='left'
     )
 
     # compute relative peak heights
-    match_isotope_df.loc[:, 'sample_peak_height_relative'] = (
-        match_isotope_df['sample_peak_height']
-        / isotope_level_peak_sums['sample_peak_height_sum']
+    match_isotope_df.loc[:, 'sample_peak_area_relative'] = (
+        match_isotope_df['sample_peak_area']
+        / isotope_level_peak_sums['sample_peak_area_sum']
     )
     # calculate isotope ratio errors
     match_isotope_df.loc[:, 'match_abundance_error'] = (
         match_isotope_df['relative_abundance']
         * (
-            match_isotope_df['sample_peak_height_relative']
+            match_isotope_df['sample_peak_area_relative']
             - match_isotope_df['relative_abundance']
         )
     )
@@ -371,8 +371,8 @@ async def item_compute(sample_item_id):
             ,"sample_item_id"
             ,"sample_peak_id"
             ,"sample_peak_mz"
-            ,"sample_peak_height"
-            ,"sample_peak_height_relative"
+            ,"sample_peak_area"
+            ,"sample_peak_area_relative"
             ,"sample_peak_tof"
             ,"match_abundance_error"
             ,"match_mz_error"
