@@ -42,6 +42,8 @@ class zarr_sdk:
         for a in arrays:
             if isinstance(a, ExtendableDataArray):
                 a.flush()
+        # write sum signal array
+        zarr_sdk.write_sum_signal_dataset(item)
 
     @staticmethod
     def init_centroid_dataset(data, item):
@@ -225,26 +227,63 @@ class zarr_sdk:
         item['tps'].extend_array(tps_data, [tps_info, ti], 'time')
 
     @staticmethod
-    def write_peak_dataset(peak_profiles, item, overwrite=False):
+    def write_peaks(peak_areas, peak_heights, item, overwrite=False):
         filename_base = item.props['filename']
-        filename_peaks = filename_to_zarr_path(filename_base, 'peaks')
-
-        if os.path.exists(filename_peaks):
+        # Write peak areas
+        filename_peak_areas = filename_to_zarr_path(filename_base, 'peak_areas')
+        if os.path.exists(filename_peak_areas):
             if overwrite:
-                rmtree(filename_peaks)
+                rmtree(filename_peak_areas)
             else:
-                raise FileExistsError(filename_peaks)
+                raise FileExistsError(filename_peak_areas)
 
-        peaks_array = ExtendableDataArray(path=filename_peaks)
-        peaks_array.init_array(
+        peak_areas_array = ExtendableDataArray(path=filename_peak_areas)
+        peak_areas_array.init_array(
             dims=('mz', 'time'),
-            data=peak_profiles.values,
+            data=peak_areas.values,
             coords={
-                'mz': peak_profiles.mz.values,
-                'time': peak_profiles.time.values,
-                'tof': ('mz', peak_profiles.tof.values)
+                'mz': peak_areas.mz.values,
+                'time': peak_areas.time.values,
+                'tof': ('mz', peak_areas.tof.values)
                 },
-            name='peaks'
+            name='peak_areas'
+        )
+        # Write peak heights
+        filename_peak_heights = filename_to_zarr_path(filename_base, 'peak_heights')
+        if os.path.exists(filename_peak_heights):
+            if overwrite:
+                rmtree(filename_peak_heights)
+            else:
+                raise FileExistsError(filename_peak_heights)
+
+        peak_heights_array = ExtendableDataArray(path=filename_peak_heights)
+        peak_heights_array.init_array(
+            dims=('mz', 'time'),
+            data=peak_heights.values,
+            coords={
+                'mz': peak_heights.mz.values,
+                'time': peak_heights.time.values,
+                'tof': ('mz', peak_heights.tof.values)
+                },
+            name='peak_heights'
+        )
+
+    @staticmethod
+    def write_sum_signal_dataset(item):
+        filename_base = item.props['filename']
+        filename_sum_signal = filename_to_zarr_path(
+            filename_base,
+            'sum_signal'
+            )
+        sum_signal = item['signal'].sum(dim='time')
+        sum_signal_array = ExtendableDataArray(path=filename_sum_signal)
+        sum_signal_array.init_array(
+            dims=('mz',),
+            data=sum_signal.values,
+            coords={
+                'mz': item['signal'].mz.values,
+                },
+            name='sum_signal'
         )
 
 

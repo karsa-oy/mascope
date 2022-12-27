@@ -82,7 +82,7 @@ export default {
               tooltip: (row) => {
                 return {
                   "Peak intensity": this.formatter.format(
-                    row.sample_peak_height_sum
+                    row.sample_peak_area_sum
                   ),
                 };
               },
@@ -107,7 +107,7 @@ export default {
               tooltip: (row) => {
                 return {
                   "Peak intensity": this.formatter.format(
-                    row.sample_peak_height_sum
+                    row.sample_peak_area_sum
                   ),
                 };
               },
@@ -132,7 +132,7 @@ export default {
               tooltip: (row) => {
                 return {
                   "Peak intensity": this.formatter.format(
-                    row.sample_peak_height_sum
+                    row.sample_peak_area_sum
                   ),
                 };
               },
@@ -157,10 +157,7 @@ export default {
               tooltip: (row) => {
                 return {
                   "Peak intensity": this.formatter.format(
-                    row.sample_peak_height
-                  ),
-                  "Rel. abundance": this.formatter.format(
-                    row.relative_abundance
+                    row.sample_peak_area
                   ),
                 };
               },

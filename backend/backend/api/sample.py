@@ -95,10 +95,10 @@ async def sample_batch_export_peaks(sid, sample_batch_id, filter_params):
     peak_data = []
     for index, row in sample_item_df.iterrows():
         try:
-            sample_file = load_file(row['filename'], vars=['peaks'])
+            sample_file = load_file(row['filename'], vars=['peak_areas'])
             peak_data_item = filter_peaks(
                 get_peaks(sample_file),
-                height=peak_min_intensity,
+                intensity=peak_min_intensity,
                 distance=peak_min_separation
             ).sum(dim='time')
         except:

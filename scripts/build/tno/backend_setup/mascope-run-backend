@@ -16,6 +16,15 @@ if [[ $os_name != "Ubuntu" || $os_version < "18" ]]; then
 fi
 
 
+function stop_mascope_backend() {
+  # kill mascope backend services and corresponding log-rotates from prev.session if any
+  pkill -f mascope-api || true
+  pkill -f file-converter || true
+  pkill log-rotate || true
+  sudo lsof -t -i:$MASCOPE_PUBLIC_API_PORT && sudo kill -9 $(sudo lsof -t -i:$MASCOPE_PUBLIC_API_PORT) || true
+}
+
+
 function run_mascope_backend() {
   echo AAA Run MASCOPE backend...
 
@@ -23,17 +32,12 @@ function run_mascope_backend() {
   source $MY_PATH/.env
   set +a
 
-  # kill mascope_api from prev.session if any
-  pkill -f mascope_api || true
-  sudo lsof -t -i:$MASCOPE_PUBLIC_API_PORT && sudo kill -9 $(sudo lsof -t -i:$MASCOPE_PUBLIC_API_PORT) || true
+  stop_mascope_backend
 
   echo AAA start mascope api server...
   PYTHONUNBUFFERED=1 mascope-api |& log-rotate -n=7000 -l=$MASCOPE_PRIVATE_LOG_DIR/mascope_api.log &
 
-  # kill file converters from prev.sessions if any
-  pkill -f file_converter || true
-
-  echo AAA start file convertor for KLTOF2...
+  echo AAA start file converter for KLTOF2...
   PYTHONUNBUFFERED=1 file-converter --config $MASCOPE_PRIVATE_CONFIG_DIR/file_converter_config/KLTOF2.yaml --ping |& log-rotate -n=5000 -l=$MASCOPE_PRIVATE_LOG_DIR/converter_KLTOF2.log &
 }
 

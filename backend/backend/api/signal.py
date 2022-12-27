@@ -55,9 +55,10 @@ def signal_mz_calibration_update(fit, filenames):
         # Write new mz coordinates to zarr file
         update_zarr_array_coord(filename, 'signal', 'mz', new_mz)
         try:
-            peak_tofs = load_coord(filename, 'peaks', 'tof')
+            peak_tofs = load_coord(filename, 'peak_areas', 'tof')
             new_peak_mzs = new_mz[peak_tofs.astype(int)]
-            update_zarr_array_coord(filename, 'peaks', 'mz', new_peak_mzs)
+            update_zarr_array_coord(filename, 'peak_areas', 'mz', new_peak_mzs)
+            update_zarr_array_coord(filename, 'peak_heights', 'mz', new_peak_mzs)
         except PathNotFoundError:
             pass
     return new_mz

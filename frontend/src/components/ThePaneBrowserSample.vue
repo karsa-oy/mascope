@@ -62,7 +62,7 @@ export default {
               hidden,
               tooltip: (row) => {
                 return {
-                  "Peak intensity": this.formatter.format(row.sample_peak_height_sum),
+                  "Peak intensity": this.formatter.format(row.sample_peak_area_sum),
                 };
               },
             },
@@ -208,7 +208,7 @@ export default {
         { field: "filename", label: "Filename" },
         { field: "target_compound_name", label: "Compound name" },
         { field: "target_compound_formula", label: "Compound formula" },
-        { field: "sample_peak_height_sum", label: "Sample peak intensity" },
+        { field: "sample_peak_area_sum", label: "Sample peak intensity" },
         { field: "sample_peak_interference_max", label: "Sample peak interference" },
         { field: "match_score", label: "Match score" },
       ];
@@ -219,7 +219,7 @@ export default {
         { field: "target_compound_formula", label: "Compound formula" },
         { field: "target_ion_mechanism", label: "Ionization mechanism" },
         { field: "target_ion_formula", label: "Ion formula" },
-        { field: "sample_peak_height_sum", label: "Sample peak intensity" },
+        { field: "sample_peak_area_sum", label: "Sample peak intensity" },
         { field: "sample_peak_interference_sum", label: "Sample peak interference" },
         { field: "match_score", label: "Match score" },
       ];

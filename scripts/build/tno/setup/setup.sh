@@ -23,11 +23,25 @@ function register_on_reboot() {
   cat /etc/rc.local | grep "$1" || echo "$1" | sudo tee -a /etc/rc.local
 }
 
+
+function stop_mascope_backend() {
+  # kill mascope backend services and corresponding log-rotates from prev.session if any
+  pkill -f mascope-api || true
+  pkill -f file-converter || true
+  pkill log-rotate || true
+  sudo lsof -t -i:$MASCOPE_PUBLIC_API_PORT && sudo kill -9 $(sudo lsof -t -i:$MASCOPE_PUBLIC_API_PORT) || true
+}
+
+
 function install_prerequisites() {
   echo AAA Install MASCOPE bundle...
 
   pushd $MY_PATH
+  set -a
   source .env
+  set +a
+
+  stop_mascope_backend
 
   # make sure needed folders exist
   [ ! -d "$MASCOPE_PRIVATE_DATADIR" ] && mkdir -p $MASCOPE_PRIVATE_DATADIR
