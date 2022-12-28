@@ -1,7 +1,7 @@
 @echo off
 
 pushd backend
-start "mascope-backend" cmd /k poetry run server
+start "mascope-backend" cmd /k poetry run mascope-api
 popd
 pushd frontend
 start "mascope-frontend" cmd /k yarn serve --host
