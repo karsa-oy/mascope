@@ -138,7 +138,7 @@ def TwEvalResolution(R0, m0, dm, mass):
 masscalibrate = toollib.TwMassCalibrate if os.name=='posix' else toollib._TwMassCalibrate
 def TwMassCalibrate(massCalibMode, nbrPoints, mass, tof, weight, nbrParams, p, legacyA, legacyB):
     if isinstance(mass, np.ndarray):
-        masscalibrate.argtypes = [ct.c_int, ct.c_int, ndpointer(np.float64, shape=nbrPoints), ndpointer(np.float64, shape=nbrPoints), ndpointer(np.float64, shape=nbrPoints), ndpointer(np.int, shape=1), ndpointer(np.float64, shape=nbrParams[0]), ndpointer(np.float64, shape=1), ndpointer(np.float64, shape=1)]
+        masscalibrate.argtypes = [ct.c_int, ct.c_int, ndpointer(np.float64, shape=nbrPoints), ndpointer(np.float64, shape=nbrPoints), ndpointer(np.float64, shape=nbrPoints), ndpointer(int, shape=1), ndpointer(np.float64, shape=nbrParams[0]), ndpointer(np.float64, shape=1), ndpointer(np.float64, shape=1)]
     else:
         masscalibrate.argtypes = [ct.c_int, ct.c_int, ct.POINTER(ct.c_double), ct.POINTER(ct.c_double), ct.POINTER(ct.c_double), ct.c_int, ct.POINTER(ct.c_double), ct.POINTER(ct.c_double), ct.POINTER(ct.c_double)]
     return masscalibrate(massCalibMode, nbrPoints, mass, tof, weight, nbrParams, p, legacyA, legacyB)
@@ -146,23 +146,23 @@ def TwMassCalibrate(massCalibMode, nbrPoints, mass, tof, weight, nbrParams, p, l
 getisotopepattern = toollib.TwGetIsotopePattern if os.name=='posix' else toollib._TwGetIsotopePattern
 def TwGetIsotopePattern(molecule, abundanceLimit, nbrIsotopes, isoMass, isoAbundance):
     if isoMass is None and isoAbundance is None:
-        getisotopepattern.argtypes = [ct.c_char_p, ct.c_double, ndpointer(np.int, shape=1), ct.c_void_p, ct.c_void_p]
+        getisotopepattern.argtypes = [ct.c_char_p, ct.c_double, ndpointer(int, shape=1), ct.c_void_p, ct.c_void_p]
     else:
-        getisotopepattern.argtypes = [ct.c_char_p, ct.c_double, ndpointer(np.int, shape=1), ndpointer(np.float64), ndpointer(np.float64)]
+        getisotopepattern.argtypes = [ct.c_char_p, ct.c_double, ndpointer(int, shape=1), ndpointer(np.float64), ndpointer(np.float64)]
     return getisotopepattern(molecule, abundanceLimit, nbrIsotopes, isoMass, isoAbundance)
 
 decomposemass = toollib.TwDecomposeMass if os.name=='posix' else toollib._TwDecomposeMass
 def TwDecomposeMass(targetMass, tolerance, nbrAtoms, atomMass, atomLabel, nbrFilters, elementIndex1, elementIndex2, filterMinVal, filterMaxVal, nbrCompomers):
     decomposemass.argtypes = [ct.c_double, ct.c_double, ct.c_int, 
                               ndpointer(np.float64), ct.c_char_p, 
-                              ct.c_int, ndpointer(np.int), ndpointer(np.int), 
+                              ct.c_int, ndpointer(int), ndpointer(int), 
                               ndpointer(np.float64), ndpointer(np.float64), 
-                              ndpointer(np.int)]
+                              ndpointer(int)]
     return decomposemass(targetMass, tolerance, nbrAtoms, atomMass, atomLabel, 
                          nbrFilters, elementIndex1, elementIndex2, filterMinVal, 
                          filterMaxVal, nbrCompomers)
     
 getcomposition = toollib.TwGetComposition if os.name=='posix' else toollib._TwGetComposition
 def TwGetComposition(index, sumFormula, sumFormulaLength, mass, massError):
-    getcomposition.argtypes = [ct.c_int, ct.c_char_p, ndpointer(np.int), ndpointer(np.float64), ndpointer(np.float64)]
+    getcomposition.argtypes = [ct.c_int, ct.c_char_p, ndpointer(int), ndpointer(np.float64), ndpointer(np.float64)]
     return getcomposition(index, sumFormula, sumFormulaLength, mass, massError)

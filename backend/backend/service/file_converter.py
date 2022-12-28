@@ -17,7 +17,8 @@ from backend.lib.struct import AttrDict, LRUDict
 from backend.lib.util import timestamp_from_filename
 from hardware.tofwerk.h5_streamer import H5Streamer
 from hardware.orbitrap.generator import RawStreamer
-from backend.service.lib.util import load_env_yaml, FSWatcher
+from backend.service.lib.filesystem_watcher import FSWatcher
+from backend.service.lib.util import load_env_yaml
 
 
 async def create_sample_file_db_record(data):
