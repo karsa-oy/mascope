@@ -3,12 +3,44 @@
     <b-modal
       :active.sync="modalActive"
       trap-focus
-      :can-cancel="true"
+      :can-cancel="false"
       aria-role="dialog"
       aria-modal
       @close="deactivateModal"
     >
       <div class="box" style="background-color: inherit">
+        <section>
+          <b-field label="Acquisition">
+            <b-progress
+              :value="acquisitionProgress"
+              :type="acquisitionProgress == 100
+                     ? 'is-success'
+                     : 'is-primary'
+                    "
+              >
+            </b-progress>
+          </b-field>
+          <b-field label="Calibration">
+            <b-progress
+              :value="calibrationProgress"
+              :type="calibrationProgress == 100
+                     ? 'is-success'
+                     : 'is-primary'
+                    "
+              >
+            </b-progress>
+          </b-field>
+          <b-field label="Target search">
+            <b-progress
+              :value="matchingProgress"
+              :type="matchingProgress == 100
+                     ? 'is-success'
+                     : 'is-primary'
+                    "
+              >
+            </b-progress>
+          </b-field>        </section>
+        <br></br>
         <b-steps
             v-model="activeStep"
             :has-navigation="false"
@@ -41,7 +73,6 @@
                       "
                       :required="fillable && item.required"
                       :disabled="!fillable || item.disabled"
-                      lazy
                       expanded
                     >
                     </b-input>
@@ -275,7 +306,7 @@ import { mapMutations } from "vuex";
 import { call, get, sync } from "vuex-pathify";
 
 export default {
-  name: "TheModalSampleItemAttributesSave",
+  name: "TheModalScenthoundWorkflow",
   components: {
     BaseParamField,
     BaseTable,
@@ -327,9 +358,12 @@ export default {
   computed: {
     ...get({
       allTemplates: "app/attributeTemplates",
+      acquisitionProgress: "instrument/acquisitionProgress",
       batchActive: "batch/active",
       batchMzCalibration: "batch/mzCalibration",
-      modalProps: "modal/sampleItemAttributesSaveProps",
+      calibrationProgress: "instrument/calibrationProgress",
+      matchingProgress: "instrument/matchingProgress",
+      modalProps: "modal/scenthoundWorkflowProps",
       mzCalibrationMatchScoreMin: "calibration/paramMatchScoreMin",
       mzCalibrationRefineWindow: "calibration/paramRefineWindow",
       mzFit: "calibration/mzFit",
@@ -339,7 +373,7 @@ export default {
       sampleMzCalibrated: "sample/active@mz_calibration.verified",
     }),
     ...sync({
-      modalActive: "modal/sampleItemAttributesSaveActive",
+      modalActive: "modal/scenthoundWorkflowActive",
     }),
     availableTemplates() {
       return [this.defaultTemplate, ...this.savedTemplates];
@@ -575,31 +609,31 @@ export default {
           name: null,
           type: this.templateType,
           template: [],
-        };
-        for (let { label, key, required, disabled } of this.defaultTemplate.template) {
-          if (required) {
-            newTemplate.template.push({
-              label,
-              key,
-              required,
-              disabled,
-              value: data.sampleItemRecordToLoad[label],
-            });
-          }
+      };
+      for (let { label, key, required, disabled } of this.defaultTemplate.template) {
+        if (required) {
+          newTemplate.template.push({
+            label,
+            key,
+            required,
+            disabled,
+            value: data.sampleItemRecordToLoad[label],
+          });
         }
-        const attributesField = this.templateType + '_attributes';
-        if (data.sampleItemRecordToLoad[attributesField]) {
-          Object.keys(data.sampleItemRecordToLoad[attributesField]).forEach((attr) =>
-            newTemplate.template.push({
-              label: attr,
-              value: data.sampleItemRecordToLoad[attributesField][attr],
-            })
-          );
-        }
-        this.loadedTemplate = newTemplate;
-        this.sampleFilename = data.sampleItemRecordToLoad.filename;
-        this.sampleInstrument = data.sampleItemRecordToLoad.instrument;
-        this.sampleItemType = data.sampleItemRecordToLoad.sample_item_type;
+      }
+      const attributesField = this.templateType + '_attributes';
+      if (data.sampleItemRecordToLoad[attributesField]) {
+        Object.keys(data.sampleItemRecordToLoad[attributesField]).forEach((attr) =>
+          newTemplate.template.push({
+            label: attr,
+            value: data.sampleItemRecordToLoad[attributesField][attr],
+          })
+        );
+      }
+      this.loadedTemplate = newTemplate;
+      this.sampleFilename = data.sampleItemRecordToLoad.filename;
+      this.sampleInstrument = data.sampleItemRecordToLoad.instrument;
+      this.sampleItemType = data.sampleItemRecordToLoad.sample_item_type;
     },
   },
 };

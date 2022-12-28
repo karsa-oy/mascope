@@ -2,8 +2,11 @@ import { make } from 'vuex-pathify';
 
 const state = {
     active: null,
-    mzCalibration: null,
+    calibrationProgress: null,
+    acquisitionProgress: null,
     acquisitions: null,
+    matchingProgress: null,
+    mzCalibration: null,
     recentAcquisitions: null,
 }
 
@@ -97,14 +100,20 @@ export default {
             commit('SET_RECENT_ACQUISITIONS', null)
         },
         // notifications
-        async onInstrumentAcquisitionFinished({}, data) {
-            console.log(data);
+        async onInstrumentAcquisitionFinished({ commit }, data) {
+            commit('SET_ACQUISITION_PROGRESS', data.progress);
         },
-        async onInstrumentAcquisitionProgress({}, data) {
-            console.log(data);
+        async onInstrumentAcquisitionProgress({ commit }, data) {
+            commit('SET_ACQUISITION_PROGRESS', data.progress);
         },
-        async onInstrumentAcquisitionStarted({}, data) {
-            console.log(data);
+        async onInstrumentAcquisitionStarted({ rootState, commit, dispatch }, data) {
+            await dispatch('sample/unload', null, {root:true});
+            commit('modal/activate', {modal: 'scenthoundWorkflow'}, {root:true});
+            rootState.modal.scenthoundWorkflowProps = {
+                action: 'create',
+                sampleItemRecordToLoad: data,
+            };
+            commit('SET_ACQUISITION_PROGRESS', data.progress);
         },
         async onSampleFileCreated({ rootState, dispatch }, filename) {
             await dispatch('api/reloadDb', null, {root:true});
