@@ -62,17 +62,21 @@ def parse_cmd_args():
 
 
 async def streamer_processor(streamer):
-    global cache
     global instrument_name
+    global sio
     # Handlers
     async def handle_spec_data(data):
         filename = data['filename']
         spec_i = data['i']
+        notification_data = {
+            'filename': filename,
+            'instrument': instrument_name,
+            'progress': streamer.progress,
+        }
         if spec_i is None:
             # File finished
             print("File finished")
             raw_filename = data['source_filepath']
-            global instrument_name
             global target_path
             mailbox_path = os.path.join(
                 target_path,
@@ -85,12 +89,26 @@ async def streamer_processor(streamer):
                 raw_filename,
                 os.path.join(mailbox_path, os.path.basename(raw_filename))
                 )
+            if sio.connected:
+                await sio.emit(
+                    'instrument_acquisition_finished',
+                    notification_data,
+                )
         elif spec_i < 0:
             # New file
             print("New file: %s" %filename)
+            if sio.connected:
+                await sio.emit(
+                    'instrument_acquisition_started',
+                    notification_data,
+                )
         else:
             # New data to existing file
-            pass
+            if sio.connected:
+                await sio.emit(
+                    'instrument_acquisition_progress',
+                    notification_data,
+                )
         print("%.2f" %streamer.progress)
         return True
 

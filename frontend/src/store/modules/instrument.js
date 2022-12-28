@@ -97,6 +97,15 @@ export default {
             commit('SET_RECENT_ACQUISITIONS', null)
         },
         // notifications
+        async onInstrumentAcquisitionFinished({}, data) {
+            console.log(data);
+        },
+        async onInstrumentAcquisitionProgress({}, data) {
+            console.log(data);
+        },
+        async onInstrumentAcquisitionStarted({}, data) {
+            console.log(data);
+        },
         async onSampleFileCreated({ rootState, dispatch }, filename) {
             await dispatch('api/reloadDb', null, {root:true});
             await dispatch('getRecentAcquisitions');
