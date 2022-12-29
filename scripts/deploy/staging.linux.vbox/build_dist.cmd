@@ -4,7 +4,11 @@ set frontend_path=%mypath%\..\..\..\frontend
 
 echo Set MASCOPE environment...
 pushd %mypath%
-FOR /F "eol=# tokens=*" %%i IN (%~dp0.env) DO SET %%i
+FOR /F "eol=# tokens=*" %%i IN (.env) DO SET %%i
+if exist .debug_env (
+    echo Override with MASCOPE debug environment...
+    FOR /F "eol=# tokens=*" %%i IN (.debug_env) DO SET %%i
+)
 popd
 
 echo Build MASCOPE dist package...
