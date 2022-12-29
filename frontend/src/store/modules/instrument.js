@@ -123,8 +123,30 @@ export default {
             };
             commit('SET_ACQUISITION_PROGRESS', data.progress);
         },
-        async onInstrumentConversionFinished({ commit }, data) {
+        async onInstrumentCalibrationFinished({ commit }, data) {
+            commit('SET_CALIBRATION_PROGRESS', data.progress);
+        },
+        async onInstrumentCalibrationProgress({ commit }, data) {
+            commit('SET_CALIBRATION_PROGRESS', data.progress);
+        },
+        async onInstrumentCalibrationStarted({ commit }, data) {
+            commit('SET_CALIBRATION_PROGRESS', data.progress);
+        },
+        async onInstrumentConversionFinished({ rootState, commit }, data) {
             commit('SET_CONVERSION_PROGRESS', data.progress);
+            // TODO: TOFService: acquisition_started -> Prompt input from user
+            const sampleActive = rootState.sample.active;
+            if (sampleActive && rootState.modal.scenthoundWorkflowActive) {
+                rootState.api.emit(
+                    'scenthound_process_sample',
+                    {
+                        'filename': sampleActive.filename,
+                        'sample_item_id': sampleActive.sample_item_id,
+                        'sample_batch_id': sampleActive.sample_batch_id,
+                    }
+                ); 
+            }
+            // TODO
         },
         async onInstrumentConversionProgress({ commit }, data) {
             commit('SET_CONVERSION_PROGRESS', data.progress);
@@ -132,22 +154,18 @@ export default {
         async onInstrumentConversionStarted({ commit }, data) {
             commit('SET_CONVERSION_PROGRESS', data.progress);
         },
+        async onInstrumentMatchingFinished({ commit }, data) {
+            commit('SET_MATCHING_PROGRESS', data.progress);
+        },
+        async onInstrumentMatchingProgress({ commit }, data) {
+            commit('SET_MATCHING_PROGRESS', data.progress);
+        },
+        async onInstrumentMatchingStarted({ commit }, data) {
+            commit('SET_MATCHING_PROGRESS', data.progress);
+        },
         async onSampleFileCreated({ rootState, dispatch }, filename) {
             await dispatch('api/reloadDb', null, {root:true});
             await dispatch('getRecentAcquisitions');
-
-            // TODO: TOFService: acquisition_started -> Prompt input from user
-            rootState.api.emit(
-                'scenthound_process_samples',
-                [{
-                    filename,
-                    'sample_batch_id': rootState.batch.active.sample_batch_id,
-                    'sample_item_attributes': [],
-                    'sample_item_name': "automatically created sample",
-                    'sample_item_type': "UNKNOWN",
-                }]
-            ); 
-            // TODO
         },
     },
     getters: {}

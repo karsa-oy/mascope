@@ -1,17 +1,90 @@
 import asyncio
+import pandas as pd
 
 from backend.api.calibration import mz_calibrate_sample as calibration_mz_calibrate_sample
 from backend.api.match import item_compute as match_item_compute
 from backend.api.sample import item_create as sample_item_create
+from backend.db.conn import conn
 from backend.server import sio
 
 
 async def process_sample(sample_item):
     try:
+        filename = sample_item['filename']
+        [instrument] = pd.read_sql(f"""--sql
+                SELECT instrument
+                FROM sample_file
+                WHERE filename = ?
+                """,
+                conn,
+                params=[filename]
+            )['instrument'].tolist()
+        await sio.emit(
+            'instrument_calibration_started',
+            {
+                'filename': filename,
+                'progress': 0,
+            },
+            room=instrument,
+            namespace='/'
+        )
+        await sio.emit(
+            'instrument_calibration_progress',
+            {},
+            room=instrument,
+            namespace='/'
+        )
         await calibration_mz_calibrate_sample(sample_item)
+        await sio.emit(
+            'instrument_calibration_finished',
+            {
+                'filename': filename,
+                'progress': 100,
+            },
+            room=instrument,
+            namespace='/'
+        )
+        await sio.emit(
+            'instrument_matching_started',
+            {
+                'filename': filename,
+                'progress': 0,
+            },
+            room=instrument,
+            namespace='/'
+        )
+        await sio.emit(
+            'instrument_matching_progress',
+            {},
+            room=instrument,
+            namespace='/'
+        )
         await match_item_compute(sample_item['sample_item_id'])
+        await sio.emit(
+            'instrument_matching_finished',
+            {
+                'filename': filename,
+                'progress': 100,
+            },
+            room=instrument,
+            namespace='/'
+        )
     except:
         print("Failed to process sample %s" %sample_item['filename'])
+
+
+@sio.event(namespace='/')
+async def scenthound_process_sample(sid, sample_item):
+    process_task = sio.start_background_task(
+        process_sample, sample_item
+    )
+    await asyncio.gather(process_task)
+    sample_batch_id = sample_item['sample_batch_id']
+    await sio.emit(
+        'sample_batch_reload',
+        room=sample_batch_id,
+        namespace='/'
+        )
 
 @sio.event(namespace='/')
 async def scenthound_process_samples(sid, sample_items):
