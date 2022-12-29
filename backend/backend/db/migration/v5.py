@@ -50,5 +50,21 @@ def run():
             ALTER TABLE match
             RENAME COLUMN sample_peak_height_relative TO sample_peak_area_relative;
         """)
+        # Redo match interferences table
+        new_conn.cursor().execute(f"""--sql
+            DROP TABLE match_interference
+        """)
+        new_conn.execute("""--sql
+            CREATE TABLE match_interference (
+                match_interference_id VARCHAR(32) PRIMARY KEY
+                ,target_isotope_id VARCHAR(32) NOT NULL
+                    REFERENCES target_isotope(target_isotope_id)
+                    ON DELETE CASCADE
+                ,sample_item_id VARCHAR(16) NOT NULL
+                    REFERENCES sample_item(sample_item_id)
+                    ON DELETE CASCADE
+                ,sample_peak_interference FLOAT NOT NULL
+            );
+        """)
         new_conn.commit()
     new_conn.close()
