@@ -1,4 +1,4 @@
-import { make } from 'vuex-pathify';
+import { dispatch, make } from 'vuex-pathify';
 
 const state = {
     active: null,
@@ -92,6 +92,24 @@ export default {
             await dispatch('getMzCalibration');
             await dispatch('getRecentAcquisitions');
         },
+        async processSample({ rootState, dispatch }) {
+            const sampleActive = rootState.sample.active;
+            if (sampleActive) {
+                rootState.api.emit(
+                    'scenthound_process_sample',
+                    {
+                        'filename': sampleActive.filename,
+                        'sample_item_id': sampleActive.sample_item_id,
+                        'sample_batch_id': sampleActive.sample_batch_id,
+                    }
+                );
+            } else {
+                // Try again in 1 second
+                setTimeout(() => {
+                    dispatch('processSample')
+                }, 1000);
+            }
+        },
         async resetProgress({ commit }) {
             commit('SET_ACQUISITION_PROGRESS', 0);
             commit('SET_CALIBRATION_PROGRESS', 0);
@@ -125,6 +143,7 @@ export default {
         },
         async onInstrumentCalibrationFinished({ commit }, data) {
             commit('SET_CALIBRATION_PROGRESS', data.progress);
+            // TODO: Verify mass calibration, start matching
         },
         async onInstrumentCalibrationProgress({ commit }, data) {
             commit('SET_CALIBRATION_PROGRESS', data.progress);
@@ -132,21 +151,12 @@ export default {
         async onInstrumentCalibrationStarted({ commit }, data) {
             commit('SET_CALIBRATION_PROGRESS', data.progress);
         },
-        async onInstrumentConversionFinished({ rootState, commit }, data) {
+        async onInstrumentConversionFinished({ rootState, commit, dispatch }, data) {
             commit('SET_CONVERSION_PROGRESS', data.progress);
-            // TODO: TOFService: acquisition_started -> Prompt input from user
-            const sampleActive = rootState.sample.active;
-            if (sampleActive && rootState.modal.scenthoundWorkflowActive) {
-                rootState.api.emit(
-                    'scenthound_process_sample',
-                    {
-                        'filename': sampleActive.filename,
-                        'sample_item_id': sampleActive.sample_item_id,
-                        'sample_batch_id': sampleActive.sample_batch_id,
-                    }
-                ); 
+            // TODO: Wait for sample to be saved, then start mass calibration
+            if (rootState.modal.scenthoundWorkflowActive) {
+                dispatch('processSample');
             }
-            // TODO
         },
         async onInstrumentConversionProgress({ commit }, data) {
             commit('SET_CONVERSION_PROGRESS', data.progress);
@@ -156,6 +166,8 @@ export default {
         },
         async onInstrumentMatchingFinished({ commit }, data) {
             commit('SET_MATCHING_PROGRESS', data.progress);
+            // TODO: case: background, verify interferences
+            // TODO: case: else, display matches
         },
         async onInstrumentMatchingProgress({ commit }, data) {
             commit('SET_MATCHING_PROGRESS', data.progress);
