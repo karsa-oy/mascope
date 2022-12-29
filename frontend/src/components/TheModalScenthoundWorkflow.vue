@@ -20,6 +20,16 @@
               >
             </b-progress>
           </b-field>
+          <b-field label="Conversion">
+            <b-progress
+              :value="conversionProgress"
+              :type="conversionProgress == 100
+                     ? 'is-success'
+                     : 'is-primary'
+                    "
+              >
+            </b-progress>
+          </b-field>
           <b-field label="Calibration">
             <b-progress
               :value="calibrationProgress"
@@ -39,8 +49,9 @@
                     "
               >
             </b-progress>
-          </b-field>        </section>
-        <br></br>
+          </b-field>
+        </section>
+        <br>
         <b-steps
             v-model="activeStep"
             :has-navigation="false"
@@ -362,6 +373,7 @@ export default {
       batchActive: "batch/active",
       batchMzCalibration: "batch/mzCalibration",
       calibrationProgress: "instrument/calibrationProgress",
+      conversionProgress: "instrument/conversionProgress",
       matchingProgress: "instrument/matchingProgress",
       modalProps: "modal/scenthoundWorkflowProps",
       mzCalibrationMatchScoreMin: "calibration/paramMatchScoreMin",

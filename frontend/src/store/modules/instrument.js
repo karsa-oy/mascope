@@ -2,10 +2,11 @@ import { make } from 'vuex-pathify';
 
 const state = {
     active: null,
-    calibrationProgress: null,
-    acquisitionProgress: null,
+    calibrationProgress: 0,
+    acquisitionProgress: 0,
     acquisitions: null,
-    matchingProgress: null,
+    conversionProgress: 0,
+    matchingProgress: 0,
     mzCalibration: null,
     recentAcquisitions: null,
 }
@@ -91,6 +92,12 @@ export default {
             await dispatch('getMzCalibration');
             await dispatch('getRecentAcquisitions');
         },
+        async resetProgress({ commit }) {
+            commit('SET_ACQUISITION_PROGRESS', 0);
+            commit('SET_CALIBRATION_PROGRESS', 0);
+            commit('SET_CONVERSION_PROGRESS', 0);
+            commit('SET_MATCHING_PROGRESS', 0);
+        },
         async unload({ rootState, state, commit }) {
             if (!state.active) return;
             rootState.api.emit('unsubscribe', state.active);
@@ -108,6 +115,7 @@ export default {
         },
         async onInstrumentAcquisitionStarted({ rootState, commit, dispatch }, data) {
             await dispatch('sample/unload', null, {root:true});
+            await dispatch('resetProgress');
             commit('modal/activate', {modal: 'scenthoundWorkflow'}, {root:true});
             rootState.modal.scenthoundWorkflowProps = {
                 action: 'create',
@@ -115,16 +123,31 @@ export default {
             };
             commit('SET_ACQUISITION_PROGRESS', data.progress);
         },
+        async onInstrumentConversionFinished({ commit }, data) {
+            commit('SET_CONVERSION_PROGRESS', data.progress);
+        },
+        async onInstrumentConversionProgress({ commit }, data) {
+            commit('SET_CONVERSION_PROGRESS', data.progress);
+        },
+        async onInstrumentConversionStarted({ commit }, data) {
+            commit('SET_CONVERSION_PROGRESS', data.progress);
+        },
         async onSampleFileCreated({ rootState, dispatch }, filename) {
             await dispatch('api/reloadDb', null, {root:true});
             await dispatch('getRecentAcquisitions');
+
+            // TODO: TOFService: acquisition_started -> Prompt input from user
             rootState.api.emit(
                 'scenthound_process_samples',
-                {
+                [{
                     filename,
-                    'sample_batch_id': rootState.batch.active.sample_batch_id
-                }
+                    'sample_batch_id': rootState.batch.active.sample_batch_id,
+                    'sample_item_attributes': [],
+                    'sample_item_name': "automatically created sample",
+                    'sample_item_type': "UNKNOWN",
+                }]
             ); 
+            // TODO
         },
     },
     getters: {}

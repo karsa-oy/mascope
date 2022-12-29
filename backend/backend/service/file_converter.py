@@ -45,6 +45,7 @@ async def create_sample_file_db_record(data):
 async def streamer_processor(streamer):
     global cache
     global instrument_name
+    global sio
     # Handlers
     async def handle_spec_data(data):
         def cleanup():
@@ -61,6 +62,11 @@ async def streamer_processor(streamer):
         cache_item = cache.get(filename)
         zarr_filename = '_'.join([instrument_name, filename]).replace(' ', '_')
         data.update({'filename': zarr_filename})
+        notification_data = {
+            'filename': filename,
+            'instrument': instrument_name,
+            'progress': streamer.progress,
+        }
         if spec_i is None:
             # File finished
             zarr_sdk.finalize_signal_dataset({'value': data}, cache_item)
@@ -76,6 +82,11 @@ async def streamer_processor(streamer):
                 await create_sample_file_db_record(data)
             except socketio.exceptions.BadNamespaceError:
                 print("Failed to create database record! No connection to server.")
+            if sio.connected:
+                await sio.emit(
+                    'instrument_conversion_finished',
+                    notification_data,
+                )
         elif spec_i < 0:
             # New file
             try:
@@ -86,9 +97,19 @@ async def streamer_processor(streamer):
                 return False
             cache_item = AttrDict(cache_item)
             cache[filename] = cache_item
+            if sio.connected:
+                await sio.emit(
+                    'instrument_conversion_started',
+                    notification_data,
+                )
         else:
             # New data to existing file
             zarr_sdk.update_signal_dataset({'value': data}, cache_item)
+            if sio.connected:
+                await sio.emit(
+                    'instrument_conversion_progress',
+                    notification_data,
+                )
         return True
             
     async def handle_tps_data(data):

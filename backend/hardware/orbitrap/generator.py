@@ -60,7 +60,6 @@ class RawStreamer(Thread):
         self.filename = None                    # Filename base from TW h5 file
         self.interval = None                    # Acquisition interval [s]
         self.length = None                      # Acquisition length [s]
-        self.progress = 0                       # Acquisition progress [%]
         self.speci = -1                         # Index of last received spectrum,
                                                 # -1 when there is no active acquisition
 
@@ -71,6 +70,11 @@ class RawStreamer(Thread):
                              self.raw.RunHeaderEx.HighMass],
                             dtype=np.float32
                             )
+    @property
+    def progress(self):
+        if not self.active.is_set():
+            return 100
+        return ((self.speci+1) / self.raw.RunHeaderEx.LastSpectrum) * 100. # [%]
 
     def _get_and_feed_data(self):
         """Read data from the RAW file and put to queues
@@ -127,7 +131,6 @@ class RawStreamer(Thread):
         """Reset per acquisition attributes
         """
         self.filename = None
-        self.progress = 0
         self.speci = -1
 
     def _set_mz_precision(self, mz, spec):
@@ -174,8 +177,6 @@ class RawStreamer(Thread):
             self.speci = scan - 1
             print(self.speci)
             self._get_and_feed_data()
-            # Acquisition progress
-            self.progress = (scan / self.raw.RunHeaderEx.LastSpectrum) * 100. # [%]
 
     def _wait_for_queues(self):
         """Wait for tick event to be set before continuing streaming
