@@ -30,11 +30,6 @@ def parse_cmd_args():
         type=str, required=False
     )
     parser.add_argument(
-        "-i", "--instrument",
-        help="instrument name",
-        type=str, required=False
-    )
-    parser.add_argument(
         "-p", "--port",
         help="Mascope socket.io port",
         type=str, required=False
@@ -62,11 +57,11 @@ def parse_cmd_args():
 
 
 async def streamer_processor(streamer):
-    global instrument_name
     global sio
     # Handlers
     async def handle_spec_data(data):
         filename = data['filename']
+        instrument_name = filename.split('_')[0]
         spec_i = data['i']
         notification_data = {
             'filename': filename,
@@ -78,16 +73,12 @@ async def streamer_processor(streamer):
             print("File finished")
             raw_filename = data['source_filepath']
             global target_path
-            mailbox_path = os.path.join(
-                target_path,
-                instrument_name
-                )
-            if not os.path.exists(mailbox_path):
-                print("Creating mailbox: %s" %mailbox_path)
-                os.mkdir(mailbox_path)
+            if not os.path.exists(target_path):
+                print("Creating mailbox: %s" %target_path)
+                os.mkdir(target_path)
             shutil.copyfile(
                 raw_filename,
-                os.path.join(mailbox_path, os.path.basename(raw_filename))
+                os.path.join(target_path, os.path.basename(raw_filename))
                 )
             if sio.connected:
                 await sio.emit(
@@ -150,7 +141,6 @@ async def main():
 
 
 host = None
-instrument_name = None
 port = None
 shutdown_event = Event()
 sio = socketio.AsyncClient(logger=True)
@@ -158,7 +148,6 @@ target_path = None
 
 def run():
     global host
-    global instrument_name
     global port
     global shutdown_event
     global target_path
@@ -166,7 +155,6 @@ def run():
     args = parse_cmd_args()
     host = args.get('host', os.environ.get('MASCOPE_PUBLIC_HOST'))
     port = args.get('port', os.environ.get('MASCOPE_PUBLIC_API_PORT'))
-    instrument_name = args.get('instrument', 'unknown')
     target_path = args.get(
         'target',
         os.environ.get('MASCOPE_PRIVATE_DOWNLOADER_DIR', '.')

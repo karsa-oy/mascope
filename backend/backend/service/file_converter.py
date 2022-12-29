@@ -23,7 +23,7 @@ from backend.service.lib.util import load_env_yaml
 
 async def create_sample_file_db_record(data):
     filename = data['filename']
-    global instrument_name
+    instrument_name = filename.split('_')[0]
     committed_length = data['committed_length']
     date = timestamp_from_filename(filename)
     utc_offset = timedelta(seconds=int(data['utc_offset']))
@@ -44,7 +44,6 @@ async def create_sample_file_db_record(data):
 
 async def streamer_processor(streamer):
     global cache
-    global instrument_name
     global sio
     # Handlers
     async def handle_spec_data(data):
@@ -58,10 +57,9 @@ async def streamer_processor(streamer):
                 streamer.tps_queue.get() # data
 
         filename = data['filename']
+        instrument_name = filename.split('_')[0]
         spec_i = data['i']
         cache_item = cache.get(filename)
-        zarr_filename = '_'.join([instrument_name, filename]).replace(' ', '_')
-        data.update({'filename': zarr_filename})
         notification_data = {
             'filename': filename,
             'instrument': instrument_name,
@@ -124,8 +122,6 @@ async def streamer_processor(streamer):
         elif spec_i < 0:
             # New file
             try:
-                zarr_filename = '_'.join([instrument_name, filename]).replace(' ', '_')
-                data.update({'filename': zarr_filename})
                 zarr_sdk.init_tps_dataset({'value': data}, cache_item)
             except FileExistsError:
                 return
@@ -157,11 +153,6 @@ def parse_cmd_args():
     parser.add_argument(
         "-c", "--config",
         help="path to yaml config file",
-        type=str, required=False
-    )
-    parser.add_argument(
-        "-i", "--instrument",
-        help="instrument name",
         type=str, required=False
     )
     parser.add_argument(
@@ -233,7 +224,6 @@ load_dotenv()
 
 cache = None
 file_queue = Queue()
-instrument_name = None
 shutdown_event = Event()
 sio = socketio.AsyncClient(logger=True)
 
@@ -241,13 +231,11 @@ sio = socketio.AsyncClient(logger=True)
 def run():
     global cache
     global file_queue
-    global instrument_name
     global shutdown_event
 
     args = parse_cmd_args()
     print(args)
 
-    instrument_name = args.get('instrument', 'unknown')
 
     streamer_type = args['streamer_type']
     if streamer_type == 'H5':
