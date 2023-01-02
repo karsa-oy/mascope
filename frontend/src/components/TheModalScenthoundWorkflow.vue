@@ -371,7 +371,6 @@ export default {
       allTemplates: "app/attributeTemplates",
       acquisitionProgress: "instrument/acquisitionProgress",
       batchActive: "batch/active",
-      batchMzCalibration: "batch/mzCalibration",
       calibrationProgress: "instrument/calibrationProgress",
       conversionProgress: "instrument/conversionProgress",
       matchingProgress: "instrument/matchingProgress",
@@ -646,6 +645,17 @@ export default {
       this.sampleFilename = data.sampleItemRecordToLoad.filename;
       this.sampleInstrument = data.sampleItemRecordToLoad.instrument;
       this.sampleItemType = data.sampleItemRecordToLoad.sample_item_type;
+    },
+    acquisitionProgress(newValue, oldValue) {
+      if (newValue == 0) this.activeStep = 0;
+
+    },
+    calibrationProgress(newValue, oldValue) {
+      if (oldValue != 100 && newValue == 100) this.activeStep = 1;
+    },
+    matchingProgress(newValue, oldValue) {
+      if (oldValue != 100 && newValue == 100) this.activeStep = 2;
+
     },
   },
 };
