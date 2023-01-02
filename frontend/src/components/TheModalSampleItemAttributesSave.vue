@@ -457,7 +457,7 @@ export default {
     sampleMatch() {
       this.$api.emit(
         'match_item_compute',
-        this.sampleActive.sample_item_id
+        this.sampleActive
       )
     },
     async saveSampleItem() {

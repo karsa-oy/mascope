@@ -92,11 +92,11 @@ export default {
             await dispatch('getMzCalibration');
             await dispatch('getRecentAcquisitions');
         },
-        async processSample({ rootState, dispatch }) {
+        async matchSample({ rootState, dispatch }) {
             const sampleActive = rootState.sample.active;
             if (sampleActive) {
                 rootState.api.emit(
-                    'scenthound_process_sample',
+                    'match_item_compute',
                     {
                         'filename': sampleActive.filename,
                         'sample_item_id': sampleActive.sample_item_id,
@@ -106,7 +106,25 @@ export default {
             } else {
                 // Try again in 1 second
                 setTimeout(() => {
-                    dispatch('processSample')
+                    dispatch('matchSample')
+                }, 1000);
+            }
+        },
+        async mzCalibrateSample({ rootState, dispatch }) {
+            const sampleActive = rootState.sample.active;
+            if (sampleActive) {
+                rootState.api.emit(
+                    'calibration_mz_calibrate_sample',
+                    {
+                        'filename': sampleActive.filename,
+                        'sample_item_id': sampleActive.sample_item_id,
+                        'sample_batch_id': sampleActive.sample_batch_id,
+                    }
+                );
+            } else {
+                // Try again in 1 second
+                setTimeout(() => {
+                    dispatch('mzCalibrateSample')
                 }, 1000);
             }
         },
@@ -141,21 +159,28 @@ export default {
             };
             commit('SET_ACQUISITION_PROGRESS', data.progress);
         },
-        async onInstrumentCalibrationFinished({ commit }, data) {
+        async onCalibrationMzCalibrateFailed({ commit }, data) {
             commit('SET_CALIBRATION_PROGRESS', data.progress);
-            // TODO: Verify mass calibration, start matching
+            // TODO:
         },
-        async onInstrumentCalibrationProgress({ commit }, data) {
+        async onCalibrationMzCalibrateFinished({ rootState, commit }, data) {
+            commit('SET_CALIBRATION_PROGRESS', data.progress);
+            // Start matching
+            if (rootState.modal.scenthoundWorkflowActive) {
+                dispatch('instrument/matchSample', null, {root:true});
+            }
+        },
+        async onCalibrationMzCalibrateProgress({ commit }, data) {
             commit('SET_CALIBRATION_PROGRESS', data.progress);
         },
-        async onInstrumentCalibrationStarted({ commit }, data) {
+        async onCalibrationMzCalibrateStarted({ commit }, data) {
             commit('SET_CALIBRATION_PROGRESS', data.progress);
         },
         async onInstrumentConversionFinished({ rootState, commit, dispatch }, data) {
             commit('SET_CONVERSION_PROGRESS', data.progress);
-            // TODO: Wait for sample to be saved, then start mass calibration
+            // Wait for sample to be saved, then start mass calibration
             if (rootState.modal.scenthoundWorkflowActive) {
-                dispatch('processSample');
+                dispatch('mzCalibrateSample');
             }
         },
         async onInstrumentConversionProgress({ commit }, data) {
@@ -164,15 +189,18 @@ export default {
         async onInstrumentConversionStarted({ commit }, data) {
             commit('SET_CONVERSION_PROGRESS', data.progress);
         },
-        async onInstrumentMatchingFinished({ commit }, data) {
+        async onMatchItemComputeFailed({ commit }, data) {
+            commit('SET_MATCHING_PROGRESS', data.progress);
+        },
+        async onMatchItemComputeFinished({ commit }, data) {
             commit('SET_MATCHING_PROGRESS', data.progress);
             // TODO: case: background, verify interferences
             // TODO: case: else, display matches
         },
-        async onInstrumentMatchingProgress({ commit }, data) {
+        async onMatchItemComputeProgress({ commit }, data) {
             commit('SET_MATCHING_PROGRESS', data.progress);
         },
-        async onInstrumentMatchingStarted({ commit }, data) {
+        async onMatchItemComputeStarted({ commit }, data) {
             commit('SET_MATCHING_PROGRESS', data.progress);
         },
         async onSampleFileCreated({ rootState, dispatch }, filename) {
