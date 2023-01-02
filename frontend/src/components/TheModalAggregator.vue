@@ -7,7 +7,6 @@
     <the-modal-sample-item-attributes-save></the-modal-sample-item-attributes-save>
     <the-modal-sample-item-overview></the-modal-sample-item-overview>
     <the-modal-sample-item-target-ion></the-modal-sample-item-target-ion>
-    <the-modal-scenthound-workflow></the-modal-scenthound-workflow>
   </div>
 </template>
 
@@ -19,7 +18,6 @@ import TheModalSampleBatchOp from "./TheModalSampleBatchOp.vue";
 import TheModalSampleItemAttributesSave from "./TheModalSampleItemAttributesSave.vue";
 import TheModalSampleItemOverview from "./TheModalSampleItemOverview.vue";
 import TheModalSampleItemTargetIon from "./TheModalSampleItemTargetIon.vue";
-import TheModalScenthoundWorkflow from "./TheModalScenthoundWorkflow.vue";
 
 export default {
   name: "TheModalAggregator",
@@ -31,7 +29,6 @@ export default {
     TheModalSampleItemAttributesSave,
     TheModalSampleItemOverview,
     TheModalSampleItemTargetIon,
-    TheModalScenthoundWorkflow,
   },
 };
 </script>

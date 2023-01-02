@@ -1,21 +1,14 @@
 <template>
   <section>
-    <b-modal
-      :active.sync="modalActive"
-      trap-focus
-      :can-cancel="false"
-      aria-role="dialog"
-      aria-modal
-      @close="deactivateModal"
-    >
-      <div class="box" style="background-color: inherit">
+    <the-layout-sidebar>
+      <div style="margin: 0 auto; width: 50vw">
         <section>
           <b-field label="Acquisition">
             <b-progress
               :value="acquisitionProgress"
               :type="acquisitionProgress == 100
-                     ? 'is-success'
-                     : 'is-primary'
+                      ? 'is-success'
+                      : 'is-primary'
                     "
               >
             </b-progress>
@@ -24,8 +17,8 @@
             <b-progress
               :value="conversionProgress"
               :type="conversionProgress == 100
-                     ? 'is-success'
-                     : 'is-primary'
+                      ? 'is-success'
+                      : 'is-primary'
                     "
               >
             </b-progress>
@@ -34,8 +27,8 @@
             <b-progress
               :value="calibrationProgress"
               :type="calibrationProgress == 100
-                     ? 'is-success'
-                     : 'is-primary'
+                      ? 'is-success'
+                      : 'is-primary'
                     "
               >
             </b-progress>
@@ -44,8 +37,8 @@
             <b-progress
               :value="matchingProgress"
               :type="matchingProgress == 100
-                     ? 'is-success'
-                     : 'is-primary'
+                      ? 'is-success'
+                      : 'is-primary'
                     "
               >
             </b-progress>
@@ -302,7 +295,7 @@
             </b-step-item>
         </b-steps>
       </div>
-    </b-modal>
+    </the-layout-sidebar>
   </section>
 </template>
 
@@ -310,6 +303,7 @@
 
 import BaseParamField from "./BaseParamField.vue";
 import BaseTable from "./BaseTable.vue";
+import TheLayoutSidebar from "./TheLayoutSidebar.vue";
 import ThePaneBrowserTarget from "./ThePaneBrowserTarget.vue";
 
 import * as _ from "underscore";
@@ -321,6 +315,7 @@ export default {
   components: {
     BaseParamField,
     BaseTable,
+    TheLayoutSidebar,
     ThePaneBrowserTarget,
   },
   props: {},

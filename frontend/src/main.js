@@ -27,6 +27,7 @@ import ThePageBatchOverview from "./components/ThePageBatchOverview.vue";
 import ThePageMzCalibration from "./components/ThePageMzCalibration.vue";
 import ThePageSampleManagement from "./components/ThePageSampleManagement.vue";
 //import ThePageSettings from "./components/ThePageSettings.vue";
+import ThePageScenthound from "./components/ThePageScenthound.vue";
 
 Vue.use(VueRouter);
 
@@ -50,6 +51,9 @@ const router = new VueRouter({
     //  }, {
     //    path: '/settings',
     //    component: ThePageSettings
+  }, {
+    path: '/scenthound',
+    component: ThePageScenthound
     //  }, {
     //    path: "*",
     //    redirect: '/'
