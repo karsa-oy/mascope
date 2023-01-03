@@ -324,6 +324,7 @@ export default {
     },
   },
   created() {
+    this.sampleUnload();
     this.scenthoundModeActive = true;
   },
   beforeRouteLeave (to, from , next) {
@@ -334,6 +335,7 @@ export default {
     ...call({
       batchSelect: "batch/load",
       mzCalibrationReset: "calibration/unload",
+      sampleUnload: "sample/unload",
     }),
     ...mapMutations({
     }),
