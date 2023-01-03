@@ -28,7 +28,9 @@
             <b-progress
               :value="calibrationProgress"
               :type="calibrationProgress == 100
-                      ? 'is-success'
+                      ? calibrationStatus.failed
+                        ? 'is-danger'
+                        : 'is-success'
                       : 'is-primary'
                     "
               >
@@ -291,7 +293,7 @@ export default {
       acquisitionProgress: "instrument/acquisitionProgress",
       batchActive: "batch/active",
       batches: "workspace/batches",
-      calibrationProgress: "instrument/calibrationProgress",
+      calibrationStatus: "instrument/calibrationStatus",
       conversionProgress: "instrument/conversionProgress",
       instrumentActive: "instrument/active",
       matchingProgress: "instrument/matchingProgress",
@@ -306,6 +308,11 @@ export default {
     ...sync({
       scenthoundModeActive: "instrument/scenthoundModeActive",
     }),
+    calibrationProgress() {
+      return this.calibrationStatus
+        ? this.calibrationStatus.progress
+        : 0
+    },
     mzCalibrationTableRows() {
       return this.mzFitStats ?? [];
     },
