@@ -76,10 +76,16 @@ async def streamer_processor(streamer):
             if not os.path.exists(target_path):
                 print("Creating mailbox: %s" %target_path)
                 os.mkdir(target_path)
-            shutil.copyfile(
-                raw_filename,
-                os.path.join(target_path, os.path.basename(raw_filename))
-                )
+            while True:
+                try:
+                    shutil.copyfile(
+                        raw_filename,
+                        os.path.join(target_path, os.path.basename(raw_filename))
+                        )
+                    break
+                except Exception as e:
+                    print("Failed to copy acquired file: %s" %e)
+                    await sio.sleep(1)
             if sio.connected:
                 await sio.emit(
                     'instrument_acquisition_finished',
