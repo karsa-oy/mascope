@@ -50,196 +50,225 @@
         <br>
         <!-- Steps -->
         <b-steps
-            v-model="activeStep"
-            :has-navigation="false"
+          v-model="activeStep"
+          :has-navigation="false"
+        >
+        <!-- Sample information step -->
+          <b-step-item
+            label="Sample information"
+            :clickable="true"
+            :type="{'is-success': this.sampleActive ? true : false}"
             >
-
-            <b-step-item
-              label="Sample information"
-              :clickable="true"
-              :type="{'is-success': this.sampleActive ? true : false}"
+            <div style="padding-bottom: 1.5em">
+              <h1 class="title has-text-centered">Sample information</h1>
+            </div>
+            <b-field label="Sample name">
+              <b-input
+                v-model="sampleItemName"
+                required
+                :disabled="!acquisitionFilename"
+                expanded
               >
-              <div style="padding-bottom: 1.5em">
-                <h1 class="title has-text-centered">Sample information</h1>
-              </div>
-              <b-field label="Sample name">
-                <b-input
-                  v-model="sampleItemName"
-                  required
-                  :disabled="!acquisitionFilename"
-                  expanded
+              </b-input>
+            </b-field>
+            <b-field label="Filter ID">
+              <b-input
+                v-model="sampleItemFilterId"
+                :disabled="!acquisitionFilename"
+                expanded
+              >
+              </b-input>
+            </b-field>
+            <b-field label="Sample type">
+              <b-dropdown
+                aria-role="list"
+                v-model="sampleItemType"
+                :disabled="!acquisitionFilename"
+                expanded
                 >
-                </b-input>
-              </b-field>
-              <b-field label="Filename">
-                <b-input
-                  v-model="acquisitionFilename"
-                  required
-                  :disabled="true"
-                  expanded
-                >
-                </b-input>
-              </b-field>
-              <div>
-                <b-field label="Sample type">
-                  <b-dropdown
-                    aria-role="list"
-                    v-model="sampleItemType"
-                    :disabled="!acquisitionFilename"
-                    expanded
-                    >
-                    <template #trigger>
-                        <b-button
-                            :label="sampleItemType"
-                            icon-right="menu-down"
-                            expanded
-                            style="align:left"
-                        />
-                    </template>
-                    <b-dropdown-item aria-role="listitem" value="SAMPLE">Sample</b-dropdown-item>
-                    <b-dropdown-item aria-role="listitem" value="BACKGROUND">Background</b-dropdown-item>
-                    <b-dropdown-item aria-role="listitem" value="BLANK">Blank</b-dropdown-item>
-                    <b-dropdown-item aria-role="listitem" value="UNKNOWN">Unknown</b-dropdown-item>
-                  </b-dropdown>
-                </b-field>
-                <b-field label="Sample batch">
-                  <b-dropdown
-                    aria-role="list"
-                    expanded
-                    @change="selectBatch"
-                    disabled
-                    >
-                    <template #trigger>
-                      <b-button
-                        :label="batchActive
-                          ? batchActive.sample_batch_name
-                          : ''
-                          "
+                <template #trigger>
+                    <b-button
+                        :label="sampleItemType"
                         icon-right="menu-down"
                         expanded
                         style="align:left"
-                      />
-                    </template>
-                    <template v-for="batch of batches">
-                      <b-dropdown-item
-                        aria-role="listitem"
-                        :key="batch.sample_batch_id"
-                        :value="batch"
-                      >
-                        {{ batch.sample_batch_name }}
-                      </b-dropdown-item>
-                    </template>
-                  </b-dropdown>
-                </b-field>
-              </div>
-              <div class="container" style="text-align: center; padding: 2em;">
-                <b-button
-                  :disabled="
-                    sampleIsSaved
-                    ||
-                    !sampleItemName
-                    ||
-                    !sampleItemType
-                    ||
-                    !acquisitionFilename
-                  "
-                  :type="sampleIsSaved
-                    ? 'is-success'
-                    : 'is-danger'
-                    "
-                  icon-left="content-save"
-                  expanded
-                  @click="saveSampleItem"
+                    />
+                </template>
+                <b-dropdown-item
+                  aria-role="listitem"
+                  value="SAMPLE"
+                  v-if="sampleItemFilterId"
                 >
-                  Save sample info
+                  Sample
+                </b-dropdown-item>
+                <b-dropdown-item
+                  aria-role="listitem"
+                  value="BACKGROUND"
+                >
+                  Background
+                </b-dropdown-item>
+                <b-dropdown-item
+                  aria-role="listitem"
+                  value="BLANK"
+                  v-if="sampleItemFilterId"
+                >
+                  Blank
+                </b-dropdown-item>
+                <b-dropdown-item
+                  aria-role="listitem"
+                  value="UNKNOWN"
+                  v-if="sampleItemFilterId"
+                >
+                  Unknown
+                </b-dropdown-item>
+              </b-dropdown>
+            </b-field>
+            <b-field label="Filename">
+              <b-input
+                v-model="acquisitionFilename"
+                required
+                :disabled="true"
+                expanded
+              >
+              </b-input>
+            </b-field>
+            <b-field label="Sample batch">
+              <b-dropdown
+                aria-role="list"
+                expanded
+                @change="selectBatch"
+                disabled
+                >
+                <template #trigger>
+                  <b-button
+                    :label="batchActive
+                      ? batchActive.sample_batch_name
+                      : ''
+                      "
+                    icon-right="menu-down"
+                    expanded
+                    style="align:left"
+                  />
+                </template>
+                <template v-for="batch of batches">
+                  <b-dropdown-item
+                    aria-role="listitem"
+                    :key="batch.sample_batch_id"
+                    :value="batch"
+                  >
+                    {{ batch.sample_batch_name }}
+                  </b-dropdown-item>
+                </template>
+              </b-dropdown>
+            </b-field>
+            <div class="container" style="text-align: center; padding: 2em;">
+              <b-button
+                :disabled="
+                  sampleIsSaved
+                  ||
+                  !sampleItemName
+                  ||
+                  !sampleItemType
+                  ||
+                  !acquisitionFilename
+                "
+                :type="sampleIsSaved
+                  ? 'is-success'
+                  : 'is-danger'
+                  "
+                icon-left="content-save"
+                expanded
+                @click="saveSampleItem"
+              >
+                Save sample info
+              </b-button>
+            </div>
+          </b-step-item>
+          <!-- Calibration step -->
+          <b-step-item
+            label="Calibration"
+            :clickable="this.sampleActive ? true : false"
+            :type="{'is-success': this.sampleMzCalibrated}"
+            >
+              <h1 class="title has-text-centered">Calibration</h1>
+              <base-param-field
+                label="Min. match score"
+                path="calibration/paramMatchScoreMin"
+                :range="{ min: 0, max: 1, step: .1 }"
+                type="is-primary"
+              >
+              </base-param-field>
+              <base-param-field
+                label="Refine window [ppm]"
+                path="calibration/paramRefineWindow"
+                :range="{ min: 0, max: 100, step: 1 }"
+                type="is-primary"
+              >
+              </base-param-field>
+              <base-table
+                :key="mzCalibrationTableKey"
+                :rows="mzCalibrationTableRows"
+                :cols="mzCalibrationTableCols"
+                :checkable="false"
+                :searchable="false"
+                :minPrecision="4"
+                :maxPrecision="4"
+              >
+              </base-table>
+              <div style="text-align: right">
+                <b-button
+                  :disabled="this.sampleActive ? false : true"
+                  type="is-primary"
+                  icon-left=""
+                  @click="mzCalibrationFit"
+                >
+                  Fit
+                </b-button>
+                <b-button
+                  :disabled="this.mzFit ? false : true"
+                  type="is-success"
+                  icon-left="content-save"
+                  @click="mzCalibrationApply"
+                >
+                  Apply calibration
                 </b-button>
               </div>
-            </b-step-item>
-
-            <b-step-item
-              label="Calibration"
-              :clickable="this.sampleActive ? true : false"
-              :type="{'is-success': this.sampleMzCalibrated}"
-              >
-                <h1 class="title has-text-centered">Calibration</h1>
-                <base-param-field
-                  label="Min. match score"
-                  path="calibration/paramMatchScoreMin"
-                  :range="{ min: 0, max: 1, step: .1 }"
-                  type="is-primary"
-                >
-                </base-param-field>
-                <base-param-field
-                  label="Refine window [ppm]"
-                  path="calibration/paramRefineWindow"
-                  :range="{ min: 0, max: 100, step: 1 }"
-                  type="is-primary"
-                >
-                </base-param-field>
-                <base-table
-                  :key="mzCalibrationTableKey"
-                  :rows="mzCalibrationTableRows"
-                  :cols="mzCalibrationTableCols"
-                  :checkable="false"
-                  :searchable="false"
-                  :minPrecision="4"
-                  :maxPrecision="4"
-                >
-                </base-table>
-                <div style="text-align: right">
-                  <b-button
-                    :disabled="this.sampleActive ? false : true"
-                    type="is-primary"
-                    icon-left=""
-                    @click="mzCalibrationFit"
-                  >
-                    Fit
-                  </b-button>
-                  <b-button
-                    :disabled="this.mzFit ? false : true"
-                    type="is-success"
-                    icon-left="content-save"
-                    @click="mzCalibrationApply"
-                  >
-                    Apply calibration
-                  </b-button>
-                </div>
-            </b-step-item>
-
-            <b-step-item
-              label="Target search"
-              :clickable="this.sampleActive
-                ? this.sampleMzCalibrated
-                  ? true
-                  : false
+          </b-step-item>
+          <!-- Target search step -->
+          <b-step-item
+            label="Target search"
+            :clickable="this.sampleActive
+              ? this.sampleMzCalibrated
+                ? true
                 : false
-                "
-              :type="{'is-success': this.sampleMatched}"
-              >
-                <h1 class="title has-text-centered">Target search</h1>
-                <div v-if="this.sampleMatched">
-                  <the-pane-browser-target></the-pane-browser-target>
-                </div>
-                <div style="text-align: center">
-                  <b-button
-                    :disabled="this.sampleActive ? false : true"
-                    type="is-success"
-                    icon-left="content-save"
-                    @click="sampleMatch"
-                    v-if="!sampleMatched"
-                  >
-                    Process
-                  </b-button>
-                  <b-button
-                    type="is-primary"
-                    icon-left="close"
-                    @click=";"
-                    v-if="sampleMatched"
-                  >
-                    Close
-                  </b-button>
-                </div>
-            </b-step-item>
+              : false
+              "
+            :type="{'is-success': this.sampleMatched}"
+            >
+              <h1 class="title has-text-centered">Target search</h1>
+              <div v-if="this.sampleMatched">
+                <the-pane-browser-target></the-pane-browser-target>
+              </div>
+              <div style="text-align: center">
+                <b-button
+                  :disabled="this.sampleActive ? false : true"
+                  type="is-success"
+                  icon-left="content-save"
+                  @click="sampleMatch"
+                  v-if="!sampleMatched"
+                >
+                  Process
+                </b-button>
+                <b-button
+                  type="is-primary"
+                  icon-left="close"
+                  @click=";"
+                  v-if="sampleMatched"
+                >
+                  Close
+                </b-button>
+              </div>
+          </b-step-item>
         </b-steps>
       </div>
     </the-layout-sidebar>
@@ -283,6 +312,7 @@ export default {
         { field: "mz_error_diff", label: "m/z error diff", subheading: null },
       ],
       mzCalibrationTableKey: 0,
+      sampleItemFilterId: null,
       sampleItemName: null,
       sampleItemType: null,
     };
@@ -369,6 +399,11 @@ export default {
         this.mzCalibrationRefineWindow
         );
     },
+    resetSampleItem() {
+      this.sampleItemFilterId = null;
+      this.sampleItemName = null;
+      this.sampleItemType = null;
+    },
     sampleMatch() {
       this.$api.emit(
         'match_item_compute',
@@ -421,7 +456,10 @@ export default {
       }
     },
     acquisitionProgress(newValue, oldValue) {
-      if (newValue == 0) this.activeStep = 0;
+      if (newValue == 0) {
+        this.resetSampleItem();
+        this.activeStep = 0;
+      }
     },
     calibrationProgress(newValue, oldValue) {
       if (oldValue != 100 && newValue == 100) this.activeStep = 1;
