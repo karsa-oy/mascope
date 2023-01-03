@@ -35,9 +35,6 @@ const state = {
     sampleItemTargetIonActive: false,
     sampleItemTargetIonProps: {
     },
-    scenthoundWorkflowActive: false,
-    scenthoundWorkflowProps: {
-    },
 };
 
 export default {

@@ -286,7 +286,7 @@
                   <b-button
                     type="is-primary"
                     icon-left="close"
-                    @click="deactivateModal"
+                    @click=";"
                     v-if="sampleMatched"
                   >
                     Close
@@ -369,7 +369,6 @@ export default {
       calibrationProgress: "instrument/calibrationProgress",
       conversionProgress: "instrument/conversionProgress",
       matchingProgress: "instrument/matchingProgress",
-      modalProps: "modal/scenthoundWorkflowProps",
       mzCalibrationMatchScoreMin: "calibration/paramMatchScoreMin",
       mzCalibrationRefineWindow: "calibration/paramRefineWindow",
       mzFit: "calibration/mzFit",
@@ -379,7 +378,6 @@ export default {
       sampleMzCalibrated: "sample/active@mz_calibration.verified",
     }),
     ...sync({
-      modalActive: "modal/scenthoundWorkflowActive",
     }),
     availableTemplates() {
       return [this.defaultTemplate, ...this.savedTemplates];
@@ -412,7 +410,6 @@ export default {
       mzCalibrationReset: "calibration/unload",
     }),
     ...mapMutations({
-      deactivateModal: "modal/deactivate",
     }),
     clone(obj) {
       return JSON.parse(JSON.stringify(obj));
