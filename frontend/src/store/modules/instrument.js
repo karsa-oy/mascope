@@ -3,12 +3,14 @@ import { dispatch, make } from 'vuex-pathify';
 const state = {
     active: null,
     calibrationProgress: 0,
+    acquisitionActiveFilename: null,
     acquisitionProgress: 0,
     acquisitions: null,
     conversionProgress: 0,
     matchingProgress: 0,
     mzCalibration: null,
     recentAcquisitions: null,
+    scenthoundModeActive: false,
 }
 
 export default {
@@ -129,44 +131,45 @@ export default {
             }
         },
         async resetProgress({ commit }) {
+            commit('SET_ACQUISITION_ACTIVE_FILENAME', null);
             commit('SET_ACQUISITION_PROGRESS', 0);
             commit('SET_CALIBRATION_PROGRESS', 0);
             commit('SET_CONVERSION_PROGRESS', 0);
             commit('SET_MATCHING_PROGRESS', 0);
         },
-        async unload({ rootState, state, commit }) {
+        async unload({ rootState, state, commit, dispatch }) {
             if (!state.active) return;
             rootState.api.emit('unsubscribe', state.active);
             commit('SET_ACTIVE', null);
             commit('SET_MZ_CALIBRATION', null);
-            commit('SET_ACQUISITIONS', null)
-            commit('SET_RECENT_ACQUISITIONS', null)
+            commit('SET_ACQUISITIONS', null);
+            commit('SET_RECENT_ACQUISITIONS', null);
+            await dispatch('resetProgress');
+            commit('SET_SCENTHOUND_MODE_ACTIVE', false);
         },
         // notifications
         async onInstrumentAcquisitionFinished({ commit }, data) {
+            commit('SET_ACQUISITION_ACTIVE_FILENAME', data.filename);
             commit('SET_ACQUISITION_PROGRESS', data.progress);
         },
         async onInstrumentAcquisitionProgress({ commit }, data) {
+            commit('SET_ACQUISITION_ACTIVE_FILENAME', data.filename);
             commit('SET_ACQUISITION_PROGRESS', data.progress);
         },
         async onInstrumentAcquisitionStarted({ rootState, commit, dispatch }, data) {
             await dispatch('sample/unload', null, {root:true});
             await dispatch('resetProgress');
-            commit('modal/activate', {modal: 'scenthoundWorkflow'}, {root:true});
-            rootState.modal.scenthoundWorkflowProps = {
-                action: 'create',
-                sampleItemRecordToLoad: data,
-            };
+            commit('SET_ACQUISITION_ACTIVE_FILENAME', data.filename);
             commit('SET_ACQUISITION_PROGRESS', data.progress);
         },
         async onCalibrationMzCalibrateFailed({ commit }, data) {
             commit('SET_CALIBRATION_PROGRESS', data.progress);
             // TODO:
         },
-        async onCalibrationMzCalibrateFinished({ rootState, commit }, data) {
+        async onCalibrationMzCalibrateFinished({ state, commit }, data) {
             commit('SET_CALIBRATION_PROGRESS', data.progress);
             // Start matching
-            if (rootState.modal.scenthoundWorkflowActive) {
+            if (state.scenthoundModeActive) {
                 dispatch('instrument/matchSample', null, {root:true});
             }
         },
@@ -176,10 +179,10 @@ export default {
         async onCalibrationMzCalibrateStarted({ commit }, data) {
             commit('SET_CALIBRATION_PROGRESS', data.progress);
         },
-        async onInstrumentConversionFinished({ rootState, commit, dispatch }, data) {
+        async onInstrumentConversionFinished({ state, commit, dispatch }, data) {
             commit('SET_CONVERSION_PROGRESS', data.progress);
             // Wait for sample to be saved, then start mass calibration
-            if (rootState.modal.scenthoundWorkflowActive) {
+            if (state.scenthoundModeActive) {
                 dispatch('mzCalibrateSample');
             }
         },

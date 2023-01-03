@@ -2,6 +2,7 @@
   <section>
     <the-layout-sidebar>
       <div style="margin: 0 auto; width: 50vw">
+        <!-- Progress bars -->
         <section>
           <b-field label="Acquisition">
             <b-progress
@@ -45,6 +46,7 @@
           </b-field>
         </section>
         <br>
+        <!-- Steps -->
         <b-steps
             v-model="activeStep"
             :has-navigation="false"
@@ -55,51 +57,33 @@
               :clickable="true"
               :type="{'is-success': this.sampleActive ? true : false}"
               >
-              <div style="text-align: right" v-if="editable">
-                <b-button
-                  icon-right="cog"
-                  type="is-primary"
-                  size="is-small"
-                  @click="showEditFunctions = !showEditFunctions"
-                >
-                </b-button>
-              </div>
               <div style="padding-bottom: 1.5em">
                 <h1 class="title has-text-centered">Sample information</h1>
               </div>
-              <div v-for="item in formFields" :key="item.label">
-                <template>
-                  <b-field :label="item.label.replaceAll('_', ' ')">
-                    <b-input
-                      v-model="item.value"
-                      :placeholder="
-                        showEditFunctions ? item.placeholder || 'default value' : ''
-                      "
-                      :required="fillable && item.required"
-                      :disabled="!fillable || item.disabled"
-                      expanded
-                    >
-                    </b-input>
-                    <div v-if="showEditFunctions">
-                      <b-button
-                        :id="item.label"
-                        :disabled="item.required"
-                        @click="removeField"
-                        type="is-danger"
-                        icon-right="delete"
-                        hover
-                        title="Delete Field"
-                      >
-                      </b-button>
-                    </div>
-                  </b-field>
-                </template>
-              </div>
+              <b-field label="Sample name">
+                <b-input
+                  v-model="sampleItemName"
+                  required
+                  :disabled="!acquisitionFilename"
+                  expanded
+                >
+                </b-input>
+              </b-field>
+              <b-field label="Filename">
+                <b-input
+                  v-model="acquisitionFilename"
+                  required
+                  :disabled="true"
+                  expanded
+                >
+                </b-input>
+              </b-field>
               <div>
                 <b-field label="Sample type">
                   <b-dropdown
                     aria-role="list"
                     v-model="sampleItemType"
+                    :disabled="!acquisitionFilename"
                     expanded
                     >
                     <template #trigger>
@@ -113,104 +97,65 @@
                     <b-dropdown-item aria-role="listitem" value="SAMPLE">Sample</b-dropdown-item>
                     <b-dropdown-item aria-role="listitem" value="BACKGROUND">Background</b-dropdown-item>
                     <b-dropdown-item aria-role="listitem" value="BLANK">Blank</b-dropdown-item>
-                    <b-dropdown-item aria-role="listitem" value="CALIBRATION">Calibration</b-dropdown-item>
                     <b-dropdown-item aria-role="listitem" value="UNKNOWN">Unknown</b-dropdown-item>
                   </b-dropdown>
                 </b-field>
-              </div>
-              <div v-if="showEditFunctions" style="padding-top: 2em">
-                <b-field>
-                  <b-button @click="addField" expanded>
-                    <b>Add new field</b>
-                  </b-button>
+                <b-field label="Sample batch">
+                  <b-dropdown
+                    aria-role="list"
+                    expanded
+                    @change="selectBatch"
+                    disabled
+                    >
+                    <template #trigger>
+                      <b-button
+                        :label="batchActive
+                          ? batchActive.sample_batch_name
+                          : ''
+                          "
+                        icon-right="menu-down"
+                        expanded
+                        style="align:left"
+                      />
+                    </template>
+                    <template v-for="batch of batches">
+                      <b-dropdown-item
+                        aria-role="listitem"
+                        :key="batch.sample_batch_id"
+                        :value="batch"
+                      >
+                        {{ batch.sample_batch_name }}
+                      </b-dropdown-item>
+                    </template>
+                  </b-dropdown>
                 </b-field>
               </div>
-              <div><br /></div>
-              <b-field label="Reuse template">
-                <div class="container">
-                  <div class="row">
-                    <div class="columns">
-                      <div class="column is-half" style="text-align: center">
-                        <b-select
-                          v-model="loadedTemplate"
-                          placeholder="Load template"
-                          expanded
-                        >
-                          <option
-                            v-for="t in availableTemplates"
-                            :value="t"
-                            :key="t.name"
-                          >
-                            {{ t.name }}
-                          </option>
-                        </b-select>
-                      </div>
-                      <div
-                        class="column is-narrow"
-                        style="text-align: left"
-                        v-if="showEditFunctions"
-                      >
-                        <b-button
-                          :disabled="
-                            !loadedTemplate ||
-                            !loadedTemplate.name ||
-                            loadedTemplate.name == 'default'
-                          "
-                          @click="deleteTemplate"
-                          type="is-danger"
-                          icon-right="delete"
-                          hover
-                          title="Delete Template"
-                        >
-                        </b-button>
-                      </div>
-                      <div
-                        class="column is-narrow"
-                        style="text-align: left"
-                        v-if="showEditFunctions"
-                      >
-                        <b-button
-                          @click="saveTemplate"
-                          :disabled="!formFields.length"
-                          type="is-success"
-                          icon-left="content-save"
-                          hover
-                          title="Save Template"
-                        >
-                        </b-button>
-                      </div>
-                      <div class="column is-one-half" style="text-align: right">
-                        <b-button
-                          :disabled="(
-                              !sampleItemType
-                              || (
-                                formFields.filter((f) => f.required).length !=
-                                  formFields
-                                  .filter((f) => f.required)
-                                  .filter((f) => f.value).length
-                              )
-                            )
-                            ||
-                            (
-                              action == 'create' && sampleActive
-                            )
-                          "
-                          type="is-success"
-                          icon-left="content-save"
-                          @click="saveSampleItem"
-                        >
-                          Save sample info
-                        </b-button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </b-field>
+              <div class="container" style="text-align: center; padding: 2em;">
+                <b-button
+                  :disabled="
+                    sampleIsSaved
+                    ||
+                    !sampleItemName
+                    ||
+                    !sampleItemType
+                    ||
+                    !acquisitionFilename
+                  "
+                  :type="sampleIsSaved
+                    ? 'is-success'
+                    : 'is-danger'
+                    "
+                  icon-left="content-save"
+                  expanded
+                  @click="saveSampleItem"
+                >
+                  Save sample info
+                </b-button>
+              </div>
             </b-step-item>
 
             <b-step-item
               label="Calibration"
-              :visible="instrumentIsTof"
               :clickable="this.sampleActive ? true : false"
               :type="{'is-success': this.sampleMzCalibrated}"
               >
@@ -262,7 +207,7 @@
             <b-step-item
               label="Target search"
               :clickable="this.sampleActive
-                ? !this.instrumentIsTof || this.sampleMzCalibrated
+                ? this.sampleMzCalibrated
                   ? true
                   : false
                 : false
@@ -321,26 +266,8 @@ export default {
   props: {},
   data: function () {
     return {
-      action: null,
       activeStep: 0,
-      defaultTemplate: {
-        name: "default",
-        template: [
-          {
-            label: "sample_item_name",
-            required: true,
-            placeholder: "Sample title",
-          },
-          {
-            label: "filename",
-            required: true,
-            placeholder: "",
-            disabled: true,
-          },
-        ],
-      },
-      formFields: [],
-      loadedTemplate: null,
+      batchSelected: null,
       mzCalibrationTableCols: [
         { field: "mz", label: "Isotope m/z" },
         { field: "sample_peak_mz", label: "Pre peak m/z" },
@@ -354,20 +281,19 @@ export default {
         { field: "mz_error_diff", label: "m/z error diff", subheading: null },
       ],
       mzCalibrationTableKey: 0,
-      sampleFilename: null,
-      sampleInstrument: null,
+      sampleItemName: null,
       sampleItemType: null,
-      showEditFunctions: false,
-      templateType: "sample_item",
     };
   },
   computed: {
     ...get({
-      allTemplates: "app/attributeTemplates",
+      acquisitionFilename: "instrument/acquisitionActiveFilename",
       acquisitionProgress: "instrument/acquisitionProgress",
       batchActive: "batch/active",
+      batches: "workspace/batches",
       calibrationProgress: "instrument/calibrationProgress",
       conversionProgress: "instrument/conversionProgress",
+      instrumentActive: "instrument/active",
       matchingProgress: "instrument/matchingProgress",
       mzCalibrationMatchScoreMin: "calibration/paramMatchScoreMin",
       mzCalibrationRefineWindow: "calibration/paramRefineWindow",
@@ -378,77 +304,41 @@ export default {
       sampleMzCalibrated: "sample/active@mz_calibration.verified",
     }),
     ...sync({
+      scenthoundModeActive: "instrument/scenthoundModeActive",
     }),
-    availableTemplates() {
-      return [this.defaultTemplate, ...this.savedTemplates];
-    },
-    editable() {
-      return ['create', 'update'].includes(this.action);
-    },
-    fillable() {
-      return ['create', 'update'].includes(this.action);
-    },
-    instrumentIsTof() {
-      return this.sampleInstrument
-        ? this.sampleInstrument.indexOf('TOF') != -1
-        : false;
-    },
     mzCalibrationTableRows() {
       return this.mzFitStats ?? [];
     },
-    savedTemplates() {
-      return this.allTemplates.filter(
-        (template) => template.type == this.templateType
-        );
+    sampleFilename() {
+      return this.sampleActive
+        ? this.sampleActive.filename
+        : this.acquisitionFilename
+    },
+    sampleIsSaved() {
+      return this.sampleActive
+      ? (
+          this.sampleItemName === this.sampleActive.sample_item_name
+          && this.sampleItemType === this.sampleActive.sample_item_type
+        )
+      : false;
     },
   },
   created() {
-    this.loadedTemplate = this.clone(this.availableTemplates[0]);
+    this.scenthoundModeActive = true;
+  },
+  beforeRouteLeave (to, from , next) {
+    this.scenthoundModeActive = false;
+    next();
   },
   methods: {
     ...call({
+      batchSelect: "batch/load",
       mzCalibrationReset: "calibration/unload",
     }),
     ...mapMutations({
     }),
     clone(obj) {
       return JSON.parse(JSON.stringify(obj));
-    },
-    addField() {
-      this.$buefy.dialog.prompt({
-        message: "Add field to template",
-        confirmText: "Add",
-        inputAttrs: {
-          placeholder: "field label",
-          maxlength: 100,
-        },
-        trapFocus: true,
-        onConfirm: (fieldToAdd) => {
-          this.loadedTemplate = {
-            name: null,
-            template: [...this.formFields, { label: fieldToAdd, value: "" }],
-          };
-        },
-      });
-    },
-    deleteTemplate() {
-      this.$buefy.dialog.confirm({
-        title: "Deleting template",
-        message:
-          "Are you sure you want to delete template <b>" +
-          this.loadedTemplate.name +
-          "</b>?",
-        confirmText: "Delete",
-        onConfirm: () => {
-          this.$api.emit(
-            'attribute_template_delete',
-            this.availableTemplates.filter(
-              (template) => 
-              (template.attribute_template_id == this.loadedTemplate.attribute_template_id)
-            ).map((template) => template.attribute_template_id)
-          );
-        }
-      });
     },
     mzCalibrationApply() {
       this.$api.emit(
@@ -470,27 +360,6 @@ export default {
         this.mzCalibrationRefineWindow
         );
     },
-    removeField(event) {
-      // Field to remove label is in button element id, find it from the event data
-      let fieldToRemove = event.target.id;
-      if (!fieldToRemove.length) {
-        // Failed to find the button id
-        console.log("fieldToRemove not found at event.target.id: ", event);
-        return;
-      }
-      for (let i = 0; i < this.loadedTemplate.template.length; ++i) {
-        if (_.isEqual(fieldToRemove, this.loadedTemplate.template[i].label)) {
-          this.loadedTemplate = {
-            name: null,
-            template: [
-              ...this.loadedTemplate.template.slice(0, i),
-              ...this.loadedTemplate.template.slice(i + 1),
-            ],
-          };
-          break;
-        }
-      }
-    },
     sampleMatch() {
       this.$api.emit(
         'match_item_compute',
@@ -499,88 +368,36 @@ export default {
     },
     async saveSampleItem() {
       switch (this.sampleItemType) {
-        case 'CALIBRATION':
+        case 'BACKGROUND':
         case 'BLANK':
         case 'SAMPLE':
         case 'UNKNOWN':
           break;
       }
-      this.saveAttributes();
+      this.saveSampleInformation();
     },
-    saveTemplate() {
-      this.$buefy.dialog.prompt({
-        title: "Template name",
-        confirmText: "Save",
-        inputAttrs: {
-          placeholder:
-            this.loadedTemplate.name === "default"
-              ? "template name"
-              : this.loadedTemplate.name,
-          maxlength: 100,
-        },
-        trapFocus: true,
-        onConfirm: (templateName) => {
-          if (templateName.toLowerCase() === "default") {
-            this.$buefy.toast.open({
-              message: `Name "${templateName}" is not allowed`,
-              duration: 5000,
-              type: "is-danger",
-            });
-            return;
-          }
-          // copy loadedTempate fields with user input
-          let newTemplate = {
-            name: templateName,
-            type: this.templateType,
-            template: this.clone(this.formFields),
-          };
-          let i = 0;
-          // set loaded template
-          for (i = 0; i < this.availableTemplates.length; ++i) {
-            if (_.isEqual(templateName, this.availableTemplates[i].name)) break;
-          }
-          if (i < this.availableTemplates.length) {
-            // existing template
-            this.availableTemplates[i] = this.clone(newTemplate);
-          } else {
-            // new template
-            this.availableTemplates.push(this.clone(newTemplate));
-          }
-          this.loadedTemplate = this.clone(newTemplate);
-          // push new template
-          this.$api.emit('attribute_template_create', [this.loadedTemplate]);
-        },
-      });
+    saveSampleInformation() {
+      let newSampleItem = {
+        filename: this.sampleFilename,
+        sample_item_name: this.sampleItemName,
+        sample_item_type: this.sampleItemType,
+        sample_batch_id: this.batchActive.sample_batch_id,
+        sample_item_attributes: {},
+      };
+      if (!this.sampleActive) {
+        this.$api.emit('sample_item_create', [newSampleItem]);
+      } else {
+        newSampleItem = {
+          ...newSampleItem,
+          sample_item_id: this.sampleActive.sample_item_id,
+          sample_item_attributes: this.sampleActive.sample_item_attributes,
+          sample_item_utc_created: this.sampleActive.sample_item_utc_created,
+        };
+        this.$api.emit('sample_item_update', [newSampleItem]);
+      }
     },
-    saveAttributes() {
-      // convert [{label, value...}, ...] to object
-        let props = {};
-        let sample_item_attributes = {};
-        this.formFields.forEach(
-          (field) => {
-            if (field.required) props[field.label] = field.value;
-            else sample_item_attributes[field.label] = field.value;
-            }
-          );
-        if (this.action == 'create') {
-          let newSampleItem = {
-            ...props,
-            sample_item_attributes,
-            sample_item_type: this.sampleItemType,
-            sample_batch_id: this.batchActive.sample_batch_id,
-            };
-          this.$api.emit('sample_item_create', [newSampleItem]);
-        } else if(this.action == 'update') {
-          let newSampleItem = {
-            ...this.sampleActive,
-            ...props,
-            sample_item_attributes,
-            sample_item_type: this.sampleItemType,
-            sample_batch_id: this.batchActive.sample_batch_id,
-            };
-          this.$api.emit('sample_item_update', [newSampleItem]);
-          this.deactivateModal();
-        }
+    selectBatch(val) {
+      this.batchSelect(val);
     },
   },
   watch: {
@@ -594,53 +411,8 @@ export default {
           break;
       }
     },
-    loadedTemplate: {
-      handler(newValue) {
-        if (newValue) {
-          // Make a copy to avoid mutating the loaded template directly
-          this.formFields = this.clone(newValue.template);
-        }
-      },
-      deep: true,
-    },
-    modalActive() {
-      if (this.modalActive) this.activeStep = 0;
-    },
-    modalProps: async function (data) {
-      this.action = data.action;
-      let newTemplate = {
-          name: null,
-          type: this.templateType,
-          template: [],
-      };
-      for (let { label, key, required, disabled } of this.defaultTemplate.template) {
-        if (required) {
-          newTemplate.template.push({
-            label,
-            key,
-            required,
-            disabled,
-            value: data.sampleItemRecordToLoad[label],
-          });
-        }
-      }
-      const attributesField = this.templateType + '_attributes';
-      if (data.sampleItemRecordToLoad[attributesField]) {
-        Object.keys(data.sampleItemRecordToLoad[attributesField]).forEach((attr) =>
-          newTemplate.template.push({
-            label: attr,
-            value: data.sampleItemRecordToLoad[attributesField][attr],
-          })
-        );
-      }
-      this.loadedTemplate = newTemplate;
-      this.sampleFilename = data.sampleItemRecordToLoad.filename;
-      this.sampleInstrument = data.sampleItemRecordToLoad.instrument;
-      this.sampleItemType = data.sampleItemRecordToLoad.sample_item_type;
-    },
     acquisitionProgress(newValue, oldValue) {
       if (newValue == 0) this.activeStep = 0;
-
     },
     calibrationProgress(newValue, oldValue) {
       if (oldValue != 100 && newValue == 100) this.activeStep = 1;
