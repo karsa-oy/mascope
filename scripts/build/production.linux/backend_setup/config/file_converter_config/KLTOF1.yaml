@@ -1,3 +1,2 @@
-instrument: KLTOF1
 streamer_type: H5
 source_dir: ${MASCOPE_PRIVATE_CONVERTER_DIR}/KLTOF1
