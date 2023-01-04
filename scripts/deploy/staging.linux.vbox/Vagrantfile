@@ -75,6 +75,6 @@ Vagrant.configure("2") do |config|
   config.vm.provision "shell", inline: "cd /vagrant/scripts/deploy/staging.linux.vbox && ./pre_provision.sh", privileged: false
   config.vm.provision "shell", inline: "cd /vagrant/scripts/deploy/staging.linux.vbox && ./provision_ssh_access.sh", privileged: false
   config.vm.provision "shell", inline: "cd /vagrant/scripts/deploy/staging.linux.vbox && ./provision_box.sh", privileged: false
-  config.vm.provision "shell", run: 'always', inline: "sudo systemctl restart mascope", privileged: false
+  # config.vm.provision "shell", run: 'always', inline: "sudo systemctl restart mascope", privileged: false
   
 end

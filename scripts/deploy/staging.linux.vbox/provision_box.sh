@@ -32,34 +32,7 @@ function source_project_env() {
 }
 
 
-function install_prerequisites() {
-    echo AAA Install needed packages
-    sudo apt-get update
-    # sudo apt-get install -y firefox
-    sudo apt-get install -y patchelf
-    sudo apt-get install -y nginx
-    sudo apt-get install -y mono-complete
-    sudo apt-get install -y python3-pip
-
-    echo AAA setting up mascope backend
-
-    source_project_env
-
-    # backend
-    pushd $MASCOPE_PROJECT/backend
-    pip install --user poetry
-    echo $PATH | grep ~/.local/bin: || echo "export PATH=\"$HOME/.local/bin:$PATH\"" >> ~/.bashrc
-    echo $PATH | grep ~/.local/bin: || export PATH="$HOME/.local/bin:$PATH"
-    poetry update
-    poetry lock --no-update
-    poetry install --no-interaction --no-root
-    # patch libtwh5.so RPATH for libtwtool.so dependency
-    TWLIBPATH=$(realpath ./hardware/tofwerk/lib/dlls/linux_x86_64)
-    patchelf --force-rpath --set-rpath "$TWLIBPATH" "$TWLIBPATH/libtwh5.so"
-    popd
-
-    echo AAA setting up mascope frontend...
-
+function set_up_mascope_frontend() {
     # frontend web server
     rm -r -f $MASCOPE_UI || true
     cp -r -f $MASCOPE_PROJECT/frontend/dist $MASCOPE_UI
@@ -87,51 +60,80 @@ function install_prerequisites() {
     sudo rm -f /etc/nginx/sites-enabled/default
     sudo gpasswd -a www-data $USER
     sudo systemctl restart nginx
+}
 
-    echo AAA setting up mascope backend service...
 
-    sudo cp -f $MY_PATH/mascope.service /etc/systemd/system/
-    sudo chmod -x  /etc/systemd/system/mascope.service
-    sudo systemctl daemon-reload
-    sudo systemctl enable mascope
-    sudo systemctl start mascope
-
-    # kill file converters from prev.sessions if any
+function stop_mascope_backend() {
+    # kill mascope backend services and corresponding log-rotates from prev.session if any
     pkill -f file-converter || true
+    pkill -f file-downloader || true
+    pkill -f mascope-api || true
+    pkill log-rotate || true
+    # release mascope-api port if any
+    sudo lsof -t -i:$MASCOPE_PUBLIC_API_PORT && sudo kill -9 $(sudo lsof -t -i:$MASCOPE_PUBLIC_API_PORT) || true
+}
+
+
+function start_mascope_backend() {
+    pushd $MASCOPE_PROJECT/backend
+
+    echo AAA start mascope-api process...
+    PYTHONUNBUFFERED=1 poetry run mascope-api |& poetry run log-rotate -n=7000 -l=$MASCOPE_PRIVATE_LOG_DIR/mascope_api.log &
 
     echo AAA start file convertor for KLTOF1...
-    pushd $MASCOPE_PROJECT/backend
     PYTHONUNBUFFERED=1 poetry run file-converter --config ./backend/service/file_converter_config/KLTOF1.yaml --ping |& poetry run log-rotate -n=5000 -l=$MASCOPE_PRIVATE_LOG_DIR/converter_KLTOF1.log &
-    popd
 
     echo AAA start file convertor for KLTOF2...
-    pushd $MASCOPE_PROJECT/backend
     PYTHONUNBUFFERED=1 poetry run file-converter --config ./backend/service/file_converter_config/KLTOF2.yaml --ping |& poetry run log-rotate -n=5000 -l=$MASCOPE_PRIVATE_LOG_DIR/converter_KLTOF2.log &
-    popd
 
     echo AAA start file convertor for KORBI1...
-    pushd $MASCOPE_PROJECT/backend
     PYTHONUNBUFFERED=1 poetry run file-converter --config ./backend/service/file_converter_config/KORBI1.yaml --ping |& poetry run log-rotate -n=5000 -l=$MASCOPE_PRIVATE_LOG_DIR/converter_KORBI1.log &
-    popd
-
-    # kill file downloaders from prev.sessions if any
-    pkill -f file-downloader || true
 
     echo AAA start file downloader for KLTOF1...
-    pushd $MASCOPE_PROJECT/backend
     PYTHONUNBUFFERED=1 poetry run file-downloader --config ./backend/service/file_downloader_config/KLTOF1.yaml --ping |& poetry run log-rotate -n=1000 -l=$MASCOPE_PRIVATE_LOG_DIR/downloader_KLTOF1.log &
-    popd
 
     echo AAA start file downloader for KLTOF2...
-    pushd $MASCOPE_PROJECT/backend
     PYTHONUNBUFFERED=1 poetry run file-downloader --config ./backend/service/file_downloader_config/KLTOF2.yaml --ping |& poetry run log-rotate -n=1000 -l=$MASCOPE_PRIVATE_LOG_DIR/downloader_KLTOF2.log &
-    popd
 
     echo AAA start file downloader for KORBI1...
-    pushd $MASCOPE_PROJECT/backend
     PYTHONUNBUFFERED=1 poetry run file-downloader --config ./backend/service/file_downloader_config/KORBI1.yaml --ping |& poetry run log-rotate -n=1000 -l=$MASCOPE_PRIVATE_LOG_DIR/downloader_KORBI1.log &
+
+    popd
+}
+
+
+function install_prerequisites() {
+    echo AAA Install needed packages
+    sudo apt-get update
+    # sudo apt-get install -y firefox
+    sudo apt-get install -y patchelf
+    sudo apt-get install -y nginx
+    sudo apt-get install -y mono-complete
+    sudo apt-get install -y python3-pip
+
+    echo AAA setting up mascope backend environment...
+
+    source_project_env
+
+    # backend
+    pushd $MASCOPE_PROJECT/backend
+    pip install --user poetry
+    echo $PATH | grep ~/.local/bin: || echo "export PATH=\"$HOME/.local/bin:$PATH\"" >> ~/.bashrc
+    echo $PATH | grep ~/.local/bin: || export PATH="$HOME/.local/bin:$PATH"
+    poetry update
+    poetry lock --no-update
+    poetry install --no-interaction --no-root
+    # patch libtwh5.so RPATH for libtwtool.so dependency
+    TWLIBPATH=$(realpath ./hardware/tofwerk/lib/dlls/linux_x86_64)
+    patchelf --force-rpath --set-rpath "$TWLIBPATH" "$TWLIBPATH/libtwh5.so"
     popd
 
+    echo AAA setting up mascope frontend...
+    set_up_mascope_frontend
+
+    echo AAA setting up mascope backend service...
+    stop_mascope_backend
+    start_mascope_backend
 }
 
 
