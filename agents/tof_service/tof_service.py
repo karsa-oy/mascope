@@ -149,7 +149,7 @@ async def main():
 host = None
 port = None
 shutdown_event = Event()
-sio = socketio.AsyncClient(logger=True)
+sio = socketio.AsyncClient(logger=True, ssl_verify=False)
 target_path = None
 
 def run():

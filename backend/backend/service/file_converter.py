@@ -225,7 +225,7 @@ load_dotenv()
 cache = None
 file_queue = Queue()
 shutdown_event = Event()
-sio = socketio.AsyncClient(logger=True)
+sio = socketio.AsyncClient(logger=True, ssl_verify=False)
 
 
 def run():
