@@ -133,7 +133,7 @@
 <script>
 import ThePaneSettingsBatch from "./ThePaneSettingsBatch.vue";
 import { mapMutations } from "vuex";
-import { get, sync } from "vuex-pathify";
+import { call, get, sync } from "vuex-pathify";
 
 export default {
   name: "TheModalSampleBatchOp",
@@ -229,6 +229,9 @@ export default {
     },
   },
   methods: {
+    ...call({
+      batchUnload: "batch/unload",
+    }),
     ...mapMutations({
       deactivateModal: "modal/deactivate",
     }),
@@ -239,6 +242,7 @@ export default {
       this.$api.emit('sample_batch_create', newBatch);
     },
     deleteBatch(batches) {
+      this.batchUnload();
       this.$api.emit('sample_batch_delete', batches);
     },
     initCalibrationCollectionSelected() {

@@ -1,10 +1,16 @@
-import { make } from 'vuex-pathify';
+import { dispatch, make } from 'vuex-pathify';
 
 const state = {
     active: null,
-    mzCalibration: null,
+    calibrationStatus: null,
+    acquisitionActiveFilename: null,
+    acquisitionProgress: 0,
     acquisitions: null,
+    conversionProgress: 0,
+    matchingProgress: 0,
+    mzCalibration: null,
     recentAcquisitions: null,
+    scenthoundModeActive: false,
 }
 
 export default {
@@ -88,16 +94,118 @@ export default {
             await dispatch('getMzCalibration');
             await dispatch('getRecentAcquisitions');
         },
-        async unload({ rootState, state, commit }) {
+        async matchSample({ rootState, dispatch }) {
+            const sampleActive = rootState.sample.active;
+            if (sampleActive) {
+                rootState.api.emit(
+                    'match_item_compute',
+                    {
+                        'filename': sampleActive.filename,
+                        'sample_item_id': sampleActive.sample_item_id,
+                        'sample_batch_id': sampleActive.sample_batch_id,
+                    }
+                );
+            } else {
+                // Try again in 1 second
+                setTimeout(() => {
+                    dispatch('matchSample')
+                }, 1000);
+            }
+        },
+        async mzCalibrateSample({ rootState, dispatch }) {
+            const sampleActive = rootState.sample.active;
+            if (sampleActive) {
+                rootState.api.emit(
+                    'calibration_mz_calibrate_sample',
+                    {
+                        'filename': sampleActive.filename,
+                        'sample_item_id': sampleActive.sample_item_id,
+                        'sample_batch_id': sampleActive.sample_batch_id,
+                    }
+                );
+            } else {
+                // Try again in 1 second
+                setTimeout(() => {
+                    dispatch('mzCalibrateSample')
+                }, 1000);
+            }
+        },
+        async resetAcquisitionStatus({ commit }) {
+            commit('SET_ACQUISITION_ACTIVE_FILENAME', null);
+            commit('SET_ACQUISITION_PROGRESS', 0);
+            commit('SET_CALIBRATION_STATUS', null);
+            commit('SET_CONVERSION_PROGRESS', 0);
+            commit('SET_MATCHING_PROGRESS', 0);
+        },
+        async unload({ rootState, state, commit, dispatch }) {
             if (!state.active) return;
             rootState.api.emit('unsubscribe', state.active);
             commit('SET_ACTIVE', null);
             commit('SET_MZ_CALIBRATION', null);
-            commit('SET_ACQUISITIONS', null)
-            commit('SET_RECENT_ACQUISITIONS', null)
+            commit('SET_ACQUISITIONS', null);
+            commit('SET_RECENT_ACQUISITIONS', null);
+            await dispatch('resetAcquisitionStatus');
+            commit('SET_SCENTHOUND_MODE_ACTIVE', false);
         },
         // notifications
-        async onSampleFileCreated({ dispatch }) {
+        async onInstrumentAcquisitionFinished({ commit }, data) {
+            commit('SET_ACQUISITION_ACTIVE_FILENAME', data.filename);
+            commit('SET_ACQUISITION_PROGRESS', data.progress);
+        },
+        async onInstrumentAcquisitionProgress({ commit }, data) {
+            commit('SET_ACQUISITION_ACTIVE_FILENAME', data.filename);
+            commit('SET_ACQUISITION_PROGRESS', data.progress);
+        },
+        async onInstrumentAcquisitionStarted({ rootState, commit, dispatch }, data) {
+            await dispatch('sample/unload', null, {root:true});
+            await dispatch('resetAcquisitionStatus');
+            commit('SET_ACQUISITION_ACTIVE_FILENAME', data.filename);
+            commit('SET_ACQUISITION_PROGRESS', data.progress);
+        },
+        async onCalibrationMzCalibrateFailed({ commit }, data) {
+            commit('SET_CALIBRATION_STATUS', {...data, failed: true});
+        },
+        async onCalibrationMzCalibrateFinished({ state, commit }, data) {
+            commit('SET_CALIBRATION_STATUS', data);
+            // Start matching
+            if (state.scenthoundModeActive) {
+                dispatch('instrument/matchSample', null, {root:true});
+            }
+        },
+        async onCalibrationMzCalibrateProgress({ commit }, data) {
+            commit('SET_CALIBRATION_STATUS', data);
+        },
+        async onCalibrationMzCalibrateStarted({ commit }, data) {
+            commit('SET_CALIBRATION_STATUS', data);
+        },
+        async onInstrumentConversionFinished({ state, commit, dispatch }, data) {
+            commit('SET_CONVERSION_PROGRESS', data.progress);
+            // Wait for sample to be saved, then start mass calibration
+            if (state.scenthoundModeActive) {
+                dispatch('mzCalibrateSample');
+            }
+        },
+        async onInstrumentConversionProgress({ commit }, data) {
+            commit('SET_CONVERSION_PROGRESS', data.progress);
+        },
+        async onInstrumentConversionStarted({ commit }, data) {
+            commit('SET_CONVERSION_PROGRESS', data.progress);
+        },
+        async onMatchItemComputeFailed({ commit }, data) {
+            commit('SET_MATCHING_PROGRESS', data.progress);
+        },
+        async onMatchItemComputeFinished({ commit }, data) {
+            commit('SET_MATCHING_PROGRESS', data.progress);
+            // TODO: case: background, verify interferences
+            // TODO: case: else, display matches
+        },
+        async onMatchItemComputeProgress({ commit }, data) {
+            commit('SET_MATCHING_PROGRESS', data.progress);
+        },
+        async onMatchItemComputeStarted({ commit }, data) {
+            commit('SET_MATCHING_PROGRESS', data.progress);
+        },
+        async onSampleFileCreated({ rootState, dispatch }, filename) {
             await dispatch('api/reloadDb', null, {root:true});
             await dispatch('getRecentAcquisitions');
         },

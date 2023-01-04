@@ -17,12 +17,13 @@ from backend.lib.struct import AttrDict, LRUDict
 from backend.lib.util import timestamp_from_filename
 from hardware.tofwerk.h5_streamer import H5Streamer
 from hardware.orbitrap.generator import RawStreamer
-from backend.service.lib.util import load_env_yaml, FSWatcher
+from backend.service.lib.filesystem_watcher import FSWatcher
+from backend.service.lib.util import load_env_yaml
 
 
 async def create_sample_file_db_record(data):
     filename = data['filename']
-    global instrument_name
+    instrument_name = filename.split('_')[0]
     committed_length = data['committed_length']
     date = timestamp_from_filename(filename)
     utc_offset = timedelta(seconds=int(data['utc_offset']))
@@ -43,7 +44,7 @@ async def create_sample_file_db_record(data):
 
 async def streamer_processor(streamer):
     global cache
-    global instrument_name
+    global sio
     # Handlers
     async def handle_spec_data(data):
         def cleanup():
@@ -56,10 +57,14 @@ async def streamer_processor(streamer):
                 streamer.tps_queue.get() # data
 
         filename = data['filename']
+        instrument_name = filename.split('_')[0]
         spec_i = data['i']
         cache_item = cache.get(filename)
-        zarr_filename = '_'.join([instrument_name, filename]).replace(' ', '_')
-        data.update({'filename': zarr_filename})
+        notification_data = {
+            'filename': filename,
+            'instrument': instrument_name,
+            'progress': streamer.progress,
+        }
         if spec_i is None:
             # File finished
             zarr_sdk.finalize_signal_dataset({'value': data}, cache_item)
@@ -75,6 +80,11 @@ async def streamer_processor(streamer):
                 await create_sample_file_db_record(data)
             except socketio.exceptions.BadNamespaceError:
                 print("Failed to create database record! No connection to server.")
+            if sio.connected:
+                await sio.emit(
+                    'instrument_conversion_finished',
+                    notification_data,
+                )
         elif spec_i < 0:
             # New file
             try:
@@ -85,9 +95,19 @@ async def streamer_processor(streamer):
                 return False
             cache_item = AttrDict(cache_item)
             cache[filename] = cache_item
+            if sio.connected:
+                await sio.emit(
+                    'instrument_conversion_started',
+                    notification_data,
+                )
         else:
             # New data to existing file
             zarr_sdk.update_signal_dataset({'value': data}, cache_item)
+            if sio.connected:
+                await sio.emit(
+                    'instrument_conversion_progress',
+                    notification_data,
+                )
         return True
             
     async def handle_tps_data(data):
@@ -102,8 +122,6 @@ async def streamer_processor(streamer):
         elif spec_i < 0:
             # New file
             try:
-                zarr_filename = '_'.join([instrument_name, filename]).replace(' ', '_')
-                data.update({'filename': zarr_filename})
                 zarr_sdk.init_tps_dataset({'value': data}, cache_item)
             except FileExistsError:
                 return
@@ -135,11 +153,6 @@ def parse_cmd_args():
     parser.add_argument(
         "-c", "--config",
         help="path to yaml config file",
-        type=str, required=False
-    )
-    parser.add_argument(
-        "-i", "--instrument",
-        help="instrument name",
         type=str, required=False
     )
     parser.add_argument(
@@ -211,21 +224,18 @@ load_dotenv()
 
 cache = None
 file_queue = Queue()
-instrument_name = None
 shutdown_event = Event()
-sio = socketio.AsyncClient(logger=True)
+sio = socketio.AsyncClient(logger=True, ssl_verify=False)
 
 
 def run():
     global cache
     global file_queue
-    global instrument_name
     global shutdown_event
 
     args = parse_cmd_args()
     print(args)
 
-    instrument_name = args.get('instrument', 'unknown')
 
     streamer_type = args['streamer_type']
     if streamer_type == 'H5':

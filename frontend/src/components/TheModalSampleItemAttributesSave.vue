@@ -76,6 +76,7 @@
                         />
                     </template>
                     <b-dropdown-item aria-role="listitem" value="SAMPLE">Sample</b-dropdown-item>
+                    <b-dropdown-item aria-role="listitem" value="BACKGROUND">Background</b-dropdown-item>
                     <b-dropdown-item aria-role="listitem" value="BLANK">Blank</b-dropdown-item>
                     <b-dropdown-item aria-role="listitem" value="CALIBRATION">Calibration</b-dropdown-item>
                     <b-dropdown-item aria-role="listitem" value="UNKNOWN">Unknown</b-dropdown-item>
@@ -328,7 +329,6 @@ export default {
       allTemplates: "app/attributeTemplates",
       batchActive: "batch/active",
       batchMzCalibration: "batch/mzCalibration",
-      modalActive: "modal/sampleItemAttributesSaveActive",
       modalProps: "modal/sampleItemAttributesSaveProps",
       mzCalibrationMatchScoreMin: "calibration/paramMatchScoreMin",
       mzCalibrationRefineWindow: "calibration/paramRefineWindow",
@@ -457,7 +457,7 @@ export default {
     sampleMatch() {
       this.$api.emit(
         'match_item_compute',
-        this.sampleActive.sample_item_id
+        this.sampleActive
       )
     },
     async saveSampleItem() {

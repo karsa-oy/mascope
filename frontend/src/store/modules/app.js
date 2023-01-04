@@ -32,7 +32,7 @@ export default {
             // load instruments
             const instruments = await api.query(`--sql
                 SELECT DISTINCT instrument
-                FROM sample_file;
+                FROM instrument_function;
             `);
             commit('SET_INSTRUMENTS', instruments);
             // load ionization mechanisms

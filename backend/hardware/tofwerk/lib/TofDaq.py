@@ -344,10 +344,10 @@ def TwWaitForEndOfAcquisition(timeout):
     return ct.cdll.tofdaqdll._TwWaitForEndOfAcquisition(timeout)
 
 def TwGetMassCalib(mode, nbrParams, p, nbrPoints, mass, tof, weight):
-    ct.cdll.tofdaqdll._TwGetMassCalib.argtypes = [ndpointer(np.int, shape=1),
-                                                  ndpointer(np.int),
+    ct.cdll.tofdaqdll._TwGetMassCalib.argtypes = [ndpointer(int, shape=1),
+                                                  ndpointer(int),
                                                   _double_array,
-                                                  ndpointer(np.int, shape=1),
+                                                  ndpointer(int, shape=1),
                                                   _double_array,
                                                   _double_array,
                                                   _double_array]
@@ -513,7 +513,7 @@ def TwTpsSaveSetFile(setFile):
 # --------- Oskari added below ----------
 
 def TwGetRegUserDataSources(arrayLength, location, nbrElements, typeint):
-    argtypes = [ndpointer(np.int, shape=1), ct.c_char_p, ndpointer(np.int, shape=1), ndpointer(np.int, shape=1)]
+    argtypes = [ndpointer(int, shape=1), ct.c_char_p, ndpointer(int, shape=1), ndpointer(int, shape=1)]
     if location is None:
         argtypes[1] = ct.c_void_p
     if nbrElements is None:
@@ -525,13 +525,13 @@ def TwGetRegUserDataSources(arrayLength, location, nbrElements, typeint):
 
 def TwGetRegUserDataDesc(location, nbrElements, elementDescription):
     if elementDescription is None:
-        ct.cdll.tofdaqdll._TwGetRegUserDataDesc.argtypes = [ct.c_char_p, ndpointer(np.int, shape=1), ct.c_void_p]
+        ct.cdll.tofdaqdll._TwGetRegUserDataDesc.argtypes = [ct.c_char_p, ndpointer(int, shape=1), ct.c_void_p]
     else:
-        ct.cdll.tofdaqdll._TwGetRegUserDataDesc.argtypes = [ct.c_char_p, ndpointer(np.int, shape=1), ct.c_char_p]
+        ct.cdll.tofdaqdll._TwGetRegUserDataDesc.argtypes = [ct.c_char_p, ndpointer(int, shape=1), ct.c_char_p]
     return ct.cdll.tofdaqdll._TwGetRegUserDataDesc(location, nbrElements, elementDescription)
 
 def TwQueryRegUserDataSize(location, nbrElements):
-    ct.cdll.tofdaqdll._TwQueryRegUserDataSize.argtypes = [ct.c_char_p, ndpointer(np.int, shape=1)]
+    ct.cdll.tofdaqdll._TwQueryRegUserDataSize.argtypes = [ct.c_char_p, ndpointer(int, shape=1)]
     return ct.cdll.tofdaqdll._TwQueryRegUserDataSize(location, nbrElements)
 
 def TwSetTimeout(timeout):

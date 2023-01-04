@@ -239,19 +239,22 @@ async def match_batch_compute(sid, sample_batch_id):
 
     with conn:
         # fetch item ids
-        sample_item_ids = pd.read_sql(f"""
-            SELECT sample_item_id
+        sample_items = pd.read_sql(f"""
+            SELECT
+                sample_item_id,
+                sample_batch_id,
+                filename
             FROM sample_item
             WHERE sample_batch_id == ?
             """,
             conn,
             params=[sample_batch_id]
-            )['sample_item_id'].tolist()
-    for sample_item_id in sample_item_ids:
+            ).to_dict('records')
+    for sample_item in sample_items:
         try:
-            await item_compute(sample_item_id)
+            await item_compute(sample_item)
         except Exception as e:
-            print("Processing sample %s failed: %s" %(sample_item_id, e))
+            print("Processing sample %s failed: %s" %(sample_item, e))
     # reload batch
     await sio.emit('sample_batch_reload', room=sample_batch_id, namespace='/')
 
@@ -293,19 +296,11 @@ async def match_batch_remove(sid, sample_batch_id):
     await sio.emit('workspace_reload', workspace_id, namespace='/')
 
 
-async def item_compute(sample_item_id):
+async def item_compute(sample_item):
     with conn:
-        # fetch filename and batch id
-        sample_item_df = pd.read_sql(f"""
-            SELECT filename, sample_batch_id
-            FROM sample_item
-            WHERE sample_item_id == ?
-            """,
-            conn,
-            params=[sample_item_id]
-            )
-        filename = sample_item_df['filename'].tolist()[0]
-        sample_batch_id = sample_item_df['sample_batch_id'].tolist()[0]
+        sample_item_id = sample_item['sample_item_id']
+        filename = sample_item['filename']
+        sample_batch_id = sample_item['sample_batch_id']
         # get sample batch
         sample_batch = pd.read_sql(
             f"""--sql
@@ -317,14 +312,19 @@ async def item_compute(sample_item_id):
             params=[sample_batch_id]
             ).to_dict('records')[0]
         # get ionization mechanisms
-        ion_mechanisms = json.loads(sample_batch['build_params'])['ion_mechanisms']
+        ion_mechanisms = json.loads(
+            sample_batch['build_params']
+            )['ion_mechanisms']
         ion_mechanism_df = pd.DataFrame.from_dict({
             'ionization_mechanism_id': ion_mechanisms
         })
-        ionization_mechanism_ids = ion_mechanism_df['ionization_mechanism_id'].tolist()
+        ionization_mechanism_ids = (
+            ion_mechanism_df['ionization_mechanism_id'].tolist()
+        )
         target_collection_ids = pd.read_sql(
             f"""--sql
-            SELECT target_collection_id FROM target_collection_in_sample_batch
+            SELECT target_collection_id
+            FROM target_collection_in_sample_batch
             WHERE sample_batch_id == ?
             """,
             conn,
@@ -344,13 +344,12 @@ async def item_compute(sample_item_id):
         target_collection_ids,  
         ionization_mechanism_ids
         )
-    if len(match_isotope_df) == 0:
-        print("No matches found")
-        return sample_item_df
     with conn:
         # save to database
         # interferences
-        match_interference_df = match_interference_df.assign(sample_item_id=sample_item_id)
+        match_interference_df = match_interference_df.assign(
+            sample_item_id=sample_item_id
+        )
         match_interference_df = match_interference_df[[
             "match_interference_id"
             ,"target_isotope_id"
@@ -363,8 +362,15 @@ async def item_compute(sample_item_id):
             if_exists='append',
             index=False
             )
+    if len(match_isotope_df) == 0:
+        print("No matches found")
+        return sample_item
+    with conn:
+        # save to database
         # matches
-        match_isotope_df = match_isotope_df.assign(sample_item_id=sample_item_id)
+        match_isotope_df = match_isotope_df.assign(
+            sample_item_id=sample_item_id
+        )
         match_isotope_df = match_isotope_df[[
             "match_id"
             ,"target_isotope_id"
@@ -384,18 +390,64 @@ async def item_compute(sample_item_id):
             if_exists='append',
             index=False
             )
-    return sample_item_df
+    return sample_item
 
 @sio.event(namespace='/')
-async def match_item_compute(sid, sample_item_id):
-    sample_item_df = await item_compute(sample_item_id)
-    sample_batch_id = sample_item_df['sample_batch_id'].tolist()[0]
-    await sio.emit(
-        'sample_batch_reload',
-        room=sample_batch_id,
-        namespace='/'
+async def match_item_compute(sid, sample_item):
+    filename = sample_item['filename']
+    [instrument] = pd.read_sql(f"""--sql
+            SELECT instrument
+            FROM sample_file
+            WHERE filename = ?
+            """,
+            conn,
+            params=[filename]
+        )['instrument'].tolist()
+    try:
+        await sio.emit(
+            'match_item_compute_started',
+            {
+                'filename': filename,
+                'progress': 0,
+            },
+            room=instrument,
+            namespace='/'
         )
-
+        await sio.emit(
+            'match_item_compute_progress',
+            {},
+            room=instrument,
+            namespace='/'
+        )
+        task = sio.start_background_task(
+            item_compute, sample_item
+        )
+        await asyncio.gather(task)
+        await sio.emit(
+            'match_item_compute_finished',
+            {
+                'filename': filename,
+                'progress': 100,
+            },
+            room=instrument,
+            namespace='/'
+        )
+        sample_batch_id = sample_item['sample_batch_id']
+        await sio.emit(
+            'sample_batch_reload',
+            room=sample_batch_id,
+            namespace='/'
+            )
+    except:
+        await sio.emit(
+            'match_item_compute_failed',
+            {
+                'filename': filename,
+                'progress': 100,
+            },
+            room=instrument,
+            namespace='/'
+        )
 
 def item_remove(sample_item_id):
     with conn:
@@ -426,4 +478,8 @@ def item_remove(sample_item_id):
 async def match_item_remove(sid, sample_item_id):
     item_remove(sample_item_id)
     # reload batch
-    await sio.emit('sample_batch_reload', room=sample_batch_id, namespace='/')
+    await sio.emit(
+        'sample_batch_reload',
+        room=sample_batch_id,
+        namespace='/'
+    )

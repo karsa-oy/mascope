@@ -15,6 +15,8 @@ export default {
   },
   computed: {
     ...get({
+      batchActive: "batch/active",
+      instrumentActive: "instrument/active",
       workspaceActive: "workspace/active",
     }),
     buttons() {
@@ -24,6 +26,12 @@ export default {
           label: "Workspace home",
           path: "/",
           visible: true,
+        },
+        {
+          icon: "dog-side",
+          label: "Scenthound",
+          path: "/scenthound",
+          visible: this.batchActive && this.instrumentActive,
         },
         {
           icon: "file-plus",

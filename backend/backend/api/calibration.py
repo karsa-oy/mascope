@@ -1,3 +1,4 @@
+import asyncio
 import json
 import pandas as pd
 
@@ -74,7 +75,7 @@ async def calibration_mz_calibrate_batch(
     sample_batch_df['calibration_sample_filename'] = filename
     await sample_batch_update(sid, sample_batch_df.to_dict('records'))
 
-async def mz_calibrate_sample(sample_item):
+async def mz_calibrate_sample(sid, sample_item):
     # get sample batch
     with conn:
         [sample_batch] = pd.read_sql(f"""
@@ -89,7 +90,8 @@ async def mz_calibrate_sample(sample_item):
     build_params = json.loads(sample_batch['build_params'])
     calibration_collection_id = build_params['calibration_collection']
     ion_mechanism_ids = build_params['ion_mechanisms']
-    fit, stats = await mz_fit(
+    fit, stats = await calibration_mz_fit(
+        sid,
         sample_item['filename'],
         [calibration_collection_id],
         ion_mechanism_ids,
@@ -98,14 +100,62 @@ async def mz_calibrate_sample(sample_item):
         )
     if not fit:
         raise Exception("Failed to fit m/z calibration")
-    mz_apply(fit, [sample_item['filename']])
+    await calibration_mz_apply(sid, fit, [sample_item['filename']])
 
 @sio.event(namespace='/')
 async def calibration_mz_calibrate_sample(sid, sample_item):
     try:
-        await mz_calibrate_sample(sample_item)
-    except:
-        print("Failed to calibrate sample %s" %sample_item['filename'])
+        filename = sample_item['filename']
+    except KeyError:
+        print("calibration_mz_calibrate_sample: Invalid sample item %s" %sample_item)
+    [instrument] = pd.read_sql(f"""--sql
+        SELECT instrument
+        FROM sample_file
+        WHERE filename = ?
+        """,
+        conn,
+        params=[filename]
+    )['instrument'].tolist()
+    try:
+        await sio.emit(
+            'calibration_mz_calibrate_started',
+            {
+                'filename': filename,
+                'progress': 0,
+            },
+            room=instrument,
+            namespace='/'
+        )
+        await sio.emit(
+            'calibration_mz_calibrate_progress',
+            {},
+            room=instrument,
+            namespace='/'
+        )
+        task = sio.start_background_task(
+            mz_calibrate_sample, sid, sample_item
+        )
+        await asyncio.gather(task)
+        await sio.emit(
+            'calibration_mz_calibrate_finished',
+            {
+                'filename': filename,
+                'progress': 100,
+            },
+            room=instrument,
+            namespace='/'
+        )
+    except Exception as e:
+        print("Failed to calibrate sample %s: %s" %(filename, e))
+        await sio.emit(
+            'calibration_mz_calibrate_failed',
+            {
+                'filename': filename,
+                'progress': 100,
+            },
+            room=instrument,
+            namespace='/'
+        )
 
 
 async def mz_fit(
@@ -162,15 +212,16 @@ async def calibration_mz_fit(
         match_score_min,
         refine_window
         )
-
-    await sio.emit(
-        'calibration_mz_fit_stats',
-        {
-            'fit': fit,
-            'stats': stats
-        },
-        room=sid
-    )
+    if sid:
+        await sio.emit(
+            'calibration_mz_fit_stats',
+            {
+                'fit': fit,
+                'stats': stats
+            },
+            room=sid
+        )
+    return fit, stats
 
 def mz_apply(fit, sample_filenames):
     # Read sample file records

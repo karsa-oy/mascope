@@ -30,11 +30,6 @@ def parse_cmd_args():
         type=str, required=False
     )
     parser.add_argument(
-        "-i", "--instrument",
-        help="instrument name",
-        type=str, required=False
-    )
-    parser.add_argument(
         "-p", "--port",
         help="Mascope socket.io port",
         type=str, required=False
@@ -62,35 +57,55 @@ def parse_cmd_args():
 
 
 async def streamer_processor(streamer):
-    global cache
-    global instrument_name
+    global sio
     # Handlers
     async def handle_spec_data(data):
         filename = data['filename']
+        instrument_name = filename.split('_')[0]
         spec_i = data['i']
+        notification_data = {
+            'filename': filename,
+            'instrument': instrument_name,
+            'progress': streamer.progress,
+        }
         if spec_i is None:
             # File finished
             print("File finished")
             raw_filename = data['source_filepath']
-            global instrument_name
             global target_path
-            mailbox_path = os.path.join(
-                target_path,
-                instrument_name
-                )
-            if not os.path.exists(mailbox_path):
-                print("Creating mailbox: %s" %mailbox_path)
-                os.mkdir(mailbox_path)
-            shutil.copyfile(
-                raw_filename,
-                os.path.join(mailbox_path, os.path.basename(raw_filename))
+            if not os.path.exists(target_path):
+                print("Creating mailbox: %s" %target_path)
+                os.mkdir(target_path)
+            while True:
+                try:
+                    shutil.copyfile(
+                        raw_filename,
+                        os.path.join(target_path, os.path.basename(raw_filename))
+                        )
+                    break
+                except Exception as e:
+                    print("Failed to copy acquired file: %s" %e)
+                    await sio.sleep(1)
+            if sio.connected:
+                await sio.emit(
+                    'instrument_acquisition_finished',
+                    notification_data,
                 )
         elif spec_i < 0:
             # New file
             print("New file: %s" %filename)
+            if sio.connected:
+                await sio.emit(
+                    'instrument_acquisition_started',
+                    notification_data,
+                )
         else:
             # New data to existing file
-            pass
+            if sio.connected:
+                await sio.emit(
+                    'instrument_acquisition_progress',
+                    notification_data,
+                )
         print("%.2f" %streamer.progress)
         return True
 
@@ -132,15 +147,13 @@ async def main():
 
 
 host = None
-instrument_name = None
 port = None
 shutdown_event = Event()
-sio = socketio.AsyncClient(logger=True)
+sio = socketio.AsyncClient(logger=True, ssl_verify=False)
 target_path = None
 
 def run():
     global host
-    global instrument_name
     global port
     global shutdown_event
     global target_path
@@ -148,7 +161,6 @@ def run():
     args = parse_cmd_args()
     host = args.get('host', os.environ.get('MASCOPE_PUBLIC_HOST'))
     port = args.get('port', os.environ.get('MASCOPE_PUBLIC_API_PORT'))
-    instrument_name = args.get('instrument', 'unknown')
     target_path = args.get(
         'target',
         os.environ.get('MASCOPE_PRIVATE_DOWNLOADER_DIR', '.')

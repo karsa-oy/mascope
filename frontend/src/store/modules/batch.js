@@ -245,6 +245,7 @@ export default {
                     sample_item_type,
                     sample_batch_id,
                     sample_file_id,
+                    filter_id,
                     datetime,
                     datetime_utc,
                     filename,
