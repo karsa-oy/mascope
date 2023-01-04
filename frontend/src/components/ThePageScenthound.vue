@@ -39,10 +39,7 @@
           <b-field label="Target search">
             <b-progress
               :value="matchingProgress"
-              :type="matchingProgress == 100
-                      ? 'is-success'
-                      : 'is-primary'
-                    "
+              :type="sampleMatchClass"
               >
             </b-progress>
           </b-field>
@@ -300,7 +297,7 @@
                 <b-button
                   type="is-primary"
                   icon-left="close"
-                  @click=";"
+                  @click="reset()"
                   v-if="sampleMatched"
                 >
                   Close
@@ -337,7 +334,6 @@ export default {
   data: function () {
     return {
       activeStep: 0,
-      batchSelected: null,
       mzCalibrationTableCols: [
         { field: "mz", label: "Isotope m/z" },
         { field: "sample_peak_mz", label: "Pre peak m/z" },
@@ -370,8 +366,12 @@ export default {
       mzCalibrationRefineWindow: "calibration/paramRefineWindow",
       mzFit: "calibration/mzFit",
       mzFitStats: "calibration/mzFitStats",
+      possibleMatchThreshold: "batch/paramPossibleMatchThreshold",
+      probableMatchThreshold: "batch/paramProbableMatchThreshold",
       sampleActive: "sample/active",
+      sampleItems: "batch/sampleItems",
       sampleMatched: "sample/matched",
+      sampleMatchCollections: "sample/matchCollections",
       sampleMzCalibrated: "sample/active@mz_calibration.verified",
     }),
     ...sync({
@@ -403,6 +403,23 @@ export default {
         )
       : false;
     },
+    sampleMatchClass() {
+      if (this.sampleMaxMatchScore === null) return 'is-primary'
+      if (this.sampleMaxMatchScore >= this.probableMatchThreshold) {
+        return "is-danger";
+      } else if (this.sampleMaxMatchScore >= this.possibleMatchThreshold) {
+        return "is-primary";
+      } else {
+        return "is-success";
+      }
+    },
+    sampleMaxMatchScore() {
+      return this.sampleMatchCollections
+        ? Math.max(
+            ...this.sampleMatchCollections.map((row) => row.match_score)
+          )
+        : null;
+    },
   },
   created() {
     this.sampleUnload();
@@ -416,6 +433,7 @@ export default {
     ...call({
       batchSelect: "batch/load",
       mzCalibrationReset: "calibration/unload",
+      resetAcquisitionStatus: "instrument/resetAcquisitionStatus",
       sampleUnload: "sample/unload",
     }),
     ...mapMutations({
@@ -445,6 +463,11 @@ export default {
         this.mzCalibrationMatchScoreMin,
         this.mzCalibrationRefineWindow
         );
+    },
+    reset() {
+      this.resetAcquisitionStatus();
+      this.resetSampleItem();
+      this.activeStep = 0;
     },
     resetSampleItem() {
       this.sampleItemFilterId = null;
@@ -510,13 +533,17 @@ export default {
       }
     },
     calibrationProgress(newValue, oldValue) {
-      if (oldValue != 100 && newValue == 100) this.activeStep = 1;
+      if (oldValue != 100 && newValue == 100) {
+        if (this.calibrationStatus.failed) {
+          this.activeStep = 1;
+        }
+      }
     },
-    matchingProgress(newValue, oldValue) {
-      if (oldValue != 100 && newValue == 100) this.activeStep = 2;
-
+    sampleMaxMatchScore() {
+      if (this.sampleMaxMatchScore >= this.possibleMatchThreshold) {
+        this.activeStep = 2;
+      }
     },
   },
 };
 </script>
-
