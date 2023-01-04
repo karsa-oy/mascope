@@ -1,5 +1,17 @@
+import { customAlphabet } from 'nanoid'
+
 export function camelToSnakeCase(str) {
     return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+}
+
+export function genId(len, case_sensitive=true) {
+    if (case_sensitive) {
+        var alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+    } else {
+        var alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    }
+    const nanoid = customAlphabet(alphabet, len);
+    return nanoid();
 }
 
 export function parseAutosamplerCsv(rows) {

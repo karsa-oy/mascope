@@ -74,10 +74,40 @@
             <b-field label="Filter ID">
               <b-input
                 v-model="sampleItemFilterId"
-                :disabled="!acquisitionFilename"
+                disabled
                 expanded
               >
               </b-input>
+              <b-dropdown
+                aria-role="list"
+                v-model="sampleItemFilterId"
+                :disabled="!acquisitionFilename"
+                expanded
+                >
+                <template #trigger>
+                  <b-button
+                      :label="sampleItemFilterId"
+                      icon-right="menu-down"
+                      style="align:left"
+                  />
+                </template>
+                <template v-for="filterId of batchFilterIds">
+                  <b-dropdown-item
+                    aria-role="listitem"
+                    :key="filterId"
+                    :value="filterId"
+                  >
+                    {{ filterId }}
+                  </b-dropdown-item>
+                </template>
+              </b-dropdown>
+              <b-button
+                type='is-primary'
+                icon-left='plus'
+                :disabled="!acquisitionFilename"
+                @click="generateFilterId()"
+                >
+              </b-button>
             </b-field>
             <b-field label="Sample type">
               <b-dropdown
@@ -96,16 +126,24 @@
                 </template>
                 <b-dropdown-item
                   aria-role="listitem"
-                  value="SAMPLE"
-                  v-if="sampleItemFilterId"
+                  value="BACKGROUND"
+                  v-if="!sampleItemFilterId"
                 >
-                  Sample
+                  System background
                 </b-dropdown-item>
                 <b-dropdown-item
                   aria-role="listitem"
                   value="BACKGROUND"
+                  v-if="sampleItemFilterId"
                 >
-                  Background
+                  Filter background
+                </b-dropdown-item>
+                <b-dropdown-item
+                  aria-role="listitem"
+                  value="SAMPLE"
+                  v-if="sampleItemFilterId"
+                >
+                  Sample
                 </b-dropdown-item>
                 <b-dropdown-item
                   aria-role="listitem"
@@ -285,6 +323,7 @@ import ThePaneBrowserTarget from "./ThePaneBrowserTarget.vue";
 import * as _ from "underscore";
 import { mapMutations } from "vuex";
 import { call, get, sync } from "vuex-pathify";
+import { genId } from "../lib/util";
 
 export default {
   name: "TheModalScenthoundWorkflow",
@@ -338,6 +377,11 @@ export default {
     ...sync({
       scenthoundModeActive: "instrument/scenthoundModeActive",
     }),
+    batchFilterIds() {
+      return this.batchActive
+        ? [null, ...new Set(this.sampleItems.map((item) => item.filter_id))]
+        : [];
+    },
     calibrationProgress() {
       return this.calibrationStatus
         ? this.calibrationStatus.progress
@@ -378,6 +422,9 @@ export default {
     }),
     clone(obj) {
       return JSON.parse(JSON.stringify(obj));
+    },
+    generateFilterId() {
+      this.sampleItemFilterId = genId(6, false);
     },
     mzCalibrationApply() {
       this.$api.emit(
@@ -427,6 +474,7 @@ export default {
         sample_item_type: this.sampleItemType,
         sample_batch_id: this.batchActive.sample_batch_id,
         sample_item_attributes: {},
+        filter_id: this.sampleItemFilterId,
       };
       if (!this.sampleActive) {
         this.$api.emit('sample_item_create', [newSampleItem]);
