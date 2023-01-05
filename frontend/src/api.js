@@ -55,7 +55,7 @@ async function initSocket() {
     const socket = io(url);
     apiLog('initialized socket for', mode, ':', url, socket);
     const emit = (ev, ...args) => {
-        apiLog(`emitting event ${ev}`, ...args);
+        apiLog(`emitting event "${ev}"`, ...args);
         socket.emit(ev, ...args);
     }
     return [socket, emit];
