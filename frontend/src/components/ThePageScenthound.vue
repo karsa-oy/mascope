@@ -126,33 +126,33 @@
                   value="BACKGROUND"
                   v-if="!sampleItemFilterId"
                 >
-                  System background
+                  Instrument background
                 </b-dropdown-item>
                 <b-dropdown-item
                   aria-role="listitem"
                   value="BACKGROUND"
-                  v-if="sampleItemFilterId"
+                  v-if="sampleItemFilterId && filterIsNew"
                 >
                   Filter background
                 </b-dropdown-item>
                 <b-dropdown-item
                   aria-role="listitem"
-                  value="SAMPLE"
-                  v-if="sampleItemFilterId"
+                  value="HOT"
+                  v-if="sampleItemFilterId && !filterIsNew"
                 >
-                  Sample
+                  Hot
                 </b-dropdown-item>
                 <b-dropdown-item
                   aria-role="listitem"
                   value="BLANK"
-                  v-if="sampleItemFilterId"
+                  v-if="sampleItemFilterId && !filterIsNew"
                 >
                   Blank
                 </b-dropdown-item>
                 <b-dropdown-item
                   aria-role="listitem"
                   value="UNKNOWN"
-                  v-if="sampleItemFilterId"
+                  v-if="sampleItemFilterId && !filterIsNew"
                 >
                   Unknown
                 </b-dropdown-item>
@@ -213,7 +213,7 @@
                   "
                 icon-left="content-save"
                 expanded
-                @click="saveSampleItem"
+                @click="saveSampleInformation"
               >
                 Save sample info
               </b-button>
@@ -236,7 +236,7 @@
               <base-param-field
                 label="Refine window [ppm]"
                 path="calibration/paramRefineWindow"
-                :range="{ min: 0, max: 100, step: 1 }"
+                :range="{ min: 0, max: 100, step: 10 }"
                 type="is-primary"
               >
               </base-param-field>
@@ -387,6 +387,9 @@ export default {
         ? this.calibrationStatus.progress
         : 0
     },
+    filterIsNew() {
+      return !this.batchFilterIds.includes(this.sampleItemFilterId);
+    },
     mzCalibrationTableRows() {
       return this.mzFitStats ?? [];
     },
@@ -479,16 +482,6 @@ export default {
         'match_item_compute',
         this.sampleActive
       )
-    },
-    async saveSampleItem() {
-      switch (this.sampleItemType) {
-        case 'BACKGROUND':
-        case 'BLANK':
-        case 'SAMPLE':
-        case 'UNKNOWN':
-          break;
-      }
-      this.saveSampleInformation();
     },
     saveSampleInformation() {
       let newSampleItem = {
