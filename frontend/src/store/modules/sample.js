@@ -229,9 +229,10 @@ export default {
                 dispatch('load', activeSample);
             }
         },
-        async onSampleItemCreated({ dispatch }, sample_item_id) {
-            await dispatch('api/reloadDb', null, {root:true})
-                .then(() => dispatch("load", {sample_item_id}));
+        async onSampleItemCreated({ rootGetters, dispatch }, sample_item_id) {
+            await dispatch('batch/onSampleBatchReload', null, {root:true});
+            const sample_item = rootGetters['batch/sampleItem'](sample_item_id);
+            await dispatch("load", sample_item);
         },
     },
     getters: {}

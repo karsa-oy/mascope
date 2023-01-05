@@ -334,12 +334,13 @@ async def sample_item_create(sid, sample_items):
             sample_item_id,
             room=sid,
             namespace='/'
-            )
+        )
     await sio.emit(
         'sample_batch_reload',
         room=sample_batch_id,
+        skip_sid=sid,
         namespace='/'
-        )
+    )
 
 @sio.event(namespace='/')
 async def sample_item_update(sid, sample_items):
