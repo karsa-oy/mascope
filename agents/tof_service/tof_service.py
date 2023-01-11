@@ -159,8 +159,8 @@ def run():
     global target_path
 
     args = parse_cmd_args()
-    host = args.get('host', os.environ.get('MASCOPE_PUBLIC_HOST'))
-    port = args.get('port', os.environ.get('MASCOPE_PUBLIC_API_PORT'))
+    host = args.get('host')
+    port = args.get('port')
     target_path = args.get(
         'target',
         os.environ.get('MASCOPE_PRIVATE_DOWNLOADER_DIR', '.')

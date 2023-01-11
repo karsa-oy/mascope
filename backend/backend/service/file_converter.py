@@ -156,6 +156,16 @@ def parse_cmd_args():
         type=str, required=False
     )
     parser.add_argument(
+        "-m", "--host",
+        help="mascope url (default: localhost)",
+        type=str, required=False
+    )
+    parser.add_argument(
+        "-p", "--port",
+        help="mascope-api service port (default: $MASCOPE_PUBLIC_API_PORT)",
+        type=str, required=False
+    )
+    parser.add_argument(
         "-nj", "--n_jobs",
         help="number of job processors",
         type=int, required=False
@@ -182,7 +192,7 @@ def parse_cmd_args():
         default=False
     )
     parser.add_argument(
-        "-p", "--ping",
+        "--ping",
         help="ping source directory for new samples (alt to filesystem event)",
         action='store_true',
         default=False
@@ -205,9 +215,6 @@ def parse_cmd_args():
 
 async def main():
     global sio
-    # service connects to API server via loopback, otherwise use MASCOPE_PUBLIC_HOST
-    host = '127.0.0.1'
-    port = os.environ['MASCOPE_PUBLIC_API_PORT']
     url = f"http://{host}:{port}"
     while not shutdown_event.is_set():
         try:
@@ -222,6 +229,8 @@ async def main():
 
 load_dotenv()
 
+host = None
+port = None
 cache = None
 file_queue = Queue()
 shutdown_event = Event()
@@ -229,6 +238,8 @@ sio = socketio.AsyncClient(logger=True, ssl_verify=False)
 
 
 def run():
+    global host
+    global port
     global cache
     global file_queue
     global shutdown_event
@@ -236,6 +247,8 @@ def run():
     args = parse_cmd_args()
     print(args)
 
+    host = args.get('host', '127.0.0.1')
+    port = args.get('port', os.environ.get('MASCOPE_PUBLIC_API_PORT'))
 
     streamer_type = args['streamer_type']
     if streamer_type == 'H5':
