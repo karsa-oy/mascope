@@ -38,7 +38,7 @@ Vagrant.configure("2") do |config|
   VAGRANT_HOST_DATADIR = ENV['VAGRANT_HOST_DATADIR'] || "D:/Data"
   VAGRANT_HOST_CONVERTER_DIR = ENV['VAGRANT_HOST_CONVERTER_DIR'] || "D:/to_mascope"
   VAGRANT_HOST_DOWNLOADER_DIR = ENV['VAGRANT_HOST_DOWNLOADER_DIR'] || "V:/Data/to_mascope"
-  VAGRANT_HOST_LOG_DIR = ENV['VAGRANT_HOST_LOG_DIR'] || "../../../log"
+  VAGRANT_HOST_LOG_DIR = ENV['VAGRANT_HOST_LOG_DIR'] || "../../../../log"
   VAGRANT_VB_MEMORY = ENV['VAGRANT_VB_MEMORY'] || "8192"
   
   # for ssh access to the image, use port 2201: e.g. ssh vagrant@localhost -p 2201

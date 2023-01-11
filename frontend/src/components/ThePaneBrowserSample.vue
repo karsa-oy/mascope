@@ -206,6 +206,7 @@ export default {
       const matchCompoundCols = [
         { field: "sample_item_name", label: "Sample name" },
         { field: "filename", label: "Filename" },
+        { field: "sample_item_type", label: "Sample type" },
         { field: "target_compound_name", label: "Compound name" },
         { field: "target_compound_formula", label: "Compound formula" },
         { field: "sample_peak_area_sum", label: "Sample peak intensity" },
@@ -215,6 +216,7 @@ export default {
       const matchIonCols = [
         { field: "sample_item_name", label: "Sample name" },
         { field: "filename", label: "Filename" },
+        { field: "sample_item_type", label: "Sample type" },
         { field: "target_compound_name", label: "Compound name" },
         { field: "target_compound_formula", label: "Compound formula" },
         { field: "target_ion_mechanism", label: "Ionization mechanism" },

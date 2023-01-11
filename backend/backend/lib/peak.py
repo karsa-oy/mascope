@@ -114,6 +114,7 @@ async def detect_peaks(
         new_peak_areas = list(zip(*new_peaks))[3]
     else:
         new_peak_mzs = []
+        new_peak_areas = []
         new_peak_heights = []
 
     if if_exists == 'append':

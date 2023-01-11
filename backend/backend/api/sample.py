@@ -376,6 +376,7 @@ async def sample_item_update(sid, sample_items):
                 'sample_item_id',
                 'sample_batch_id',
                 'filename',
+                'filter_id',
                 'sample_item_attributes',
                 'sample_item_name',
                 'sample_item_type',
