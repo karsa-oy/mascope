@@ -57,18 +57,18 @@ export default {
                         -- set match_score to 0 if not within set tolerances
                             WHEN (
                                 ABS(match_mz_error) <= ${mzTolerance}
-                                AND ABS(match_abundance_error) <= ${isotopeRatioTolerance}
+                                -- AND ABS(match_abundance_error) <= ${isotopeRatioTolerance}
                                 AND sample_peak_area >= ${peakMinIntensity}
                                 ) THEN match_score
                             ELSE 0
                         END AS match_score,
                         match_mz_error,
-                        match_abundance_error,
+                        -- match_abundance_error,
                         sample_item_id,
                         CASE
                             WHEN (
                                 ABS(match_mz_error) <= ${mzTolerance}
-                                AND ABS(match_abundance_error) <= ${isotopeRatioTolerance}
+                                -- AND ABS(match_abundance_error) <= ${isotopeRatioTolerance}
                                 AND relative_abundance >= ${minIsotopeAbundance}
                                 )
                             THEN sample_peak_area

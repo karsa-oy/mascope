@@ -157,7 +157,7 @@ async def compute_matches(
             match_isotope_df['sample_peak_area_relative']
             - match_isotope_df['relative_abundance']
         )
-    )
+    ) * 0 # TODO: match_abundance_error set to 0 for now
 
     # calculate mz errors
     match_isotope_df.loc[:, 'match_mz_error'] = (

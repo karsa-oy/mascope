@@ -34,7 +34,7 @@ const paramDefaults = {
     paramCalibrationCollection: [],
     paramIonMechanisms: [],
     // filter parameters
-    paramIsotopeRatioTolerance: 0.1,
+    paramIsotopeRatioTolerance: 1.0,
     paramMinIsotopeAbundance: 0.05,
     paramMzTolerance: 10,
     paramPeakMinIntensity: null,
@@ -91,7 +91,7 @@ export default {
                             CASE
                                 WHEN (
                                     ABS(match_mz_error) <= ${mzTolerance}
-                                    AND ABS(match_abundance_error) <= ${isotopeRatioTolerance}
+                                    -- AND ABS(match_abundance_error) <= ${isotopeRatioTolerance}
                                     AND relative_abundance >= ${minIsotopeAbundance}
                                     )
                                 THEN sample_peak_area
@@ -100,7 +100,7 @@ export default {
                             CASE
                                 WHEN (
                                     ABS(match_mz_error) <= ${mzTolerance}
-                                    AND ABS(match_abundance_error) <= ${isotopeRatioTolerance}
+                                    -- AND ABS(match_abundance_error) <= ${isotopeRatioTolerance}
                                     AND sample_peak_area >= ${peakMinIntensity}
                                     AND relative_abundance >= ${minIsotopeAbundance}
                                     )
