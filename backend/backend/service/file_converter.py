@@ -216,6 +216,7 @@ def parse_cmd_args():
 async def main():
     global sio
     url = f"http://{host}:{port}"
+    print(f"Connecting to {url}...")
     while not shutdown_event.is_set():
         try:
             await sio.connect(url)

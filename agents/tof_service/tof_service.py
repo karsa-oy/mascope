@@ -134,10 +134,11 @@ async def main():
         url = f"http://{host}:{port}"
     elif host:
         url = f"http://{host}"
-
+    if not url:
+        print("Mascope host not defined, running in offline mode")
     while url and not shutdown_event.is_set():
         try:
-            print("Connecting to %s" %url)
+            print(f"Connecting to {url}")
             await sio.connect(url)
             break
         except:
