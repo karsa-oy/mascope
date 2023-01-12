@@ -31,8 +31,11 @@ async def compute_matches(
     # load target isotopes
     target_isotope_df = pd.read_sql(
         f"""
-        SELECT
-            target_isotope.*
+        SELECT DISTINCT
+            target_isotope_id,
+            target_ion_id,
+            mz,
+            relative_abundance
         FROM
             target_collection
             NATURAL JOIN target_compound_in_target_collection
@@ -186,8 +189,11 @@ async def compute_raw_intensities(
     # load target isotopes
     target_isotope_df = pd.read_sql(
         f"""
-        SELECT
-            target_isotope.*
+        SELECT DISTINCT
+            target_isotope_id,
+            target_ion_id,
+            mz,
+            relative_abundance
         FROM
             target_collection
             NATURAL JOIN target_compound_in_target_collection
