@@ -6,7 +6,7 @@ import initSqlJs from "sql.js";
 const mode = import.meta.env.MASCOPE_PUBLIC_MODE;
 const dbVersion = import.meta.env.MASCOPE_PUBLIC_DB_VERSION;
 const protocol = import.meta.env.MASCOPE_PUBLIC_PROTOCOL;
-const host = import.meta.env.MASCOPE_PUBLIC_HOST;
+const host = location.hostname;
 const port = import.meta.env.MASCOPE_PUBLIC_PORT;
 const api_port = import.meta.env.MASCOPE_PUBLIC_API_PORT;
 const platform = import.meta.env.MASCOPE_PRIVATE_ENV
@@ -21,7 +21,6 @@ export const api = await initApi();
 
 async function initDb() {
     // INIT DATABASE
-
     // open db file served from backend
     let path = '';
     if ( platform.includes('inux') ) {

@@ -39,7 +39,7 @@ function install_prerequisites() {
     sudo rm -r -f /var/www/mascope.site || true
     sudo mkdir /var/www/mascope.site
     sudo ln -s -f $MASCOPE_UI /var/www/mascope.site/production
-    sed "s/MASCOPE_PUBLIC_HOST/$MASCOPE_PUBLIC_HOST/g;s/MASCOPE_PUBLIC_PORT/$MASCOPE_PUBLIC_PORT/g;s/MASCOPE_PUBLIC_API_PORT/$MASCOPE_PUBLIC_API_PORT/g;" $MY_PATH/nginx/mascope_site.conf > $MY_PATH/nginx/mascope.com
+    sed "s/MASCOPE_PUBLIC_PORT/$MASCOPE_PUBLIC_PORT/g;s/MASCOPE_PUBLIC_API_PORT/$MASCOPE_PUBLIC_API_PORT/g;" $MY_PATH/nginx/mascope_site.conf > $MY_PATH/nginx/mascope.com
     sudo mv -f $MY_PATH/nginx/mascope.com /etc/nginx/sites-available/mascope.com
     sudo chmod -x /etc/nginx/sites-available/mascope.com
     # create and deploy self-signed ssl certificate for https access to nginx

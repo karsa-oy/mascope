@@ -31,8 +31,11 @@ async def compute_matches(
     # load target isotopes
     target_isotope_df = pd.read_sql(
         f"""
-        SELECT
-            target_isotope.*
+        SELECT DISTINCT
+            target_isotope_id,
+            target_ion_id,
+            mz,
+            relative_abundance
         FROM
             target_collection
             NATURAL JOIN target_compound_in_target_collection
@@ -154,7 +157,7 @@ async def compute_matches(
             match_isotope_df['sample_peak_area_relative']
             - match_isotope_df['relative_abundance']
         )
-    )
+    ) * 0 # TODO: match_abundance_error set to 0 for now
 
     # calculate mz errors
     match_isotope_df.loc[:, 'match_mz_error'] = (
@@ -186,8 +189,11 @@ async def compute_raw_intensities(
     # load target isotopes
     target_isotope_df = pd.read_sql(
         f"""
-        SELECT
-            target_isotope.*
+        SELECT DISTINCT
+            target_isotope_id,
+            target_ion_id,
+            mz,
+            relative_abundance
         FROM
             target_collection
             NATURAL JOIN target_compound_in_target_collection

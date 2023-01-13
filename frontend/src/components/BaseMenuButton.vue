@@ -1,6 +1,11 @@
 <template>
   <div v-on:click="onClick">
-    <b-menu-item tag="router-link" :to="{ path, query }" :icon="icon">
+    <b-menu-item
+      tag="router-link"
+      :to="{ path, query }"
+      :icon="icon"
+      :disabled="disabled"
+    >
     </b-menu-item>
   </div>
 </template>
@@ -10,6 +15,11 @@ import { mapState } from "vuex";
 
 export default {
   props: {
+    disabled: {
+      type: Boolean,
+      required: false,
+      default: false,
+    },
     label: {
       type: String,
       required: true,

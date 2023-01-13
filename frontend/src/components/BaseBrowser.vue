@@ -192,6 +192,9 @@ export default {
   },
   methods: {
     getChildLevels: function (...parentRows) {
+      // TODO: Currently only looks one level up for parent id.
+      // Should check all levels (e.g. target_ion_id -> target_compound_id -> target_collection_id)
+
       let childLevels = [];
       // init iteration parameters
       let currentLevel = cloneDeep(this.currentLevel);

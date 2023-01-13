@@ -134,10 +134,11 @@ async def main():
         url = f"http://{host}:{port}"
     elif host:
         url = f"http://{host}"
-
+    if not url:
+        print("Mascope host not defined, running in offline mode")
     while url and not shutdown_event.is_set():
         try:
-            print("Connecting to %s" %url)
+            print(f"Connecting to {url}")
             await sio.connect(url)
             break
         except:
@@ -159,8 +160,8 @@ def run():
     global target_path
 
     args = parse_cmd_args()
-    host = args.get('host', os.environ.get('MASCOPE_PUBLIC_HOST'))
-    port = args.get('port', os.environ.get('MASCOPE_PUBLIC_API_PORT'))
+    host = args.get('host')
+    port = args.get('port')
     target_path = args.get(
         'target',
         os.environ.get('MASCOPE_PRIVATE_DOWNLOADER_DIR', '.')

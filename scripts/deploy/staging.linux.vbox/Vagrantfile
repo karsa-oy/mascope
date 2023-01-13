@@ -26,7 +26,6 @@ Vagrant.configure("2") do |config|
   # Dotenv.overload('.env')
   # Dotenv.overload('.debug_env')
 
-  MASCOPE_HOST = ENV['MASCOPE_PUBLIC_HOST']
   MASCOPE_HTTP = ENV['MASCOPE_PUBLIC_PORT']
   MASCOPE_HTTPS = 443
   MASCOPE_API = ENV['MASCOPE_PUBLIC_API_PORT']
@@ -54,7 +53,7 @@ Vagrant.configure("2") do |config|
   config.vm.synced_folder VAGRANT_HOST_DOWNLOADER_DIR, MASCOPE_PRIVATE_DOWNLOADER_DIR
   config.vm.synced_folder VAGRANT_HOST_LOG_DIR, MASCOPE_PRIVATE_LOG_DIR
 
-  config.vm.hostname = "mascope-" + MASCOPE_HOST.gsub(".", "-")
+  config.vm.hostname = "mascope-" + ENV['COMPUTERNAME']
   
   config.vm.provider :virtualbox do |vb|
     vb.name = config.vm.hostname

@@ -20,15 +20,15 @@ export default ({ mode }) => {
                      '/data/database/'
                 ]
             },
-            proxy: {
-                '/socket.io': {
-                    target: process.env.MASCOPE_PUBLIC_PROTOCOL+'://'+
-                            process.env.MASCOPE_PUBLIC_HOST+':'+
-                            process.env.MASCOPE_PUBLIC_API_PORT,
-                    changeOrigin: true,
-                    ws: true,
-                }
-            }
+            // proxy: {
+            //     '/socket.io': {
+            //         target: process.env.MASCOPE_PUBLIC_PROTOCOL+'://'+
+            //                 process.env.MASCOPE_PUBLIC_HOST+':'+
+            //                 process.env.MASCOPE_PUBLIC_API_PORT,
+            //         changeOrigin: true,
+            //         ws: true,
+            //     }
+            // }
         },
         resolve: {
             alias: [

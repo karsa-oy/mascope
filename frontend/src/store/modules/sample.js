@@ -57,18 +57,18 @@ export default {
                         -- set match_score to 0 if not within set tolerances
                             WHEN (
                                 ABS(match_mz_error) <= ${mzTolerance}
-                                AND ABS(match_abundance_error) <= ${isotopeRatioTolerance}
+                                -- AND ABS(match_abundance_error) <= ${isotopeRatioTolerance}
                                 AND sample_peak_area >= ${peakMinIntensity}
                                 ) THEN match_score
                             ELSE 0
                         END AS match_score,
                         match_mz_error,
-                        match_abundance_error,
+                        -- match_abundance_error,
                         sample_item_id,
                         CASE
                             WHEN (
                                 ABS(match_mz_error) <= ${mzTolerance}
-                                AND ABS(match_abundance_error) <= ${isotopeRatioTolerance}
+                                -- AND ABS(match_abundance_error) <= ${isotopeRatioTolerance}
                                 AND relative_abundance >= ${minIsotopeAbundance}
                                 )
                             THEN sample_peak_area
@@ -134,7 +134,7 @@ export default {
                             SUM(sample_peak_area) AS sample_peak_area_sum,
                             SUM(sample_peak_interference) AS sample_peak_interference_sum
                         FROM sample_match_filter
-                        GROUP BY sample_item_id, target_compound_id, target_ion_id
+                        GROUP BY sample_item_id, target_collection_id, target_compound_id, target_ion_id
                     )
                     GROUP BY sample_item_id, target_collection_id
                 )
@@ -164,9 +164,9 @@ export default {
                         SUM(sample_peak_area) AS sample_peak_area_sum,
                         SUM(sample_peak_interference) AS sample_peak_interference_sum
                     FROM sample_match_filter
-                    GROUP BY sample_item_id, target_compound_id, target_ion_id
+                    GROUP BY sample_item_id, target_collection_id, target_compound_id, target_ion_id
                 )
-                GROUP BY sample_item_id, target_compound_id;
+                GROUP BY sample_item_id, target_collection_id, target_compound_id;
             `).then((res) => {
                 commit('SET_MATCH_COMPOUNDS', res);
             });
@@ -176,11 +176,12 @@ export default {
                     target_ion_formula,
                     target_ion_id,
                     target_compound_id,
+                    target_collection_id,
                     IFNULL(SUM(match_score*relative_abundance), 0) AS match_score,
                     IFNULL(SUM(sample_peak_area), 0) AS sample_peak_area_sum,
                     SUM(sample_peak_interference) AS sample_peak_interference_sum
                 FROM sample_match_filter
-                GROUP BY sample_item_id, target_compound_id, target_ion_id;
+                GROUP BY sample_item_id, target_collection_id, target_compound_id, target_ion_id;
             `).then((res) => {
                 commit('SET_MATCH_IONS', res);
             });
@@ -200,6 +201,7 @@ export default {
                     target_ion_id,
                     target_ion_formula,
                     target_compound_id,
+                    target_collection_id,
                     target_compound_name,
                     target_compound_formula
                 FROM sample_match_filter

@@ -95,6 +95,7 @@ async def mz_calibrate_sample(sid, sample_item):
         sample_item['filename'],
         [calibration_collection_id],
         ion_mechanism_ids,
+        isotope_abundance_min=0.1,
         match_score_min=0,
         refine_window=500
         )
@@ -162,6 +163,7 @@ async def mz_fit(
     filename,
     calibration_collection_ids,
     ionization_mechanism_ids,
+    isotope_abundance_min,
     match_score_min,
     refine_window
     ):
@@ -173,7 +175,8 @@ async def mz_fit(
     )
     # Filter matches
     good_matches_df = match_isotope_df[
-        (abs(match_isotope_df.match_mz_error) <= refine_window)
+        (match_isotope_df.relative_abundance >= isotope_abundance_min)
+        & (abs(match_isotope_df.match_mz_error) <= refine_window)
         & (match_isotope_df.match_score >= match_score_min)
         ]
 
@@ -202,6 +205,7 @@ async def calibration_mz_fit(
     filename,
     calibration_collection_ids,
     ionization_mechanism_ids,
+    isotope_abundance_min,
     match_score_min,
     refine_window
     ):
@@ -209,6 +213,7 @@ async def calibration_mz_fit(
         filename,
         calibration_collection_ids,
         ionization_mechanism_ids,
+        isotope_abundance_min,
         match_score_min,
         refine_window
         )

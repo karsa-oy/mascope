@@ -20,6 +20,7 @@
       path="batch/paramIsotopeRatioTolerance"
       @paramChange="reloadMatches"
       :range="{ min: 0, max: 1, step: .01 }"
+      disabled
     >
     </base-param-field>
     <base-param-field

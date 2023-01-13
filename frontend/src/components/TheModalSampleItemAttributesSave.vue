@@ -429,6 +429,7 @@ export default {
         this.sampleFilename,
         [calibrationCollectionId],
         ionizationMechanismIds,
+        0.10, // isotope_abundance_min
         this.mzCalibrationMatchScoreMin,
         this.mzCalibrationRefineWindow
         );
