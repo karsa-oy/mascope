@@ -52,8 +52,9 @@ export default {
           name: "Item",
           slug: "sample_item",
           cols: [
-            { field: "sample_item_name", label: "Item", width: "90%" },
+            { field: "sample_item_name", label: "Item", width: "80%" },
             { field: "datetime", label: "Datetime", width: "0%", hidden:true },
+            { field: "filter_id", label: "Filter ID", width: "10%" },
             {
               field: "match_score",
               label: "Score",

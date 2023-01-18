@@ -36,11 +36,11 @@ export default {
           visible: true,
         },
         {
-          disabled: this.allButtonsDisabled,
+          disabled: this.allButtonsDisabled || !(this.batchActive && this.instrumentActive),
           icon: "dog-side",
           label: "Scenthound",
           path: "/scenthound",
-          visible: this.batchActive && this.instrumentActive,
+          visible: true,
         },
         {
           disabled: this.allButtonsDisabled,

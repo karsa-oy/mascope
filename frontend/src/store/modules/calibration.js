@@ -5,10 +5,10 @@ const state = {
     mzFit: null,
     mzFitError: null,
     mzFitStats: null,
-    paramMatchScoreMin: 0.9,
+    paramMatchScoreMin: 0,
     paramMinIsotopeAbundance: 0.1,
     paramMinPeakIntensity: 1000,
-    paramRefineWindow: 10,
+    paramRefineWindow: 100,
 };
 
 export default {

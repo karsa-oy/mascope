@@ -22,6 +22,7 @@ const state = {
     // filter parameters
     paramIsotopeRatioTolerance: null,
     paramMinIsotopeAbundance: null,
+    paramMinIsotopeCorrelation: null,
     paramMzTolerance: null,
     paramPeakMinIntensity: null,
     paramPeakMinSeparation: null,
@@ -34,13 +35,14 @@ const paramDefaults = {
     paramCalibrationCollection: [],
     paramIonMechanisms: [],
     // filter parameters
-    paramIsotopeRatioTolerance: 1.0,
-    paramMinIsotopeAbundance: 0.05,
-    paramMzTolerance: 10,
+    paramIsotopeRatioTolerance: 0.1,
+    paramMinIsotopeAbundance: 0.15,
+    paramMinIsotopeCorrelation: 0.6,
+    paramMzTolerance: 15,
     paramPeakMinIntensity: null,
     paramPeakMinSeparation: null,
     paramPossibleMatchThreshold: 0.7,
-    paramProbableMatchThreshold: 0.9,
+    paramProbableMatchThreshold: 0.85,
 }
 
 // initialize parameter values in state with defaults
@@ -65,8 +67,10 @@ export default {
             const mzTolerance = filterParams.mz_tolerance;
             const isotopeRatioTolerance = filterParams.isotope_ratio_tolerance;
             const peakMinIntensity = filterParams.peak_min_intensity;
-            const peakMinSeparation = filterParams.peak_min_separation;
             const minIsotopeAbundance = filterParams.min_isotope_abundance;
+            const minIsotopeCorrelation = filterParams.min_isotope_correlation
+                ? filterParams.min_isotope_correlation
+                : paramDefaults.paramMinIsotopeCorrelation;
             await rootState.api.query(`--sql
                 -- matches
                 DROP TABLE IF EXISTS batch_match_filter;
@@ -91,7 +95,9 @@ export default {
                             CASE
                                 WHEN (
                                     ABS(match_mz_error) <= ${mzTolerance}
-                                    -- AND ABS(match_abundance_error) <= ${isotopeRatioTolerance}
+                                    AND ABS(match_abundance_error) <= ${isotopeRatioTolerance}
+                                    AND MAX(match_isotope_correlation, 0) >= ${minIsotopeCorrelation}
+                                    AND ABS(match_abundance_error) <= ${isotopeRatioTolerance}
                                     AND relative_abundance >= ${minIsotopeAbundance}
                                     )
                                 THEN sample_peak_area
@@ -100,7 +106,8 @@ export default {
                             CASE
                                 WHEN (
                                     ABS(match_mz_error) <= ${mzTolerance}
-                                    -- AND ABS(match_abundance_error) <= ${isotopeRatioTolerance}
+                                    AND ABS(match_abundance_error) <= ${isotopeRatioTolerance}
+                                    AND MAX(match_isotope_correlation, 0) >= ${minIsotopeCorrelation}
                                     AND sample_peak_area >= ${peakMinIntensity}
                                     AND relative_abundance >= ${minIsotopeAbundance}
                                     )
@@ -303,6 +310,7 @@ export default {
                 NATURAL LEFT JOIN sample_item
                 NATURAL LEFT JOIN sample_file
                 GROUP BY sample_item_id
+                ORDER BY sample_item_utc_created ASC
             `).then((res) => {
                 commit('SET_SAMPLE_ITEMS', res);
             });
@@ -566,6 +574,7 @@ export default {
             return {
                 'isotope_ratio_tolerance': state.paramIsotopeRatioTolerance,
                 'min_isotope_abundance': state.paramMinIsotopeAbundance,
+                'min_isotope_correlation': state.paramMinIsotopeCorrelation,
                 'mz_tolerance': state.paramMzTolerance,
                 'peak_min_intensity': state.paramPeakMinIntensity,
                 'peak_min_separation': state.paramPeakMinSeparation,

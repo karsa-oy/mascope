@@ -48,6 +48,7 @@ export default {
             const peakMinIntensity = filterParams.peak_min_intensity;
             const peakMinSeparation = filterParams.peak_min_separation;
             const minIsotopeAbundance = filterParams.min_isotope_abundance;
+            const minIsotopeCorrelation = filterParams.min_isotope_correlation;
             await rootState.api.query(`--sql
                 -- matches
                 DROP TABLE IF EXISTS sample_match_filter;
@@ -57,19 +58,21 @@ export default {
                         -- set match_score to 0 if not within set tolerances
                             WHEN (
                                 ABS(match_mz_error) <= ${mzTolerance}
-                                -- AND ABS(match_abundance_error) <= ${isotopeRatioTolerance}
+                                AND ABS(match_abundance_error) <= ${isotopeRatioTolerance}
+                                AND MAX(match_isotope_correlation, 0) >= ${minIsotopeCorrelation}
                                 AND sample_peak_area >= ${peakMinIntensity}
                                 ) THEN match_score
                             ELSE 0
                         END AS match_score,
                         match_mz_error,
-                        -- match_abundance_error,
+                        match_abundance_error,
+                        match_isotope_correlation,
                         sample_item_id,
                         CASE
                             WHEN (
                                 ABS(match_mz_error) <= ${mzTolerance}
-                                -- AND ABS(match_abundance_error) <= ${isotopeRatioTolerance}
-                                AND relative_abundance >= ${minIsotopeAbundance}
+                                AND ABS(match_abundance_error) <= ${isotopeRatioTolerance}
+                                AND MAX(match_isotope_correlation, 0) >= ${minIsotopeCorrelation}
                                 )
                             THEN sample_peak_area
                             ELSE 0

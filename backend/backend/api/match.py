@@ -19,6 +19,7 @@ async def compute_matches(
     filename,
     target_collection_ids,
     ionization_mechanism_ids,
+    min_isotope_abundance=0.1
     ):
     # Note:
     #   Matching is done on isotope-level. Ion, compound
@@ -44,9 +45,14 @@ async def compute_matches(
         WHERE
             target_collection_id IN ({collection_id_refs})
             AND ionization_mechanism_id IN ({mechanism_id_refs})
+            AND relative_abundance >= ?
         """,
         conn,
-        params=[*target_collection_ids, *ionization_mechanism_ids]
+        params=[
+            *target_collection_ids,
+            *ionization_mechanism_ids,
+            min_isotope_abundance
+        ],
         )
 
     #########################
@@ -72,6 +78,7 @@ async def compute_matches(
             sample_peak_area=np.nan,
             sample_peak_area_relative=np.nan,
             match_abundance_error=np.nan,
+            match_isotope_correlation=np.nan,
             match_mz_error=np.nan,
             match_score=np.nan,
         )
@@ -157,8 +164,23 @@ async def compute_matches(
             match_isotope_df['sample_peak_area_relative']
             - match_isotope_df['relative_abundance']
         )
-    ) * 0 # TODO: match_abundance_error set to 0 for now
-
+    )
+    # calculate isotope correlations
+    match_isotope_df = match_isotope_df.groupby(
+        ['target_ion_id'],
+        group_keys=False
+    ).apply(
+        lambda ion_group: (
+            ion_group.assign(
+                match_isotope_correlation = np.corrcoef(
+                    np.array([
+                        peaks.sel(mz=peak_mz, method='nearest')
+                        for peak_mz in ion_group['sample_peak_mz']
+                    ])
+                )[0, 1]
+            )
+        )
+    )
     # calculate mz errors
     match_isotope_df.loc[:, 'match_mz_error'] = (
         1e6 * (match_isotope_df['sample_peak_mz'] - match_isotope_df['mz'])
@@ -236,71 +258,6 @@ async def compute_raw_intensities(
     )
 
     return isotope_interference_df
-
-@sio.event(namespace='/')
-async def match_batch_compute(sid, sample_batch_id):
-
-    # clear previous matches
-    await match_batch_remove(sid, sample_batch_id)
-
-    with conn:
-        # fetch item ids
-        sample_items = pd.read_sql(f"""
-            SELECT
-                sample_item_id,
-                sample_batch_id,
-                filename
-            FROM sample_item
-            WHERE sample_batch_id == ?
-            """,
-            conn,
-            params=[sample_batch_id]
-            ).to_dict('records')
-    for sample_item in sample_items:
-        try:
-            await item_compute(sample_item)
-        except Exception as e:
-            print("Processing sample %s failed: %s" %(sample_item, e))
-    # reload batch
-    await sio.emit('sample_batch_reload', room=sample_batch_id, namespace='/')
-
-@sio.event(namespace='/')
-async def match_batch_remove(sid, sample_batch_id):
-    with conn:
-        # get workspace id
-        workspace_id = pd.read_sql(f"""--sql'
-            SELECT workspace_id
-            FROM sample_batch
-            WHERE sample_batch_id == ?
-        """,
-        conn,
-        params=[sample_batch_id]
-        ).to_dict('records')
-
-        # delete record
-        conn.cursor().execute(f"""--sql
-            DELETE FROM match
-            WHERE sample_item_id IN (
-                SELECT sample_item_id
-                FROM sample_item
-                WHERE sample_batch_id == ?
-            )
-        """,
-        [sample_batch_id]
-        )
-        conn.cursor().execute(f"""--sql
-            DELETE FROM match_interference
-            WHERE sample_item_id IN (
-                SELECT sample_item_id
-                FROM sample_item
-                WHERE sample_batch_id == ?
-            )
-        """,
-        [sample_batch_id]
-        )
-    # reload workspace
-    await sio.emit('workspace_reload', workspace_id, namespace='/')
-
 
 async def item_compute(sample_item):
     with conn:
@@ -387,6 +344,7 @@ async def item_compute(sample_item):
             ,"sample_peak_area_relative"
             ,"sample_peak_tof"
             ,"match_abundance_error"
+            ,"match_isotope_correlation"
             ,"match_mz_error"
             ,"match_score"
         ]]
@@ -397,6 +355,87 @@ async def item_compute(sample_item):
             index=False
             )
     return sample_item
+
+def item_remove(sample_item_id):
+    with conn:
+        # delete record
+        conn.cursor().execute(f"""--sql
+            DELETE FROM match
+            WHERE sample_item_id == ?
+            """,
+            [sample_item_id]
+            )
+        conn.cursor().execute(f"""--sql
+            DELETE FROM match_interference
+            WHERE sample_item_id == ?
+            """,
+            [sample_item_id]
+            )
+
+
+@sio.event(namespace='/')
+async def match_batch_compute(sid, sample_batch_id):
+
+    # clear previous matches
+    await match_batch_remove(sid, sample_batch_id)
+
+    with conn:
+        # fetch item ids
+        sample_items = pd.read_sql(f"""
+            SELECT
+                sample_item_id,
+                sample_batch_id,
+                filename
+            FROM sample_item
+            WHERE sample_batch_id == ?
+            """,
+            conn,
+            params=[sample_batch_id]
+            ).to_dict('records')
+    for sample_item in sample_items:
+        try:
+            await item_compute(sample_item)
+        except Exception as e:
+            print("Processing sample %s failed: %s" %(sample_item, e))
+    # reload batch
+    await sio.emit('sample_batch_reload', room=sample_batch_id, namespace='/')
+
+@sio.event(namespace='/')
+async def match_batch_remove(sid, sample_batch_id):
+    with conn:
+        # get workspace id
+        workspace_id = pd.read_sql(f"""--sql'
+            SELECT workspace_id
+            FROM sample_batch
+            WHERE sample_batch_id == ?
+        """,
+        conn,
+        params=[sample_batch_id]
+        ).to_dict('records')
+
+        # delete record
+        conn.cursor().execute(f"""--sql
+            DELETE FROM match
+            WHERE sample_item_id IN (
+                SELECT sample_item_id
+                FROM sample_item
+                WHERE sample_batch_id == ?
+            )
+        """,
+        [sample_batch_id]
+        )
+        conn.cursor().execute(f"""--sql
+            DELETE FROM match_interference
+            WHERE sample_item_id IN (
+                SELECT sample_item_id
+                FROM sample_item
+                WHERE sample_batch_id == ?
+            )
+        """,
+        [sample_batch_id]
+        )
+    # reload workspace
+    await sio.emit('workspace_reload', workspace_id, namespace='/')
 
 @sio.event(namespace='/')
 async def match_item_compute(sid, sample_item):
@@ -444,7 +483,8 @@ async def match_item_compute(sid, sample_item):
             room=sample_batch_id,
             namespace='/'
             )
-    except:
+    except Exception as e:
+        print(f"match_item_compute failed: {e}")
         await sio.emit(
             'match_item_compute_failed',
             {
@@ -455,34 +495,18 @@ async def match_item_compute(sid, sample_item):
             namespace='/'
         )
 
-def item_remove(sample_item_id):
-    with conn:
-        # fetch batch id
-        sample_batch_id = pd.read_sql(f"""
-            SELECT sample_batch_id
-            FROM sample_item
-            WHERE sample_item_id == ?
-            """,
-            conn,
-            params=[sample_item_id]
-            )['sample_batch_id'].tolist()[0]
-        # delete record
-        conn.cursor().execute(f"""--sql
-            DELETE FROM match
-            WHERE sample_item_id == ?
-            """,
-            [sample_item_id]
-            )
-        conn.cursor().execute(f"""--sql
-            DELETE FROM match_interference
-            WHERE sample_item_id == ?
-            """,
-            [sample_item_id]
-            )
-
 @sio.event(namespace='/')
 async def match_item_remove(sid, sample_item_id):
     item_remove(sample_item_id)
+    # fetch batch id
+    [sample_batch_id] = pd.read_sql(f"""
+        SELECT sample_batch_id
+        FROM sample_item
+        WHERE sample_item_id == ?
+        """,
+        conn,
+        params=[sample_item_id]
+        )['sample_batch_id'].tolist()
     # reload batch
     await sio.emit(
         'sample_batch_reload',

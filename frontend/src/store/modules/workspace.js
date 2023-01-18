@@ -25,7 +25,8 @@ export default {
                     sample_batch_utc_modified
                     ,0 as selection
                 FROM sample_batch
-                WHERE workspace_id == '${workspace.workspace_id}';
+                WHERE workspace_id == '${workspace.workspace_id}'
+                ORDER BY sample_batch_utc_created ASC
             `);
             await commit('SET_BATCHES', batches);
             await commit('SET_ACTIVE', workspace);

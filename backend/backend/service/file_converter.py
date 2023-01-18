@@ -28,6 +28,7 @@ async def create_sample_file_db_record(data):
     date = timestamp_from_filename(filename)
     utc_offset = timedelta(seconds=int(data['utc_offset']))
     mz_calibration = data.get('mz_calibration')
+    tic = cache.get(filename)['signal'].sum(dim='time').sum(dim='mz').compute().item()
     await sio.emit(
             'sample_file_create',
             [{
@@ -38,6 +39,7 @@ async def create_sample_file_db_record(data):
                 "length": committed_length,
                 "range": data['range'],
                 "mz_calibration": mz_calibration,
+                "tic": tic,
             }]
         )
 

@@ -13,29 +13,28 @@
       path="batch/paramMinIsotopeAbundance"
       @paramChange="reloadMatches"
       :range="{ min: 0, max: 1, step: .01 }"
+      disabled
     >
     </base-param-field>
     <base-param-field
       label="Isotope ratio tolerance"
       path="batch/paramIsotopeRatioTolerance"
       @paramChange="reloadMatches"
-      :range="{ min: 0, max: 1, step: .01 }"
-      disabled
+      :range="{ min: 0, max: 1, step: .1 }"
     >
     </base-param-field>
     <base-param-field
       label="Minimum peak intensity"
       path="batch/paramPeakMinIntensity"
       @paramChange="reloadMatches"
-      :range="{ min: 0, max: 10000, step: 1 }"
+      :range="{ min: 0, max: 10000, step: 500 }"
     >
     </base-param-field>
     <base-param-field
-      label="Minimum peak separation"
-      path="batch/paramPeakMinSeparation"
+      label="Minimum isotope correlation"
+      path="batch/paramMinIsotopeCorrelation"
       @paramChange="reloadMatches"
-      :range="{ min: 0, max: 100, step: 1 }"
-      disabled
+      :range="{ min: 0, max: 1, step: .1 }"
     >
     </base-param-field>
     <base-param-field
