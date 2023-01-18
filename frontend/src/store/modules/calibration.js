@@ -3,9 +3,12 @@ import { make } from 'vuex-pathify';
 const state = {
     active: null,
     mzFit: null,
+    mzFitError: null,
     mzFitStats: null,
-    paramRefineWindow: 10,
     paramMatchScoreMin: 0.9,
+    paramMinIsotopeAbundance: 0.1,
+    paramMinPeakIntensity: 1000,
+    paramRefineWindow: 10,
 };
 
 export default {
@@ -15,7 +18,7 @@ export default {
         ...make.mutations(state),
     },
     actions: {
-        async load({ commit }, sample) {
+        async load({ commit, rootState }, sample) {
             // reset if previous calibration loaded
             if (state.active) {
                 dispatch('unload');
@@ -33,6 +36,7 @@ export default {
         },
         async unload({ commit }) {
             await commit('SET_MZ_FIT', null);
+            await commit('SET_MZ_FIT_ERROR', null);
             await commit('SET_MZ_FIT_STATS', null);
         },
         async onCalibrationMzApplied({ dispatch }, sample_item_id) {
@@ -42,9 +46,21 @@ export default {
         },
         async onCalibrationMzFitStats({ commit }, response) {
             let fit = response.fit;
+            let fitError = response.error;
             let fitStats = response.stats;
             await commit('SET_MZ_FIT', fit);
+            await commit('SET_MZ_FIT_ERROR', fitError);
             await commit('SET_MZ_FIT_STATS', fitStats);
         },
-    }
+    },
+    getters: {
+        params: (state) => {
+            return {
+                match_score_min: state.paramMatchScoreMin,
+                refine_window: state.paramRefineWindow,
+                peak_intensity_min: state.paramMinPeakIntensity,
+                isotope_abundance_min: state.paramMinIsotopeAbundance,
+            }
+        },
+    },
 }

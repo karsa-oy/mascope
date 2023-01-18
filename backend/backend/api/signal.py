@@ -6,10 +6,16 @@ from hardware.tofwerk.lib.TwTool import TwTof2Mass
 from backend.lib.file import (
     get_zarr_var_shape,
     load_coord,
+    load_file,
     update_props,
     update_zarr_array_coord,
 )
 
+def calculate_tic(filename):
+    sample_file_data = load_file(filename, vars=['signal'])
+    sum_spectrum = sample_file_data.signal.sum(dim='time')
+    tic = sum_spectrum.sum(dim='mz').compute().item()
+    return tic
 
 def remove_duplicate_mz_values(mz):
     # Sometimes TOF signal mz coordinate contains multiple zeros at the beginning

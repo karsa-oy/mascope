@@ -112,7 +112,7 @@ export default {
                 }, 1000);
             }
         },
-        async mzCalibrateSample({ rootState, dispatch }) {
+        async mzCalibrateSample({ rootState, rootGetters, dispatch }) {
             const sampleActive = rootState.sample.active;
             if (sampleActive) {
                 rootState.api.emit(
@@ -121,7 +121,8 @@ export default {
                         'filename': sampleActive.filename,
                         'sample_item_id': sampleActive.sample_item_id,
                         'sample_batch_id': sampleActive.sample_batch_id,
-                    }
+                    },
+                    rootGetters['calibration/params'],
                 );
             } else {
                 // Try again in 1 second

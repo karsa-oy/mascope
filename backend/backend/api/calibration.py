@@ -6,10 +6,139 @@ from backend.api.match import compute_matches, match_item_remove
 from backend.api.match import item_remove as match_item_remove
 from backend.api.sample import sample_batch_update
 from backend.api.sample import file_update as sample_file_update
-from backend.api.signal import signal_mz_calibration_update
+from backend.api.signal import calculate_tic, signal_mz_calibration_update
 from backend.db.conn import conn
 from hardware.tofwerk.calibration import mz_calibrate
 from backend.server import sio
+
+
+def mz_apply(fit, sample_filenames):
+    # Read sample file records
+    sample_filename_refs = ','.join('?'*len(sample_filenames))
+    with conn:
+        sample_file_df = pd.read_sql(f"""--sql
+            SELECT *
+            FROM sample_file
+            WHERE filename IN (
+                {sample_filename_refs}
+            )
+            """,
+            conn,
+            params=sample_filenames
+            )
+    sample_file_df = sample_file_df.assign(
+        mz_calibration=sample_file_df[['mz_calibration']].applymap(
+            lambda x: json.loads(x) if x is not None else x
+            ),
+        range=sample_file_df[['range']].applymap(
+            lambda x: json.loads(x)
+            ),
+        )
+    # Update zarr files
+    filenames = sample_file_df['filename'].tolist()
+    new_mz = signal_mz_calibration_update(fit, filenames)
+    new_range = [new_mz[0], new_mz[-1]]
+
+    fit.update({'verified': True})
+    for _, sample_file in sample_file_df.iterrows():
+        # Update database record
+        sample_file['mz_calibration'] = fit
+        sample_file['range'] = new_range
+        sample_file_update(
+            [sample_file.to_dict()]
+            )
+        # Read affected sample items
+        with conn:
+            sample_item_ids = pd.read_sql(f"""--sql
+                SELECT sample_item_id
+                FROM sample_item
+                NATURAL LEFT JOIN sample_file
+                WHERE sample_file_id == ?
+                """,
+                conn,
+                params=[sample_file['sample_file_id']]
+                )['sample_item_id'].tolist()
+        for sample_item_id in sample_item_ids:
+            # Delete outdated matches
+            match_item_remove(sample_item_id)
+    return sample_item_ids
+
+async def mz_calibrate_sample(sid, sample_item, params):
+    fit, stats, error = await calibration_mz_fit(
+        sid,
+        sample_item['sample_item_id'],
+        params,
+    )
+    if fit:
+        await calibration_mz_apply(sid, fit, [sample_item['filename']])
+    return fit, stats, error
+
+async def mz_fit(
+    filename,
+    calibration_collection_id,
+    ionization_mechanism_ids,
+    peak_intensity_min,
+    isotope_abundance_min,
+    match_score_min,
+    refine_window
+    ):
+    error = None
+    # Compute matches for calibration compounds
+    match_isotope_df = await compute_matches(
+        filename,
+        [calibration_collection_id],
+        ionization_mechanism_ids
+    )
+    # Filter matches
+    good_matches_df = match_isotope_df[
+        (match_isotope_df.relative_abundance >= isotope_abundance_min)
+        & (match_isotope_df.sample_peak_area >= peak_intensity_min)
+        & (abs(match_isotope_df.match_mz_error) <= refine_window)
+        & (match_isotope_df.match_score >= match_score_min)
+        ]
+    n_relevant_isotopes = len(
+        match_isotope_df[
+            (match_isotope_df.relative_abundance >= isotope_abundance_min)
+            ]
+    )
+    calibrant_signal_intensity = good_matches_df['sample_peak_area']
+    tic = calculate_tic(filename)
+    calibrant_to_tic = calibrant_signal_intensity / tic
+
+    if n_relevant_isotopes > 3 and len(good_matches_df) == n_relevant_isotopes:
+        # Fit mz calibration
+        fit, stats = mz_calibrate(
+            good_matches_df['sample_peak_tof'],
+            good_matches_df['sample_peak_mz'],
+            good_matches_df['mz']
+        )
+        calibration_df = good_matches_df.copy().assign(
+            calibration_mz=stats['new_mz'],
+            calibration_mz_error=stats['post_dmz'],
+            mz_error_diff=abs(stats['post_dmz'])-abs(stats['pre_dmz']),
+            calibrant_to_tic=calibrant_to_tic,
+        )
+        mz_error_tolerance = 10
+        calibration_inaccurate = (
+            abs(calibration_df['calibration_mz_error']
+            ) > mz_error_tolerance
+            ).any()
+        if calibration_inaccurate:
+            error = "Calibration inaccurate"
+        stats = calibration_df.to_dict('records')
+        summary_row = {
+            'match_mz_error': abs(calibration_df['match_mz_error']).mean(),
+            'calibration_mz_error': abs(calibration_df['calibration_mz_error']).mean(),
+            'mz_error_diff': sum(calibration_df['mz_error_diff']),
+            'calibrant_to_tic': sum(calibration_df['calibrant_to_tic'])
+        }
+        stats.append(summary_row)
+    else:
+        # Not enough calibration peaks
+        fit = None
+        stats = good_matches_df.to_dict('records')
+        error = "Not enough calibration peaks"
+    return fit, stats, error
 
 
 @sio.event(namespace='/')
@@ -75,36 +204,8 @@ async def calibration_mz_calibrate_batch(
     sample_batch_df['calibration_sample_filename'] = filename
     await sample_batch_update(sid, sample_batch_df.to_dict('records'))
 
-async def mz_calibrate_sample(sid, sample_item):
-    # get sample batch
-    with conn:
-        [sample_batch] = pd.read_sql(f"""
-            SELECT build_params
-            FROM sample_batch
-            WHERE sample_batch_id == ?
-            """,
-            conn,
-            params=[sample_item['sample_batch_id']]
-            ).to_dict('records')
-    # get mz calibration parameters
-    build_params = json.loads(sample_batch['build_params'])
-    calibration_collection_id = build_params['calibration_collection']
-    ion_mechanism_ids = build_params['ion_mechanisms']
-    fit, stats = await calibration_mz_fit(
-        sid,
-        sample_item['filename'],
-        [calibration_collection_id],
-        ion_mechanism_ids,
-        isotope_abundance_min=0.1,
-        match_score_min=0,
-        refine_window=500
-        )
-    if not fit:
-        raise Exception("Failed to fit m/z calibration")
-    await calibration_mz_apply(sid, fit, [sample_item['filename']])
-
 @sio.event(namespace='/')
-async def calibration_mz_calibrate_sample(sid, sample_item):
+async def calibration_mz_calibrate_sample(sid, sample_item, params):
     try:
         filename = sample_item['filename']
     except KeyError:
@@ -117,26 +218,27 @@ async def calibration_mz_calibrate_sample(sid, sample_item):
         conn,
         params=[filename]
     )['instrument'].tolist()
-    try:
-        await sio.emit(
-            'calibration_mz_calibrate_started',
-            {
-                'filename': filename,
-                'progress': 0,
-            },
-            room=instrument,
-            namespace='/'
-        )
-        await sio.emit(
-            'calibration_mz_calibrate_progress',
-            {},
-            room=instrument,
-            namespace='/'
-        )
-        task = sio.start_background_task(
-            mz_calibrate_sample, sid, sample_item
-        )
-        await asyncio.gather(task)
+    await sio.emit(
+        'calibration_mz_calibrate_started',
+        {
+            'filename': filename,
+            'progress': 0,
+        },
+        room=instrument,
+        namespace='/'
+    )
+    await sio.emit(
+        'calibration_mz_calibrate_progress',
+        {},
+        room=instrument,
+        namespace='/'
+    )
+    task = sio.start_background_task(
+        mz_calibrate_sample, sid, sample_item, params
+    )
+    results = await asyncio.gather(task)
+    fit, stats, error = results[0]
+    if fit:
         await sio.emit(
             'calibration_mz_calibrate_finished',
             {
@@ -146,8 +248,7 @@ async def calibration_mz_calibrate_sample(sid, sample_item):
             room=instrument,
             namespace='/'
         )
-    except Exception as e:
-        print("Failed to calibrate sample %s: %s" %(filename, e))
+    else:
         await sio.emit(
             'calibration_mz_calibrate_failed',
             {
@@ -158,61 +259,55 @@ async def calibration_mz_calibrate_sample(sid, sample_item):
             namespace='/'
         )
 
-
-async def mz_fit(
-    filename,
-    calibration_collection_ids,
-    ionization_mechanism_ids,
-    isotope_abundance_min,
-    match_score_min,
-    refine_window
-    ):
-    # Compute matches for calibration compounds
-    match_isotope_df = await compute_matches(
-        filename,
-        calibration_collection_ids,
-        ionization_mechanism_ids
-    )
-    # Filter matches
-    good_matches_df = match_isotope_df[
-        (match_isotope_df.relative_abundance >= isotope_abundance_min)
-        & (abs(match_isotope_df.match_mz_error) <= refine_window)
-        & (match_isotope_df.match_score >= match_score_min)
-        ]
-
-    if len(good_matches_df) > 3:
-        # Fit mz calibration
-        fit, stats = mz_calibrate(
-            good_matches_df['sample_peak_tof'],
-            good_matches_df['sample_peak_mz'],
-            good_matches_df['mz']
-        )
-        # TODO: Check calibration is ok
-        calibration_df = good_matches_df.copy().assign(
-            calibration_mz=stats['new_mz'],
-            calibration_mz_error=stats['post_dmz']
-            )
-        stats = calibration_df.to_dict('records')
-    else:
-        # Not enough calibration peaks
-        fit = None
-        stats = None
-    return fit, stats
-
 @sio.event(namespace='/')
 async def calibration_mz_fit(
     sid,
-    filename,
-    calibration_collection_ids,
-    ionization_mechanism_ids,
-    isotope_abundance_min,
-    match_score_min,
-    refine_window
+    sample_item_id,
+    params,
     ):
-    fit, stats = await mz_fit(
+    with conn:
+        [filename] = pd.read_sql(f"""
+            SELECT filename
+            FROM sample_item
+            WHERE sample_item_id == ?
+            """,
+            conn,
+            params=[sample_item_id]
+        )['filename'].tolist()
+        [sample_batch_id] = pd.read_sql(f"""
+            SELECT sample_batch_id
+            FROM sample_item
+            WHERE sample_item_id == ?
+            """,
+            conn,
+            params=[sample_item_id]
+        )['sample_batch_id'].tolist()
+    # unpack parameters
+    peak_intensity_min = params.get('peak_intensity_min', 3000.)
+    isotope_abundance_min = params.get('isotope_abundance_min', 0.1)
+    match_score_min = params.get('match_score_min', 0)
+    refine_window = params.get('refine_window', 100)
+
+    # read sample batch
+    with conn:
+        [sample_batch] = pd.read_sql(f"""
+            SELECT build_params
+            FROM sample_batch
+            WHERE sample_batch_id == ?
+            """,
+            conn,
+            params=[sample_batch_id]
+        ).to_dict('records')
+    # get mz calibration parameters
+    build_params = json.loads(sample_batch['build_params'])
+    calibration_collection_id = build_params['calibration_collection']
+    ionization_mechanism_ids = build_params['ion_mechanisms']
+
+    fit, stats, error = await mz_fit(
         filename,
-        calibration_collection_ids,
+        calibration_collection_id,
         ionization_mechanism_ids,
+        peak_intensity_min,
         isotope_abundance_min,
         match_score_min,
         refine_window
@@ -222,62 +317,12 @@ async def calibration_mz_fit(
             'calibration_mz_fit_stats',
             {
                 'fit': fit,
-                'stats': stats
+                'stats': stats,
+                'error': error,
             },
             room=sid
         )
-    return fit, stats
-
-def mz_apply(fit, sample_filenames):
-    # Read sample file records
-    sample_filename_refs = ','.join('?'*len(sample_filenames))
-    with conn:
-        sample_file_df = pd.read_sql(f"""--sql
-            SELECT *
-            FROM sample_file
-            WHERE filename IN (
-                {sample_filename_refs}
-            )
-            """,
-            conn,
-            params=sample_filenames
-            )
-    sample_file_df = sample_file_df.assign(
-        mz_calibration=sample_file_df[['mz_calibration']].applymap(
-            lambda x: json.loads(x) if x is not None else x
-            ),
-        range=sample_file_df[['range']].applymap(
-            lambda x: json.loads(x)
-            ),
-        )
-    # Update zarr files
-    filenames = sample_file_df['filename'].tolist()
-    new_mz = signal_mz_calibration_update(fit, filenames)
-    new_range = [new_mz[0], new_mz[-1]]
-
-    fit.update({'verified': True})
-    for _, sample_file in sample_file_df.iterrows():
-        # Update database record
-        sample_file['mz_calibration'] = fit
-        sample_file['range'] = new_range
-        sample_file_update(
-            [sample_file.to_dict()]
-            )
-        # Read affected sample items
-        with conn:
-            sample_item_ids = pd.read_sql(f"""--sql
-                SELECT sample_item_id
-                FROM sample_item
-                NATURAL LEFT JOIN sample_file
-                WHERE sample_file_id == ?
-                """,
-                conn,
-                params=[sample_file['sample_file_id']]
-                )['sample_item_id'].tolist()
-        for sample_item_id in sample_item_ids:
-            # Delete outdated matches
-            match_item_remove(sample_item_id)
-    return sample_item_ids
+    return fit, stats, error
 
 @sio.event(namespace='/')
 async def calibration_mz_apply(sid, fit, sample_filenames):

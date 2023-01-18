@@ -19,7 +19,7 @@ async def process_sample(sample_item):
                 conn,
                 params=[filename]
             )['instrument'].tolist()
-        await calibration_mz_calibrate_sample(None, sample_item)
+        await calibration_mz_calibrate_sample(None, sample_item, {})
         await match_item_compute(sample_item['sample_item_id'])
     except:
         print("Failed to process sample %s" %sample_item['filename'])

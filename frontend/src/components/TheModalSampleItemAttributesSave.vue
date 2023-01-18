@@ -180,25 +180,35 @@
               :type="{'is-success': this.sampleMzCalibrated}"
               >
                 <h1 class="title has-text-centered">Calibration</h1>
-                <base-param-field
-                  label="Min. match score"
-                  path="calibration/paramMatchScoreMin"
-                  :range="{ min: 0, max: 1, step: .1 }"
-                  type="is-primary"
+                <b-collapse
+                  :open="false"
+                  animation="slide"
                 >
-                </base-param-field>
-                <base-param-field
-                  label="Refine window [ppm]"
-                  path="calibration/paramRefineWindow"
-                  :range="{ min: 0, max: 100, step: 1 }"
-                  type="is-primary"
-                >
-                </base-param-field>
+                  <template #trigger>
+                    <section style="padding: 0.5em">
+                      <b-button
+                        icon-left="wrench"
+                        size="is-small"
+                        @click="
+                          (props) => {
+                            props.open = !props.open;
+                          }
+                        "
+                      >
+                      </b-button>
+                    </section>
+                  </template>
+                  <the-pane-settings-calibration></the-pane-settings-calibration>
+                </b-collapse>
+                <b-message v-if="mzFitError" type="is-danger" has-icon>
+                  {{ mzFitError }}
+                </b-message>
                 <base-table
                   :key="mzCalibrationTableKey"
                   :rows="mzCalibrationTableRows"
                   :cols="mzCalibrationTableCols"
                   :checkable="false"
+                  :defaultSort="['mz', 'asc']"
                   :searchable="false"
                   :minPrecision="4"
                   :maxPrecision="4"
@@ -269,6 +279,7 @@
 import BaseParamField from "./BaseParamField.vue";
 import BaseTable from "./BaseTable.vue";
 import ThePaneBrowserTarget from "./ThePaneBrowserTarget.vue";
+import ThePaneSettingsCalibration from "./ThePaneSettingsCalibration.vue";
 
 import * as _ from "underscore";
 import { mapMutations } from "vuex";
@@ -280,6 +291,7 @@ export default {
     BaseParamField,
     BaseTable,
     ThePaneBrowserTarget,
+    ThePaneSettingsCalibration,
   },
   props: {},
   data: function () {
@@ -315,6 +327,7 @@ export default {
           subheading: null,
         },
         { field: "mz_error_diff", label: "m/z error diff", subheading: null },
+        { field: "calibrant_to_tic", label: "fraction of TIC", subheading: null },
       ],
       mzCalibrationTableKey: 0,
       sampleFilename: null,
@@ -330,9 +343,9 @@ export default {
       batchActive: "batch/active",
       batchMzCalibration: "batch/mzCalibration",
       modalProps: "modal/sampleItemAttributesSaveProps",
-      mzCalibrationMatchScoreMin: "calibration/paramMatchScoreMin",
-      mzCalibrationRefineWindow: "calibration/paramRefineWindow",
+      mzCalibrationParams: "calibration/params",
       mzFit: "calibration/mzFit",
+      mzFitError: "calibration/mzFitError",
       mzFitStats: "calibration/mzFitStats",
       sampleActive: "sample/active",
       sampleMatched: "sample/matched",
@@ -422,17 +435,11 @@ export default {
     },
     mzCalibrationFit() {
       this.mzCalibrationReset();
-      const calibrationCollectionId = this.batchActive.build_params.calibration_collection;
-      const ionizationMechanismIds = this.batchActive.build_params.ion_mechanisms;
       this.$api.emit(
         'calibration_mz_fit',
-        this.sampleFilename,
-        [calibrationCollectionId],
-        ionizationMechanismIds,
-        0.10, // isotope_abundance_min
-        this.mzCalibrationMatchScoreMin,
-        this.mzCalibrationRefineWindow
-        );
+        this.sampleActive.sample_item_id,
+        this.mzCalibrationParams,
+      );
     },
     removeField(event) {
       // Field to remove label is in button element id, find it from the event data
