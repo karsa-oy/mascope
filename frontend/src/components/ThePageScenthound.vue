@@ -295,6 +295,16 @@
                   Apply calibration
                 </b-button>
               </div>
+              <div style="text-align: center">
+                <b-button
+                  type="is-primary"
+                  icon-left="close"
+                  @click="reset()"
+                  v-if="mzFitError"
+                >
+                  Close
+                </b-button>
+              </div>
           </b-step-item>
           <!-- Target search step -->
           <b-step-item
@@ -508,6 +518,7 @@ export default {
       this.activeStep = 0;
     },
     resetSampleItem() {
+      this.sampleUnload();
       this.sampleItemFilterId = null;
       this.sampleItemName = null;
       this.sampleItemType = null;
