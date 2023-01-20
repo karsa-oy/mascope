@@ -82,7 +82,16 @@ async def mz_fit(
     match_score_min,
     refine_window
     ):
+
+    fit = None
+    stats = None
     error = None
+
+    # calculate tic
+    tic = calculate_tic(filename)
+    if tic < 1e6:
+        error = "TIC is too low! Check ionization device."
+        return fit, stats, error
     # Compute matches for calibration compounds
     match_isotope_df = await compute_matches(
         filename,
@@ -102,7 +111,6 @@ async def mz_fit(
             ]
     )
     calibrant_signal_intensity = good_matches_df['sample_peak_area']
-    tic = calculate_tic(filename)
     calibrant_to_tic = calibrant_signal_intensity / tic
 
     if n_relevant_isotopes > 3 and len(good_matches_df) == n_relevant_isotopes:
