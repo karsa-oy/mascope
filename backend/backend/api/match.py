@@ -19,7 +19,7 @@ async def compute_matches(
     filename,
     target_collection_ids,
     ionization_mechanism_ids,
-    min_isotope_abundance=0.1
+    min_isotope_abundance=0.15
     ):
     # Note:
     #   Matching is done on isotope-level. Ion, compound

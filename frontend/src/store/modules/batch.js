@@ -42,7 +42,7 @@ const paramDefaults = {
     paramPeakMinIntensity: null,
     paramPeakMinSeparation: null,
     paramPossibleMatchThreshold: 0.7,
-    paramProbableMatchThreshold: 0.85,
+    paramProbableMatchThreshold: 0.8,
 }
 
 // initialize parameter values in state with defaults
