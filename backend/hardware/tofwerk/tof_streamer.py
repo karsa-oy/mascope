@@ -8,6 +8,7 @@ Created on Tue Apr 09 13:08:29 2019
 """
 
 import numpy as np
+import os
 
 from multiprocessing import Event
 from time import sleep
@@ -22,6 +23,7 @@ from .lib.TofDaq import (
     TwAddLogEntry,
     TwGetDescriptor,
     TwTofDaqRunning,
+    TwCleanupDll,
     TwDaqActive,
     TwWaitForNewData,
     TwGetBufTimeFromShMem,
@@ -34,6 +36,20 @@ from .lib.TofDaq import (
     TwStopAcquisition
     )
 
+def strip_filepath(filepath):
+    """Strip path and file extension
+
+    Parameters
+    ----------
+    filepath : str
+        Full file path
+
+    Returns
+    -------
+    str
+        Base filename
+    """
+    return os.path.splitext(os.path.basename(filepath))[0]
 
 class TofDaqStreamer(BaseGenerator):
     def __init__(self, shutdown_event=Event()):
@@ -112,29 +128,29 @@ class TofDaqStreamer(BaseGenerator):
             # Feed
             self.spec_queue.put(spec_data)
 
-        # == Get and feed TPS data ==
-        # Query data size
-        nel = np.zeros((1,), dtype=int)
-        TwQueryRegUserDataSize(b'/TPS2', nel)
-        # Get most recent TPS data from TW shared memory
-        data = np.zeros((nel.item(), 1),
-                        dtype=np.double
-                        )
-        ret = TwReadRegUserData(b'/TPS2', nel.item(), data)
-        if ret == 4: # Success
-            # Combine data for output
-            tps_data = {
-                'filename': self.filename,          # Current file basename
-                'i': self.speci,                    # Current spectrum integer index
-                't': float(ti),                     # Timestamp [s]
-                'period': self.interval,            # Collection period [s]
-                'data': data.astype(np.float32 # convert to float32
-                                ).reshape(-1   # reshape to (-1,)
-                                ).tobytes(     # serialize
-                                )                   # Serialized TPS data [float32]
-                }
-            # Feed
-            self.tps_queue.put(tps_data)
+        # # == Get and feed TPS data ==
+        # # Query data size
+        # nel = np.zeros((1,), dtype=int)
+        # TwQueryRegUserDataSize(b'/TPS2', nel)
+        # # Get most recent TPS data from TW shared memory
+        # data = np.zeros((nel.item(), 1),
+        #                 dtype=np.double
+        #                 )
+        # ret = TwReadRegUserData(b'/TPS2', nel.item(), data)
+        # if ret == 4: # Success
+        #     # Combine data for output
+        #     tps_data = {
+        #         'filename': self.filename,          # Current file basename
+        #         'i': self.speci,                    # Current spectrum integer index
+        #         't': float(ti),                     # Timestamp [s]
+        #         'period': self.interval,            # Collection period [s]
+        #         'data': data.astype(np.float32 # convert to float32
+        #                         ).reshape(-1   # reshape to (-1,)
+        #                         ).tobytes(     # serialize
+        #                         )                   # Serialized TPS data [float32]
+        #         }
+        #     # Feed
+        #     self.tps_queue.put(tps_data)
 
     def _get_tps_info(self):
         """Get TPS parameter descriptions from TofDaq Recorder
@@ -169,6 +185,109 @@ class TofDaqStreamer(BaseGenerator):
         TwAddLogEntry(text, timestamp)
 
     def run(self):
+        prevRecRunning = False
+        prevDaqActive = False
+        myTotalBufsProcessed = 0
+        bufTime = np.zeros((1,), dtype=np.float64)
+
+        def RecorderStarted():
+            print('recorder started')
+
+        def FirstDaqActive():
+            nonlocal myTotalBufsProcessed
+            TwGetDescriptor(self.desc) #just update descriptor without waiting for data    
+            myTotalBufsProcessed = 0
+            print('acquisition started')
+            
+            # custom
+            # custom ends
+
+        def DaqActive():
+            nonlocal bufTime, myTotalBufsProcessed
+            ret = TwWaitForNewData(1000, self.desc, self.ptr, True)
+            if ret == 4:
+                if not self.active.is_set():
+                    # New file, update attributes
+                    h5_filepath = self.desc.currentDataFileName.decode() # TW h5 file full path
+                    self.filename = strip_filepath(h5_filepath)
+                    tof_period_s = self.desc.tofPeriod
+                    if tof_period_s > 1:
+                        # Convert [ns]->[s] if needed
+                        tof_period_s *= 1e-9
+                    self.sample_interval = self.desc.sampleInterval * 1e9 # [s]->[ns]
+                    self.single_ion_signal = self.desc.singleIonSignal
+                    self.tof_frequency = 1.0 / tof_period_s
+                    self.interval = tof_period_s * self.desc.nbrWaveforms # [s]
+                    self.length = (self.desc.nbrWrites * self.desc.nbrBufs) * self.interval # [s]
+                    # Feed coordinates
+                    self._feed_coordinates()
+                    print("TofDaqStreamer started: %s" %self.filename)
+                    self.active.set()
+                if self.desc.totalBufsProcessed > 0:
+                    for b in range(myTotalBufsProcessed, self.desc.totalBufsProcessed):
+                        bufIndex = b % self.desc.nbrBufs
+                        writeIndex = b // self.desc.nbrBufs
+                        #get timestamp                
+                        TwGetBufTimeFromShMem(bufTime, bufIndex, writeIndex)
+                        
+                        #custom code goes here
+                        # New data
+                        new_speci = (self.desc.iWrite * self.desc.nbrBufs) + self.desc.iBuf
+                        if new_speci - self.speci > 1:
+                            print("Warning: Skipped a spec!")
+                        self.speci = new_speci
+                        print(self.speci)
+                        self._get_and_feed_data()
+                        #custom code ends here
+                    myTotalBufsProcessed = self.desc.totalBufsProcessed
+            elif ret == 8:
+                pass
+            else:
+                print("Unexpected return value: %s" %ret)
+
+        def DaqEnded():
+            print('acquisition stopped/ended')
+            # custom
+            # Clear active flag
+            self.active.clear()
+            # Reset self
+            self._finalize()
+            TwCleanupDll()
+            # custom ends
+
+        def RecorderClosed():
+            print('recorder closed')
+
+        while not self.shutdown_event.is_set():
+            isRecorderRunning = TwTofDaqRunning()
+            isAcquisitionActive = TwDaqActive() if isRecorderRunning else False
+            
+            if isRecorderRunning:
+                if not prevRecRunning:
+                    RecorderStarted()
+                    pass
+                if isAcquisitionActive:
+                    if not prevDaqActive:
+                        FirstDaqActive()
+                    DaqActive()                    
+                else:
+                    if prevDaqActive:
+                        DaqEnded()
+                        prevDaqActive = False
+                    sleep(1.0)
+            else:
+                if prevRecRunning:
+                    RecorderClosed()
+                    prevRecRunning = False
+                sleep(1.0)
+
+            prevRecRunning = isRecorderRunning
+            prevDaqActive = isAcquisitionActive
+        # custom
+        self.shutdown()
+        # custom ends
+
+    def run_deprecated(self):
         """Main loop
 
         Poll TW API for new data at interval set by 'self.timeout'.

@@ -128,46 +128,46 @@ class H5Streamer(BaseGenerator, KInstrument):
             # Feed
             self.spec_queue.put(spec_data)
 
-        # == Get and feed TPS data ==
-        # Query data size
-        nel = np.zeros((1,), dtype=np.int32)
-        with self.lock:
-            TwGetRegUserDataFromH5(
-                self.desc.currentDataFileName,
-                b'/TPS2',
-                0,
-                0,
-                nel,
-                None,
-                None
-            )
-        # Get TPS data from TW h5
-        data = np.zeros((nel.item(), ),
-                        dtype=np.double
-                        )
-        with self.lock:
-            ret = TwGetRegUserDataFromH5(
-                self.desc.currentDataFileName,
-                b'/TPS2',
-                self.desc.iBuf,
-                self.desc.iWrite,
-                nel,
-                data,
-                None # char buffer for info
-            )
-        if ret == 4: # Success
-            # Combine data for output
-            tps_data = {
-                'filename': self.filename,          # Current file basename
-                'i': self.speci,                    # Current spectrum integer index
-                't': float(ti),                     # Timestamp [s]
-                'period': self.interval,            # Collection period [s]
-                'data': data.astype(np.float32  # convert to float32
-                                ).tobytes(      # serialize
-                                )                   # Serialized TPS data [float32]
-                }
-            # Feed
-            self.tps_queue.put(tps_data)
+        # # == Get and feed TPS data ==
+        # # Query data size
+        # nel = np.zeros((1,), dtype=np.int32)
+        # with self.lock:
+        #     TwGetRegUserDataFromH5(
+        #         self.desc.currentDataFileName,
+        #         b'/TPS2',
+        #         0,
+        #         0,
+        #         nel,
+        #         None,
+        #         None
+        #     )
+        # # Get TPS data from TW h5
+        # data = np.zeros((nel.item(), ),
+        #                 dtype=np.double
+        #                 )
+        # with self.lock:
+        #     ret = TwGetRegUserDataFromH5(
+        #         self.desc.currentDataFileName,
+        #         b'/TPS2',
+        #         self.desc.iBuf,
+        #         self.desc.iWrite,
+        #         nel,
+        #         data,
+        #         None # char buffer for info
+        #     )
+        # if ret == 4: # Success
+        #     # Combine data for output
+        #     tps_data = {
+        #         'filename': self.filename,          # Current file basename
+        #         'i': self.speci,                    # Current spectrum integer index
+        #         't': float(ti),                     # Timestamp [s]
+        #         'period': self.interval,            # Collection period [s]
+        #         'data': data.astype(np.float32  # convert to float32
+        #                         ).tobytes(      # serialize
+        #                         )                   # Serialized TPS data [float32]
+        #         }
+        #     # Feed
+        #     self.tps_queue.put(tps_data)
 
     def _get_tps_info(self):
         """Get TPS parameter descriptions from TW h5
@@ -222,7 +222,7 @@ class H5Streamer(BaseGenerator, KInstrument):
             True if ticked, False if cancel or shutdown
         """
         while not (self.shutdown_event.is_set() or self.cancel_event.is_set()):
-            if not (self.spec_queue.qsize() or self.tps_queue.qsize()):
+            if not (self.spec_queue.qsize()):# or self.tps_queue.qsize()):
                 # Queues empty
                 return True
             else:
@@ -251,11 +251,13 @@ class H5Streamer(BaseGenerator, KInstrument):
                     )
                     if ret != 4:
                         print("Error reading file: %s" %ret)
+                        TwCloseH5(file_to_stream.encode())
                         continue
-                if not (self.desc.nbrWrites and self.desc.nbrBufs):
-                    # Empty file, skip
-                    print("Skipping empty file: %s" %self.desc.currentDataFileName)
-                    continue
+                    if not (self.desc.nbrBufs and self.desc.nbrWrites):
+                        # Empty file, skip
+                        print("Skipping empty file: %s" %file_to_stream)
+                        TwCloseH5(file_to_stream.encode())
+                        continue
                 # Test read to check for corrupt file
                 with self.lock:
                     ret = TwGetTofSpectrumFromH5(

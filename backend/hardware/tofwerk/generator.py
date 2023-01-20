@@ -39,7 +39,7 @@ class BaseGenerator(Thread):
         self.active = Event()                   # TofDaqStreamer active event
         self.cancel_event = Event()             # Cancel event
         self.spec_queue = Queue()               # Signal output queue
-        self.tps_queue = Queue()                # TPS output queue
+        # self.tps_queue = Queue()                # TPS output queue
         # Per acquisition attributes
         self.filename = None                    # Filename base from TW h5 file
         self.interval = None                    # TofDaqStreamer interval [s]
@@ -100,13 +100,13 @@ class BaseGenerator(Thread):
             'single_ion_signal': self.single_ion_signal,
         }
         self.spec_queue.put(coordinates)
-        tps_info = {
-            'filename': self.filename,
-            'i': -1,
-            'tps_info': self.tps_info,
-            't_range': [0, self.length],
-        }
-        self.tps_queue.put(tps_info)
+        # tps_info = {
+        #     'filename': self.filename,
+        #     'i': -1,
+        #     'tps_info': self.tps_info,
+        #     't_range': [0, self.length],
+        # }
+        # self.tps_queue.put(tps_info)
 
     def _finalize(self):
         """Finalize acquisition
@@ -118,10 +118,10 @@ class BaseGenerator(Thread):
                 'i': None,
                 'source_filepath': self.desc.currentDataFileName.decode()
             })
-            self.tps_queue.put({
-                'filename': self.filename,
-                'i': None
-            })
+            # self.tps_queue.put({
+            #     'filename': self.filename,
+            #     'i': None
+            # })
         # Reset self
         self._reset()
 
@@ -178,12 +178,12 @@ class BaseGenerator(Thread):
         while True:
             try:
                 self.spec_queue.get_nowait()
-                self.tps_queue.get_nowait()
+                # self.tps_queue.get_nowait()
             except Empty:
                 break
             sleep(.1)
         # Close queues
         self.spec_queue.close()
         self.spec_queue.join_thread()
-        self.tps_queue.close()
-        self.tps_queue.join_thread()
+        # self.tps_queue.close()
+        # self.tps_queue.join_thread()
