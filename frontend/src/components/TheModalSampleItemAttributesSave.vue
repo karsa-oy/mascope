@@ -61,6 +61,42 @@
                 </template>
               </div>
               <div>
+                <b-field label="Filter ID">
+                  <b-input
+                    v-model="sampleItemFilterId"
+                    disabled
+                    expanded
+                  >
+                  </b-input>
+                  <b-dropdown
+                    aria-role="list"
+                    v-model="sampleItemFilterId"
+                    expanded
+                    >
+                    <template #trigger>
+                      <b-button
+                          :label="sampleItemFilterId"
+                          icon-right="menu-down"
+                          style="align:left"
+                      />
+                    </template>
+                    <template v-for="filterId of batchFilterIds">
+                      <b-dropdown-item
+                        aria-role="listitem"
+                        :key="filterId"
+                        :value="filterId"
+                      >
+                        {{ filterId }}
+                      </b-dropdown-item>
+                    </template>
+                  </b-dropdown>
+                  <b-button
+                    type='is-primary'
+                    icon-left='plus'
+                    @click="generateFilterId()"
+                    >
+                  </b-button>
+                </b-field>
                 <b-field label="Sample type">
                   <b-dropdown
                     aria-role="list"
@@ -75,10 +111,9 @@
                             style="align:left"
                         />
                     </template>
-                    <b-dropdown-item aria-role="listitem" value="SAMPLE">Sample</b-dropdown-item>
                     <b-dropdown-item aria-role="listitem" value="BACKGROUND">Background</b-dropdown-item>
+                    <b-dropdown-item aria-role="listitem" value="HOT">Hot</b-dropdown-item>
                     <b-dropdown-item aria-role="listitem" value="BLANK">Blank</b-dropdown-item>
-                    <b-dropdown-item aria-role="listitem" value="CALIBRATION">Calibration</b-dropdown-item>
                     <b-dropdown-item aria-role="listitem" value="UNKNOWN">Unknown</b-dropdown-item>
                   </b-dropdown>
                 </b-field>
@@ -284,6 +319,7 @@ import ThePaneSettingsCalibration from "./ThePaneSettingsCalibration.vue";
 import * as _ from "underscore";
 import { mapMutations } from "vuex";
 import { call, get, sync } from "vuex-pathify";
+import { genId } from "../lib/util";
 
 export default {
   name: "TheModalSampleItemAttributesSave",
@@ -331,6 +367,7 @@ export default {
       ],
       mzCalibrationTableKey: 0,
       sampleFilename: null,
+      sampleItemFilterId: null,
       sampleInstrument: null,
       sampleItemType: null,
       showEditFunctions: false,
@@ -348,6 +385,7 @@ export default {
       mzFitError: "calibration/mzFitError",
       mzFitStats: "calibration/mzFitStats",
       sampleActive: "sample/active",
+      sampleItems: "batch/sampleItems",
       sampleMatched: "sample/matched",
       sampleMzCalibrated: "sample/active@mz_calibration.verified",
     }),
@@ -356,6 +394,11 @@ export default {
     }),
     availableTemplates() {
       return [this.defaultTemplate, ...this.savedTemplates];
+    },
+    batchFilterIds() {
+      return this.batchActive
+        ? [null, ...new Set(this.sampleItems.map((item) => item.filter_id))]
+        : [];
     },
     editable() {
       return ['create', 'update'].includes(this.action);
@@ -426,6 +469,9 @@ export default {
         }
       });
     },
+    generateFilterId() {
+      this.sampleItemFilterId = genId(6, false);
+    },
     mzCalibrationApply() {
       this.$api.emit(
         'calibration_mz_apply',
@@ -469,13 +515,6 @@ export default {
       )
     },
     async saveSampleItem() {
-      switch (this.sampleItemType) {
-        case 'CALIBRATION':
-        case 'BLANK':
-        case 'SAMPLE':
-        case 'UNKNOWN':
-          break;
-      }
       this.saveAttributes();
     },
     saveTemplate() {
@@ -539,6 +578,7 @@ export default {
             sample_item_attributes,
             sample_item_type: this.sampleItemType,
             sample_batch_id: this.batchActive.sample_batch_id,
+            filter_id: this.sampleItemFilterId,
             };
           this.$api.emit('sample_item_create', [newSampleItem]);
         } else if(this.action == 'update') {
@@ -548,6 +588,7 @@ export default {
             sample_item_attributes,
             sample_item_type: this.sampleItemType,
             sample_batch_id: this.batchActive.sample_batch_id,
+            filter_id: this.sampleItemFilterId,
             };
           this.$api.emit('sample_item_update', [newSampleItem]);
           this.deactivateModal();
