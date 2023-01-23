@@ -39,6 +39,8 @@ export default {
     window.addEventListener("keyup", (event) => {
       this.keyup(event);
     });
+    // Return to home page at reload
+    if (this.$route.path !== '/') this.$router.push('/');
   },
   methods: {
     ...call({
