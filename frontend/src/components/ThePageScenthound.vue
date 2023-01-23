@@ -168,33 +168,48 @@
               </b-input>
             </b-field>
             <b-field label="Sample batch">
-              <b-dropdown
-                aria-role="list"
-                expanded
-                @change="selectBatch"
-                disabled
-                >
-                <template #trigger>
-                  <b-button
-                    :label="batchActive
-                      ? batchActive.sample_batch_name
-                      : ''
-                      "
-                    icon-right="menu-down"
-                    expanded
-                    style="align:left"
-                  />
-                </template>
-                <template v-for="batch of batches">
-                  <b-dropdown-item
-                    aria-role="listitem"
-                    :key="batch.sample_batch_id"
-                    :value="batch"
+              <b-tooltip
+                :delay="200"
+                position="is-top"
+                type="is-dark"
+                size="is-small"
+                multilined
+              >
+                <b-dropdown
+                  aria-role="list"
+                  expanded
+                  @change="selectBatch"
+                  disabled
                   >
-                    {{ batch.sample_batch_name }}
-                  </b-dropdown-item>
+                  <template #trigger>
+                    <b-button
+                      :label="batchActive
+                        ? batchActive.sample_batch_name
+                        : ''
+                        "
+                      icon-right="menu-down"
+                      expanded
+                      style="align:left"
+                    />
+                  </template>
+                  <template v-for="batch of batches">
+                    <b-dropdown-item
+                      aria-role="listitem"
+                      :key="batch.sample_batch_id"
+                      :value="batch"
+                    >
+                      {{ batch.sample_batch_name }}
+                    </b-dropdown-item>
+                  </template>
+                </b-dropdown>
+                <!-- tooltip slot -->
+                <template v-slot:content>
+                  <b>Samples:</b><br>
+                  <template v-for="(item) in sampleItems">
+                    {{item.sample_item_name}}<br v-bind:key="item.sample_item_id" />
+                  </template>
                 </template>
-              </b-dropdown>
+              </b-tooltip>
             </b-field>
             <div class="container" style="text-align: center; padding: 2em 0em 0em 0em;">
               <div class="columns">
