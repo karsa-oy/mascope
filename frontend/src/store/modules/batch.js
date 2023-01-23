@@ -37,7 +37,7 @@ const paramDefaults = {
     // filter parameters
     paramIsotopeRatioTolerance: 0.1,
     paramMinIsotopeAbundance: 0.15,
-    paramMinIsotopeCorrelation: 0.6,
+    paramMinIsotopeCorrelation: 0.8,
     paramMzTolerance: 15,
     paramPeakMinIntensity: null,
     paramPeakMinSeparation: null,
@@ -310,7 +310,7 @@ export default {
                 NATURAL LEFT JOIN sample_item
                 NATURAL LEFT JOIN sample_file
                 GROUP BY sample_item_id
-                ORDER BY sample_item_utc_created ASC
+                ORDER BY datetime_utc ASC
             `).then((res) => {
                 commit('SET_SAMPLE_ITEMS', res);
             });
