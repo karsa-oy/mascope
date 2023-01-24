@@ -5,13 +5,13 @@ from .lib.TwTool import TwMassCalibrate, TwTof2Mass
 
 def mz_calibrate(peak_tof, peak_mz, exact_mz):
     # Prepare arguments
-    mass_calib_mode = 2
+    mass_calib_mode = 0
     nbr_points = len(peak_tof)
     mass = np.array(exact_mz, dtype=np.double)
     tofs = np.array(peak_tof, dtype=np.double)
     peak_mz = np.array(peak_mz)
     weight = np.ones((nbr_points,)) # TODO: Set weights?
-    nbr_params = np.array([3], dtype=np.int)
+    nbr_params = np.array([2], dtype=np.int)
     mass_calib_par = np.zeros((nbr_params[0],), dtype=np.double)
     legacy_a = legacy_b = np.array([None], dtype=np.double)
     # Calibrate
