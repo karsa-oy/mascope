@@ -178,6 +178,7 @@ async def compute_matches(
                         for peak_mz in ion_group['sample_peak_mz']
                     ])
                 )[0, 1]
+                if len(ion_group) > 1 else 1
             )
         )
     )
