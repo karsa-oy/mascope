@@ -55,7 +55,10 @@ class BaseGenerator(Thread):
     def conversion_coefficient(self):
         """Coefficient to convert signal intensity from [mV/ext] -> [ions/sec]
         """
-        return (self.sample_interval * self.tof_frequency) / self.single_ion_signal
+        return (
+            self.interval * (self.sample_interval * self.tof_frequency)
+            / self.single_ion_signal
+        )
 
     @property
     def progress(self):
