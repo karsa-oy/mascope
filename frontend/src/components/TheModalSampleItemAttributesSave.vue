@@ -408,7 +408,7 @@ export default {
     },
     instrumentIsTof() {
       return this.sampleInstrument
-        ? this.sampleInstrument.indexOf('TOF') != -1
+        ? this.sampleInstrument.indexOf('ORBI') == -1
         : false;
     },
     mzCalibrationTableRows() {
