@@ -77,13 +77,18 @@ export default {
   },
   methods: {
     ...call({
-      reloadMatchesBatch: "batch/loadSamples",
+      batchLoadMatches: "batch/loadMatches",
+      batchLoadSamples: "batch/loadSamples",
       reloadMatchesSample: "sample/loadMatches",
     }),
     reloadMatches() {
       if (!this.batchActive) return;
       this.reloadMatchesBatch();
       if (this.sampleFocused) this.reloadMatchesSample();
+    },
+    reloadMatchesBatch() {
+      this.batchLoadSamples();
+      this.batchLoadMatches();
     },
   },
 };
