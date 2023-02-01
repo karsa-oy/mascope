@@ -97,7 +97,6 @@ export default {
                                     ABS(match_mz_error) <= ${mzTolerance}
                                     AND ABS(match_abundance_error) <= ${isotopeRatioTolerance}
                                     AND MAX(match_isotope_correlation, 0) >= ${minIsotopeCorrelation}
-                                    AND ABS(match_abundance_error) <= ${isotopeRatioTolerance}
                                     AND relative_abundance >= ${minIsotopeAbundance}
                                     )
                                 THEN sample_peak_area
