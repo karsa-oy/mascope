@@ -8,8 +8,7 @@ from dotenv import load_dotenv
 from backend.api.match import match_batch_compute
 from backend.db.conn import conn
 from backend.db.id import gen_id
-from backend.lib.file import load_file
-from backend.lib.peak import get_peaks, filter_peaks
+from backend.lib.peak import detect_peaks, get_peaks, filter_peaks
 from backend.server import sio
 
 load_dotenv()
@@ -61,43 +60,15 @@ async def sample_batch_create(sid, sample_batches):
         [workspace_id] = workspace_ids
         await sio.emit('workspace_reload', room=workspace_id, namespace='/')
 
-@sio.event(namespace='/')
-async def sample_batch_export_peaks(sid, sample_batch_id, filter_params):
-    peak_min_intensity = filter_params.get('peak_min_intensity')
-    peak_min_separation = filter_params.get('peak_min_separation')
-    with conn:
-        # batch data
-        sample_batch_df = pd.read_sql(f"""
-            SELECT
-                sample_batch_name
-            FROM sample_batch
-            WHERE sample_batch_id == ?
-            """,
-            conn,
-            params=[sample_batch_id]
-        )
-        sample_batch_df =   sample_batch_df.assign(
-            peak_min_intensity=[peak_min_intensity],
-            peak_min_separation=[peak_min_separation],
-        )
-        # sample item data
-        sample_item_df = pd.read_sql(f"""
-            SELECT
-                filename,
-                sample_item_name,
-                sample_item_type
-            FROM sample_item
-            WHERE sample_batch_id == ?
-            """,
-            conn,
-            params=[sample_batch_id]
-        )
+async def export_peaks(sample_batch_df, sample_item_df):
+    [peak_min_intensity] = sample_batch_df['peak_min_intensity'].tolist(),
+    [peak_min_separation] = sample_batch_df['peak_min_separation'].tolist(),
     peak_data = []
     for index, row in sample_item_df.iterrows():
         try:
-            sample_file = load_file(row['filename'], vars=['peak_areas'])
+            sample_file = await detect_peaks(row['filename'], u_list=None, if_exists='append')
             peak_data_item = filter_peaks(
-                get_peaks(sample_file),
+                get_peaks(sample_file, 'area'),
                 intensity=peak_min_intensity,
                 distance=peak_min_separation
             ).sum(dim='time')
@@ -120,7 +91,7 @@ async def sample_batch_export_peaks(sid, sample_batch_id, filter_params):
 
     dt_str = datetime.now().isoformat().replace('-', '').replace(':', '').split('.')[0]
     [sample_batch_name] = sample_batch_df['sample_batch_name'].tolist()
-    spreadsheet_path = os.environ.get('MASCOPE_PRIVATE_DOWNLOADER_DIR', '.')
+    spreadsheet_path = os.environ.get('MASCOPE_PRIVATE_DATADIR', '.')
     spreadsheet_filename = (
         dt_str
         + '_peaks_'
@@ -143,6 +114,42 @@ async def sample_batch_export_peaks(sid, sample_batch_id, filter_params):
             sheet_name='Peaks',
             index=False
         )
+
+@sio.event(namespace='/')
+async def sample_batch_export_peaks(sid, sample_batch_id, filter_params):
+    peak_min_intensity = filter_params.get('peak_min_intensity')
+    peak_min_separation = filter_params.get('peak_min_separation')
+    with conn:
+        # batch data
+        sample_batch_df = pd.read_sql(f"""
+            SELECT
+                sample_batch_name
+            FROM sample_batch
+            WHERE sample_batch_id == ?
+            """,
+            conn,
+            params=[sample_batch_id]
+        )
+        sample_batch_df = sample_batch_df.assign(
+            peak_min_intensity=[peak_min_intensity],
+            peak_min_separation=[peak_min_separation],
+        )
+        # sample item data
+        sample_item_df = pd.read_sql(f"""
+            SELECT
+                filename,
+                sample_item_name,
+                sample_item_type
+            FROM sample_item
+            WHERE sample_batch_id == ?
+            """,
+            conn,
+            params=[sample_batch_id]
+        )
+    sio.start_background_task(
+        export_peaks, sample_batch_df, sample_item_df
+    )
+    
 
 @sio.event(namespace='/')
 async def sample_batch_update(sid, sample_batches):
