@@ -61,12 +61,16 @@ async def sample_batch_create(sid, sample_batches):
         await sio.emit('workspace_reload', room=workspace_id, namespace='/')
 
 async def export_peaks(sample_batch_df, sample_item_df):
-    [peak_min_intensity] = sample_batch_df['peak_min_intensity'].tolist(),
-    [peak_min_separation] = sample_batch_df['peak_min_separation'].tolist(),
+    [peak_min_intensity] = sample_batch_df['peak_min_intensity'].tolist()
+    [peak_min_separation] = sample_batch_df['peak_min_separation'].tolist()
     peak_data = []
     for index, row in sample_item_df.iterrows():
         try:
-            sample_file = await detect_peaks(row['filename'], u_list=None, if_exists='append')
+            sample_file = await detect_peaks(
+                row['filename'],
+                u_list=None,
+                if_exists='append'
+            )
             peak_data_item = filter_peaks(
                 get_peaks(sample_file, 'area'),
                 intensity=peak_min_intensity,
@@ -98,6 +102,7 @@ async def export_peaks(sample_batch_df, sample_item_df):
         + sample_batch_name.replace(' ', '_')
         + '.xlsx'
     )
+    print(f"Writing peak data to file {spreadsheet_filename}")
     with pd.ExcelWriter(os.path.join(spreadsheet_path, spreadsheet_filename)) as writer:
         sample_batch_df.to_excel(
             writer,
@@ -114,6 +119,7 @@ async def export_peaks(sample_batch_df, sample_item_df):
             sheet_name='Peaks',
             index=False
         )
+    print("Write complete")
 
 @sio.event(namespace='/')
 async def sample_batch_export_peaks(sid, sample_batch_id, filter_params):
