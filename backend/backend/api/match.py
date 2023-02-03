@@ -309,8 +309,25 @@ async def item_compute(sample_item):
         ionization_mechanism_ids
         )
     with conn:
-        # save to database
-        # interferences
+        # save interferences to database
+        # check if exists
+        target_isotope_refs = ','.join('?'*len(match_interference_df))
+        [match_interferences_exist] = pd.read_sql(f'''
+            SELECT
+                CASE
+                    WHEN COUNT(match_interference_id) > 0 THEN 1
+                    ELSE 0
+                END AS match_interferences_exist
+            FROM match_interference
+            WHERE sample_item_id == ?
+            AND target_isotope_id IN ({target_isotope_refs})
+            ''',
+            conn,
+            params=[sample_item_id, *match_interference_df['target_isotope_id']],
+            )['match_interferences_exist'].tolist()
+        if match_interferences_exist:
+            raise(RuntimeError("Match interferences exist! Not going to overwrite"))
+
         match_interference_df = match_interference_df.assign(
             sample_item_id=sample_item_id
         )
@@ -330,8 +347,26 @@ async def item_compute(sample_item):
         print("No matches found")
         return sample_item
     with conn:
-        # save to database
-        # matches
+        # save matches to database
+        # check if exists
+        target_isotope_refs = ','.join('?'*len(match_isotope_df))
+        [matches_exist] = pd.read_sql(f'''
+            SELECT
+                CASE
+                    WHEN COUNT(match_id) > 0 THEN 1
+                    ELSE 0
+                END AS matches_exist
+            FROM match
+            WHERE sample_item_id == ?
+            AND target_isotope_id IN ({target_isotope_refs})
+            ''',
+            conn,
+            params=[sample_item_id, *match_isotope_df['target_isotope_id']],
+            )['matches_exist'].tolist()
+        # if matches_exist:
+        if True:
+            raise(RuntimeError("Matches exist! Not going to overwrite"))
+
         match_isotope_df = match_isotope_df.assign(
             sample_item_id=sample_item_id
         )
