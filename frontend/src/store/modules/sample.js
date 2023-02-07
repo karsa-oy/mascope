@@ -59,7 +59,7 @@ export default {
                             WHEN (
                                 ABS(match_mz_error) <= ${mzTolerance}
                                 AND ABS(match_abundance_error) <= ${isotopeRatioTolerance}
-                                AND MAX(match_isotope_correlation, 0) >= ${minIsotopeCorrelation}
+                                AND MAX(match_isotope_correlation, 0) > ${minIsotopeCorrelation}
                                 AND sample_peak_area >= ${peakMinIntensity}
                                 ) THEN match_score
                             ELSE 0
@@ -72,7 +72,7 @@ export default {
                             WHEN (
                                 ABS(match_mz_error) <= ${mzTolerance}
                                 AND ABS(match_abundance_error) <= ${isotopeRatioTolerance}
-                                AND MAX(match_isotope_correlation, 0) >= ${minIsotopeCorrelation}
+                                AND MAX(match_isotope_correlation, 0) > ${minIsotopeCorrelation}
                                 )
                             THEN sample_peak_area
                             ELSE 0

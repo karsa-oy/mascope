@@ -182,35 +182,28 @@ async def sample_batch_update(sid, sample_batches):
                 target_collection_ids_new = (
                     sample_batch_df['target_collection_id'].tolist()[0]
                 )
-                target_collections_to_match = [
-                    id for id in target_collection_ids_new 
-                    if id not in target_collection_ids_old
-                    ]
+                if set(target_collection_ids_new) != set(target_collection_ids_old):
+                    return True
+
+                # Get difference in ionization mechanisms
                 ion_mechanism_ids_new = (
                     sample_batch_df['build_params'].tolist()[0]['ion_mechanisms']
                 )
-                if len(target_collections_to_match) > 0:
-                    ion_mechanisms_to_match = ion_mechanism_ids_new
-                else:
-                    # Get difference in ionization mechanisms
-                    ion_mechanism_ids_old = json.loads(
-                        pd.read_sql(f"""--sql
-                            SELECT build_params
-                            FROM sample_batch
-                            WHERE sample_batch_id == ?
-                            """,
-                            conn,
-                            params=[sample_batch_id]
-                            )['build_params'].tolist()[0]
-                        )['ion_mechanisms']
-                    ion_mechanisms_to_match = [
-                        id for id in ion_mechanism_ids_new 
-                        if id not in ion_mechanism_ids_old
-                        ]
-                print("target_collections_to_match: %s" %target_collections_to_match)
-                print("ion_mechanisms_to_match: %s" %ion_mechanisms_to_match)
-                # Return true if either new target collections or new ionization mechanisms
-                return len(target_collections_to_match) or len(ion_mechanisms_to_match)
+                ion_mechanism_ids_old = json.loads(
+                    pd.read_sql(f"""--sql
+                        SELECT build_params
+                        FROM sample_batch
+                        WHERE sample_batch_id == ?
+                        """,
+                        conn,
+                        params=[sample_batch_id]
+                        )['build_params'].tolist()[0]
+                    )['ion_mechanisms']
+                if set(ion_mechanism_ids_new) != set(ion_mechanism_ids_old):
+                    return True
+
+                # Both target collections and ionization mechanisms equal
+                return False
             rematch = need_for_rematch()
             # Make sure foreign keys is disabled to not cascade delete
             conn.execute("PRAGMA foreign_keys = 0")

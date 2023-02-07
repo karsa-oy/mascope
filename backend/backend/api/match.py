@@ -363,8 +363,7 @@ async def item_compute(sample_item):
             conn,
             params=[sample_item_id, *match_isotope_df['target_isotope_id']],
             )['matches_exist'].tolist()
-        # if matches_exist:
-        if True:
+        if matches_exist:
             raise(RuntimeError("Matches exist! Not going to overwrite"))
 
         match_isotope_df = match_isotope_df.assign(
@@ -439,16 +438,6 @@ async def match_batch_compute(sid, sample_batch_id):
 @sio.event(namespace='/')
 async def match_batch_remove(sid, sample_batch_id):
     with conn:
-        # get workspace id
-        workspace_id = pd.read_sql(f"""--sql'
-            SELECT workspace_id
-            FROM sample_batch
-            WHERE sample_batch_id == ?
-        """,
-        conn,
-        params=[sample_batch_id]
-        ).to_dict('records')
-
         # delete record
         conn.cursor().execute(f"""--sql
             DELETE FROM match
@@ -471,7 +460,11 @@ async def match_batch_remove(sid, sample_batch_id):
         [sample_batch_id]
         )
     # reload workspace
-    await sio.emit('workspace_reload', workspace_id, namespace='/')
+    await sio.emit(
+        'sample_batch_reload',
+        sample_batch_id,
+        namespace='/'
+    )
 
 @sio.event(namespace='/')
 async def match_item_compute(sid, sample_item):
