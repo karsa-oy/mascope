@@ -26,7 +26,7 @@
                   <b-input v-model="batchDesc"></b-input>
                 </b-field>
               </b-tab-item>
-              <b-tab-item label="Calibration">
+              <b-tab-item label="Calibration" :disabled="action != 'create'">
                 <b-table
                   :data="targetCollectionsAll"
                   :columns="[
