@@ -207,7 +207,7 @@
                   <table style="text-align:center; width:100%">
                     <tr>
                       <th>#</th>
-                      <th>Samples</th>
+                      <th>Sample name</th>
                     </tr>
                     <template v-for="(item) in sampleItems">
                       <tr v-bind:key="item.sample_item_id">
