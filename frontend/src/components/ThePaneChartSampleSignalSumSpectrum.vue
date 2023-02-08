@@ -28,13 +28,31 @@ export default {
     layout: function () {
       return {
         grid: {
-          rows: 3,
-          columns: 3,
+          rows: 1,
+          columns: 2,
           pattern: "independent",
         },
+        yaxis: this.yAxisConfiguration,
+        xaxis: this.xAxisConfiguration,
+        yaxis2: this.yAxisConfiguration,
+        xaxis2: this.xAxisConfiguration,
         dragmode: "zoom",
         showlegend: false,
+        height: "400",
+        width: "860",
       };
+    },
+    xAxisConfiguration() {
+      return {
+        title: 'm/z [Th]',
+        gridcolor: "#757575",
+      }
+    },
+    yAxisConfiguration() {
+      return {
+        title: 'Signal intensity [cps]',
+        gridcolor: "#757575",
+      }
     },
   },
 };

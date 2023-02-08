@@ -20,7 +20,8 @@ async def visualization_ion_focus(
         sample_item_id,
         target_ion_id,
         min_isotope_abundance,
-        peak_min_intensity
+        peak_min_intensity,
+        mz_tolerance,
         ):
     t_range = None
     with conn:
@@ -63,6 +64,7 @@ async def visualization_ion_focus(
     )
     main_isotope_i = 0
     main_isotope_height = 0
+    sum_timeseries = None
     for i, mz in enumerate(mzs):
         print("{:d}/{:d}: {:3f}".format(i+1, len(mzs), mz))
         spectrum_traces = []
@@ -74,9 +76,6 @@ async def visualization_ion_focus(
         isotope_slice = cache_item_slice.sel(
             mz=slice(*mz_range)
             ).compute()
-        isotope_timeseries = isotope_slice.signal.sel(
-            mz=mz, method='nearest'
-            )
         isotope_sum_spectrum = isotope_slice.sum(
             dim='time'
             ).compute()
@@ -116,26 +115,51 @@ async def visualization_ion_focus(
         peaks = filter_peaks(peaks, intensity=peak_min_intensity)
         for peak in peaks:
             peak_mz = peak.mz.item()
+            match = True if abs((peak_mz-mz)/mz*1e6) <= mz_tolerance else False
             peak_height = peak.values.item()
             spectrum_traces.append({
                 'name': "{:.4f}".format(peak_mz),
                 'type': 'scatter',
-                'mode': 'lines+markers',
+                'mode': 'lines+markers' if match else 'lines',
                 'line': {
-                    'color': 'white'
+                    'color': 'white' if match else 'grey',
                     },
                 'x': [peak_mz, peak_mz],
                 'y': [0, peak_height],
                 'xaxis': 'x{:d}'.format(i+1),
                 'yaxis': 'y{:d}'.format(i+1),
             })
+            if match:
+                # Timeseries trace
+                match_timeseries = isotope_slice.signal.sel(
+                    mz=peak_mz, method='nearest'
+                    )
+                timeseries_time = match_timeseries.time.values.astype(
+                    np.float32
+                    )
+                timeseries_y = match_timeseries.values.astype(np.float32)
+                timeseries_traces.append(
+                    {'name': '{:.4f}'.format(mz),
+                    'type': 'scatter',
+                    'mode': 'lines',
+                    'line': {
+                        'color': 'rgb({},{},{})'.format(*colormap[i])
+                    },
+                    'x': timeseries_time.tobytes(),
+                    'y': timeseries_y.tobytes(),
+                    }
+                )
+                if sum_timeseries is None:
+                    sum_timeseries = match_timeseries
+                else:
+                    sum_timeseries += match_timeseries
         # Target mz trace (red vertical line)
         spectrum_traces.append({
             'name': 'target m/z',
             'type': 'scatter',
-            'mode': 'lines+markers',
+            'mode': 'lines',
             'line': {
-               'color': 'red'
+               'color': 'red',
                },
             'x': [float(mz), float(mz)],
             'y': [0, isotope_expected_height],
@@ -147,26 +171,6 @@ async def visualization_ion_focus(
             spectrum_traces,
             room=sid
             )
-        # Timeseries traces
-        timeseries_time = isotope_timeseries.time.values.astype(
-            np.float32
-            )
-        timeseries_y = isotope_timeseries.values.astype(np.float32)
-        timeseries_traces.append(
-            {'name': '{:.4f}'.format(mz),
-             'type': 'scatter',
-             'mode': 'lines',
-             'line': {
-                 'color': 'rgb({},{},{})'.format(*colormap[i])
-             },
-             'x': timeseries_time.tobytes(),
-             'y': timeseries_y.tobytes(),
-             }
-        )
-        if i == 0:
-            sum_timeseries = isotope_timeseries
-        else:
-            sum_timeseries = sum_timeseries + isotope_timeseries
 
         await sio.emit(
             'visualization_signal_timeseries',
@@ -176,6 +180,8 @@ async def visualization_ion_focus(
         # Sleep 0 to let other tasks be scheduled before next iteration
         await asyncio.sleep(0)
 
+    if not len(timeseries_traces):
+        return
     timeseries_time = sum_timeseries.time.values.astype(np.float32)
     timeseries_y = sum_timeseries.values.astype(np.float32)
     timeseries_traces = [

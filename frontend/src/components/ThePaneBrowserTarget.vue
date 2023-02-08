@@ -39,6 +39,7 @@ export default {
       matchCompounds: "sample/matchCompounds",
       matchIons: "sample/matchIons",
       matchIsotopes: "sample/matchIsotopes",
+      mzTolerance: "batch/paramMzTolerance",
       minIsotopeAbundance: "batch/paramMinIsotopeAbundance",
       peakMinIntensity: "batch/paramPeakMinIntensity",
       sampleItemFocused: "sample/active",
@@ -269,7 +270,8 @@ export default {
         this.sampleItemFocused.sample_item_id,
         row.target_ion_id,
         this.minIsotopeAbundance,
-        this.peakMinIntensity
+        this.peakMinIntensity,
+        this.mzTolerance,
         )
       const targetIon = this.targetIons.filter(
         (ion) => ion.target_ion_id == row.target_ion_id

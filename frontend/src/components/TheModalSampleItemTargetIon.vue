@@ -8,11 +8,11 @@
       aria-modal
       @close="deactivateModal"
     >
-      <div class="modal-card" style="width: 85vh">
+      <div class="modal-card" style="width:100%; height:100%">
         <header class="modal-card-head">
           <h2 class="subtitle">{{ modalTitle }}</h2>
         </header>
-        <section class="modal-card-body" style="min-height: 250px">
+        <section class="modal-card-body">
           <the-pane-sample-signal></the-pane-sample-signal>
         </section>
         <footer class="modal-card-foot">

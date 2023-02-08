@@ -34,7 +34,7 @@ export default {
           gridcolor: "#757575",
         },
         yaxis: {
-          title: "Integrated signal [a.u.]",
+          title: "Peak height [cps]",
           showgrid: true,
           autorange: true,
           rangemode: "tozero",
@@ -42,6 +42,8 @@ export default {
         },
         dragmode: "zoom",
         showlegend: true,
+        height: "400",
+        width: "860",
       };
     },
   },
