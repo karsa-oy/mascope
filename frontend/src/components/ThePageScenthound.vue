@@ -222,40 +222,27 @@
             <div class="container" style="text-align: center; padding: 2em 0em 0em 0em;">
               <div class="columns">
                 <div class="column is-full">
-                <b-button
-                  :disabled="
-                    sampleIsSaved
-                    ||
-                    !sampleItemName
-                    ||
-                    !sampleItemType
-                    ||
-                    !acquisitionFilename
-                  "
-                  :type="sampleIsSaved
-                    ? 'is-success'
-                    : 'is-danger'
+                  <b-button
+                    :disabled="
+                      sampleIsSaved
+                      ||
+                      !sampleItemName
+                      ||
+                      !sampleItemType
+                      ||
+                      !acquisitionFilename
                     "
-                  icon-left="content-save"
-                  expanded
-                  @click="saveSampleInformation"
-                >
-                  Save sample info
-                </b-button>
-              </div>
-              <div class="column" style="text-align: right">
-                <b-button
-                  :disabled="
-                    sampleActive
-                    || !acquisitionFilename
-                    || conversionProgress < 100
-                  "
-                  type="is-dark"
-                  icon-left="delete"
-                  @click="discardSample()"
-                >
-                </b-button>
-              </div>
+                    :type="sampleIsSaved
+                      ? 'is-success'
+                      : 'is-danger'
+                      "
+                    icon-left="content-save"
+                    expanded
+                    @click="saveSampleInformation"
+                  >
+                    Save sample info
+                  </b-button>
+                </div>
               </div>
             </div>
           </b-step-item>
@@ -507,16 +494,6 @@ export default {
     }),
     clone(obj) {
       return JSON.parse(JSON.stringify(obj));
-    },
-    discardSample() {
-      this.$buefy.dialog.confirm({
-        title: "Discard sample",
-        message: `Discard sample "${this.acquisitionFilename}"?`,
-        confirmText: "Discard",
-        onConfirm: () => {
-          this.reset();
-        },
-      });
     },
     generateFilterId() {
       this.sampleItemFilterId = genId(6, false);
