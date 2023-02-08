@@ -399,6 +399,7 @@ export default {
           subheading: null,
         },
         { field: "mz_error_diff", label: "m/z error diff", subheading: null },
+        { field: "calibrant_to_tic", label: "fraction of TIC", subheading: null },
       ],
       mzCalibrationTableKey: 0,
       sampleItemFilterId: null,
