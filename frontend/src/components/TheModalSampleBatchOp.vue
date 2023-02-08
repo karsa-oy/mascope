@@ -79,6 +79,12 @@
               type="is-primary"
               icon-left="content-save"
               expanded
+              :disabled="
+                !batchName
+                || !targetCollectionsSelected
+                || !calibrationCollectionSelected
+                || !ionMechanismsSelected
+              "
               @click="
                 () => {
                   actionIs('create')
@@ -150,7 +156,6 @@ export default {
     };
   },
   created() {
-    
   },
   computed: {
     ...sync({
@@ -256,15 +261,26 @@ export default {
       }
     },
     initData() {
-      this.batchName = this.action != 'create'
-        ? this.batchActive.sample_batch_name
-        : null;
-      this.batchDesc = this.action != 'create'
-        ? this.batchActive.sample_batch_description
-        : null;
-      this.initCalibrationCollectionSelected();
-      this.initIonMechanismsSelected();
-      this.initTargetCollectionsSelected();
+      if (this.action == 'create') {
+        this.batchName = null;
+        this.batchDesc = null;
+        // set defaults
+        [this.calibrationCollectionSelected] = this.targetCollectionsAll.filter(
+          (collection) => collection.target_collection_id === 'xkSPp3eZrWXYSVDa'
+        );
+        this.ionMechanismsSelected = this.ionMechanismsAll.filter(
+          (mech) => mech.ionization_mechanism === '+Br-'
+        );
+        this.targetCollectionsSelected = this.targetCollectionsAll.filter(
+          (collection) => collection.target_collection_id === 'kNBOCx32dpehRWUw'
+        );
+      } else {
+        this.batchName = this.batchActive.sample_batch_name;
+        this.batchDesc = this.batchActive.sample_batch_description;
+        this.initCalibrationCollectionSelected();
+        this.initIonMechanismsSelected();
+        this.initTargetCollectionsSelected();
+      }
     },
     initIonMechanismsSelected() {
       const ids = this.batchIonMechanismIds;
