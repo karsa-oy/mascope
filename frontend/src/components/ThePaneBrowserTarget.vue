@@ -1,6 +1,11 @@
 <template>
   <section>
-    <base-browser name="Targets" :levels="targetLevels" :menu="menu">
+    <base-browser
+      name="Targets"
+      :levels="targetLevels"
+      :menu="menu"
+      :contextMenuIcon="contextMenuIcon"
+    >
     </base-browser>
   </section>
 </template>
@@ -43,6 +48,11 @@ export default {
       targetIons: "batch/targetIons",
       targetIsotopes: "batch/targetIsotopes",
     }),
+    contextMenuIcon() {
+      return this.targetCollectionsSelected.length == 1
+        ? "dots-horizontal"
+        : "plus"
+    },
     targetCollectionRows: function() {
       return this.sampleItemFocused && this.matchCollections
       ? this.matchCollections

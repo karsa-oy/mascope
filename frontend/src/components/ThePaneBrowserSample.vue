@@ -1,5 +1,10 @@
 <template>
-  <base-browser name="Samples" :levels="sampleLevels" :menu="menu">
+  <base-browser
+    name="Samples"
+    :levels="sampleLevels"
+    :menu="menu"
+    :contextMenuIcon="contextMenuIcon"
+  >
   </base-browser>
 </template>
 
@@ -34,6 +39,11 @@ export default {
       modalSampleItemAttributesSaveProps: "modal/sampleItemAttributesSaveProps",
       modalSampleItemOverviewProps: "modal/sampleItemOverviewProps",
     }),
+    contextMenuIcon() {
+      return this.batchActiveCount == 0
+        ? "plus"
+        : "dots-horizontal"
+    },
     sampleLevels() {
       let hidden = this.batchActive ? false : true;
       return [

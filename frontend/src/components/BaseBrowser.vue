@@ -5,7 +5,7 @@
       <slot name="header"></slot>
       <b-dropdown v-if="menu" aria-role="list" position="is-bottom-left">
         <template #trigger>
-          <b-button icon-left="dots-horizontal" size="is-small" />
+          <b-button :icon-left=contextMenuIcon size="is-small" />
         </template>
         <template v-for="item of menu">
           <b-dropdown-item
@@ -97,6 +97,11 @@ export default {
     BaseTagMatch,
   },
   props: {
+    contextMenuIcon: {
+      type: String,
+      required: false,
+      default: "dots-horizontal"
+    },
     name: {
       type: String,
       required: false,
