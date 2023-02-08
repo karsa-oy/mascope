@@ -311,6 +311,8 @@ export default {
                 GROUP BY sample_item_id
                 ORDER BY datetime_utc ASC
             `).then((res) => {
+                // Add order number
+                res.forEach((row, i) => row.index = (i+1).toString());
                 commit('SET_SAMPLE_ITEMS', res);
             });
         },

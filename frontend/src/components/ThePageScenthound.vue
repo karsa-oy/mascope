@@ -204,10 +204,18 @@
                 </b-dropdown>
                 <!-- tooltip slot -->
                 <template v-slot:content>
-                  <b>Samples:</b><br>
-                  <template v-for="(item) in sampleItems">
-                    {{item.sample_item_name}}<br v-bind:key="item.sample_item_id" />
-                  </template>
+                  <table style="text-align:center; width:100%">
+                    <tr>
+                      <th>#</th>
+                      <th>Samples</th>
+                    </tr>
+                    <template v-for="(item) in sampleItems">
+                      <tr v-bind:key="item.sample_item_id">
+                        <td>{{item.index}}</td>
+                        <td>{{item.sample_item_name}}</td>
+                      </tr>
+                    </template>
+                  </table>
                 </template>
               </b-tooltip>
             </b-field>
