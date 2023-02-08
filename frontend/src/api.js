@@ -62,9 +62,14 @@ async function initSocket() {
 
 // helpers
 function tryJsonParse(value) {
+    if (!value) return value;
+    // only try to parse objects and arrays
+    if (!['[', '{'].includes(value[0])) return value;
     try {
+        // valud JSON object or array
         return JSON.parse(value);
     } catch {
+        // not valid JSON object nor array
         return value;
     }
 }
