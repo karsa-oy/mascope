@@ -287,7 +287,7 @@
                   <b-button
                     :disabled="this.sampleActive ? false : true"
                     type="is-success"
-                    icon-left="content-save"
+                    icon-left=""
                     @click="sampleMatch"
                     v-if="!sampleMatched"
                   >

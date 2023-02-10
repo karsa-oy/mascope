@@ -220,8 +220,8 @@
               </b-tooltip>
             </b-field>
             <div class="container" style="text-align: center; padding: 2em 0em 0em 0em;">
-              <div class="columns">
-                <div class="column is-full">
+              <div class="rows">
+                <div class="row">
                   <b-button
                     :disabled="
                       sampleIsSaved
@@ -241,6 +241,21 @@
                     @click="saveSampleInformation"
                   >
                     Save sample info
+                  </b-button>
+                </div>
+                <div class="row" style="padding:1em">
+                  <b-button
+                    type="is-primary"
+                    icon-left="close"
+                    @click="reset()"
+                    :disabled="
+                      sampleActive
+                      ? (calibrationProgress != 100 || matchingProgress == null)
+                      : false
+                    "
+                    v-if="acquisitionFilename && conversionProgress == 100"
+                  >
+                    Close
                   </b-button>
                 </div>
               </div>
@@ -335,7 +350,7 @@
                 <b-button
                   :disabled="this.sampleActive ? false : true"
                   type="is-success"
-                  icon-left="content-save"
+                  icon-left=""
                   @click="sampleMatch"
                   v-if="!sampleMatched"
                 >
