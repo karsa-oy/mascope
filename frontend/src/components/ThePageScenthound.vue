@@ -247,7 +247,7 @@
                   <b-button
                     type="is-primary"
                     icon-left="close"
-                    @click="reset()"
+                    @click="closeButtonPressed()"
                     :disabled="
                       sampleActive
                       ? (calibrationProgress != 100 || matchingProgress == null)
@@ -324,7 +324,7 @@
                 <b-button
                   type="is-primary"
                   icon-left="close"
-                  @click="reset()"
+                  @click="closeButtonPressed()"
                   v-if="mzFitError"
                 >
                   Close
@@ -359,7 +359,7 @@
                 <b-button
                   type="is-primary"
                   icon-left="close"
-                  @click="reset()"
+                  @click="closeButtonPressed()"
                   v-if="sampleMatched"
                 >
                   Close
@@ -509,6 +509,21 @@ export default {
     }),
     clone(obj) {
       return JSON.parse(JSON.stringify(obj));
+    },
+    closeButtonPressed() {
+      if (this.sampleActive && this.sampleIsSaved) {
+        this.reset();
+      } else {
+        this.$buefy.dialog.confirm({
+          title: "Close sample without saving?",
+          message: `There is unsaved information in the form.
+            Are you sure you want to close the sample without saving?`,
+          confirmText: "Close",
+          onConfirm: () => {
+            this.reset();
+          },
+        });
+      }
     },
     generateFilterId() {
       this.sampleItemFilterId = genId(6, false);
