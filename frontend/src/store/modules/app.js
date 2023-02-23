@@ -7,6 +7,7 @@ const state = {
     instruments: [],
     ionMechanisms: [],
     mode: mode,
+    pushNotification: null,
     ready: false,
     schema: {},
     targetCollections: [],
@@ -57,6 +58,9 @@ export default {
         async onOrgReload({ dispatch }) {
             await dispatch('api/reloadDb', null, {root:true});
             dispatch('reload');
-        }
+        },
+        async pushNotification({ commit }, message) {
+            commit('SET_PUSH_NOTIFICATION', message);
+        },
     }
 }

@@ -25,6 +25,7 @@ export default {
   computed: {
     ...get({
       appMode: "app/mode",
+      appPushNotification: "app/pushNotification@message",
       appReady: "app/ready",
     }),
     isDevelopmentMode() {
@@ -47,6 +48,14 @@ export default {
       keydown: "key/down",
       keyup: "key/up",
     }),
+  },
+  watch: {
+    appPushNotification: {
+      handler() {
+        this.$buefy.dialog.alert(this.appPushNotification);
+      },
+      deep: true
+    },
   },
 };
 </script>
