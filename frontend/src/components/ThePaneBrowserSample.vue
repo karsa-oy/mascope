@@ -108,7 +108,7 @@ export default {
       };
       let exportBatchPeaksButton = {
         label: "Export peak data",
-        onClick: this.peakExport,
+        onClick: this.batchPeakExport,
       };
       let updateBatchButton = {
         label: "Update sample batch",
@@ -262,6 +262,19 @@ export default {
         },
       ]);
     },
+    batchPeakExport() {
+      this.$buefy.dialog.confirm({
+        title: "Export batch peak data",
+        message: `Export peak data for batch "${this.batchActive.sample_batch_name}"?`,
+        confirmText: "Export",
+        onConfirm: () => {
+          this.$api.emit(
+            'sample_batch_export_peaks',
+            this.batchActive.sample_batch_id,
+          );
+        },
+      });
+    },
     batchUpdate() {
       this.modalSampleBatchOpProps = {
         action: "update",
@@ -309,13 +322,6 @@ export default {
           modal: "sampleItemOverview",
         });
       }
-    },
-    peakExport() {
-      this.$api.emit(
-        'sample_batch_export_peaks',
-        this.batchActive.sample_batch_id,
-        this.batchActive.filter_params,
-        );
     },
   },
 };

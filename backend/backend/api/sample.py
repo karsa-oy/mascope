@@ -61,8 +61,6 @@ async def sample_batch_create(sid, sample_batches):
         await sio.emit('workspace_reload', room=workspace_id, namespace='/')
 
 async def export_peaks(sample_batch_df, sample_item_df):
-    [peak_min_intensity] = sample_batch_df['peak_min_intensity'].tolist()
-    [peak_min_separation] = sample_batch_df['peak_min_separation'].tolist()
     peak_data = []
     for index, row in sample_item_df.iterrows():
         try:
@@ -71,11 +69,10 @@ async def export_peaks(sample_batch_df, sample_item_df):
                 u_list=None,
                 if_exists='append'
             )
-            peak_data_item = filter_peaks(
-                get_peaks(sample_file, 'area'),
-                intensity=peak_min_intensity,
-                distance=peak_min_separation
-            ).sum(dim='time')
+            peak_data_item = get_peaks(
+                sample_file,
+                'area'
+                ).sum(dim='time')
         except:
             continue
         peak_data.extend([
@@ -95,36 +92,22 @@ async def export_peaks(sample_batch_df, sample_item_df):
 
     dt_str = datetime.now().isoformat().replace('-', '').replace(':', '').split('.')[0]
     [sample_batch_name] = sample_batch_df['sample_batch_name'].tolist()
-    spreadsheet_path = os.environ.get('MASCOPE_PRIVATE_DATADIR', '.')
-    spreadsheet_filename = (
+    peakfile_path = os.environ.get('MASCOPE_PRIVATE_DATADIR', '.')
+    peakfile_filename = (
         dt_str
         + '_peaks_'
         + sample_batch_name.replace(' ', '_')
-        + '.xlsx'
+        + '.parquet'
     )
-    print(f"Writing peak data to file {spreadsheet_filename}")
-    with pd.ExcelWriter(os.path.join(spreadsheet_path, spreadsheet_filename)) as writer:
-        sample_batch_df.to_excel(
-            writer,
-            sheet_name='Batch',
-            index=False
-        )
-        sample_item_df.to_excel(
-            writer,
-            sheet_name='Samples',
-            index=False
-        )
-        batch_peak_df.to_excel(
-            writer,
-            sheet_name='Peaks',
-            index=False
-        )
+    print(f"Writing peak data to file {peakfile_filename}")
+    batch_peak_df.to_parquet(
+        os.path.join(peakfile_path, peakfile_filename),
+        index=False
+    )
     print("Write complete")
 
 @sio.event(namespace='/')
-async def sample_batch_export_peaks(sid, sample_batch_id, filter_params):
-    peak_min_intensity = filter_params.get('peak_min_intensity')
-    peak_min_separation = filter_params.get('peak_min_separation')
+async def sample_batch_export_peaks(sid, sample_batch_id):
     with conn:
         # batch data
         sample_batch_df = pd.read_sql(f"""
@@ -135,10 +118,6 @@ async def sample_batch_export_peaks(sid, sample_batch_id, filter_params):
             """,
             conn,
             params=[sample_batch_id]
-        )
-        sample_batch_df = sample_batch_df.assign(
-            peak_min_intensity=[peak_min_intensity],
-            peak_min_separation=[peak_min_separation],
         )
         # sample item data
         sample_item_df = pd.read_sql(f"""
