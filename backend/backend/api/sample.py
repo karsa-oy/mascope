@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import pandas as pd
@@ -73,7 +74,8 @@ async def export_peaks(sample_batch_df, sample_item_df):
                 sample_file,
                 'area'
                 ).sum(dim='time')
-        except:
+        except Exception as e:
+            print(repr(e))
             continue
         peak_data.extend([
             (
@@ -131,10 +133,23 @@ async def sample_batch_export_peaks(sid, sample_batch_id):
             conn,
             params=[sample_batch_id]
         )
-    sio.start_background_task(
+    task = sio.start_background_task(
         export_peaks, sample_batch_df, sample_item_df
     )
-    
+    try:
+        await asyncio.gather(task)
+        await sio.emit(
+            'sample_batch_export_peaks_ready',
+            room=sid,
+            namespace='/'
+        )
+    except Exception as e:
+        await sio.emit(
+            'sample_batch_export_peaks_failed',
+            repr(e),
+            room=sid,
+            namespace='/'
+        )   
 
 @sio.event(namespace='/')
 async def sample_batch_update(sid, sample_batches):

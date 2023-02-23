@@ -234,6 +234,20 @@ export default {
                 dispatch('load', activeSample);
             }
         },
+        async onSampleBatchExportPeaksFailed({dispatch}, error) {
+            await dispatch(
+                'app/pushNotification',
+                {message: error, key: Math.random()}, 
+                {root:true}
+            );
+        },
+        async onSampleBatchExportPeaksReady({dispatch}) {
+            await dispatch(
+                'app/pushNotification',
+                {message: "Sample batch peak export finished", key: Math.random()}, 
+                {root:true}
+            );
+        },
         async onSampleItemCreated({ rootGetters, dispatch }, sample_item_id) {
             await dispatch('batch/onSampleBatchReload', null, {root:true});
             const sample_item = rootGetters['batch/sampleItem'](sample_item_id);
