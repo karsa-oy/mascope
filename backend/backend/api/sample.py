@@ -155,7 +155,6 @@ async def sample_batch_export_peaks(sid, sample_batch_id):
 async def sample_batch_update(sid, sample_batches):
     for sample_batch in sample_batches:
         sample_batch_df = pd.DataFrame.from_records([sample_batch])
-        print(sample_batch_df.to_string())
         workspace_ids = pd.unique(sample_batch_df['workspace_id']).tolist()
         if len(workspace_ids) != 1:
             raise ValueError(

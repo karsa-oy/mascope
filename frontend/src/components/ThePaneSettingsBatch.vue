@@ -86,8 +86,8 @@ export default {
       this.reloadMatchesBatch();
       if (this.sampleFocused) this.reloadMatchesSample();
     },
-    reloadMatchesBatch() {
-      this.batchLoadSamples();
+    async reloadMatchesBatch() {
+      await this.batchLoadSamples();
       this.batchLoadMatches();
     },
   },

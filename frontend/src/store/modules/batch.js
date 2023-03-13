@@ -68,7 +68,7 @@ export default {
             const isotopeRatioTolerance = filterParams.isotope_ratio_tolerance;
             const peakMinIntensity = filterParams.peak_min_intensity;
             const minIsotopeAbundance = filterParams.min_isotope_abundance;
-            const minIsotopeCorrelation = filterParams.min_isotope_correlation
+            const minIsotopeCorrelation = filterParams.min_isotope_correlation != null
                 ? filterParams.min_isotope_correlation
                 : paramDefaults.paramMinIsotopeCorrelation;
             await rootState.api.query(`--sql
@@ -96,7 +96,7 @@ export default {
                                 WHEN (
                                     ABS(match_mz_error) <= ${mzTolerance}
                                     AND ABS(match_abundance_error) <= ${isotopeRatioTolerance}
-                                    AND MAX(match_isotope_correlation, 0) > ${minIsotopeCorrelation}
+                                    AND MAX(match_isotope_correlation, 0) >= ${minIsotopeCorrelation}
                                     AND relative_abundance >= ${minIsotopeAbundance}
                                     )
                                 THEN sample_peak_area
@@ -106,7 +106,7 @@ export default {
                                 WHEN (
                                     ABS(match_mz_error) <= ${mzTolerance}
                                     AND ABS(match_abundance_error) <= ${isotopeRatioTolerance}
-                                    AND MAX(match_isotope_correlation, 0) > ${minIsotopeCorrelation}
+                                    AND MAX(match_isotope_correlation, 0) >= ${minIsotopeCorrelation}
                                     AND sample_peak_area >= ${peakMinIntensity}
                                     AND relative_abundance >= ${minIsotopeAbundance}
                                     )
