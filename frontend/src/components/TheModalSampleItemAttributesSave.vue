@@ -648,6 +648,7 @@ export default {
         this.loadedTemplate = newTemplate;
         this.sampleFilename = data.sampleItemRecordToLoad.filename;
         this.sampleInstrument = data.sampleItemRecordToLoad.instrument;
+        this.sampleItemFilterId = data.sampleItemRecordToLoad.filter_id;
         this.sampleItemType = data.sampleItemRecordToLoad.sample_item_type;
     },
   },
