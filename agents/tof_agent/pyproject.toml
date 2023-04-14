@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "tof-service"
+name = "tof-agent"
 version = "1.0"
 description = "Agent to connect Tofwerk TOF with Karsa Mascope"
 authors = ["Karsa Oy <support@karsa.fi>"]
@@ -14,7 +14,7 @@ requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
-tof-service = 'tof_service:run'
+tof-agent = 'tof_agent:run'
 
 [tool.poetry.dependencies]
 python = ">=3.8,<3.11"

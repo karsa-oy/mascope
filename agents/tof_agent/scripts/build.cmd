@@ -1,0 +1,1 @@
+poetry run pyinstaller tof_agent.py --name bin --noconfirm --onefile --console --collect-all hardware.tofwerk --icon=assets/icon.ico
