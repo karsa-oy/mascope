@@ -1,34 +1,36 @@
-import { dispatch, make } from 'vuex-pathify';
+import { dispatch, make } from "vuex-pathify";
 
 const state = {
-    active: null,
-    // matches
-    matched: null,
-    matchCollections: null,
-    matchCompounds: null,
-    matchIons: null,
-    matchIsotopes: null,
-}
+  active: null,
+  // matches
+  matched: null,
+  matchCollections: null,
+  matchCompounds: null,
+  matchIons: null,
+  matchIsotopes: null,
+};
 
 export default {
-    namespaced: true,
-    state,
-    mutations: make.mutations(state),
-    actions: {
-        async load({ rootState, commit, dispatch }, sample) {
-            // reset if previous sample loaded
-            if (state.active) {
-                dispatch('unload');
-            }
-            const sampleItemId = sample.sample_item_id;
-            rootState.api.emit('subscribe', sampleItemId);
-            // set sample active
-            await commit('SET_ACTIVE', sample);
-            await dispatch('loadMatches');
-        },
-        async loadMatches({ rootState, rootGetters, state, commit }) {
-            const sampleItemId = state.active.sample_item_id;
-            await rootState.api.query(`--sql
+  namespaced: true,
+  state,
+  mutations: make.mutations(state),
+  actions: {
+    async load({ rootState, commit, dispatch }, sample) {
+      // reset if previous sample loaded
+      if (state.active) {
+        dispatch("unload");
+      }
+      const sampleItemId = sample.sample_item_id;
+      rootState.api.emit("subscribe", sampleItemId);
+      // set sample active
+      await commit("SET_ACTIVE", sample);
+      await dispatch("loadMatches");
+    },
+    async loadMatches({ rootState, rootGetters, state, commit }) {
+      const sampleItemId = state.active.sample_item_id;
+      await rootState.api
+        .query(
+          `--sql
                 -- matches exist
                 SELECT
                     CASE
@@ -37,19 +39,21 @@ export default {
                     END AS matched
                 FROM match
                 WHERE sample_item_id == '${sampleItemId}'
-            `).then((res) => {
-                commit('SET_MATCHED', res[0].matched);
-            });
-            const sampleBatchId = state.active.sample_batch_id;
-            // initialize match filter
-            const filterParams = rootGetters["batch/filterParams"];
-            const mzTolerance = filterParams.mz_tolerance;
-            const isotopeRatioTolerance = filterParams.isotope_ratio_tolerance;
-            const peakMinIntensity = filterParams.peak_min_intensity;
-            const peakMinSeparation = filterParams.peak_min_separation;
-            const minIsotopeAbundance = filterParams.min_isotope_abundance;
-            const minIsotopeCorrelation = filterParams.min_isotope_correlation;
-            await rootState.api.query(`--sql
+            `
+        )
+        .then((res) => {
+          commit("SET_MATCHED", res[0].matched);
+        });
+      const sampleBatchId = state.active.sample_batch_id;
+      // initialize match filter
+      const filterParams = rootGetters["batch/filterParams"];
+      const mzTolerance = filterParams.mz_tolerance;
+      const isotopeRatioTolerance = filterParams.isotope_ratio_tolerance;
+      const peakMinIntensity = filterParams.peak_min_intensity;
+      const peakMinSeparation = filterParams.peak_min_separation;
+      const minIsotopeAbundance = filterParams.min_isotope_abundance;
+      const minIsotopeCorrelation = filterParams.min_isotope_correlation;
+      await rootState.api.query(`--sql
                 -- matches
                 DROP TABLE IF EXISTS sample_match_filter;
                 CREATE TEMPORARY TABLE sample_match_filter AS
@@ -107,8 +111,10 @@ export default {
                         AND relative_abundance >= ${minIsotopeAbundance}
                     )
             `);
-            // load matches
-            await rootState.api.query(`--sql
+      // load matches
+      await rootState.api
+        .query(
+          `--sql
                 SELECT
                     target_collection_id,
                     target_collection_name,
@@ -142,10 +148,14 @@ export default {
                     GROUP BY sample_item_id, target_collection_id
                 )
                 GROUP BY sample_item_id, target_collection_id;
-            `).then((res) => {
-                commit('SET_MATCH_COLLECTIONS', res);
-            });
-            await rootState.api.query(`--sql
+            `
+        )
+        .then((res) => {
+          commit("SET_MATCH_COLLECTIONS", res);
+        });
+      await rootState.api
+        .query(
+          `--sql
                 SELECT
                     sample_item_id,
                     target_compound_id,
@@ -170,10 +180,14 @@ export default {
                     GROUP BY sample_item_id, target_collection_id, target_compound_id, target_ion_id
                 )
                 GROUP BY sample_item_id, target_collection_id, target_compound_id;
-            `).then((res) => {
-                commit('SET_MATCH_COMPOUNDS', res);
-            });
-            await rootState.api.query(`--sql
+            `
+        )
+        .then((res) => {
+          commit("SET_MATCH_COMPOUNDS", res);
+        });
+      await rootState.api
+        .query(
+          `--sql
                 SELECT
                     sample_item_id,
                     target_ion_formula,
@@ -185,10 +199,14 @@ export default {
                     SUM(sample_peak_interference) AS sample_peak_interference_sum
                 FROM sample_match_filter
                 GROUP BY sample_item_id, target_collection_id, target_compound_id, target_ion_id;
-            `).then((res) => {
-                commit('SET_MATCH_IONS', res);
-            });
-            await rootState.api.query(`--sql
+            `
+        )
+        .then((res) => {
+          commit("SET_MATCH_IONS", res);
+        });
+      await rootState.api
+        .query(
+          `--sql
                 SELECT
                     match_score,
                     match_mz_error,
@@ -208,51 +226,53 @@ export default {
                     target_compound_name,
                     target_compound_formula
                 FROM sample_match_filter
-            `).then((res) => {
-                commit('SET_MATCH_ISOTOPES', res);
-            });
-        },
-        async unload({ rootState, state, commit, dispatch }) {
-            if (!state.active) return;
-            rootState.api.emit('unsubscribe', state.active.sample_item_id);
-            commit('SET_ACTIVE', null);
-            // matches
-            commit('SET_MATCHED', null);
-            commit('SET_MATCH_COLLECTIONS', null);
-            commit('SET_MATCH_COMPOUNDS', null);
-            commit('SET_MATCH_IONS', null);
-            commit('SET_MATCH_ISOTOPES', null);
-            // calibration
-            dispatch("calibration/unload", null, {root:true});
-        },
-        async reload({ rootGetters, dispatch, state }, sample=null) {
-            const sampleToLoad = sample ? sample : state.active;
-            if (sampleToLoad) {
-                const sampleToLoadId = sampleToLoad.sample_item_id;
-                await dispatch('unload');
-                const activeSample = rootGetters["batch/sampleItem"](sampleToLoadId);
-                dispatch('load', activeSample);
-            }
-        },
-        async onSampleBatchExportPeaksFailed({dispatch}, error) {
-            await dispatch(
-                'app/pushNotification',
-                {message: error, key: Math.random()}, 
-                {root:true}
-            );
-        },
-        async onSampleBatchExportPeaksReady({dispatch}) {
-            await dispatch(
-                'app/pushNotification',
-                {message: "Sample batch peak export finished", key: Math.random()}, 
-                {root:true}
-            );
-        },
-        async onSampleItemCreated({ rootGetters, dispatch }, sample_item_id) {
-            await dispatch('batch/onSampleBatchReload', null, {root:true});
-            const sample_item = rootGetters['batch/sampleItem'](sample_item_id);
-            await dispatch("load", sample_item);
-        },
+            `
+        )
+        .then((res) => {
+          commit("SET_MATCH_ISOTOPES", res);
+        });
     },
-    getters: {}
-}
+    async unload({ rootState, state, commit, dispatch }) {
+      if (!state.active) return;
+      rootState.api.emit("unsubscribe", state.active.sample_item_id);
+      commit("SET_ACTIVE", null);
+      // matches
+      commit("SET_MATCHED", null);
+      commit("SET_MATCH_COLLECTIONS", null);
+      commit("SET_MATCH_COMPOUNDS", null);
+      commit("SET_MATCH_IONS", null);
+      commit("SET_MATCH_ISOTOPES", null);
+      // calibration
+      dispatch("calibration/unload", null, { root: true });
+    },
+    async reload({ rootGetters, dispatch, state }, sample = null) {
+      const sampleToLoad = sample ? sample : state.active;
+      if (sampleToLoad) {
+        const sampleToLoadId = sampleToLoad.sample_item_id;
+        await dispatch("unload");
+        const activeSample = rootGetters["batch/sampleItem"](sampleToLoadId);
+        dispatch("load", activeSample);
+      }
+    },
+    async onSampleBatchExportPeaksFailed({ dispatch }, error) {
+      await dispatch(
+        "app/pushNotification",
+        { message: error, key: Math.random() },
+        { root: true }
+      );
+    },
+    async onSampleBatchExportPeaksReady({ dispatch }) {
+      await dispatch(
+        "app/pushNotification",
+        { message: "Sample batch peak export finished", key: Math.random() },
+        { root: true }
+      );
+    },
+    async onSampleItemCreated({ rootGetters, dispatch }, sample_item_id) {
+      await dispatch("batch/onSampleBatchReload", null, { root: true });
+      const sample_item = rootGetters["batch/sampleItem"](sample_item_id);
+      await dispatch("load", sample_item);
+    },
+  },
+  getters: {},
+};

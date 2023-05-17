@@ -1,8 +1,7 @@
 import numpy as np
-
+from hardware.tofwerk.lib.TwTool import TwTof2Mass
 from zarr.errors import PathNotFoundError
 
-from hardware.tofwerk.lib.TwTool import TwTof2Mass
 from backend.lib.file import (
     get_zarr_var_shape,
     load_coord,
@@ -11,11 +10,13 @@ from backend.lib.file import (
     update_zarr_array_coord,
 )
 
+
 def calculate_tic(filename):
-    sample_file_data = load_file(filename, vars=['signal'])
-    sum_spectrum = sample_file_data.signal.sum(dim='time')
-    tic = sum_spectrum.sum(dim='mz').compute().item()
+    sample_file_data = load_file(filename, vars=["signal"])
+    sum_spectrum = sample_file_data.signal.sum(dim="time")
+    tic = sum_spectrum.sum(dim="mz").compute().item()
     return tic
+
 
 def remove_duplicate_mz_values(mz):
     # Sometimes TOF signal mz coordinate contains multiple zeros at the beginning
@@ -27,48 +28,37 @@ def remove_duplicate_mz_values(mz):
     if (np.diff(mz[mz_below_10_mask]) == 0).any():
         mz_below_10_maxi = mz_below_10_mask.sum()
         mz_unique[mz_below_10_mask] = np.linspace(
-                                            0,
-                                            mz[mz_below_10_maxi],
-                                            mz_below_10_maxi,
-                                            endpoint=False
-                                            )
+            0, mz[mz_below_10_maxi], mz_below_10_maxi, endpoint=False
+        )
     return mz_unique
 
+
 def signal_mz_calibration_update(fit, filenames):
-    mode = fit['mode']
-    par = fit['par']
+    mode = fit["mode"]
+    par = fit["par"]
     # Calculate new mz axis
-    nbr_samples = get_zarr_var_shape(filenames[0], 'signal')[0]
+    nbr_samples = get_zarr_var_shape(filenames[0], "signal")[0]
     par = np.array(par, dtype=np.double)
-    new_mz = np.array([
-        TwTof2Mass(tof, mode, par)
-        for tof in range(nbr_samples)
-    ])
+    new_mz = np.array([TwTof2Mass(tof, mode, par) for tof in range(nbr_samples)])
     new_mz = remove_duplicate_mz_values(new_mz)
     new_range = [new_mz[0], new_mz[-1]]
     # Update zarr file coordinates and props
     for filename in filenames:
         print("Calibrating file: %s" % filename)
-        if nbr_samples != get_zarr_var_shape(filename, 'signal')[0]:
+        if nbr_samples != get_zarr_var_shape(filename, "signal")[0]:
             raise Exception("Number of TOF samples does not match")
-        update_props(
-            filename,
-            {
-                'range': new_range,
-                'mz_calibration': fit    
-            }
-            )
+        update_props(filename, {"range": new_range, "mz_calibration": fit})
         # Write new mz coordinates to zarr file
-        update_zarr_array_coord(filename, 'signal', 'mz', new_mz)
+        update_zarr_array_coord(filename, "signal", "mz", new_mz)
         try:
-            update_zarr_array_coord(filename, 'sum_signal', 'mz', new_mz)
+            update_zarr_array_coord(filename, "sum_signal", "mz", new_mz)
         except PathNotFoundError:
             pass
         try:
-            peak_tofs = load_coord(filename, 'peak_areas', 'tof')
+            peak_tofs = load_coord(filename, "peak_areas", "tof")
             new_peak_mzs = new_mz[peak_tofs.astype(int)]
-            update_zarr_array_coord(filename, 'peak_areas', 'mz', new_peak_mzs)
-            update_zarr_array_coord(filename, 'peak_heights', 'mz', new_peak_mzs)
+            update_zarr_array_coord(filename, "peak_areas", "mz", new_peak_mzs)
+            update_zarr_array_coord(filename, "peak_heights", "mz", new_peak_mzs)
         except PathNotFoundError:
             pass
     return new_mz

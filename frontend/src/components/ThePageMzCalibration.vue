@@ -102,14 +102,21 @@ export default {
         { field: "sample_peak_mz", label: "Sample m/z" },
         { field: "match_mz_error", label: "m/z error [ppm]" },
         { field: "relative_abundance", label: "Relative abundance" },
-        { field: "sample_peak_area_relative", label: "Relative peak intensity" },
+        {
+          field: "sample_peak_area_relative",
+          label: "Relative peak intensity",
+        },
         { field: "sample_peak_area", label: "Sample peak intensity" },
         { field: "match_score", label: "Match score" },
       ],
       selectedTableCols: [
         { field: "mz", label: "Isotope m/z" },
         { field: "sample_peak_mz", label: "Pre peak m/z" },
-        { field: "match_mz_error", label: "Pre m/z error [ppm]", subheading: null },
+        {
+          field: "match_mz_error",
+          label: "Pre m/z error [ppm]",
+          subheading: null,
+        },
         { field: "post_mz", label: "Post peak m/z" },
         {
           field: "post_dmz",
@@ -152,10 +159,10 @@ export default {
         confirmText: "Apply",
         onConfirm: () => {
           this.$api.emit(
-            'calibration_mz_apply',  
+            "calibration_mz_apply",
             this.mzFit,
             this.sampleItems.map((item) => item.filename)
-            );
+          );
         },
       });
     },
@@ -166,12 +173,7 @@ export default {
         let peakTofs = newRows.map((row) => row.sample_peak_tof);
         let peakMzs = newRows.map((row) => row.sample_peak_mz);
         let exactMzs = newRows.map((row) => row.mz);
-        await this.$api.emit(
-          'calibration_mz_fit',
-          peakTofs,
-          peakMzs,
-          exactMzs,
-        );
+        await this.$api.emit("calibration_mz_fit", peakTofs, peakMzs, exactMzs);
       }
     },
   },
@@ -180,7 +182,8 @@ export default {
       this.selectedTableRows.forEach((row, i) => {
         row.post_mz = this.mzFitStats.post_mz[i];
         row.post_dmz = this.mzFitStats.post_dmz[i];
-        row.mz_error_diff = Math.abs(row.post_dmz) - Math.abs(row.match_mz_error);
+        row.mz_error_diff =
+          Math.abs(row.post_dmz) - Math.abs(row.match_mz_error);
       });
       this.selectedTableCols.filter(
         (col) => col.field == "match_mz_error"

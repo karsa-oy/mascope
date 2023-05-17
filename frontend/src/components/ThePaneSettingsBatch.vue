@@ -12,7 +12,7 @@
       label="Minimum isotope abundance"
       path="batch/paramMinIsotopeAbundance"
       @paramChange="reloadMatches"
-      :range="{ min: 0, max: 1, step: .01 }"
+      :range="{ min: 0, max: 1, step: 0.01 }"
       disabled
     >
     </base-param-field>
@@ -20,7 +20,7 @@
       label="Isotope ratio tolerance"
       path="batch/paramIsotopeRatioTolerance"
       @paramChange="reloadMatches"
-      :range="{ min: 0, max: 1, step: .1 }"
+      :range="{ min: 0, max: 1, step: 0.1 }"
     >
     </base-param-field>
     <base-param-field
@@ -34,7 +34,7 @@
       label="Minimum isotope correlation"
       path="batch/paramMinIsotopeCorrelation"
       @paramChange="reloadMatches"
-      :range="{ min: 0, max: 1, step: .1 }"
+      :range="{ min: 0, max: 1, step: 0.1 }"
     >
     </base-param-field>
     <base-param-field
@@ -55,7 +55,6 @@
     </base-param-field>
   </section>
 </template>
-
 
 <script>
 import BaseParamField from "./BaseParamField.vue";

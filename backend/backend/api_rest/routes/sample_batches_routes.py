@@ -1,7 +1,8 @@
 from fastapi import APIRouter
+
 from ..controllers.sample_batches_controller import (
-    get_sample_batches,
     get_sample_batch_by_id,
+    get_sample_batches,
 )
 
 sample_batches_router = APIRouter()

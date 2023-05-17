@@ -6,7 +6,7 @@
           <the-pane-browser-target></the-pane-browser-target>
           <the-pane-browser-sample></the-pane-browser-sample>
         </div>
-        
+
         <div class="column is-9">
           <div class="columns">
             <div class="column is-6">
@@ -19,7 +19,6 @@
             </div>
           </div>
         </div>
-       
       </div>
     </section>
   </the-layout-sidebar>

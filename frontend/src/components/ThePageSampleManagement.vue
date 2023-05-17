@@ -45,7 +45,8 @@
                 <b>
                   {{
                     batchActive
-                      ? "Items to add to batch: " + batchActive.sample_batch_name
+                      ? "Items to add to batch: " +
+                        batchActive.sample_batch_name
                       : "Please select a batch"
                   }}
                 </b>
@@ -101,8 +102,7 @@ export default {
     };
   },
   computed: {
-    ...sync({
-    }),
+    ...sync({}),
     ...get({
       batchActive: "batch/active",
       workspaces: "app/workspaces",
@@ -119,12 +119,10 @@ export default {
   },
   methods: {
     sampleItemCreate(items) {
-      this.$api.emit('sample_item_create', items);
+      this.$api.emit("sample_item_create", items);
     },
     selectSampleFiles(newRows, oldRows) {
-      let fields = this.sampleItemCols
-        .map((col) => col.field
-      );
+      let fields = this.sampleItemCols.map((col) => col.field);
       this.sampleItemRows = newRows.map((file) =>
         fields
           .map((field) => ({ [field]: file[field] }))
@@ -161,11 +159,13 @@ export default {
       let dt1 = new Date(this.sampleFileMinDateTime).toISOString();
       let dt2 = new Date(this.sampleFileMaxDateTime).toISOString();
       this.$api
-        .query(`--sql
+        .query(
+          `--sql
           SELECT *
           FROM sample_file
           WHERE datetime_utc BETWEEN '${dt1}' AND '${dt2}'
-        `)
+        `
+        )
         .then((res) => {
           this.sampleFileRows = res;
         });

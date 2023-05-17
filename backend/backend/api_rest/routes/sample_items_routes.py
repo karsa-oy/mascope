@@ -1,7 +1,8 @@
 from fastapi import APIRouter
+
 from ..controllers.sample_items_controller import (
-    get_sample_items,
     get_sample_item_by_id,
+    get_sample_items,
 )
 
 sample_items_router = APIRouter()

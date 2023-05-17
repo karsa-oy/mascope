@@ -7,34 +7,25 @@ data and its attributes. It utilizes Tofwerk API to access the raw data.
 Created on Tue Apr  2 13:36:46 2019
 """
 
-import numpy as np
-import pandas as pd
-import h5py
-import h5sparse
-import xarray
-
 from copy import deepcopy
 
-from .util import (
-    write_sampleid,
-    read_sampleid,
-    write_description,
-    read_description
-)
+import h5py
+import h5sparse
+import numpy as np
+import pandas as pd
+import xarray
+
+from .image import DEFAULT_TRACE, gen_heatmap_image, gen_spec_stack_image
 from .spectra import KSpectra
-from .image import (
-    gen_heatmap_image,
-    gen_spec_stack_image,
-    DEFAULT_TRACE
-)
+from .util import read_description, read_sampleid, write_description, write_sampleid
 
 
 class KEvent(KSpectra):
-    """Class providing an API to read and visualize 
+    """Class providing an API to read and visualize
     TOF data
-    
+
     ...
-    
+
     Attributes
     ----------
     sampleid : str
@@ -42,10 +33,10 @@ class KEvent(KSpectra):
     description : str
         User defined description of the sample
     """
-    
+
     def __init__(self, filename):
         """Initialize self
-        
+
         Retrieve TwH5Descriptor for the file, load time vectors,
         Sample ID and Sample description when available.
 
@@ -61,10 +52,10 @@ class KEvent(KSpectra):
         Exception
             If retrieving TwH5Descriptor fails
         """
-        
+
         KSpectra.__init__(self, filename)
-            
-        #self.filename = filename
+
+        # self.filename = filename
         self.sampleid = self.get_sampleid()
         self.description = self.get_description()
 
@@ -85,21 +76,14 @@ class KEvent(KSpectra):
         mz : array
             m/z vector of the requested sample number range
         """
-        
+
         if si1 is None:
             si1 = self.desc.nbrSamples
         return np.asarray(self.sno2mz(range(si0, si1)))
 
-    def get_spec(self,
-                 m0=None,
-                 m1=None,
-                 si0=0,
-                 si1=None,
-                 t0=None,
-                 t1=None,
-                 dt=None):
+    def get_spec(self, m0=None, m1=None, si0=0, si1=None, t0=None, t1=None, dt=None):
         """Get a single (averaged) spectrum from file
-        
+
         Calculate average spectrum for a given mass/sample and/or time range.
         Use either m0 & m1 or si0 & si1 to specify the ranges.
 
@@ -131,7 +115,7 @@ class KEvent(KSpectra):
         spec : array
             Average spectrum for the requested ranges.
         """
-        
+
         ind = self._t2bufind(t0, t1, dt)
         if m0 is not None:
             si0 = self.mz2sno(m0, True)
@@ -141,16 +125,9 @@ class KEvent(KSpectra):
         spec[spec < 0] = 0
         return spec
 
-    def get_spectra(self,
-                    m0=None,
-                    m1=None,
-                    si0=0,
-                    si1=None,
-                    t0=None,
-                    t1=None,
-                    dt=None):
+    def get_spectra(self, m0=None, m1=None, si0=0, si1=None, t0=None, t1=None, dt=None):
         """Get multiple spectra from file
-        
+
         Load non-averaged spectra for a given mass/sample and/or time range.
         Use either m0 & m1 or si0 & si1 to specify the ranges.
 
@@ -180,7 +157,7 @@ class KEvent(KSpectra):
         spectra : array
             Spectra for the requested ranges.
         """
-        
+
         ind = self._t2bufind(t0, t1, dt)
         if m0 is not None:
             si0 = self.mz2sno(m0, True)
@@ -190,17 +167,11 @@ class KEvent(KSpectra):
         spectra[spectra < 0] = 0
         return spectra
 
-    def get_avg_spectra(self,
-                        avg_s,
-                        m0=None,
-                        m1=None,
-                        si0=0,
-                        si1=None,
-                        t0=0.0,
-                        t1=None,
-                        dt=None):
+    def get_avg_spectra(
+        self, avg_s, m0=None, m1=None, si0=0, si1=None, t0=0.0, t1=None, dt=None
+    ):
         """Get averaged spectra from file
-        
+
         Calculate averaged spectra for a given mass/sample and/or time range
         and averaging window. Use either m0 & m1 or si0 & si1 to specify the
         ranges.
@@ -226,13 +197,13 @@ class KEvent(KSpectra):
             Length of the desired range. The default is None.
             If not None, 't0' and 'dt' are used to define the range
             instead of 't0' and 't1'.
-            
+
         Returns
         -------
         avg_spectra : array
             Averaged spectra for the requested ranges.
         """
-        
+
         if m0 is not None:
             si0 = self.mz2sno(m0, True)
         if m1 is not None:
@@ -258,14 +229,9 @@ class KEvent(KSpectra):
 
         return np.asarray(avg_spectra).T
 
-    def get_stickspec(self,
-                      pi0=0,
-                      pi1=None,
-                      t0=None,
-                      t1=None,
-                      dt=None):
+    def get_stickspec(self, pi0=0, pi1=None, t0=None, t1=None, dt=None):
         """Get a single (averaged) unit mass resolution (UMR) spectrum from file
-        
+
         Calculate average UMR spectrum for a given mass/sample and/or time range.
 
         Parameters
@@ -290,18 +256,13 @@ class KEvent(KSpectra):
         stickspec : array
             Average UMR spectrum for the requested ranges.
         """
-        
+
         ind = self._t2bufind(t0, t1, dt)
         return self.load_stickspec(ind, pi0, pi1)
 
-    def get_stickspectra(self,
-                        pi0=0,
-                        pi1=None,
-                        t0=None,
-                        t1=None,
-                        dt=None):
+    def get_stickspectra(self, pi0=0, pi1=None, t0=None, t1=None, dt=None):
         """Get multiple unit mass resolution (UMR) spectra from file
-        
+
         Load non-averaged UMR spectra for a given mass/sample and/or time range.
 
         Parameters
@@ -326,19 +287,13 @@ class KEvent(KSpectra):
         stickspectra : array
             UMR spectra for the requested ranges.
         """
-        
+
         ind = self._t2bufind(t0, t1, dt)
         return self.load_stickspectra(ind, pi0, pi1)
 
-    def get_avg_stickspectra(self,
-                             avg_s,
-                             pi0=0,
-                             pi1=None,
-                             t0=0.0,
-                             t1=None,
-                             dt=None):
+    def get_avg_stickspectra(self, avg_s, pi0=0, pi1=None, t0=0.0, t1=None, dt=None):
         """Get averaged UMR spectra from file
-        
+
         Calculate averaged UMR spectra for a given mass/sample and/or time range
         and averaging window.
 
@@ -359,13 +314,13 @@ class KEvent(KSpectra):
             Length of the desired range. The default is None.
             If not None, 't0' and 'dt' are used to define the range
             instead of 't0' and 't1'.
-            
+
         Returns
         -------
         avg_spectra : array
             Averaged spectra for the requested ranges.
         """
-        
+
         avg_s = max(self.time_res, avg_s)
         if t1 is None:
             if dt is not None:
@@ -384,7 +339,7 @@ class KEvent(KSpectra):
 
     def get_tps_data(self, t0=None, t1=None, dt=None):
         """Load TPS parameter data from file
-        
+
         Parameters
         ----------
         t0 : float, optional
@@ -397,20 +352,20 @@ class KEvent(KSpectra):
             Length of the desired range. The default is None.
             If not None, 't0' and 'dt' are used to define the range
             instead of 't0' and 't1'.
-        
+
         Returns
         -------
         data, info : array
             Returns TPS parameter data and parameter names
         """
-        
+
         ind = self._t2bufind(t0, t1, dt)
         data, info = self.load_tps_data(ind)
         return data, info
-    
+
     def get_avg_tps_data(self, avg_s, t0=0.0, t1=None, dt=None):
         """Load averaged TPS parameter data from file
-        
+
         Parameters
         ----------
         avg_s : float
@@ -424,13 +379,13 @@ class KEvent(KSpectra):
             Length of the desired range. The default is None.
             If not None, 't0' and 'dt' are used to define the range
             instead of 't0' and 't1'.
-            
+
         Returns
         -------
         data, info : array
             Returns averaged TPS parameter data and parameter names
         """
-        
+
         avg_s = max(self.time_res, avg_s)
         if t1 is None:
             if dt is not None:
@@ -450,16 +405,9 @@ class KEvent(KSpectra):
             tnow += avg_s
         return np.asarray(avg_data).T, info
 
-    def get_code(self,
-                 m0=None,
-                 m1=None,
-                 si0=None,
-                 si1=None,
-                 t0=None,
-                 t1=None,
-                 dt=None):
+    def get_code(self, m0=None, m1=None, si0=None, si1=None, t0=None, t1=None, dt=None):
         """Get a single code vector from file
-        
+
         Get averaged KEncoder result code for a given mass/sample and/or
         time range. Use either m0 & m1 or si0 & si1 to specify the ranges.
 
@@ -489,7 +437,7 @@ class KEvent(KSpectra):
         code : array
             Average code for the requested ranges.
         """
-        
+
         ind = self._t2flatind(t0, t1, dt)
         if ind is not None:
             i0, i1 = ind
@@ -501,23 +449,17 @@ class KEvent(KSpectra):
         if m1 is not None:
             si1 = self.mz2sno(m1, True)
         with h5sparse.File(self.filename, "r") as h5f:
-            code = h5f['Karsa/code'].value[si0:si1,
-                                           i0:i1].sum(axis=1)
-            code = np.squeeze( np.asarray(code) )
-            avg_step = h5f['Karsa/code'].attrs['avg_step']
-            code /= ((i1 - i0) / float(avg_step))
+            code = h5f["Karsa/code"].value[si0:si1, i0:i1].sum(axis=1)
+            code = np.squeeze(np.asarray(code))
+            avg_step = h5f["Karsa/code"].attrs["avg_step"]
+            code /= (i1 - i0) / float(avg_step)
         return code
 
-    def get_codes(self,
-                  m0=None,
-                  m1=None,
-                  si0=None,
-                  si1=None,
-                  t0=None,
-                  t1=None,
-                  dt=None):
+    def get_codes(
+        self, m0=None, m1=None, si0=None, si1=None, t0=None, t1=None, dt=None
+    ):
         """Get code sparse matrix from file
-        
+
         Get KEncoder result codes for a given mass/sample and/or
         time range. Use either m0 & m1 or si0 & si1 to specify the ranges.
 
@@ -547,7 +489,7 @@ class KEvent(KSpectra):
         codes : csc_matrix
             Code for the requested ranges as a sparse matrix
         """
-        
+
         ind = self._t2flatind(t0, t1, dt)
         if ind is not None:
             i0, i1 = ind
@@ -559,14 +501,14 @@ class KEvent(KSpectra):
         if m1 is not None:
             si1 = self.mz2sno(m1, True)
         with h5sparse.File(self.filename) as h5f:
-            codes = h5f['Karsa/code'].value[si0:si1, i0:i1]
-            avg_step = h5f['Karsa/code'].attrs['avg_step']
-            codes /= ((i1 - i0) / float(avg_step))
+            codes = h5f["Karsa/code"].value[si0:si1, i0:i1]
+            avg_step = h5f["Karsa/code"].attrs["avg_step"]
+            codes /= (i1 - i0) / float(avg_step)
         return codes  # .toarray()
 
     def write_peaks(self, peaks):
         """Write peaks to file
-        
+
         Write peak position and height to the h5 file, to datasets:
             '/Karsa/peaks/pos'
             '/Karsa/peaks/hei'
@@ -578,18 +520,18 @@ class KEvent(KSpectra):
         """
 
         ppos, phei = zip(*peaks)
-        with h5py.File(self.filename, 'r+') as h5f:
-            dset = 'Karsa/peaks'
+        with h5py.File(self.filename, "r+") as h5f:
+            dset = "Karsa/peaks"
             if dset in h5f:
                 del h5f[dset]
-            h5f[dset + '/pos'] = np.asarray(ppos)
-            h5f[dset + '/hei'] = np.asarray(phei)
+            h5f[dset + "/pos"] = np.asarray(ppos)
+            h5f[dset + "/hei"] = np.asarray(phei)
 
     def get_peaks(self):
         """Read peaks from file
-                
+
         Try to read peaks from the file, return None if failed.
-        
+
         Returns
         -------
         peaks : list or None
@@ -598,9 +540,9 @@ class KEvent(KSpectra):
         """
 
         try:
-            with h5py.File(self.filename, 'r') as h5f:
-                posds = h5f['Karsa/peaks/pos']
-                heids = h5f['Karsa/peaks/hei']
+            with h5py.File(self.filename, "r") as h5f:
+                posds = h5f["Karsa/peaks/pos"]
+                heids = h5f["Karsa/peaks/hei"]
                 ppos = posds[()]
                 phei = heids[()]
                 peaks = [(ppos[i], phei[i]) for i in range(len(ppos))]
@@ -610,84 +552,79 @@ class KEvent(KSpectra):
 
     def write_sampleid(self, sampleid):
         """Write Sample ID to file
-        
+
         Parameters
         ----------
         sampleid : str
             Sample ID to write
         """
-        
+
         self.sampleid = sampleid
         write_sampleid(self.filename, self.sampleid)
 
     def get_sampleid(self):
         """Read Sample ID from file
-        
+
         Returns
         -------
         sampleid : str
-            Returns Sample ID string. If reading from file 
+            Returns Sample ID string. If reading from file
             failed, returns None.
         """
-        
+
         return read_sampleid(self.filename)
-    
+
     def write_description(self, description):
         """Write Sample Description to file
-        
+
         Parameters
         ----------
         description : str
             Sample Description to write
         """
-        
+
         self.description = description
         write_description(self.filename, self.description)
-    
+
     def get_description(self):
         """Read Sample Description from file
-        
+
         Returns
         -------
         description : str
             Returns Sample Description string. If reading from
             file failed, returns None.
         """
-        
+
         return read_description(self.filename)
-    
+
     def get_target_list(self):
-        """ Read target list DataFrame from file
-        
+        """Read target list DataFrame from file
+
         Returns
         -------
         target_list : DataFrame
             Returns target_list DataFrame, empty if reading failed
 
         """
-        
+
         try:
-            target_list = pd.read_hdf(self.filename,
-                                      '/Karsa/target_list'
-                                      )
+            target_list = pd.read_hdf(self.filename, "/Karsa/target_list")
         except KeyError:
-            print('Target list not saved in file')
+            print("Target list not saved in file")
             target_list = pd.DataFrame()
         return target_list
-    
-    def get_heatmap(self,
-                    t_range=None,
-                    mz_range=None,
-                    img_width=None,
-                    img_height=600,
-                    cache=False):
+
+    def get_heatmap(
+        self, t_range=None, mz_range=None, img_width=None, img_height=600, cache=False
+    ):
         """Get (generate) heatmap image in given m/z and/or time range
-        
+
         Generate heatmap image to visualize the MS data. If
         self.spectra_xarray is not None, uses that and otherwise
         loads data from file. If no time or m/z ranges are given,
-        full ranges will be used. 
-        
+        full ranges will be used.
+
         TODO: Read image from file in case of full ranges.
 
         Parameters
@@ -717,11 +654,11 @@ class KEvent(KSpectra):
             t_range = (self.t[0], self.t[-1])
         if mz_range is None:
             mz_range = (self.sno2mz(0), self.sno2mz(self.desc.nbrSamples))
-            
-        #XXX Should make img size and ranges attributes in h5
+
+        # XXX Should make img size and ranges attributes in h5
         # if (img_width is None and
         #     img_height is None and
-        #     t_range is None and 
+        #     t_range is None and
         #     mz_range is None):
         #     # Try to load full image from file
         #     with h5py.File(self.filename, 'r') as h5f:
@@ -730,54 +667,51 @@ class KEvent(KSpectra):
         #             img_arr = h5f[dset][()]
         #             heatmap_img = Image.fromarray(img_arr)
         #             return heatmap_img
-            
+
         # Either heatmap not saved in the file or particular range requested
-        if hasattr(self, 'spectra_xarray'):
+        if hasattr(self, "spectra_xarray"):
             spectra_xarray = self.spectra_xarray
             t = spectra_xarray.time
         else:
             spectra = self.get_spectra()
             mz = self.mz()
-            t = self.t[:spectra.shape[1]] #XXX Fix for incomplete writes
+            t = self.t[: spectra.shape[1]]  # XXX Fix for incomplete writes
             spectra_xarray = xarray.DataArray(
-                                    spectra,
-                                    dims=('mz', 'time'),
-                                    coords=[mz, t],
-                                    name='spectra'
-                                    )
+                spectra, dims=("mz", "time"), coords=[mz, t], name="spectra"
+            )
             if cache:
                 self.spectra_xarray = spectra_xarray
-        
+
         if img_width is None:
             img_width = len(t)
 
-        hm_img = gen_heatmap_image(spectra_xarray,
-                                   t_range,
-                                   mz_range,
-                                   img_width=img_width,
-                                   img_height=img_height
-                                   )
-        
-        heatmap = {'t_range': t_range,
-                   'mz_range': mz_range,
-                   'img': hm_img
-                   }
+        hm_img = gen_heatmap_image(
+            spectra_xarray,
+            t_range,
+            mz_range,
+            img_width=img_width,
+            img_height=img_height,
+        )
+
+        heatmap = {"t_range": t_range, "mz_range": mz_range, "img": hm_img}
         return heatmap
-    
-    def get_spec_stack(self,
-                       avg_s,
-                       t_range=None,
-                       mz_range=None,
-                       img_width=600,
-                       img_height=1200,
-                       cache=False):
+
+    def get_spec_stack(
+        self,
+        avg_s,
+        t_range=None,
+        mz_range=None,
+        img_width=600,
+        img_height=1200,
+        cache=False,
+    ):
         """Get (generate) spec stack image in given m/z and/or time range
-        
+
         Generate spec stack image to visualize the MS data. If
         self.spectra_xarray is not None, uses that and otherwise
         loads data from file. If no time or m/z ranges are given,
-        full ranges will be used. 
-        
+        full ranges will be used.
+
         TODO: Read image from file in case of full ranges.
 
         Parameters
@@ -809,11 +743,11 @@ class KEvent(KSpectra):
             t_range = (self.t[0], self.t[-1])
         if mz_range is None:
             mz_range = (self.sno2mz(0), self.sno2mz(self.desc.nbrSamples))
-        
-        #XXX Should make img size and ranges attributes in h5
+
+        # XXX Should make img size and ranges attributes in h5
         # if (img_width is None and
         #     img_height is None and
-        #     t_range is None and 
+        #     t_range is None and
         #     mz_range is None):
         #     # Try to load full image from file
         #     with h5py.File(self.filename, 'r') as h5f:
@@ -822,40 +756,35 @@ class KEvent(KSpectra):
         #             img_arr = h5f[dset][()]
         #             heatmap_img = Image.fromarray(img_arr)
         #             return heatmap_img
-            
+
         # Either heatmap not saved in the file or particular range requested
-        if hasattr(self, 'spectra_xarray'):
+        if hasattr(self, "spectra_xarray"):
             spectra_xarray = self.spectra_xarray
             t = spectra_xarray.time
         else:
             spectra = self.get_spectra()
             mz = self.mz()
-            t = self.t[:spectra.shape[1]] #XXX Fix for incomplete writes
+            t = self.t[: spectra.shape[1]]  # XXX Fix for incomplete writes
             spectra_xarray = xarray.DataArray(
-                                    spectra,
-                                    dims=('mz', 'time'),
-                                    coords=[mz, t],
-                                    name='spectra'
-                                    )
+                spectra, dims=("mz", "time"), coords=[mz, t], name="spectra"
+            )
             if cache:
                 self.spectra_xarray = spectra_xarray
-            
-        ss_img = gen_spec_stack_image(spectra_xarray,
-                                      t_range,
-                                      mz_range,
-                                      avg_s,
-                                      img_width=img_width,
-                                      img_height=img_height
-                                      )
-        spec_stack = {'t_range': t_range,
-                      'mz_range': mz_range,
-                      'img': ss_img
-                   }
+
+        ss_img = gen_spec_stack_image(
+            spectra_xarray,
+            t_range,
+            mz_range,
+            avg_s,
+            img_width=img_width,
+            img_height=img_height,
+        )
+        spec_stack = {"t_range": t_range, "mz_range": mz_range, "img": ss_img}
         return spec_stack
-    
+
     def get_tps_traces(self, selected_traces=[], **kwargs):
         """Generate TPS traces for selected parameters
-        
+
         Generates plotly scatter compatible traces for selected
         TPS parameters. Loads TPS data from file to generate the
         traces.
@@ -876,17 +805,20 @@ class KEvent(KSpectra):
             the data for each trace.
 
         """
-        
+
         if len(selected_traces) == 0:
             return []
         data, info = self.get_tps_data(**kwargs)
         traces = []
         for i in selected_traces:
             trace = deepcopy(DEFAULT_TRACE)
-            trace.update({'name': info[i].decode('unicode_escape'),
-                          'x': self.t.tolist(),
-                          'y': data[i, :].tolist()
-                          })
+            trace.update(
+                {
+                    "name": info[i].decode("unicode_escape"),
+                    "x": self.t.tolist(),
+                    "y": data[i, :].tolist(),
+                }
+            )
             traces.append(trace)
         return traces
 
@@ -904,21 +836,18 @@ class KEvent(KSpectra):
             the data for each trace.
         """
 
-        ridge_df = pd.read_hdf(self.filename, '/Karsa/all_peaks')
+        ridge_df = pd.read_hdf(self.filename, "/Karsa/all_peaks")
 
         traces = []
         for _, row in ridge_df.iterrows():
             ridge = row.ridge
-            x = [ self.t[i] for i in ridge[1] ]
-            y = [ self.sno2mz(sno) for sno in ridge[0] ]
+            x = [self.t[i] for i in ridge[1]]
+            y = [self.sno2mz(sno) for sno in ridge[0]]
 
             ridge_trace = deepcopy(DEFAULT_TRACE)
-            ridge_trace.update({'x': x,
-                                'y': y,
-                                'name': row.name,
-                                'line': {'color': '#f00'}
-                                }
-                               )
+            ridge_trace.update(
+                {"x": x, "y": y, "name": row.name, "line": {"color": "#f00"}}
+            )
             traces.append(ridge_trace)
         return traces
 
@@ -940,17 +869,11 @@ class KEvent(KSpectra):
 
         s0 = self.mz2sno(mz_range[0], roundit=True)
         s1 = self.mz2sno(mz_range[1], roundit=True)
-        mz = [ self.sno2mz(s) for s in range(s0, s1) ]
-        spec = self.get_spec(t0=t_range[0],
-                             t1=t_range[1],
-                             si0=s0,
-                             si1=s1
-                             )
+        mz = [self.sno2mz(s) for s in range(s0, s1)]
+        spec = self.get_spec(t0=t_range[0], t1=t_range[1], si0=s0, si1=s1)
 
         trace = deepcopy(DEFAULT_TRACE)
-        trace.update({'name': self.sampleid,
-                        'x': mz,
-                        'y': spec.tolist(),
-                        'hoverinfo': 'x, y'
-                        })
+        trace.update(
+            {"name": self.sampleid, "x": mz, "y": spec.tolist(), "hoverinfo": "x, y"}
+        )
         return trace

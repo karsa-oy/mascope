@@ -1,4 +1,5 @@
-max_predicate = lambda a, b:  a[2] <= b[2]
+max_predicate = lambda a, b: a[2] <= b[2]
+
 
 class Heap:
     def __init__(self):
@@ -10,7 +11,7 @@ class Heap:
         self.heap[b] = t
 
     def _heapify(self, heap_size, x, predicate):
-        left = 2 *  (x + 1) - 1
+        left = 2 * (x + 1) - 1
         right = 2 * (x + 1)
 
         largest = x
@@ -25,14 +26,13 @@ class Heap:
             self._heapify(heap_size, largest, predicate)
 
     def make_heap(self, h, comp=max_predicate):
-
         for i in range(len(h)):
             spectra_peak = h[i][0]
             self.heap.append([i, 0, spectra_peak])
 
         heap_size = len(self.heap)
 
-        for i in reversed(range(0, heap_size //2)):
+        for i in reversed(range(0, heap_size // 2)):
             self._heapify(heap_size, i, comp)
 
     def top(self):
@@ -49,7 +49,7 @@ class Heap:
 
     def pop_heap(self, predicate):
         pop_value = self.heap[0]
-        self.heap_swap(0, len(self.heap)-1)
+        self.heap_swap(0, len(self.heap) - 1)
         self.heap = self.heap[:-1]
         self._heapify(len(self.heap), 0, predicate)
         return pop_value

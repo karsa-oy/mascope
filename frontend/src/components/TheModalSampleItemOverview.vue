@@ -12,11 +12,8 @@
         <header class="modal-card-head">
           <h2 class="subtitle">{{ modalTitle }}</h2>
         </header>
-        <section class="modal-card-body" style="min-height: 250px">
-        </section>
-        <footer class="modal-card-foot">
-
-        </footer>
+        <section class="modal-card-body" style="min-height: 250px"></section>
+        <footer class="modal-card-foot"></footer>
       </div>
     </b-modal>
   </section>
@@ -31,9 +28,7 @@ export default {
   components: {},
   props: {},
   data: function () {
-    return {
-
-    };
+    return {};
   },
   computed: {
     ...get({
@@ -44,9 +39,7 @@ export default {
       modalActive: "modal/sampleItemOverviewActive",
     }),
     modalTitle() {
-      return this.sampleItem
-      ? this.sampleItem.sample_item_name
-      : "";
+      return this.sampleItem ? this.sampleItem.sample_item_name : "";
     },
   },
   methods: {
@@ -54,9 +47,6 @@ export default {
       deactivateModal: "modal/deactivate",
     }),
   },
-  watch: {
-
-  },
+  watch: {},
 };
 </script>
-

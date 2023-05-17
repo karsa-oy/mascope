@@ -1,6 +1,6 @@
-import pandas as pd
-
 from datetime import datetime
+
+import pandas as pd
 
 from backend.db.conn import conn
 from backend.db.id import gen_id

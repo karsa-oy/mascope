@@ -1,10 +1,11 @@
-import os
-import inspect
 import glob
-from threading import Thread, Event
+import inspect
+import os
+from threading import Event, Thread
 from time import sleep
-from watchdog.observers import Observer
+
 from watchdog.events import PatternMatchingEventHandler
+from watchdog.observers import Observer
 
 
 class FSWatcher:
@@ -16,7 +17,9 @@ class FSWatcher:
             self.recursive = recursive
             self.observer = Observer()
             if not isinstance(mask, list):
-                mask = [mask, ]
+                mask = [
+                    mask,
+                ]
             super().__init__(patterns=mask)
 
         def log(self, *arg):
@@ -25,12 +28,12 @@ class FSWatcher:
         def start(self):
             self.observer.schedule(self, self.path, recursive=self.recursive)
             self.observer.start()
-            self.log('started watching', self.path)
+            self.log("started watching", self.path)
 
         def stop(self):
             self.observer.stop()
             self.observer.join()
-            self.log('stopped')
+            self.log("stopped")
 
         def on_created(self, event):
             filepath = event.src_path
@@ -57,17 +60,18 @@ class FSWatcher:
             self.start()
             while not self.parent.shutdown_event.is_set():
                 try:
-                    sleep(.5)
+                    sleep(0.5)
                 except KeyboardInterrupt:
-                    self.log('KeyboardInterrupt')
+                    self.log("KeyboardInterrupt")
                     self.parent.shutdown_event.set()
                 except Exception as e:
                     self.log(f"Exception {e.__class__.__name__}({str(e)})")
                     pass
             self.stop()
 
-    class FSPingHandler():
+    class FSPingHandler:
         PING_INTERVAL = 3
+
         def __init__(self, parent, path, mask, recursive=False):
             self.parent = parent
             self.path = path
@@ -77,18 +81,18 @@ class FSWatcher:
         def log(self, *arg):
             print(f"[{self.__class__.__name__}.{inspect.stack()[1].function}]", *arg)
 
-        def walk(self, path='.', mask='*.*', recursive=False):
+        def walk(self, path=".", mask="*.*", recursive=False):
             if recursive:
-                search_path = os.path.join(path, '**', mask)
+                search_path = os.path.join(path, "**", mask)
             else:
                 search_path = os.path.join(path, mask)
             return glob.glob(search_path, recursive=recursive)
 
         def start(self):
-            self.log('started watching', self.path)
+            self.log("started watching", self.path)
 
         def stop(self):
-            self.log('stopped')
+            self.log("stopped")
 
         def on_created(self, filelist):
             # Check for ready files in the filelist,
@@ -117,11 +121,13 @@ class FSWatcher:
                 try:
                     sleep(self.PING_INTERVAL)
                     latest_files = self.walk(self.path, self.mask, self.recursive)
-                    new_files.extend([[path, -1] for path in set(latest_files).difference(files)])
+                    new_files.extend(
+                        [[path, -1] for path in set(latest_files).difference(files)]
+                    )
                     files = latest_files
                     new_files = self.on_created(new_files)
                 except KeyboardInterrupt:
-                    self.log('KeyboardInterrupt')
+                    self.log("KeyboardInterrupt")
                     self.parent.shutdown_event.set()
                 except Exception as e:
                     self.log(f"Exception {e.__class__.__name__}({str(e)})")
@@ -131,7 +137,15 @@ class FSWatcher:
     def log(self, *arg):
         print(f"[{self.__class__.__name__}.{inspect.stack()[1].function}]", *arg)
 
-    def __init__(self, path, mask, file_queue, recursive=False, ping=False, shutdown_event=Event()):
+    def __init__(
+        self,
+        path,
+        mask,
+        file_queue,
+        recursive=False,
+        ping=False,
+        shutdown_event=Event(),
+    ):
         assert os.path.isdir(path), f"{path} is missing"
         self.shutdown_event = shutdown_event
         self.file_queue = file_queue

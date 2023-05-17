@@ -25,7 +25,6 @@
 </template>
 
 <script>
-
 import { sync } from "vuex-pathify";
 
 export default {
@@ -68,7 +67,7 @@ export default {
     }),
   },
   watch: {
-    param: function() {
+    param: function () {
       this.$emit("paramChange");
     },
   },

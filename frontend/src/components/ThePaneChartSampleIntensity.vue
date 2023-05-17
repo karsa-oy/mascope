@@ -32,7 +32,7 @@ export default {
       if (!(this.sampleItems && this.matchCompounds)) return [];
       let allCompoundIds = this.targetCompounds.map(
         (compound) => compound.target_compound_id
-        );
+      );
       let compoundColors = Object.fromEntries(
         allCompoundIds.map((compoundId, index) => [
           [compoundId],
@@ -44,19 +44,19 @@ export default {
       for (let item of this.sampleItems) {
         let x = [item.sample_item_id];
         let itemMatches = this.matchCompounds.filter(
-          row => row.sample_item_id === item.sample_item_id
-          );
+          (row) => row.sample_item_id === item.sample_item_id
+        );
         // Loop through target compounds
         for (let compound of this.targetCompounds) {
           let y = itemMatches
             .filter(
-              (match) => match.target_compound_id === compound.target_compound_id)
-            .map(compoundMatch => compoundMatch.sample_peak_area_sum);
+              (match) =>
+                match.target_compound_id === compound.target_compound_id
+            )
+            .map((compoundMatch) => compoundMatch.sample_peak_area_sum);
           let compoundColor = compoundColors[compound.target_compound_id];
           let markerSymbol =
-            compound.rating === "probable"
-            ? "square"
-            : "square-open";
+            compound.rating === "probable" ? "square" : "square-open";
           data.push({
             name: compound.target_compound_name.trim()
               ? compound.target_compound_name

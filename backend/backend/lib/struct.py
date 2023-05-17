@@ -1,20 +1,19 @@
 import array
 import inspect
 import os
-import sparse
 import time
-import xarray
-import zarr
+from multiprocessing import Event, Lock, cpu_count
+from queue import Empty, Full
+from threading import Thread
 
 import dask.array as da
 import numpy as np
-
-from multiprocessing import Event, Lock, cpu_count
-from queue import Empty, Full
+import sparse
+import xarray
+import zarr
 from scipy.sparse import coo_matrix
-from threading import Thread
-from watchdog.observers import Observer
 from watchdog.events import PatternMatchingEventHandler
+from watchdog.observers import Observer
 
 
 class AttrDict(dict):
@@ -24,11 +23,12 @@ class AttrDict(dict):
     d = AttrDict({'a': 0})  # initialize AttrDict with a dict
     d.a                     # returns 0
     """
+
     def __init__(self, *args, **kwargs):
-        """Initialize self
-        """
+        """Initialize self"""
         super(AttrDict, self).__init__(*args, **kwargs)
         self.__dict__ = self
+
 
 class LRUDict(dict):
     def __init__(self, capacity: int, *args, **kwargs):
@@ -59,9 +59,10 @@ class LRUDict(dict):
             self.lru_keys.remove(key)
             return super().__delitem__(key)
 
-class ExtendableDataArray():
+
+class ExtendableDataArray:
     """Class to collect data incrementally into a xarray.DataArray
-    
+
     ...
 
     Attributes
@@ -77,23 +78,24 @@ class ExtendableDataArray():
         DataArray into which the data is collected
 
     """
-    
+
     @staticmethod
     def get_zarr_synchronizer(zarr_path):
         parent_dir = os.path.dirname(zarr_path)
-        sync_name = zarr_path.split(os.path.sep)[-1].replace('.zarr', '.sync')
+        sync_name = zarr_path.split(os.path.sep)[-1].replace(".zarr", ".sync")
         sync_path = os.path.sep.join([parent_dir, sync_name])
         return zarr.ProcessSynchronizer(sync_path)
 
-    def __init__(self,
-                 path=None,
-                 array_module=da,
-                 dtype=np.float32,
-                 sparse=False,
-                 chunk_size=10,
-                 persist=False,
-                 overwrite=False,
-                 ):
+    def __init__(
+        self,
+        path=None,
+        array_module=da,
+        dtype=np.float32,
+        sparse=False,
+        chunk_size=10,
+        persist=False,
+        overwrite=False,
+    ):
         """Initialize self
 
         Parameters
@@ -120,7 +122,7 @@ class ExtendableDataArray():
         self.overwrite = overwrite
 
         self.data_array = xarray.DataArray()
-        
+
         self.delayed_write = None
         self.group = -1
 
@@ -136,16 +138,15 @@ class ExtendableDataArray():
         try:
             return getattr(self.data_array, name)
         except AttributeError:
-            raise AttributeError("'ExtendableDataArray' object has no attribute '%s'"
-                                 %name
-                                 )
-    
+            raise AttributeError(
+                "'ExtendableDataArray' object has no attribute '%s'" % name
+            )
+
     def __getitem__(self, indices):
-        """Make encapsulated DataArray object subscriptable
-        """
+        """Make encapsulated DataArray object subscriptable"""
         return self.data_array.__getitem__(indices)
 
-    def init_array(self, dims, data=None, coords=None, name=''):
+    def init_array(self, dims, data=None, coords=None, name=""):
         """Initalize the data array.
 
         Parameters
@@ -164,49 +165,35 @@ class ExtendableDataArray():
 
         if coords is None:
             # Create empty coords
-            coords = [[]]*len(dims)
-        
+            coords = [[]] * len(dims)
+
         # Initialize the DataArray
-        self.data_array = xarray.DataArray(data,
-                                           dims=dims,
-                                           coords=coords,
-                                           name=name
-                                           )
+        self.data_array = xarray.DataArray(data, dims=dims, coords=coords, name=name)
         # Initialize file
         if self.path is not None:
             self.data_array.to_dataset().to_zarr(
-                                            self.path,
-                                            mode='w' if self.overwrite else 'w-'
-                                            )
+                self.path, mode="w" if self.overwrite else "w-"
+            )
 
     def combine_first(self, data, coords):
         data = self.array_module.array(data, dtype=self.dtype)
 
-        extension = xarray.DataArray(data,
-                                     dims=self.data_array.dims,
-                                     coords=coords,
-                                     name=self.data_array.name
-                                     )
+        extension = xarray.DataArray(
+            data, dims=self.data_array.dims, coords=coords, name=self.data_array.name
+        )
 
         self.data_array = self.data_array.combine_first(extension)
 
-    def extend_array(self,
-                     data,
-                     coords,
-                     dim,
-                     callback=None,
-                     cargs=(),
-                     ckwargs={}
-                     ):
+    def extend_array(self, data, coords, dim, callback=None, cargs=(), ckwargs={}):
         """Extend data array with new data.
-        
+
         Parameters
         ----------
         data : array
             Array of data to be added into the existing array.
         coords : list
             Coordinate vectors for the data to be added.
-        dim : 
+        dim :
             Dimension along which to concatenate.
         callback : callable, optional
             Callback function to execute at the end of this method,
@@ -217,36 +204,34 @@ class ExtendableDataArray():
 
         # t0 = time.time()
 
-        # Dimension check            
+        # Dimension check
         dims = self.data_array.dims
         try:
             dim_index = dims.index(dim)
         except ValueError:
-            raise ValueError("Failed to extend array. Input argument 'dim' " +
-                             "must be one of the dimensions of the existing array")
-        
+            raise ValueError(
+                "Failed to extend array. Input argument 'dim' "
+                + "must be one of the dimensions of the existing array"
+            )
+
         if self.sparse:
             data = sparse.COO(data)
 
         data = self.array_module.array(data, dtype=self.dtype)
 
-        extension = xarray.DataArray(data,
-                                     dims=dims,
-                                     coords=coords,
-                                     name=self.data_array.name
-                                     )
+        extension = xarray.DataArray(
+            data, dims=dims, coords=coords, name=self.data_array.name
+        )
 
         if self.data_array.shape[dim_index] > 0:
             # Extend non-empty array
-            to_concat = [ self.data_array, extension ]
+            to_concat = [self.data_array, extension]
         else:
             # Extend empty array
-            to_concat = [ extension ]
+            to_concat = [extension]
 
         # Concatenate
-        self.data_array = xarray.concat(to_concat,
-                                        dim=dim
-                                        )
+        self.data_array = xarray.concat(to_concat, dim=dim)
         if self.persist:
             self.data_array = self.data_array.persist()
         # t1 = time.time()
@@ -260,20 +245,21 @@ class ExtendableDataArray():
                 self.delayed_write = extension
             else:
                 # Collect delayed chunk to be written later
-                self.delayed_write = xarray.concat([self.delayed_write, extension],
-                                                   dim=dim
-                                                   )
+                self.delayed_write = xarray.concat(
+                    [self.delayed_write, extension], dim=dim
+                )
             if self.delayed_write.shape[dim_index] == self.chunk_size:
                 # Write delayed chunk
                 self.group = (self.data_array.shape[dim_index] / self.chunk_size) - 1
-                group_name = '%04d' % self.group
-                self.delayed_write.to_dataset().to_zarr(self.path,
-                                                        group=group_name,
-                                                        mode='a',
-                                                        synchronizer=self.sync,
-                                                        consolidated=False,
-                                                        compute=True
-                                                        )
+                group_name = "%04d" % self.group
+                self.delayed_write.to_dataset().to_zarr(
+                    self.path,
+                    group=group_name,
+                    mode="a",
+                    synchronizer=self.sync,
+                    consolidated=False,
+                    compute=True,
+                )
                 self.delayed_write = None
 
         # t1 = time.time()
@@ -287,15 +273,16 @@ class ExtendableDataArray():
 
     def flush(self):
         if self.delayed_write is not None:
-            group_name = '%04d' % (self.group+1)
+            group_name = "%04d" % (self.group + 1)
             # Write (last, incomplete) delayed chunk
-            self.delayed_write.to_dataset().to_zarr(self.path,
-                                                    group=group_name,
-                                                    mode='a',
-                                                    synchronizer=self.sync,
-                                                    consolidated=False,
-                                                    compute=True
-                                                    )
+            self.delayed_write.to_dataset().to_zarr(
+                self.path,
+                group=group_name,
+                mode="a",
+                synchronizer=self.sync,
+                consolidated=False,
+                compute=True,
+            )
             self.delayed_write = None
 
     def assign_column(self, data, col):
@@ -318,16 +305,17 @@ class ExtendableDataArray():
             self.data_array[col] = data
         else:
             # TODO: Implement for dask array (using da.concatenate)
-            raise NotImplementedError("Column assignment not implemented " + 
-                                      "for array module %s" %str(self.array_module)
-                                      )
+            raise NotImplementedError(
+                "Column assignment not implemented "
+                + "for array module %s" % str(self.array_module)
+            )
 
 
-class IncrementalCOO():
+class IncrementalCOO:
     """Sparse matrix structure optimized for incremental construction.
-    
+
     Class to construct COO-type sparse matrix incrementally.
-    
+
     Attributes
     ----------
     dtype : int32, int64, float32, float64
@@ -342,10 +330,10 @@ class IncrementalCOO():
         array holding values
 
     """
-    
+
     def __init__(self, dtype):
         """Initialize self
-        
+
         Parameters
         ----------
         shape : tuple
@@ -358,21 +346,21 @@ class IncrementalCOO():
         Exception
             If given dtype is not supported.
         """
-        
+
         if dtype is np.int32:
-            type_flag = 'i'
+            type_flag = "i"
         elif dtype is np.int64:
-            type_flag = 'l'
+            type_flag = "l"
         elif dtype is np.float32:
-            type_flag = 'f'
+            type_flag = "f"
         elif dtype is np.float64:
-            type_flag = 'd'
+            type_flag = "d"
         else:
-            raise Exception('Dtype not supported.')
+            raise Exception("Dtype not supported.")
 
         self.dtype = dtype
-        self.rows = array.array('i')
-        self.cols = array.array('i')
+        self.rows = array.array("i")
+        self.cols = array.array("i")
         self.data = array.array(type_flag)
 
     def extend(self, rows, cols, data):
@@ -406,15 +394,13 @@ class IncrementalCOO():
         cols = np.frombuffer(self.cols, dtype=np.int32)
         data = np.frombuffer(self.data, dtype=self.dtype)
 
-        shape = ( max(rows)+1, max(cols)+1 )
+        shape = (max(rows) + 1, max(cols) + 1)
 
-        return coo_matrix( (data, (rows, cols)),
-                           shape=shape
-                           )
+        return coo_matrix((data, (rows, cols)), shape=shape)
 
     def tocsc(self):
         """Return matrix as CSC sparse matrix
-        
+
         Convert first to COO and then CSC.
 
         Returns
@@ -423,12 +409,13 @@ class IncrementalCOO():
             Return as scipy.sparse.csc_matrix
 
         """
-        
+
         return self.tocoo().tocsc()
+
 
 class QConnect(Thread):
     OUT_Q_LIMIT = cpu_count()
-    CACHE_LIMIT = 1000000   # TODO: number?
+    CACHE_LIMIT = 1000000  # TODO: number?
 
     def __init__(self, in_q=None, out_q=None, shutdown_event=None):
         Thread.__init__(self)
@@ -481,23 +468,25 @@ class QConnect(Thread):
                 finally:
                     self.input_ready.set()
             if self.out_q.qsize() >= self.OUT_Q_LIMIT:
-                time.sleep(.01)
+                time.sleep(0.01)
                 continue
             data = self.cache_get()
             if data:
                 self.out_q.put(data)
                 # print('out_q.put', data.get('request_id', ':'.join([data.get('name','?'), data.get('key','?')])))
             else:
-                time.sleep(.01)
+                time.sleep(0.01)
         self.cache = None
         print(f"Exit from {self.__class__.__name__} thread")
 
+
 class CacheQ(QConnect):
     """Cached queue emulator: works like a queue with ability to manipulate its content."""
+
     def __init__(self, cache_key, *arg, **kwarg):
         super().__init__(*arg, **kwarg)
         self.cache = dict()
-        self.cache_key_separator = kwarg.get('cache_key_separator', '/')
+        self.cache_key_separator = kwarg.get("cache_key_separator", "/")
         self.cache_key = cache_key.split(self.cache_key_separator)
         self.cache_index = len(self.cache_key) * [0]
         self.cache_index[0] = -1
@@ -507,7 +496,7 @@ class CacheQ(QConnect):
     def cache_put(self, data):
         keys = []
         for k in self.cache_key:
-            keys.append(data.get(k, 'default'))
+            keys.append(data.get(k, "default"))
         cache_depth = len(keys) - 1
         cache_level = self.cache
         with self.lock:
@@ -526,7 +515,9 @@ class CacheQ(QConnect):
     def _inc_cache_index(self):
         cache_level = self.cache
         for i in range(len(self.cache_index)):
-            self.cache_index[i], shift = self._inc_cache_level_index(cache_level, self.cache_index[i])
+            self.cache_index[i], shift = self._inc_cache_level_index(
+                cache_level, self.cache_index[i]
+            )
             if not shift:
                 break
             next_key = list(cache_level.keys())[self.cache_index[i]]
@@ -553,7 +544,7 @@ class CacheQ(QConnect):
             cache_level_dics.append(cache_level)
             cache_level_keys.append(key)
         data = cache_level.pop()
-        if not cache_level:             # no more data in this cache element - clean up
+        if not cache_level:  # no more data in this cache element - clean up
             for d, k in reversed(list(zip(cache_level_dics, cache_level_keys))):
                 if not d[k]:
                     del d[k]
@@ -568,7 +559,7 @@ class CacheQ(QConnect):
             if self.in_q:
                 # set ignore-marker for data, which is pending in in_q
                 self.in_q_filters.append(key)
-                self.in_q.put({'name': '__stop_fits_filter', 'key': key})
+                self.in_q.put({"name": "__stop_fits_filter", "key": key})
             # delete cache hierarchy for the key
             cache_level = self.cache
             key_to_delete = level_keys.pop(0)
@@ -585,9 +576,9 @@ class CacheQ(QConnect):
     def fits_filter(self, data):
         with self.lock:
             # filter out ignore-marker package
-            if data.get('name') == '__stop_fits_filter':
+            if data.get("name") == "__stop_fits_filter":
                 # print('__stop_fits_filter', data['key'])
-                self.in_q_filters.remove(data['key'])
+                self.in_q_filters.remove(data["key"])
                 return True
             # check if input data fits any filter element
             for filter in self.in_q_filters:
@@ -607,15 +598,16 @@ class CacheQ(QConnect):
             return len(cache_level)
         return sum([self.cache_size(v) for v in cache_level.values()])
 
+
 class SubscriptableQueue(object):
     """Subscriptable Queue object
-    
+
     Threads or Processes can subscribe to this object with
     a unique identifier, allowing synchronization between
     producer and consumer threads. It is intended to be used
     within the producer thread in place of a standard Queue, in
-    cases where multiple consumers need to have simultaneous access 
-    to the queue. Use instances of 'QueueSubscription' in place 
+    cases where multiple consumers need to have simultaneous access
+    to the queue. Use instances of 'QueueSubscription' in place
     of a standard Queue within the consumer threads to allow direct
     replacement of a Queue object.
 
@@ -628,8 +620,7 @@ class SubscriptableQueue(object):
     """
 
     def __init__(self):
-        """Initialize self
-        """
+        """Initialize self"""
 
         self.queues = {}
 
@@ -688,7 +679,7 @@ class SubscriptableQueue(object):
         any
             Return the next object in the queue (if any)
         """
-        
+
         return self.queues.get(ident).get_nowait(*args, **kwargs)
 
     def qsize(self, ident, *args, **kwargs):
@@ -723,25 +714,24 @@ class SubscriptableQueue(object):
         """
 
         if ident in self.queues.keys():
-            raise Exception('name %s already subscribed' %ident)
+            raise Exception("name %s already subscribed" % ident)
         else:
             self.queues.update({ident: Queue()})
 
     def close(self):
-        """Close all queues
-        """
+        """Close all queues"""
 
         for ident, q in self.queues.items():
             q.close()
-            
+
     def join_thread(self):
-        """Join all queue threads
-        """
+        """Join all queue threads"""
 
         for ident, q in self.queues.items():
             q.close()
-            
-class QueueSubscription():
+
+
+class QueueSubscription:
     """Object to use in place of a standard Queue within a consumer thread,
     when using SubscriptableQueue within the producer thread.
 
@@ -823,7 +813,9 @@ class FSWatcher:
         def __init__(self, client, mask):
             self.client = client
             if not isinstance(mask, list):
-                mask = [mask, ]
+                mask = [
+                    mask,
+                ]
             super().__init__(patterns=mask)
 
         def log(self, *arg):
@@ -880,17 +872,19 @@ class FSWatcher:
         self.target_attrs = target_attrs
         self.recursive = recursive
         self.observer = Observer()
-        self.handler = self.FSEventHandler(self.client, self.target_attrs['mask'])
+        self.handler = self.FSEventHandler(self.client, self.target_attrs["mask"])
 
     def start(self):
-        self.observer.schedule(self.handler, self.target_attrs['path'], recursive=self.recursive)
+        self.observer.schedule(
+            self.handler, self.target_attrs["path"], recursive=self.recursive
+        )
         self.observer.start()
-        self.log('started watching', self.target_attrs)
+        self.log("started watching", self.target_attrs)
 
     def stop(self):
         self.observer.stop()
         self.observer.join()
-        self.log('stopped')
+        self.log("stopped")
 
     def run(self):
         self.start()
@@ -898,7 +892,7 @@ class FSWatcher:
             try:
                 time.sleep(1)
             except KeyboardInterrupt:
-                self.log('KeyboardInterrupt')
+                self.log("KeyboardInterrupt")
                 self.client.shutdown_event.set()
             except Exception as e:
                 self.log(f"Exception {e.__class__.__name__}({str(e)})")

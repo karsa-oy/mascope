@@ -5,7 +5,7 @@
       <slot name="header"></slot>
       <b-dropdown v-if="menu" aria-role="list" position="is-bottom-left">
         <template #trigger>
-          <b-button :icon-left=contextMenuIcon size="is-small" />
+          <b-button :icon-left="contextMenuIcon" size="is-small" />
         </template>
         <template v-for="item of menu">
           <b-dropdown-item
@@ -52,8 +52,8 @@
               :display-match-score="col.displayMatchScore"
               :match-score="
                 props.row.matched === undefined || props.row.matched
-                ? props.row[col.field]
-                : null
+                  ? props.row[col.field]
+                  : null
               "
               :tooltip="col.tooltip ? col.tooltip(props.row) : {}"
             ></base-tag-match>
@@ -100,7 +100,7 @@ export default {
     contextMenuIcon: {
       type: String,
       required: false,
-      default: "dots-horizontal"
+      default: "dots-horizontal",
     },
     name: {
       type: String,
@@ -176,7 +176,7 @@ export default {
         this.currentLevel.detailsOpen(row);
         this.refresh();
       };
-      return handleDetailsOpen
+      return handleDetailsOpen;
     },
     rowClick: function () {
       let handleClick = (row) => {

@@ -144,7 +144,7 @@
     </div>
   </div>
 </template>
-    
+
 <script type="text/javascript">
 import * as _ from "underscore";
 
@@ -256,12 +256,17 @@ export default {
           "</b>?",
         confirmText: "Delete",
         onConfirm: () => {
-          this.$emit("deleteTemplate", this.availableTemplates.filter(
-            (template) => 
-            (template.attribute_template_id == this.loadedTemplate.attribute_template_id)
-            ).map((template) => template.attribute_template_id)
+          this.$emit(
+            "deleteTemplate",
+            this.availableTemplates
+              .filter(
+                (template) =>
+                  template.attribute_template_id ==
+                  this.loadedTemplate.attribute_template_id
+              )
+              .map((template) => template.attribute_template_id)
           );
-        }
+        },
       });
     },
     saveTemplate() {
@@ -361,7 +366,7 @@ export default {
             });
           }
         }
-        const attributesField = this.templateType + '_attributes';
+        const attributesField = this.templateType + "_attributes";
         if (data.row[attributesField]) {
           Object.keys(data.row[attributesField]).forEach((attr) =>
             newTemplate.template.push({

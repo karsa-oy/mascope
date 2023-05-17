@@ -2,68 +2,66 @@ import pandas as pd
 
 from backend.db.conn import conn
 from backend.db.id import gen_id
-
 from backend.lib.molmass import Formula
-
 from backend.server import sio
-
 
 # target collections
 
-@sio.event(namespace='/')
+
+@sio.event(namespace="/")
 async def target_collection_create(sid, target_collections):
     print(target_collections)
     target_collections = [
-        {**target_collection, 'target_collection_id': gen_id()}
+        {**target_collection, "target_collection_id": gen_id()}
         for target_collection in target_collections
-        ]
+    ]
     for target_collection in target_collections:
         # create compounds
-        collection_compound_ids = (
-            await target_compound_create(
-                None,
-                target_collection['target_compounds']
-                )
-            )
+        collection_compound_ids = await target_compound_create(
+            None, target_collection["target_compounds"]
+        )
         with conn:
             # create collection
-            conn.cursor().execute("""
+            conn.cursor().execute(
+                """
                 INSERT INTO target_collection (
                     target_collection_id,
                     target_collection_name,
                     target_collection_description
                 ) VALUES (?, ?, ?);
-                """, [
-                target_collection['target_collection_id'],
-                target_collection['target_collection_name'],
-                target_collection['target_collection_description']
-                ])
+                """,
+                [
+                    target_collection["target_collection_id"],
+                    target_collection["target_collection_name"],
+                    target_collection["target_collection_description"],
+                ],
+            )
             # add compounds to collection
             for collection_compound_id in collection_compound_ids:
-                conn.cursor().execute("""
+                conn.cursor().execute(
+                    """
                     INSERT INTO target_compound_in_target_collection (
                         target_compound_id,
                         target_collection_id
                     ) VALUES (?, ?);
-                    """, [
-                    collection_compound_id,
-                    target_collection['target_collection_id']
-                    ])
+                    """,
+                    [collection_compound_id, target_collection["target_collection_id"]],
+                )
             # add collection to sample batches
-            for sample_batch_id in target_collection.get('sample_batches', []):
-                conn.cursor().execute("""
+            for sample_batch_id in target_collection.get("sample_batches", []):
+                conn.cursor().execute(
+                    """
                     INSERT INTO target_collection_in_sample_batch (
                         target_collection_id,
                         sample_batch_id
                     ) VALUES (?, ?);
-                    """, [
-                    target_collection['target_collection_id'],
-                    sample_batch_id
-                ])
-    await sio.emit('org_reload', namespace='/')
+                    """,
+                    [target_collection["target_collection_id"], sample_batch_id],
+                )
+    await sio.emit("org_reload", namespace="/")
 
 
-@sio.event(namespace='/')
+@sio.event(namespace="/")
 async def target_collection_update(sid, target_collections):
     return
     # TODO:
@@ -99,7 +97,7 @@ async def target_collection_update(sid, target_collections):
     #             # N.B - instead of updating compounds, we
     #             # simply create new ones and update the collection
     #             # record to link to them.
-                
+
     #             # add the new compounds to the collection
     #             target_compound_df = pd.DataFrame.from_dict({
     #                 'target_compound_id': target_compound_ids
@@ -166,29 +164,31 @@ async def target_collection_update(sid, target_collections):
     # await sio.emit('org_reload', namespace='/')
 
 
-@sio.event(namespace='/')
+@sio.event(namespace="/")
 async def target_collection_delete(sid, target_collection_ids):
-    target_collection_id_refs = ','.join('?'*len(target_collection_ids))
+    target_collection_id_refs = ",".join("?" * len(target_collection_ids))
     with conn:
         # Enable foreign keys to properly cascade record deletes
         conn.execute("PRAGMA foreign_keys = 1")
         # delete the collection records
-        conn.cursor().execute(f"""
+        conn.cursor().execute(
+            f"""
             DELETE FROM target_collection
             WHERE target_collection_id IN (
                 {target_collection_id_refs}
             );
             """,
-            target_collection_ids
-            )
+            target_collection_ids,
+        )
         # Disable foreign keys to not cascade delete when updating
         conn.execute("PRAGMA foreign_keys = 0")
-    await sio.emit('org_reload', namespace='/')
+    await sio.emit("org_reload", namespace="/")
 
 
 # target compounds
 
-@sio.event(namespace='/')
+
+@sio.event(namespace="/")
 async def target_compound_create(sid, target_compounds):
     # helper functions
     def norm(name, lower=False):
@@ -208,87 +208,84 @@ async def target_compound_create(sid, target_compounds):
     def generate_target_ions_from_composition():
         # generate and create ion records
         for ionization_mechanism in ionization_mechanisms:
-            mechanism = ionization_mechanism['ionization_mechanism']
+            mechanism = ionization_mechanism["ionization_mechanism"]
             try:
                 # get and save ions
                 raw_ion = Formula(
-                    '(' +
-                    target_compound['target_compound_formula'].rstrip() +
-                    mechanism[:-1] +
-                    ')' + mechanism[-1]
-                    )
+                    "("
+                    + target_compound["target_compound_formula"].rstrip()
+                    + mechanism[:-1]
+                    + ")"
+                    + mechanism[-1]
+                )
             except ValueError as e:
-                print("Failed to parse ion formula: %s" %e)
+                print("Failed to parse ion formula: %s" % e)
             else:
                 # construct and save ion row
                 ion = {
-                    'target_ion_id': gen_id(),
-                    'target_compound_id': target_compound['target_compound_id'],
-                    'ionization_mechanism_id': ionization_mechanism['ionization_mechanism_id'],
-                    'target_ion_formula': raw_ion.formula + charge_string(raw_ion),
+                    "target_ion_id": gen_id(),
+                    "target_compound_id": target_compound["target_compound_id"],
+                    "ionization_mechanism_id": ionization_mechanism[
+                        "ionization_mechanism_id"
+                    ],
+                    "target_ion_formula": raw_ion.formula + charge_string(raw_ion),
                 }
                 nonlocal target_ions
                 target_ions.append(ion)
                 # construct and save isotope rows
-                raw_isotopes = (
-                    raw_ion.mz_spectrum()
-                    .values()
-                )
+                raw_isotopes = raw_ion.mz_spectrum().values()
                 nonlocal target_isotopes
-                target_isotopes += [{
-                    'target_isotope_id': gen_id(),
-                    'target_ion_id': ion['target_ion_id'],
-                    'mz': mz,
-                    'relative_abundance': rel_abu
-                    } for [mz, rel_abu] in raw_isotopes
+                target_isotopes += [
+                    {
+                        "target_isotope_id": gen_id(),
+                        "target_ion_id": ion["target_ion_id"],
+                        "mz": mz,
+                        "relative_abundance": rel_abu,
+                    }
+                    for [mz, rel_abu] in raw_isotopes
                 ]
 
     def generate_target_ions_from_mass(target_compound_mass):
         # generate and create ion records
         for ionization_mechanism in ionization_mechanisms:
-            mechanism = ionization_mechanism['ionization_mechanism']
+            mechanism = ionization_mechanism["ionization_mechanism"]
             # construct and save ion row
             ion = {
-                'target_ion_id': gen_id(),
-                'target_compound_id': target_compound['target_compound_id'],
-                'ionization_mechanism_id': ionization_mechanism['ionization_mechanism_id'],
-                'target_ion_formula': (
-                    f"{target_compound_mass:.4f}" + mechanism
-                ),
+                "target_ion_id": gen_id(),
+                "target_compound_id": target_compound["target_compound_id"],
+                "ionization_mechanism_id": ionization_mechanism[
+                    "ionization_mechanism_id"
+                ],
+                "target_ion_formula": (f"{target_compound_mass:.4f}" + mechanism),
             }
             nonlocal target_ions
             target_ions.append(ion)
             # construct and save isotope rows
-            raw_ion = Formula(
-                '(' +
-                mechanism[1:-1] +
-                ')' +
-                mechanism[-1]
-            )
-            is_adduct = mechanism[0] == '+'
+            raw_ion = Formula("(" + mechanism[1:-1] + ")" + mechanism[-1])
+            is_adduct = mechanism[0] == "+"
             if is_adduct:
-                raw_isotopes = (
-                    raw_ion.mz_spectrum()
-                    .values()
-                )
+                raw_isotopes = raw_ion.mz_spectrum().values()
             else:
                 raw_isotopes = [(-raw_ion.mz, 1.0)]
             nonlocal target_isotopes
-            target_isotopes += [{
-                'target_isotope_id': gen_id(),
-                'target_ion_id': ion['target_ion_id'],
-                'mz': (target_compound_mass + reagent_mz),
-                'relative_abundance': reagent_rel_abu
-                } for [reagent_mz, reagent_rel_abu] in raw_isotopes
+            target_isotopes += [
+                {
+                    "target_isotope_id": gen_id(),
+                    "target_ion_id": ion["target_ion_id"],
+                    "mz": (target_compound_mass + reagent_mz),
+                    "relative_abundance": reagent_rel_abu,
+                }
+                for [reagent_mz, reagent_rel_abu] in raw_isotopes
             ]
-        
+
     # fetch ionization mechanisms
     with conn:
-        ionization_mechanisms = pd.read_sql("""
+        ionization_mechanisms = pd.read_sql(
+            """
             SELECT * FROM ionization_mechanism;
             """,
-            conn
-        ).to_dict('records')
+            conn,
+        ).to_dict("records")
 
         # initialize list of targets to return
         target_compound_ids = []
@@ -299,36 +296,34 @@ async def target_compound_create(sid, target_compounds):
 
         for target_compound in target_compounds:
             # check if the compound record is already in the database
-            existing_compounds = pd.read_sql("""
+            existing_compounds = pd.read_sql(
+                """
                 SELECT * FROM target_compound
                 WHERE target_compound_formula COLLATE NOCASE==?;
                 """,
                 conn,
-                params=[norm(
-                    target_compound['target_compound_formula'],
-                    lower=True
-                    )]
-                ).to_dict('records')
+                params=[norm(target_compound["target_compound_formula"], lower=True)],
+            ).to_dict("records")
             if len(existing_compounds) == 0:
                 # save the new compound for creation if it doesn't exist
-                target_compound = {**target_compound, 'target_compound_id': gen_id()}
-                target_compound['target_compound_formula'] = norm(
-                    target_compound['target_compound_formula']
-                    )
+                target_compound = {**target_compound, "target_compound_id": gen_id()}
+                target_compound["target_compound_formula"] = norm(
+                    target_compound["target_compound_formula"]
+                )
                 target_compounds_to_create.append(target_compound)
-                target_compound_ids.append(target_compound['target_compound_id'])
+                target_compound_ids.append(target_compound["target_compound_id"])
             elif len(existing_compounds) == 1:
                 # use the existing compound record if it does exist
                 [target_compound] = existing_compounds
-                target_compound_ids.append(target_compound['target_compound_id'])
+                target_compound_ids.append(target_compound["target_compound_id"])
                 continue  # as ions & isotopes are already there in this case
             else:
                 # the database is inconsistent
-                raise RuntimeError('Duplicate target compound in database')
+                raise RuntimeError("Duplicate target compound in database")
 
             try:
                 # Target compound given by mass
-                target_compound_mass = float(target_compound['target_compound_formula'])
+                target_compound_mass = float(target_compound["target_compound_formula"])
                 generate_target_ions_from_mass(target_compound_mass)
             except ValueError:
                 # Target compound given by composition
@@ -337,23 +332,12 @@ async def target_compound_create(sid, target_compounds):
         # create the targets
         target_compound_df = pd.DataFrame.from_records(target_compounds_to_create)
         target_compound_df.to_sql(
-            'target_compound',
-            conn,
-            if_exists='append',
-            index=False
-            )
+            "target_compound", conn, if_exists="append", index=False
+        )
         target_ion_df = pd.DataFrame.from_records(target_ions)
-        target_ion_df.to_sql(
-            'target_ion',
-            conn,
-            if_exists='append',
-            index=False
-            )
+        target_ion_df.to_sql("target_ion", conn, if_exists="append", index=False)
         target_isotope_df = pd.DataFrame.from_records(target_isotopes)
         target_isotope_df.to_sql(
-            'target_isotope',
-            conn,
-            if_exists='append',
-            index=False
-            )
+            "target_isotope", conn, if_exists="append", index=False
+        )
     return target_compound_ids

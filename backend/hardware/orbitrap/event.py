@@ -9,11 +9,13 @@ import numpy as np
 
 from .spectra import KOSpectra
 
+
 class KOEvent(KOSpectra):
     """
     KEvent equivalent for Orbitrap data
     """
-    def __init__(self, filename, order='auto'):
+
+    def __init__(self, filename, order="auto"):
         KOSpectra.__init__(self, filename)
 
         self.sampleid = self.raw.SampleInformation.SampleName
@@ -21,26 +23,26 @@ class KOEvent(KOSpectra):
             self.sampleid = None
 
     def _t2scannum(self, t0=None, t1=None, dt=None):
-        """ Get scan index for time window (s) """
+        """Get scan index for time window (s)"""
         if t0 is None and t1 is None and dt is None:
             return None
         if t0 is not None:
-            t0 /= 60. # Convert to minutes
+            t0 /= 60.0  # Convert to minutes
             s0 = self.raw.ScanNumberFromRetentionTime(t0)
         if t1 is not None:
-            t1 /= 60. # Convert to minutes
+            t1 /= 60.0  # Convert to minutes
             s1 = self.raw.ScanNumberFromRetentionTime(t1)
         if dt is not None:
-            dt /= 60. # Convert to minutes
-            s1 = self.raw.ScanNumberFromRetentionTime(t0+dt)
+            dt /= 60.0  # Convert to minutes
+            s1 = self.raw.ScanNumberFromRetentionTime(t0 + dt)
         return (s0, s1)
-    
+
     def get_spec(self, m0=None, m1=None, **kwargs):
         # Get a single spectrum from file
         # Keyword arguments t0, t1 and dt are allowed
         ind = self._t2scannum(**kwargs)
         return self.load_spec(ind, m0, m1)
-    
+
     def get_spectra(self, m0=None, m1=None, **kwargs):
         # Get spectra from file
         # Arguments t0, t1 and dt are allowed
@@ -50,9 +52,9 @@ class KOEvent(KOSpectra):
     def get_avg_spectra(self, avg_s, m0=None, m1=None, **kwargs):
         avg_s = max(self.time_res, avg_s)
         if avg_s < self.t[-1]:
-            t0 = kwargs.pop('t0', 0.0)
-            t1 = kwargs.pop('t1', None)
-            dt = kwargs.pop('dt', None)
+            t0 = kwargs.pop("t0", 0.0)
+            t1 = kwargs.pop("t1", None)
+            dt = kwargs.pop("dt", None)
             if t1 is None:
                 if dt is not None:
                     t1 = min((t0 + dt), self.t[-1])
@@ -86,9 +88,9 @@ class KOEvent(KOSpectra):
 
     def get_avg_stickspectra(self, avg_s, m0=None, m1=None, **kwargs):
         avg_s = max(self.time_res, avg_s)
-        t0 = kwargs.pop('t0', 0.0)
-        t1 = kwargs.pop('t1', None)
-        dt = kwargs.pop('dt', None)
+        t0 = kwargs.pop("t0", 0.0)
+        t1 = kwargs.pop("t1", None)
+        dt = kwargs.pop("dt", None)
         if t1 is None:
             if dt is not None:
                 t1 = min((t0 + dt), self.t[-1])

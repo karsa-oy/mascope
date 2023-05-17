@@ -1,128 +1,118 @@
 import asyncio
 import json
 import os
-import pandas as pd
-
 from datetime import datetime
+
+import pandas as pd
 from dotenv import load_dotenv
 
 from backend.api.match import match_batch_compute
 from backend.db.conn import conn
 from backend.db.id import gen_id
-from backend.lib.peak import detect_peaks, get_peaks, filter_peaks
+from backend.lib.peak import detect_peaks, filter_peaks, get_peaks
 from backend.server import sio
 
 load_dotenv()
 
 # === sample batches === #
 
-@sio.event(namespace='/')
+
+@sio.event(namespace="/")
 async def sample_batch_create(sid, sample_batches):
     sample_batches = [
-        {**sample_batch, 'sample_batch_id': gen_id()}
-        for sample_batch in sample_batches
+        {**sample_batch, "sample_batch_id": gen_id()} for sample_batch in sample_batches
     ]
     sample_batch_df = pd.DataFrame.from_records(sample_batches)
     with conn:
-        workspace_ids = pd.unique(sample_batch_df['workspace_id']).tolist()
+        workspace_ids = pd.unique(sample_batch_df["workspace_id"]).tolist()
         if len(workspace_ids) != 1:
-            raise ValueError(
-                'sample batches created must be in exactly one workspace'
-            )
-        sample_batch_df['sample_batch_utc_created'] = [
+            raise ValueError("sample batches created must be in exactly one workspace")
+        sample_batch_df["sample_batch_utc_created"] = [
             datetime.now().isoformat()
-            ]*len(sample_batch_df)
-        sample_batch_df['sample_batch_utc_modified'] = [
+        ] * len(sample_batch_df)
+        sample_batch_df["sample_batch_utc_modified"] = [
             datetime.now().isoformat()
-            ]*len(sample_batch_df)
+        ] * len(sample_batch_df)
         sample_batch_df = sample_batch_df.assign(
-            build_params=sample_batch_df[['build_params']].applymap(
+            build_params=sample_batch_df[["build_params"]].applymap(
                 lambda x: json.dumps(x)
             ),
-            filter_params=sample_batch_df[['filter_params']].applymap(
+            filter_params=sample_batch_df[["filter_params"]].applymap(
                 lambda x: json.dumps(x)
-            )
+            ),
         )
-        sample_batch_df.drop(columns=['target_collection_id']).to_sql(
-            'sample_batch',
-            conn,
-            if_exists='append',
-            index=False
-            )
-        target_collection_in_sample_batch_df = sample_batch_df[
-            ['target_collection_id', 'sample_batch_id']
-            ].explode('target_collection_id', ignore_index=True).dropna()
+        sample_batch_df.drop(columns=["target_collection_id"]).to_sql(
+            "sample_batch", conn, if_exists="append", index=False
+        )
+        target_collection_in_sample_batch_df = (
+            sample_batch_df[["target_collection_id", "sample_batch_id"]]
+            .explode("target_collection_id", ignore_index=True)
+            .dropna()
+        )
         target_collection_in_sample_batch_df.to_sql(
-            'target_collection_in_sample_batch',
-            conn,
-            if_exists='append',
-            index=False
-            )
+            "target_collection_in_sample_batch", conn, if_exists="append", index=False
+        )
         [workspace_id] = workspace_ids
-        await sio.emit('workspace_reload', room=workspace_id, namespace='/')
+        await sio.emit("workspace_reload", room=workspace_id, namespace="/")
+
 
 async def export_peaks(sample_batch_df, sample_item_df):
     peak_data = []
     for index, row in sample_item_df.iterrows():
         try:
             sample_file = await detect_peaks(
-                row['filename'],
-                u_list=None,
-                if_exists='append'
+                row["filename"], u_list=None, if_exists="append"
             )
-            peak_data_item = get_peaks(
-                sample_file,
-                'area'
-                ).sum(dim='time')
+            peak_data_item = get_peaks(sample_file, "area").sum(dim="time")
         except Exception as e:
             print(repr(e))
             continue
-        peak_data.extend([
-            (
-                row['sample_item_name'],
-                row['sample_item_type'],
-                row['filename'],
-                peak.mz.item(),
-                peak.item()
-            )
-            for peak in peak_data_item
-        ])
+        peak_data.extend(
+            [
+                (
+                    row["sample_item_name"],
+                    row["sample_item_type"],
+                    row["filename"],
+                    peak.mz.item(),
+                    peak.item(),
+                )
+                for peak in peak_data_item
+            ]
+        )
     batch_peak_df = pd.DataFrame.from_records(
-        peak_data,
-        columns=('sample name', 'sample type', 'filename', 'mz', 'intensity')
+        peak_data, columns=("sample name", "sample type", "filename", "mz", "intensity")
     )
 
-    dt_str = datetime.now().isoformat().replace('-', '').replace(':', '').split('.')[0]
-    [sample_batch_name] = sample_batch_df['sample_batch_name'].tolist()
-    peakfile_path = os.environ.get('MASCOPE_PRIVATE_DATADIR', '.')
+    dt_str = datetime.now().isoformat().replace("-", "").replace(":", "").split(".")[0]
+    [sample_batch_name] = sample_batch_df["sample_batch_name"].tolist()
+    peakfile_path = os.environ.get("MASCOPE_PRIVATE_DATADIR", ".")
     peakfile_filename = (
-        dt_str
-        + '_peaks_'
-        + sample_batch_name.replace(' ', '_')
-        + '.parquet'
+        dt_str + "_peaks_" + sample_batch_name.replace(" ", "_") + ".parquet"
     )
     print(f"Writing peak data to file {peakfile_filename}")
     batch_peak_df.to_parquet(
-        os.path.join(peakfile_path, peakfile_filename),
-        index=False
+        os.path.join(peakfile_path, peakfile_filename), index=False
     )
     print("Write complete")
 
-@sio.event(namespace='/')
+
+@sio.event(namespace="/")
 async def sample_batch_export_peaks(sid, sample_batch_id):
     with conn:
         # batch data
-        sample_batch_df = pd.read_sql(f"""
+        sample_batch_df = pd.read_sql(
+            f"""
             SELECT
                 sample_batch_name
             FROM sample_batch
             WHERE sample_batch_id == ?
             """,
             conn,
-            params=[sample_batch_id]
+            params=[sample_batch_id],
         )
         # sample item data
-        sample_item_df = pd.read_sql(f"""
+        sample_item_df = pd.read_sql(
+            f"""
             SELECT
                 filename,
                 sample_item_name,
@@ -131,134 +121,123 @@ async def sample_batch_export_peaks(sid, sample_batch_id):
             WHERE sample_batch_id == ?
             """,
             conn,
-            params=[sample_batch_id]
+            params=[sample_batch_id],
         )
-    task = sio.start_background_task(
-        export_peaks, sample_batch_df, sample_item_df
-    )
+    task = sio.start_background_task(export_peaks, sample_batch_df, sample_item_df)
     try:
         await asyncio.gather(task)
-        await sio.emit(
-            'sample_batch_export_peaks_ready',
-            room=sid,
-            namespace='/'
-        )
+        await sio.emit("sample_batch_export_peaks_ready", room=sid, namespace="/")
     except Exception as e:
         await sio.emit(
-            'sample_batch_export_peaks_failed',
-            repr(e),
-            room=sid,
-            namespace='/'
-        )   
+            "sample_batch_export_peaks_failed", repr(e), room=sid, namespace="/"
+        )
 
-@sio.event(namespace='/')
+
+@sio.event(namespace="/")
 async def sample_batch_update(sid, sample_batches):
     for sample_batch in sample_batches:
         sample_batch_df = pd.DataFrame.from_records([sample_batch])
-        workspace_ids = pd.unique(sample_batch_df['workspace_id']).tolist()
+        workspace_ids = pd.unique(sample_batch_df["workspace_id"]).tolist()
         if len(workspace_ids) != 1:
-            raise ValueError(
-                'sample batches updated must be in exactly one workspace'
-            )
-        [sample_batch_id] = sample_batch_df['sample_batch_id'].tolist()
+            raise ValueError("sample batches updated must be in exactly one workspace")
+        [sample_batch_id] = sample_batch_df["sample_batch_id"].tolist()
         with conn:
+
             def need_for_rematch():
                 # Get difference in target collections
-                target_collection_ids_old = pd.read_sql(f"""--sql
+                target_collection_ids_old = pd.read_sql(
+                    f"""--sql
                     SELECT target_collection_id
                     FROM target_collection_in_sample_batch
                     WHERE sample_batch_id == ?
                     """,
                     conn,
-                    params=[sample_batch_id]
-                    )['target_collection_id'].tolist()
-                target_collection_ids_new = (
-                    sample_batch_df['target_collection_id'].tolist()[0]
-                )
+                    params=[sample_batch_id],
+                )["target_collection_id"].tolist()
+                target_collection_ids_new = sample_batch_df[
+                    "target_collection_id"
+                ].tolist()[0]
                 if set(target_collection_ids_new) != set(target_collection_ids_old):
                     return True
 
                 # Get difference in ionization mechanisms
-                ion_mechanism_ids_new = (
-                    sample_batch_df['build_params'].tolist()[0]['ion_mechanisms']
-                )
+                ion_mechanism_ids_new = sample_batch_df["build_params"].tolist()[0][
+                    "ion_mechanisms"
+                ]
                 ion_mechanism_ids_old = json.loads(
-                    pd.read_sql(f"""--sql
+                    pd.read_sql(
+                        f"""--sql
                         SELECT build_params
                         FROM sample_batch
                         WHERE sample_batch_id == ?
                         """,
                         conn,
-                        params=[sample_batch_id]
-                        )['build_params'].tolist()[0]
-                    )['ion_mechanisms']
+                        params=[sample_batch_id],
+                    )["build_params"].tolist()[0]
+                )["ion_mechanisms"]
                 if set(ion_mechanism_ids_new) != set(ion_mechanism_ids_old):
                     return True
 
                 # Both target collections and ionization mechanisms equal
                 return False
+
             rematch = need_for_rematch()
             # Make sure foreign keys is disabled to not cascade delete
             conn.execute("PRAGMA foreign_keys = 0")
             # Delete existing sample batch records
-            conn.cursor().execute(f"""
+            conn.cursor().execute(
+                f"""
                 DELETE FROM sample_batch
                 WHERE sample_batch_id == ?
                 """,
-                [sample_batch_id]
-                )
-            conn.cursor().execute(f"""
+                [sample_batch_id],
+            )
+            conn.cursor().execute(
+                f"""
                 DELETE FROM target_collection_in_sample_batch
                 WHERE sample_batch_id == ?
                 """,
-                [sample_batch_id]
-                )
+                [sample_batch_id],
+            )
             # Create new records with updated data
             sample_batch_df = sample_batch_df.assign(
-                build_params=sample_batch_df[['build_params']].applymap(
+                build_params=sample_batch_df[["build_params"]].applymap(
                     lambda x: json.dumps(x)
                 ),
-                filter_params=sample_batch_df[['filter_params']].applymap(
+                filter_params=sample_batch_df[["filter_params"]].applymap(
                     lambda x: json.dumps(x)
-                )
+                ),
             )
-            sample_batch_df['sample_batch_utc_modified'] = [
+            sample_batch_df["sample_batch_utc_modified"] = [
                 datetime.now().isoformat()
-                ]*len(sample_batch_df)
-            sample_batch_df.drop(columns=['target_collection_id']
-                ).to_sql(
-                    'sample_batch',
-                    conn,
-                    if_exists='append',
-                    index=False
-                    )
-            target_collection_in_sample_batch_df = sample_batch_df[
-                ['target_collection_id', 'sample_batch_id']
-                ].explode('target_collection_id', ignore_index=True).dropna()
-            target_collection_in_sample_batch_df.to_sql(
-                'target_collection_in_sample_batch',
-                conn,
-                if_exists='append',
-                index=False
-                )
-        if rematch:
-            sio.start_background_task(
-                match_batch_compute, sid, sample_batch_id
+            ] * len(sample_batch_df)
+            sample_batch_df.drop(columns=["target_collection_id"]).to_sql(
+                "sample_batch", conn, if_exists="append", index=False
             )
+            target_collection_in_sample_batch_df = (
+                sample_batch_df[["target_collection_id", "sample_batch_id"]]
+                .explode("target_collection_id", ignore_index=True)
+                .dropna()
+            )
+            target_collection_in_sample_batch_df.to_sql(
+                "target_collection_in_sample_batch",
+                conn,
+                if_exists="append",
+                index=False,
+            )
+        if rematch:
+            sio.start_background_task(match_batch_compute, sid, sample_batch_id)
         else:
             [workspace_id] = workspace_ids
-            await sio.emit(
-                'workspace_reload',
-                room=workspace_id,
-                namespace='/'
-                )
+            await sio.emit("workspace_reload", room=workspace_id, namespace="/")
 
 
-@sio.event(namespace='/')
+@sio.event(namespace="/")
 async def sample_batch_delete(sid, sample_batch_ids):
     with conn:
-        sample_batch_id_refs = ','.join('?'*len(sample_batch_ids))
-        workspace_ids = pd.read_sql(f"""--sql
+        sample_batch_id_refs = ",".join("?" * len(sample_batch_ids))
+        workspace_ids = pd.read_sql(
+            f"""--sql
             SELECT DISTINCT workspace_id
             FROM sample_batch
             WHERE sample_batch_id IN (
@@ -266,139 +245,119 @@ async def sample_batch_delete(sid, sample_batch_ids):
             )
             """,
             conn,
-            params=sample_batch_ids
-            )['workspace_id'].tolist()
+            params=sample_batch_ids,
+        )["workspace_id"].tolist()
         if len(workspace_ids) != 1:
-            raise ValueError(
-                'sample batches deleted must be in exactly one workspace'
-            )
+            raise ValueError("sample batches deleted must be in exactly one workspace")
         # Enable foreign keys to properly cascade record deletes
         conn.execute("PRAGMA foreign_keys = 1")
-        conn.cursor().execute(f"""
+        conn.cursor().execute(
+            f"""
             DELETE FROM sample_batch
             WHERE sample_batch_id IN (
                 {sample_batch_id_refs}
             )
             """,
-            sample_batch_ids
+            sample_batch_ids,
         )
         # Disable foreign keys to not cascade delete when updating
         conn.execute("PRAGMA foreign_keys = 0")
         [workspace_id] = workspace_ids
-        await sio.emit('workspace_reload', room=workspace_id, namespace='/')
+        await sio.emit("workspace_reload", room=workspace_id, namespace="/")
 
 
 # === sample items === #
 
+
 def item_create(sample_items):
     sample_items = [
-        {**sample_item, 'sample_item_id': gen_id()}
-        for sample_item in sample_items
+        {**sample_item, "sample_item_id": gen_id()} for sample_item in sample_items
     ]
     sample_item_df = pd.DataFrame.from_records(sample_items)
     with conn:
-        sample_batch_ids = pd.unique(sample_item_df['sample_batch_id']).tolist()
+        sample_batch_ids = pd.unique(sample_item_df["sample_batch_id"]).tolist()
         if len(sample_batch_ids) != 1:
-            raise ValueError(
-                'sample items created must be in exactly one sample batch'
-            )
+            raise ValueError("sample items created must be in exactly one sample batch")
         [sample_batch_id] = sample_batch_ids
         sample_item_df = sample_item_df.assign(
-            sample_item_attributes=sample_item_df[['sample_item_attributes']].applymap(
+            sample_item_attributes=sample_item_df[["sample_item_attributes"]].applymap(
                 lambda x: json.dumps(x)
-                ),
-            )
-        sample_item_df['sample_item_utc_created'] = [
-            datetime.now().isoformat()
-            ]*len(sample_item_df)
-        sample_item_df['sample_item_utc_modified'] = [
-            datetime.now().isoformat()
-            ]*len(sample_item_df)
-        sample_item_df.to_sql(
-            'sample_item',
-            conn,
-            if_exists='append',
-            index=False
-            )
+            ),
+        )
+        sample_item_df["sample_item_utc_created"] = [datetime.now().isoformat()] * len(
+            sample_item_df
+        )
+        sample_item_df["sample_item_utc_modified"] = [datetime.now().isoformat()] * len(
+            sample_item_df
+        )
+        sample_item_df.to_sql("sample_item", conn, if_exists="append", index=False)
     return sample_item_df
 
-@sio.event(namespace='/')
+
+@sio.event(namespace="/")
 async def sample_item_create(sid, sample_items):
     sample_item_df = item_create(sample_items)
-    sample_batch_id = sample_item_df['sample_batch_id'].tolist()[0]
-    sample_item_ids = sample_item_df['sample_item_id'].tolist()
+    sample_batch_id = sample_item_df["sample_batch_id"].tolist()[0]
+    sample_item_ids = sample_item_df["sample_item_id"].tolist()
     for sample_item_id in sample_item_ids:
-        await sio.emit(
-            'sample_item_created',
-            sample_item_id,
-            room=sid,
-            namespace='/'
-        )
+        await sio.emit("sample_item_created", sample_item_id, room=sid, namespace="/")
     await sio.emit(
-        'sample_batch_reload',
-        room=sample_batch_id,
-        skip_sid=sid,
-        namespace='/'
+        "sample_batch_reload", room=sample_batch_id, skip_sid=sid, namespace="/"
     )
 
-@sio.event(namespace='/')
+
+@sio.event(namespace="/")
 async def sample_item_update(sid, sample_items):
     sample_item_df = pd.DataFrame.from_records(sample_items)
-    sample_batch_ids = pd.unique(sample_item_df['sample_batch_id']).tolist()
+    sample_batch_ids = pd.unique(sample_item_df["sample_batch_id"]).tolist()
     if len(sample_batch_ids) != 1:
-        raise ValueError(
-            'sample items updated must be in exactly one workspace'
-        )
+        raise ValueError("sample items updated must be in exactly one workspace")
     else:
-        sample_item_ids = sample_item_df['sample_item_id'].tolist()
-        sample_item_id_refs = ','.join('?'*len(sample_item_ids))
+        sample_item_ids = sample_item_df["sample_item_id"].tolist()
+        sample_item_id_refs = ",".join("?" * len(sample_item_ids))
         sample_item_df = sample_item_df.assign(
-            sample_item_attributes=sample_item_df[['sample_item_attributes']].applymap(
+            sample_item_attributes=sample_item_df[["sample_item_attributes"]].applymap(
                 lambda x: json.dumps(x)
-                ),
-            )
-        sample_item_df['sample_item_utc_modified'] = [
-            datetime.now().isoformat()
-            ]*len(sample_item_df)
+            ),
+        )
+        sample_item_df["sample_item_utc_modified"] = [datetime.now().isoformat()] * len(
+            sample_item_df
+        )
         with conn:
             # Make sure foreign keys is disabled to not cascade delete
             conn.execute("PRAGMA foreign_keys = 0")
             # Delete existing sample item records
-            conn.cursor().execute(f"""
+            conn.cursor().execute(
+                f"""
                 DELETE FROM sample_item
                 WHERE sample_item_id IN ({sample_item_id_refs})
                 """,
-                sample_item_ids
-                )
-            # Create new records with updated data
-            sample_item_df[[
-                'sample_item_id',
-                'sample_batch_id',
-                'filename',
-                'filter_id',
-                'sample_item_attributes',
-                'sample_item_name',
-                'sample_item_type',
-                'sample_item_utc_created',
-                'sample_item_utc_modified',
-                ]].to_sql(
-                    'sample_item',
-                    conn,
-                    if_exists='append',
-                    index=False
-                    )
-        [sample_batch_id] = sample_batch_ids
-        await sio.emit(
-            'sample_batch_reload',
-            room=sample_batch_id,
-            namespace='/'
+                sample_item_ids,
             )
+            # Create new records with updated data
+            sample_item_df[
+                [
+                    "sample_item_id",
+                    "sample_batch_id",
+                    "filename",
+                    "filter_id",
+                    "sample_item_attributes",
+                    "sample_item_name",
+                    "sample_item_type",
+                    "sample_item_utc_created",
+                    "sample_item_utc_modified",
+                ]
+            ].to_sql("sample_item", conn, if_exists="append", index=False)
+        [sample_batch_id] = sample_batch_ids
+        await sio.emit("sample_batch_reload", room=sample_batch_id, namespace="/")
 
-@sio.event(namespace='/')
+
+@sio.event(namespace="/")
 async def sample_item_delete(sid, sample_item_ids):
-    sample_item_id_refs = ','.join('?'*len(sample_item_ids))
+    sample_item_id_refs = ",".join("?" * len(sample_item_ids))
     with conn:
-        sample_batch_ids = pd.read_sql(f"""--sql
+        sample_batch_ids = pd.read_sql(
+            f"""--sql
             SELECT DISTINCT sample_batch_id
             FROM sample_item
             WHERE sample_item_id IN (
@@ -406,10 +365,11 @@ async def sample_item_delete(sid, sample_item_ids):
             )
             """,
             conn,
-            params=sample_item_ids
-            )['sample_batch_id'].tolist()
-        sample_batch_id_refs = ','.join('?'*len(sample_batch_ids))
-        workspace_ids = pd.read_sql(f"""--sql
+            params=sample_item_ids,
+        )["sample_batch_id"].tolist()
+        sample_batch_id_refs = ",".join("?" * len(sample_batch_ids))
+        workspace_ids = pd.read_sql(
+            f"""--sql
             SELECT DISTINCT workspace_id
             FROM sample_batch
             WHERE sample_batch_id IN (
@@ -417,102 +377,87 @@ async def sample_item_delete(sid, sample_item_ids):
             )
             """,
             conn,
-            params=sample_batch_ids
-            )['workspace_id'].tolist()
+            params=sample_batch_ids,
+        )["workspace_id"].tolist()
         if len(workspace_ids) != 1:
-            raise ValueError(
-                'sample items deleted must be in exactly one workspace'
-            )
+            raise ValueError("sample items deleted must be in exactly one workspace")
         else:
             # Enable foreign keys to properly cascade record deletes
             conn.execute("PRAGMA foreign_keys = 1")
             # Delete sample item records
-            conn.cursor().execute(f"""
+            conn.cursor().execute(
+                f"""
                 DELETE FROM sample_item
                 WHERE sample_item_id IN ({sample_item_id_refs})
                 """,
-                sample_item_ids
-                )
+                sample_item_ids,
+            )
             # Disable foreign keys to not cascade delete when updating
             conn.execute("PRAGMA foreign_keys = 0")
             # Notify batch subscribers
             [sample_batch_id] = sample_batch_ids
-            await sio.emit(
-                'sample_batch_reload',
-                room=sample_batch_id,
-                namespace='/'
-                )
+            await sio.emit("sample_batch_reload", room=sample_batch_id, namespace="/")
 
 
 # === sample files === #
 
-@sio.event(namespace='/')
+
+@sio.event(namespace="/")
 async def sample_file_create(sid, sample_files):
     sample_files = [
-        {**sample_file, 'sample_file_id': gen_id()}
-        for sample_file in sample_files
-        ]
+        {**sample_file, "sample_file_id": gen_id()} for sample_file in sample_files
+    ]
     sample_file_df = pd.DataFrame.from_records(sample_files)
 
-    instruments = pd.unique(sample_file_df['instrument']).tolist()
+    instruments = pd.unique(sample_file_df["instrument"]).tolist()
     if len(instruments) != 1:
-        raise ValueError(
-            'sample files created must be from exactly one instrument'
-        )
+        raise ValueError("sample files created must be from exactly one instrument")
 
     sample_file_df = sample_file_df.assign(
-        mz_calibration=sample_file_df[['mz_calibration']].applymap(
+        mz_calibration=sample_file_df[["mz_calibration"]].applymap(
             lambda x: json.dumps(x) if x is not None else x
-            ) if 'mz_calibration' in sample_file_df else [None]*len(sample_files),
-        range=sample_file_df[['range']].applymap(
-            lambda x: json.dumps(x)
-            ) if 'range' in sample_file_df else [None]*len(sample_files),
         )
+        if "mz_calibration" in sample_file_df
+        else [None] * len(sample_files),
+        range=sample_file_df[["range"]].applymap(lambda x: json.dumps(x))
+        if "range" in sample_file_df
+        else [None] * len(sample_files),
+    )
     with conn:
-        sample_file_df.to_sql(
-            'sample_file',
-            conn,
-            if_exists='append',
-            index=False
-            )
+        sample_file_df.to_sql("sample_file", conn, if_exists="append", index=False)
 
     for _, row in sample_file_df.iterrows():
-        filename = row['filename']
-        instrument = row['instrument']
-        await sio.emit('sample_file_created', filename, room=instrument, namespace='/')
+        filename = row["filename"]
+        instrument = row["instrument"]
+        await sio.emit("sample_file_created", filename, room=instrument, namespace="/")
 
 
 def file_update(sample_files):
     sample_file_df = pd.DataFrame.from_records(sample_files)
     sample_file_df = sample_file_df.assign(
-        mz_calibration=sample_file_df[['mz_calibration']].applymap(
+        mz_calibration=sample_file_df[["mz_calibration"]].applymap(
             lambda x: json.dumps(x) if x is not None else x
-            ),
-        range=sample_file_df[['range']].applymap(
-            lambda x: json.dumps(x)
-            ),
-        )
+        ),
+        range=sample_file_df[["range"]].applymap(lambda x: json.dumps(x)),
+    )
     with conn:
-        sample_file_ids = sample_file_df['sample_file_id'].tolist()
-        sample_file_id_refs = ','.join('?'*len(sample_file_ids))
+        sample_file_ids = sample_file_df["sample_file_id"].tolist()
+        sample_file_id_refs = ",".join("?" * len(sample_file_ids))
         # Delete existing sample item records
-        conn.cursor().execute(f"""
+        conn.cursor().execute(
+            f"""
             DELETE FROM sample_file
             WHERE sample_file_id IN ({sample_file_id_refs})
             """,
-            sample_file_ids
-            )
+            sample_file_ids,
+        )
         # Create new records with updated data
-        sample_file_df.to_sql(
-            'sample_file',
-            conn,
-            if_exists='append',
-            index=False
-            )
+        sample_file_df.to_sql("sample_file", conn, if_exists="append", index=False)
 
-@sio.event(namespace='/')
+
+@sio.event(namespace="/")
 async def sample_file_update(sid, sample_files):
     file_update(sample_files)
     sample_file_df = pd.DataFrame.from_records(sample_files)
-    for instrument in pd.unique(sample_file_df['instrument']).tolist():
-        await sio.emit('sample_file_updated', room=instrument, namespace='/')
+    for instrument in pd.unique(sample_file_df["instrument"]).tolist():
+        await sio.emit("sample_file_updated", room=instrument, namespace="/")

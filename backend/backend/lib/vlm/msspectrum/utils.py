@@ -1,5 +1,6 @@
-import numpy as np
 from bisect import bisect_left
+
+import numpy as np
 
 
 def _is_mz_equal(reference_mz, spectra_list):
@@ -20,7 +21,7 @@ def _is_mz_precision_equal(reference_precision, spectra_list):
     return True
 
 
-#def _is_mz_step_constant(spectrum):
+# def _is_mz_step_constant(spectrum):
 #    previous_step = None
 #
 #    mz_values = spectrum.mz_values
@@ -85,7 +86,7 @@ def binary_search_for_right_range(mz_values, right_range):
     return low - 1
 
 
-#def binary_search_find_values(mz_values, left, right):
+# def binary_search_find_values(mz_values, left, right):
 #    return mz_values[left:right + 1]
 
 
@@ -99,7 +100,7 @@ def binary_search_mz_values(spectrum, mz, window):
     """
     right = binary_search_for_right_range(spectrum, mz + (mz * window / 1000000.0))
     left = binary_search_for_left_range(spectrum, mz - (mz * window / 1000000.0))
-    return spectrum[left:right + 1]
+    return spectrum[left : right + 1]
 
 
 def take_closest(my_list, my_number):
@@ -122,7 +123,7 @@ def take_closest(my_list, my_number):
         return before
 
 
-#def take_closest_lo(my_list, my_number, lo=0):
+# def take_closest_lo(my_list, my_number, lo=0):
 #    # http://stackoverflow.com/questions/12141150/from-list-of-integers-get-number-closest-to-a-given-value
 #    """
 #    Assumes myList is sorted. Returns closest value to myNumber.

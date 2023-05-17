@@ -269,15 +269,16 @@ export default {
       return actions.includes(this.action);
     },
     createTargetCollection(target_collections) {
-      this.$api.emit('target_collection_create', target_collections);
+      this.$api.emit("target_collection_create", target_collections);
     },
     deleteTargetCollection(target_collection_ids) {
-      this.$api.emit('target_collection_delete', target_collection_ids);
+      this.$api.emit("target_collection_delete", target_collection_ids);
     },
     initData() {
       if (this.oldCollection) {
         this.newCollectionName = this.oldCollection.target_collection_name;
-        this.newCollectionDesc = this.oldCollection.target_collection_description;
+        this.newCollectionDesc =
+          this.oldCollection.target_collection_description;
       }
     },
     loadTargetCompounds(rows) {
@@ -287,7 +288,7 @@ export default {
       this.batchesToAddTo = newRows.map((row) => row.sample_batch_id);
     },
     updateTargetCollection(target_collections) {
-      this.$api.emit('target_collection_update', target_collections);
+      this.$api.emit("target_collection_update", target_collections);
     },
   },
 };

@@ -3,7 +3,7 @@
     <base-param-field
       label="Min. match score"
       path="calibration/paramMatchScoreMin"
-      :range="{ min: 0, max: 1, step: .1 }"
+      :range="{ min: 0, max: 1, step: 0.1 }"
       type="is-primary"
     >
     </base-param-field>
@@ -17,7 +17,7 @@
     <base-param-field
       label="Min. isotope abundance"
       path="calibration/paramMinIsotopeAbundance"
-      :range="{ min: 0, max: 1, step: .1 }"
+      :range="{ min: 0, max: 1, step: 0.1 }"
       type="is-primary"
     >
     </base-param-field>
@@ -31,7 +31,6 @@
   </section>
 </template>
 
-
 <script>
 import BaseParamField from "./BaseParamField.vue";
 
@@ -43,12 +42,10 @@ export default {
     BaseParamField,
   },
   computed: {
-    ...get({
-    }),
+    ...get({}),
   },
   methods: {
-    ...call({
-    }),
+    ...call({}),
   },
 };
 </script>

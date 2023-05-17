@@ -31,7 +31,10 @@
                   :data="targetCollectionsAll"
                   :columns="[
                     { field: 'target_collection_name', label: 'Name' },
-                    { field: 'target_collection_description', label: 'Description' },
+                    {
+                      field: 'target_collection_description',
+                      label: 'Description',
+                    },
                   ]"
                   :selected.sync="calibrationCollectionSelected"
                 >
@@ -42,7 +45,10 @@
                   :data="targetCollectionsAll"
                   :columns="[
                     { field: 'target_collection_name', label: 'Name' },
-                    { field: 'target_collection_description', label: 'Description' },
+                    {
+                      field: 'target_collection_description',
+                      label: 'Description',
+                    },
                   ]"
                   checkable
                   :checked-rows.sync="targetCollectionsSelected"
@@ -54,7 +60,10 @@
                   :data="ionMechanismsAll"
                   :columns="[
                     { field: 'ionization_mechanism', label: 'Mechanism' },
-                    { field: 'ionization_mechanism_polarity', label: 'Polarity' },
+                    {
+                      field: 'ionization_mechanism_polarity',
+                      label: 'Polarity',
+                    },
                   ]"
                   checkable
                   :checked-rows.sync="ionMechanismsSelected"
@@ -80,10 +89,10 @@
               icon-left="content-save"
               expanded
               :disabled="
-                !batchName
-                || !targetCollectionsSelected
-                || !calibrationCollectionSelected
-                || !ionMechanismsSelected
+                !batchName ||
+                !targetCollectionsSelected ||
+                !calibrationCollectionSelected ||
+                !ionMechanismsSelected
               "
               @click="
                 () => {
@@ -155,8 +164,7 @@ export default {
       targetCollectionsSelected: [],
     };
   },
-  created() {
-  },
+  created() {},
   computed: {
     ...sync({
       modalActive: "modal/sampleBatchOpActive",
@@ -183,9 +191,10 @@ export default {
           sample_batch_description: this.batchDesc,
           workspace_id: this.workspaceActive.workspace_id,
           build_params: {
-            calibration_collection: this.calibrationCollectionSelected.target_collection_id,
+            calibration_collection:
+              this.calibrationCollectionSelected.target_collection_id,
             ion_mechanisms: this.ionMechanismIds,
-            },
+          },
           filter_params: this.batchFilterParams,
           target_collection_id: this.targetCollectionIds,
         };
@@ -196,13 +205,14 @@ export default {
           sample_batch_description: this.batchDesc,
           workspace_id: this.workspaceActive.workspace_id,
           build_params: {
-            calibration_collection: this.calibrationCollectionSelected.target_collection_id,
+            calibration_collection:
+              this.calibrationCollectionSelected.target_collection_id,
             ion_mechanisms: this.ionMechanismIds,
           },
           filter_params: this.batchFilterParams,
           target_collection_id: this.targetCollectionIds,
           sample_batch_utc_created: this.batchActive.sample_batch_utc_created,
-          };
+        };
       } else {
         return null;
       }
@@ -224,8 +234,8 @@ export default {
     },
     ionMechanismIds() {
       return this.ionMechanismsSelected.map(
-            (row) => row.ionization_mechanism_id
-          )
+        (row) => row.ionization_mechanism_id
+      );
     },
     targetCollectionIds() {
       return this.targetCollectionsSelected.map(
@@ -244,35 +254,35 @@ export default {
       return actions.includes(this.action);
     },
     createBatch(newBatch) {
-      this.$api.emit('sample_batch_create', newBatch);
+      this.$api.emit("sample_batch_create", newBatch);
     },
     deleteBatch(batches) {
       this.batchUnload();
-      this.$api.emit('sample_batch_delete', batches);
+      this.$api.emit("sample_batch_delete", batches);
     },
     initCalibrationCollectionSelected() {
       if (this.batchCalibrationCollectionId) {
-        [this.calibrationCollectionSelected] = this.targetCollectionsAll
-          .filter((collection) =>
+        [this.calibrationCollectionSelected] = this.targetCollectionsAll.filter(
+          (collection) =>
             collection.target_collection_id == this.batchCalibrationCollectionId
-          );
+        );
       } else {
         this.calibrationCollectionSelected = null;
       }
     },
     initData() {
-      if (this.action == 'create') {
+      if (this.action == "create") {
         this.batchName = null;
         this.batchDesc = null;
         // set defaults
         [this.calibrationCollectionSelected] = this.targetCollectionsAll.filter(
-          (collection) => collection.target_collection_id === 'xkSPp3eZrWXYSVDa'
+          (collection) => collection.target_collection_id === "xkSPp3eZrWXYSVDa"
         );
         this.ionMechanismsSelected = this.ionMechanismsAll.filter(
-          (mech) => mech.ionization_mechanism === '+Br-'
+          (mech) => mech.ionization_mechanism === "+Br-"
         );
         this.targetCollectionsSelected = this.targetCollectionsAll.filter(
-          (collection) => collection.target_collection_id === 'kNBOCx32dpehRWUw'
+          (collection) => collection.target_collection_id === "kNBOCx32dpehRWUw"
         );
       } else {
         this.batchName = this.batchActive.sample_batch_name;
@@ -284,22 +294,20 @@ export default {
     },
     initIonMechanismsSelected() {
       const ids = this.batchIonMechanismIds;
-      this.ionMechanismsSelected = this.ionMechanismsAll.filter(
-        (row) => ids.includes(row.ionization_mechanism_id)
+      this.ionMechanismsSelected = this.ionMechanismsAll.filter((row) =>
+        ids.includes(row.ionization_mechanism_id)
       );
     },
     initTargetCollectionsSelected() {
       const ids = this.batchActive
-        ? this.batchTargetCollections.map(
-            (row) => row.target_collection_id
-            )
+        ? this.batchTargetCollections.map((row) => row.target_collection_id)
         : [];
-      this.targetCollectionsSelected = this.targetCollectionsAll.filter(
-        (row) => ids.includes(row.target_collection_id)
+      this.targetCollectionsSelected = this.targetCollectionsAll.filter((row) =>
+        ids.includes(row.target_collection_id)
       );
     },
     updateBatch(batches) {
-      this.$api.emit('sample_batch_update', batches);
+      this.$api.emit("sample_batch_update", batches);
     },
   },
 };

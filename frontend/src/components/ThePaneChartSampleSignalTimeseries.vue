@@ -21,9 +21,7 @@ export default {
       traces: "visualization/tracesSignalTimeseries",
     }),
     data: function () {
-      return this.traces
-        ? this.traces
-        : [];
+      return this.traces ? this.traces : [];
     },
     layout: function () {
       return {

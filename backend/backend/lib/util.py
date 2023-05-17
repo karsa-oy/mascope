@@ -1,12 +1,13 @@
 import argparse
-import os
-import re
-import random
-import string
-import yaml
-import datetime_glob
 import fnmatch
+import os
+import random
+import re
+import string
 from datetime import datetime, timedelta
+
+import datetime_glob
+import yaml
 
 from .struct import AttrDict
 
@@ -72,8 +73,8 @@ def generate_unique_key():
     str
         Random string with 15 characters
     """
-    CHARACTERS = (string.ascii_letters + string.digits + '-._~')
-    return ''.join(random.sample(CHARACTERS, 15))
+    CHARACTERS = string.ascii_letters + string.digits + "-._~"
+    return "".join(random.sample(CHARACTERS, 15))
 
 
 def get_client_notification_context(data):
@@ -81,16 +82,15 @@ def get_client_notification_context(data):
     Get shallow copy of client_notificaiton arguments
     ignoring 'name' and 'value' fields.
     """
-    return copy_dict(data, ignore_keys=['name', 'value'])
+    return copy_dict(data, ignore_keys=["name", "value"])
 
 
 def timestamp_from_filename(filename):
-
     FILENAME_DATETIME_PATTERNS = [
-        '*%Y.%m.%d*%Hh%Mm%Ss*',
-        '*%Y%m%d_%H%M_*',
-        '*%Y%m%d_*',
-        ]
+        "*%Y.%m.%d*%Hh%Mm%Ss*",
+        "*%Y%m%d_%H%M_*",
+        "*%Y%m%d_*",
+    ]
 
     for pattern in FILENAME_DATETIME_PATTERNS:
         matcher = datetime_glob.Matcher(pattern=pattern)
@@ -114,15 +114,11 @@ def parse_path_from_item_filename(item_filename, base_path=""):
     """
 
     def parse_subdir_from_datetime(datetime):
-        date_dir = '%.4d.%.2d.%.2d' % (
-            datetime.year,
-            datetime.month,
-            datetime.day
-        )
+        date_dir = "%.4d.%.2d.%.2d" % (datetime.year, datetime.month, datetime.day)
         return date_dir
 
     # Instrument name
-    instrument = item_filename.split('_')[0]
+    instrument = item_filename.split("_")[0]
     # Parse datetime and convert to date subdirectory name (yyyy.mm.dd)
     item_datetime = timestamp_from_filename(item_filename)
     date_dir = parse_subdir_from_datetime(item_datetime)
@@ -132,7 +128,7 @@ def parse_path_from_item_filename(item_filename, base_path=""):
 
 
 def recursive_walk(dir_path, *file_masks):
-    print('walking', dir_path)
+    print("walking", dir_path)
     res = []
     cur_dir, dirs, files = next(os.walk(dir_path))
     for file_mask in file_masks:
@@ -153,60 +149,50 @@ def parse_cmd_args():
     Default argument values: see default_args.
     """
     parser = argparse.ArgumentParser()
+    parser.add_argument("-u", "--url", help="backend url", type=str, required=False)
+    parser.add_argument("-p", "--port", help="backend port", type=int, required=False)
     parser.add_argument(
-        "-u", "--url",
-        help="backend url",
-        type=str, required=False
+        "-n", "--ns", help="instrument namespace to connect", type=str, required=False
     )
     parser.add_argument(
-        "-p", "--port",
-        help="backend port",
-        type=int, required=False
+        "-c", "--config", help="path to yaml config file", type=str, required=False
     )
     parser.add_argument(
-        "-n", "--ns",
-        help="instrument namespace to connect",
-        type=str, required=False
+        "-i", "--instrument", help="instrument name", type=str, required=False
     )
     parser.add_argument(
-        "-c", "--config",
-        help="path to yaml config file",
-        type=str, required=False
+        "-m", "--data_pool_mask", help="file mask to watch", type=str, required=False
     )
     parser.add_argument(
-        "-i", "--instrument",
-        help="instrument name",
-        type=str, required=False
+        "-nj", "--n_jobs", help="number of job processors", type=int, required=False
     )
     parser.add_argument(
-        "-m", "--data_pool_mask",
-        help="file mask to watch",
-        type=str, required=False
-    )
-    parser.add_argument(
-        "-nj", "--n_jobs",
-        help="number of job processors",
-        type=int, required=False
-    )
-    parser.add_argument(
-        "-s", "--data_pool_path",
+        "-s",
+        "--data_pool_path",
         help="source data pool path for streaming (before date dirs)",
-        type=str, required=False
+        type=str,
+        required=False,
     )
     parser.add_argument(
-        "-st", "--streamer_type",
+        "-st",
+        "--streamer_type",
         help="streamer type (H5/Raw)",
-        type=str, required=False
+        type=str,
+        required=False,
     )
     parser.add_argument(
-        "-t", "--target_data_pool_path",
+        "-t",
+        "--target_data_pool_path",
         help="target data pool path for streaming (before date dirs)",
-        type=str, required=False
+        type=str,
+        required=False,
     )
     parser.add_argument(
-        "-tr", "--transit",
+        "-tr",
+        "--transit",
         help="transit mode for streaming",
-        action='store_true', required=False
+        action="store_true",
+        required=False,
     )
 
     all_args = parser.parse_args()
@@ -218,22 +204,17 @@ def parse_cmd_args():
     file_args = {}
     if all_args.config:
         # service config may be defined in yaml file
-        with open(all_args.config, 'r') as f:
+        with open(all_args.config, "r") as f:
             file_args = yaml.safe_load(f)
-    return AttrDict(
-        **{
-            **file_args,
-            **cmdline_args
-        }
-    )
+    return AttrDict(**{**file_args, **cmdline_args})
 
 
 def to_snake_case(value):
     if isinstance(value, str):
         string = value
         if len(string) > 0:
-            string = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', string)
-            string = re.sub('([a-z0-9])([A-Z])', r'\1_\2', string).lower()
+            string = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", string)
+            string = re.sub("([a-z0-9])([A-Z])", r"\1_\2", string).lower()
         return string
     else:
         return value
@@ -242,10 +223,8 @@ def to_snake_case(value):
 def to_camel_case(value):
     if isinstance(value, str):
         string = value
-        words = string.split('_')
-        return words[0] + ''.join(
-            word.title() for word in words[1:]
-        )
+        words = string.split("_")
+        return words[0] + "".join(word.title() for word in words[1:])
     else:
         return value
 

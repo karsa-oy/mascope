@@ -8,11 +8,12 @@ Created on Tue Apr 09 13:08:29 2019
 """
 
 import os
-import numpy as np
-from multiprocessing import Event, Queue, Lock
+from ctypes import create_string_buffer
+from multiprocessing import Event, Lock, Queue
 from queue import Empty
 from time import sleep
-from ctypes import create_string_buffer
+
+import numpy as np
 
 from .generator import BaseGenerator
 from .instrument import KInstrument
@@ -24,16 +25,11 @@ from .lib.TwH5 import (
     TwGetSpecXaxisFromH5,
     TwGetTofSpectrumFromH5,
     TwH5Desc,
-    )
+)
 
 
 class H5Streamer(BaseGenerator, KInstrument):
-    def __init__(
-        self,
-        file_queue=Queue(),
-        shutdown_event=Event(),
-        lock=Lock()
-        ):
+    def __init__(self, file_queue=Queue(), shutdown_event=Event(), lock=Lock()):
         """Initialize self
 
         Inherits 'karsatof.kinstrument.KInstrument' which provides some
@@ -53,9 +49,9 @@ class H5Streamer(BaseGenerator, KInstrument):
 
         # Synchronization primitives
         # Streamer specific
-        self.file_queue = file_queue            # Queue for files to stream
-        self.cancel_event = Event()             # Set to cancel current stream
-        self.shutdown_event = shutdown_event    # Set to break out from main loop
+        self.file_queue = file_queue  # Queue for files to stream
+        self.cancel_event = Event()  # Set to cancel current stream
+        self.shutdown_event = shutdown_event  # Set to break out from main loop
         self.lock = lock
 
     @property
@@ -63,68 +59,56 @@ class H5Streamer(BaseGenerator, KInstrument):
         # Get mz axis from file
         mz = np.zeros((self.desc.nbrSamples,), dtype=np.double)
         with self.lock:
-            TwGetSpecXaxisFromH5(
-                self.desc.currentDataFileName,
-                mz,
-                1,
-                None,
-                0,
-                0
-                )
+            TwGetSpecXaxisFromH5(self.desc.currentDataFileName, mz, 1, None, 0, 0)
         return mz.astype(np.float32)
 
     @property
     def mz_calibration(self):
         return {
-            'mode': self.desc.massCalibMode,
-            'par': self.desc.p[:self.desc.nbrCalibParams]
+            "mode": self.desc.massCalibMode,
+            "par": self.desc.p[: self.desc.nbrCalibParams],
         }
 
     @property
     def tps_info(self):
-        """List of TPS  names
-        """
+        """List of TPS  names"""
         return self._get_tps_info()
 
     def _get_and_feed_data(self):
-        """Read data from the h5 and put to queues
-        """
+        """Read data from the h5 and put to queues"""
         # Get timestamp from TW h5
         ti = np.zeros((1,))
         with self.lock:
             TwGetBufTimeFromH5(
-                self.desc.currentDataFileName,
-                ti,
-                self.desc.iBuf,
-                self.desc.iWrite
+                self.desc.currentDataFileName, ti, self.desc.iBuf, self.desc.iWrite
             )
         # == Get and feed mass spectrum data ==
         # Get most recent spectrum from TW shared memory
-        spec = np.zeros((self.desc.nbrSamples, ), dtype=np.float32)
+        spec = np.zeros((self.desc.nbrSamples,), dtype=np.float32)
         with self.lock:
             ret = TwGetTofSpectrumFromH5(
                 self.desc.currentDataFileName,
                 spec,
-                0,                  # Segment start index
-                0,                  # Segment end index
-                self.desc.iBuf,     # Buf start index
-                self.desc.iBuf,     # Buf end index
-                self.desc.iWrite,   # Write start index
-                self.desc.iWrite,   # Write end index
-                True,               # BufWrite linked
-                True                # Normalize to
-            )                   # [mV/ext]
-        if ret == 4: # Success
+                0,  # Segment start index
+                0,  # Segment end index
+                self.desc.iBuf,  # Buf start index
+                self.desc.iBuf,  # Buf end index
+                self.desc.iWrite,  # Write start index
+                self.desc.iWrite,  # Write end index
+                True,  # BufWrite linked
+                True,  # Normalize to
+            )  # [mV/ext]
+        if ret == 4:  # Success
             # Convert spec from [mV/ext] -> [ions/sec]
             spec *= self.conversion_coefficient
             # Combine data for output
             spec_data = {
-                    'filename': self.filename,  # Current file basename
-                    'i': self.speci,            # Current spectrum integer index
-                    't': float(ti),             # Timestamp [s]
-                    'period': self.interval,    # Collection period [s]
-                    'spec': spec.tobytes()      # Serialized spectrum [float32]
-                    }
+                "filename": self.filename,  # Current file basename
+                "i": self.speci,  # Current spectrum integer index
+                "t": float(ti),  # Timestamp [s]
+                "period": self.interval,  # Collection period [s]
+                "spec": spec.tobytes(),  # Serialized spectrum [float32]
+            }
             # Feed
             self.spec_queue.put(spec_data)
 
@@ -182,35 +166,27 @@ class H5Streamer(BaseGenerator, KInstrument):
         nel = np.zeros((1,), dtype=np.int32)
         with self.lock:
             TwGetRegUserDataFromH5(
-                self.desc.currentDataFileName,
-                b'TPS2',
-                0,
-                0,
-                nel,
-                None,
-                None
+                self.desc.currentDataFileName, b"TPS2", 0, 0, nel, None, None
             )
         # Parameter description buffer
-        infobuf = create_string_buffer(b'', 256 * nel.item())
+        infobuf = create_string_buffer(b"", 256 * nel.item())
         # Get TPS data from TW h5
-        data = np.zeros((nel.item(),),
-                        dtype=np.double
-                        )
+        data = np.zeros((nel.item(),), dtype=np.double)
         with self.lock:
             TwGetRegUserDataFromH5(
                 self.desc.currentDataFileName,
-                b'TPS2',
+                b"TPS2",
                 0,
                 0,
                 nel,
-                data,   # data not used, but needs to be there
-                infobuf
+                data,  # data not used, but needs to be there
+                infobuf,
             )
         # Parameter descriptions retrieved succesfully
         # Convert char array to bytes array
-        info = np.asarray(infobuf).view('S256').ravel()
-        info = info.tolist() # Array to list
-        info = [ i.decode('unicode_escape') for i in info ] # bytes to str
+        info = np.asarray(infobuf).view("S256").ravel()
+        info = info.tolist()  # Array to list
+        info = [i.decode("unicode_escape") for i in info]  # bytes to str
         return info
 
     def _wait_for_queues(self):
@@ -222,19 +198,19 @@ class H5Streamer(BaseGenerator, KInstrument):
             True if ticked, False if cancel or shutdown
         """
         while not (self.shutdown_event.is_set() or self.cancel_event.is_set()):
-            if not (self.spec_queue.qsize()):# or self.tps_queue.qsize()):
+            if not (self.spec_queue.qsize()):  # or self.tps_queue.qsize()):
                 # Queues empty
                 return True
             else:
                 # Wait for data to be consumed from queues
-                sleep(.01)
+                sleep(0.01)
         # Shutdown or cancel
         return False
 
     def run(self):
         """Main loop
 
-        Poll TW API for new data at interval set by 'self.timeout'. 
+        Poll TW API for new data at interval set by 'self.timeout'.
         Loop until 'self.shutdown_event' is set.
         """
 
@@ -242,31 +218,35 @@ class H5Streamer(BaseGenerator, KInstrument):
         # Main loop
         while not self.shutdown_event.is_set():
             try:
-                file_to_stream = self.file_queue.get(timeout=.1)
+                file_to_stream = self.file_queue.get(timeout=0.1)
                 # Update TW h5 descriptor
                 with self.lock:
-                    ret = TwGetH5Descriptor(
-                        file_to_stream.encode(),
-                        self.desc
-                    )
+                    ret = TwGetH5Descriptor(file_to_stream.encode(), self.desc)
                     if ret != 4:
-                        print("Error reading file: %s" %ret)
+                        print("Error reading file: %s" % ret)
                         TwCloseH5(file_to_stream.encode())
                         continue
                     if not (self.desc.nbrBufs and self.desc.nbrWrites):
                         # Empty file, skip
-                        print("Skipping empty file: %s" %file_to_stream)
+                        print("Skipping empty file: %s" % file_to_stream)
                         TwCloseH5(file_to_stream.encode())
                         continue
                 # Test read to check for corrupt file
                 with self.lock:
                     ret = TwGetTofSpectrumFromH5(
                         file_to_stream.encode(),
-                        np.zeros((self.desc.nbrSamples, ), dtype=np.float32),
-                        0, 0, 0, 0, 0, 0, True, True
+                        np.zeros((self.desc.nbrSamples,), dtype=np.float32),
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        True,
+                        True,
                     )
                     if ret != 4:
-                        print("Error reading file: %s" %ret)
+                        print("Error reading file: %s" % ret)
                         TwCloseH5(file_to_stream.encode())
                         continue
                 # Add fields to comply with TW shared memory descriptor
@@ -309,16 +289,15 @@ class H5Streamer(BaseGenerator, KInstrument):
             self.cancel_event.clear()
             print("h5Stream finished")
         # Out of main loop
-        print('H5Streamer exiting')
+        print("H5Streamer exiting")
         self.shutdown()
 
     def start_stream(self, filename):
         if os.path.isfile(filename):
             self.file_queue.put(filename)
         else:
-            raise ValueError("File does not exist: %s" %filename)
+            raise ValueError("File does not exist: %s" % filename)
 
     def stop_stream(self):
-        """Stop stream before complete
-        """
+        """Stop stream before complete"""
         self.cancel_event.set()

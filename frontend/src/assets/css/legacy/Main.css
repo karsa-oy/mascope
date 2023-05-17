@@ -49,12 +49,14 @@ body::-webkit-scrollbar {
 
 /* COMPONENTS */
 
-.button:focus{
-    outline: none;
-} 
+.button:focus {
+  outline: none;
+}
 
-a.dropdown-item.is-active, .dropdown .dropdown-menu .has-link a.is-active, button.dropdown-item.is-active {
-    background-color: #fff;
+a.dropdown-item.is-active,
+.dropdown .dropdown-menu .has-link a.is-active,
+button.dropdown-item.is-active {
+  background-color: #fff;
 }
 
 /* material design icons */
@@ -63,9 +65,9 @@ a.dropdown-item.is-active, .dropdown .dropdown-menu .has-link a.is-active, butto
   color: #fff;
 }
 
-.mdi-flattr{
-    -webkit-animation: mdi-spin 2s infinite linear;
-    animation: mdi-spin 2s infinite linear;
+.mdi-flattr {
+  -webkit-animation: mdi-spin 2s infinite linear;
+  animation: mdi-spin 2s infinite linear;
 }
 
 /* menu */
@@ -75,14 +77,14 @@ a.dropdown-item.is-active, .dropdown .dropdown-menu .has-link a.is-active, butto
   font-weight: bold !important;
 }
 
-/* tables */ 
+/* tables */
 
 .table-wrapper:not(:last-child) {
-    margin-bottom: 0.5rem;
+  margin-bottom: 0.5rem;
 }
 
 .b-table .level:not(.top) {
-    padding-bottom: 0rem;
+  padding-bottom: 0rem;
 }
 
 .table .thead {
@@ -90,7 +92,6 @@ a.dropdown-item.is-active, .dropdown .dropdown-menu .has-link a.is-active, butto
   color: #fff;
   font-size: 15px;
 }
-
 
 .table tr.is-selected {
   background-color: #7c5bd6;
@@ -106,12 +107,11 @@ th > input {
   color: #dfdfdf;
 }
 
-
 /* radio */
 
 .b-radio.radio {
-    align-items: end;
-    margin-top: 0.5px;
+  align-items: end;
+  margin-top: 0.5px;
 }
 
 /* checkbox */
@@ -131,25 +131,25 @@ th > input {
 
 /* card */
 
-.card{
-    background-color: #29282e; 
-    border: 1px solid #a7a7a7;; 
-    border-radius: 5px;
-    margin-bottom: 5px; 
-    color: #fff; 
+.card {
+  background-color: #29282e;
+  border: 1px solid #a7a7a7;
+  border-radius: 5px;
+  margin-bottom: 5px;
+  color: #fff;
 }
-.card-header-title{
-    color: #fff; 
+.card-header-title {
+  color: #fff;
 }
-.card-header{
-    border-bottom: 1px solid #fff; 
-    background-color: #151418;
+.card-header {
+  border-bottom: 1px solid #fff;
+  background-color: #151418;
 }
-.card-content{
-    padding: 0px;
+.card-content {
+  padding: 0px;
 }
-.card-header-title{
-    font-size: medium; 
+.card-header-title {
+  font-size: medium;
 }
 
 /* modals */
@@ -166,40 +166,52 @@ th > input {
 /* content */
 
 .content ul {
-    list-style: none;
-    margin-left: 0;
-    margin-top: 0;
+  list-style: none;
+  margin-left: 0;
+  margin-top: 0;
 }
 
-.content h1{
-    color: #fff;
-    font-weight: normal;
-    font-size: medium; 
+.content h1 {
+  color: #fff;
+  font-weight: normal;
+  font-size: medium;
 }
 
-.content p:not(:last-child), .content dl:not(:last-child), .content ol:not(:last-child), .content ul:not(:last-child), .content blockquote:not(:last-child), .content pre:not(:last-child), .content table:not(:last-child) {
-    margin-bottom: 0em;
+.content p:not(:last-child),
+.content dl:not(:last-child),
+.content ol:not(:last-child),
+.content ul:not(:last-child),
+.content blockquote:not(:last-child),
+.content pre:not(:last-child),
+.content table:not(:last-child) {
+  margin-bottom: 0em;
 }
 
-.content table thead td, .content table thead th {
-    border-width: 0 0 2px;
-    color: #fff;
+.content table thead td,
+.content table thead th {
+  border-width: 0 0 2px;
+  color: #fff;
 }
 
 /* acquisition */
 
-.acquisition-parameters-h1{
-    padding-left: 2%;
-    padding-top: 10px;
+.acquisition-parameters-h1 {
+  padding-left: 2%;
+  padding-top: 10px;
 }
 
 /* disable user select */
 
-.label, .gl-container, span, label {
+.label,
+.gl-container,
+span,
+label {
   user-select: none;
 }
 
-.modebar, .modebar--hover, .ease-bg {
+.modebar,
+.modebar--hover,
+.ease-bg {
   user-select: none;
 }
 
@@ -249,12 +261,12 @@ th > input {
 
 /* ------------------------ */
 
-.spec-stack-holder{
-    margin-top:0px;
-    margin-right:0rem; 
-    border:1px solid #a7a7a7;; 
-    border-radius: 5px; 
-    min-height:400px;
+.spec-stack-holder {
+  margin-top: 0px;
+  margin-right: 0rem;
+  border: 1px solid #a7a7a7;
+  border-radius: 5px;
+  min-height: 400px;
 }
 
 ul {

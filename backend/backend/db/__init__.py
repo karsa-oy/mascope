@@ -1,9 +1,11 @@
-from backend.db.id import *  # noqa
-from dotenv import load_dotenv
 import os
 import re
 import traceback
 from importlib import import_module
+
+from dotenv import load_dotenv
+
+from backend.db.id import *  # noqa
 
 
 def run():

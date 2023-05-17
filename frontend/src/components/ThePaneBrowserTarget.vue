@@ -52,25 +52,24 @@ export default {
     contextMenuIcon() {
       return this.targetCollectionsSelected.length == 1
         ? "dots-horizontal"
-        : "plus"
+        : "plus";
     },
-    targetCollectionRows: function() {
+    targetCollectionRows: function () {
       return this.sampleItemFocused && this.matchCollections
-      ? this.matchCollections
-      : this.targetCollections;
+        ? this.matchCollections
+        : this.targetCollections;
     },
-    targetCompoundRows: function() {
+    targetCompoundRows: function () {
       return this.sampleItemFocused && this.matchCompounds
-      ? this.matchCompounds
-      : this.targetCompounds;
-
+        ? this.matchCompounds
+        : this.targetCompounds;
     },
-    targetIonRows: function() {
+    targetIonRows: function () {
       return this.sampleItemFocused && this.matchIons
-      ? this.matchIons
-      : this.targetIons;
+        ? this.matchIons
+        : this.targetIons;
     },
-    targetIsotopeRows: function() {
+    targetIsotopeRows: function () {
       return this.sampleItemFocused && this.matchIsotopes
         ? this.matchIsotopes
         : this.targetIsotopes;
@@ -82,8 +81,16 @@ export default {
           name: "Collection",
           slug: "target_collection",
           cols: [
-            { field: "target_collection_name", label: "Collection", width: "30%" },
-            { field: "target_collection_description", label: "Description", width: "60%" },
+            {
+              field: "target_collection_name",
+              label: "Collection",
+              width: "30%",
+            },
+            {
+              field: "target_collection_description",
+              label: "Description",
+              width: "60%",
+            },
             {
               field: "match_score",
               label: "Score",
@@ -108,7 +115,11 @@ export default {
           name: "Compound",
           slug: "target_compound",
           cols: [
-            { field: "target_compound_formula", label: "Compound", width: "45%" },
+            {
+              field: "target_compound_formula",
+              label: "Compound",
+              width: "45%",
+            },
             { field: "target_compound_name", label: "", width: "45%" },
             {
               field: "match_score",
@@ -167,9 +178,7 @@ export default {
               hidden,
               tooltip: (row) => {
                 return {
-                  "Peak intensity": this.formatter.format(
-                    row.sample_peak_area
-                  ),
+                  "Peak intensity": this.formatter.format(row.sample_peak_area),
                 };
               },
             },
@@ -266,20 +275,20 @@ export default {
     ionShow(row) {
       this.resetIonVisualization();
       this.$api.emit(
-        'visualization_ion_focus',
+        "visualization_ion_focus",
         this.sampleItemFocused.sample_item_id,
         row.target_ion_id,
         this.minIsotopeAbundance,
         this.peakMinIntensity,
-        this.mzTolerance,
-        )
+        this.mzTolerance
+      );
       const targetIon = this.targetIons.filter(
         (ion) => ion.target_ion_id == row.target_ion_id
-        )[0];
+      )[0];
       this.modalSampleItemTargetIonProps = {
         ...row,
-        target_ion_formula: targetIon.target_ion_formula
-        };
+        target_ion_formula: targetIon.target_ion_formula,
+      };
       this.activateModal({
         modal: "sampleItemTargetIon",
       });

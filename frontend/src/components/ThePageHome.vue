@@ -1,7 +1,7 @@
 <template>
   <section>
     <the-layout-sidebar>
-      <div class="columns" style="margin: 0 auto; width: 70vw;">
+      <div class="columns" style="margin: 0 auto; width: 70vw">
         <div class="column is-half">
           <section style="padding: 2em 2em 2em 2em">
             <h1 class="title is-4">Instruments:</h1>
@@ -20,10 +20,7 @@
             <section style="padding: 2em 2em 2em 2em">
               <h1 class="title is-4">Acquisitions:</h1>
             </section>
-            <b-collapse
-              :open.sync="browseAcquisitions"
-              animation="slide"
-            >
+            <b-collapse :open.sync="browseAcquisitions" animation="slide">
               <template #trigger>
                 <section style="padding: 0.5em">
                   <b-button
@@ -70,7 +67,11 @@
               <b-button
                 type="is-primary"
                 style="position: fixed; left: 5em; bottom: 2em"
-                :disabled="!workspaceActive || !batchActive || sampleFilesSelected.length != 1"
+                :disabled="
+                  !workspaceActive ||
+                  !batchActive ||
+                  sampleFilesSelected.length != 1
+                "
                 @click="launchProcessSelectedModal"
               >
                 Process selected
@@ -78,11 +79,16 @@
               <b-button
                 v-if="browseAcquisitions"
                 type="is-primary"
-                style="position: fixed; left: 15em; bottom: 2em;"
-                :disabled="!workspaceActive || !batchActive || !acquisitions.length || sampleFilesSelected.length > 0"
+                style="position: fixed; left: 15em; bottom: 2em"
+                :disabled="
+                  !workspaceActive ||
+                  !batchActive ||
+                  !acquisitions.length ||
+                  sampleFilesSelected.length > 0
+                "
                 @click="launchProcessBatchModal"
               >
-                Process batch ({{acquisitions.length}})
+                Process batch ({{ acquisitions.length }})
               </b-button>
             </section>
           </div>
@@ -123,11 +129,7 @@
               <h1 class="title is-4">{{ workspaceHomeText }}</h1>
             </section>
             <the-pane-browser-sample></the-pane-browser-sample>
-            <b-collapse
-              v-if="batchActive"
-              :open="false"
-              animation="slide"
-            >
+            <b-collapse v-if="batchActive" :open="false" animation="slide">
               <template #trigger>
                 <section style="padding: 0.5em">
                   <b-button
@@ -163,7 +165,6 @@ import ThePaneBrowserSample from "./ThePaneBrowserSample.vue";
 import ThePaneBrowserTarget from "./ThePaneBrowserTarget.vue";
 import ThePaneSettingsBatch from "./ThePaneSettingsBatch.vue";
 
-
 import { mapMutations } from "vuex";
 import { call, get, sync } from "vuex-pathify";
 
@@ -181,8 +182,8 @@ export default {
     return {
       browseAcquisitions: false,
       sampleFileMinDatetime: new Date(
-        new Date().getTime() - (24*60*60*1000)
-        ), // now - 24h
+        new Date().getTime() - 24 * 60 * 60 * 1000
+      ), // now - 24h
       sampleFileMaxDatetime: new Date(), // now
       sampleFilesSelected: [],
       sampleFileTableDataKey: 0,
@@ -212,9 +213,7 @@ export default {
         : this.recentAcquisitions;
     },
     sampleFileCols() {
-      return [
-        {field: 'filename', label: 'Filename'}
-      ];
+      return [{ field: "filename", label: "Filename" }];
     },
     sampleFileTableHeight() {
       return "calc(50vh)";
@@ -243,12 +242,12 @@ export default {
     getAcquisitionsInRange() {
       this.getAcquisitions({
         min: this.sampleFileMinDatetime,
-        max: this.sampleFileMaxDatetime
+        max: this.sampleFileMaxDatetime,
       });
     },
     launchProcessBatchModal() {
       this.activateModal({
-        modal: 'sampleBatchImport',
+        modal: "sampleBatchImport",
       });
     },
     launchProcessSelectedModal() {
@@ -257,11 +256,11 @@ export default {
         this.sampleItemFocus(this.sampleActive);
       }
       this.sampleItemAttributesSaveProps = {
-        action: 'create',
+        action: "create",
         sampleItemRecordToLoad: this.sampleFilesSelected[0],
       };
       this.activateModal({
-        modal: 'sampleItemAttributesSave',
+        modal: "sampleItemAttributesSave",
       });
     },
     selectInstrument(newRows, oldRows) {
@@ -284,7 +283,7 @@ export default {
     sampleFileMaxDatetime: function () {
       this.getAcquisitionsInRange();
     },
-    recentAcquisitions: function() {
+    recentAcquisitions: function () {
       // This watcher triggers on database reload
       if (this.browseAcquisitions) this.getAcquisitionsInRange();
     },

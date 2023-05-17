@@ -30,7 +30,9 @@ export default {
         {
           name: "Probable match",
           x: this.sampleItems.map((item) => item.sample_item_id),
-          y: this.sampleItems.map((item) => this.itemMatchCompoundProbableCount(item.sample_item_id)),
+          y: this.sampleItems.map((item) =>
+            this.itemMatchCompoundProbableCount(item.sample_item_id)
+          ),
           type: "bar",
           marker: {
             color: "#5cb85c",
@@ -39,7 +41,9 @@ export default {
         {
           name: "Possible match",
           x: this.sampleItems.map((item) => item.sample_item_id),
-          y: this.sampleItems.map((item) => this.itemMatchCompoundPossibleCount(item.sample_item_id)),
+          y: this.sampleItems.map((item) =>
+            this.itemMatchCompoundPossibleCount(item.sample_item_id)
+          ),
           type: "bar",
           marker: {
             color: "#df691a",
@@ -71,20 +75,20 @@ export default {
     },
   },
   methods: {
-    itemMatchCompoundPossibleCount: function(sampleItemId) {
+    itemMatchCompoundPossibleCount: function (sampleItemId) {
       return this.matchCompounds
         .filter((item) => item.sample_item_id === sampleItemId)
-        .filter((match) => 
-          (match.match_score >= this.possibleMatchThreshol
-          && match.match_score < this.probableMatchThreshold)
-          )
-        .length
+        .filter(
+          (match) =>
+            match.match_score >= this.possibleMatchThreshol &&
+            match.match_score < this.probableMatchThreshold
+        ).length;
     },
-    itemMatchCompoundProbableCount: function(sampleItemId) {
+    itemMatchCompoundProbableCount: function (sampleItemId) {
       return this.matchCompounds
         .filter((item) => item.sample_item_id === sampleItemId)
         .filter((match) => match.match_score >= this.probableMatchThreshold)
-        .length
+        .length;
     },
     onClick: function (event) {
       console.log(event);

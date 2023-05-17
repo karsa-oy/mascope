@@ -40,9 +40,7 @@ export default {
       modalSampleItemOverviewProps: "modal/sampleItemOverviewProps",
     }),
     contextMenuIcon() {
-      return this.batchActiveCount == 0
-        ? "plus"
-        : "dots-horizontal"
+      return this.batchActiveCount == 0 ? "plus" : "dots-horizontal";
     },
     sampleLevels() {
       let hidden = this.batchActive ? false : true;
@@ -50,10 +48,8 @@ export default {
         {
           name: "Batch",
           slug: "sample_batch",
-          cols: [
-            { field: "sample_batch_name", label: "Batch", width: "90%" },
-          ],
-          detailsIcon: 'none',
+          cols: [{ field: "sample_batch_name", label: "Batch", width: "90%" }],
+          detailsIcon: "none",
           rows: this.batches,
           rowClick: this.batchToggle,
           opened: this.openedBatch,
@@ -64,7 +60,7 @@ export default {
           cols: [
             { field: "index", label: "#", width: "5%" },
             { field: "sample_item_name", label: "Item", width: "75%" },
-            { field: "datetime", label: "Datetime", width: "0%", hidden:true },
+            { field: "datetime", label: "Datetime", width: "0%", hidden: true },
             { field: "filter_id", label: "Filter ID", width: "10%" },
             {
               field: "match_score",
@@ -74,7 +70,9 @@ export default {
               hidden,
               tooltip: (row) => {
                 return {
-                  "Peak intensity": this.formatter.format(row.sample_peak_area_sum),
+                  "Peak intensity": this.formatter.format(
+                    row.sample_peak_area_sum
+                  ),
                 };
               },
             },
@@ -83,7 +81,7 @@ export default {
           defaultSort: ["datetime", "asc"],
           // detailsIcon: 'magnify',
           // detailsOpen: this.itemShow,
-          detailsIcon: 'none',
+          detailsIcon: "none",
           rowClick: this.itemSelect,
           opened: [],
         },
@@ -118,11 +116,11 @@ export default {
         this.batchActiveCount == 0
           ? [createBatchButton]
           : [
-            updateBatchButton,
-            deleteBatchButton,
-            exportBatchButton,
-            exportBatchPeaksButton,
-          ];
+              updateBatchButton,
+              deleteBatchButton,
+              exportBatchButton,
+              exportBatchPeaksButton,
+            ];
       // sample items
       let updateItemButton = {
         label: `Update sample item`,
@@ -132,20 +130,17 @@ export default {
         label: `Delete sample item`,
         onClick: this.itemDelete,
       };
-      let itemButtons =
-        this.sampleItemFocused
-          ? [updateItemButton, deleteItemButton]
-          : [];
+      let itemButtons = this.sampleItemFocused
+        ? [updateItemButton, deleteItemButton]
+        : [];
       // menu
-      return this.sampleItemFocused
-        ? itemButtons
-        : batchButtons;
+      return this.sampleItemFocused ? itemButtons : batchButtons;
     },
     openedBatch() {
       return this.batchActive
-        ? this.batches.filter((batch) => 
-            batch.sample_batch_id == this.batchActive.sample_batch_id
-            )
+        ? this.batches.filter(
+            (batch) => batch.sample_batch_id == this.batchActive.sample_batch_id
+          )
         : [];
     },
   },
@@ -184,30 +179,36 @@ export default {
     },
     batchExport() {
       const batchCols = [
-        { field: 'field', label: 'Batch' },
-        { field: 'value', label: '' }
+        { field: "field", label: "Batch" },
+        { field: "value", label: "" },
       ];
       let batchRows = [
         { field: "Name", value: this.batchActive.sample_batch_name },
-        { field: "Description", value: this.batchActive.sample_batch_description },
-        { field: "Workspace", value: this.workspaceActive.workspace_name },
-        { field: "", value: '' },
-        { field: "Target collections",
-          value: this.batchTargetCollections.map(
-            (row) => row.target_collection_name
-            ).join(', ')
+        {
+          field: "Description",
+          value: this.batchActive.sample_batch_description,
         },
-        { field: "", value: '' },
-        { field: "Parameters", value: '' },
+        { field: "Workspace", value: this.workspaceActive.workspace_name },
+        { field: "", value: "" },
+        {
+          field: "Target collections",
+          value: this.batchTargetCollections
+            .map((row) => row.target_collection_name)
+            .join(", "),
+        },
+        { field: "", value: "" },
+        { field: "Parameters", value: "" },
       ];
-      const batchParams = {...this.batchBuildParams, ...this.batchFilterParams};
-      Object.entries(batchParams).forEach(
-        ([key, val]) => batchRows.push(
-          {
-            field: key.replaceAll("_", " "),
-            value: JSON.stringify(val)
-          }
-      ));
+      const batchParams = {
+        ...this.batchBuildParams,
+        ...this.batchFilterParams,
+      };
+      Object.entries(batchParams).forEach(([key, val]) =>
+        batchRows.push({
+          field: key.replaceAll("_", " "),
+          value: JSON.stringify(val),
+        })
+      );
       const sampleItemCols = [
         { field: "sample_item_name", label: "Sample name" },
         { field: "filename", label: "Filename" },
@@ -222,7 +223,10 @@ export default {
         { field: "target_compound_name", label: "Compound name" },
         { field: "target_compound_formula", label: "Compound formula" },
         { field: "sample_peak_area_sum", label: "Sample peak intensity" },
-        { field: "sample_peak_interference_max", label: "Sample peak interference" },
+        {
+          field: "sample_peak_interference_max",
+          label: "Sample peak interference",
+        },
         { field: "match_score", label: "Match score" },
       ];
       const matchIonCols = [
@@ -234,31 +238,40 @@ export default {
         { field: "target_ion_mechanism", label: "Ionization mechanism" },
         { field: "target_ion_formula", label: "Ion formula" },
         { field: "sample_peak_area_sum", label: "Sample peak intensity" },
-        { field: "sample_peak_interference_sum", label: "Sample peak interference" },
+        {
+          field: "sample_peak_interference_sum",
+          label: "Sample peak interference",
+        },
         { field: "match_score", label: "Match score" },
       ];
-      const datetimestamp = (new Date).toJSON().slice(0, -5).replace(/[-:]/g, '');
-      const filename = `${datetimestamp}_${this.batchActive.sample_batch_name.replaceAll(' ', '_')}.xlsx`;
+      const datetimestamp = new Date()
+        .toJSON()
+        .slice(0, -5)
+        .replace(/[-:]/g, "");
+      const filename = `${datetimestamp}_${this.batchActive.sample_batch_name.replaceAll(
+        " ",
+        "_"
+      )}.xlsx`;
       table.toSpreadsheet(filename, [
         {
           name: "Batch",
           rows: batchRows,
-          cols: batchCols
+          cols: batchCols,
         },
         {
           name: "Samples",
           rows: this.sampleItems,
-          cols: sampleItemCols
+          cols: sampleItemCols,
         },
         {
           name: "Match compounds",
           rows: this.batchMatchCompounds,
-          cols: matchCompoundCols
+          cols: matchCompoundCols,
         },
         {
           name: "Match ions",
           rows: this.batchMatchIons,
-          cols: matchIonCols
+          cols: matchIonCols,
         },
       ]);
     },
@@ -269,8 +282,8 @@ export default {
         confirmText: "Export",
         onConfirm: () => {
           this.$api.emit(
-            'sample_batch_export_peaks',
-            this.batchActive.sample_batch_id,
+            "sample_batch_export_peaks",
+            this.batchActive.sample_batch_id
           );
         },
       });
@@ -301,7 +314,7 @@ export default {
           const itemId = this.sampleItemFocused.sample_item_id;
           // defocus
           this.itemFocus(this.sampleItemFocused);
-          this.$api.emit('sample_item_delete', [itemId]);
+          this.$api.emit("sample_item_delete", [itemId]);
         },
       });
     },
@@ -310,8 +323,10 @@ export default {
       this.itemFocus(row);
     },
     itemShow(row) {
-      if (!this.sampleItemFocused
-        || !(this.sampleItemFocused.sample_item_id == row.sample_item_id)) {
+      if (
+        !this.sampleItemFocused ||
+        !(this.sampleItemFocused.sample_item_id == row.sample_item_id)
+      ) {
         this.itemSelect(row);
       }
       if (this.sampleItemFocused) {

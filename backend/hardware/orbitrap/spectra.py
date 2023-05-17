@@ -5,13 +5,12 @@ Created on Mon Dec  2 12:09:29 2019
 @author: Oskari Kausiala
 """
 
-import numpy as np
-
 from datetime import datetime, timedelta
 
+import numpy as np
+from hardware.orbitrap.util import net2np_array
 from ThermoFisher.CommonCore.Data import Business
 
-from hardware.orbitrap.util import net2np_array
 from .instrument import KOInstrument
 
 
@@ -19,25 +18,28 @@ class KOSpectra(KOInstrument):
     """
     KSpectra equivalent for Orbitrap
     """
+
     def __init__(self, rawfile):
         KOInstrument.__init__(self, rawfile)
 
         # Get timing data
-        scans = range( self.raw.RunHeaderEx.FirstSpectrum,
-                        self.raw.RunHeaderEx.LastSpectrum + 1 )
-        t = [ 60.*self.raw.RetentionTimeFromScanNumber(s) for s in scans ]
+        scans = range(
+            self.raw.RunHeaderEx.FirstSpectrum, self.raw.RunHeaderEx.LastSpectrum + 1
+        )
+        t = [60.0 * self.raw.RetentionTimeFromScanNumber(s) for s in scans]
 
         # Get datetime
         sysdt = self.raw.CreationDate
-        dt0 = datetime(sysdt.Year,
-                        sysdt.Month,
-                        sysdt.Day,
-                        sysdt.Hour,
-                        sysdt.Minute,
-                        sysdt.Second,
-                        sysdt.Millisecond)
-        dt = np.asarray([dt0 + timedelta(seconds=ti)
-                          for ti in t])
+        dt0 = datetime(
+            sysdt.Year,
+            sysdt.Month,
+            sysdt.Day,
+            sysdt.Hour,
+            sysdt.Minute,
+            sysdt.Second,
+            sysdt.Millisecond,
+        )
+        dt = np.asarray([dt0 + timedelta(seconds=ti) for ti in t])
         dt1 = dt0 + timedelta(seconds=t[-1])
         self.t = np.array(t)
         self.dt = dt
@@ -46,11 +48,11 @@ class KOSpectra(KOInstrument):
         self.length = t[-1]
         self.scans = scans
         self.time_res = np.diff(t).mean()
-        #self.polarity = None
+        # self.polarity = None
 
         self.scan_avgr = Business.ScanAveragerFactory.GetScanAverager(self.raw)
-    
-    def load_spec(self, ind=None, m0=None, m1=None, scan_filter=''):
+
+    def load_spec(self, ind=None, m0=None, m1=None, scan_filter=""):
         if ind is None:
             ind = (self.scans[0], self.scans[-1])
         avg_scan = self.scan_avgr.GetAverageScanInScanRange(ind[0], ind[1], scan_filter)
@@ -65,13 +67,13 @@ class KOSpectra(KOInstrument):
             mz = mz[mind]
             spec = spec[mind]
         return mz, spec
-    
-    def load_spectra(self, ind=None, m0=None, m1=None, scan_filter=''):
+
+    def load_spectra(self, ind=None, m0=None, m1=None, scan_filter=""):
         if ind is None:
             ind = (self.scans[0], self.scans[-1])
         mzs = []
         specs = []
-        for scan in range(ind[0], ind[1]+1):
+        for scan in range(ind[0], ind[1] + 1):
             segscan = self.raw.GetSegmentedScanFromScanNumber(scan, None)
             mz = net2np_array(segscan.Positions)
             spec = net2np_array(segscan.Intensities)
@@ -86,8 +88,8 @@ class KOSpectra(KOInstrument):
             mzs.append(mz)
             specs.append(spec)
         return mzs, specs
-    
-    def load_stickspec(self, ind=None, m0=None, m1=None, scan_filter=''):
+
+    def load_stickspec(self, ind=None, m0=None, m1=None, scan_filter=""):
         if ind is None:
             ind = (self.scans[0], self.scans[-1])
         avg_scan = self.scan_avgr.GetAverageScanInScanRange(ind[0], ind[1], scan_filter)
@@ -104,13 +106,13 @@ class KOSpectra(KOInstrument):
             mz = mz[mind]
             sticks = sticks[mind]
         return mz, sticks
-    
-    def load_stickspectra(self, ind=None, m0=None, m1=None, scan_filter=''):
+
+    def load_stickspectra(self, ind=None, m0=None, m1=None, scan_filter=""):
         if ind is None:
             ind = (self.scans[0], self.scans[-1])
         mzs = []
         stickss = []
-        for scan in range(ind[0], ind[1]+1):
+        for scan in range(ind[0], ind[1] + 1):
             cent = self.raw.GetCentroidStream(scan, None)
             masses = net2np_array(cent.Masses)
             sticks = net2np_array(cent.Intensities)

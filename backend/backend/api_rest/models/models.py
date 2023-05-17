@@ -1,13 +1,4 @@
-from sqlalchemy import (
-    Column,
-    String,
-    Integer,
-    Float,
-    ForeignKey,
-    TIMESTAMP,
-    Text,
-    text,
-)
+from sqlalchemy import TIMESTAMP, Column, Float, ForeignKey, Integer, String, Text, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 

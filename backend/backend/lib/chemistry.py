@@ -12,8 +12,8 @@ def get_exact_isotope_mzs(formula_str):
 
 
 def match_mz(mz, mz_list, tolerance=0.5):
-    '''
-    Find matching m/z values from a sorted list for a given m/z, within 
+    """
+    Find matching m/z values from a sorted list for a given m/z, within
     tolerance.
 
     Parameters
@@ -24,13 +24,13 @@ def match_mz(mz, mz_list, tolerance=0.5):
         SORTED list of m/z values to find matches from.
     tolerance : float, optional
         Match tolerance [ppm], by default 0.
-    
+
     Returns
     -------
     matches : tuple
         Tuple containing two lists: indices and mz values from 'mz_list',
         matching 'mz' within given tolerance.
-    '''
+    """
     min_mz, max_mz = (mz - tolerance, mz + tolerance)
     i = bisect_left(mz_list, min_mz)
     match_mzs = []

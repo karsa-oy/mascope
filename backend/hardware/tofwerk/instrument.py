@@ -8,13 +8,12 @@ Created on Tue Apr  2 13:05:14 2019
 """
 
 import numpy as np
-
 from scipy.io import loadmat
 
-from .lib.TwTool import TwTof2Mass, TwMass2Tof
+from .lib.TwTool import TwMass2Tof, TwTof2Mass
 
 
-class KInstrument():
+class KInstrument:
     """Base class holding the properties of the TOF-MS instrument,
     namely TofDaq and TPS configuration, peak shape, resolution function
     and SIS.
@@ -58,7 +57,7 @@ class KInstrument():
         """
 
         self.desc = descriptor
-        
+
         self._mz = self.calculate_mz()
 
         self.ps = None
@@ -134,15 +133,15 @@ class KInstrument():
         """
 
         if ps_file is None:
-            ps_file = u'ADC4_ps_new.mat'
+            ps_file = "ADC4_ps_new.mat"
         ps_mat = loadmat(ps_file)
-        ps_struct = ps_mat['peakShape']
-        ps = ps_struct['dat'][0]
+        ps_struct = ps_mat["peakShape"]
+        ps = ps_struct["dat"][0]
         ps = ps[0]
         x = ps[:, 0]
         y = ps[:, 1]
         y = y / max(y)
-        self.ps = {'x': x, 'y': y}
+        self.ps = {"x": x, "y": y}
 
     def get_ps(self, ppos):
         """Get peakshape at particular position in the TOF space
@@ -165,7 +164,7 @@ class KInstrument():
         """
 
         if self.peakshapes is None and self.ps is None:
-            raise Exception('Peakshape not defined')
+            raise Exception("Peakshape not defined")
         if self.peakshapes is None:
             return self.ps
         ps_def = np.asarray(self.peakshapes.keys())
@@ -183,8 +182,8 @@ class KInstrument():
         self.r0 = 0.0001034
         self.r1 = 0.002548
 
-    def r_at(self, x, mode='R', space='mz'):
-        """Calculate resolution at given m/z or sample number with the 
+    def r_at(self, x, mode="R", space="mz"):
+        """Calculate resolution at given m/z or sample number with the
         2-parameter resolution function.
 
         Can return resolution (m/dm), peak FWHM or peak sigma in either
@@ -207,38 +206,36 @@ class KInstrument():
 
         """
 
-        if space == 'mz':
+        if space == "mz":
             mz = x
-        elif space == 'tof':
+        elif space == "tof":
             mz = self.sno2mz(x)
 
         R = self.R(mz, self.r0, self.r1)
 
         fwhm = mz / R
-        sigma = fwhm / (2. * np.sqrt(2. * np.log(2)))
+        sigma = fwhm / (2.0 * np.sqrt(2.0 * np.log(2)))
 
-        if mode == 'R':
+        if mode == "R":
             val = R
-        elif mode == 'fwhm':
+        elif mode == "fwhm":
             val = fwhm
-        elif mode == 'sigma':
+        elif mode == "sigma":
             val = sigma
         # Convert to TOF space if needed
-        if space == 'tof':
-            if mode != 'R':
+        if space == "tof":
+            if mode != "R":
                 val = (self.mz2sno(mz + 10 * val) - self.mz2sno(mz)) / 10.0
             else:
-                fwhm_sno = (
-                    self.mz2sno(
-                        mz + 10 * fwhm) - self.mz2sno(mz)) / 10.0
+                fwhm_sno = (self.mz2sno(mz + 10 * fwhm) - self.mz2sno(mz)) / 10.0
                 val = self.mz2sno(mz) / fwhm_sno
         return val
 
-    def r_at_3p(self, sno, mode='R'):
-        """Calculate resolution at given sample number with the 
+    def r_at_3p(self, sno, mode="R"):
+        """Calculate resolution at given sample number with the
         3-parameter resolution function.
 
-        Can return resolution (m/dm), peak FWHM or peak sigma in 
+        Can return resolution (m/dm), peak FWHM or peak sigma in
         TOF (sample number) space.
 
         TODO: Should be merged with 'r_at'.
@@ -259,11 +256,11 @@ class KInstrument():
         R = self.R_3p(sno, self.R0, self.m0, self.dm)
         fwhm = sno / R
         sigma = fwhm / (2 * np.sqrt(2 * np.log(2)))
-        if mode == 'R':
+        if mode == "R":
             return R
-        elif mode == 'fwhm':
+        elif mode == "fwhm":
             return fwhm
-        elif mode == 'sigma':
+        elif mode == "sigma":
             return sigma
 
     def mz2sno(self, mzs, roundit=False):
@@ -286,16 +283,15 @@ class KInstrument():
             Sample number(s) representing the 'mzs'.
         """
 
-        if not hasattr(mzs, '__iter__'):
+        if not hasattr(mzs, "__iter__"):
             mzs = [mzs]
         if roundit:
-            snos = [int(round(TwMass2Tof(mz, self.desc.massCalibMode, self.desc.p)))
-                    for mz in mzs
-                    ]
+            snos = [
+                int(round(TwMass2Tof(mz, self.desc.massCalibMode, self.desc.p)))
+                for mz in mzs
+            ]
         else:
-            snos = [TwMass2Tof(mz, self.desc.massCalibMode, self.desc.p)
-                    for mz in mzs
-                    ]
+            snos = [TwMass2Tof(mz, self.desc.massCalibMode, self.desc.p) for mz in mzs]
         if len(snos) == 1:
             snos = snos[0]
         return snos
@@ -320,26 +316,24 @@ class KInstrument():
             m/z(s) representing the 'snos'.
         """
 
-        if not hasattr(snos, '__iter__'):
+        if not hasattr(snos, "__iter__"):
             if snos == -1:
                 snos = self.desc.nbrSamples
             snos = [snos]
         if roundit:
-            mzs = [int( round( TwTof2Mass(sno,
-                                          self.desc.massCalibMode,
-                                          self.desc.p
-                                          )))
-                   for sno in snos
-                   ]
+            mzs = [
+                int(round(TwTof2Mass(sno, self.desc.massCalibMode, self.desc.p)))
+                for sno in snos
+            ]
         else:
-            mzs = [TwTof2Mass(sno, self.desc.massCalibMode, self.desc.p) 
-                   for sno in snos
-                   ]
+            mzs = [
+                TwTof2Mass(sno, self.desc.massCalibMode, self.desc.p) for sno in snos
+            ]
         if len(mzs) == 1:
             mzs = mzs[0]
         return mzs
 
     def calculate_mz(self):
-        return np.array([self.sno2mz(s) for s in range(self.desc.nbrSamples)],
-                         dtype=np.float32
-                         )
+        return np.array(
+            [self.sno2mz(s) for s in range(self.desc.nbrSamples)], dtype=np.float32
+        )

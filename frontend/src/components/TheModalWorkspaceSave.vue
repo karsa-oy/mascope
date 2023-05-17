@@ -150,16 +150,16 @@ export default {
         workspace_name: this.workspaceName,
         workspace_description: this.workspaceDesc,
       };
-      this.$api.emit('workspace_create', [newWorkspace]);
+      this.$api.emit("workspace_create", [newWorkspace]);
     },
     deleteWorkspace() {
-      this.$api.emit('workspace_delete', [this.oldWorkspace.workspace_id]);
+      this.$api.emit("workspace_delete", [this.oldWorkspace.workspace_id]);
     },
     loadWorkspace() {
       this.workspaceName = this.oldWorkspace
         ? this.oldWorkspace.workspace_name
         : null;
-      this.workspaceDesc = this.oldWorkspace 
+      this.workspaceDesc = this.oldWorkspace
         ? this.oldWorkspace.workspace_description
         : null;
     },
@@ -169,7 +169,7 @@ export default {
         workspace_name: this.workspaceName,
         workspace_description: this.workspaceDesc,
       };
-      this.$api.emit('workspace_update', [updatedWorkspace]);
+      this.$api.emit("workspace_update", [updatedWorkspace]);
     },
   },
 };

@@ -1,7 +1,9 @@
 # __author__ = 'Alexandre Drouin'
-from .utils import _is_mz_precision_equal
-import numpy as np
 from copy import deepcopy
+
+import numpy as np
+
+from .utils import _is_mz_precision_equal
 
 
 class Spectrum(object):
@@ -13,7 +15,9 @@ class Spectrum(object):
         self._mz_precision = mz_precision  # in decimals e.g.: mz_precision=3 => 5.342
 
         if len(mz_values) != len(intensity_values):
-            raise ValueError("The number of mz values must be equal to the number of intensity values.")
+            raise ValueError(
+                "The number of mz values must be equal to the number of intensity values."
+            )
 
         self.set_peaks(mz_values, intensity_values)
 
@@ -74,10 +78,14 @@ class Spectrum(object):
             current_unique_mz = unique_mz[0]
             for i, mz in enumerate(mz_values):
                 if mz != current_unique_mz:
-                    unique_mz_intensities[current_unique_mz_idx] = acc  # Flush the accumulator
+                    unique_mz_intensities[
+                        current_unique_mz_idx
+                    ] = acc  # Flush the accumulator
                     acc = 0  # Reset the accumulator
                     current_unique_mz_idx += 1  # Go to the next unique mz value
-                    current_unique_mz = unique_mz[current_unique_mz_idx]  # Get the unique mz value
+                    current_unique_mz = unique_mz[
+                        current_unique_mz_idx
+                    ]  # Get the unique mz value
                 acc += intensity_values[i]  # Increment the accumulator
             unique_mz_intensities[current_unique_mz_idx] = acc  # Flush the accumulator
         else:
@@ -89,8 +97,12 @@ class Spectrum(object):
         self._peaks_intensity.flags.writeable = False
         self._peaks_intensity = unique_mz_intensities
 
-        self._peaks = dict([(round(self._peaks_mz[i], self._mz_precision), self._peaks_intensity[i]) for i in
-                            range(len(self._peaks_mz))])
+        self._peaks = dict(
+            [
+                (round(self._peaks_mz[i], self._mz_precision), self._peaks_intensity[i])
+                for i in range(len(self._peaks_mz))
+            ]
+        )
 
         self._check_peaks_integrity()
 
@@ -113,8 +125,13 @@ class Spectrum(object):
 
     def _check_peaks_integrity(self):
         if not len(self._peaks_mz) == len(self._peaks_intensity):
-            raise ValueError("The number of mz values must be equal to the number of intensity values.")
-        if not all(self._peaks_mz[i] <= self._peaks_mz[i + 1] for i in range(len(self._peaks_mz) - 1)):
+            raise ValueError(
+                "The number of mz values must be equal to the number of intensity values."
+            )
+        if not all(
+            self._peaks_mz[i] <= self._peaks_mz[i + 1]
+            for i in range(len(self._peaks_mz) - 1)
+        ):
             raise ValueError("Mz values must be sorted.")
         if len(np.unique(self._peaks_mz)) != len(self._peaks_mz):
             raise ValueError("Mz value list contains duplicate values.")
@@ -135,8 +152,12 @@ def copy_spectrum(spectrum):
     """
     metadata = deepcopy(spectrum.metadata)
     # XXX: The mz_values and intensity_values are copied in the constructor. No need to copy here.
-    return Spectrum(mz_values=spectrum.mz_values, intensity_values=spectrum.intensity_values,
-                    mz_precision=int(spectrum.mz_precision), metadata=metadata)
+    return Spectrum(
+        mz_values=spectrum.mz_values,
+        intensity_values=spectrum.intensity_values,
+        mz_precision=int(spectrum.mz_precision),
+        metadata=metadata,
+    )
 
 
 def copy_spectrum_with_new_intensities(spectrum, new_intensity_values):
@@ -157,11 +178,17 @@ def copy_spectrum_with_new_intensities(spectrum, new_intensity_values):
     """
     metadata = deepcopy(spectrum.metadata)
     # XXX: The mz_values and intensity_values are copied in the constructor. No need to copy here.
-    return Spectrum(mz_values=spectrum.mz_values, intensity_values=new_intensity_values,
-                    mz_precision=int(spectrum.mz_precision), metadata=metadata)
+    return Spectrum(
+        mz_values=spectrum.mz_values,
+        intensity_values=new_intensity_values,
+        mz_precision=int(spectrum.mz_precision),
+        metadata=metadata,
+    )
 
 
-def copy_spectrum_with_new_mz_and_intensities(spectrum, new_mz_values, new_intensity_values):
+def copy_spectrum_with_new_mz_and_intensities(
+    spectrum, new_mz_values, new_intensity_values
+):
     """
     Copies a spectrum and replaces its mz and intensity values.
 
@@ -181,8 +208,12 @@ def copy_spectrum_with_new_mz_and_intensities(spectrum, new_mz_values, new_inten
     """
     metadata = deepcopy(spectrum.metadata)
     # XXX: The mz_values and intensity_values are copied in the constructor. No need to copy here.
-    return Spectrum(mz_values=new_mz_values, intensity_values=new_intensity_values,
-                    mz_precision=int(spectrum.mz_precision), metadata=metadata)
+    return Spectrum(
+        mz_values=new_mz_values,
+        intensity_values=new_intensity_values,
+        mz_precision=int(spectrum.mz_precision),
+        metadata=metadata,
+    )
 
 
 def unify_mz(spectra):
@@ -199,13 +230,19 @@ def unify_mz(spectra):
     * The operation is performed in-place
     """
     if not _is_mz_precision_equal(spectra[0].mz_precision, spectra):
-        raise ValueError("The m/z precision of the spectra must be equal in order to unify the m/z values.")
+        raise ValueError(
+            "The m/z precision of the spectra must be equal in order to unify the m/z values."
+        )
 
-    mz_values = np.array(sorted(set(mz for spectra in spectra for mz in spectra.mz_values)))
+    mz_values = np.array(
+        sorted(set(mz for spectra in spectra for mz in spectra.mz_values))
+    )
 
     for spectrum in spectra:
-        spectrum.set_peaks(mz_values=mz_values,
-                           intensity_values=np.array([spectrum.intensity_at(mz) for mz in mz_values]))
+        spectrum.set_peaks(
+            mz_values=mz_values,
+            intensity_values=np.array([spectrum.intensity_at(mz) for mz in mz_values]),
+        )
 
 
 def unify_precision(spectra, new_precision):

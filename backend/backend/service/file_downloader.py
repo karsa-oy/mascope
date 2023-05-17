@@ -1,13 +1,16 @@
 import argparse
 import asyncio
 import os
-import sys
 import shutil
-from dotenv import load_dotenv
+import sys
 from multiprocessing import Event, Queue
 from queue import Empty
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
+from dotenv import load_dotenv
+
+sys.path.append(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+)
 from backend.service.lib.filesystem_watcher import FSWatcher
 from backend.service.lib.util import load_env_yaml
 
@@ -26,36 +29,26 @@ def parse_cmd_args():
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        "-c", "--config",
-        help="path to yaml config file",
-        type=str, required=False
+        "-c", "--config", help="path to yaml config file", type=str, required=False
     )
     parser.add_argument(
-        "-m", "--file_mask",
-        help="filename mask",
-        type=str, required=False
+        "-m", "--file_mask", help="filename mask", type=str, required=False
     )
     parser.add_argument(
-        "-r", "--recursive",
-        help="recursive",
-        action='store_true',
-        default=False
+        "-r", "--recursive", help="recursive", action="store_true", default=False
     )
     parser.add_argument(
-        "-s", "--source_dir",
-        help="source directory",
-        type=str, required=False
+        "-s", "--source_dir", help="source directory", type=str, required=False
     )
     parser.add_argument(
-        "-t", "--target_dir",
-        help="target directory",
-        type=str, required=False
+        "-t", "--target_dir", help="target directory", type=str, required=False
     )
     parser.add_argument(
-        "-p", "--ping",
+        "-p",
+        "--ping",
         help="ping source directory for new samples (alt to filesystem event)",
-        action='store_true',
-        default=False
+        action="store_true",
+        default=False,
     )
     all_args = parser.parse_args()
     cmdline_args = {}
@@ -67,10 +60,7 @@ def parse_cmd_args():
     if all_args.config:
         # service config may be defined in yaml file
         file_args = load_env_yaml(all_args.config)
-    return {
-        **file_args,
-        **cmdline_args
-        }
+    return {**file_args, **cmdline_args}
 
 
 async def main():
@@ -95,11 +85,11 @@ def run():
     print(args)
     loop = asyncio.get_event_loop()
 
-    source_path = args['source_dir']
-    file_mask = args.get('file_mask', '*')
-    target_path = args['target_dir']
-    recursive = args['recursive']
-    ping = args['ping']
+    source_path = args["source_dir"]
+    file_mask = args.get("file_mask", "*")
+    target_path = args["target_dir"]
+    recursive = args["recursive"]
+    ping = args["ping"]
 
     if not os.path.exists(source_path):
         print(f"Creating missing source directory {source_path}")
@@ -116,7 +106,7 @@ def run():
         recursive=recursive,
         ping=ping,
         shutdown_event=shutdown_event,
-        )
+    )
     fs_watcher.run_as_daemon()
 
     try:
@@ -128,6 +118,6 @@ def run():
         shutdown_event.set()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     load_dotenv()
     run()

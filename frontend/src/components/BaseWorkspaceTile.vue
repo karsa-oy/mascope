@@ -48,7 +48,6 @@
   </div>
 </template>
 
-
 <script>
 import { mapMutations } from "vuex";
 import { sync, call } from "vuex-pathify";
