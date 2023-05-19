@@ -4,6 +4,7 @@ from backend.db import run as run_db
 from .db_api_rest import init_db
 from .api_rest.routes.sample_items_routes import sample_items_router
 from .api_rest.routes.sample_batches_routes import sample_batches_router
+from .api_rest.routes.workspace_routes import workspace_router
 
 # Configure socket.io server
 sio = socketio.AsyncServer(
@@ -24,6 +25,7 @@ async def startup_event():
 
 fastapi_app.include_router(sample_items_router)
 fastapi_app.include_router(sample_batches_router)
+fastapi_app.include_router(workspace_router)
 
 # Initialize ASGI app with socket.io and FastAPI app
 app = socketio.ASGIApp(sio, other_asgi_app=fastapi_app)

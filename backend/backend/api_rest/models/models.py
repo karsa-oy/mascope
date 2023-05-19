@@ -1,6 +1,8 @@
 from sqlalchemy import TIMESTAMP, Column, Float, ForeignKey, Integer, String, Text, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
+from pydantic import BaseModel, Field
+from typing import Optional
 
 
 class BaseMixin(object):
@@ -20,6 +22,47 @@ class BaseMixin(object):
 Base = declarative_base(cls=BaseMixin)
 
 
+class WorkspaceBase(BaseModel):
+    workspace_name: str = Field(..., description="Name of the workspace")
+    workspace_description: Optional[str] = Field(
+        None, description="Description of the workspace"
+    )
+
+
+class WorkspaceCreate(WorkspaceBase):
+    pass
+
+
+class WorkspaceUpdate(WorkspaceBase):
+    pass
+    # workspace_id: Optional[str] = Field(None, description="ID of the workspace")
+
+
+class WorkspaceInDB(WorkspaceBase):
+    workspace_id: str = Field(..., description="ID of the workspace")
+    workspace_utc_created: Optional[str] = Field(
+        None, description="Creation timestamp of the workspace"
+    )
+    workspace_utc_modified: Optional[str] = Field(
+        None, description="Last modification timestamp of the workspace"
+    )
+
+    class Config:
+        orm_mode = True
+
+
+class Workspace(Base):
+    __tablename__ = "workspace"
+    workspace_id = Column(String, primary_key=True)
+    workspace_name = Column(String)
+    workspace_description = Column(Text)
+    workspace_utc_created = Column(TIMESTAMP)
+    workspace_utc_modified = Column(TIMESTAMP)
+
+    # Define relationships
+    sample_batch = relationship("SampleBatch", back_populates="workspace")
+
+
 class SampleBatch(Base):
     __tablename__ = "sample_batch"
     sample_batch_id = Column(String, primary_key=True)
@@ -32,6 +75,7 @@ class SampleBatch(Base):
     sample_batch_utc_modified = Column(TIMESTAMP)
 
     # Define relationships
+    workspace = relationship("Workspace", back_populates="sample_batch")
     sample_item = relationship("SampleItem", back_populates="sample_batch")
 
 
