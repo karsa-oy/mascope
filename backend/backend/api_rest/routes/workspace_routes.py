@@ -6,7 +6,10 @@ from ..controllers.workspace_controller import (
     update_workspace,
     delete_workspace,
 )
-from ..models.models import WorkspaceCreate, WorkspaceUpdate
+from ..models.pydantic_models.workspace_pydantic_model import (
+    WorkspaceCreate,
+    WorkspaceUpdate,
+)
 
 workspace_router = APIRouter()
 

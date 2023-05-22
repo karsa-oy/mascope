@@ -3,7 +3,11 @@ from sqlalchemy import asc, desc, func
 from sqlalchemy.future import select
 from datetime import datetime
 from backend.db_api_rest import async_session
-from ..models.models import Workspace, WorkspaceCreate, WorkspaceUpdate
+from ..models.models import Workspace
+from ..models.pydantic_models.workspace_pydantic_model import (
+    WorkspaceCreate,
+    WorkspaceUpdate,
+)
 from backend.db.id import gen_id
 
 
@@ -67,7 +71,8 @@ async def update_workspace(workspace_id: str, workspace: WorkspaceUpdate):
         if not existing_workspace:
             raise HTTPException(status_code=404, detail="Workspace not found")
 
-        for key, value in workspace.dict().items():
+        update_data = workspace.dict(exclude_unset=True)
+        for key, value in update_data.items():
             setattr(existing_workspace, key, value)
 
         existing_workspace.workspace_utc_modified = datetime.utcnow()
