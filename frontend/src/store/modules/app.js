@@ -1,4 +1,5 @@
 import { make } from "vuex-pathify";
+import { http } from "../../http.js";
 
 const mode = import.meta.env.MASCOPE_PUBLIC_MODE;
 
@@ -42,10 +43,14 @@ export default {
             `);
       commit("SET_ION_MECHANISMS", ionMechanisms);
       // load workspaces
-      const workspaces = await api.query(`--sql
-                SELECT * FROM workspace;
-            `);
-      commit("SET_WORKSPACES", workspaces);
+      try {
+        const response = await http.get("/workspaces");
+        const workspaces = response.data.data;
+        commit("SET_WORKSPACES", workspaces);
+      } catch (error) {
+        console.error("Failed to fetch workspaces: ", error);
+      }
+
       // get schema
       api.emit("schema_read", (resp) => {
         commit("SET_SCHEMA", resp);

@@ -10,6 +10,8 @@ from ..models.pydantic_models.workspace_pydantic_model import (
 )
 from backend.db.id import gen_id
 
+from backend.socket_events import sio
+
 
 async def get_workspaces(sort: str, order: str, page: int, limit: int):
     async with async_session() as session:
@@ -62,6 +64,8 @@ async def create_workspace(workspace: WorkspaceCreate):
         session.add(new_workspace)
         await session.commit()
         await session.refresh(new_workspace)
+        # emit the event to inform the clients about the new workspace
+        await sio.emit("org_reload", namespace="/")
         return new_workspace
 
 
@@ -77,6 +81,7 @@ async def update_workspace(workspace_id: str, workspace: WorkspaceUpdate):
 
         existing_workspace.workspace_utc_modified = datetime.utcnow()
         await session.commit()
+        await sio.emit("org_reload", namespace="/")
         return existing_workspace
 
 
@@ -91,3 +96,4 @@ async def delete_workspace(workspace_id: str):
 
         await session.delete(workspace)
         await session.commit()
+        await sio.emit("org_reload", namespace="/")
