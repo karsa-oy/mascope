@@ -87,6 +87,7 @@
 <script>
 import { mapMutations } from "vuex";
 import { sync, get } from "vuex-pathify";
+import { http } from "../http.js";
 
 import table from "$lib/table";
 
@@ -145,15 +146,24 @@ export default {
     actionIs(...actions) {
       return actions.includes(this.action);
     },
-    createWorkspace() {
+    async createWorkspace() {
       const newWorkspace = {
         workspace_name: this.workspaceName,
         workspace_description: this.workspaceDesc,
       };
-      this.$api.emit("workspace_create", [newWorkspace]);
+      try {
+        const response = await http.post("/workspaces", newWorkspace);
+        console.log(response);
+      } catch (error) {
+        console.error("Failed to create workspace: ", error);
+      }
     },
-    deleteWorkspace() {
-      this.$api.emit("workspace_delete", [this.oldWorkspace.workspace_id]);
+    async deleteWorkspace() {
+      try {
+        await http.delete(`/workspaces/${this.oldWorkspace.workspace_id}`);
+      } catch (error) {
+        console.error("Failed to delete workspace: ", error);
+      }
     },
     loadWorkspace() {
       this.workspaceName = this.oldWorkspace
@@ -163,13 +173,19 @@ export default {
         ? this.oldWorkspace.workspace_description
         : null;
     },
-    updateWorkspace() {
+    async updateWorkspace() {
       const updatedWorkspace = {
-        ...this.oldWorkspace,
         workspace_name: this.workspaceName,
         workspace_description: this.workspaceDesc,
       };
-      this.$api.emit("workspace_update", [updatedWorkspace]);
+      try {
+        await http.patch(
+          `/workspaces/${this.oldWorkspace.workspace_id}`,
+          updatedWorkspace
+        );
+      } catch (error) {
+        console.error("Failed to update workspace: ", error);
+      }
     },
   },
 };

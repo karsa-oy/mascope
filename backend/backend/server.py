@@ -1,17 +1,14 @@
 import socketio
 from fastapi import FastAPI
+
+from .socket_events import sio
+from fastapi.middleware.cors import CORSMiddleware
 from backend.db import run as run_db
 from .db_api_rest import init_db
 from .api_rest.routes.sample_items_routes import sample_items_router
 from .api_rest.routes.sample_batches_routes import sample_batches_router
+from .api_rest.routes.workspace_routes import workspace_router
 
-# Configure socket.io server
-sio = socketio.AsyncServer(
-    async_mode="asgi",
-    cors_allowed_origins="*",
-    ping_timeout=60,
-    logger=True,
-)
 
 fastapi_app = FastAPI()
 
@@ -22,8 +19,19 @@ async def startup_event():
     run_db()
 
 
+# CORS middleware
+fastapi_app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:8080"],  # Allow specific origins
+    # allow_origins=["*"],  # Allow all origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 fastapi_app.include_router(sample_items_router)
 fastapi_app.include_router(sample_batches_router)
+fastapi_app.include_router(workspace_router)
 
 # Initialize ASGI app with socket.io and FastAPI app
 app = socketio.ASGIApp(sio, other_asgi_app=fastapi_app)

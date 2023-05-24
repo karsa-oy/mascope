@@ -20,6 +20,18 @@ class BaseMixin(object):
 Base = declarative_base(cls=BaseMixin)
 
 
+class Workspace(Base):
+    __tablename__ = "workspace"
+    workspace_id = Column(String, primary_key=True)
+    workspace_name = Column(String)
+    workspace_description = Column(Text)
+    workspace_utc_created = Column(TIMESTAMP)
+    workspace_utc_modified = Column(TIMESTAMP)
+
+    # Define relationships
+    sample_batch = relationship("SampleBatch", back_populates="workspace")
+
+
 class SampleBatch(Base):
     __tablename__ = "sample_batch"
     sample_batch_id = Column(String, primary_key=True)
@@ -32,6 +44,7 @@ class SampleBatch(Base):
     sample_batch_utc_modified = Column(TIMESTAMP)
 
     # Define relationships
+    workspace = relationship("Workspace", back_populates="sample_batch")
     sample_item = relationship("SampleItem", back_populates="sample_batch")
 
 
