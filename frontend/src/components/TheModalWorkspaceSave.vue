@@ -161,7 +161,6 @@ export default {
     async deleteWorkspace() {
       try {
         await http.delete(`/workspaces/${this.oldWorkspace.workspace_id}`);
-        this.$api.emit("org_reload");
       } catch (error) {
         console.error("Failed to delete workspace: ", error);
       }
@@ -184,7 +183,6 @@ export default {
           `/workspaces/${this.oldWorkspace.workspace_id}`,
           updatedWorkspace
         );
-        this.$api.emit("org_reload");
       } catch (error) {
         console.error("Failed to update workspace: ", error);
       }
