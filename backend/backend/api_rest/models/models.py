@@ -1,4 +1,14 @@
-from sqlalchemy import TIMESTAMP, Column, Float, ForeignKey, Integer, String, Text, text
+from sqlalchemy import (
+    TIMESTAMP,
+    Column,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    text,
+    JSON,
+)
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 
@@ -38,14 +48,51 @@ class SampleBatch(Base):
     workspace_id = Column(String, ForeignKey("workspace.workspace_id"))
     sample_batch_name = Column(String)
     sample_batch_description = Column(Text)
-    build_params = Column(String)
-    filter_params = Column(String)
+    build_params = Column(JSON)
+    filter_params = Column(JSON)
     sample_batch_utc_created = Column(TIMESTAMP)
     sample_batch_utc_modified = Column(TIMESTAMP)
 
     # Define relationships
     workspace = relationship("Workspace", back_populates="sample_batch")
-    sample_item = relationship("SampleItem", back_populates="sample_batch")
+    sample_item = relationship(
+        "SampleItem",
+        back_populates="sample_batch",
+        cascade="all, delete, delete-orphan",
+    )
+    target_collection = relationship(
+        "TargetCollectionInSampleBatch",
+        back_populates="sample_batch",
+        cascade="all, delete, delete-orphan",
+    )
+
+
+class TargetCollectionInSampleBatch(Base):
+    __tablename__ = "target_collection_in_sample_batch"
+    target_collection_id = Column(
+        String(16),
+        ForeignKey("target_collection.target_collection_id"),
+        primary_key=True,
+    )
+    sample_batch_id = Column(
+        String(16), ForeignKey("sample_batch.sample_batch_id"), primary_key=True
+    )
+
+    # Define relationships
+    target_collection = relationship("TargetCollection", back_populates="sample_batch")
+    sample_batch = relationship("SampleBatch", back_populates="target_collection")
+
+
+class TargetCollection(Base):
+    __tablename__ = "target_collection"
+    target_collection_id = Column(String(16), primary_key=True)
+    target_collection_name = Column(String(256))
+    target_collection_description = Column(Text)
+
+    # Define relationships
+    sample_batch = relationship(
+        "TargetCollectionInSampleBatch", back_populates="target_collection"
+    )
 
 
 class SampleItem(Base):

@@ -1,4 +1,5 @@
 import { make } from "vuex-pathify";
+import { http } from "../../http.js";
 
 const state = {
   active: null,
@@ -12,24 +13,18 @@ export default {
   actions: {
     async load({ commit, rootState }, workspace) {
       rootState.api.emit("subscribe", workspace.workspace_id);
-      // reload sample batches
-      const batches = await rootState.api.query(`--sql
-                SELECT 
-                    sample_batch_id,
-                    sample_batch_name,
-                    sample_batch_description,
-                    workspace_id,
-                    build_params,
-                    filter_params,
-                    sample_batch_utc_created,
-                    sample_batch_utc_modified
-                    ,0 as selection
-                FROM sample_batch
-                WHERE workspace_id == '${workspace.workspace_id}'
-                ORDER BY sample_batch_utc_created ASC
-            `);
-      await commit("SET_BATCHES", batches);
-      await commit("SET_ACTIVE", workspace);
+      try {
+        const response = await http.get(
+          `/sample_batches?workspace_id=${workspace.workspace_id}`
+        );
+        const batches = response.data.data.map((batch) => {
+          return { ...batch, selection: 0 };
+        });
+        await commit("SET_BATCHES", batches);
+        await commit("SET_ACTIVE", workspace);
+      } catch (error) {
+        console.error("Failed to fetch sample batches: ", error);
+      }
     },
     async reload({ state, rootState, getters, dispatch }) {
       if (state.active) {
