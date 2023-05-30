@@ -97,8 +97,8 @@
               @click="
                 () => {
                   actionIs('create')
-                    ? createBatch([newBatch])
-                    : updateBatch([newBatch]);
+                    ? createBatch(newBatch)
+                    : updateBatch(newBatch);
                   deactivateModal();
                 }
               "
@@ -149,6 +149,7 @@
 import ThePaneSettingsBatch from "./ThePaneSettingsBatch.vue";
 import { mapMutations } from "vuex";
 import { call, get, sync } from "vuex-pathify";
+import { http } from "../http.js";
 
 export default {
   name: "TheModalSampleBatchOp",
@@ -253,13 +254,30 @@ export default {
     actionIs(...actions) {
       return actions.includes(this.action);
     },
-    createBatch(newBatch) {
-      this.$api.emit("sample_batch_create", newBatch);
+    async createBatch(newBatch) {
+      try {
+        await http.post("/sample_batches", newBatch);
+      } catch (error) {
+        console.error("Failed to create sample batch: ", error);
+      }
     },
-    deleteBatch(batches) {
+    async deleteBatch(batches) {
       this.batchUnload();
-      this.$api.emit("sample_batch_delete", batches);
+      const promises = batches.map((batch) =>
+        http.delete(`/sample_batches/${batch}`)
+      );
+      const results = await Promise.allSettled(promises);
+
+      results.forEach((result, index) => {
+        if (result.status === "rejected") {
+          console.error(
+            `Failed to delete batch with id ${batches[index]}: `,
+            result.reason
+          );
+        }
+      });
     },
+
     initCalibrationCollectionSelected() {
       if (this.batchCalibrationCollectionId) {
         [this.calibrationCollectionSelected] = this.targetCollectionsAll.filter(
@@ -306,8 +324,18 @@ export default {
         ids.includes(row.target_collection_id)
       );
     },
-    updateBatch(batches) {
-      this.$api.emit("sample_batch_update", batches);
+    // updateBatch(batches) {
+    //   this.$api.emit("sample_batch_update", batches);
+    // },
+    async updateBatch(newBatch) {
+      try {
+        await http.patch(
+          `/sample_batches/${newBatch.sample_batch_id}`,
+          newBatch
+        );
+      } catch (error) {
+        console.error("Failed to update batch", error);
+      }
     },
   },
 };

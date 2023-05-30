@@ -17,45 +17,6 @@ load_dotenv()
 # === sample batches === #
 
 
-@sio.event(namespace="/")
-async def sample_batch_create(sid, sample_batches):
-    sample_batches = [
-        {**sample_batch, "sample_batch_id": gen_id()} for sample_batch in sample_batches
-    ]
-    sample_batch_df = pd.DataFrame.from_records(sample_batches)
-    with conn:
-        workspace_ids = pd.unique(sample_batch_df["workspace_id"]).tolist()
-        if len(workspace_ids) != 1:
-            raise ValueError("sample batches created must be in exactly one workspace")
-        sample_batch_df["sample_batch_utc_created"] = [
-            datetime.now().isoformat()
-        ] * len(sample_batch_df)
-        sample_batch_df["sample_batch_utc_modified"] = [
-            datetime.now().isoformat()
-        ] * len(sample_batch_df)
-        sample_batch_df = sample_batch_df.assign(
-            build_params=sample_batch_df[["build_params"]].applymap(
-                lambda x: json.dumps(x)
-            ),
-            filter_params=sample_batch_df[["filter_params"]].applymap(
-                lambda x: json.dumps(x)
-            ),
-        )
-        sample_batch_df.drop(columns=["target_collection_id"]).to_sql(
-            "sample_batch", conn, if_exists="append", index=False
-        )
-        target_collection_in_sample_batch_df = (
-            sample_batch_df[["target_collection_id", "sample_batch_id"]]
-            .explode("target_collection_id", ignore_index=True)
-            .dropna()
-        )
-        target_collection_in_sample_batch_df.to_sql(
-            "target_collection_in_sample_batch", conn, if_exists="append", index=False
-        )
-        [workspace_id] = workspace_ids
-        await sio.emit("workspace_reload", room=workspace_id, namespace="/")
-
-
 async def export_peaks(sample_batch_df, sample_item_df):
     peak_data = []
     for index, row in sample_item_df.iterrows():
@@ -133,137 +94,103 @@ async def sample_batch_export_peaks(sid, sample_batch_id):
         )
 
 
-@sio.event(namespace="/")
-async def sample_batch_update(sid, sample_batches):
-    for sample_batch in sample_batches:
-        sample_batch_df = pd.DataFrame.from_records([sample_batch])
-        workspace_ids = pd.unique(sample_batch_df["workspace_id"]).tolist()
-        if len(workspace_ids) != 1:
-            raise ValueError("sample batches updated must be in exactly one workspace")
-        [sample_batch_id] = sample_batch_df["sample_batch_id"].tolist()
-        with conn:
+# @sio.event(namespace="/")
+# async def sample_batch_update(sid, sample_batches):
+#     for sample_batch in sample_batches:
+#         sample_batch_df = pd.DataFrame.from_records([sample_batch])
+#         workspace_ids = pd.unique(sample_batch_df["workspace_id"]).tolist()
+#         if len(workspace_ids) != 1:
+#             raise ValueError("sample batches updated must be in exactly one workspace")
+#         [sample_batch_id] = sample_batch_df["sample_batch_id"].tolist()
+#         with conn:
 
-            def need_for_rematch():
-                # Get difference in target collections
-                target_collection_ids_old = pd.read_sql(
-                    f"""--sql
-                    SELECT target_collection_id
-                    FROM target_collection_in_sample_batch
-                    WHERE sample_batch_id == ?
-                    """,
-                    conn,
-                    params=[sample_batch_id],
-                )["target_collection_id"].tolist()
-                target_collection_ids_new = sample_batch_df[
-                    "target_collection_id"
-                ].tolist()[0]
-                if set(target_collection_ids_new) != set(target_collection_ids_old):
-                    return True
+#             def need_for_rematch():
+#                 # Get difference in target collections
+#                 target_collection_ids_old = pd.read_sql(
+#                     f"""--sql
+#                     SELECT target_collection_id
+#                     FROM target_collection_in_sample_batch
+#                     WHERE sample_batch_id == ?
+#                     """,
+#                     conn,
+#                     params=[sample_batch_id],
+#                 )["target_collection_id"].tolist()
+#                 target_collection_ids_new = sample_batch_df[
+#                     "target_collection_id"
+#                 ].tolist()[0]
+#                 if set(target_collection_ids_new) != set(target_collection_ids_old):
+#                     return True
 
-                # Get difference in ionization mechanisms
-                ion_mechanism_ids_new = sample_batch_df["build_params"].tolist()[0][
-                    "ion_mechanisms"
-                ]
-                ion_mechanism_ids_old = json.loads(
-                    pd.read_sql(
-                        f"""--sql
-                        SELECT build_params
-                        FROM sample_batch
-                        WHERE sample_batch_id == ?
-                        """,
-                        conn,
-                        params=[sample_batch_id],
-                    )["build_params"].tolist()[0]
-                )["ion_mechanisms"]
-                if set(ion_mechanism_ids_new) != set(ion_mechanism_ids_old):
-                    return True
+#                 # Get difference in ionization mechanisms
+#                 ion_mechanism_ids_new = sample_batch_df["build_params"].tolist()[0][
+#                     "ion_mechanisms"
+#                 ]
+#                 ion_mechanism_ids_old = json.loads(
+#                     pd.read_sql(
+#                         f"""--sql
+#                         SELECT build_params
+#                         FROM sample_batch
+#                         WHERE sample_batch_id == ?
+#                         """,
+#                         conn,
+#                         params=[sample_batch_id],
+#                     )["build_params"].tolist()[0]
+#                 )["ion_mechanisms"]
+#                 if set(ion_msechanism_ids_new) != set(ion_mechanism_ids_old):
+#                     return True
 
-                # Both target collections and ionization mechanisms equal
-                return False
+#                 # Both target collections and ionization mechanisms equal
+#                 return False
 
-            rematch = need_for_rematch()
-            # Make sure foreign keys is disabled to not cascade delete
-            conn.execute("PRAGMA foreign_keys = 0")
-            # Delete existing sample batch records
-            conn.cursor().execute(
-                f"""
-                DELETE FROM sample_batch
-                WHERE sample_batch_id == ?
-                """,
-                [sample_batch_id],
-            )
-            conn.cursor().execute(
-                f"""
-                DELETE FROM target_collection_in_sample_batch
-                WHERE sample_batch_id == ?
-                """,
-                [sample_batch_id],
-            )
-            # Create new records with updated data
-            sample_batch_df = sample_batch_df.assign(
-                build_params=sample_batch_df[["build_params"]].applymap(
-                    lambda x: json.dumps(x)
-                ),
-                filter_params=sample_batch_df[["filter_params"]].applymap(
-                    lambda x: json.dumps(x)
-                ),
-            )
-            sample_batch_df["sample_batch_utc_modified"] = [
-                datetime.now().isoformat()
-            ] * len(sample_batch_df)
-            sample_batch_df.drop(columns=["target_collection_id"]).to_sql(
-                "sample_batch", conn, if_exists="append", index=False
-            )
-            target_collection_in_sample_batch_df = (
-                sample_batch_df[["target_collection_id", "sample_batch_id"]]
-                .explode("target_collection_id", ignore_index=True)
-                .dropna()
-            )
-            target_collection_in_sample_batch_df.to_sql(
-                "target_collection_in_sample_batch",
-                conn,
-                if_exists="append",
-                index=False,
-            )
-        if rematch:
-            sio.start_background_task(match_batch_compute, sid, sample_batch_id)
-        else:
-            [workspace_id] = workspace_ids
-            await sio.emit("workspace_reload", room=workspace_id, namespace="/")
-
-
-@sio.event(namespace="/")
-async def sample_batch_delete(sid, sample_batch_ids):
-    with conn:
-        sample_batch_id_refs = ",".join("?" * len(sample_batch_ids))
-        workspace_ids = pd.read_sql(
-            f"""--sql
-            SELECT DISTINCT workspace_id
-            FROM sample_batch
-            WHERE sample_batch_id IN (
-                {sample_batch_id_refs}
-            )
-            """,
-            conn,
-            params=sample_batch_ids,
-        )["workspace_id"].tolist()
-        if len(workspace_ids) != 1:
-            raise ValueError("sample batches deleted must be in exactly one workspace")
-        # Enable foreign keys to properly cascade record deletes
-        conn.execute("PRAGMA foreign_keys = 1")
-        conn.cursor().execute(
-            f"""
-            DELETE FROM sample_batch
-            WHERE sample_batch_id IN (
-                {sample_batch_id_refs}
-            )
-            """,
-            sample_batch_ids,
-        )
-        # Disable foreign keys to not cascade delete when updating
-        conn.execute("PRAGMA foreign_keys = 0")
-        [workspace_id] = workspace_ids
-        await sio.emit("workspace_reload", room=workspace_id, namespace="/")
+#             rematch = need_for_rematch()
+#             # Make sure foreign keys is disabled to not cascade delete
+#             conn.execute("PRAGMA foreign_keys = 0")
+#             # Delete existing sample batch records
+#             conn.cursor().execute(
+#                 f"""
+#                 DELETE FROM sample_batch
+#                 WHERE sample_batch_id == ?
+#                 """,
+#                 [sample_batch_id],
+#             )
+#             conn.cursor().execute(
+#                 f"""
+#                 DELETE FROM target_collection_in_sample_batch
+#                 WHERE sample_batch_id == ?
+#                 """,
+#                 [sample_batch_id],
+#             )
+#             # Create new records with updated data
+#             sample_batch_df = sample_batch_df.assign(
+#                 build_params=sample_batch_df[["build_params"]].applymap(
+#                     lambda x: json.dumps(x)
+#                 ),
+#                 filter_params=sample_batch_df[["filter_params"]].applymap(
+#                     lambda x: json.dumps(x)
+#                 ),
+#             )
+#             sample_batch_df["sample_batch_utc_modified"] = [
+#                 datetime.now().isoformat()
+#             ] * len(sample_batch_df)
+#             sample_batch_df.drop(columns=["target_collection_id"]).to_sql(
+#                 "sample_batch", conn, if_exists="append", index=False
+#             )
+#             target_collection_in_sample_batch_df = (
+#                 sample_batch_df[["target_collection_id", "sample_batch_id"]]
+#                 .explode("target_collection_id", ignore_index=True)
+#                 .dropna()
+#             )
+#             target_collection_in_sample_batch_df.to_sql(
+#                 "target_collection_in_sample_batch",
+#                 conn,
+#                 if_exists="append",
+#                 index=False,
+#             )
+#         if rematch:
+#             sio.start_background_task(match_batch_compute, sid, sample_batch_id)
+#         else:
+#             [workspace_id] = workspace_ids
+#             await sio.emit("workspace_reload", room=workspace_id, namespace="/")
 
 
 # === sample items === #

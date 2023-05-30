@@ -2,15 +2,15 @@ from fastapi import HTTPException
 from sqlalchemy import asc, desc, func
 from sqlalchemy.future import select
 from datetime import datetime
+
 from backend.db_api_rest import async_session
+from backend.socket_events import sio
+from backend.db.id import gen_id
 from ..models.models import Workspace
 from ..models.pydantic_models.workspace_pydantic_model import (
     WorkspaceCreate,
     WorkspaceUpdate,
 )
-from backend.db.id import gen_id
-
-from backend.socket_events import sio
 
 
 async def get_workspaces(sort: str, order: str, page: int, limit: int):

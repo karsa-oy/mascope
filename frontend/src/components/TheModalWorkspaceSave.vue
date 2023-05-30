@@ -152,8 +152,7 @@ export default {
         workspace_description: this.workspaceDesc,
       };
       try {
-        const response = await http.post("/workspaces", newWorkspace);
-        console.log(response);
+        await http.post("/workspaces", newWorkspace);
       } catch (error) {
         console.error("Failed to create workspace: ", error);
       }
