@@ -112,7 +112,9 @@ class SampleItem(Base):
     sample_file = relationship(
         "SampleFile", back_populates="sample_item", foreign_keys=[filename]
     )
-    matches = relationship("Match", back_populates="sample_item")
+    matches = relationship(
+        "Match", back_populates="sample_item", cascade="all, delete, delete-orphan"
+    )
 
     # Methods
     async def get_compound_intensity(self, session, compounds):
