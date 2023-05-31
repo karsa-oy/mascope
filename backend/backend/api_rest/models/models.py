@@ -157,14 +157,14 @@ class SampleItem(Base):
 
 class SampleFile(Base):
     __tablename__ = "sample_file"
-    sample_file_id = Column(String, primary_key=True)
-    filename = Column(String, unique=True)
-    #     instrument = Column(String)
-    #     datetime = Column(TIMESTAMP)
-    #     datetime_utc = Column(TIMESTAMP)
-    #     length = Column(Float)
-    #     range = Column(String)
-    #     mz_calibration = Column(String)
+    sample_file_id = Column(String(256), primary_key=True)
+    filename = Column(String(256), nullable=False, unique=True)
+    instrument = Column(String(64))
+    datetime = Column(TIMESTAMP)
+    datetime_utc = Column(TIMESTAMP)
+    length = Column(Float)
+    range = Column(JSON)
+    mz_calibration = Column(JSON)
     tic = Column(Float)
 
     # Define relationships
