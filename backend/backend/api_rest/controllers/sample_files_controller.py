@@ -1,7 +1,6 @@
 from fastapi import HTTPException
-from sqlalchemy import asc, desc, func, and_, or_, extract
+from sqlalchemy import asc, desc, func, and_, cast, Float
 from sqlalchemy.future import select
-from sqlalchemy.orm import joinedload
 from datetime import datetime
 from backend.db_api_rest import async_session
 
@@ -20,13 +19,13 @@ async def get_sample_files(
     async with async_session() as session:
         stmt = select(SampleFile)
 
-        # FIX check the utc datetime comparison after writing create function, now not working correctly (seems not considering time)
-        # Where clause for datetime range and instrument if provided
         if minDatetime and maxDatetime:
             stmt = stmt.where(
                 and_(
-                    SampleFile.datetime_utc >= minDatetime,
-                    SampleFile.datetime_utc <= maxDatetime,
+                    cast(func.julianday(SampleFile.datetime_utc), Float)
+                    >= func.julianday(minDatetime),
+                    cast(func.julianday(SampleFile.datetime_utc), Float)
+                    <= func.julianday(maxDatetime),
                 )
             )
 

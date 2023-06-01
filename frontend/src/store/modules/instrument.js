@@ -1,4 +1,5 @@
 import { dispatch, make } from "vuex-pathify";
+import { http } from "../../http.js";
 
 const state = {
   active: null,
@@ -18,90 +19,56 @@ export default {
   state,
   mutations: make.mutations(state),
   actions: {
-    async getAcquisitions({ state, rootState, commit }, datetimeRange) {
-      const minDatetime = datetimeRange.min.toISOString();
-      const maxDatetime = datetimeRange.max.toISOString();
-      await rootState.api
-        .query(
-          `--sql
-                SELECT
-                    sample_file_id,
-                    filename,
-                    instrument,
-                    datetime,
-                    datetime_utc,
-                    length,
-                    range,
-                    mz_calibration
-                FROM sample_file
-                WHERE (
-                    (
-                        JulianDay(datetime_utc) >= JulianDay('${minDatetime}') AND
-                        JulianDay(datetime_utc) <= JulianDay('${maxDatetime}')
-                    )
-                AND
-                    instrument IN (
-                    '${state.active}'
-                    )
-                )
-                ORDER BY datetime_utc ASC;
-            `
-        )
-        .then((res) => {
-          commit("SET_ACQUISITIONS", res);
+    async getAcquisitions({ state, commit }, datetimeRange) {
+      try {
+        const minDatetime = datetimeRange.min.toISOString();
+        const maxDatetime = datetimeRange.max.toISOString();
+
+        const response = await http.get("/sample_files", {
+          params: {
+            minDatetime,
+            maxDatetime,
+            instrument: state.active,
+            sort: "datetime_utc",
+            order: "desc",
+          },
         });
+        commit("SET_ACQUISITIONS", response.data.data);
+      } catch (error) {
+        "An error occurred while fetching data from the API:", error;
+      }
     },
-    async getRecentAcquisitions({ state, rootState, commit }) {
-      await rootState.api
-        .query(
-          `--sql
-                SELECT
-                    sample_file_id,
-                    filename,
-                    instrument,
-                    datetime,
-                    datetime_utc,
-                    length,
-                    range,
-                    mz_calibration
-                FROM sample_file
-                WHERE (
-                    (JulianDay('now') - JulianDay(datetime_utc) ) <= 1
-                AND
-                    instrument IN (
-                    '${state.active}'
-                    )
-                )
-                ORDER BY datetime_utc ASC;
-            `
-        )
-        .then((res) => {
-          commit("SET_RECENT_ACQUISITIONS", res);
+    async getRecentAcquisitions({ state, commit }) {
+      try {
+        const response = await http.get("/sample_files/recent", {
+          params: {
+            instrument: state.active,
+            sort: "datetime_utc",
+            order: "asc",
+          },
         });
+        commit("SET_RECENT_ACQUISITIONS", response.data.data);
+      } catch (error) {
+        console.error(
+          "An error occurred while fetching recent acquisitions data from the API:",
+          error
+        );
+      }
     },
-    async getMzCalibration({ rootState, state, commit }) {
-      await rootState.api
-        .query(
-          `--sql
-                SELECT mz_calibration
-                FROM sample_file
-                WHERE (
-                    datetime_utc = (
-                        SELECT MAX(datetime_utc)
-                        FROM sample_file
-                        WHERE (
-                            instrument == '${state.active}'
-                        AND
-                            mz_calibration NOT NULL
-                        )
-                    )
-                );
-            `
-        )
-        .then((res) => {
-          const mz_calibration = res.length ? res[0].mz_calibration : null;
-          commit("SET_MZ_CALIBRATION", mz_calibration);
+    async getMzCalibration({ state, commit }) {
+      try {
+        const response = await http.get("/sample_files/mz_calibration", {
+          params: {
+            instrument: state.active,
+          },
         });
+
+        const mz_calibration = response.data ? response.data : null;
+        commit("SET_MZ_CALIBRATION", mz_calibration);
+      } catch (error) {
+        "An error occurred while fetching mz calibration data from the API:",
+          error;
+      }
     },
     async load({ rootState, commit, dispatch }, instrument) {
       if (state.active) await dispatch("unload");

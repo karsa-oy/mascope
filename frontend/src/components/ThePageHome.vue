@@ -226,6 +226,7 @@ export default {
       }
     },
   },
+  // TODO Why do we need the acquisitions here?
   created: function () {
     this.getAcquisitionsInRange();
   },

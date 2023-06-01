@@ -35,9 +35,7 @@ async def get_recent_sample_files_route(
 ):
     minDatetime = datetime.utcnow() - timedelta(days=1)
     maxDatetime = datetime.utcnow()
-    print(datetime.now())
-    print(minDatetime)
-    print(maxDatetime)
+
     return await get_sample_files(
         sort, order, page, limit, minDatetime, maxDatetime, instrument
     )
