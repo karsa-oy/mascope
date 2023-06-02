@@ -23,8 +23,8 @@ async def startup_event():
 # CORS middleware
 fastapi_app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8080"],  # Allow specific origins
-    # allow_origins=["*"],  # Allow all origins
+    # allow_origins=["http://localhost:8080"],  # Allow specific origins
+    allow_origins=["*"],  # Allow all origins
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

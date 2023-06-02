@@ -5,6 +5,12 @@ from ..controllers.sample_files_controller import (
     get_sample_files,
     get_sample_file_by_id,
     get_mz_calibration,
+    create_sample_file,
+    delete_sample_file,
+)
+from ..models.pydantic_models.sample_file_pydantic_model import (
+    SampleFileCreate,
+    SampleFileUpdate,
 )
 
 sample_files_router = APIRouter()
@@ -51,3 +57,13 @@ async def get_last_mz_calibration_route(
 @sample_files_router.get("/api/sample_files/{sample_file_id}")
 async def get_sample_file_by_id_route(sample_file_id: str):
     return await get_sample_file_by_id(sample_file_id)
+
+
+@sample_files_router.post("/api/sample_files")
+async def create_sample_file_route(sample_file: SampleFileCreate):
+    return await create_sample_file(sample_file)
+
+
+@sample_files_router.delete("/api/sample_files/{sample_file_id}")
+async def delete_sample_file_route(sample_file_id: str):
+    return await delete_sample_file(sample_file_id)

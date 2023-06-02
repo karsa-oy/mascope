@@ -4,7 +4,11 @@ from sqlalchemy.future import select
 from datetime import datetime
 from backend.db_api_rest import async_session
 
+# from backend.server import sio
+
+from backend.db.id import gen_id
 from ..models.models import SampleFile
+from ..models.pydantic_models.sample_file_pydantic_model import SampleFileCreate
 
 
 async def get_sample_files(
@@ -92,3 +96,36 @@ async def get_sample_file_by_id(sample_file_id: str):
             )
 
         return sample_file.to_dict()
+
+
+async def create_sample_file(sample_file: SampleFileCreate):
+    async with async_session() as session:
+        new_sample_file = SampleFile(
+            sample_file_id=gen_id(16),
+            filename=sample_file.filename,
+            instrument=sample_file.instrument,
+            datetime=sample_file.datetime,
+            datetime_utc=sample_file.datetime_utc,
+            length=sample_file.length,
+            range=sample_file.range,
+            mz_calibration=sample_file.mz_calibration,
+            tic=sample_file.tic,
+        )
+        session.add(new_sample_file)
+        await session.commit()
+        await session.refresh(new_sample_file)
+
+        return new_sample_file
+
+
+async def delete_sample_file(sample_file_id: str):
+    async with async_session() as session:
+        result = await session.execute(
+            select(SampleFile).filter(SampleFile.sample_file_id == sample_file_id)
+        )
+        sample_file = result.scalar_one_or_none()
+        if not sample_file:
+            raise HTTPException(status_code=404, detail="Sample file not found")
+
+        await session.delete(sample_file)
+        await session.commit()

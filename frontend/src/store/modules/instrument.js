@@ -30,7 +30,7 @@ export default {
             maxDatetime,
             instrument: state.active,
             sort: "datetime_utc",
-            order: "desc",
+            order: "asc",
           },
         });
         commit("SET_ACQUISITIONS", response.data.data);
