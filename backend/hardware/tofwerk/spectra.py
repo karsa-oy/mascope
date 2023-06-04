@@ -27,7 +27,7 @@ from .lib.TwH5 import (
     TwGetTofSpectrumFromH5,
     TwH5Desc,
 )
-from .util import filetime2datetime
+from backend.lib.util import filetime2datetime
 
 
 class KSpectra(KInstrument):
@@ -98,11 +98,11 @@ class KSpectra(KInstrument):
 
         # Try to parse local time from filename
         try:
-            pattern = "Data_%Y.%m.%d_%Hh%Mm%Ss.h5"
-            # datestr = basename(filename)
-            # datestr = path.splitext(datestr)[0]
-            # datestr = datestr.split('_')[-1]
-            dt0_loc = datetime.strptime(basename(filename), pattern)
+            pattern = "%Y.%m.%d_%Hh%Mm%Ss"
+            datestr = basename(filename)
+            datestr = path.splitext(datestr)[0]
+            datestr = "_".join(datestr.split("_")[1:])
+            dt0_loc = datetime.strptime(datestr, pattern)
             dt0_loc += timedelta(microseconds=dt0.microsecond)
             dt1_loc = dt0_loc + timedelta(seconds=dts)
             self.dt0_loc = dt0_loc  # start datetime local
