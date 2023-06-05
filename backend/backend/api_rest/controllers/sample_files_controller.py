@@ -1,10 +1,10 @@
-from fastapi import HTTPException
+from fastapi import HTTPException, status
 from sqlalchemy import asc, desc, func, and_, cast, Float
 from sqlalchemy.future import select
 from datetime import datetime
 from backend.db_api_rest import async_session
 
-# from backend.server import sio
+from backend.server import sio
 
 from backend.db.id import gen_id
 from ..models.models import SampleFile
@@ -115,6 +115,18 @@ async def create_sample_file(sample_file: SampleFileCreate):
         await session.commit()
         await session.refresh(new_sample_file)
 
+        if not new_sample_file:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to create sample file",
+            )
+
+        await sio.emit(
+            "sample_file_created",
+            sample_file.filename,
+            room=sample_file.instrument,
+            namespace="/",
+        )
         return new_sample_file
 
 

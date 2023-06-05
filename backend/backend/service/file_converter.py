@@ -13,6 +13,8 @@ from multiprocessing import Event, Lock, Queue
 from queue import Empty
 
 import socketio
+import aiohttp
+import asyncio
 from dotenv import load_dotenv
 from hardware.orbitrap.generator import RawStreamer
 from hardware.tofwerk.h5_streamer import H5Streamer
@@ -33,21 +35,28 @@ async def create_sample_file_db_record(data):
     utc_offset = timedelta(seconds=int(data["utc_offset"]))
     mz_calibration = data.get("mz_calibration")
     tic = cache.get(filename)["signal"].sum(dim="time").sum(dim="mz").compute().item()
-    await sio.emit(
-        "sample_file_create",
-        [
-            {
-                "filename": filename,
-                "instrument": instrument_name,
-                "datetime": date.isoformat(),
-                "datetime_utc": (date - utc_offset).isoformat(),
-                "length": committed_length,
-                "range": data["range"],
-                "mz_calibration": mz_calibration,
-                "tic": tic,
-            }
-        ],
-    )
+
+    sample_file = {
+        "filename": filename,
+        "instrument": instrument_name,
+        "datetime": date.isoformat(),
+        "datetime_utc": (date - utc_offset).isoformat(),
+        "length": committed_length,
+        "range": data["range"],
+        "mz_calibration": mz_calibration,
+        "tic": tic,
+    }
+
+    headers = {"Content-Type": "application/json"}
+
+    url = f"http://{host}:{port}/api/sample_files"
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, headers=headers, json=sample_file) as response:
+            if response.status != 200:
+                print(
+                    f"Failed to create database record! Status code: {response.status}"
+                )
 
 
 async def streamer_processor(streamer):
@@ -244,7 +253,7 @@ async def main():
 
 
 load_dotenv()
-
+#
 host = None
 port = None
 cache = None
