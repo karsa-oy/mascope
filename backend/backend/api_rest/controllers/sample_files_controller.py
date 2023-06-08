@@ -8,17 +8,21 @@ from backend.server import sio
 
 from backend.db.id import gen_id
 from ..models.models import SampleFile
-from ..models.pydantic_models.sample_file_pydantic_model import SampleFileCreate
+from ..models.pydantic_models.sample_file_pydantic_model import (
+    SampleFileCreate,
+    SampleFileUpdate,
+)
 
 
 async def get_sample_files(
-    sort: str,
-    order: str,
-    page: int,
-    limit: int,
+    sort: str = None,
+    order: str = None,
+    page: int = 0,
+    limit: int = 100,
     minDatetime: datetime = None,
     maxDatetime: datetime = None,
     instrument: str = None,
+    filename: str = None,
 ):
     async with async_session() as session:
         stmt = select(SampleFile)
@@ -35,6 +39,9 @@ async def get_sample_files(
 
         if instrument:
             stmt = stmt.where(SampleFile.instrument == instrument)
+
+        if filename:
+            stmt = stmt.where(SampleFile.filename == filename)
 
         if sort:
             if order == "desc":
@@ -141,3 +148,27 @@ async def delete_sample_file(sample_file_id: str):
 
         await session.delete(sample_file)
         await session.commit()
+
+
+async def update_sample_file(sample_file_id: str, sample_file: SampleFileUpdate):
+    async with async_session() as session:
+        db_sample_file = await session.get(SampleFile, sample_file_id)
+        if not db_sample_file:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Sample file not found",
+            )
+
+        for key, value in sample_file.dict(exclude_unset=True).items():
+            setattr(db_sample_file, key, value)
+
+        await session.commit()
+        await session.refresh(db_sample_file)
+
+        await sio.emit(
+            "sample_file_updated",
+            sample_file.filename,
+            room=sample_file.instrument,
+            namespace="/",
+        )
+        return db_sample_file

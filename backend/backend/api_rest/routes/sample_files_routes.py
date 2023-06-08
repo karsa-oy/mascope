@@ -7,6 +7,7 @@ from ..controllers.sample_files_controller import (
     get_mz_calibration,
     create_sample_file,
     delete_sample_file,
+    update_sample_file,
 )
 from ..models.pydantic_models.sample_file_pydantic_model import (
     SampleFileCreate,
@@ -25,9 +26,10 @@ async def get_sample_files_route(
     minDatetime: datetime = None,
     maxDatetime: datetime = None,
     instrument: str = None,
+    filename: str = None,
 ):
     return await get_sample_files(
-        sort, order, page, limit, minDatetime, maxDatetime, instrument
+        sort, order, page, limit, minDatetime, maxDatetime, instrument, filename
     )
 
 
@@ -67,3 +69,8 @@ async def create_sample_file_route(sample_file: SampleFileCreate):
 @sample_files_router.delete("/api/sample_files/{sample_file_id}")
 async def delete_sample_file_route(sample_file_id: str):
     return await delete_sample_file(sample_file_id)
+
+
+@sample_files_router.patch("/api/sample_files/{sample_file_id}")
+async def update_sample_file_route(sample_file_id: str, sample_file: SampleFileUpdate):
+    return await update_sample_file(sample_file_id, sample_file)

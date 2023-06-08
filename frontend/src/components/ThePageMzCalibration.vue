@@ -81,6 +81,7 @@ import TheLayoutSidebar from "./TheLayoutSidebar.vue";
 import ThePaneBrowserSample from "./ThePaneBrowserSample.vue";
 import ThePaneBrowserTarget from "./ThePaneBrowserTarget.vue";
 import BaseTable from "./BaseTable.vue";
+import { http } from "../http.js";
 
 import { sync, get, call } from "vuex-pathify";
 
@@ -157,12 +158,15 @@ export default {
         title: "Calibrate items",
         message: `Apply calibration to batch ${this.batchActive.sample_batch_name}?`,
         confirmText: "Apply",
-        onConfirm: () => {
-          this.$api.emit(
-            "calibration_mz_apply",
-            this.mzFit,
-            this.sampleItems.map((item) => item.filename)
-          );
+        onConfirm: async () => {
+          try {
+            await http.post("/calibration/mz_apply", {
+              fit: this.mzFit,
+              sample_filenames: this.sampleItems.map((item) => item.filename),
+            });
+          } catch (error) {
+            console.error(error);
+          }
         },
       });
     },
