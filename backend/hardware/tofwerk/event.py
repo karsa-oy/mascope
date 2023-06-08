@@ -15,9 +15,10 @@ import numpy as np
 import pandas as pd
 import xarray
 
-from .image import DEFAULT_TRACE, gen_heatmap_image, gen_spec_stack_image
+from backend.lib.image import DEFAULT_TRACE, gen_heatmap_image, gen_spec_stack_image
 from .spectra import KSpectra
-from .util import read_description, read_sampleid, write_description, write_sampleid
+
+# from .util import read_description, read_sampleid, write_description, write_sampleid
 
 
 class KEvent(KSpectra):
@@ -54,10 +55,6 @@ class KEvent(KSpectra):
         """
 
         KSpectra.__init__(self, filename)
-
-        # self.filename = filename
-        self.sampleid = self.get_sampleid()
-        self.description = self.get_description()
 
     def mz(self, si0=0, si1=None):
         """Calculate m/z axis for given range of TOF sample numbers
@@ -550,54 +547,6 @@ class KEvent(KSpectra):
             peaks = None
         return peaks
 
-    def write_sampleid(self, sampleid):
-        """Write Sample ID to file
-
-        Parameters
-        ----------
-        sampleid : str
-            Sample ID to write
-        """
-
-        self.sampleid = sampleid
-        write_sampleid(self.filename, self.sampleid)
-
-    def get_sampleid(self):
-        """Read Sample ID from file
-
-        Returns
-        -------
-        sampleid : str
-            Returns Sample ID string. If reading from file
-            failed, returns None.
-        """
-
-        return read_sampleid(self.filename)
-
-    def write_description(self, description):
-        """Write Sample Description to file
-
-        Parameters
-        ----------
-        description : str
-            Sample Description to write
-        """
-
-        self.description = description
-        write_description(self.filename, self.description)
-
-    def get_description(self):
-        """Read Sample Description from file
-
-        Returns
-        -------
-        description : str
-            Returns Sample Description string. If reading from
-            file failed, returns None.
-        """
-
-        return read_description(self.filename)
-
     def get_target_list(self):
         """Read target list DataFrame from file
 
@@ -814,7 +763,7 @@ class KEvent(KSpectra):
             trace = deepcopy(DEFAULT_TRACE)
             trace.update(
                 {
-                    "name": info[i].decode("unicode_escape"),
+                    "name": info[i],  # .decode("unicode_escape"),
                     "x": self.t.tolist(),
                     "y": data[i, :].tolist(),
                 }
