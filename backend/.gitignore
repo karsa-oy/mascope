@@ -8,3 +8,4 @@ dist
 .vscode
 .vagrant
 .Trash*
+backend\service\file_converter_config\test.yaml

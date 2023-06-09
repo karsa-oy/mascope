@@ -48,7 +48,6 @@ export default {
     },
     // backend notifications
     async onWorkspaceReload({ dispatch }) {
-      await dispatch("api/reloadDb", null, { root: true });
       await dispatch("reload");
     },
   },
