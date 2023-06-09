@@ -24,12 +24,12 @@ async def get_sample_item_by_id(sample_item_id: str):
 
 
 async def get_sample_items(
-    sample_batch_id: str,
-    filename: str,
-    sort: str,
-    order: str,
-    page: int,
-    limit: int,
+    sample_batch_id: str = None,
+    filename: str = None,
+    sort: str = None,
+    order: str = None,
+    page: int = 0,
+    limit: int = 10000,
     include_tic: bool = False,
     include_intensity: bool = False,
     compounds: str = "",

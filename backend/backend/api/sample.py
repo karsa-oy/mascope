@@ -6,7 +6,6 @@ from datetime import datetime
 import pandas as pd
 from dotenv import load_dotenv
 
-from backend.api.match import match_batch_compute
 from backend.db.conn import conn
 from backend.db.id import gen_id
 from backend.lib.peak import detect_peaks, filter_peaks, get_peaks
@@ -324,67 +323,3 @@ async def sample_item_delete(sid, sample_item_ids):
             # Notify batch subscribers
             [sample_batch_id] = sample_batch_ids
             await sio.emit("sample_batch_reload", room=sample_batch_id, namespace="/")
-
-
-# === sample files === #
-
-
-@sio.event(namespace="/")
-async def sample_file_create(sid, sample_files):
-    sample_files = [
-        {**sample_file, "sample_file_id": gen_id()} for sample_file in sample_files
-    ]
-    sample_file_df = pd.DataFrame.from_records(sample_files)
-
-    instruments = pd.unique(sample_file_df["instrument"]).tolist()
-    if len(instruments) != 1:
-        raise ValueError("sample files created must be from exactly one instrument")
-
-    sample_file_df = sample_file_df.assign(
-        mz_calibration=sample_file_df[["mz_calibration"]].applymap(
-            lambda x: json.dumps(x) if x is not None else x
-        )
-        if "mz_calibration" in sample_file_df
-        else [None] * len(sample_files),
-        range=sample_file_df[["range"]].applymap(lambda x: json.dumps(x))
-        if "range" in sample_file_df
-        else [None] * len(sample_files),
-    )
-    with conn:
-        sample_file_df.to_sql("sample_file", conn, if_exists="append", index=False)
-
-    for _, row in sample_file_df.iterrows():
-        filename = row["filename"]
-        instrument = row["instrument"]
-        await sio.emit("sample_file_created", filename, room=instrument, namespace="/")
-
-
-def file_update(sample_files):
-    sample_file_df = pd.DataFrame.from_records(sample_files)
-    sample_file_df = sample_file_df.assign(
-        mz_calibration=sample_file_df[["mz_calibration"]].applymap(
-            lambda x: json.dumps(x) if x is not None else x
-        ),
-        range=sample_file_df[["range"]].applymap(lambda x: json.dumps(x)),
-    )
-    with conn:
-        sample_file_ids = sample_file_df["sample_file_id"].tolist()
-        sample_file_id_refs = ",".join("?" * len(sample_file_ids))
-        # Delete existing sample item records
-        conn.cursor().execute(
-            f"""
-            DELETE FROM sample_file
-            WHERE sample_file_id IN ({sample_file_id_refs})
-            """,
-            sample_file_ids,
-        )
-        # Create new records with updated data
-        sample_file_df.to_sql("sample_file", conn, if_exists="append", index=False)
-
-
-@sio.event(namespace="/")
-async def sample_file_update(sid, sample_files):
-    file_update(sample_files)
-    sample_file_df = pd.DataFrame.from_records(sample_files)
-    for instrument in pd.unique(sample_file_df["instrument"]).tolist():
-        await sio.emit("sample_file_updated", room=instrument, namespace="/")

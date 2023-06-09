@@ -226,9 +226,6 @@ export default {
       }
     },
   },
-  created: function () {
-    this.getAcquisitionsInRange();
-  },
   methods: {
     ...call({
       sampleItemFocus: "batch/sampleItemFocus",
