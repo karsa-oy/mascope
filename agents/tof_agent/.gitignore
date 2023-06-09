@@ -1,1 +1,3 @@
 build
+dist/tof_agent_config.yaml
+dist/bin.exe

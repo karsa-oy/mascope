@@ -407,7 +407,7 @@ async def match_batch_compute(sid, sample_batch_id):
         except Exception as e:
             print("Processing sample %s failed: %s" % (sample_item, e))
     # reload batch
-    # await sio.emit("sample_batch_reload", room=sample_batch_id, namespace="/")
+    await sio.emit("sample_batch_reload", room=sample_batch_id, namespace="/")
 
 
 @sio.event(namespace="/")

@@ -22,13 +22,6 @@ async def calibration_mz_apply(fit: dict, sample_filenames: List[str]):
 
     sample_file_df = pd.DataFrame(sample_files)
 
-    sample_file_df = sample_file_df.assign(
-        mz_calibration=sample_file_df[["mz_calibration"]].applymap(
-            lambda x: x if x is not None else x
-        ),
-        range=sample_file_df[["range"]].applymap(lambda x: x),
-    )
-
     # Update zarr files
     filenames = sample_file_df["filename"].tolist()
     new_mz = signal_mz_calibration_update(fit, filenames)
