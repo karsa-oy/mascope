@@ -149,7 +149,7 @@
 import ThePaneSettingsBatch from "./ThePaneSettingsBatch.vue";
 import { mapMutations } from "vuex";
 import { call, get, sync } from "vuex-pathify";
-import { http } from "../http.js";
+import httpClient from "../httpClient.js";
 
 export default {
   name: "TheModalSampleBatchOp",
@@ -255,27 +255,15 @@ export default {
       return actions.includes(this.action);
     },
     async createBatch(newBatch) {
-      try {
-        await http.post("/sample_batches", newBatch);
-      } catch (error) {
-        console.error("Failed to create sample batch: ", error);
-      }
+      await httpClient.createBatch(newBatch);
     },
     async deleteBatch(batches) {
       this.batchUnload();
-      const promises = batches.map((batch) =>
-        http.delete(`/sample_batches/${batch}`)
-      );
-      const results = await Promise.allSettled(promises);
-
-      results.forEach((result, index) => {
-        if (result.status === "rejected") {
-          console.error(
-            `Failed to delete batch with id ${batches[index]}: `,
-            result.reason
-          );
-        }
-      });
+      try {
+        await httpClient.deleteBatch(batches);
+      } catch (error) {
+        console.error(error);
+      }
     },
 
     initCalibrationCollectionSelected() {
@@ -324,18 +312,8 @@ export default {
         ids.includes(row.target_collection_id)
       );
     },
-    // updateBatch(batches) {
-    //   this.$api.emit("sample_batch_update", batches);
-    // },
     async updateBatch(newBatch) {
-      try {
-        await http.patch(
-          `/sample_batches/${newBatch.sample_batch_id}`,
-          newBatch
-        );
-      } catch (error) {
-        console.error("Failed to update batch", error);
-      }
+      await httpClient.updateBatch(newBatch);
     },
   },
 };

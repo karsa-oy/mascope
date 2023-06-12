@@ -7,3 +7,5 @@ __pycache__
 /.env
 *.tar.gz
 .debug_env
+
+backend/backend/service/file_converter_config/test.yaml

@@ -1,5 +1,5 @@
 import { make } from "vuex-pathify";
-import { http } from "../../http.js";
+import httpClient from "../../httpClient.js";
 
 const state = {
   active: null,
@@ -13,18 +13,12 @@ export default {
   actions: {
     async load({ commit, rootState }, workspace) {
       rootState.api.emit("subscribe", workspace.workspace_id);
-      try {
-        const response = await http.get(
-          `/sample_batches?workspace_id=${workspace.workspace_id}`
-        );
-        const batches = response.data.data.map((batch) => {
-          return { ...batch, selection: 0 };
-        });
-        await commit("SET_BATCHES", batches);
-        await commit("SET_ACTIVE", workspace);
-      } catch (error) {
-        console.error("Failed to fetch sample batches: ", error);
-      }
+      const response = await httpClient.loadWorkspace(workspace.workspace_id);
+      const batches = response.data.data.map((batch) => {
+        return { ...batch, selection: 0 };
+      });
+      await commit("SET_BATCHES", batches);
+      await commit("SET_ACTIVE", workspace);
     },
     async reload({ state, rootState, getters, dispatch }) {
       if (state.active) {

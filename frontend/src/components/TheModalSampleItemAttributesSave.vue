@@ -309,8 +309,7 @@ import * as _ from "underscore";
 import { mapMutations } from "vuex";
 import { call, get, sync } from "vuex-pathify";
 import { genId } from "../lib/util";
-
-import { http } from "../http.js";
+import httpClient from "../httpClient.js";
 
 export default {
   name: "TheModalSampleItemAttributesSave",
@@ -475,14 +474,10 @@ export default {
       this.sampleItemFilterId = genId(6, false);
     },
     async mzCalibrationApply() {
-      try {
-        await http.post("/calibration/mz_apply", {
-          fit: this.mzFit,
-          sample_filenames: [this.sampleFilename],
-        });
-      } catch (error) {
-        console.error(error);
-      }
+      await httpClient.mzCalibrationApply({
+        fit: this.mzFit,
+        sample_filenames: [this.sampleFilename],
+      });
       // FIX the score is not refreshed if calibration is done but the target search process not clicked. It's can't be cliked since not refreshed, so old score are displayed
     },
     mzCalibrationFit() {

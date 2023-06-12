@@ -87,7 +87,7 @@
 <script>
 import { mapMutations } from "vuex";
 import { sync, get } from "vuex-pathify";
-import { http } from "../http.js";
+import httpClient from "../httpClient.js";
 
 import table from "$lib/table";
 
@@ -151,18 +151,10 @@ export default {
         workspace_name: this.workspaceName,
         workspace_description: this.workspaceDesc,
       };
-      try {
-        await http.post("/workspaces", newWorkspace);
-      } catch (error) {
-        console.error("Failed to create workspace: ", error);
-      }
+      await httpClient.createWorkspace(newWorkspace);
     },
     async deleteWorkspace() {
-      try {
-        await http.delete(`/workspaces/${this.oldWorkspace.workspace_id}`);
-      } catch (error) {
-        console.error("Failed to delete workspace: ", error);
-      }
+      await httpClient.deleteWorkspace(this.oldWorkspace.workspace_id);
     },
     loadWorkspace() {
       this.workspaceName = this.oldWorkspace
@@ -177,14 +169,10 @@ export default {
         workspace_name: this.workspaceName,
         workspace_description: this.workspaceDesc,
       };
-      try {
-        await http.patch(
-          `/workspaces/${this.oldWorkspace.workspace_id}`,
-          updatedWorkspace
-        );
-      } catch (error) {
-        console.error("Failed to update workspace: ", error);
-      }
+      await httpClient.updateWorkspace(
+        this.oldWorkspace.workspace_id,
+        updatedWorkspace
+      );
     },
   },
 };

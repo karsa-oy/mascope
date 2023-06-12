@@ -1,5 +1,5 @@
 import { dispatch, make } from "vuex-pathify";
-import { http } from "../../http.js";
+import httpClient from "../../httpClient.js";
 
 const state = {
   active: null,
@@ -20,55 +20,32 @@ export default {
   mutations: make.mutations(state),
   actions: {
     async getAcquisitions({ state, commit }, datetimeRange) {
-      try {
-        const minDatetime = datetimeRange.min.toISOString();
-        const maxDatetime = datetimeRange.max.toISOString();
+      const minDatetime = datetimeRange.min.toISOString();
+      const maxDatetime = datetimeRange.max.toISOString();
 
-        const response = await http.get("/sample_files", {
-          params: {
-            minDatetime,
-            maxDatetime,
-            instrument: state.active,
-            sort: "datetime_utc",
-            order: "asc",
-          },
-        });
-        commit("SET_ACQUISITIONS", response.data.data);
-      } catch (error) {
-        "An error occurred while fetching data from the API:", error;
-      }
+      const response = await httpClient.getAllSampleFiles({
+        minDatetime,
+        maxDatetime,
+        instrument: state.active,
+        sort: "datetime_utc",
+        order: "asc",
+      });
+      commit("SET_ACQUISITIONS", response.data.data);
     },
     async getRecentAcquisitions({ state, commit }) {
-      try {
-        const response = await http.get("/sample_files/recent", {
-          params: {
-            instrument: state.active,
-            sort: "datetime_utc",
-            order: "asc",
-          },
-        });
-        commit("SET_RECENT_ACQUISITIONS", response.data.data);
-      } catch (error) {
-        console.error(
-          "An error occurred while fetching recent acquisitions data from the API:",
-          error
-        );
-      }
+      const response = await httpClient.getRecentSampleFiles({
+        instrument: state.active,
+        sort: "datetime_utc",
+        order: "asc",
+      });
+      commit("SET_RECENT_ACQUISITIONS", response.data.data);
     },
     async getMzCalibration({ state, commit }) {
-      try {
-        const response = await http.get("/sample_files/mz_calibration", {
-          params: {
-            instrument: state.active,
-          },
-        });
-
-        const mz_calibration = response.data ? response.data : null;
-        commit("SET_MZ_CALIBRATION", mz_calibration);
-      } catch (error) {
-        "An error occurred while fetching mz calibration data from the API:",
-          error;
-      }
+      const response = await httpClient.getLastMzCalibration({
+        instrument: state.active,
+      });
+      const mz_calibration = response.data ? response.data : null;
+      commit("SET_MZ_CALIBRATION", mz_calibration);
     },
     async load({ rootState, commit, dispatch }, instrument) {
       if (state.active) await dispatch("unload");
