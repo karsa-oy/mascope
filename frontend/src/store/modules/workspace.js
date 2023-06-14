@@ -1,5 +1,4 @@
 import { make } from "vuex-pathify";
-import httpClient from "../../httpClient.js";
 
 const state = {
   active: null,
@@ -13,7 +12,9 @@ export default {
   actions: {
     async load({ commit, rootState }, workspace) {
       rootState.api.emit("subscribe", workspace.workspace_id);
-      const response = await httpClient.loadWorkspace(workspace.workspace_id);
+      const response = await rootState.api.httpClient.loadWorkspace(
+        workspace.workspace_id
+      );
       const batches = response.data.data.map((batch) => {
         return { ...batch, selection: 0 };
       });

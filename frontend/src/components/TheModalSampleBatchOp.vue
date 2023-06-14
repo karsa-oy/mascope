@@ -149,7 +149,6 @@
 import ThePaneSettingsBatch from "./ThePaneSettingsBatch.vue";
 import { mapMutations } from "vuex";
 import { call, get, sync } from "vuex-pathify";
-import httpClient from "../httpClient.js";
 
 export default {
   name: "TheModalSampleBatchOp",
@@ -255,12 +254,12 @@ export default {
       return actions.includes(this.action);
     },
     async createBatch(newBatch) {
-      await httpClient.createBatch(newBatch);
+      await this.$api.httpClient.createBatch(newBatch);
     },
     async deleteBatch(batches) {
       this.batchUnload();
       try {
-        await httpClient.deleteBatch(batches);
+        await this.$api.httpClient.deleteBatch(batches);
       } catch (error) {
         console.error(error);
       }
@@ -313,7 +312,7 @@ export default {
       );
     },
     async updateBatch(newBatch) {
-      await httpClient.updateBatch(newBatch);
+      await this.$api.httpClient.updateBatch(newBatch);
     },
   },
 };

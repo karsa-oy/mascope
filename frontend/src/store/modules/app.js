@@ -1,5 +1,5 @@
 import { make } from "vuex-pathify";
-import httpClient from "../../httpClient.js";
+// import httpClient from "../../httpClient.js";
 
 const mode = import.meta.env.MASCOPE_PUBLIC_MODE;
 
@@ -43,7 +43,7 @@ export default {
             `);
       commit("SET_ION_MECHANISMS", ionMechanisms);
       // load workspaces
-      const response = await httpClient.getAllWorkspaces();
+      const response = await api.httpClient.getAllWorkspaces();
       const workspaces = response.data.data;
       commit("SET_WORKSPACES", workspaces);
 

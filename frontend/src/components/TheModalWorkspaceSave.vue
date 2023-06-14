@@ -87,7 +87,6 @@
 <script>
 import { mapMutations } from "vuex";
 import { sync, get } from "vuex-pathify";
-import httpClient from "../httpClient.js";
 
 import table from "$lib/table";
 
@@ -151,10 +150,12 @@ export default {
         workspace_name: this.workspaceName,
         workspace_description: this.workspaceDesc,
       };
-      await httpClient.createWorkspace(newWorkspace);
+      await this.$api.httpClient.createWorkspace(newWorkspace);
     },
     async deleteWorkspace() {
-      await httpClient.deleteWorkspace(this.oldWorkspace.workspace_id);
+      await this.$api.httpClient.deleteWorkspace(
+        this.oldWorkspace.workspace_id
+      );
     },
     loadWorkspace() {
       this.workspaceName = this.oldWorkspace
@@ -169,7 +170,7 @@ export default {
         workspace_name: this.workspaceName,
         workspace_description: this.workspaceDesc,
       };
-      await httpClient.updateWorkspace(
+      await this.$api.httpClient.updateWorkspace(
         this.oldWorkspace.workspace_id,
         updatedWorkspace
       );

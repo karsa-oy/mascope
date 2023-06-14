@@ -1,5 +1,4 @@
 import { dispatch, make } from "vuex-pathify";
-import httpClient from "../../httpClient.js";
 
 const state = {
   active: null,
@@ -19,11 +18,11 @@ export default {
   state,
   mutations: make.mutations(state),
   actions: {
-    async getAcquisitions({ state, commit }, datetimeRange) {
+    async getAcquisitions({ rootState, state, commit }, datetimeRange) {
       const minDatetime = datetimeRange.min.toISOString();
       const maxDatetime = datetimeRange.max.toISOString();
 
-      const response = await httpClient.getAllSampleFiles({
+      const response = await rootState.api.httpClient.getAllSampleFiles({
         minDatetime,
         maxDatetime,
         instrument: state.active,
@@ -32,16 +31,16 @@ export default {
       });
       commit("SET_ACQUISITIONS", response.data.data);
     },
-    async getRecentAcquisitions({ state, commit }) {
-      const response = await httpClient.getRecentSampleFiles({
+    async getRecentAcquisitions({ rootState, state, commit }) {
+      const response = await rootState.api.httpClient.getRecentSampleFiles({
         instrument: state.active,
         sort: "datetime_utc",
         order: "asc",
       });
       commit("SET_RECENT_ACQUISITIONS", response.data.data);
     },
-    async getMzCalibration({ state, commit }) {
-      const response = await httpClient.getLastMzCalibration({
+    async getMzCalibration({ rootState, state, commit }) {
+      const response = await rootState.api.httpClient.getLastMzCalibration({
         instrument: state.active,
       });
       const mz_calibration = response.data ? response.data : null;

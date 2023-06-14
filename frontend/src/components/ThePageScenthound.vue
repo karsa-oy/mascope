@@ -360,7 +360,6 @@ import * as _ from "underscore";
 import { mapMutations } from "vuex";
 import { call, get, sync } from "vuex-pathify";
 import { genId } from "../lib/util";
-import httpClient from "../httpClient.js";
 
 export default {
   name: "TheModalScenthoundWorkflow",
@@ -507,7 +506,7 @@ export default {
       this.sampleItemFilterId = genId(6, false);
     },
     async mzCalibrationApply() {
-      await httpClient.mzCalibrationApply({
+      await this.$api.httpClient.mzCalibrationApply({
         fit: this.mzFit,
         sample_filenames: [this.sampleFilename],
       });

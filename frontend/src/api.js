@@ -1,6 +1,6 @@
 import { io } from "socket.io-client";
-
 import initSqlJs from "sql.js";
+import { createHttpClient } from "./httpClient.js";
 
 // LOAD ENV VARS
 const mode = import.meta.env.MASCOPE_PUBLIC_MODE;
@@ -86,6 +86,7 @@ async function asObject(resp) {
 async function initApi() {
   const [socket, emit] = await initSocket();
   const [dbcon, query] = await initDb();
+  const httpClient = createHttpClient(host, api_port);
 
   const api = {
     socket,
@@ -93,6 +94,7 @@ async function initApi() {
     emit,
     query,
     initDb,
+    httpClient,
   };
 
   return api;
