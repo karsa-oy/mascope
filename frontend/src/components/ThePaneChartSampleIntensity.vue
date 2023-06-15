@@ -46,7 +46,7 @@ export default {
       let data = [];
       let x = this.sampleItems.map((item) => item.sample_item_id);
 
-      // Loop through target compounds
+      // Loop through target compounds, make traces and push to data
       for (let targetCompoundId of allCompoundIds) {
         let y = [];
         let compoundMaxMatchScore = 0;
@@ -80,7 +80,7 @@ export default {
         if (y.every((intensity) => intensity === null)) continue;
         let compoundSymbol =
           compoundMaxMatchScore >= this.paramProbableMatchThreshold
-            ? "circle"
+            ? "square"
             : "square-open";
         let compoundColor = compoundColors[targetCompoundId];
         let compound = this.targetCompounds.filter(
@@ -101,6 +101,21 @@ export default {
           },
         });
       }
+      // Make trace for TIC
+      let y = this.sampleItems.map((item) => item.tic);
+      data.push({
+        name: "TIC",
+        x,
+        y,
+        mode: "markers",
+        type: "scatter",
+        marker: {
+          color: "white",
+          size: 10,
+          symbol: "diamond",
+        },
+      });
+
       return data;
     },
     layout: function () {

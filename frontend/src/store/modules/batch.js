@@ -298,7 +298,8 @@ export default {
                             sample_item_id == '${sampleItemActiveId}'
                         ) THEN 3
                         ELSE 0
-                    END AS selection
+                    END AS selection,
+                    tic
                 FROM (
                     -- ion level
                     SELECT
