@@ -2,6 +2,7 @@ from backend.db_api_rest import async_session
 from backend.api.match import item_remove as match_item_remove
 from backend.api.signal import signal_mz_calibration_update
 
+from backend.socket_events import sio
 from sqlalchemy import func, and_
 from sqlalchemy.future import select
 
@@ -47,6 +48,14 @@ async def calibration_mz_apply(fit: dict, sample_filenames: List[str]):
         for sample_item_id in sample_item_ids:
             # Delete outdated matches
             match_item_remove(sample_item_id)
+
+            await sio.emit(
+                "calibration_mz_applied",
+                sample_item_id,
+                room=sample_item_id,
+                namespace="/",
+            )
+
     return sample_item_ids
 
 

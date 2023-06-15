@@ -32,7 +32,7 @@ async def get_sample_files_route(
     )
 
 
-@sample_files_router.get("/api/sample_files/recent")
+@sample_files_router.get("/api/sample_files-recent")
 async def get_recent_sample_files_route(
     instrument: str,
     sort: str = None,

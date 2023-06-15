@@ -341,6 +341,8 @@ export default {
       },
       formFields: [],
       loadedTemplate: null,
+      // TEMP
+      loadingInstance: null,
       mzCalibrationTableCols: [
         { field: "mz", label: "Isotope m/z" },
         { field: "sample_peak_mz", label: "Pre peak m/z" },
@@ -419,6 +421,15 @@ export default {
   },
   created() {
     this.loadedTemplate = this.clone(this.availableTemplates[0]);
+    // TEMP
+    this.$api.socket.on(
+      "match_item_compute_finished",
+      this.onMatchItemComputeFinished
+    );
+    this.$api.socket.on(
+      "match_item_compute_failed",
+      this.onMatchItemComputeFailed
+    );
   },
   methods: {
     ...call({
@@ -473,12 +484,15 @@ export default {
       this.sampleItemFilterId = genId(6, false);
     },
     async mzCalibrationApply() {
-      await this.$api.httpClient.mzCalibrationApply({
-        fit: this.mzFit,
-        sample_filenames: [this.sampleFilename],
-      });
-      // FIX the score is not refreshed if calibration is done but the target search process not clicked. It's can't be cliked since not refreshed, so old score are displayed
+      await this.$api.httpClient.mzCalibrationApply(
+        {
+          fit: this.mzFit,
+          sample_filenames: [this.sampleFilename],
+        },
+        true
+      );
     },
+
     mzCalibrationFit() {
       this.mzCalibrationReset();
       this.$api.emit(
@@ -509,7 +523,22 @@ export default {
       }
     },
     sampleMatch() {
+      this.$api.emit("subscribe", this.sampleInstrument);
       this.$api.emit("match_item_compute", this.sampleActive);
+      // TEMP
+      this.loadingInstance = this.$buefy.loading.open();
+    },
+    onMatchItemComputeFinished() {
+      if (this.loadingInstance) {
+        this.loadingInstance.close();
+        this.loadingInstance = null;
+      }
+    },
+    onMatchItemComputeFailed() {
+      if (this.loadingInstance) {
+        this.loadingInstance.close();
+        this.loadingInstance = null;
+      }
     },
     async saveSampleItem() {
       this.saveAttributes();
@@ -648,6 +677,19 @@ export default {
       this.sampleItemFilterId = data.sampleItemRecordToLoad.filter_id;
       this.sampleItemType = data.sampleItemRecordToLoad.sample_item_type;
     },
+  },
+  // TEMP
+  beforeDestroy() {
+    // Cleanup the socket.io event listener
+    this.$api.socket.off(
+      "match_item_compute_finished",
+      this.onMatchItemComputeFinished
+    );
+    this.$api.socket.off(
+      "match_item_compute_failed",
+      this.onMatchItemComputeFailed
+    );
+    this.$api.emit("unsubscribe", this.sampleInstrument);
   },
 };
 </script>

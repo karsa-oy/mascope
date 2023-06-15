@@ -1,4 +1,5 @@
 import axios from "axios";
+import Vue from "vue";
 
 const logRequest = (request) => {
   console.log(
@@ -27,6 +28,10 @@ const handleError = (error) => {
     console.log(`[httpClient] Request Error: ${error.message}`);
   }
   return Promise.reject(error);
+};
+
+const openLoading = () => {
+  return Vue.prototype.$buefy.loading.open();
 };
 
 const workspacesBaseUrl = "/workspaces";
@@ -156,7 +161,7 @@ export function createHttpClient(host, api_port) {
     },
     getRecentSampleFiles: async (params = {}) => {
       try {
-        return await httpClient.get(`${filesBaseUrl}/recent`, { params });
+        return await httpClient.get(`${filesBaseUrl}-recent`, { params });
       } catch (error) {
         console.error("Failed to get recent acquisitions: ", error);
       }
@@ -222,14 +227,20 @@ export function createHttpClient(host, api_port) {
         console.error("Failed to get last mz calibration: ", error);
       }
     },
-    mzCalibrationApply: async (calibrationData) => {
+    mzCalibrationApply: async (calibrationData, showLoading = false) => {
+      let loadingInstance = null;
       try {
-        return await httpClient.post(
+        if (showLoading) loadingInstance = openLoading();
+        const result = await httpClient.post(
           `${calibrationBaseUrl}/mz_apply`,
           calibrationData
         );
+        if (loadingInstance)
+          setTimeout(() => loadingInstance.close(), 1 * 1000);
+        return result;
       } catch (error) {
         console.error("Failed to apply mz calibration: ", error);
+        if (loadingInstance) loadingInstance.close();
       }
     },
   };
