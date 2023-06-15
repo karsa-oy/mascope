@@ -61,7 +61,7 @@ export default {
           icon: "flask",
           label: "Batch overview",
           path: "/batch-overview",
-          visible: false, //this.workspaceActive,
+          visible: this.batchActive,
         },
         {
           disabled: this.allButtonsDisabled,

@@ -125,31 +125,7 @@
             </section>
           </template>
           <template v-else>
-            <section style="padding: 2em 2em 2em 2em">
-              <h1 class="title is-4">{{ workspaceHomeText }}</h1>
-            </section>
-            <the-pane-browser-sample></the-pane-browser-sample>
-            <b-collapse v-if="batchActive" :open="false" animation="slide">
-              <template #trigger>
-                <section style="padding: 0.5em">
-                  <b-button
-                    icon-left="wrench"
-                    size="is-small"
-                    @click="
-                      (props) => {
-                        props.open = !props.open;
-                      }
-                    "
-                  >
-                  </b-button>
-                </section>
-              </template>
-              <the-pane-settings-batch></the-pane-settings-batch>
-            </b-collapse>
-            <div v-if="!sampleActive || sampleMatched">
-              <!-- hide target browser if selected sample is not matched -->
-              <the-pane-browser-target></the-pane-browser-target>
-            </div>
+            <the-pane-browser></the-pane-browser>
           </template>
         </div>
       </div>
@@ -161,8 +137,7 @@
 import BaseTable from "./BaseTable.vue";
 import BaseWorkspaceTile from "./BaseWorkspaceTile.vue";
 import TheLayoutSidebar from "./TheLayoutSidebar.vue";
-import ThePaneBrowserSample from "./ThePaneBrowserSample.vue";
-import ThePaneBrowserTarget from "./ThePaneBrowserTarget.vue";
+import ThePaneBrowser from "./ThePaneBrowser.vue";
 import ThePaneSettingsBatch from "./ThePaneSettingsBatch.vue";
 
 import { mapMutations } from "vuex";
@@ -174,8 +149,7 @@ export default {
     BaseTable,
     BaseWorkspaceTile,
     TheLayoutSidebar,
-    ThePaneBrowserTarget,
-    ThePaneBrowserSample,
+    ThePaneBrowser,
     ThePaneSettingsBatch,
   },
   data: function () {
