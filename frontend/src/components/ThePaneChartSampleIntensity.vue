@@ -10,7 +10,7 @@
 
 <script>
 import BaseChartPlotly from "./BaseChartPlotly.vue";
-import { get } from "vuex-pathify";
+import { call, get } from "vuex-pathify";
 import { glasbeyHv } from "$lib/styles";
 
 export default {
@@ -18,6 +18,8 @@ export default {
   components: { BaseChartPlotly },
   computed: {
     ...get({
+      paramPossibleMatchThreshold: "batch/paramPossibleMatchThreshold",
+      paramProbableMatchThreshold: "batch/paramProbableMatchThreshold",
       sampleItems: "batch/sampleItems",
       targetCompounds: "batch/targetCompounds",
       matchCompounds: "batch/matchCompounds",
@@ -29,10 +31,12 @@ export default {
       return this.stats.filter((stat) => stat.rating == "possible");
     },
     data: function () {
+      console.log("data computed");
       if (!(this.sampleItems && this.matchCompounds)) return [];
       let allCompoundIds = this.targetCompounds.map(
         (compound) => compound.target_compound_id
       );
+      allCompoundIds = [...new Set(allCompoundIds)];
       let compoundColors = Object.fromEntries(
         allCompoundIds.map((compoundId, index) => [
           [compoundId],
@@ -40,39 +44,78 @@ export default {
         ])
       );
       let data = [];
-      // Loop through sample items
-      for (let item of this.sampleItems) {
-        let x = [item.sample_item_id];
-        let itemMatches = this.matchCompounds.filter(
-          (row) => row.sample_item_id === item.sample_item_id
-        );
-        // Loop through target compounds
-        for (let compound of this.targetCompounds) {
-          let y = itemMatches
-            .filter(
-              (match) =>
-                match.target_compound_id === compound.target_compound_id
-            )
-            .map((compoundMatch) => compoundMatch.sample_peak_area_sum);
-          let compoundColor = compoundColors[compound.target_compound_id];
-          let markerSymbol =
-            compound.rating === "probable" ? "square" : "square-open";
-          data.push({
-            name: compound.target_compound_name.trim()
-              ? compound.target_compound_name
-              : compound.target_compound_formula,
-            x,
-            y,
-            mode: "markers",
-            type: "scatter",
-            marker: {
-              color: `rgb(${compoundColor[0]},${compoundColor[1]},${compoundColor[2]})`,
-              size: 10,
-              symbol: markerSymbol,
-            },
-          });
+      let x = this.sampleItems.map((item) => item.sample_item_id);
+
+      // Loop through target compounds, make traces and push to data
+      for (let targetCompoundId of allCompoundIds) {
+        let y = [];
+        let compoundMaxMatchScore = 0;
+        for (let sampleItemId of x) {
+          let itemMatches = this.matchCompounds.filter(
+            (row) => row.sample_item_id === sampleItemId
+          );
+          let sampleItemCompoundStats = itemMatches
+            .filter((match) => match.target_compound_id === targetCompoundId)
+            .map((compoundMatch) =>
+              Object.fromEntries([
+                ["match_score", compoundMatch.match_score],
+                ["intensity", compoundMatch.sample_peak_area_sum],
+              ])
+            )[0];
+          if (!sampleItemCompoundStats) continue;
+          let sampleItemCompoundMatchScore =
+            sampleItemCompoundStats.match_score;
+          let sampleItemCompoundIntensity = sampleItemCompoundStats.intensity;
+
+          y.push(
+            sampleItemCompoundMatchScore >= this.paramPossibleMatchThreshold
+              ? sampleItemCompoundIntensity
+              : null
+          );
+          compoundMaxMatchScore = Math.max(
+            compoundMaxMatchScore,
+            sampleItemCompoundMatchScore
+          );
         }
+        if (y.every((intensity) => intensity === null)) continue;
+        let compoundSymbol =
+          compoundMaxMatchScore >= this.paramProbableMatchThreshold
+            ? "square"
+            : "square-open";
+        let compoundColor = compoundColors[targetCompoundId];
+        let compound = this.targetCompounds.filter(
+          (target) => target.target_compound_id === targetCompoundId
+        )[0];
+        data.push({
+          name: compound.target_compound_name.trim()
+            ? compound.target_compound_name
+            : compound.target_compound_formula,
+          x,
+          y,
+          mode: "markers",
+          type: "scatter",
+          marker: {
+            color: `rgb(${compoundColor[0]},${compoundColor[1]},${compoundColor[2]})`,
+            size: 10,
+            symbol: compoundSymbol,
+          },
+        });
       }
+      // Make trace for TIC
+      let y = this.sampleItems.map((item) => item.tic);
+      data.push({
+        name: "TIC",
+        x,
+        y,
+        mode: "markers",
+        type: "scatter",
+        marker: {
+          color: "white",
+          size: 10,
+          symbol: "diamond",
+        },
+      });
+
       return data;
     },
     layout: function () {
@@ -93,13 +136,23 @@ export default {
           rangemode: "tozero",
           gridcolor: "#757575",
         },
-        showlegend: false,
+        showlegend: true,
       };
     },
   },
   methods: {
+    ...call({
+      itemFocus: "batch/sampleItemFocus",
+      itemToggle: "batch/sampleItemToggle",
+    }),
+    itemSelect(row) {
+      this.itemToggle(row);
+      this.itemFocus(row);
+    },
     onClick: function (event) {
-      console.log(event);
+      let sampleItemIndex = event.points[0].pointIndex;
+      let sampleItem = this.sampleItems[sampleItemIndex];
+      this.itemSelect(sampleItem);
     },
   },
 };
