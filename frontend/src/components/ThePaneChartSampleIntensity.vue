@@ -1,7 +1,7 @@
 <template>
   <base-chart-plotly
     id="ChartSampleIntensity"
-    title="Target compound intensity by sample item"
+    :title="this.batchActive.sample_batch_name"
     :data="data"
     :layout="layout"
     @click="onClick"
@@ -18,11 +18,12 @@ export default {
   components: { BaseChartPlotly },
   computed: {
     ...get({
+      batchActive: "batch/active",
+      matchCompounds: "batch/matchCompounds",
       paramPossibleMatchThreshold: "batch/paramPossibleMatchThreshold",
       paramProbableMatchThreshold: "batch/paramProbableMatchThreshold",
       sampleItems: "batch/sampleItems",
       targetCompounds: "batch/targetCompounds",
-      matchCompounds: "batch/matchCompounds",
     }),
     probable: function () {
       return this.stats.filter((stat) => stat.rating == "probable");
@@ -31,7 +32,6 @@ export default {
       return this.stats.filter((stat) => stat.rating == "possible");
     },
     data: function () {
-      console.log("data computed");
       if (!(this.sampleItems && this.matchCompounds)) return [];
       let allCompoundIds = this.targetCompounds.map(
         (compound) => compound.target_compound_id
@@ -90,6 +90,7 @@ export default {
           name: compound.target_compound_name.trim()
             ? compound.target_compound_name
             : compound.target_compound_formula,
+          target_compound_id: targetCompoundId,
           x,
           y,
           mode: "markers",
@@ -150,9 +151,22 @@ export default {
       this.itemFocus(row);
     },
     onClick: function (event) {
+      // Select sample item corresponding to clicked data point
       let sampleItemIndex = event.points[0].pointIndex;
       let sampleItem = this.sampleItems[sampleItemIndex];
       this.itemSelect(sampleItem);
+      // Mouse button dependent action
+      switch (event.event.button) {
+        case 0:
+          // Left click
+          break;
+        case 1:
+          // Middle click
+          break;
+        case 2:
+          // Right click
+          break;
+      }
     },
   },
 };

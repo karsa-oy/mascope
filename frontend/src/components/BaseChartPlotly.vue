@@ -1,6 +1,7 @@
 <template>
-  <section>
+  <section ref="plotlyChart">
     <plotly
+      :id="id"
       :data="data"
       :layout="{ ...baseLayout, ...layout }"
       style="width: 100%; height: 100%"
@@ -14,7 +15,7 @@
 import Plotly from "./external/Plotly.vue";
 
 export default {
-  name: "ThePageExplorerChartBatch",
+  name: "BaseChartPlotly",
   components: {
     Plotly,
   },
@@ -34,16 +35,32 @@ export default {
     },
     id: {
       type: String,
-      required: false,
-      default: null,
+      required: true,
     },
   },
   data: function () {
     return {
       baseConfig: {
-        displayLogo: false,
-        displayModeBar: false,
+        displaylogo: false,
+        displayModeBar: true,
         responsive: true,
+        modeBarButtonsToRemove: [
+          "autoScale",
+          "select2d",
+          "resetScale2d",
+          "lasso2d",
+          "pan2d",
+          "zoom2d",
+          "zoomIn2d",
+          "zoomOut2d",
+        ],
+        toImageButtonOptions: {
+          format: "png", // one of png, svg, jpeg, webp
+          filename: this.title.toLowerCase().replaceAll(/[\s-]/g, "_"),
+          height: 500,
+          width: 700,
+          scale: 1, // Multiply title/legend/axis/canvas sizes by this factor
+        },
       },
     };
   },
@@ -59,10 +76,19 @@ export default {
         hoverinfo: "name+y",
         plot_bgcolor: "transparent",
         paper_bgcolor: "transparent",
-        autosize: false,
+        autosize: true,
         useResizeHandler: true,
+        modebar: {
+          bgcolor: "transparent",
+        },
       };
     },
+  },
+  mounted() {
+    // Disable context menu on right click
+    this.$refs.plotlyChart.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+    });
   },
 };
 </script>
