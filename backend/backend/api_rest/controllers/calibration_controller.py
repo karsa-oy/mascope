@@ -1,5 +1,10 @@
+from backend.db_api_rest import async_session
 from backend.api.match import item_remove as match_item_remove
 from backend.api.signal import signal_mz_calibration_update
+
+from backend.socket_events import sio
+from sqlalchemy import func, and_
+from sqlalchemy.future import select
 
 from backend.api_rest.controllers.sample_files_controller import update_sample_file
 from backend.api_rest.controllers.sample_files_controller import get_sample_files
@@ -11,6 +16,7 @@ from typing import List
 from ..models.pydantic_models.sample_file_pydantic_model import (
     SampleFileUpdate,
 )
+from ..models.models import SampleFile
 
 
 async def calibration_mz_apply(fit: dict, sample_filenames: List[str]):
@@ -42,4 +48,38 @@ async def calibration_mz_apply(fit: dict, sample_filenames: List[str]):
         for sample_item_id in sample_item_ids:
             # Delete outdated matches
             match_item_remove(sample_item_id)
+
+            await sio.emit(
+                "calibration_mz_applied",
+                sample_item_id,
+                room=sample_item_id,
+                namespace="/",
+            )
+
     return sample_item_ids
+
+
+async def get_mz_calibration(
+    instrument: str,
+):
+    async with async_session() as session:
+        stmt = select(SampleFile.mz_calibration).where(
+            and_(
+                SampleFile.instrument == instrument,
+                SampleFile.mz_calibration.isnot(None),
+                SampleFile.datetime_utc
+                == select(func.max(SampleFile.datetime_utc))
+                .where(
+                    and_(
+                        SampleFile.instrument == instrument,
+                        SampleFile.mz_calibration.isnot(None),
+                    )
+                )
+                .scalar_subquery(),
+            )
+        )
+
+        result = await session.execute(stmt)
+        mz_calibration = result.scalars().first()
+
+        return mz_calibration

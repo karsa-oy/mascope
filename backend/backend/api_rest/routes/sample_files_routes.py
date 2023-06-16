@@ -4,7 +4,6 @@ from datetime import datetime, timedelta
 from ..controllers.sample_files_controller import (
     get_sample_files,
     get_sample_file_by_id,
-    get_mz_calibration,
     create_sample_file,
     delete_sample_file,
     update_sample_file,
@@ -33,7 +32,7 @@ async def get_sample_files_route(
     )
 
 
-@sample_files_router.get("/api/sample_files/recent")
+@sample_files_router.get("/api/sample_files-recent")
 async def get_recent_sample_files_route(
     instrument: str,
     sort: str = None,
@@ -47,13 +46,6 @@ async def get_recent_sample_files_route(
     return await get_sample_files(
         sort, order, page, limit, minDatetime, maxDatetime, instrument
     )
-
-
-@sample_files_router.get("/api/sample_files/mz_calibration")
-async def get_last_mz_calibration_route(
-    instrument: str,
-):
-    return await get_mz_calibration(instrument)
 
 
 @sample_files_router.get("/api/sample_files/{sample_file_id}")

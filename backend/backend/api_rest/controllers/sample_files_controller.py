@@ -64,32 +64,6 @@ async def get_sample_files(
         }
 
 
-async def get_mz_calibration(
-    instrument: str,
-):
-    async with async_session() as session:
-        stmt = select(SampleFile.mz_calibration).where(
-            and_(
-                SampleFile.instrument == instrument,
-                SampleFile.mz_calibration.isnot(None),
-                SampleFile.datetime_utc
-                == select(func.max(SampleFile.datetime_utc))
-                .where(
-                    and_(
-                        SampleFile.instrument == instrument,
-                        SampleFile.mz_calibration.isnot(None),
-                    )
-                )
-                .scalar_subquery(),
-            )
-        )
-
-        result = await session.execute(stmt)
-        mz_calibration = result.scalars().first()
-
-        return mz_calibration
-
-
 async def get_sample_file_by_id(sample_file_id: str):
     async with async_session() as session:
         stmt = select(SampleFile).filter(SampleFile.sample_file_id == sample_file_id)
