@@ -258,11 +258,7 @@ export default {
     },
     async deleteBatch(batches) {
       this.batchUnload();
-      try {
-        await this.$api.httpClient.deleteBatch(batches);
-      } catch (error) {
-        console.error(error);
-      }
+      await this.$api.httpClient.deleteBatch(batches);
     },
 
     initCalibrationCollectionSelected() {
