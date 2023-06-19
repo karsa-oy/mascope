@@ -9,8 +9,9 @@ from sqlalchemy import (
     text,
     JSON,
 )
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql.schema import CheckConstraint
+from sqlalchemy.ext.declarative import declarative_base
 
 
 class BaseMixin(object):
@@ -67,34 +68,6 @@ class SampleBatch(Base):
     )
 
 
-class TargetCollectionInSampleBatch(Base):
-    __tablename__ = "target_collection_in_sample_batch"
-    target_collection_id = Column(
-        String(16),
-        ForeignKey("target_collection.target_collection_id"),
-        primary_key=True,
-    )
-    sample_batch_id = Column(
-        String(16), ForeignKey("sample_batch.sample_batch_id"), primary_key=True
-    )
-
-    # Define relationships
-    target_collection = relationship("TargetCollection", back_populates="sample_batch")
-    sample_batch = relationship("SampleBatch", back_populates="target_collection")
-
-
-class TargetCollection(Base):
-    __tablename__ = "target_collection"
-    target_collection_id = Column(String(16), primary_key=True)
-    target_collection_name = Column(String(256))
-    target_collection_description = Column(Text)
-
-    # Define relationships
-    sample_batch = relationship(
-        "TargetCollectionInSampleBatch", back_populates="target_collection"
-    )
-
-
 class SampleItem(Base):
     __tablename__ = "sample_item"
     sample_item_id = Column(String, primary_key=True)
@@ -112,8 +85,13 @@ class SampleItem(Base):
     sample_file = relationship(
         "SampleFile", back_populates="sample_item", foreign_keys=[filename]
     )
-    matches = relationship(
+    match = relationship(
         "Match", back_populates="sample_item", cascade="all, delete, delete-orphan"
+    )
+    target_isotope = relationship(
+        "MatchInterference",
+        back_populates="sample_item",
+        # TODO add cascade deletes when editting DELETE sample_item
     )
 
     # Methods
@@ -187,16 +165,76 @@ class Match(Base):
     match_isotope_correlation = Column(Float)
 
     # Define relationships
-    sample_item = relationship("SampleItem", back_populates="matches")
-    # target_isotope = relationship("TargetIsotope", back_populates="matches")
+    sample_item = relationship("SampleItem", back_populates="match")
+    target_isotope = relationship("TargetIsotope", back_populates="match")
 
 
-class TargetIsotope(Base):
-    __tablename__ = "target_isotope"
-    target_isotope_id = Column(String, primary_key=True)
-    target_ion_id = Column(String, ForeignKey("target_ion.target_ion_id"))
-    # mz = Column(Float)
-    # relative_abundance = Column(Float)
+class TargetCollectionInSampleBatch(Base):
+    __tablename__ = "target_collection_in_sample_batch"
+    target_collection_id = Column(
+        String(16),
+        ForeignKey("target_collection.target_collection_id"),
+        primary_key=True,
+    )
+    sample_batch_id = Column(
+        String(16), ForeignKey("sample_batch.sample_batch_id"), primary_key=True
+    )
+
+    # Define relationships
+    target_collection = relationship("TargetCollection", back_populates="sample_batch")
+    sample_batch = relationship("SampleBatch", back_populates="target_collection")
+
+
+class TargetCollection(Base):
+    __tablename__ = "target_collection"
+    target_collection_id = Column(String(16), primary_key=True)
+    target_collection_name = Column(String(256))
+    target_collection_description = Column(Text)
+
+    # Define relationships
+    sample_batch = relationship(
+        "TargetCollectionInSampleBatch", back_populates="target_collection"
+    )
+    target_compound = relationship(
+        "TargetCompoundInTargetCollection",
+        back_populates="target_collection",
+    )
+
+
+class TargetCompoundInTargetCollection(Base):
+    __tablename__ = "target_compound_in_target_collection"
+    target_compound_id = Column(
+        String(32), ForeignKey("target_compound.target_compound_id"), primary_key=True
+    )
+    target_collection_id = Column(
+        String(16),
+        ForeignKey("target_collection.target_collection_id"),
+        primary_key=True,
+    )
+
+    # Define relationships
+    target_collection = relationship(
+        "TargetCollection", back_populates="target_compound"
+    )
+    target_compound = relationship("TargetCompound", back_populates="target_collection")
+
+
+class TargetCompound(Base):
+    __tablename__ = "target_compound"
+    target_compound_id = Column(String, primary_key=True)
+    target_compound_name = Column(Text)
+    target_compound_formula = Column(String)
+    cas_number = Column(String(12))
+
+    # Define relationships
+    target_collection = relationship(
+        "TargetCompoundInTargetCollection",
+        back_populates="target_compound",
+    )
+    target_ion = relationship(
+        "TargetIon",
+        back_populates="target_compound",
+    )
 
 
 class TargetIon(Base):
@@ -205,14 +243,81 @@ class TargetIon(Base):
     target_compound_id = Column(
         String, ForeignKey("target_compound.target_compound_id")
     )
-    # ionization_mechanism_id = Column(
-    #     String, ForeignKey("ionization_mechanism.ionization_mechanism_id")
-    # )
-    # target_ion_formula = Column(String)
+    ionization_mechanism_id = Column(
+        String, ForeignKey("ionization_mechanism.ionization_mechanism_id")
+    )
+    target_ion_formula = Column(String)
+
+    # Define relationships
+    target_compound = relationship(
+        "TargetCompound",
+        back_populates="target_ion",
+    )
+    ionization_mechanism = relationship(
+        "IonizationMechanism", back_populates="target_ion"
+    )
+    target_isotope = relationship("TargetIsotope", back_populates="target_ion")
 
 
-class TargetCompound(Base):
-    __tablename__ = "target_compound"
-    target_compound_id = Column(String, primary_key=True)
-    #     target_compound_name = Column(Text)
-    target_compound_formula = Column(String)
+class IonizationMechanism(Base):
+    __tablename__ = "ionization_mechanism"
+    ionization_mechanism_id = Column(String(16), primary_key=True)
+    ionization_mechanism_polarity = Column(String(1))
+    ionization_mechanism = Column(String)
+    reagent = Column(String)
+
+    # Define relationships
+    target_ion = relationship("TargetIon", back_populates="ionization_mechanism")
+
+
+class TargetIsotope(Base):
+    __tablename__ = "target_isotope"
+    target_isotope_id = Column(String, primary_key=True)
+    target_ion_id = Column(String, ForeignKey("target_ion.target_ion_id"))
+    mz = Column(Float)
+    relative_abundance = Column(
+        Float, CheckConstraint("relative_abundance >= 0 AND relative_abundance <= 1")
+    )
+    # Define relationships
+    target_ion = relationship("TargetIon", back_populates="target_isotope")
+    sample_item = relationship(
+        "MatchInterference",
+        back_populates="target_isotope",
+    )
+    match = relationship(
+        "Match",
+        back_populates="target_isotope",
+    )
+
+
+class MatchInterference(Base):
+    __tablename__ = "match_interference"
+    match_interference_id = Column(String(32), primary_key=True)
+    target_isotope_id = Column(
+        String(32), ForeignKey("target_isotope.target_isotope_id"), nullable=False
+    )
+    sample_item_id = Column(
+        String(16), ForeignKey("sample_item.sample_item_id"), nullable=False
+    )
+    sample_peak_interference = Column(Float, nullable=False)
+
+    # Define relationships
+    sample_item = relationship("SampleItem", back_populates="target_isotope")
+    target_isotope = relationship("TargetIsotope", back_populates="sample_item")
+
+
+class AttributeTemplate(Base):
+    __tablename__ = "attribute_template"
+    attribute_template_id = Column(String(256), primary_key=True)
+    name = Column(String(256), nullable=False)
+    type = Column(String(64))
+    template = Column(JSON)
+
+
+class InstrumentFunction(Base):
+    __tablename__ = "instrument_function"
+    instrument_function_id = Column(String(32), primary_key=True)
+    instrument = Column(String(64))
+    datetime_utc = Column(TIMESTAMP)
+    peakshape = Column(JSON)
+    resolution_function = Column(JSON)
