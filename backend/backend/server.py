@@ -11,6 +11,8 @@ from .api_rest.routes.workspace_routes import workspace_router
 from .api_rest.routes.sample_files_routes import sample_files_router
 from .api_rest.routes.calibration_routes import calibration_router
 
+from .api_rest.routes.matches_routes import matches_router
+
 
 fastapi_app = FastAPI()
 
@@ -35,6 +37,7 @@ fastapi_app.include_router(sample_batches_router)
 fastapi_app.include_router(workspace_router)
 fastapi_app.include_router(sample_files_router)
 fastapi_app.include_router(calibration_router)
+fastapi_app.include_router(matches_router)
 
 # Initialize ASGI app with socket.io and FastAPI app
 app = socketio.ASGIApp(sio, other_asgi_app=fastapi_app)
