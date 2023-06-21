@@ -1,5 +1,5 @@
 import { make } from "vuex-pathify";
-// import httpClient from "../../httpClient.js";
+import { loadFromApi, extractDistinctValues } from "./apiHelper.js";
 
 const mode = import.meta.env.MASCOPE_PUBLIC_MODE;
 
@@ -22,30 +22,39 @@ export default {
     async load({ commit, rootState }) {
       const api = rootState.api;
       // load attribute templates
-      const attributeTemplates = await api.query(`--sql
-                SELECT * FROM attribute_template;
-            `);
-      commit("SET_ATTRIBUTE_TEMPLATES", attributeTemplates);
+      await loadFromApi(
+        api.httpClient.getAllAttributeTemplates,
+        "SET_ATTRIBUTE_TEMPLATES",
+        commit
+      );
+
       // load target collections
-      const collections = await api.query(`--sql
-                SELECT * FROM target_collection;
-            `);
-      commit("SET_TARGET_COLLECTIONS", collections);
+      await loadFromApi(
+        api.httpClient.getAllTargetCollections,
+        "SET_TARGET_COLLECTIONS",
+        commit
+      );
       // load instruments
-      const instruments = await api.query(`--sql
-                SELECT DISTINCT instrument
-                FROM instrument_function;
-            `);
-      commit("SET_INSTRUMENTS", instruments);
-      // load ionization mechanisms
-      const ionMechanisms = await api.query(`--sql
-                SELECT * FROM ionization_mechanism;
-            `);
-      commit("SET_ION_MECHANISMS", ionMechanisms);
+      await loadFromApi(
+        api.httpClient.getAllInstrumentFunctions,
+        "SET_INSTRUMENTS",
+        commit,
+        (instruments) => extractDistinctValues(instruments, "instrument")
+      );
+
+      // Load ionization mechanisms
+      await loadFromApi(
+        api.httpClient.getAllIonizationMechanisms,
+        "SET_ION_MECHANISMS",
+        commit
+      );
+
       // load workspaces
-      const response = await api.httpClient.getAllWorkspaces();
-      const workspaces = response.data.data;
-      commit("SET_WORKSPACES", workspaces);
+      await loadFromApi(
+        api.httpClient.getAllWorkspaces,
+        "SET_WORKSPACES",
+        commit
+      );
 
       // get schema
       api.emit("schema_read", (resp) => {

@@ -39,6 +39,19 @@ const batchesBaseUrl = "/sample_batches";
 const filesBaseUrl = "/sample_files";
 const itemsBaseUrl = "/sample_items";
 const calibrationBaseUrl = "/calibration";
+const matchesBaseUrl = "/matches";
+const targetCollectionsBaseUrl = "/target_collections";
+const targetCollectionsInSampleBatchBaseUrl =
+  "/target_collections_in_sample_batch";
+const targetCompoundsBaseUrl = "/target_compounds";
+const targetCompoundsInTargetCollectionsBaseUrl =
+  "/target_compound_in_target_collections";
+const targetIonsBaseUrl = "/target_ions";
+const ionizationMechanismsBaseUrl = "/ionization_mechanisms";
+const targetIsotopesBaseUrl = "/target_isotopes";
+const matchInterferencesBaseUrl = "/match_interferences";
+const instrumentFunctionsBaseUrl = "/instrument_functions";
+const attributeTemplatesBaseUrl = "/attribute_templates";
 
 export function createHttpClient(host, api_port) {
   const axiosInstance = axios.create({
@@ -51,6 +64,7 @@ export function createHttpClient(host, api_port) {
 
   const httpClient = {
     ...axiosInstance,
+    // Workspaces
     getAllWorkspaces: async (params = {}) => {
       try {
         return await httpClient.get(workspacesBaseUrl, { params });
@@ -241,6 +255,202 @@ export function createHttpClient(host, api_port) {
       } catch (error) {
         console.error("Failed to apply mz calibration: ", error);
         if (loadingInstance) loadingInstance.close();
+      }
+    },
+    // Matches
+    getAllMatches: async (params = {}) => {
+      try {
+        return await httpClient.get(`${matchesBaseUrl}`, { params });
+      } catch (error) {
+        console.error("Failed to get all matches: ", error);
+      }
+    },
+    getMatchById: async (matchId) => {
+      try {
+        return await httpClient.get(`${matchesBaseUrl}/${matchId}`);
+      } catch (error) {
+        console.error("Failed to get match by id: ", error);
+      }
+    },
+
+    // Target collections
+    getAllTargetCollections: async (params = {}) => {
+      try {
+        return await httpClient.get(`${targetCollectionsBaseUrl}`, { params });
+      } catch (error) {
+        console.error("Failed to get all target collections: ", error);
+      }
+    },
+
+    getTargetCollectionById: async (targetCollectionId) => {
+      try {
+        return await httpClient.get(
+          `${targetCollectionsBaseUrl}/${targetCollectionId}`
+        );
+      } catch (error) {
+        console.error("Failed to get target collection by id: ", error);
+      }
+    },
+
+    // Target collections in sample batch
+    getAllTargetCollectionsInSampleBatch: async (params = {}) => {
+      try {
+        return await httpClient.get(
+          `${targetCollectionsInSampleBatchBaseUrl}`,
+          {
+            params,
+          }
+        );
+      } catch (error) {
+        console.error(
+          "Failed to get all target collections in sample batch: ",
+          error
+        );
+      }
+    },
+
+    // Target compounds
+    getAllTargetCompounds: async (params = {}) => {
+      try {
+        return await httpClient.get(`${targetCompoundsBaseUrl}`, { params });
+      } catch (error) {
+        console.error("Failed to get all target compounds: ", error);
+      }
+    },
+
+    getTargetCompoundById: async (targetCompoundId) => {
+      try {
+        return await httpClient.get(
+          `${targetCompoundsBaseUrl}/${targetCompoundId}`
+        );
+      } catch (error) {
+        console.error("Failed to get target compound by id: ", error);
+      }
+    },
+
+    // Target compound in target collections
+    getAllTargetCompoundInTargetCollections: async (params = {}) => {
+      try {
+        return await httpClient.get(
+          `${targetCompoundsInTargetCollectionsBaseUrl}`,
+          {
+            params,
+          }
+        );
+      } catch (error) {
+        console.error(
+          "Failed to get all target compound in target collections: ",
+          error
+        );
+      }
+    },
+
+    // Target ions
+    getAllTargetIons: async (params = {}) => {
+      try {
+        return await httpClient.get(`${targetIonsBaseUrl}`, { params });
+      } catch (error) {
+        console.error("Failed to get all target ions: ", error);
+      }
+    },
+
+    getTargetIonById: async (targetIonId) => {
+      try {
+        return await httpClient.get(`${targetIonsBaseUrl}/${targetIonId}`);
+      } catch (error) {
+        console.error("Failed to get target ion by id: ", error);
+      }
+    },
+
+    // Ionization mechanisms
+    getAllIonizationMechanisms: async (params = {}) => {
+      try {
+        return await httpClient.get(`${ionizationMechanismsBaseUrl}`, {
+          params,
+        });
+      } catch (error) {
+        console.error("Failed to get all ionization mechanisms: ", error);
+      }
+    },
+
+    getIonizationMechanismById: async (ionizationMechanismId) => {
+      try {
+        return await httpClient.get(
+          `${ionizationMechanismsBaseUrl}/${ionizationMechanismId}`
+        );
+      } catch (error) {
+        console.error("Failed to get ionization mechanism by id: ", error);
+      }
+    },
+    // Target isotopes
+    getAllTargetIsotopes: async (params = {}) => {
+      try {
+        return await httpClient.get(`${targetIsotopesBaseUrl}`, { params });
+      } catch (error) {
+        console.error("Failed to get all target isotopes: ", error);
+      }
+    },
+    getTargetIsotopeById: async (isotopeId) => {
+      try {
+        return await httpClient.get(`${targetIsotopesBaseUrl}/${isotopeId}`);
+      } catch (error) {
+        console.error("Failed to get target isotope by id: ", error);
+      }
+    },
+
+    // Match interferences
+    getAllMatchInterferences: async (params = {}) => {
+      try {
+        return await httpClient.get(`${matchInterferencesBaseUrl}`, { params });
+      } catch (error) {
+        console.error("Failed to get all match interferences: ", error);
+      }
+    },
+    getMatchInterferenceById: async (interferenceId) => {
+      try {
+        return await httpClient.get(
+          `${matchInterferencesBaseUrl}/${interferenceId}`
+        );
+      } catch (error) {
+        console.error("Failed to get match interference by id: ", error);
+      }
+    },
+
+    // Instrument functions
+    getAllInstrumentFunctions: async (params = {}) => {
+      try {
+        return await httpClient.get(`${instrumentFunctionsBaseUrl}`, {
+          params,
+        });
+      } catch (error) {
+        console.error("Failed to get all instrument functions: ", error);
+      }
+    },
+    getInstrumentFunctionById: async (functionId) => {
+      try {
+        return await httpClient.get(
+          `${instrumentFunctionsBaseUrl}/${functionId}`
+        );
+      } catch (error) {
+        console.error("Failed to get instrument function by id: ", error);
+      }
+    },
+
+    // Attribute templates
+    getAllAttributeTemplates: async (params = {}) => {
+      try {
+        return await httpClient.get(`${attributeTemplatesBaseUrl}`, { params });
+      } catch (error) {
+        console.error("Failed to get all attribute templates: ", error);
+      }
+    },
+    getAttributeTemplateById: async (templateId) => {
+      try {
+        return await httpClient.get(
+          `${attributeTemplatesBaseUrl}/${templateId}`
+        );
+      } catch (error) {
+        console.error("Failed to get attribute template by id: ", error);
       }
     },
   };
