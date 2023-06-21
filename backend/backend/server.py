@@ -45,22 +45,27 @@ fastapi_app.add_middleware(
     allow_headers=["*"],
 )
 
-fastapi_app.include_router(sample_items_router)
-fastapi_app.include_router(sample_batches_router)
-fastapi_app.include_router(workspace_router)
-fastapi_app.include_router(sample_files_router)
-fastapi_app.include_router(calibration_router)
-fastapi_app.include_router(matches_router)
-fastapi_app.include_router(target_collections_router)
-fastapi_app.include_router(target_collection_in_sample_batch_router)
-fastapi_app.include_router(target_compounds_router)
-fastapi_app.include_router(target_compound_in_target_collection_router)
-fastapi_app.include_router(target_ions_router)
-fastapi_app.include_router(ionization_mechanisms_router)
-fastapi_app.include_router(target_isotopes_router)
-fastapi_app.include_router(match_interferences_router)
-fastapi_app.include_router(instrument_functions_router)
-fastapi_app.include_router(attribute_templates_router)
+routers = [
+    sample_items_router,
+    sample_batches_router,
+    workspace_router,
+    sample_files_router,
+    calibration_router,
+    matches_router,
+    target_collections_router,
+    target_collection_in_sample_batch_router,
+    target_compounds_router,
+    target_compound_in_target_collection_router,
+    target_ions_router,
+    ionization_mechanisms_router,
+    target_isotopes_router,
+    match_interferences_router,
+    instrument_functions_router,
+    attribute_templates_router,
+]
+
+for router in routers:
+    fastapi_app.include_router(router)
 
 # Initialize ASGI app with socket.io and FastAPI app
 app = socketio.ASGIApp(sio, other_asgi_app=fastapi_app)
