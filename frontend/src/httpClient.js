@@ -44,7 +44,7 @@ const targetCollectionsBaseUrl = "/target_collections";
 const targetCollectionsInSampleBatchBaseUrl =
   "/target_collections_in_sample_batch";
 const targetCompoundsBaseUrl = "/target_compounds";
-const targetCompoundsInTargetCollectionsBaseUrl =
+const targetCompoundsInTargetCollectionBaseUrl =
   "/target_compound_in_target_collections";
 const targetIonsBaseUrl = "/target_ions";
 const ionizationMechanismsBaseUrl = "/ionization_mechanisms";
@@ -329,10 +329,10 @@ export function createHttpClient(host, api_port) {
     },
 
     // Target compound in target collections
-    getAllTargetCompoundInTargetCollections: async (params = {}) => {
+    getAllTargetCompoundsInTargetCollection: async (params = {}) => {
       try {
         return await httpClient.get(
-          `${targetCompoundsInTargetCollectionsBaseUrl}`,
+          `${targetCompoundsInTargetCollectionBaseUrl}`,
           {
             params,
           }
