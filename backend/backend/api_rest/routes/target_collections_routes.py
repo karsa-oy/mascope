@@ -1,0 +1,22 @@
+from fastapi import APIRouter
+from ..controllers.target_collections_controller import (
+    get_target_collection_by_id,
+    get_target_collections,
+)
+
+target_collections_router = APIRouter()
+
+
+@target_collections_router.get("/api/target_collections")
+async def get_target_collections_route(
+    sort: str = None,
+    order: str = None,
+    page: int = 0,
+    limit: int = 10,
+):
+    return await get_target_collections(sort, order, page, limit)
+
+
+@target_collections_router.get("/api/target_collections/{target_collection_id}")
+async def get_target_collection_by_id_route(target_collection_id: str):
+    return await get_target_collection_by_id(target_collection_id)
