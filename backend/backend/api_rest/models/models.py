@@ -8,10 +8,15 @@ from sqlalchemy import (
     Text,
     text,
     JSON,
+    case,
+    and_,
+    func,
+    select,
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, column_property, backref
 from sqlalchemy.sql.schema import CheckConstraint
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.ext.hybrid import hybrid_property
 
 
 class BaseMixin(object):
@@ -88,10 +93,11 @@ class SampleItem(Base):
     match = relationship(
         "Match", back_populates="sample_item", cascade="all, delete, delete-orphan"
     )
-    target_isotope = relationship(
+    match_interference = relationship(
         "MatchInterference",
         back_populates="sample_item",
         # TODO add cascade deletes when editting DELETE sample_item
+        # cascade="all, delete, delete-orphan",
     )
 
     # Methods
@@ -280,9 +286,8 @@ class TargetIsotope(Base):
     )
     # Define relationships
     target_ion = relationship("TargetIon", back_populates="target_isotope")
-    sample_item = relationship(
-        "MatchInterference",
-        back_populates="target_isotope",
+    match_interference = relationship(
+        "MatchInterference", back_populates="target_isotope"
     )
     match = relationship(
         "Match",
@@ -301,9 +306,9 @@ class MatchInterference(Base):
     )
     sample_peak_interference = Column(Float, nullable=False)
 
-    # Define relationships
-    sample_item = relationship("SampleItem", back_populates="target_isotope")
-    target_isotope = relationship("TargetIsotope", back_populates="sample_item")
+    # # Define relationships
+    sample_item = relationship("SampleItem", back_populates="match_interference")
+    target_isotope = relationship("TargetIsotope", back_populates="match_interference")
 
 
 class AttributeTemplate(Base):
@@ -321,3 +326,189 @@ class InstrumentFunction(Base):
     datetime_utc = Column(TIMESTAMP)
     peakshape = Column(JSON)
     resolution_function = Column(JSON)
+
+
+# class Sample(Base):
+#     # No __tablename__ since this is a composite model not backed by a specific table
+
+#     # Primary Key
+#     sample_id = Column(
+#         String, primary_key=True
+#     )  # Ensure this uniquely identifies a Sample
+
+#     # Foreign Keys - Not required unless you have a specific use case
+#     # sample_item_id = Column(String, ForeignKey("sample_item.sample_item_id"))
+#     # filename = Column(String, ForeignKey("sample_file.filename"))
+
+#     # Relationships - Link to SampleItem and SampleFile
+#     sample_item = relationship("SampleItem", back_populates="sample")
+#     sample_file = relationship("SampleFile", back_populates="sample")
+
+#     # Composite properties
+#     @hybrid_property
+#     def sample_item_name(self):
+#         return self.sample_item.sample_item_name
+
+#     @hybrid_property
+#     def filename(self):
+#         return self.sample_file.filename
+
+#     # ... add more fields as necessary
+
+
+# ______________________________________________________________________
+# class Sample(Base):
+#     __tablename__ = "sample"
+
+#     # Primary Key
+#     sample_id = Column(String, primary_key=True)
+
+#     # Relationships
+#     sample_item = relationship("SampleItem", back_populates="sample", uselist=False)
+#     sample_file = relationship("SampleFile", back_populates="sample", uselist=False)
+#     # target_compound = relationship("TargetCompound")
+#     # target_ion = relationship("TargetIon")
+#     # target_isotope = relationship("TargetIsotope")
+#     # match = relationship("Match", back_populates="sample")
+#     # match_interferences = relationship("MatchInterference", back_populates="sample")
+
+#     # Foreign Keys
+#     sample_item_id = Column(String, ForeignKey("sample_item.sample_item_id"))
+#     filename = Column(String, ForeignKey("sample_file.filename"))
+#     # target_compound_id = Column(String, ForeignKey("target_compound.target_compound_id"))
+#     # target_ion_id = Column(String, ForeignKey("target_ion.target_ion_id"))
+#     # target_isotope_id = Column(String, ForeignKey("target_isotope.target_isotope_id"))
+
+#     # Columns
+#     # sample_item_name = Column(String)
+#     # sample_item_type = Column(String)
+#     # target_compound_formula = Column(String)
+#     # target_compound_name = Column(String)
+#     # target_ion_formula = Column(String)
+#     # target_ion_mechanism = Column(String)
+
+#     # sample_peak_interference = column_property(
+#     #     select([MatchInterference.__table__.c.sample_peak_interference]).where(
+#     #         MatchInterference.sample_item_id == sample_item_id
+#     #     )
+#     # )
+#     # sample_peak_interference = column_property(
+#     #     select([MatchInterference.sample_peak_interference]).where(
+#     #         MatchInterference.sample_item_id == sample_item_id
+#     #     )
+#     # )
+
+#     # The following properties can be used to emulate batch_match_filter
+
+#     # @hybrid_property
+#     # def sample_peak_area(self):
+#     #     # Emulates the logic inside the CASE WHEN statement
+#     #     return self.match.sample_peak_area if self._match_filter_condition() else 0
+
+#     # @hybrid_property
+#     # def match_score(self):
+#     #     # Emulates the logic inside the CASE WHEN statement
+#     #     return self.match.match_score if self._match_filter_condition() else 0
+
+#     # def _match_filter_condition(
+#     #     self,
+#     #     mz_tolerance,
+#     #     isotope_ratio_tolerance,
+#     #     min_isotope_correlation,
+#     #     min_isotope_abundance,
+#     #     peak_min_intensity,
+#     # ):
+#     #     # This private method is used to encapsulate the filter condition used in the CASE WHEN statements
+#     #     return (
+#     #         abs(self.match.match_mz_error) <= mz_tolerance
+#     #         and abs(self.match.match_abundance_error) <= isotope_ratio_tolerance
+#     #         and max(self.match.match_isotope_correlation, 0) >= min_isotope_correlation
+#     #         and self.match.sample_peak_area >= peak_min_intensity
+#     #         and self.match.relative_abundance >= min_isotope_abundance
+#     #     )
+
+
+# ________________________________________________________________________
+
+# class Sample(Base):
+#     __tablename__ = "sample"
+
+#     # SampleItem properties
+#     sample_item_id = Column(String, primary_key=True)
+#     sample_batch_id = Column(String, ForeignKey("sample_batch.sample_batch_id"))
+#     filename = Column(String, ForeignKey("sample_file.filename"))
+#     sample_item_name = Column(String)
+#     sample_item_type = Column(String)
+#     sample_item_attributes = Column(String)
+#     sample_item_utc_created = Column(TIMESTAMP)
+#     sample_item_utc_modified = Column(TIMESTAMP)
+#     filter_id = Column(String)
+
+#     # SampleFile properties
+#     instrument = Column(String(64))
+#     datetime = Column(TIMESTAMP)
+#     datetime_utc = Column(TIMESTAMP)
+#     length = Column(Float)
+#     range = Column(JSON)
+#     mz_calibration = Column(JSON)
+#     tic = Column(Float)
+
+#     # Match properties
+#     match_score = Column(Float)
+#     match_abundance_error = Column(Float)
+#     match_mz_error = Column(Float)
+#     match_isotope_correlation = Column(Float)
+#     sample_peak_area = Column(Float)
+
+#     # MatchInterference properties
+#     sample_peak_interference = Column(Float)
+
+#     # TargetIsotope properties
+#     relative_abundance = Column(Float)
+
+#     # TargetIon properties
+#     target_ion_formula = Column(String)
+
+#     # IonizationMechanism properties
+#     ionization_mechanism = Column(String)
+
+#     # TargetCompound properties
+#     target_compound_formula = Column(String)
+#     target_compound_id = Column(String)
+#     target_compound_name = Column(String)
+
+#     # More properties to aggregate data
+#     # e.g., MAX(match_score) AS match_score
+#     match_score = column_property(
+#         select([
+#             func.max(Match.match_score)
+#         ]).where(
+#             and_(
+#                 Match.sample_item_id == sample_item_id,
+#                 Match.match_mz_error <= ${mzTolerance},
+#                 Match.match_abundance_error <= ${isotopeRatioTolerance},
+#                 Match.match_isotope_correlation >= ${minIsotopeCorrelation},
+#                 TargetIsotope.relative_abundance >= ${minIsotopeAbundance},
+#                 Match.sample_peak_area >= ${peakMinIntensity}
+#             )
+#         )
+#     )
+
+#     sample_peak_area_sum = column_property(
+#         select([
+#             func.sum(Match.sample_peak_area)
+#         ]).where(
+#             and_(
+#                 Match.sample_item_id == sample_item_id,
+#                 Match.match_mz_error <= ${mzTolerance},
+#                 Match.match_abundance_error <= ${isotopeRatioTolerance},
+#                 Match.match_isotope_correlation >= ${minIsotopeCorrelation},
+#                 TargetIsotope.relative_abundance >= ${minIsotopeAbundance},
+#                 Match.sample_peak_area >= ${peakMinIntensity}
+#             )
+#         )
+#     )
+
+#     # Similar property definitions for other aggregated fields...
+
+#     # Define relationships
