@@ -12,7 +12,8 @@ class FilterParams(BaseModel):
 
 
 class MatchFilterBody(BaseModel):
-    batch_id: str
+    sample_batch_id: str
+    sample_item_id: Optional[str] = None
     filter_params: FilterParams
 
 
@@ -31,3 +32,4 @@ class GetSamplesBody(BaseModel):
     filter_params: Optional[FilterParams] = None
     page: Optional[int] = 0
     limit: Optional[int] = 10000
+    batch_matches_info: Optional[bool] = False

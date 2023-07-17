@@ -2,11 +2,13 @@ from fastapi import APIRouter
 from ..controllers.samples_controller import (
     get_sample_by_id,
     get_samples,
-    init_match_filter,
+    init_batch_match_filter,
+    init_sample_match_filter,
 )
 from ..models.pydantic_models.sample_pydantic_model import (
     MatchFilterBody,
     GetSamplesBody,
+    FilterParams,
 )
 
 samples_router = APIRouter()
@@ -31,18 +33,45 @@ async def get_samples_route(
         filter_params=body.filter_params,
         page=body.page,
         limit=body.limit,
+        batch_matches_info=body.batch_matches_info,
     )
 
 
-@samples_router.get("/api/samples/{sample_id}")
-async def get_sample_by_id_route(sample_id: str):
-    return await get_sample_by_id(sample_id)
-
-
-@samples_router.post("/api/samples/init_match_filter")
+@samples_router.post("/api/samples/init_batch_match_filter")
 async def init_match_filter_route(body: MatchFilterBody):
-    result = await init_match_filter(body.batch_id, body.filter_params)
+    result = await init_batch_match_filter(body.sample_batch_id, body.filter_params)
+
+    message = (
+        "Batch match filter successfully initialized"
+        if len(result) > 0
+        else "No matches found"
+    )
     return {
+        "message": message,
         "results": len(result),
         "data": result,
     }
+
+
+@samples_router.post("/api/samples/init_sample_match_filter")
+async def init_match_filter_route(body: MatchFilterBody):
+    result = await init_sample_match_filter(
+        body.sample_batch_id, body.sample_item_id, body.filter_params
+    )
+
+    message = (
+        "Sample match filter successfully initialized"
+        if len(result) > 0
+        else "No matches found"
+    )
+
+    return {
+        "message": message,
+        "results": len(result),
+        "data": result,
+    }
+
+
+@samples_router.post("/api/samples/{sample_item_id}")
+async def get_sample_by_id_route(sample_item_id: str, filter_params: FilterParams):
+    return await get_sample_by_id(sample_item_id, filter_params)

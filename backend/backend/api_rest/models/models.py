@@ -94,7 +94,6 @@ class SampleItem(Base):
         # TODO add cascade deletes when editting DELETE sample_item
         # cascade="all, delete, delete-orphan",
     )
-    sample = relationship("Sample", back_populates="sample_item")
 
     # Methods
     async def get_compound_intensity(self, session, compounds):
@@ -149,7 +148,6 @@ class SampleFile(Base):
 
     # Define relationships
     sample_item = relationship("SampleItem", back_populates="sample_file")
-    sample = relationship("Sample", back_populates="sample_file")
 
 
 class Match(Base):
@@ -326,27 +324,19 @@ class InstrumentFunction(Base):
 
 
 class Sample(Base):
-    __tablename__ = "sample"
+    __tablename__ = "sample_view"
+    __table_args__ = {"extend_existing": True}
 
-    # Primary Key
-    sample_id = Column(String(16), primary_key=True)
-
-    # Foreign Keys
-    sample_item_id = Column(
-        String(16), ForeignKey("sample_item.sample_item_id"), nullable=False
-    )
-    sample_file_id = Column(
-        String(256), ForeignKey("sample_file.sample_file_id"), nullable=False
-    )
-
-    # Columns
-    sample_batch_id = Column(String(16), nullable=False)
-    sample_item_name = Column(String(256), nullable=False)
-    filename = Column(String(256), nullable=False)
-    instrument = Column(String(64))
-    sample_item_type = Column(String(64), nullable=False)
+    # all columns read-only
+    sample_item_id = Column(String, primary_key=True)
+    sample_file_id = Column(String)
+    sample_batch_id = Column(String)
+    sample_item_name = Column(String)
+    filename = Column(String)
+    instrument = Column(String)
+    sample_item_type = Column(String)
     sample_item_attributes = Column(String)
-    filter_id = Column(String(6))
+    filter_id = Column(String)
     length = Column(Float)
     tic = Column(Float)
     range = Column(JSON)
@@ -355,7 +345,3 @@ class Sample(Base):
     datetime_utc = Column(TIMESTAMP)
     sample_item_utc_created = Column(TIMESTAMP)
     sample_item_utc_modified = Column(TIMESTAMP)
-
-    # Relationships
-    sample_item = relationship("SampleItem", back_populates="sample")
-    sample_file = relationship("SampleFile", back_populates="sample")

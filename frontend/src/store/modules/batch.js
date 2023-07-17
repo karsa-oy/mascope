@@ -13,7 +13,8 @@ const state = {
   targetIons: null,
   targetIsotopes: null,
   // matches
-  matchCollections: null,
+  // matchCollections: null,
+  matchSamples: null,
   matchCompounds: null,
   matchIons: null,
   // build parameters
@@ -184,7 +185,7 @@ export default {
             `
         )
         .then((res) => {
-          commit("SET_MATCH_COLLECTIONS", res);
+          commit("SET_MATCH_SAMPLES", res);
         });
       await rootState.api
         .query(
