@@ -489,7 +489,7 @@ export default {
       commit("SET_TARGET_IONS", null);
       commit("SET_TARGET_ISOTOPES", null);
       // matches
-      commit("SET_MATCH_COLLECTIONS", null);
+      commit("SET_MATCH_SAMPLES", null);
       commit("SET_MATCH_COMPOUNDS", null);
       commit("SET_MATCH_IONS", null);
       if (propagate) dispatch("sample/unload", null, { root: true });

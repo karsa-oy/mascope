@@ -91,8 +91,7 @@ class SampleItem(Base):
     match_interference = relationship(
         "MatchInterference",
         back_populates="sample_item",
-        # TODO add cascade deletes when editting DELETE sample_item
-        # cascade="all, delete, delete-orphan",
+        cascade="all, delete, delete-orphan",
     )
 
     # Methods
