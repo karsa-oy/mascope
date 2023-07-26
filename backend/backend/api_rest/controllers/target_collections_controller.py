@@ -98,6 +98,14 @@ async def create_target_collection(target_collection: TargetCollectionCreate):
         await session.refresh(new_target_collection)
         await sio.emit("org_reload", namespace="/")
 
+        if target_collection.sample_batches is not None:
+            for sample_batch_id in target_collection.sample_batches:
+                await sio.emit(
+                    "sample_batch_reload",
+                    room=sample_batch_id,
+                    namespace="/",
+                )
+
         return new_target_collection
 
 
@@ -113,6 +121,15 @@ async def delete_target_collection(target_collection_id: str):
 
         if not target_collection:
             raise HTTPException(status_code=404, detail="Target collection not found")
+
+        # Get all associated sample batches
+        sample_batches = await session.execute(
+            select(TargetCollectionInSampleBatch.sample_batch_id).filter(
+                TargetCollectionInSampleBatch.target_collection_id
+                == target_collection_id
+            )
+        )
+        sample_batch_ids = [sb for sb in sample_batches.scalars()]
 
         # Check if the compound is present in other collections
         compounds_in_collection = await session.execute(
@@ -139,9 +156,13 @@ async def delete_target_collection(target_collection_id: str):
         # Delete the target collection
         await session.delete(target_collection)
         await session.commit()
+
         await sio.emit("org_reload", namespace="/")
-        await sio.emit(
-            "sample_batch_reload",
-            # room=db_sample_item.sample_batch_id,
-            namespace="/",
-        )
+
+        # Emit the sample_batch_reload event to the related sample_batch rooms
+        for sample_batch_id in sample_batch_ids:
+            await sio.emit(
+                "sample_batch_reload",
+                room=sample_batch_id,
+                namespace="/",
+            )

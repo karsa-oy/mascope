@@ -1,19 +1,17 @@
-import pandas as pd
+# import pandas as pd
 
 from fastapi import HTTPException
 from sqlalchemy import asc, desc, func, select, or_
 from typing import List
 
-from backend.db.conn import conn
+# from backend.db.conn import conn
 from backend.db.id import gen_id
 from backend.lib.molmass import Formula
 from backend.db_api_rest import async_session
 
 from .ionization_mechanisms_controller import get_ionization_mechanisms
-from ..models.models import TargetCompound
+from ..models.models import TargetCompound, TargetIon, TargetIsotope
 from ..models.pydantic_models.target_compound_pydantic_model import TargetCompoundBase
-from ..models.pydantic_models.target_ion_pydantic_model import TargetIonBase
-from ..models.pydantic_models.target_isotope_pydantic_model import TargetIsotopeBase
 
 
 async def get_target_compounds(
@@ -123,7 +121,7 @@ async def create_target_compound(target_compounds: List[TargetCompoundBase]):
                 print("Failed to parse ion formula: %s" % e)
             else:
                 # construct and save ion row
-                ion = TargetIonBase(
+                ion = TargetIon(
                     target_ion_id=gen_id(),
                     target_compound_id=target_compound.target_compound_id,
                     ionization_mechanism_id=ionization_mechanism[
@@ -139,7 +137,7 @@ async def create_target_compound(target_compounds: List[TargetCompoundBase]):
                 raw_isotopes = raw_ion.mz_spectrum().values()
                 nonlocal target_isotopes
                 target_isotopes += [
-                    TargetIsotopeBase(
+                    TargetIsotope(
                         target_isotope_id=gen_id(),
                         target_ion_id=ion.target_ion_id,
                         mz=mz,
@@ -153,7 +151,7 @@ async def create_target_compound(target_compounds: List[TargetCompoundBase]):
         for ionization_mechanism in ionization_mechanisms:
             mechanism = ionization_mechanism["ionization_mechanism"]
             # construct and save ion row
-            ion = TargetIonBase(
+            ion = TargetIon(
                 target_ion_id=gen_id(),
                 target_compound_id=target_compound.target_compound_id,
                 ionization_mechanism_id=ionization_mechanism["ionization_mechanism_id"],
@@ -171,7 +169,7 @@ async def create_target_compound(target_compounds: List[TargetCompoundBase]):
                 raw_isotopes = [(-raw_ion.mz, 1.0)]
             nonlocal target_isotopes
             target_isotopes += [
-                TargetIsotopeBase(
+                TargetIsotope(
                     target_isotope_id=gen_id(),
                     target_ion_id=ion.target_ion_id,
                     mz=(target_compound_mass + reagent_mz),
@@ -208,7 +206,7 @@ async def create_target_compound(target_compounds: List[TargetCompoundBase]):
 
             if len(existing_compounds) == 0:
                 # save the new compound for creation if it doesn't exist
-                target_compound = TargetCompoundBase(
+                target_compound = TargetCompound(
                     target_compound_id=gen_id(),
                     target_compound_name=target_compound.target_compound_name,
                     target_compound_formula=norm(
@@ -236,21 +234,14 @@ async def create_target_compound(target_compounds: List[TargetCompoundBase]):
                 # Target compound given by composition
                 generate_target_ions_from_composition()
 
-        # Convert the targets to DataFrame using their dictionaries
-        target_compound_df = pd.DataFrame.from_records(
-            [t.dict() for t in target_compounds_to_create]
-        )
-        target_ion_df = pd.DataFrame.from_records([i.dict() for i in target_ions])
-        target_isotope_df = pd.DataFrame.from_records(
-            [i.dict() for i in target_isotopes]
-        )
+        # Add the targets to the database and commit
+        for target_compound in target_compounds_to_create:
+            session.add(target_compound)
+        for target_ion in target_ions:
+            session.add(target_ion)
+        for target_isotope in target_isotopes:
+            session.add(target_isotope)
 
-        # create the targets
-        target_compound_df.to_sql(
-            "target_compound", conn, if_exists="append", index=False
-        )
-        target_ion_df.to_sql("target_ion", conn, if_exists="append", index=False)
-        target_isotope_df.to_sql(
-            "target_isotope", conn, if_exists="append", index=False
-        )
+        await session.commit()
+
     return target_compound_ids

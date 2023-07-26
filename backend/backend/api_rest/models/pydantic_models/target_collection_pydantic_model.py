@@ -2,18 +2,6 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 from .target_compound_pydantic_model import TargetCompoundBase
 
-# class TargetCompoundBase(BaseModel):
-#     target_compound_id: Optional[str] = Field(
-#         None, description="ID of the target compound"
-#     )
-#     target_compound_name: str = Field(..., description="Name of the target compound")
-#     target_compound_formula: str = Field(
-#         ..., description="Formula of the target compound"
-#     )
-#     cas_number: Optional[str] = Field(
-#         None, description="CAS Number of the target compound"
-#     )
-
 
 class TargetCollectionBase(BaseModel):
     target_collection_name: str = Field(
