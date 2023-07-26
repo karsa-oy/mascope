@@ -6,13 +6,13 @@ from ..models.models import IonizationMechanism
 
 
 async def get_ionization_mechanisms(
-    ionization_mechanism_polarity: str,
-    ionization_mechanism: str,
-    reagent: str,
-    sort: str,
-    order: str,
-    page: int,
-    limit: int,
+    ionization_mechanism_polarity: str = None,
+    ionization_mechanism: str = None,
+    reagent: str = None,
+    sort: str = None,
+    order: str = None,
+    page: int = 0,
+    limit: int = 100,
 ):
     async with async_session() as session:
         stmt = select(IonizationMechanism)
@@ -21,11 +21,6 @@ async def get_ionization_mechanisms(
             stmt = stmt.filter(
                 IonizationMechanism.ionization_mechanism_polarity
                 == ionization_mechanism_polarity
-            )
-
-        if ionization_mechanism:
-            stmt = stmt.filter(
-                IonizationMechanism.ionization_mechanism == ionization_mechanism
             )
 
         if reagent:

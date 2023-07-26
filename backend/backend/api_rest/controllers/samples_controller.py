@@ -559,10 +559,18 @@ async def get_sample_by_id(sample_item_id: str, filter_params: FilterParams):
         sample_dict.update(matches)
 
         # Add the aggregated dataframes to the sample dictionary
-        sample_dict["match_collections"] = match_collections_df.to_dict("records")
-        sample_dict["match_compounds"] = match_compounds_df.to_dict("records")
-        sample_dict["match_ions"] = match_ions_df.to_dict("records")
-        sample_dict["match_isotopes"] = match_isotopes_df.to_dict("records")
+        sample_dict["match_collections"] = match_collections_df.sort_values(
+            by="match_score", ascending=False
+        ).to_dict("records")
+        sample_dict["match_compounds"] = match_compounds_df.sort_values(
+            by="match_score", ascending=False
+        ).to_dict("records")
+        sample_dict["match_ions"] = match_ions_df.sort_values(
+            by="match_score", ascending=False
+        ).to_dict("records")
+        sample_dict["match_isotopes"] = match_isotopes_df.sort_values(
+            by="match_score", ascending=False
+        ).to_dict("records")
 
         return sample_dict
 

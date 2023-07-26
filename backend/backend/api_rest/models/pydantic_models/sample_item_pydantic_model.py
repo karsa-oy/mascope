@@ -19,7 +19,6 @@ class SampleItemCreate(SampleItemBase):
 
 
 class SampleItemUpdate(SampleItemBase):
-    # sample_item_name: Optional[str] = Field(None, description="Name of the sample item")
     pass
 
 
