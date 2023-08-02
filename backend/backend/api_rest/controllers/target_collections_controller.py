@@ -72,9 +72,11 @@ async def create_target_collection(target_collection: TargetCollectionCreate):
         session.add(new_target_collection)
 
         # Create the target compounds
-        target_compound_ids = await create_target_compound(
+        target_compounds_result = await create_target_compound(
             target_collection.target_compounds
         )
+
+        target_compound_ids = target_compounds_result["target_compound_ids"]
 
         # Add the target compounds to the target collection
         for target_compound_id in target_compound_ids:
@@ -106,7 +108,17 @@ async def create_target_collection(target_collection: TargetCollectionCreate):
                     namespace="/",
                 )
 
-        return new_target_collection
+        return {
+            "new_target_collection": new_target_collection,
+            "created_compounds_count": len(
+                target_compounds_result["created_compounds"]
+            ),
+            "created_compounds": target_compounds_result["created_compounds"],
+            "existing_compounds_count": len(
+                target_compounds_result["existing_compounds"]
+            ),
+            "existing_compounds": target_compounds_result["existing_compounds"],
+        }
 
 
 async def delete_target_collection(target_collection_id: str):

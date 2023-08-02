@@ -30,7 +30,15 @@ async def get_target_collection_by_id_route(target_collection_id: str):
 
 @target_collections_router.post("/api/target_collections")
 async def create_target_collection_route(target_collection: TargetCollectionCreate):
-    return await create_target_collection(target_collection)
+    result = await create_target_collection(target_collection)
+    response = {
+        "new_target_collection": result["new_target_collection"],
+        "created_compounds_count": result["created_compounds_count"],
+        "created_compounds": result["created_compounds"],
+        "existing_compounds_count": result["existing_compounds_count"],
+        "existing_compounds": result["existing_compounds"],
+    }
+    return response
 
 
 @target_collections_router.delete("/api/target_collections/{target_collection_id}")
