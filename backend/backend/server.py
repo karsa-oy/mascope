@@ -26,6 +26,8 @@ from .api_rest.routes.match_interferences_routes import match_interferences_rout
 from .api_rest.routes.instrument_functions_routes import instrument_functions_router
 from .api_rest.routes.attribute_templates_routes import attribute_templates_router
 
+from .api_rest.routes.samples_routes import samples_router
+
 
 fastapi_app = FastAPI()
 
@@ -62,6 +64,7 @@ routers = [
     match_interferences_router,
     instrument_functions_router,
     attribute_templates_router,
+    samples_router,
 ]
 
 for router in routers:

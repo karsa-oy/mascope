@@ -88,10 +88,10 @@ class SampleItem(Base):
     match = relationship(
         "Match", back_populates="sample_item", cascade="all, delete, delete-orphan"
     )
-    target_isotope = relationship(
+    match_interference = relationship(
         "MatchInterference",
         back_populates="sample_item",
-        # TODO add cascade deletes when editting DELETE sample_item
+        cascade="all, delete, delete-orphan",
     )
 
     # Methods
@@ -169,11 +169,30 @@ class Match(Base):
     target_isotope = relationship("TargetIsotope", back_populates="match")
 
 
+class TargetCollection(Base):
+    __tablename__ = "target_collection"
+    target_collection_id = Column(String(16), primary_key=True)
+    target_collection_name = Column(String(256))
+    target_collection_description = Column(Text)
+
+    # Define relationships
+    sample_batch = relationship(
+        "TargetCollectionInSampleBatch",
+        back_populates="target_collection",
+        cascade="all, delete, delete-orphan",
+    )
+    target_compound = relationship(
+        "TargetCompoundInTargetCollection",
+        back_populates="target_collection",
+        cascade="all, delete, delete-orphan",
+    )
+
+
 class TargetCollectionInSampleBatch(Base):
     __tablename__ = "target_collection_in_sample_batch"
     target_collection_id = Column(
         String(16),
-        ForeignKey("target_collection.target_collection_id"),
+        ForeignKey("target_collection.target_collection_id", ondelete="CASCADE"),
         primary_key=True,
     )
     sample_batch_id = Column(
@@ -185,22 +204,6 @@ class TargetCollectionInSampleBatch(Base):
     sample_batch = relationship("SampleBatch", back_populates="target_collection")
 
 
-class TargetCollection(Base):
-    __tablename__ = "target_collection"
-    target_collection_id = Column(String(16), primary_key=True)
-    target_collection_name = Column(String(256))
-    target_collection_description = Column(Text)
-
-    # Define relationships
-    sample_batch = relationship(
-        "TargetCollectionInSampleBatch", back_populates="target_collection"
-    )
-    target_compound = relationship(
-        "TargetCompoundInTargetCollection",
-        back_populates="target_collection",
-    )
-
-
 class TargetCompoundInTargetCollection(Base):
     __tablename__ = "target_compound_in_target_collection"
     target_compound_id = Column(
@@ -208,7 +211,7 @@ class TargetCompoundInTargetCollection(Base):
     )
     target_collection_id = Column(
         String(16),
-        ForeignKey("target_collection.target_collection_id"),
+        ForeignKey("target_collection.target_collection_id", ondelete="CASCADE"),
         primary_key=True,
     )
 
@@ -230,10 +233,12 @@ class TargetCompound(Base):
     target_collection = relationship(
         "TargetCompoundInTargetCollection",
         back_populates="target_compound",
+        cascade="all, delete, delete-orphan",
     )
     target_ion = relationship(
         "TargetIon",
         back_populates="target_compound",
+        cascade="all, delete, delete-orphan",
     )
 
 
@@ -241,7 +246,7 @@ class TargetIon(Base):
     __tablename__ = "target_ion"
     target_ion_id = Column(String, primary_key=True)
     target_compound_id = Column(
-        String, ForeignKey("target_compound.target_compound_id")
+        String, ForeignKey("target_compound.target_compound_id", ondelete="CASCADE")
     )
     ionization_mechanism_id = Column(
         String, ForeignKey("ionization_mechanism.ionization_mechanism_id")
@@ -256,7 +261,11 @@ class TargetIon(Base):
     ionization_mechanism = relationship(
         "IonizationMechanism", back_populates="target_ion"
     )
-    target_isotope = relationship("TargetIsotope", back_populates="target_ion")
+    target_isotope = relationship(
+        "TargetIsotope",
+        back_populates="target_ion",
+        cascade="all, delete, delete-orphan",
+    )
 
 
 class IonizationMechanism(Base):
@@ -273,20 +282,25 @@ class IonizationMechanism(Base):
 class TargetIsotope(Base):
     __tablename__ = "target_isotope"
     target_isotope_id = Column(String, primary_key=True)
-    target_ion_id = Column(String, ForeignKey("target_ion.target_ion_id"))
+    target_ion_id = Column(
+        String, ForeignKey("target_ion.target_ion_id", ondelete="CASCADE")
+    )
     mz = Column(Float)
     relative_abundance = Column(
         Float, CheckConstraint("relative_abundance >= 0 AND relative_abundance <= 1")
     )
     # Define relationships
     target_ion = relationship("TargetIon", back_populates="target_isotope")
-    sample_item = relationship(
+    # TODO check cascade deletes to match and match_interference
+    match_interference = relationship(
         "MatchInterference",
         back_populates="target_isotope",
+        cascade="all, delete, delete-orphan",
     )
     match = relationship(
         "Match",
         back_populates="target_isotope",
+        cascade="all, delete, delete-orphan",
     )
 
 
@@ -302,8 +316,8 @@ class MatchInterference(Base):
     sample_peak_interference = Column(Float, nullable=False)
 
     # Define relationships
-    sample_item = relationship("SampleItem", back_populates="target_isotope")
-    target_isotope = relationship("TargetIsotope", back_populates="sample_item")
+    sample_item = relationship("SampleItem", back_populates="match_interference")
+    target_isotope = relationship("TargetIsotope", back_populates="match_interference")
 
 
 class AttributeTemplate(Base):
@@ -321,3 +335,27 @@ class InstrumentFunction(Base):
     datetime_utc = Column(TIMESTAMP)
     peakshape = Column(JSON)
     resolution_function = Column(JSON)
+
+
+class Sample(Base):
+    __tablename__ = "sample_view"
+    __table_args__ = {"extend_existing": True}
+
+    # all columns read-only
+    sample_item_id = Column(String, primary_key=True)
+    sample_file_id = Column(String)
+    sample_batch_id = Column(String)
+    sample_item_name = Column(String)
+    filename = Column(String)
+    instrument = Column(String)
+    sample_item_type = Column(String)
+    sample_item_attributes = Column(String)
+    filter_id = Column(String)
+    length = Column(Float)
+    tic = Column(Float)
+    range = Column(JSON)
+    mz_calibration = Column(JSON)
+    datetime = Column(TIMESTAMP)
+    datetime_utc = Column(TIMESTAMP)
+    sample_item_utc_created = Column(TIMESTAMP)
+    sample_item_utc_modified = Column(TIMESTAMP)
