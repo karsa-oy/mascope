@@ -15,7 +15,7 @@ async def get_affected_batches_and_collections(target_compound_id: str):
                 == target_compound_id
             )
         )
-        target_collections_ids = [tc[0] for tc in target_collections]
+        target_collections_ids = {tc[0] for tc in target_collections}
 
         # Get all affected sample batches
         sample_batches = await session.execute(
