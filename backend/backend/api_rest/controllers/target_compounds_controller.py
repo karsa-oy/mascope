@@ -11,6 +11,7 @@ from backend.db_api_rest import async_session
 from backend.api.match import match_batch_compute
 
 from .ionization_mechanisms_controller import get_ionization_mechanisms
+from .helpers_controller import get_affected_batches_and_collections
 from ..models.models import (
     TargetCompound,
     TargetIon,
@@ -334,29 +335,6 @@ async def create_target_compound(
 
 
 async def update_target_compound(target_compounds: List[TargetCompoundUpdate]):
-    # helper functions
-    async def get_affected_batches_and_collections(target_compound_id: str):
-        # Get the target collections for this compound
-        target_collections = await session.execute(
-            select(TargetCompoundInTargetCollection.target_collection_id).where(
-                TargetCompoundInTargetCollection.target_compound_id
-                == target_compound_id
-            )
-        )
-        target_collections_ids = [tc[0] for tc in target_collections]
-
-        # Get all affected sample batches
-        sample_batches = await session.execute(
-            select(TargetCollectionInSampleBatch.sample_batch_id).where(
-                TargetCollectionInSampleBatch.target_collection_id.in_(
-                    target_collections_ids
-                )
-            )
-        )
-        sample_batches_ids = {sb[0] for sb in sample_batches}
-
-        return sample_batches_ids, target_collections_ids
-
     async with async_session() as session:
         not_changed_target_compounds = []
         not_updated_target_compounds = []

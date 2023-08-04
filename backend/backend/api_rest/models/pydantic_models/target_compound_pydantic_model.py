@@ -17,6 +17,9 @@ class TargetCompoundBase(BaseModel):
 
 class TargetCompoundUpdate(BaseModel):
     target_compound_id: str = Field(..., description="ID of the target compound")
+    target_collection_id: Optional[str] = Field(
+        None, description="ID of the target collection"
+    )
     target_compound_name: str = Field(None, description="Name of the target compound")
     target_compound_formula: Optional[str] = Field(
         None, description="Formula of the target compound"

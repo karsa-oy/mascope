@@ -1,6 +1,6 @@
 from typing import List, Optional
 from pydantic import BaseModel, Field
-from .target_compound_pydantic_model import TargetCompoundBase
+from .target_compound_pydantic_model import TargetCompoundBase, TargetCompoundUpdate
 
 
 class TargetCollectionBase(BaseModel):
@@ -13,11 +13,20 @@ class TargetCollectionBase(BaseModel):
 
 
 class TargetCollectionCreate(TargetCollectionBase):
-    target_compounds: List[TargetCompoundBase] = Field(
-        ..., description="Compounds in the target collection"
+    target_compounds: Optional[List[TargetCompoundBase]] = Field(
+        None, description="Compounds in the target collection"
     )
     sample_batches: Optional[List[str]] = Field(
         None, description="List of sample batch ids related to the target collection"
+    )
+
+
+class TargetCollectionUpdate(TargetCollectionBase):
+    compounds_to_add: List[TargetCompoundUpdate] = Field(
+        [], description="List of compounds to add to the target collection"
+    )
+    compounds_to_remove: List[TargetCompoundUpdate] = Field(
+        [], description="List of compounds to remove from the target collection"
     )
 
 

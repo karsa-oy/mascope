@@ -61,107 +61,110 @@ async def get_target_collections_in_sample_batch(
 
 async def create_target_collection_in_sample_batch(
     target_collections_in_sample_batch: List[TargetCollectionInSampleBatchBase],
+    session=None,
 ):
+    independent_transaction = False
     added_collections_to_sample_batch = []
     sample_batches_to_rematch = set()
     message_log = {}
 
-    async with async_session() as session:
-        for i, target_collection_in_sample_batch in enumerate(
-            target_collections_in_sample_batch
-        ):
-            # Initialize messages list
-            message_log[i + 1] = {
-                "status_code": 0,
-                "messages": [],
-            }
+    if session is None:
+        independent_transaction = True
+        session = async_session()
 
-            # Check if target collection exists
-            result = await session.execute(
-                select(TargetCollection).filter(
-                    TargetCollection.target_collection_id
-                    == target_collection_in_sample_batch.target_collection_id
+    for i, target_collection_in_sample_batch in enumerate(
+        target_collections_in_sample_batch
+    ):
+        # Initialize messages list
+        message_log[i] = {
+            "status_code": 0,
+            "messages": [],
+        }
+
+        # Check if target collection exists
+        result = await session.execute(
+            select(TargetCollection).filter(
+                TargetCollection.target_collection_id
+                == target_collection_in_sample_batch.target_collection_id
+            )
+        )
+        target_collection = result.scalar_one_or_none()
+        if not target_collection:
+            message_log[i]["status_code"] = 404
+            message_log[i]["messages"].append(
+                "Target collection with target_collection_id: {} not found".format(
+                    target_collection_in_sample_batch.target_collection_id
                 )
             )
-            target_collection = result.scalar_one_or_none()
-            if not target_collection:
-                message_log[i + 1]["status_code"] = 404
-                message_log[i + 1]["messages"].append(
-                    "Target collection with target_collection_id: {} not found".format(
-                        target_collection_in_sample_batch.target_collection_id
-                    )
-                )
-                continue
+            continue
 
-            # Check if sample batch exists
-            result = await session.execute(
-                select(SampleBatch).filter(
-                    SampleBatch.sample_batch_id
-                    == target_collection_in_sample_batch.sample_batch_id
+        # Check if sample batch exists
+        result = await session.execute(
+            select(SampleBatch).filter(
+                SampleBatch.sample_batch_id
+                == target_collection_in_sample_batch.sample_batch_id
+            )
+        )
+        sample_batch = result.scalar_one_or_none()
+        if not sample_batch:
+            message_log[i]["status_code"] = 404
+            message_log[i]["messages"].append(
+                "Sample batch with sample_batch_id: {} not found".format(
+                    target_collection_in_sample_batch.sample_batch_id
                 )
             )
-            sample_batch = result.scalar_one_or_none()
-            if not sample_batch:
-                message_log[i + 1]["status_code"] = 404
-                message_log[i + 1]["messages"].append(
-                    "Sample batch with sample_batch_id: {} not found".format(
-                        target_collection_in_sample_batch.sample_batch_id
-                    )
-                )
-                continue
+            continue
 
-            # Check if the same entry already exists
-            result = await session.execute(
-                select(TargetCollectionInSampleBatch).filter(
-                    and_(
-                        TargetCollectionInSampleBatch.target_collection_id
-                        == target_collection_in_sample_batch.target_collection_id,
-                        TargetCollectionInSampleBatch.sample_batch_id
-                        == target_collection_in_sample_batch.sample_batch_id,
-                    )
+        # Check if the same entry already exists
+        result = await session.execute(
+            select(TargetCollectionInSampleBatch).filter(
+                and_(
+                    TargetCollectionInSampleBatch.target_collection_id
+                    == target_collection_in_sample_batch.target_collection_id,
+                    TargetCollectionInSampleBatch.sample_batch_id
+                    == target_collection_in_sample_batch.sample_batch_id,
                 )
             )
-            existing_entry = result.scalar_one_or_none()
+        )
+        existing_entry = result.scalar_one_or_none()
 
-            # If the entry already exists, log the error and skip this iteration
-            if existing_entry:
-                message_log[i + 1]["status_code"] = 409
-                message_log[i + 1]["messages"].append(
-                    "The collection (target_collection_id: {} ) is already added to the sample batch (sample_batch_id: {} )".format(
-                        target_collection_in_sample_batch.target_collection_id,
-                        target_collection_in_sample_batch.sample_batch_id,
-                    )
-                )
-                continue
-
-            # Create TargetCollectionInSampleBatch
-            new_target_collection_in_sample_batch = TargetCollectionInSampleBatch(
-                target_collection_id=target_collection_in_sample_batch.target_collection_id,
-                sample_batch_id=target_collection_in_sample_batch.sample_batch_id,
-            )
-            session.add(new_target_collection_in_sample_batch)
-
-            added_collections_to_sample_batch.append(
-                new_target_collection_in_sample_batch
-            )
-
-            message_log[i + 1]["status_code"] = 201
-            message_log[i + 1]["messages"].append(
-                "The collection {} was successfully added to sample batch {}".format(
+        # If the entry already exists, log the error and skip this iteration
+        if existing_entry:
+            message_log[i]["status_code"] = 409
+            message_log[i]["messages"].append(
+                "The collection (target_collection_id: {} ) is already added to the sample batch (sample_batch_id: {} )".format(
                     target_collection_in_sample_batch.target_collection_id,
                     target_collection_in_sample_batch.sample_batch_id,
                 )
             )
+            continue
 
-            # Add the sample batch id to the set
-            sample_batches_to_rematch.add(
-                new_target_collection_in_sample_batch.sample_batch_id
+        # Create TargetCollectionInSampleBatch
+        new_target_collection_in_sample_batch = TargetCollectionInSampleBatch(
+            target_collection_id=target_collection_in_sample_batch.target_collection_id,
+            sample_batch_id=target_collection_in_sample_batch.sample_batch_id,
+        )
+        session.add(new_target_collection_in_sample_batch)
+
+        added_collections_to_sample_batch.append(new_target_collection_in_sample_batch)
+
+        message_log[i]["status_code"] = 201
+        message_log[i]["messages"].append(
+            "The collection {} was successfully added to sample batch {}".format(
+                target_collection_in_sample_batch.target_collection_id,
+                target_collection_in_sample_batch.sample_batch_id,
             )
+        )
 
+        # Add the sample batch id to the set
+        sample_batches_to_rematch.add(
+            new_target_collection_in_sample_batch.sample_batch_id
+        )
+
+    if independent_transaction:
         await session.commit()
-
         # Run rematch for all sample batch ids in the set
-        # FIX replace with request? Do we need remathes in all cases?
+        # FIX replace with request?
         for sample_batch_id in sample_batches_to_rematch:
             task = asyncio.create_task(
                 match_batch_compute(
@@ -170,11 +173,13 @@ async def create_target_collection_in_sample_batch(
                 )
             )
             await task
+    else:
+        await session.flush()
 
-        return {
-            "added_collections_to_sample_batch": added_collections_to_sample_batch,
-            "message_logs": message_log,
-        }
+    return {
+        "added_collections_to_sample_batch": added_collections_to_sample_batch,
+        "message_logs": message_log,
+    }
 
 
 async def delete_target_collection_in_sample_batch(
