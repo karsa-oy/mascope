@@ -108,13 +108,6 @@ async def get_samples(
             # Convert the result to a dataframe
             batch_match_filter_df = pd.DataFrame(batch_match_filter_dict)
 
-            # print(
-            #     "\batch_match_filter_df",
-            #     len(batch_match_filter_df),
-            #     "results:\n",
-            #     batch_match_filter_df,
-            # )
-
             # Calculate matchIsotopes, matchIons, matchCompounds, matchCollections
 
             # If batch_match_filter_df is empty, assign None to relevant fields and continue
@@ -135,31 +128,7 @@ async def get_samples(
                 result_dict = {"results": total, "data": samples_df.to_dict("records")}
                 return result_dict
 
-            # # 1) Aggregate fields for matchIsotopes FIX can be removed to sped up, not use yet aside the length. Or could be used instead batch_match_filter?
-
-            # samples_dict = samples_df.to_dict("records")
-
-            # # Use list comprehension to create a list of coroutine objects
-            # coroutines = [
-            #     init_sample_match_filter(
-            #         sample["sample_batch_id"], sample["sample_item_id"], filter_params
-            #     )
-            #     for sample in samples_dict
-            # ]
-
-            # # Use asyncio.gather to run the coroutines concurrently and await their results
-            # sample_match_filter_dicts = await asyncio.gather(*coroutines)
-
-            # # Convert the results to dataframes and store them in a list
-            # match_isotopes_dfs = [
-            #     pd.DataFrame(sample_match_filter_dict)
-            #     for sample_match_filter_dict in sample_match_filter_dicts
-            # ]
-
-            # # Concatenate all the match_isotopes_df DataFrames in the list into one DataFrame
-            # match_isotopes_df = pd.concat(match_isotopes_dfs)
-
-            # 2) Aggregate fields for matchIons
+            # 1) Aggregate fields for matchIons
             match_ions_df = (
                 batch_match_filter_df.groupby(
                     [
@@ -193,14 +162,7 @@ async def get_samples(
                 )
             )
 
-            # print(
-            #     "\nmatch_ions_df",
-            #     len(match_ions_df),
-            #     "results:\n",
-            #     match_ions_df.sort_values(by="match_score", ascending=False),
-            # )
-
-            # 3) Aggregate fields for matchCompounds
+            # 2) Aggregate fields for matchCompounds
             match_compounds_df = (
                 match_ions_df.groupby(
                     [
@@ -228,13 +190,6 @@ async def get_samples(
                 )
             )
 
-            # print(
-            #     "\nmatch_compounds_df",
-            #     len(match_compounds_df),
-            #     "results:\n",
-            #     match_compounds_df.sort_values(by="match_score", ascending=False),
-            # )
-
             # Create a copy of match_compounds_df
             match_compounds_df_copy = match_compounds_df.copy()
 
@@ -249,7 +204,7 @@ async def get_samples(
                 max_match_score_idx, "sample_peak_interference_max"
             ]
 
-            # 4)  Aggregate fields for matchSamples
+            # 3)  Aggregate fields for matchSamples
             match_samples_df = (
                 match_compounds_df_copy.groupby(
                     [
@@ -272,13 +227,6 @@ async def get_samples(
                     }
                 )
             )
-
-            # print(
-            #     "\nmatch_samples_df",
-            #     len(match_samples_df),
-            #     "results:\n",
-            #     match_samples_df.sort_values(by="match_score", ascending=False),
-            # )
 
             # Select relevant columns from match_samples_df
             match_samples_df_short = match_samples_df[
@@ -408,13 +356,6 @@ async def get_sample_by_id(sample_item_id: str, filter_params: FilterParams):
             ],
         ]
 
-        # print(
-        #     "\nmatch_isotopes_df",
-        #     len(match_isotopes_df),
-        #     "results:\n",
-        #     match_isotopes_df,
-        # )
-
         # Aggregate fields for matchIons
         match_ions_df = (
             match_isotopes_df.groupby(
@@ -448,13 +389,6 @@ async def get_sample_by_id(sample_item_id: str, filter_params: FilterParams):
             )
         )
 
-        # print(
-        #     "\nmatch_ions_df",
-        #     len(match_ions_df),
-        #     "results:\n",
-        #     match_ions_df,
-        # )
-
         # Aggregate fields for matchCompounds
         match_compounds_df = (
             match_ions_df.groupby(
@@ -483,13 +417,6 @@ async def get_sample_by_id(sample_item_id: str, filter_params: FilterParams):
             )
         )
 
-        # print(
-        #     "\nmatch_compounds_df",
-        #     len(match_compounds_df),
-        #     "results:\n",
-        #     match_compounds_df,
-        # )
-
         # Aggregate fields for matchCollections
         match_collections_df = (
             match_compounds_df.groupby(
@@ -509,13 +436,6 @@ async def get_sample_by_id(sample_item_id: str, filter_params: FilterParams):
             )
             .reset_index()
         )
-
-        # print(
-        #     "\nmatch_collections_df",
-        #     len(match_collections_df),
-        #     "results:\n",
-        #     match_collections_df,
-        # )
 
         # Calculate and add fields match_score, sample_peak_area_sum, sample_peak_interference_sum, matched, selection
 
@@ -654,7 +574,6 @@ async def init_batch_match_filter(batch_id: str, filter_params: FilterParams):
             .where(Sample.sample_batch_id == batch_id)
         )
 
-        # return stmt
         result = await session.execute(stmt)
         batch_match_filter = result.fetchall()
 
