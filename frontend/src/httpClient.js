@@ -11,11 +11,21 @@ const logRequest = (request) => {
 };
 
 const logResponse = (response) => {
-  console.log(
-    `[httpClient] Response: ${response.status} ${
-      response.statusText
-    } from ${response.config.method.toUpperCase()} ${response.config.url}`
-  );
+  let logMessage = `[httpClient] Response: ${response.status} ${
+    response.statusText
+  } from ${response.config.method.toUpperCase()} ${response.config.url}`;
+  // Append the message if available
+  if (response.data && response.data.message) {
+    logMessage += ` | Message: ${response.data.message}`;
+  }
+
+  console.log(logMessage);
+
+  // Log the message-logs if available
+  if (response.data && response.data["message-logs"]) {
+    console.log(`[httpClient] Message-Logs:`, response.data["message-logs"]);
+  }
+
   return response;
 };
 
@@ -36,6 +46,7 @@ const openLoading = () => {
 
 const workspacesBaseUrl = "/workspaces";
 const batchesBaseUrl = "/sample_batches";
+const samplesBaseUrl = "/samples";
 const filesBaseUrl = "/sample_files";
 const itemsBaseUrl = "/sample_items";
 const calibrationBaseUrl = "/calibration";
@@ -165,6 +176,56 @@ export function createHttpClient(host, api_port) {
       }
     },
 
+    // Samples
+    getAllSamples: async (body) => {
+      try {
+        return await httpClient.post(samplesBaseUrl, body);
+      } catch (error) {
+        console.error("Failed to get all samples: ", error);
+      }
+    },
+
+    getSampleById: async (sample_item_id, filter_params) => {
+      try {
+        return await httpClient.post(
+          `${samplesBaseUrl}/${sample_item_id}`,
+          filter_params
+        );
+      } catch (error) {
+        console.error("Failed to get sample by id: ", error);
+      }
+    },
+
+    initBatchMatchFilter: async (body) => {
+      try {
+        return await httpClient.post(
+          `${samplesBaseUrl}/init_batch_match_filter`,
+          body
+        );
+      } catch (error) {
+        console.error("Failed to initialize batch match filter: ", error);
+      }
+    },
+
+    initSampleMatchFilter: async (body) => {
+      try {
+        return await httpClient.post(
+          `${samplesBaseUrl}/init_sample_match_filter`,
+          body
+        );
+      } catch (error) {
+        console.error("Failed to initialize sample match filter: ", error);
+      }
+    },
+
+    loadBatchTargets: async (body) => {
+      try {
+        return await httpClient.post(`${samplesBaseUrl}_batch_targets`, body);
+      } catch (error) {
+        console.error("Failed to fetch batch targets: ", error);
+      }
+    },
+
     // Sample Files
     getAllSampleFiles: async (params = {}) => {
       try {
@@ -225,6 +286,31 @@ export function createHttpClient(host, api_port) {
         return await httpClient.get(`${itemsBaseUrl}/${sample_item_id}`);
       } catch (error) {
         console.error("Failed to get sample item: ", error);
+      }
+    },
+
+    createSampleItem: async (newSampleItem) => {
+      try {
+        return await httpClient.post(itemsBaseUrl, newSampleItem);
+      } catch (error) {
+        console.error("Failed to create sample item: ", error);
+      }
+    },
+    updateSampleItem: async (sample_item_id, updatedSampleItem) => {
+      try {
+        return await httpClient.patch(
+          `${itemsBaseUrl}/${sample_item_id}`,
+          updatedSampleItem
+        );
+      } catch (error) {
+        console.error("Failed to update sample item: ", error);
+      }
+    },
+    deleteSampleItem: async (sample_item_id) => {
+      try {
+        return await httpClient.delete(`${itemsBaseUrl}/${sample_item_id}`);
+      } catch (error) {
+        console.error("Failed to delete sample item: ", error);
       }
     },
 
@@ -292,18 +378,80 @@ export function createHttpClient(host, api_port) {
       }
     },
 
-    // Target collections in sample batch
-    getAllTargetCollectionsInSampleBatch: async (params = {}) => {
+    createTargetCollection: async (newTargetCollection) => {
       try {
-        return await httpClient.get(
-          `${targetCollectionsInSampleBatchBaseUrl}`,
-          {
-            params,
-          }
+        return await httpClient.post(
+          targetCollectionsBaseUrl,
+          newTargetCollection
+        );
+      } catch (error) {
+        console.error("Failed to create target collection: ", error);
+      }
+    },
+    updateTargetCollection: async (
+      targetCollectionId,
+      updatedTargetCollection
+    ) => {
+      try {
+        return await httpClient.patch(
+          `${targetCollectionsBaseUrl}/${targetCollectionId}`,
+          updatedTargetCollection
+        );
+      } catch (error) {
+        console.error("Failed to update target collection: ", error);
+      }
+    },
+    deleteTargetCollection: async (
+      targetCollectionId,
+      deleteOrphanCompounds = false
+    ) => {
+      try {
+        return await httpClient.delete(
+          `${targetCollectionsBaseUrl}/${targetCollectionId}`,
+          { params: { delete_orphan_compounds: deleteOrphanCompounds } }
+        );
+      } catch (error) {
+        console.error("Failed to delete target collection: ", error);
+      }
+    },
+
+    // Target Collections in Sample Batch
+    getAllTargetCollectionsInSampleBatchByParams: async (params = {}) => {
+      try {
+        return await httpClient.get(targetCollectionsInSampleBatchBaseUrl, {
+          params,
+        });
+      } catch (error) {
+        console.error(
+          "Failed to get target collections in sample batch: ",
+          error
+        );
+      }
+    },
+    addTargetCollectionToSampleBatch: async (collectionsToSampleBatch) => {
+      try {
+        return await httpClient.post(
+          targetCollectionsInSampleBatchBaseUrl,
+          collectionsToSampleBatch
         );
       } catch (error) {
         console.error(
-          "Failed to get all target collections in sample batch: ",
+          "Failed to add target collection to sample batch: ",
+          error
+        );
+      }
+    },
+    removeTargetCollectionFromSampleBatch: async (
+      targetCollectionId,
+      sampleBatchId
+    ) => {
+      try {
+        return await httpClient.delete(
+          `${targetCollectionsInSampleBatchBaseUrl}/${targetCollectionId}/${sampleBatchId}`
+        );
+      } catch (error) {
+        console.error(
+          "Failed to remove target collection from sample batch: ",
           error
         );
       }
@@ -328,6 +476,30 @@ export function createHttpClient(host, api_port) {
       }
     },
 
+    createTargetCompounds: async (targetCompounds) => {
+      try {
+        return await httpClient.post(targetCompoundsBaseUrl, targetCompounds);
+      } catch (error) {
+        console.error("Failed to create target compounds: ", error);
+      }
+    },
+    updateTargetCompounds: async (targetCompounds) => {
+      try {
+        return await httpClient.patch(targetCompoundsBaseUrl, targetCompounds);
+      } catch (error) {
+        console.error("Failed to update target compounds: ", error);
+      }
+    },
+    deleteTargetCompound: async (targetCompoundId) => {
+      try {
+        return await httpClient.delete(
+          `${targetCompoundsBaseUrl}/${targetCompoundId}`
+        );
+      } catch (error) {
+        console.error("Failed to delete target compound: ", error);
+      }
+    },
+
     // Target compound in target collections
     getAllTargetCompoundsInTargetCollection: async (params = {}) => {
       try {
@@ -340,6 +512,36 @@ export function createHttpClient(host, api_port) {
       } catch (error) {
         console.error(
           "Failed to get all target compound in target collections: ",
+          error
+        );
+      }
+    },
+    addTargetCompoundToTargetCollection: async (
+      targetCompoundsInTargetCollection
+    ) => {
+      try {
+        return await httpClient.post(
+          targetCompoundsInTargetCollectionBaseUrl,
+          targetCompoundsInTargetCollection
+        );
+      } catch (error) {
+        console.error(
+          "Failed to add target compound to target collection: ",
+          error
+        );
+      }
+    },
+    removeTargetCompoundFromTargetCollection: async (
+      targetCompoundId,
+      targetCollectionId
+    ) => {
+      try {
+        return await httpClient.delete(
+          `${targetCompoundsInTargetCollectionBaseUrl}/${targetCompoundId}/${targetCollectionId}`
+        );
+      } catch (error) {
+        console.error(
+          "Failed to remove target compound from target collection: ",
           error
         );
       }

@@ -377,7 +377,6 @@ export default {
     ...get({
       allTemplates: "app/attributeTemplates",
       batchActive: "batch/active",
-      batchMzCalibration: "batch/mzCalibration",
       modalProps: "modal/sampleItemAttributesSaveProps",
       mzCalibrationParams: "calibration/params",
       mzFit: "calibration/mzFit",

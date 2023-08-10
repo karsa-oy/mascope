@@ -4,11 +4,13 @@ from ..controllers.samples_controller import (
     get_samples,
     init_batch_match_filter,
     init_sample_match_filter,
+    get_targets,
 )
 from ..models.pydantic_models.sample_pydantic_model import (
     MatchFilterBody,
     GetSamplesBody,
     FilterParams,
+    GetTargetsBody,
 )
 
 samples_router = APIRouter()
@@ -18,7 +20,7 @@ samples_router = APIRouter()
 async def get_samples_route(
     body: GetSamplesBody,
 ):
-    return await get_samples(
+    result = await get_samples(
         sample_item_id=body.sample_item_id,
         sample_item_id_active=body.sample_item_id_active,
         sample_file_id=body.sample_file_id,
@@ -36,20 +38,26 @@ async def get_samples_route(
         batch_matches_info=body.batch_matches_info,
     )
 
+    response = {
+        "message": result["message"],
+        "results": result["results"],
+        "data": result["data"],
+    }
+
+    if "batch_matches_info" in result and result["batch_matches_info"]:
+        response["batch_matches_info"] = result["batch_matches_info"]
+
+    return response
+
 
 @samples_router.post("/api/samples/init_batch_match_filter")
 async def init_match_filter_route(body: MatchFilterBody):
     result = await init_batch_match_filter(body.sample_batch_id, body.filter_params)
 
-    message = (
-        "Batch match filter successfully initialized"
-        if len(result) > 0
-        else "No matches found"
-    )
     return {
-        "message": message,
-        "results": len(result),
-        "data": result,
+        "results": len(result["data"]),
+        "message": result["message"],
+        "data": result["data"],
     }
 
 
@@ -59,19 +67,23 @@ async def init_match_filter_route(body: MatchFilterBody):
         body.sample_batch_id, body.sample_item_id, body.filter_params
     )
 
-    message = (
-        "Sample match filter successfully initialized"
-        if len(result) > 0
-        else "No matches found"
-    )
-
     return {
-        "message": message,
-        "results": len(result),
-        "data": result,
+        "results": len(result["data"]),
+        "message": result["message"],
+        "data": result["data"],
     }
 
 
 @samples_router.post("/api/samples/{sample_item_id}")
 async def get_sample_by_id_route(sample_item_id: str, filter_params: FilterParams):
-    return await get_sample_by_id(sample_item_id, filter_params)
+    result = await get_sample_by_id(sample_item_id, filter_params)
+    return {
+        "message": result["message"],
+        "data": result["data"],
+    }
+
+
+@samples_router.post("/api/samples_batch_targets")
+async def get_targets_route(body: GetTargetsBody):
+    result = await get_targets(body.sample_batch_id, body.ion_mechanisms)
+    return {"message": "Fetched targets successfully.", "data": result}

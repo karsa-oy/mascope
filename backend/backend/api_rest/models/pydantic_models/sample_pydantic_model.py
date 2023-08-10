@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel
 from datetime import datetime
 
@@ -33,3 +33,8 @@ class GetSamplesBody(BaseModel):
     page: Optional[int] = 0
     limit: Optional[int] = 10000
     batch_matches_info: Optional[bool] = False
+
+
+class GetTargetsBody(BaseModel):
+    sample_batch_id: str
+    ion_mechanisms: List[str]
