@@ -67,7 +67,8 @@ export default {
     }),
   },
   watch: {
-    param: function () {
+    param: function (newVal, oldVal) {
+      if (newVal === null) return;
       this.$emit("paramChange");
     },
   },

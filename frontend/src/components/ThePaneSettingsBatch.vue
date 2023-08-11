@@ -76,28 +76,18 @@ export default {
   },
   methods: {
     ...call({
-      // FIX
-      // batchLoad: "batch/load",
-      batchLoadMatches: "batch/loadMatches",
-      batchLoadSamples: "batch/loadSamples",
-      // TODO check call
+      batchLoadBatch: "batch/loadBatch",
       reloadMatchesSample: "sample/loadMatches",
     }),
     reloadMatches() {
-      // FIX
-      console.log(`⚠️ test 1 from ThePaneSettingsBatch.vue`);
       if (!this.batchActive) return;
-      console.log(`⚠️ test 2 from ThePaneSettingsBatch.vue`);
-      this.reloadMatchesBatch();
-      if (this.sampleFocused) this.reloadMatchesSample();
-    },
-    async reloadMatchesBatch() {
-      // FIX
-      console.log(`⚠️ test 3 from ThePaneSettingsBatch.vue`);
-      // await this.batchLoad(this.batchActive);
-      // FIX
-      // await this.batchLoadSamples();
-      // this.batchLoadMatches();
+      const activeSampleItemId = this.sampleFocused
+        ? this.sampleFocused.sample_item_id
+        : null;
+      this.batchLoadBatch(activeSampleItemId);
+      if (this.sampleFocused) {
+        this.reloadMatchesSample();
+      }
     },
   },
 };

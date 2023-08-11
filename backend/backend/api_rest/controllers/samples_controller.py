@@ -137,7 +137,11 @@ async def get_samples(
                     None,
                     0,
                 )
-                result_dict = {"results": total, "data": samples_df.to_dict("records")}
+                result_dict = {
+                    "results": total,
+                    "data": samples_df.to_dict("records"),
+                    "message": message,
+                }
                 return result_dict
 
             # 1) Aggregate fields for matchIons
@@ -344,7 +348,10 @@ async def get_sample_by_id(sample_item_id: str, filter_params: FilterParams):
                     "matchIsotopes": [],
                 }
             )
-            return sample_dict
+            return {
+                "data": sample_dict,
+                "message": message,
+            }
 
         # Aggregate fields for matchIsotopes
         match_isotopes_df = sample_match_filter_df.loc[
@@ -609,7 +616,7 @@ async def init_batch_match_filter(batch_id: str, filter_params: FilterParams):
         message = (
             "Batch match filter successfully initialized"
             if len(batch_match_filter_dict) > 0
-            else "No matches found"
+            else "No matches found for the batch"
         )
         return {
             "message": message,
@@ -729,7 +736,7 @@ async def init_sample_match_filter(
         message = (
             "Sample match filter successfully initialized"
             if len(sample_match_filter_dict) > 0
-            else "No matches found"
+            else "No matches found for the sample"
         )
         return {
             "message": message,

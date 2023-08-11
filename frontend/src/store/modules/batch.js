@@ -11,7 +11,6 @@ const state = {
   targetIons: null,
   targetIsotopes: null,
   // matches
-  // matchCollections: null,
   matchSamples: null,
   matchCompounds: null,
   matchIons: null,
@@ -38,7 +37,7 @@ const paramDefaults = {
   paramMinIsotopeAbundance: 0.15,
   paramMinIsotopeCorrelation: 0.8,
   paramMzTolerance: 15,
-  paramPeakMinIntensity: null,
+  paramPeakMinIntensity: 0,
   paramPeakMinSeparation: null,
   paramPossibleMatchThreshold: 0.7,
   paramProbableMatchThreshold: 0.8,
@@ -59,43 +58,40 @@ export default {
   },
   actions: {
     // data loading
-    async load({ rootState, state, commit, dispatch, getters }, batch) {
+    async load({ rootState, state, commit, dispatch }, batch) {
       if (state.active) await dispatch("unload");
       rootState.api.emit("subscribe", batch.sample_batch_id);
-      // set batch active
-      console.log(`⚠️ test 1 from batch.js`);
       await commit("SET_ACTIVE", batch);
-      console.log(`⚠️ test 2 from batch.js`);
-      // unpack parameters
-      console.log(`⚠️ test 3 from batch.js`);
       await dispatch("unpackParams");
-      console.log(`⚠️ test 4 from batch.js`);
       await dispatch("loadTargets");
-      const filterParams = getters["filterParams"];
+      await dispatch("loadBatch");
+    },
 
+    async loadBatch(
+      { rootState, state, commit, getters },
+      sampleItemIdActive = null
+    ) {
+      const batchId = state.active.sample_batch_id;
+      const filterParams = getters["filterParams"];
       const reqBody = {
-        sample_batch_id: batch.sample_batch_id,
+        sample_batch_id: batchId,
         batch_matches_info: true,
-        filter_params: {
-          mz_tolerance: filterParams.mz_tolerance,
-          isotope_ratio_tolerance: filterParams.isotope_ratio_tolerance,
-          peak_min_intensity: filterParams.peak_min_intensity,
-          min_isotope_abundance: filterParams.min_isotope_abundance,
-          min_isotope_correlation:
-            filterParams.min_isotope_correlation != null
-              ? filterParams.min_isotope_correlation
-              : paramDefaults.paramMinIsotopeCorrelation,
-        },
+        filter_params: { ...filterParams },
       };
+
+      // Add the sample_item_id_active if provided
+      if (sampleItemIdActive) {
+        reqBody.sample_item_id_active = sampleItemIdActive;
+      }
 
       try {
         const response = await rootState.api.httpClient.getAllSamples(reqBody);
         if (response.data) {
-          // Add order number
           response.data.data.forEach(
             (row, i) => (row.index = (i + 1).toString())
           );
           commit("SET_SAMPLE_ITEMS", response.data.data);
+          if (!response.data.batch_matches_info) return;
           commit(
             "SET_MATCH_SAMPLES",
             response.data.batch_matches_info.match_samples
@@ -107,7 +103,7 @@ export default {
           commit("SET_MATCH_IONS", response.data.batch_matches_info.match_ions);
         }
       } catch (error) {
-        console.error("Failed to load batch information: ", error);
+        console.error("Failed to load batch data: ", error);
       }
     },
 
@@ -233,7 +229,6 @@ export default {
         case 2:
           // Focus
           sampleItemFocused.selection = 3;
-          // TODO check call
           await dispatch("sample/load", sampleItemFocused, { root: true });
           break;
         case 3:

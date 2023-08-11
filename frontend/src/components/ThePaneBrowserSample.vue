@@ -155,7 +155,6 @@ export default {
       activateModal: "modal/activate",
     }),
     ...call({
-      batchLoad: "batch/load",
       itemFocus: "batch/sampleItemFocus",
       itemToggle: "batch/sampleItemToggle",
       batchToggle: "batch/batchToggle",
