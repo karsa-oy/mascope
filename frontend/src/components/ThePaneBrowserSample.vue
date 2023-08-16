@@ -309,11 +309,11 @@ export default {
         message: `Delete sample "${this.sampleItemFocused.sample_item_name}"
           from batch "${this.batchActive.sample_batch_name}"?`,
         confirmText: "Delete",
-        onConfirm: () => {
+        onConfirm: async () => {
           const itemId = this.sampleItemFocused.sample_item_id;
           // defocus
           this.itemFocus(this.sampleItemFocused);
-          this.$api.emit("sample_item_delete", [itemId]);
+          await this.$api.httpClient.deleteSampleItem(itemId);
         },
       });
     },

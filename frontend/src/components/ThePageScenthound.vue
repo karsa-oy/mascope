@@ -533,7 +533,7 @@ export default {
     sampleMatch() {
       this.$api.emit("match_item_compute", this.sampleActive);
     },
-    saveSampleInformation() {
+    async saveSampleInformation() {
       let newSampleItem = {
         filename: this.sampleFilename,
         sample_item_name: this.sampleItemName,
@@ -543,7 +543,7 @@ export default {
         filter_id: this.sampleItemFilterId,
       };
       if (!this.sampleActive) {
-        this.$api.emit("sample_item_create", [newSampleItem]);
+        await this.$api.httpClient.createSampleItem(newSampleItem);
       } else {
         newSampleItem = {
           ...newSampleItem,
@@ -551,7 +551,10 @@ export default {
           sample_item_attributes: this.sampleActive.sample_item_attributes,
           sample_item_utc_created: this.sampleActive.sample_item_utc_created,
         };
-        this.$api.emit("sample_item_update", [newSampleItem]);
+        await this.$api.httpClient.updateSampleItem(
+          newSampleItem.sample_item_id,
+          newSampleItem
+        );
       }
     },
     selectBatch(val) {

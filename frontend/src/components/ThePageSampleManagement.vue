@@ -118,8 +118,8 @@ export default {
     },
   },
   methods: {
-    sampleItemCreate(items) {
-      this.$api.emit("sample_item_create", items);
+    async sampleItemCreate(items) {
+      await this.$api.httpClient.createSampleItem(newSampleItem);
     },
     selectSampleFiles(newRows, oldRows) {
       let fields = this.sampleItemCols.map((col) => col.field);
@@ -140,12 +140,12 @@ export default {
           Add ${n} sample item${s} to batch ${b} in workspace ${w}?
         `,
         confirmText: "Add",
-        onConfirm: () => {
+        onConfirm: async () => {
           let rows = this.sampleItemRows.map((row) => ({
             ...row,
             sample_batch_id: this.batchActive.sample_batch_id,
           }));
-          this.sampleItemCreate(rows);
+          await this.sampleItemCreate(rows);
         },
       });
     },

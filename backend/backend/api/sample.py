@@ -93,108 +93,10 @@ async def sample_batch_export_peaks(sid, sample_batch_id):
         )
 
 
-# @sio.event(namespace="/")
-# async def sample_batch_update(sid, sample_batches):
-#     for sample_batch in sample_batches:
-#         sample_batch_df = pd.DataFrame.from_records([sample_batch])
-#         workspace_ids = pd.unique(sample_batch_df["workspace_id"]).tolist()
-#         if len(workspace_ids) != 1:
-#             raise ValueError("sample batches updated must be in exactly one workspace")
-#         [sample_batch_id] = sample_batch_df["sample_batch_id"].tolist()
-#         with conn:
-
-#             def need_for_rematch():
-#                 # Get difference in target collections
-#                 target_collection_ids_old = pd.read_sql(
-#                     f"""--sql
-#                     SELECT target_collection_id
-#                     FROM target_collection_in_sample_batch
-#                     WHERE sample_batch_id == ?
-#                     """,
-#                     conn,
-#                     params=[sample_batch_id],
-#                 )["target_collection_id"].tolist()
-#                 target_collection_ids_new = sample_batch_df[
-#                     "target_collection_id"
-#                 ].tolist()[0]
-#                 if set(target_collection_ids_new) != set(target_collection_ids_old):
-#                     return True
-
-#                 # Get difference in ionization mechanisms
-#                 ion_mechanism_ids_new = sample_batch_df["build_params"].tolist()[0][
-#                     "ion_mechanisms"
-#                 ]
-#                 ion_mechanism_ids_old = json.loads(
-#                     pd.read_sql(
-#                         f"""--sql
-#                         SELECT build_params
-#                         FROM sample_batch
-#                         WHERE sample_batch_id == ?
-#                         """,
-#                         conn,
-#                         params=[sample_batch_id],
-#                     )["build_params"].tolist()[0]
-#                 )["ion_mechanisms"]
-#                 if set(ion_msechanism_ids_new) != set(ion_mechanism_ids_old):
-#                     return True
-
-#                 # Both target collections and ionization mechanisms equal
-#                 return False
-
-#             rematch = need_for_rematch()
-#             # Make sure foreign keys is disabled to not cascade delete
-#             conn.execute("PRAGMA foreign_keys = 0")
-#             # Delete existing sample batch records
-#             conn.cursor().execute(
-#                 f"""
-#                 DELETE FROM sample_batch
-#                 WHERE sample_batch_id == ?
-#                 """,
-#                 [sample_batch_id],
-#             )
-#             conn.cursor().execute(
-#                 f"""
-#                 DELETE FROM target_collection_in_sample_batch
-#                 WHERE sample_batch_id == ?
-#                 """,
-#                 [sample_batch_id],
-#             )
-#             # Create new records with updated data
-#             sample_batch_df = sample_batch_df.assign(
-#                 build_params=sample_batch_df[["build_params"]].applymap(
-#                     lambda x: json.dumps(x)
-#                 ),
-#                 filter_params=sample_batch_df[["filter_params"]].applymap(
-#                     lambda x: json.dumps(x)
-#                 ),
-#             )
-#             sample_batch_df["sample_batch_utc_modified"] = [
-#                 datetime.now().isoformat()
-#             ] * len(sample_batch_df)
-#             sample_batch_df.drop(columns=["target_collection_id"]).to_sql(
-#                 "sample_batch", conn, if_exists="append", index=False
-#             )
-#             target_collection_in_sample_batch_df = (
-#                 sample_batch_df[["target_collection_id", "sample_batch_id"]]
-#                 .explode("target_collection_id", ignore_index=True)
-#                 .dropna()
-#             )
-#             target_collection_in_sample_batch_df.to_sql(
-#                 "target_collection_in_sample_batch",
-#                 conn,
-#                 if_exists="append",
-#                 index=False,
-#             )
-#         if rematch:
-#             sio.start_background_task(match_batch_compute, sid, sample_batch_id)
-#         else:
-#             [workspace_id] = workspace_ids
-#             await sio.emit("workspace_reload", room=workspace_id, namespace="/")
-
-
 # === sample items === #
 
 
+# TODO delete when refatoring backend\backend\api\scenthound.py
 def item_create(sample_items):
     sample_items = [
         {**sample_item, "sample_item_id": gen_id()} for sample_item in sample_items
@@ -220,6 +122,7 @@ def item_create(sample_items):
     return sample_item_df
 
 
+# TODO delete when refatoring backend\backend\api\scenthound.py
 @sio.event(namespace="/")
 async def sample_item_create(sid, sample_items):
     sample_item_df = item_create(sample_items)
@@ -230,96 +133,3 @@ async def sample_item_create(sid, sample_items):
     await sio.emit(
         "sample_batch_reload", room=sample_batch_id, skip_sid=sid, namespace="/"
     )
-
-
-@sio.event(namespace="/")
-async def sample_item_update(sid, sample_items):
-    sample_item_df = pd.DataFrame.from_records(sample_items)
-    sample_batch_ids = pd.unique(sample_item_df["sample_batch_id"]).tolist()
-    if len(sample_batch_ids) != 1:
-        raise ValueError("sample items updated must be in exactly one workspace")
-    else:
-        sample_item_ids = sample_item_df["sample_item_id"].tolist()
-        sample_item_id_refs = ",".join("?" * len(sample_item_ids))
-        sample_item_df = sample_item_df.assign(
-            sample_item_attributes=sample_item_df[["sample_item_attributes"]].applymap(
-                lambda x: json.dumps(x)
-            ),
-        )
-        sample_item_df["sample_item_utc_modified"] = [datetime.now().isoformat()] * len(
-            sample_item_df
-        )
-        with conn:
-            # Make sure foreign keys is disabled to not cascade delete
-            conn.execute("PRAGMA foreign_keys = 0")
-            # Delete existing sample item records
-            conn.cursor().execute(
-                f"""
-                DELETE FROM sample_item
-                WHERE sample_item_id IN ({sample_item_id_refs})
-                """,
-                sample_item_ids,
-            )
-            # Create new records with updated data
-            sample_item_df[
-                [
-                    "sample_item_id",
-                    "sample_batch_id",
-                    "filename",
-                    "filter_id",
-                    "sample_item_attributes",
-                    "sample_item_name",
-                    "sample_item_type",
-                    "sample_item_utc_created",
-                    "sample_item_utc_modified",
-                ]
-            ].to_sql("sample_item", conn, if_exists="append", index=False)
-        [sample_batch_id] = sample_batch_ids
-        await sio.emit("sample_batch_reload", room=sample_batch_id, namespace="/")
-
-
-@sio.event(namespace="/")
-async def sample_item_delete(sid, sample_item_ids):
-    sample_item_id_refs = ",".join("?" * len(sample_item_ids))
-    with conn:
-        sample_batch_ids = pd.read_sql(
-            f"""--sql
-            SELECT DISTINCT sample_batch_id
-            FROM sample_item
-            WHERE sample_item_id IN (
-                {sample_item_id_refs}
-            )
-            """,
-            conn,
-            params=sample_item_ids,
-        )["sample_batch_id"].tolist()
-        sample_batch_id_refs = ",".join("?" * len(sample_batch_ids))
-        workspace_ids = pd.read_sql(
-            f"""--sql
-            SELECT DISTINCT workspace_id
-            FROM sample_batch
-            WHERE sample_batch_id IN (
-                {sample_batch_id_refs}
-            )
-            """,
-            conn,
-            params=sample_batch_ids,
-        )["workspace_id"].tolist()
-        if len(workspace_ids) != 1:
-            raise ValueError("sample items deleted must be in exactly one workspace")
-        else:
-            # Enable foreign keys to properly cascade record deletes
-            conn.execute("PRAGMA foreign_keys = 1")
-            # Delete sample item records
-            conn.cursor().execute(
-                f"""
-                DELETE FROM sample_item
-                WHERE sample_item_id IN ({sample_item_id_refs})
-                """,
-                sample_item_ids,
-            )
-            # Disable foreign keys to not cascade delete when updating
-            conn.execute("PRAGMA foreign_keys = 0")
-            # Notify batch subscribers
-            [sample_batch_id] = sample_batch_ids
-            await sio.emit("sample_batch_reload", room=sample_batch_id, namespace="/")
