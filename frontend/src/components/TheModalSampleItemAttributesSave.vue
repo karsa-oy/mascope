@@ -377,7 +377,6 @@ export default {
     ...get({
       allTemplates: "app/attributeTemplates",
       batchActive: "batch/active",
-      batchMzCalibration: "batch/mzCalibration",
       modalProps: "modal/sampleItemAttributesSaveProps",
       mzCalibrationParams: "calibration/params",
       mzFit: "calibration/mzFit",
@@ -541,7 +540,7 @@ export default {
       }
     },
     async saveSampleItem() {
-      this.saveAttributes();
+      await this.saveAttributes();
     },
     saveTemplate() {
       this.$buefy.dialog.prompt({
@@ -588,7 +587,7 @@ export default {
         },
       });
     },
-    saveAttributes() {
+    async saveAttributes() {
       // convert [{label, value...}, ...] to object
       let props = {};
       let sample_item_attributes = {};
@@ -604,7 +603,7 @@ export default {
           sample_batch_id: this.batchActive.sample_batch_id,
           filter_id: this.sampleItemFilterId,
         };
-        this.$api.emit("sample_item_create", [newSampleItem]);
+        await this.$api.httpClient.createSampleItem(newSampleItem);
       } else if (this.action == "update") {
         let newSampleItem = {
           ...this.sampleActive,
@@ -614,7 +613,11 @@ export default {
           sample_batch_id: this.batchActive.sample_batch_id,
           filter_id: this.sampleItemFilterId,
         };
-        this.$api.emit("sample_item_update", [newSampleItem]);
+        await this.$api.httpClient.updateSampleItem(
+          newSampleItem.sample_item_id,
+          newSampleItem
+        );
+
         this.deactivateModal();
       }
     },
@@ -663,14 +666,21 @@ export default {
       }
       const attributesField = this.templateType + "_attributes";
       if (data.sampleItemRecordToLoad[attributesField]) {
-        Object.keys(data.sampleItemRecordToLoad[attributesField]).forEach(
-          (attr) =>
+        const attributes = data.sampleItemRecordToLoad[attributesField];
+        if (
+          attributes &&
+          typeof attributes === "object" &&
+          Object.keys(attributes).length > 0
+        ) {
+          Object.keys(attributes).forEach((attr) => {
             newTemplate.template.push({
               label: attr,
-              value: data.sampleItemRecordToLoad[attributesField][attr],
-            })
-        );
+              value: attributes[attr],
+            });
+          });
+        }
       }
+
       this.loadedTemplate = newTemplate;
       this.sampleFilename = data.sampleItemRecordToLoad.filename;
       this.sampleInstrument = data.sampleItemRecordToLoad.instrument;

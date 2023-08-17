@@ -15,7 +15,13 @@ from sqlalchemy.ext.declarative import declarative_base
 
 
 class BaseMixin(object):
-    def to_dict(self, include_tic=False, include_intensity=False, compounds=None):
+    def to_dict(
+        self,
+        include_tic=False,
+        include_intensity=False,
+        compounds=None,
+        include_selection=False,
+    ):
         data = {c.name: getattr(self, c.name) for c in self.__table__.columns}
         if include_tic and hasattr(self, "tic"):
             data["tic"] = self.tic
@@ -25,6 +31,8 @@ class BaseMixin(object):
             for compound in compounds:
                 compounds_intensity[compound] = getattr(self, compound, 0)
             data["compounds_intensity"] = compounds_intensity
+        if include_selection:
+            data["selection"] = 0
         return data
 
 

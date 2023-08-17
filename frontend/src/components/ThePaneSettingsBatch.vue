@@ -76,18 +76,18 @@ export default {
   },
   methods: {
     ...call({
-      batchLoadMatches: "batch/loadMatches",
-      batchLoadSamples: "batch/loadSamples",
+      batchLoadBatch: "batch/loadBatch",
       reloadMatchesSample: "sample/loadMatches",
     }),
     reloadMatches() {
       if (!this.batchActive) return;
-      this.reloadMatchesBatch();
-      if (this.sampleFocused) this.reloadMatchesSample();
-    },
-    async reloadMatchesBatch() {
-      await this.batchLoadSamples();
-      this.batchLoadMatches();
+      const activeSampleItemId = this.sampleFocused
+        ? this.sampleFocused.sample_item_id
+        : null;
+      this.batchLoadBatch(activeSampleItemId);
+      if (this.sampleFocused) {
+        this.reloadMatchesSample();
+      }
     },
   },
 };

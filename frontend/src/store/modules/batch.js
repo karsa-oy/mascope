@@ -3,8 +3,6 @@ import { camelToSnakeCase } from "../../lib/util";
 
 const state = {
   active: null,
-  // calibration
-  mzCalibration: null,
   // samples
   sampleItems: null,
   // targets
@@ -13,7 +11,6 @@ const state = {
   targetIons: null,
   targetIsotopes: null,
   // matches
-  // matchCollections: null,
   matchSamples: null,
   matchCompounds: null,
   matchIons: null,
@@ -40,7 +37,7 @@ const paramDefaults = {
   paramMinIsotopeAbundance: 0.15,
   paramMinIsotopeCorrelation: 0.8,
   paramMzTolerance: 15,
-  paramPeakMinIntensity: null,
+  paramPeakMinIntensity: 0,
   paramPeakMinSeparation: null,
   paramPossibleMatchThreshold: 0.7,
   paramProbableMatchThreshold: 0.8,
@@ -61,400 +58,80 @@ export default {
   },
   actions: {
     // data loading
-    async initMatchFilter({ rootState, state, getters }) {
-      const batchId = state.active.sample_batch_id;
-      // initialize match filter
-      const filterParams = getters["filterParams"];
-      const mzTolerance = filterParams.mz_tolerance;
-      const isotopeRatioTolerance = filterParams.isotope_ratio_tolerance;
-      const peakMinIntensity = filterParams.peak_min_intensity;
-      const minIsotopeAbundance = filterParams.min_isotope_abundance;
-      const minIsotopeCorrelation =
-        filterParams.min_isotope_correlation != null
-          ? filterParams.min_isotope_correlation
-          : paramDefaults.paramMinIsotopeCorrelation;
-      await rootState.api.query(`--sql
-                -- matches
-                DROP TABLE IF EXISTS batch_match_filter;
-                CREATE TEMPORARY TABLE batch_match_filter AS
-                    SELECT
-                    *
-                    FROM (
-                        SELECT
-                            filename,
-                            relative_abundance,
-                            sample_item_id,
-                            sample_item_name,
-                            sample_item_type,
-                            target_compound_formula,
-                            target_compound_id,
-                            target_compound_name,
-                            target_ion_formula,
-                            target_ion_id,
-                            ionization_mechanism AS target_ion_mechanism,
-                            target_isotope_id,
-                            sample_peak_interference,
-                            CASE
-                                WHEN (
-                                    ABS(match_mz_error) <= ${mzTolerance}
-                                    AND ABS(match_abundance_error) <= ${isotopeRatioTolerance}
-                                    AND MAX(match_isotope_correlation, 0) >= ${minIsotopeCorrelation}
-                                    AND relative_abundance >= ${minIsotopeAbundance}
-                                    )
-                                THEN sample_peak_area
-                                ELSE 0
-                            END AS sample_peak_area,
-                            CASE
-                                WHEN (
-                                    ABS(match_mz_error) <= ${mzTolerance}
-                                    AND ABS(match_abundance_error) <= ${isotopeRatioTolerance}
-                                    AND MAX(match_isotope_correlation, 0) >= ${minIsotopeCorrelation}
-                                    AND sample_peak_area >= ${peakMinIntensity}
-                                    AND relative_abundance >= ${minIsotopeAbundance}
-                                    )
-                                THEN match_score
-                                ELSE 0
-                            END AS match_score
-                        FROM sample_item
-                        NATURAL LEFT JOIN sample_batch
-                        NATURAL LEFT JOIN match
-                        NATURAL LEFT JOIN match_interference
-                        NATURAL LEFT JOIN target_isotope
-                        NATURAL LEFT JOIN target_ion
-                        NATURAL LEFT JOIN ionization_mechanism
-                        NATURAL LEFT JOIN target_compound
-                        WHERE (
-                            sample_batch_id == '${batchId}'
-                        )
-                    )
-            `);
-    },
     async load({ rootState, state, commit, dispatch }, batch) {
       if (state.active) await dispatch("unload");
-      const batchId = batch.sample_batch_id;
-      rootState.api.emit("subscribe", batchId);
-      // set batch active
+      rootState.api.emit("subscribe", batch.sample_batch_id);
       await commit("SET_ACTIVE", batch);
-      // unpack parameters
       await dispatch("unpackParams");
-      await dispatch("loadCalibration");
       await dispatch("loadTargets");
-      await dispatch("loadSamples");
-      await dispatch("loadMatches");
+      await dispatch("loadBatch");
     },
-    async loadCalibration({ rootState, commit }) {
-      const calibrationFilename = state.active.calibration_sample_filename;
-      await rootState.api
-        .query(
-          `--sql
-                -- calibration
-                SELECT
-                    mz_calibration
-                FROM sample_file
-                WHERE filename == '${calibrationFilename}'
-            `
-        )
-        .then((res) => {
-          if (res.length) commit("SET_MZ_CALIBRATION", res[0].mz_calibration);
-        });
-    },
-    async loadMatches({ rootState, commit }) {
-      // load matches
-      await rootState.api
-        .query(
-          `--sql
-                SELECT
-                    filename,
-                    sample_item_id,
-                    sample_item_name,
-                    MAX(match_score) AS match_score,
-                    SUM(sample_peak_area_sum) AS sample_peak_area_sum
-                FROM (
-                    SELECT
-                        filename,
-                        sample_item_id,
-                        sample_item_name,
-                        target_ion_id,
-                        target_compound_id,
-                        SUM(match_score*relative_abundance) AS match_score,
-                        SUM(sample_peak_area) AS sample_peak_area_sum
-                    FROM batch_match_filter
-                    GROUP BY sample_item_id, target_compound_id, target_ion_id
-                )
-                GROUP BY sample_item_id
-            `
-        )
-        .then((res) => {
-          commit("SET_MATCH_SAMPLES", res);
-        });
-      await rootState.api
-        .query(
-          `--sql
-                SELECT
-                    filename,
-                    sample_item_id,
-                    sample_item_name,
-                    sample_item_type,
-                    target_compound_formula,
-                    target_compound_id,
-                    target_compound_name,
-                    IFNULL(MAX(match_score), 0) as match_score,
-                    IFNULL(SUM(sample_peak_area_sum), 0) AS sample_peak_area_sum,
-                    MAX(sample_peak_interference_sum) AS sample_peak_interference_max
-                FROM (
-                    SELECT
-                        filename,
-                        sample_item_id,
-                        sample_item_name,
-                        sample_item_type,
-                        target_compound_formula,
-                        target_compound_id,
-                        target_compound_name,
-                        target_ion_id,
-                        SUM(match_score*relative_abundance) AS match_score,
-                        SUM(sample_peak_area) AS sample_peak_area_sum,
-                        SUM(sample_peak_interference) AS sample_peak_interference_sum
-                    FROM batch_match_filter
-                    GROUP BY sample_item_id, target_compound_id, target_ion_id
-                )
-                GROUP BY sample_item_id, target_compound_id;
-            `
-        )
-        .then((res) => {
-          commit("SET_MATCH_COMPOUNDS", res);
-        });
-      await rootState.api
-        .query(
-          `--sql
-                SELECT
-                    filename,
-                    sample_item_id,
-                    sample_item_name,
-                    sample_item_type,
-                    target_compound_formula,
-                    target_compound_id,
-                    target_compound_name,
-                    target_ion_formula,
-                    target_ion_mechanism,
-                    IFNULL(SUM(match_score*relative_abundance), 0) AS match_score,
-                    IFNULL(SUM(sample_peak_area), 0) AS sample_peak_area_sum,
-                    SUM(sample_peak_interference) AS sample_peak_interference_sum
-                FROM batch_match_filter
-                GROUP BY sample_item_id, target_compound_id, target_ion_id;
-            `
-        )
-        .then((res) => {
-          commit("SET_MATCH_IONS", res);
-        });
-    },
-    async loadSamples({ rootState, commit, dispatch }) {
-      // initialize match filter
-      await dispatch("initMatchFilter");
+
+    async loadBatch(
+      { rootState, state, commit, getters },
+      sampleItemIdActive = null
+    ) {
       const batchId = state.active.sample_batch_id;
-      // initialize sample filter
-      await rootState.api.query(`--sql
-                -- samples
-                DROP TABLE IF EXISTS sample_item_filter;
-                CREATE TEMPORARY TABLE sample_item_filter AS
-                    SELECT
-                        sample_item_id
-                    FROM sample_item
-                    WHERE sample_batch_id == '${batchId}'
-            `);
-      // load sample items
-      const sampleItemActiveId = rootState.sample.active
-        ? rootState.sample.active.sample_item_id
-        : null;
-      await rootState.api
-        .query(
-          `--sql
-                SELECT
-                    sample_item_id,
-                    sample_item_name,
-                    sample_item_attributes,
-                    sample_item_type,
-                    sample_batch_id,
-                    sample_file_id,
-                    filter_id,
-                    datetime,
-                    datetime_utc,
-                    filename,
-                    instrument,
-                    length,
-                    range,
-                    mz_calibration,
-                    sample_item_utc_created,
-                    sample_item_utc_modified,
-                    CASE
-                        WHEN (
-                            match_score IS NULL
-                        ) THEN 0
-                        ELSE 1
-                    END AS matched,
-                    IFNULL(MAX(match_score), 0) AS match_score,
-                    IFNULL(SUM(sample_peak_area_sum), 0) AS sample_peak_area_sum,
-                    sample_peak_interference_sum,
-                    CASE
-                        WHEN (
-                            sample_item_id == '${sampleItemActiveId}'
-                        ) THEN 3
-                        ELSE 0
-                    END AS selection,
-                    tic
-                FROM (
-                    -- ion level
-                    SELECT
-                        sample_item_id,
-                        target_ion_id,
-                        target_compound_id,
-                        SUM(match_score*relative_abundance) AS match_score,
-                        SUM(sample_peak_area) AS sample_peak_area_sum,
-                        SUM(sample_peak_interference) AS sample_peak_interference_sum
-                    FROM (
-                        -- isotope level
-                        SELECT
-                            sample_item_id,
-                            match_score,
-                            relative_abundance,
-                            sample_peak_area,
-                            sample_peak_interference,
-                            target_isotope_id,
-                            target_ion_id,
-                            target_compound_id
-                        FROM
-                            sample_item_filter
-                        NATURAL LEFT JOIN batch_match_filter
-                    )
-                    GROUP BY sample_item_id, target_compound_id, target_ion_id
-                )
-                NATURAL LEFT JOIN sample_item
-                NATURAL LEFT JOIN sample_file
-                GROUP BY sample_item_id
-                ORDER BY datetime_utc ASC
-            `
-        )
-        .then((res) => {
-          // Add order number
-          res.forEach((row, i) => (row.index = (i + 1).toString()));
-          commit("SET_SAMPLE_ITEMS", res);
-        });
+      const filterParams = getters["filterParams"];
+      const reqBody = {
+        sample_batch_id: batchId,
+        batch_matches_info: true,
+        filter_params: { ...filterParams },
+      };
+
+      // Add the sample_item_id_active if provided
+      if (sampleItemIdActive) {
+        reqBody.sample_item_id_active = sampleItemIdActive;
+      }
+
+      try {
+        const response = await rootState.api.httpClient.getAllSamples(reqBody);
+        if (response.data) {
+          response.data.data.forEach(
+            (row, i) => (row.index = (i + 1).toString())
+          );
+          commit("SET_SAMPLE_ITEMS", response.data.data);
+          if (!response.data.batch_matches_info) return;
+          commit(
+            "SET_MATCH_SAMPLES",
+            response.data.batch_matches_info.match_samples
+          );
+          commit(
+            "SET_MATCH_COMPOUNDS",
+            response.data.batch_matches_info.match_compounds
+          );
+          commit("SET_MATCH_IONS", response.data.batch_matches_info.match_ions);
+        }
+      } catch (error) {
+        console.error("Failed to load batch data: ", error);
+      }
     },
+
     async loadTargets({ rootState, state, commit }) {
       const batchId = state.active.sample_batch_id;
-      // initialize target collection filter
-      await rootState.api.query(`--sql
-                DROP TABLE IF EXISTS target_collection_filter;
-                CREATE TEMPORARY TABLE target_collection_filter AS
-                    SELECT
-                        target_collection_id
-                        ,0 as selection
-                    FROM target_collection
-                    NATURAL JOIN target_collection_in_sample_batch
-                    WHERE sample_batch_id == '${batchId}'
-            `);
-      // load target collections
-      await rootState.api
-        .query(
-          `--sql
-                SELECT
-                    target_collection_id,
-                    target_collection_name,
-                    target_collection_description,
-                    selection
-                FROM target_collection_filter
-                NATURAL LEFT JOIN target_collection
-            `
-        )
-        .then((res) => {
-          commit("SET_TARGET_COLLECTIONS", res);
-        });
-      // initialize target compound filter
-      await rootState.api.query(`--sql
-                DROP TABLE IF EXISTS target_compound_filter;
-                CREATE TEMPORARY TABLE target_compound_filter AS
-                    SELECT
-                        target_compound_id,
-                        target_collection_id
-                        ,0 as selection
-                    FROM target_compound
-                    NATURAL JOIN target_compound_in_target_collection
-                    NATURAL JOIN target_collection_in_sample_batch
-                    WHERE sample_batch_id == '${batchId}'
-            `);
-      // load target compounds
-      await rootState.api
-        .query(
-          `--sql
-                SELECT
-                    target_compound_id,
-                    target_compound_name,
-                    target_compound_formula,
-                    target_collection_id,
-                    cas_number,
-                    selection
-                FROM target_compound_filter
-                NATURAL LEFT JOIN target_compound
-            `
-        )
-        .then((res) => {
-          commit("SET_TARGET_COMPOUNDS", res);
-        });
-      // initialize target ion filter
-      await rootState.api.query(`--sql
-                DROP TABLE IF EXISTS target_ion_filter;
-                CREATE TEMPORARY TABLE target_ion_filter AS
-                SELECT
-                    target_ion_id,
-                    target_ion_formula,
-                    target_compound_id,
-                    target_collection_id,
-                    ionization_mechanism_id,
-                    ionization_mechanism
-                    ,0 as selection
-                FROM (
-                    SELECT
-                    *
-                    FROM
-                        target_ion
-                    NATURAL LEFT JOIN ionization_mechanism
-                    WHERE ionization_mechanism_id IN (
-                        ${
-                          `'` +
-                          state.active.build_params.ion_mechanisms.join(`','`) +
-                          `'`
-                        }
-                    )
-                )
-                NATURAL JOIN target_compound_filter;
-            `);
-      // load target ions
-      await rootState.api
-        .query(
-          `--sql
-                SELECT
-                    *
-                FROM target_ion_filter
-            `
-        )
-        .then((res) => {
-          commit("SET_TARGET_IONS", res);
-        });
+      const ionMechanisms = state.active.build_params.ion_mechanisms;
 
-      // load target isotopes
-      await rootState.api
-        .query(
-          `--sql
-                SELECT
-                    target_isotope.*,
-                    selection
-                FROM target_isotope
-                NATURAL JOIN target_ion_filter
-            `
-        )
-        .then((res) => {
-          commit("SET_TARGET_ISOTOPES", res);
-        });
+      const body = {
+        sample_batch_id: batchId,
+        ion_mechanisms: ionMechanisms,
+      };
+      try {
+        const response = await rootState.api.httpClient.loadBatchTargets(body);
+
+        if (response && response.data) {
+          const data = response.data.data;
+
+          // Setting targets using fetched data
+          commit("SET_TARGET_COLLECTIONS", data.target_collections);
+          commit("SET_TARGET_COMPOUNDS", data.target_compounds);
+          commit("SET_TARGET_IONS", data.target_ions);
+          commit("SET_TARGET_ISOTOPES", data.target_isotopes);
+        }
+      } catch (error) {
+        console.error("Failed to load batch targets: ", error);
+      }
     },
+
     async reload(
       { rootGetters, getters, rootState, state, dispatch },
       batch = null
@@ -477,8 +154,6 @@ export default {
       if (!state.active) return;
       rootState.api.emit("unsubscribe", state.active.sample_batch_id);
       commit("SET_ACTIVE", null);
-      // calibration
-      commit("SET_MZ_CALIBRATION", null);
       // parameters
       dispatch("resetParams");
       // samples

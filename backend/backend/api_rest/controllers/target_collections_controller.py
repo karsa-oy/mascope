@@ -230,6 +230,8 @@ async def create_target_collection(target_collection: TargetCollectionCreate):
             )
             await task
 
+        await sio.emit("org_reload", namespace="/")
+
         return {
             "new_target_collection": new_target_collection,
             "created_compounds_count": len(

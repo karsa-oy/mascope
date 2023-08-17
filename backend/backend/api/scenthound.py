@@ -6,6 +6,8 @@ from backend.api.calibration import (
     mz_calibrate_sample as calibration_mz_calibrate_sample,
 )
 from backend.api.match import item_compute as match_item_compute
+
+# TODO replace with controllers
 from backend.api.sample import item_create as sample_item_create
 from backend.db.conn import conn
 from backend.server import sio
@@ -34,6 +36,7 @@ async def scenthound_process_sample(sid, sample_item):
 @sio.event(namespace="/")
 async def scenthound_process_samples(sid, sample_items):
     # Create sample item records
+    # TODO replace with controllers?
     sample_item_df = sample_item_create(sample_items)
     sample_items = sample_item_df.to_dict("records")
 

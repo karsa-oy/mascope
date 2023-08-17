@@ -1,8 +1,19 @@
 import pandas as pd
-import asyncio
 from datetime import datetime
+from collections import defaultdict
 from fastapi import HTTPException
-from sqlalchemy import asc, desc, and_, select, func, case, cast, Float, literal_column
+from sqlalchemy import (
+    asc,
+    desc,
+    and_,
+    select,
+    func,
+    case,
+    cast,
+    Float,
+    literal,
+)
+from typing import List
 
 from backend.db_api_rest import async_session
 
@@ -100,12 +111,13 @@ async def get_samples(
 
         if sample_batch_id and filter_params:
             # Calculate and add fields match_score, sample_peak_area_sum, sample_peak_interference_sum, matched
-            # call to init_match_filter
-            batch_match_filter_dict = await init_batch_match_filter(
+            batch_match_filter_result = await init_batch_match_filter(
                 sample_batch_id, filter_params
             )
 
             # Convert the result to a dataframe
+            batch_match_filter_dict = batch_match_filter_result["data"]
+            message = batch_match_filter_result["message"]
             batch_match_filter_df = pd.DataFrame(batch_match_filter_dict)
 
             # Calculate matchIsotopes, matchIons, matchCompounds, matchCollections
@@ -125,7 +137,11 @@ async def get_samples(
                     None,
                     0,
                 )
-                result_dict = {"results": total, "data": samples_df.to_dict("records")}
+                result_dict = {
+                    "results": total,
+                    "data": samples_df.to_dict("records"),
+                    "message": message,
+                }
                 return result_dict
 
             # 1) Aggregate fields for matchIons
@@ -265,8 +281,11 @@ async def get_samples(
                 0
             )
 
-        result_dict = {"results": total, "data": samples_df.to_dict("records")}
-
+        result_dict = {
+            "results": total,
+            "data": samples_df.to_dict("records"),
+            "message": message,
+        }
         # If batch_matches_info is true, calculate matches and add match dataframes to the result
         if batch_matches_info and sample_batch_id and filter_params:
             result_dict["batch_matches_info"] = {
@@ -304,12 +323,13 @@ async def get_sample_by_id(sample_item_id: str, filter_params: FilterParams):
 
         # Calculate matchIsotopes, matchIons, matchCompounds, matchCollections
 
-        # call to init_match_filter
-        sample_match_filter_dict = await init_sample_match_filter(
+        sample_match_filter_result = await init_sample_match_filter(
             sample.sample_batch_id, sample.sample_item_id, filter_params
         )
 
         # Convert the result to a dataframe
+        sample_match_filter_dict = sample_match_filter_result["data"]
+        message = sample_match_filter_result["message"]
         sample_match_filter_df = pd.DataFrame(sample_match_filter_dict)
 
         # If sample_match_filter_df is empty, return the sample dictionary with empty fields
@@ -328,7 +348,10 @@ async def get_sample_by_id(sample_item_id: str, filter_params: FilterParams):
                     "matchIsotopes": [],
                 }
             )
-            return sample_dict
+            return {
+                "data": sample_dict,
+                "message": message,
+            }
 
         # Aggregate fields for matchIsotopes
         match_isotopes_df = sample_match_filter_df.loc[
@@ -355,6 +378,11 @@ async def get_sample_by_id(sample_item_id: str, filter_params: FilterParams):
                 "target_compound_formula",
             ],
         ]
+
+        # Drop duplicates for matchIsotopes based on target_isotope_id
+        match_isotopes_unique_df = match_isotopes_df.drop_duplicates(
+            subset="target_isotope_id"
+        )
 
         # Aggregate fields for matchIons
         match_ions_df = (
@@ -389,6 +417,8 @@ async def get_sample_by_id(sample_item_id: str, filter_params: FilterParams):
             )
         )
 
+        # Drop duplicates for matchIons based on target_ion_id
+        match_ions_unique_df = match_ions_df.drop_duplicates(subset="target_ion_id")
         # Aggregate fields for matchCompounds
         match_compounds_df = (
             match_ions_df.groupby(
@@ -469,8 +499,8 @@ async def get_sample_by_id(sample_item_id: str, filter_params: FilterParams):
         # Add the matches field as a dictionary
         matches = {
             "matches": {
-                "match_isotopes": len(match_isotopes_df),
-                "match_ions": len(match_ions_df),
+                "match_isotopes": len(match_isotopes_unique_df),
+                "match_ions": len(match_ions_unique_df),
                 "match_compounds": len(match_compounds_df),
                 "match_collections": len(match_collections_df),
             }
@@ -485,14 +515,17 @@ async def get_sample_by_id(sample_item_id: str, filter_params: FilterParams):
         sample_dict["match_compounds"] = match_compounds_df.sort_values(
             by="match_score", ascending=False
         ).to_dict("records")
-        sample_dict["match_ions"] = match_ions_df.sort_values(
+        sample_dict["match_ions"] = match_ions_unique_df.sort_values(
             by="match_score", ascending=False
         ).to_dict("records")
-        sample_dict["match_isotopes"] = match_isotopes_df.sort_values(
+        sample_dict["match_isotopes"] = match_isotopes_unique_df.sort_values(
             by="match_score", ascending=False
         ).to_dict("records")
 
-        return sample_dict
+        return {
+            "data": sample_dict,
+            "message": message,
+        }
 
 
 async def init_batch_match_filter(batch_id: str, filter_params: FilterParams):
@@ -580,7 +613,15 @@ async def init_batch_match_filter(batch_id: str, filter_params: FilterParams):
         # Convert each Row object in the result into a dictionary
         batch_match_filter_dict = [row._asdict() for row in batch_match_filter]
 
-        return batch_match_filter_dict
+        message = (
+            "Batch match filter successfully initialized"
+            if len(batch_match_filter_dict) > 0
+            else "No matches found for the batch"
+        )
+        return {
+            "message": message,
+            "data": batch_match_filter_dict,
+        }
 
 
 async def init_sample_match_filter(
@@ -641,7 +682,7 @@ async def init_sample_match_filter(
                 TargetIon.target_ion_formula,
                 TargetIon.target_ion_id,
                 TargetIsotope.target_isotope_id,
-                literal_column("2").label("selection"),
+                literal(2).label("selection"),
             )
             .select_from(Sample)
             .join(Match, Sample.sample_item_id == Match.sample_item_id)
@@ -692,4 +733,174 @@ async def init_sample_match_filter(
         # Convert each Row object in the result into a dictionary
         sample_match_filter_dict = [row._asdict() for row in sample_match_filter]
 
-        return sample_match_filter_dict
+        message = (
+            "Sample match filter successfully initialized"
+            if len(sample_match_filter_dict) > 0
+            else "No matches found for the sample"
+        )
+        return {
+            "message": message,
+            "data": sample_match_filter_dict,
+        }
+
+
+async def get_targets(sample_batch_id: str, ion_mechanisms: List[str]):
+    async with async_session() as session:
+        #   TargetCollections
+        # Fetch TargetCollections associated with the sample_batch_id
+        target_collections = await session.execute(
+            select(
+                TargetCollection,
+                literal(0).label("selection"),
+            )
+            .join(
+                TargetCollectionInSampleBatch,
+                TargetCollectionInSampleBatch.target_collection_id
+                == TargetCollection.target_collection_id,
+            )
+            .filter(TargetCollectionInSampleBatch.sample_batch_id == sample_batch_id)
+        )
+        target_collections = target_collections.scalars().all()
+
+        # Fetch the required target_collection_ids
+        target_collection_ids = [tc.target_collection_id for tc in target_collections]
+
+        #   TargetCompounds
+        # Fetch TargetCompounds associated with the fetched TargetCollections and add the associated target_collection_id
+        target_compounds_query = await session.execute(
+            select(TargetCompound)
+            .join(
+                TargetCompoundInTargetCollection,
+                TargetCompoundInTargetCollection.target_compound_id
+                == TargetCompound.target_compound_id,
+            )
+            .filter(
+                TargetCompoundInTargetCollection.target_collection_id.in_(
+                    [tc.target_collection_id for tc in target_collections]
+                )
+            )
+        )
+        target_compounds = target_compounds_query.scalars().all()
+
+        associations_list = []
+
+        associations = await session.execute(
+            select(
+                TargetCompoundInTargetCollection.target_compound_id,
+                TargetCompoundInTargetCollection.target_collection_id,
+            ).filter(
+                TargetCompoundInTargetCollection.target_collection_id.in_(
+                    target_collection_ids
+                )
+            )
+        )
+
+        for association in associations:
+            compound_id = association.target_compound_id
+            collection_id = association.target_collection_id
+            associations_list.append((compound_id, collection_id))
+
+        # Convert target_compounds to a dictionary for faster lookup
+        target_compounds_dict_lookup = {
+            tc.target_compound_id: tc for tc in target_compounds
+        }
+
+        target_compounds_dict = []
+        for compound_id, collection_id in associations_list:
+            tc = target_compounds_dict_lookup.get(compound_id)
+            if tc:
+                target_compounds_dict.append(
+                    {
+                        **tc.to_dict(),
+                        "target_collection_id": collection_id,
+                        "selection": 0,
+                    }
+                )
+
+        #   TargetIons
+        # Fetch TargetIons associated with the fetched TargetCompounds, ion_mechanisms, and relevant TargetCollections
+        target_ions_query = await session.execute(
+            select(TargetIon)
+            .distinct(TargetIon.target_ion_id)
+            .join(
+                TargetCompoundInTargetCollection,
+                TargetIon.target_compound_id
+                == TargetCompoundInTargetCollection.target_compound_id,
+            )
+            .join(
+                IonizationMechanism,
+                TargetIon.ionization_mechanism_id
+                == IonizationMechanism.ionization_mechanism_id,
+            )
+            .filter(
+                TargetCompoundInTargetCollection.target_collection_id.in_(
+                    target_collection_ids
+                ),
+                TargetIon.target_compound_id.in_(
+                    [tc.target_compound_id for tc in target_compounds]
+                ),
+                IonizationMechanism.ionization_mechanism_id.in_(ion_mechanisms),
+            )
+        )
+        target_ions = target_ions_query.scalars().all()
+
+        # Create a lookup dictionary for target_compound_id -> target_collection_id
+        target_compound_to_collection = {
+            tc["target_compound_id"]: tc["target_collection_id"]
+            for tc in target_compounds_dict
+        }
+
+        # Fetch all ionization mechanisms and create a lookup dictionary for them
+        ion_mechanisms_query = await session.execute(
+            select(
+                IonizationMechanism.ionization_mechanism_id,
+                IonizationMechanism.ionization_mechanism,
+            )
+        )
+        ion_mechanisms_associations = {
+            im.ionization_mechanism_id: im.ionization_mechanism
+            for im in ion_mechanisms_query
+        }
+
+        # Create TargetIons dictionary including the new fields
+        target_ions_dict = [
+            {
+                **ti.to_dict(),
+                "target_collection_id": target_compound_to_collection.get(
+                    ti.target_compound_id
+                ),
+                "ionization_mechanism": ion_mechanisms_associations.get(
+                    ti.ionization_mechanism_id
+                ),
+                "selection": 0,
+            }
+            for ti in target_ions
+        ]
+        #   TargetIsotopes
+        # Fetch TargetIsotopes associated with the fetched TargetIons
+        target_isotopes = await session.execute(
+            select(
+                TargetIsotope,
+                literal(0).label("selection"),
+            ).filter(
+                TargetIsotope.target_ion_id.in_(
+                    [ti.target_ion_id for ti in target_ions]
+                )
+            )
+        )
+        target_isotopes = target_isotopes.scalars().all()
+
+        return {
+            "target_collections_count": len(target_collections),
+            "target_compounds_count": len(target_compounds),
+            "target_ions_count": len(target_ions),
+            "target_isotopes_count": len(target_isotopes),
+            "target_collections": [
+                tc.to_dict(include_selection=True) for tc in target_collections
+            ],
+            "target_compounds": target_compounds_dict,
+            "target_ions": target_ions_dict,
+            "target_isotopes": [
+                ti.to_dict(include_selection=True) for ti in target_isotopes
+            ],
+        }

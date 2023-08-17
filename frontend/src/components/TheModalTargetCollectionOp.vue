@@ -96,17 +96,15 @@
               expanded
               @click="
                 () => {
-                  createTargetCollection([
-                    {
-                      target_collection_name: newCollectionName,
-                      target_collection_description: newCollectionDesc,
-                      target_compounds: newTargetCompounds,
-                      sample_batches:
-                        addToSampleBatch && sampleBatchSelected
-                          ? [sampleBatchSelected]
-                          : [],
-                    },
-                  ]);
+                  createTargetCollection({
+                    target_collection_name: newCollectionName,
+                    target_collection_description: newCollectionDesc,
+                    target_compounds: newTargetCompounds,
+                    sample_batches:
+                      addToSampleBatch && sampleBatchSelected
+                        ? [sampleBatchSelected]
+                        : [],
+                  });
                   deactivateModal();
                 }
               "
@@ -268,8 +266,8 @@ export default {
     actionIs(...actions) {
       return actions.includes(this.action);
     },
-    createTargetCollection(target_collections) {
-      this.$api.emit("target_collection_create", target_collections);
+    async createTargetCollection(target_collection) {
+      await this.$api.httpClient.createTargetCollection(target_collection);
     },
     deleteTargetCollection(target_collection_ids) {
       this.$api.emit("target_collection_delete", target_collection_ids);

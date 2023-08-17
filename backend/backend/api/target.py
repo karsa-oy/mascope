@@ -9,59 +9,6 @@ from backend.server import sio
 
 
 @sio.event(namespace="/")
-async def target_collection_create(sid, target_collections):
-    print(target_collections)
-    target_collections = [
-        {**target_collection, "target_collection_id": gen_id()}
-        for target_collection in target_collections
-    ]
-    for target_collection in target_collections:
-        # create compounds
-        collection_compound_ids = await target_compound_create(
-            None, target_collection["target_compounds"]
-        )
-        with conn:
-            # create collection
-            conn.cursor().execute(
-                """
-                INSERT INTO target_collection (
-                    target_collection_id,
-                    target_collection_name,
-                    target_collection_description
-                ) VALUES (?, ?, ?);
-                """,
-                [
-                    target_collection["target_collection_id"],
-                    target_collection["target_collection_name"],
-                    target_collection["target_collection_description"],
-                ],
-            )
-            # add compounds to collection
-            for collection_compound_id in collection_compound_ids:
-                conn.cursor().execute(
-                    """
-                    INSERT INTO target_compound_in_target_collection (
-                        target_compound_id,
-                        target_collection_id
-                    ) VALUES (?, ?);
-                    """,
-                    [collection_compound_id, target_collection["target_collection_id"]],
-                )
-            # add collection to sample batches
-            for sample_batch_id in target_collection.get("sample_batches", []):
-                conn.cursor().execute(
-                    """
-                    INSERT INTO target_collection_in_sample_batch (
-                        target_collection_id,
-                        sample_batch_id
-                    ) VALUES (?, ?);
-                    """,
-                    [target_collection["target_collection_id"], sample_batch_id],
-                )
-    await sio.emit("org_reload", namespace="/")
-
-
-@sio.event(namespace="/")
 async def target_collection_update(sid, target_collections):
     return
     # TODO:
