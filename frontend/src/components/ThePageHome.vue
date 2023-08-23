@@ -6,7 +6,7 @@
           <section style="padding: 2em 2em 2em 2em">
             <h1 class="title is-4">Instruments:</h1>
           </section>
-          <b-field label="Select instrument to monitor">
+          <h2>Select instrument to monitor</h2>
             <base-table
               :rows="instruments"
               :cols="[{ field: 'instrument', label: 'Instrument' }]"
@@ -15,7 +15,6 @@
               @selectRows="selectInstrument"
             >
             </base-table>
-          </b-field>
           <div v-if="instrumentActive">
             <section style="padding: 2em 2em 2em 2em">
               <h1 class="title is-4">Acquisitions:</h1>

@@ -50,7 +50,7 @@
       path="batch/paramPossibleMatchThreshold"
       @paramChange="reloadMatches"
       :range="{ min: 0, max: paramProbableMatchThreshold, step: 0.1 }"
-      type="is-primary"
+      type="is-warning"
     >
     </base-param-field>
   </section>

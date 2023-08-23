@@ -1,6 +1,14 @@
 <template>
-  <b-menu>
-    <b-menu-list>
+  <b-menu label="menu">
+    <div class="menu-header">
+      <div style="padding: 0.5em 0.65em 1em 0.5em">
+        <b-image
+          :src="require('../assets/karsa_logo_touch_icon_nega.png')"
+          alt="Karsa Logo"
+        ></b-image>
+      </div>
+    </div>
+    <b-menu-list label="">
       <base-menu-button
         v-for="button of buttons"
         v-bind="button"
@@ -57,6 +65,10 @@ export default {
 </script>
 
 <style>
+.menu-header {
+  top: 0;
+  width: 100%;
+}
 .menu-footer {
   position: absolute;
   bottom: 0;
