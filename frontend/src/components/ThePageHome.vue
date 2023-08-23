@@ -7,14 +7,14 @@
             <h1 class="title is-4">Instruments:</h1>
           </section>
           <h2>Select instrument to monitor</h2>
-            <base-table
-              :rows="instruments"
-              :cols="[{ field: 'instrument', label: 'Instrument' }]"
-              :checkable="true"
-              :checkSingle="true"
-              @selectRows="selectInstrument"
-            >
-            </base-table>
+          <b-table
+            :data="instruments"
+            :columns="[{ field: 'instrument', label: 'Instrument' }]"
+            checkable
+            :header-checkable="false"
+            :checked-rows.sync="instrumentSelected"
+          >
+          </b-table>
           <div v-if="instrumentActive">
             <section style="padding: 2em 2em 2em 2em">
               <h1 class="title is-4">Acquisitions:</h1>
@@ -154,6 +154,7 @@ export default {
   data: function () {
     return {
       browseAcquisitions: false,
+      instrumentSelected: [],
       sampleFileMinDatetime: new Date(
         new Date().getTime() - 24 * 60 * 60 * 1000
       ), // now - 24h
@@ -199,6 +200,11 @@ export default {
       }
     },
   },
+  created: function () {
+    this.instrumentSelected = this.instruments.filter(
+      (instrument) => instrument.instrument === this.instrumentActive
+    );
+  },
   methods: {
     ...call({
       sampleItemFocus: "batch/sampleItemFocus",
@@ -233,7 +239,7 @@ export default {
         modal: "sampleItemAttributesSave",
       });
     },
-    selectInstrument(newRows, oldRows) {
+    selectInstrument(newRows) {
       const instrument = newRows.length ? newRows[0].instrument : null;
       if (instrument) {
         this.loadInstrument(instrument);
@@ -247,6 +253,16 @@ export default {
     },
   },
   watch: {
+    instrumentSelected: function (newRows, oldRows) {
+      if (newRows === null) return;
+      if (newRows.length > 1) {
+        this.instrumentSelected = newRows.filter(
+          (row) => !oldRows.includes(row)
+        );
+        return;
+      }
+      this.selectInstrument(newRows);
+    },
     sampleFileMinDatetime: function () {
       this.getAcquisitionsInRange();
     },
