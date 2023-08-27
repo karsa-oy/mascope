@@ -5,6 +5,7 @@ from sqlalchemy import asc, desc, func
 from sqlalchemy.future import select
 from datetime import datetime
 from sqlalchemy.orm import joinedload
+from typing import List
 
 
 from backend.db_api_rest import async_session
@@ -14,6 +15,7 @@ from ..models.models import SampleBatch, TargetCollectionInSampleBatch
 from ..models.pydantic_models.sample_batch_pydantic_model import (
     SampleBatchCreate,
     SampleBatchUpdate,
+    SampleBatchComputeMatch,
 )
 from backend.api.match import match_batch_compute
 
@@ -165,15 +167,75 @@ async def update_sample_batch(sample_batch_id: str, sample_batch: SampleBatchUpd
         await session.commit()
         # Inform clients about the update
         if rematch:
-            # FIX replace with request
-            task = sio.start_background_task(
-                match_batch_compute, None, existing_sample_batch.sample_batch_id
+            await compute_sample_batch_matches(existing_sample_batch.sample_batch_id)
+        else:
+            await sio.emit(
+                "workspace_reload",
+                room=existing_sample_batch.workspace_id,
+                namespace="/",
             )
-            await asyncio.gather(task)
+
+        return existing_sample_batch
+
+
+async def reload_sample_batch(sample_batch_id: str):
+    await sio.emit(
+        "sample_batch_reload",
+        room=sample_batch_id,
+        namespace="/",
+    )
+
+    return {"status": "success", "message": "Sample batch reloaded successfully"}
+
+
+# TODO_match
+async def compute_sample_batch_matches(sample_batches: List[SampleBatchComputeMatch]):
+    room_ids = set()
+    for sample_batch in sample_batches:
+        # Add the workspace_id if provided, else add the sample_batch_id
+        room_ids.add(
+            sample_batch.workspace_id
+            if sample_batch.workspace_id
+            else sample_batch.sample_batch_id
+        )
+
+    total_batches = len(sample_batches)
+
+    # Emit "started" events to all workspaces or sample batches
+    for identifier in room_ids:
         await sio.emit(
-            "workspace_reload",
-            room=existing_sample_batch.workspace_id,
+            "match_batch_compute_started",
+            {"total_batches": total_batches},
+            room=identifier,
             namespace="/",
         )
 
-        return existing_sample_batch
+    for index, sample_batch in enumerate(sample_batches, start=1):
+        emit_message = f"computing matches for sample batch {index}/{total_batches}"
+
+        # Emit progress event for each batch
+        await sio.emit(
+            "match_batch_compute_progress",
+            {"message": emit_message, "current_batch": index},
+            room=sample_batch.sample_batch_id,
+            namespace="/",
+        )
+
+        task = asyncio.create_task(
+            match_batch_compute(
+                None,
+                sample_batch.sample_batch_id,
+            )
+        )
+        await task
+
+    # Emit finished event once after all batches are done
+    for identifier in room_ids:
+        await sio.emit(
+            "match_batch_compute_finished",
+            {"total_batches": total_batches},
+            room=identifier,
+            namespace="/",
+        )
+
+    return {"status": f"Match computation for {total_batches} batches"}

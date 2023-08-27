@@ -67,12 +67,14 @@ export default {
   methods: {
     ...call({
       workspaceLoad: "workspace/load",
+      targetsLoad: "targets/load",
     }),
     ...mapMutations({
       activateModal: "modal/activate",
     }),
     onClick() {
       this.workspaceLoad(this.workspace);
+      this.targetsLoad();
     },
   },
 };

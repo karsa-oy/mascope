@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+from typing import List
 
 from ..controllers.sample_batches_controller import (
     get_sample_batch_by_id,
@@ -6,10 +7,13 @@ from ..controllers.sample_batches_controller import (
     create_sample_batch,
     delete_sample_batch,
     update_sample_batch,
+    reload_sample_batch,
+    compute_sample_batch_matches,
 )
 from ..models.pydantic_models.sample_batch_pydantic_model import (
     SampleBatchCreate,
     SampleBatchUpdate,
+    SampleBatchComputeMatch,
 )
 
 sample_batches_router = APIRouter()
@@ -46,3 +50,15 @@ async def update_sample_batch_route(
     sample_batch_id: str, sample_batch: SampleBatchUpdate
 ):
     return await update_sample_batch(sample_batch_id, sample_batch)
+
+
+@sample_batches_router.post("/api/sample_batches/{sample_batch_id}/reload")
+async def reload_sample_batch_route(sample_batch_id: str):
+    return await reload_sample_batch(sample_batch_id)
+
+
+@sample_batches_router.post("/api/sample_batches/compute_matches")
+async def compute_sample_batch_matches_route(
+    sample_batches: List[SampleBatchComputeMatch],
+):
+    return await compute_sample_batch_matches(sample_batches)

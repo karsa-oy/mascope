@@ -17,6 +17,9 @@ from .target_compound_in_target_collection_controller import (
 from ..controllers.target_collection_in_sample_batch_controller import (
     create_target_collection_in_sample_batch,
 )
+from ..controllers.sample_batches_controller import (
+    compute_sample_batch_matches,
+)
 from ..models.models import (
     TargetCollection,
     TargetCompoundInTargetCollection,
@@ -31,6 +34,9 @@ from ..models.pydantic_models.target_compound_in_target_collection_pydantic_mode
 )
 from ..models.pydantic_models.target_collection_in_sample_batch_pydantic_model import (
     TargetCollectionInSampleBatchBase,
+)
+from ..models.pydantic_models.sample_batch_pydantic_model import (
+    SampleBatchComputeMatch,
 )
 
 
@@ -112,7 +118,7 @@ async def get_target_collection_by_id(target_collection_id: str):
 
 async def create_target_collection(target_collection: TargetCollectionCreate):
     async with async_session() as session:
-        sample_batches_to_rematch = set()
+        sample_batches_to_rematch = []
         message_logs = {}
 
         new_target_collection = TargetCollection(
@@ -175,27 +181,27 @@ async def create_target_collection(target_collection: TargetCollectionCreate):
 
         # Add the target collection to the sample batches
         if (
-            target_collection.sample_batches is not None
+            target_collection.sample_batches
             and len(target_collection.sample_batches) > 0
         ):
             target_collections_in_sample_batch = [
                 TargetCollectionInSampleBatchBase(
                     target_collection_id=new_target_collection.target_collection_id,
-                    sample_batch_id=sample_batch_id,
+                    sample_batch_id=sample_batch.sample_batch_id,
                 )
-                for sample_batch_id in target_collection.sample_batches
+                for sample_batch in target_collection.sample_batches
             ]
             result = await create_target_collection_in_sample_batch(
-                target_collections_in_sample_batch, session
+                target_collections_in_sample_batch, False, session
             )
             added_collections_to_sample_batch = result[
                 "added_collections_to_sample_batch"
             ]
             if (
-                added_collections_to_sample_batch is not None
+                added_collections_to_sample_batch
                 and len(added_collections_to_sample_batch) > 0
             ):
-                sample_batches_to_rematch = target_collection.sample_batches
+                sample_batches_to_rematch.extend(target_collection.sample_batches)
 
                 added_to_batches_logs = {}
                 number_added = 0
@@ -219,16 +225,10 @@ async def create_target_collection(target_collection: TargetCollectionCreate):
         # Add the new target collection to the session and commit
         await session.commit()
 
-        # Run rematch for all sample batch ids in the set
-        # FIX replace with request?
-        for sample_batch_id in sample_batches_to_rematch:
-            task = asyncio.create_task(
-                match_batch_compute(
-                    None,
-                    sample_batch_id,
-                )
-            )
-            await task
+        # Run rematch for all sample batches in the list
+        # TODO_match
+        if sample_batches_to_rematch:
+            await compute_sample_batch_matches(sample_batches_to_rematch)
 
         await sio.emit("org_reload", namespace="/")
 
@@ -268,7 +268,7 @@ async def delete_target_collection(
                 == target_collection_id
             )
         )
-        sample_batch_ids = [sb for sb in sample_batches.scalars()]
+        sample_batches_to_rematch = [sb for sb in sample_batches.scalars()]
 
         if delete_orphan_compounds:
             # Check if the compound is present in other collections
@@ -297,13 +297,14 @@ async def delete_target_collection(
         await session.delete(target_collection)
         await session.commit()
 
-        # Emit the sample_batch_reload event to the related sample_batch rooms
-        for sample_batch_id in sample_batch_ids:
-            await sio.emit(
-                "sample_batch_reload",
-                room=sample_batch_id,
-                namespace="/",
-            )
+        # Run rematch for all sample batches in the list
+        # TODO_match
+        if sample_batches_to_rematch:
+            sample_batches = [
+                SampleBatchComputeMatch(sample_batch_id=id)
+                for id in sample_batches_to_rematch
+            ]
+            await compute_sample_batch_matches(sample_batches)
 
 
 async def update_target_collection(

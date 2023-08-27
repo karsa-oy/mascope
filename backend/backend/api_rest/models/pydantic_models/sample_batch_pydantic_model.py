@@ -44,3 +44,10 @@ class SampleBatchInDB(SampleBatchBase):
 
     class Config:
         orm_mode = True
+
+
+class SampleBatchComputeMatch(BaseModel):
+    sample_batch_id: str = Field(..., description="ID of the sample batch")
+    workspace_id: Optional[str] = Field(
+        None, description="ID of the workspace associated with the sample batch"
+    )

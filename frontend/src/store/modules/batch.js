@@ -26,6 +26,8 @@ const state = {
   paramPeakMinSeparation: null,
   paramPossibleMatchThreshold: null,
   paramProbableMatchThreshold: null,
+  // loading spin
+  isLoading: false,
 };
 
 const paramDefaults = {
@@ -55,6 +57,12 @@ export default {
   state,
   mutations: {
     ...make.mutations(state),
+    SET_COLLECTION_SELECTION: (state, { collectionId, selectionValue }) => {
+      const collection = state.targetCollections.find(
+        (coll) => coll.target_collection_id === collectionId
+      );
+      if (collection) collection.selection = selectionValue;
+    },
   },
   actions: {
     // data loading
@@ -63,7 +71,7 @@ export default {
       rootState.api.emit("subscribe", batch.sample_batch_id);
       await commit("SET_ACTIVE", batch);
       await dispatch("unpackParams");
-      await dispatch("loadTargets");
+      await dispatch("loadBatchTargets");
       await dispatch("loadBatch");
     },
 
@@ -107,7 +115,7 @@ export default {
       }
     },
 
-    async loadTargets({ rootState, state, commit }) {
+    async loadBatchTargets({ rootState, state, commit }) {
       const batchId = state.active.sample_batch_id;
       const ionMechanisms = state.active.build_params.ion_mechanisms;
 
@@ -198,6 +206,24 @@ export default {
         dispatch("reload")
       );
     },
+    async onMatchBatchComputeStarted({ commit }) {
+      commit("SET_IS_LOADING", true);
+    },
+    async onMatchBatchComputeFinished({ commit }) {
+      commit("SET_IS_LOADING", false);
+    },
+
+    // backend event emitters
+    async reloadBatchInfo({ rootState }, sample_batch_id) {
+      await rootState.api.httpClient.reloadBatch(sample_batch_id);
+    },
+    async computeBatchMatches({ rootState }, sample_batches) {
+      const formattedBatches = sample_batches.map((batch) => ({
+        sample_batch_id: batch.sample_batch_id,
+        workspace_id: batch.workspace_id,
+      }));
+      await rootState.api.httpClient.computeBatchMatches(formattedBatches);
+    },
 
     // selection
     async batchToggle({ rootState, state, dispatch }, batch) {
@@ -262,7 +288,10 @@ export default {
           break;
       }
     },
-    async targetCollectionToggle({ getters, state }, targetCollectionToggled) {
+    async targetCollectionToggle(
+      { commit, getters, state, dispatch },
+      targetCollectionToggled
+    ) {
       const targetCollectionToggledId =
         targetCollectionToggled.target_collection_id;
       state.targetCollections
@@ -277,18 +306,35 @@ export default {
       );
       switch (targetCollectionToggled.selection) {
         case 0:
-          // Select
-          targetCollectionToggled.selection = 2;
+          commit("SET_COLLECTION_SELECTION", {
+            collectionId: targetCollectionToggledId,
+            selectionValue: 2,
+          });
           break;
         case 2:
           // Unselect
-          targetCollectionToggled.selection = 0;
+          commit("SET_COLLECTION_SELECTION", {
+            collectionId: targetCollectionToggledId,
+            selectionValue: 0,
+          });
           break;
         case 3:
           // Stay focused
-          targetCollectionToggled.selection = 3;
+          commit("SET_COLLECTION_SELECTION", {
+            collectionId: targetCollectionToggledId,
+            selectionValue: 3,
+          });
           break;
       }
+      // Dispatch to targets module to update selection there as well
+      dispatch(
+        "targets/updateCollectionSelection",
+        {
+          collectionId: targetCollectionToggledId,
+          selectionValue: targetCollectionToggled.selection,
+        },
+        { root: true }
+      );
     },
   },
   getters: {

@@ -175,6 +175,25 @@ export function createHttpClient(host, api_port) {
         console.error("Failed to update batch", error);
       }
     },
+    reloadBatch: async (sample_batch_id) => {
+      try {
+        return await httpClient.post(
+          `${batchesBaseUrl}/${sample_batch_id}/reload`
+        );
+      } catch (error) {
+        console.error("Failed to reload sample batch: ", error);
+      }
+    },
+    computeBatchMatches: async (sample_batches) => {
+      try {
+        return await httpClient.post(
+          `${batchesBaseUrl}/compute_matches`,
+          sample_batches
+        );
+      } catch (error) {
+        console.error("Failed to compute batch matches: ", error);
+      }
+    },
 
     // Samples
     getAllSamples: async (body) => {
@@ -428,12 +447,18 @@ export function createHttpClient(host, api_port) {
         );
       }
     },
-    addTargetCollectionToSampleBatch: async (collectionsToSampleBatch) => {
+
+    addTargetCollectionToSampleBatch: async (
+      collectionsToSampleBatch,
+      skipRematch = false
+    ) => {
+      // console.log(collectionsToSampleBatch);
+      // console.log(skipRematch);
       try {
-        return await httpClient.post(
-          targetCollectionsInSampleBatchBaseUrl,
-          collectionsToSampleBatch
-        );
+        return await httpClient.post(targetCollectionsInSampleBatchBaseUrl, {
+          target_collections: collectionsToSampleBatch,
+          skipRematch,
+        });
       } catch (error) {
         console.error(
           "Failed to add target collection to sample batch: ",
@@ -441,17 +466,21 @@ export function createHttpClient(host, api_port) {
         );
       }
     },
-    removeTargetCollectionFromSampleBatch: async (
-      targetCollectionId,
-      sampleBatchId
+
+    removeTargetCollectionsFromSampleBatch: async (
+      collectionsToRemove,
+      skipRematch = false
     ) => {
+      // console.log(collectionsToRemove);
+      // console.log(skipRematch);
       try {
         return await httpClient.delete(
-          `${targetCollectionsInSampleBatchBaseUrl}/${targetCollectionId}/${sampleBatchId}`
+          `${targetCollectionsInSampleBatchBaseUrl}`,
+          { data: { target_collections: collectionsToRemove, skipRematch } }
         );
       } catch (error) {
         console.error(
-          "Failed to remove target collection from sample batch: ",
+          "Failed to remove target collections from sample batch: ",
           error
         );
       }

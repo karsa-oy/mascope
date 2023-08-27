@@ -384,6 +384,7 @@ def item_remove(sample_item_id):
 
 @sio.event(namespace="/")
 async def match_batch_compute(sid, sample_batch_id):
+    print("⚠️⚠️⚠️")
     # clear previous matches
     await match_batch_remove(sid, sample_batch_id)
 
@@ -406,6 +407,7 @@ async def match_batch_compute(sid, sample_batch_id):
             await item_compute(sample_item)
         except Exception as e:
             print("Processing sample %s failed: %s" % (sample_item, e))
+    # await sio.emit("match_batch_compute_finished", room=sample_batch_id, namespace="/")
     # reload batch
     await sio.emit("sample_batch_reload", room=sample_batch_id, namespace="/")
 
@@ -437,7 +439,7 @@ async def match_batch_remove(sid, sample_batch_id):
             [sample_batch_id],
         )
     # reload workspace
-    await sio.emit("sample_batch_reload", sample_batch_id, namespace="/")
+    # await sio.emit("sample_batch_reload", sample_batch_id, namespace="/")
 
 
 @sio.event(namespace="/")

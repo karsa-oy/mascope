@@ -1,5 +1,7 @@
 <template>
   <section>
+    <button @click="reloadBatch">Reload Batch</button>
+    <button @click="rematchBatches">Rematch Batch</button>
     <base-browser
       name="Targets"
       :levels="targetLevels"
@@ -11,7 +13,8 @@
 </template>
 
 <script>
-import { mapMutations } from "vuex";
+import { mapActions, mapMutations } from "vuex";
+
 import { sync, get, call } from "vuex-pathify";
 
 import BaseBrowser from "./BaseBrowser.vue";
@@ -26,6 +29,7 @@ export default {
   data: function () {
     return {
       showOnlyChecked: false,
+      loadingInstance: null,
     };
   },
   computed: {
@@ -35,6 +39,7 @@ export default {
     }),
     ...get({
       batchActive: "batch/active",
+      sampleBatchesSelected: "workspace/sampleBatchesSelected",
       matchCollections: "sample/matchCollections",
       matchCompounds: "sample/matchCompounds",
       matchIons: "sample/matchIons",
@@ -48,11 +53,12 @@ export default {
       targetCompounds: "batch/targetCompounds",
       targetIons: "batch/targetIons",
       targetIsotopes: "batch/targetIsotopes",
+      isLoading: "batch/isLoading",
     }),
     contextMenuIcon() {
-      return this.targetCollectionsSelected.length == 1
-        ? "dots-horizontal"
-        : "plus";
+      if (this.targetCollectionsSelected.length === 1) return "menu";
+      if (this.sampleBatchesSelected.length === 1) return "dots-horizontal";
+      if (this.sampleBatchesSelected.length !== 1) return "plus";
     },
     targetCollectionRows: function () {
       return this.sampleItemFocused && this.matchCollections
@@ -109,7 +115,7 @@ export default {
           rows: this.targetCollectionRows,
           defaultSort: ["match_score", "desc"],
           detailsIcon: "default",
-          rowClick: doNothing,
+          rowClick: this.targetCollectionToggle,
         },
         {
           name: "Compound",
@@ -205,19 +211,40 @@ export default {
         label: "Delete target collection",
         onClick: this.collectionDelete,
       };
-      let addCollectionToBatchButton = {
-        label: "Add target collection to batch",
-        onClick: this.collectionAddToBatch,
+      let copySelectedCollectionToOtherBatchesButton = {
+        label: "Add selected collection to batches",
+        onClick: this.addSelectedCollectionToBatches,
       };
+      let editBatchCollectionsButton = {
+        label: "Edit collections of selected batch",
+        onClick: this.editBatchCollections,
+      };
+      if (
+        this.targetCollectionsSelected.length == 0 &&
+        this.sampleBatchesSelected.length == 1
+      ) {
+        return [createCollectionButton, editBatchCollectionsButton];
+      }
+      if (this.targetCollectionsSelected.length == 0) {
+        return [createCollectionButton];
+      }
       if (this.targetCollectionsSelected.length == 1) {
         return [
-          addCollectionToBatchButton,
-          createCollectionButton,
           // updateCollectionButton,
+          createCollectionButton,
+          editBatchCollectionsButton,
+          copySelectedCollectionToOtherBatchesButton,
           deleteCollectionButton,
         ];
+      }
+    },
+  },
+  watch: {
+    isLoading(boolean) {
+      if (boolean) {
+        this.startLoading();
       } else {
-        return [createCollectionButton];
+        this.stopLoading();
       }
     },
   },
@@ -228,15 +255,35 @@ export default {
     });
   },
   methods: {
+    ...mapActions("batch", ["reloadBatchInfo", "computeBatchMatches"]),
     ...mapMutations({
       activateModal: "modal/activate",
     }),
     ...call({
       resetIonVisualization: "visualization/reset",
+      targetCollectionToggle: "batch/targetCollectionToggle",
     }),
-    collectionAddToBatch() {
+    addSelectedCollectionToBatches() {
       this.modalTargetCollectionOpProps = {
-        action: "addToBatch",
+        action: "addSelectedCollectionToBatches",
+        collection: this.targetCollectionsSelected[0],
+      };
+      this.activateModal({
+        modal: "targetCollectionOp",
+      });
+    },
+    async editBatchCollections() {
+      this.modalTargetCollectionOpProps = {
+        action: "editBatchCollections",
+        collection: this.targetCollectionsSelected[0],
+      };
+      this.activateModal({
+        modal: "targetCollectionOp",
+      });
+    },
+    collectionRemoveFromBatch() {
+      this.modalTargetCollectionOpProps = {
+        action: "removeFromBatch",
         collection: this.targetCollectionsSelected[0],
       };
       this.activateModal({
@@ -292,6 +339,24 @@ export default {
       this.activateModal({
         modal: "sampleItemTargetIon",
       });
+    },
+    async reloadBatch() {
+      const sample_batch_id = this.batchActive.sample_batch_id;
+      await this.reloadBatchInfo(sample_batch_id);
+    },
+    async rematchBatches() {
+      await this.computeBatchMatches(this.sampleBatchesSelected);
+    },
+    startLoading() {
+      // console.log(this.$el);
+      this.loadingInstance = this.$buefy.loading.open();
+    },
+
+    stopLoading() {
+      if (this.loadingInstance) {
+        this.loadingInstance.close();
+        this.loadingInstance = null;
+      }
     },
   },
 };

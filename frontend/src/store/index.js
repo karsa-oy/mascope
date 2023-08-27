@@ -12,6 +12,7 @@ import instrument from "./modules/instrument";
 import key from "./modules/key";
 import modal from "./modules/modal";
 import sample from "./modules/sample";
+import targets from "./modules/targets";
 import visualization from "./modules/visualization";
 import workspace from "./modules/workspace";
 
@@ -26,6 +27,7 @@ export default new Vuex.Store({
     key,
     modal,
     sample,
+    targets,
     visualization,
     workspace,
   },
