@@ -114,9 +114,3 @@ export default {
   },
 };
 </script>
-
-<style>
-.b-table .table-wrapper.has-sticky-header tr:first-child th {
-  background-color: #2b3e50 !important;
-}
-</style>

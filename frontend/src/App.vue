@@ -1,6 +1,11 @@
 <template>
   <div id="app">
-    <b-message v-if="isDevelopmentMode" type="is-danger" has-icon>
+    <b-message
+      v-if="isDevelopmentMode"
+      title="Warning"
+      type="is-danger"
+      has-icon
+    >
       NOTE: You are running the development version of Mascope. Any changes are
       not persisted.
     </b-message>
@@ -14,7 +19,9 @@
 </template>
 
 <style src="./assets/css/style.css"></style>
-<style src="./assets/css/logo.css"></style>
+<style lang="scss">
+@import "./assets/css/style.scss";
+</style>
 
 <script>
 import { call, get } from "vuex-pathify";

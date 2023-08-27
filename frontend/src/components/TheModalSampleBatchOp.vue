@@ -12,7 +12,10 @@
       :type="actionIs('delete') ? 'is-danger' : 'is-primary'"
     >
       <template v-if="actionIs('create', 'update')">
-        <div class="modal-card" style="height: 800px">
+        <div
+          class="modal-card"
+          style="background-color: inherit; height: 800px"
+        >
           <header class="modal-card-head">
             <h2 class="subtitle">{{ modalTitle }}</h2>
           </header>

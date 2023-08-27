@@ -10,20 +10,22 @@ body {
 html::-webkit-scrollbar {
   display: none;
 }
+
 body::-webkit-scrollbar {
   display: none;
 }
 
 ::-webkit-scrollbar {
   width: 10px;
-  height: 10px;
+  height: 2px;
 }
+
 ::-webkit-scrollbar-track {
   box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.3);
 }
+
 ::-webkit-scrollbar-thumb {
-  background-color: #888886;
-  outline: 1px solid slategrey;
+  background-color: #454752;
 }
 
 // BUEFY FIXES
@@ -31,6 +33,6 @@ body::-webkit-scrollbar {
 // bulmaswatch superhero theme fixes
 
 // slider thumb text legibility fix
-.b-slider-thumb > span {
+.b-slider-thumb>span {
   color: #666 !important;
 }

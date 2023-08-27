@@ -73,7 +73,7 @@ export default {
       } else if (this.matchScore >= this.possibleMatchThreshold) {
         return {
           category: "possible",
-          class: "is-primary",
+          class: "is-warning",
           icon: "help",
           weight: "font-size: bold",
         };

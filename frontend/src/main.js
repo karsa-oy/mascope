@@ -10,9 +10,7 @@ apiLog("registered API with Vue prototype");
 // Buefy framework
 
 import Buefy from "buefy"; // components
-import "buefy/dist/buefy.css"; // styles
 import "@mdi/font/css/materialdesignicons.min.css"; // material design icons
-import "./assets/css/bulmaswatch/superhero.css"; // bulmaswatch superhero theme
 
 Vue.use(Buefy);
 Vue.config.productionTip = false;

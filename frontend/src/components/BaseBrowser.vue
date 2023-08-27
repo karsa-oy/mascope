@@ -319,20 +319,8 @@ export default {
   display: none;
 }
 
-.base-browser-row-focused {
-  background: #a5690e;
-}
-
-.base-browser-row-fully-selected {
-  background: #4c7799;
-}
-
-.base-browser-row-partially-selected {
-  background: #496275;
-}
-
 .icon > .mdi-chevron-right,
 .mdi-chevron-down {
-  color: rgb(255, 255, 255) !important;
+  color: rgb(0, 0, 0) !important;
 }
 </style>

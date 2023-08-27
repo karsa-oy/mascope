@@ -1,0 +1,145 @@
+// Import Bulma's core
+@import "../node_modules/bulma/sass/utilities/_all.sass";
+
+// Karsa colors
+$moss-green: #425634;
+$moss-green-light: #94aa83;
+$burgundy-red: #600b18;
+$burgundy-red-light: #ce6175;
+$magenta: #f83260;
+$magenta-light: #fdbcce;
+$orange: #f1613c;
+$orange-light: #facfc2;
+$cool-grey: #464752;
+$cool-grey-light: #b0b1ba;
+$warm-grey: #c9c8b9;
+$warm-grey-light: #e4e3db;
+$light-blue: #e4e5f4;
+
+// Set your colors
+$primary: $moss-green-light;
+$primary-light: findLightColor($primary);
+$primary-dark: findDarkColor($primary);
+$primary-invert: findColorInvert($primary);
+
+$success: #86b758;
+$success-light: findLightColor($success);
+$success-dark: findDarkColor($success);
+$success-invert: findColorInvert($success);
+
+$danger: #f8054a;
+$danger-light: findLightColor($danger);
+$danger-dark: findDarkColor($danger);
+$danger-invert: findColorInvert($danger);
+
+$info: $light-blue;
+$info-light: findLightColor($info);
+$info-dark: findDarkColor($info);
+$info-invert: findColorInvert($info);
+
+$warning: $orange;
+$warning-light: findLightColor($warning);
+$warning-dark: findDarkColor($warning);
+$warning-invert: findColorInvert($warning);
+
+// Page
+$body-background-color: black; //#454752;
+$dropdown-content-background-color: $warm-grey-light;
+
+// Text
+$dropdown-item-color: black;
+// $family-primary: sans-serif;
+$label-color: white;
+$text: white;
+$title-color: white;
+$subtitle-color: white;
+
+// Modal
+$modal-card-head-background-color: inherit;
+$modal-card-body-background-color: inherit;
+
+// Table
+$table-background-color: white;
+$table-head-background-color: $warm-grey-light;
+$table-row-hover-background-color: $warm-grey-light;
+.base-browser-row-focused {
+  background: $orange-light;
+}
+.base-browser-row-fully-selected {
+  background: $warm-grey;
+}
+.base-browser-row-partially-selected {
+  background: $warm-grey;
+}
+
+// Lists and maps
+$custom-colors: null !default;
+$custom-shades: null !default;
+
+// Setup $colors to use as bulma classes (e.g. 'is-twitter')
+$colors: mergeColorMaps(
+  (
+    "white": (
+      $white,
+      $black,
+    ),
+    "black": (
+      $black,
+      $white,
+    ),
+    "light": (
+      $light,
+      $light-invert,
+    ),
+    "dark": (
+      $dark,
+      $dark-invert,
+    ),
+    "primary": (
+      $primary,
+      $primary-invert,
+      $primary-light,
+      $primary-dark,
+    ),
+    "link": (
+      $link,
+      $link-invert,
+      $link-light,
+      $link-dark,
+    ),
+    "info": (
+      $info,
+      $info-invert,
+      $info-light,
+      $info-dark,
+    ),
+    "success": (
+      $success,
+      $success-invert,
+      $success-light,
+      $success-dark,
+    ),
+    "warning": (
+      $warning,
+      $warning-invert,
+      $warning-light,
+      $warning-dark,
+    ),
+    "danger": (
+      $danger,
+      $danger-invert,
+      $danger-light,
+      $danger-dark,
+    ),
+  ),
+  $custom-colors
+);
+
+// Links
+$link: $primary;
+$link-invert: $primary-invert;
+$link-focus-border: $primary;
+
+// Import Bulma and Buefy styles
+@import "../node_modules/bulma/bulma.sass";
+@import "../node_modules/buefy/src/scss/buefy.scss";
