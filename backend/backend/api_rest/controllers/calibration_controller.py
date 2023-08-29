@@ -16,7 +16,7 @@ from typing import List
 from ..models.pydantic_models.sample_file_pydantic_model import (
     SampleFileUpdate,
 )
-from ..models.models import SampleFile
+from ..models.models import Sample
 
 
 async def calibration_mz_apply(fit: dict, sample_filenames: List[str]):
@@ -60,24 +60,29 @@ async def calibration_mz_apply(fit: dict, sample_filenames: List[str]):
 
 
 async def get_mz_calibration(
-    instrument: str,
+    instrument: str = None,
+    sample_item_id: str = None,
 ):
     async with async_session() as session:
-        stmt = select(SampleFile.mz_calibration).where(
-            and_(
-                SampleFile.instrument == instrument,
-                SampleFile.mz_calibration.isnot(None),
-                SampleFile.datetime_utc
-                == select(func.max(SampleFile.datetime_utc))
-                .where(
-                    and_(
-                        SampleFile.instrument == instrument,
-                        SampleFile.mz_calibration.isnot(None),
+        stmt = select(Sample.mz_calibration)
+        if instrument:
+            stmt = select(Sample.mz_calibration).where(
+                and_(
+                    Sample.instrument == instrument,
+                    Sample.mz_calibration.isnot(None),
+                    Sample.datetime_utc
+                    == select(func.max(Sample.datetime_utc))
+                    .where(
+                        and_(
+                            Sample.instrument == instrument,
+                            Sample.mz_calibration.isnot(None),
+                        )
                     )
+                    .scalar_subquery(),
                 )
-                .scalar_subquery(),
             )
-        )
+        elif sample_item_id:
+            stmt = stmt.filter(Sample.sample_item_id == sample_item_id)
 
         result = await session.execute(stmt)
         mz_calibration = result.scalars().first()

@@ -327,6 +327,15 @@ export function createHttpClient(host, api_port) {
         console.error("Failed to get last mz calibration: ", error);
       }
     },
+    getSampleMzCalibration: async (sample_item_id) => {
+      try {
+        return await httpClient.get(
+          `${calibrationBaseUrl}/sample_mz_calibration/${sample_item_id}`
+        );
+      } catch (error) {
+        console.error("Failed to get sample mz calibration: ", error);
+      }
+    },
     mzCalibrationApply: async (calibrationData, showLoading = false) => {
       let loadingInstance = null;
       try {

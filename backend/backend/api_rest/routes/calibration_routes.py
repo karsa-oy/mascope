@@ -17,4 +17,11 @@ async def calibration_mz_apply_route(fit: dict, sample_filenames: List[str]):
 async def get_last_mz_calibration_route(
     instrument: str,
 ):
-    return await get_mz_calibration(instrument)
+    return await get_mz_calibration(instrument=instrument)
+
+
+@calibration_router.get("/api/calibration/sample_mz_calibration/{sample_item_id}")
+async def get_sample_mz_calibration_route(
+    sample_item_id: str,
+):
+    return await get_mz_calibration(sample_item_id=sample_item_id)

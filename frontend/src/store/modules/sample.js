@@ -25,6 +25,7 @@ export default {
       // set sample active
       await commit("SET_ACTIVE", sample);
       await dispatch("loadMatches");
+      await dispatch("calibration/load", sample, { root: true });
     },
     async loadMatches({ rootState, rootGetters, state, commit }) {
       const sampleItemId = state.active.sample_item_id;
