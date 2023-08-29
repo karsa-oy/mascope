@@ -166,7 +166,6 @@ export default {
       commit("SET_MATCHING_PROGRESS", data.progress);
     },
     async onSampleFileCreated({ rootState, dispatch }, filename) {
-      await dispatch("api/reloadDb", null, { root: true });
       await dispatch("getRecentAcquisitions");
     },
   },

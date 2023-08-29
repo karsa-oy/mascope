@@ -94,7 +94,7 @@ export default {
       );
     },
     async onSampleItemCreated({ rootGetters, dispatch }, sample_item_id) {
-      await dispatch("batch/onSampleBatchReload", null, { root: true });
+      await dispatch("batch/reload", null, { root: true });
       const sample_item = rootGetters["batch/sampleItem"](sample_item_id);
       await dispatch("load", sample_item);
     },

@@ -194,9 +194,7 @@ export default {
 
     // backend notifications
     async onSampleBatchReload({ dispatch }) {
-      await dispatch("api/reloadDb", null, { root: true }).then(() =>
-        dispatch("reload")
-      );
+      await dispatch("reload");
     },
 
     // selection
