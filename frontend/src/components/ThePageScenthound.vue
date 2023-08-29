@@ -215,9 +215,10 @@
                       !acquisitionFilename
                     "
                     :type="sampleIsSaved ? 'is-success' : 'is-danger'"
+                    :loading="sampleItemPending === null ? false : true"
                     icon-left="content-save"
                     expanded
-                    @click="saveSampleInformation"
+                    @click="saveSampleInfoButtonPressed"
                   >
                     Save sample info
                   </b-button>
@@ -424,6 +425,7 @@ export default {
       sampleMzCalibrated: "sample/active@mz_calibration.verified",
     }),
     ...sync({
+      sampleItemPending: "instrument/sampleItemPending",
       scenthoundModeActive: "instrument/scenthoundModeActive",
     }),
     batchFilterIds() {
@@ -481,6 +483,8 @@ export default {
       batchSelect: "batch/load",
       mzCalibrationReset: "calibration/unload",
       resetAcquisitionStatus: "instrument/resetAcquisitionStatus",
+      sampleItemCreate: "sample/create",
+      sampleItemUpdate: "sample/update",
       sampleUnload: "sample/unload",
     }),
     ...mapMutations({}),
@@ -533,8 +537,8 @@ export default {
     sampleMatch() {
       this.$api.emit("match_item_compute", this.sampleActive);
     },
-    async saveSampleInformation() {
-      let newSampleItem = {
+    saveSampleInfoButtonPressed() {
+      let sample = {
         filename: this.sampleFilename,
         sample_item_name: this.sampleItemName,
         sample_item_type: this.sampleItemType,
@@ -542,19 +546,26 @@ export default {
         sample_item_attributes: {},
         filter_id: this.sampleItemFilterId,
       };
-      if (!this.sampleActive) {
-        await this.$api.httpClient.createSampleItem(newSampleItem);
+      if (this.conversionProgress < 100) {
+        this.sampleItemPending = sample;
+        return;
       } else {
-        newSampleItem = {
-          ...newSampleItem,
+        this.saveSampleInformation(sample);
+      }
+    },
+    async saveSampleInformation(sample) {
+      if (!this.sampleActive) {
+        // Create
+        await this.sampleItemCreate(sample);
+      } else {
+        // Update
+        sample = {
+          ...sample,
           sample_item_id: this.sampleActive.sample_item_id,
           sample_item_attributes: this.sampleActive.sample_item_attributes,
           sample_item_utc_created: this.sampleActive.sample_item_utc_created,
         };
-        await this.$api.httpClient.updateSampleItem(
-          newSampleItem.sample_item_id,
-          newSampleItem
-        );
+        await this.sampleItemUpdate(sample);
       }
     },
     selectBatch(val) {

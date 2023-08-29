@@ -79,6 +79,15 @@ export default {
         dispatch("load", activeSample);
       }
     },
+    async create({ rootState }, sample) {
+      await rootState.api.httpClient.createSampleItem(sample);
+    },
+    async update({ rootState }, sample) {
+      await rootState.api.httpClient.updateSampleItem(
+        sample.sample_item_id,
+        sample
+      );
+    },
     async onSampleBatchExportPeaksFailed({ dispatch }, error) {
       await dispatch(
         "app/pushNotification",

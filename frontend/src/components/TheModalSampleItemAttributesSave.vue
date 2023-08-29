@@ -422,6 +422,8 @@ export default {
   methods: {
     ...call({
       mzCalibrationReset: "calibration/unload",
+      sampleItemCreate: "sample/create",
+      sampleItemUpdate: "sample/update",
     }),
     ...mapMutations({
       deactivateModal: "modal/deactivate",
@@ -577,7 +579,7 @@ export default {
           sample_batch_id: this.batchActive.sample_batch_id,
           filter_id: this.sampleItemFilterId,
         };
-        await this.$api.httpClient.createSampleItem(newSampleItem);
+        await this.sampleItemCreate(newSampleItem);
       } else if (this.action == "update") {
         let newSampleItem = {
           ...this.sampleActive,
@@ -587,10 +589,7 @@ export default {
           sample_batch_id: this.batchActive.sample_batch_id,
           filter_id: this.sampleItemFilterId,
         };
-        await this.$api.httpClient.updateSampleItem(
-          newSampleItem.sample_item_id,
-          newSampleItem
-        );
+        await this.sampleItemUpdate(newSampleItem);
 
         this.deactivateModal();
       }
