@@ -42,7 +42,7 @@ export default {
 
 <style>
 .sidebar-content {
-  background-color: #454752 !important;
+  background-color: #464752 !important;
 }
 
 .page-container {

@@ -1,6 +1,6 @@
 <template>
-  <div class="card base-tile">
-    <header class="card-header">
+  <div class="base-tile">
+    <header class="tile-card-header">
       <p class="card-header-title" @click="onClick">
         {{ workspace.workspace_name }}
       </p>
@@ -47,7 +47,7 @@
         </b-dropdown-item>
       </b-dropdown>
     </header>
-    <div class="card-content">
+    <div class="tile-card-content">
       {{ workspace.workspace_description }}
     </div>
   </div>
@@ -82,18 +82,3 @@ export default {
   },
 };
 </script>
-
-<style scoped>
-.base-tile {
-  height: 200px;
-  width: 200px;
-  margin: 10px;
-}
-
-.card-header {
-  background-color: #cac7b8;
-}
-.card-content {
-  color: black;
-}
-</style>
