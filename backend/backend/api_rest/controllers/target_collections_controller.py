@@ -21,6 +21,7 @@ from ..controllers.sample_batches_controller import (
     compute_sample_batch_matches,
 )
 from ..models.models import (
+    SampleBatch,
     TargetCollection,
     TargetCompoundInTargetCollection,
     TargetCollectionInSampleBatch,
@@ -231,6 +232,10 @@ async def create_target_collection(target_collection: TargetCollectionCreate):
             await compute_sample_batch_matches(sample_batches_to_rematch)
 
         await sio.emit("org_reload", namespace="/")
+        await sio.emit(
+            "targets_all_reload",
+            namespace="/",
+        )
 
         return {
             "new_target_collection": new_target_collection,
@@ -261,14 +266,25 @@ async def delete_target_collection(
         if not target_collection:
             raise HTTPException(status_code=404, detail="Target collection not found")
 
-        # Get all associated sample batches
+        # Get all associated sample batches with their workspace_ids
         sample_batches = await session.execute(
-            select(TargetCollectionInSampleBatch.sample_batch_id).filter(
+            select(
+                TargetCollectionInSampleBatch.sample_batch_id,
+                SampleBatch.workspace_id,
+            )
+            .join(
+                SampleBatch,
+                TargetCollectionInSampleBatch.sample_batch_id
+                == SampleBatch.sample_batch_id,
+            )
+            .filter(
                 TargetCollectionInSampleBatch.target_collection_id
                 == target_collection_id
             )
         )
-        sample_batches_to_rematch = [sb for sb in sample_batches.scalars()]
+
+        sample_batches_to_rematch = [sb for sb in sample_batches]
+        workspaces_to_reload = set([sb[1] for sb in sample_batches_to_rematch])
 
         if delete_orphan_compounds:
             # Check if the compound is present in other collections
@@ -301,10 +317,14 @@ async def delete_target_collection(
         # TODO_match
         if sample_batches_to_rematch:
             sample_batches = [
-                SampleBatchComputeMatch(sample_batch_id=id)
-                for id in sample_batches_to_rematch
+                SampleBatchComputeMatch(sample_batch_id=sb[0], workspace_id=sb[1])
+                for sb in sample_batches_to_rematch
             ]
+
             await compute_sample_batch_matches(sample_batches)
+
+            for workspace_id in workspaces_to_reload:
+                await sio.emit("targets_all_reload", room=workspace_id, namespace="/")
 
 
 async def update_target_collection(

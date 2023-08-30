@@ -167,13 +167,25 @@ async def create_target_collection_in_sample_batch(
 
     if independent_transaction:
         await session.commit()
+        await sio.emit(
+            "targets_all_reload",
+            namespace="/",
+        )
         # TODO_match
         if not skipRematch and sample_batches_to_rematch:
             sample_batches = [
-                SampleBatchComputeMatch(sample_batch_id=id)
-                for id in sample_batches_to_rematch
+                SampleBatchComputeMatch(sample_batch_id=sample_batch_id)
+                for sample_batch_id in sample_batches_to_rematch
             ]
             await compute_sample_batch_matches(sample_batches)
+        elif skipRematch:
+            # Reload the sample batches if compute_sample_batch_matches is skipped
+            for sample_batch_id in sample_batches_to_rematch:
+                await sio.emit(
+                    "sample_batch_reload",
+                    room=sample_batch_id,
+                    namespace="/",
+                )
 
     else:
         await session.flush()
@@ -264,5 +276,18 @@ async def delete_target_collections_in_sample_batch(
             for id in sample_batches_to_rematch
         ]
         await compute_sample_batch_matches(sample_batches)
+    elif skipRematch:
+        # Reload the sample batches if compute_sample_batch_matches is skipped
+        for sample_batch_id in sample_batches_to_rematch:
+            await sio.emit(
+                "sample_batch_reload",
+                room=sample_batch_id,
+                namespace="/",
+            )
+
+    await sio.emit(
+        "targets_all_reload",
+        namespace="/",
+    )
 
     return {"message_logs": message_log}

@@ -11,7 +11,7 @@ const state = {
   pushNotification: null,
   ready: false,
   schema: {},
-  targetCollections: [],
+  // targetCollections: [],
   workspaces: [],
 };
 export default {
@@ -19,7 +19,7 @@ export default {
   state,
   mutations: make.mutations(state),
   actions: {
-    async load({ commit, rootState }) {
+    async load({ commit, dispatch, rootState }) {
       const api = rootState.api;
       // load attribute templates
       await loadFromApi(
@@ -28,12 +28,6 @@ export default {
         commit
       );
 
-      // load target collections
-      await loadFromApi(
-        api.httpClient.getAllTargetCollections,
-        "SET_TARGET_COLLECTIONS",
-        commit
-      );
       // load instruments
       await loadFromApi(
         api.httpClient.getAllInstrumentFunctions,

@@ -37,7 +37,7 @@
           </section>
           <footer class="modal-card-foot">
             <b-button
-              type="is-warning"
+              type="is-dark"
               icon-left="close"
               expanded
               @click="deactivateModal"
@@ -60,7 +60,7 @@
           </footer>
         </div>
       </template>
-      <template v-if="actionIs('addSelectedCollectionToBatches')">
+      <template v-if="actionIs('manageSelectedCollectionBatches')">
         <div class="modal-card" style="height: 85vh">
           <header class="modal-card-head">
             <p class="modal-card-title">Add target collection to batch</p>
@@ -72,36 +72,42 @@
             <b-field label="Description">
               <b-input v-model="newCollectionDesc" :disabled="true"> </b-input>
             </b-field>
-            <b-field label="Add to sample batch">
-              <base-table
-                :rows="sampleBatches"
-                :cols="[{ field: 'sample_batch_name', label: 'Batch' }]"
-                :checkable="true"
-                @selectRows="selectBatchesToAddTo"
+            <b-field
+              :label="`Select batches for target collection ${targetCollectionActiveInfo.target_collection_name}`"
+            >
+              <b-table
+                :data="sampleBatches"
+                :columns="[{ field: 'sample_batch_name', label: 'Batch' }]"
+                checkable
+                :checked-rows.sync="sampleBatchesChecked"
               >
-              </base-table>
+              </b-table>
             </b-field>
           </section>
           <footer class="modal-card-foot">
-            <b-button expanded @click="modalActive = false"> Cancel </b-button>
+            <b-button
+              type="is-dark"
+              icon-left="close"
+              expanded
+              @click="modalActive = false"
+            >
+              Cancel
+            </b-button>
             <b-button
               type="is-primary"
+              icon-left="content-save"
               expanded
               @click="
                 () => {
-                  updateTargetCollection([
-                    {
-                      target_collection_id: oldCollection.target_collection_id,
-                      target_collection_name: newCollectionName,
-                      target_collection_description: newCollectionDesc,
-                      sample_batches: batchesToAddTo,
-                    },
-                  ]);
+                  manageSelectedCollectionBatches(
+                    sampleBatchesChecked,
+                    selectedCollection
+                  );
                   deactivateModal();
                 }
               "
             >
-              Update
+              Save
             </b-button>
           </footer>
         </div>
@@ -140,9 +146,17 @@
             </b-field>
           </section>
           <footer class="modal-card-foot">
-            <b-button expanded @click="modalActive = false"> Cancel </b-button>
+            <b-button
+              type="is-dark"
+              icon-left="close"
+              expanded
+              @click="modalActive = false"
+            >
+              Cancel
+            </b-button>
             <b-button
               type="is-primary"
+              icon-left="content-save"
               expanded
               @click="
                 () => {
@@ -196,7 +210,8 @@
                 () => {
                   updateTargetCollection([
                     {
-                      target_collection_id: oldCollection.target_collection_id,
+                      target_collection_id:
+                        selectedCollection.target_collection_id,
                       target_collection_name: newCollectionName,
                       target_collection_description: newCollectionDesc,
                       target_compounds: newTargetCompounds,
@@ -212,7 +227,7 @@
         </div>
       </template>
       <template v-else-if="actionIs('delete')">
-        <div class="modal-card" style="height: 25vh">
+        <div class="modal-card" style="height: 40vh">
           <header class="modal-card-head">
             <p class="modal-card-title">Delete terget colletion</p>
           </header>
@@ -226,12 +241,12 @@
             "
           >
             <b-field
-              :label="`Are you sure you want to delete the collection ${selectedCollectionInfo.target_collection_name} ?`"
+              :label="`Are you sure you want to delete the collection ${targetCollectionActiveInfo.target_collection_name} ?`"
             >
               <b-radio
                 v-model="deleteUnusedCompounds"
                 :native-value="false"
-                type="is-warning"
+                type="is-info"
               >
                 Delete collection
               </b-radio>
@@ -240,7 +255,7 @@
               <b-radio
                 v-model="deleteUnusedCompounds"
                 :native-value="true"
-                type="is-danger"
+                type="is-primary"
               >
                 Delete collection and unused compounds
               </b-radio>
@@ -248,7 +263,7 @@
           </section>
           <footer class="modal-card-foot">
             <b-button
-              type="is-warning"
+              type="is-dark"
               icon-left="close"
               expanded
               @click="deactivateModal"
@@ -261,7 +276,9 @@
               expanded
               @click="
                 () => {
-                  deleteTargetCollection(oldCollection.target_collection_id);
+                  deleteTargetCollection(
+                    selectedCollection.target_collection_id
+                  );
                   deactivateModal();
                 }
               "
@@ -298,8 +315,11 @@ export default {
       newTargetCompounds: [],
       addToSampleBatch: true,
       // Delete Selected Collection
-      selectedCollectionInfo: {},
+      targetCollectionActiveInfo: {},
       deleteUnusedCompounds: true,
+      //
+      initialSampleBatchesChecked: [],
+      sampleBatchesChecked: [],
     };
   },
   computed: {
@@ -312,6 +332,7 @@ export default {
       sampleBatchesSelected: "workspace/sampleBatchesSelected",
       targetCollectionsSelected: "batch/targetCollectionsSelected",
       batchActive: "batch/active",
+      targetCollectionActive: "targets/activeCollection",
       batchTargetCollections: "batch/targetCollections",
       targetCollectionsAll: "targets/targetCollectionsAll",
     }),
@@ -320,9 +341,6 @@ export default {
     },
     action() {
       return this.modalProps.action;
-    },
-    oldCollection() {
-      return this.modalProps.collection ?? null;
     },
     selectedBatch() {
       return this.sampleBatchesSelected[0] ?? null;
@@ -400,28 +418,61 @@ export default {
         );
       }
     },
-    async removeTargetCollectionFromSampleBatch(
-      target_collection_id,
-      sample_batch_id
-    ) {
-      await this.$api.httpClient.removeTargetCollectionFromSampleBatch(
-        target_collection_id,
-        sample_batch_id
+    async manageSelectedCollectionBatches(batches, target_collection) {
+      const removedBatches = this.initialSampleBatchesChecked.filter(
+        (initialBatch) =>
+          !batches.some(
+            (batch) => batch.sample_batch_id === initialBatch.sample_batch_id
+          )
       );
+
+      const addedBatches = batches
+        .filter(
+          (batch) =>
+            !this.initialSampleBatchesChecked.some(
+              (initialBatch) =>
+                initialBatch.sample_batch_id === batch.sample_batch_id
+            )
+        )
+        .map((batch) => ({
+          sample_batch_id: batch.sample_batch_id,
+          target_collection_id: target_collection.target_collection_id,
+        }));
+
+      if (removedBatches.length === 0 && addedBatches.length === 0) return;
+
+      if (removedBatches.length > 0) {
+        const batchesToRemove = removedBatches.map((batch) => ({
+          sample_batch_id: batch.sample_batch_id,
+          target_collection_id: target_collection.target_collection_id,
+        }));
+
+        const skipRematch = addedBatches.length > 0;
+        await this.$api.httpClient.removeTargetCollectionsFromSampleBatch(
+          batchesToRemove,
+          skipRematch
+        );
+      }
+
+      if (addedBatches.length > 0) {
+        await this.$api.httpClient.addTargetCollectionToSampleBatch(
+          addedBatches
+        );
+      }
     },
+
     initData() {
-      if (this.oldCollection) {
-        this.newCollectionName = this.oldCollection.target_collection_name;
+      if (this.selectedCollection) {
+        this.newCollectionName = this.selectedCollection.target_collection_name;
         this.newCollectionDesc =
-          this.oldCollection.target_collection_description;
+          this.selectedCollection.target_collection_description;
+        this.targetCollectionActiveInfo = this.targetCollectionActive;
       }
       if (this.selectedBatch) {
-        this.selectedBatchInfo = this.selectedBatch;
-      }
-      if (this.selectedCollection) {
-        this.selectedCollectionInfo = this.selectedCollection;
+        this.selectedBatchInfo = this.batchActive;
       }
       this.initTargetCollectionsChecked();
+      this.initSampleBatchesChecked();
     },
     initTargetCollectionsChecked() {
       const ids = this.batchActive
@@ -432,6 +483,18 @@ export default {
       );
       this.initialTargetCollectionsChecked = [...this.targetCollectionsChecked];
     },
+    initSampleBatchesChecked() {
+      const batchIdsForCurrentCollection = this.targetCollectionActive
+        ? this.targetCollectionActive.sample_batches.map(
+            (batch) => batch.sample_batch_id
+          )
+        : [];
+      this.sampleBatchesChecked = this.sampleBatches.filter((batch) =>
+        batchIdsForCurrentCollection.includes(batch.sample_batch_id)
+      );
+      this.initialSampleBatchesChecked = [...this.sampleBatchesChecked];
+    },
+
     loadTargetCompounds(rows) {
       this.newTargetCompounds = rows;
     },

@@ -212,8 +212,8 @@ export default {
         onClick: this.collectionDelete,
       };
       let copySelectedCollectionToOtherBatchesButton = {
-        label: "Add selected collection to batches",
-        onClick: this.addSelectedCollectionToBatches,
+        label: "Manage selected collection batches",
+        onClick: this.manageSelectedCollectionBatches,
       };
       let editBatchCollectionsButton = {
         label: "Edit collections of selected batch",
@@ -263,9 +263,9 @@ export default {
       resetIonVisualization: "visualization/reset",
       targetCollectionToggle: "batch/targetCollectionToggle",
     }),
-    addSelectedCollectionToBatches() {
+    manageSelectedCollectionBatches() {
       this.modalTargetCollectionOpProps = {
-        action: "addSelectedCollectionToBatches",
+        action: "manageSelectedCollectionBatches",
         collection: this.targetCollectionsSelected[0],
       };
       this.activateModal({

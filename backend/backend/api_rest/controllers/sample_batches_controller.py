@@ -191,13 +191,25 @@ async def reload_sample_batch(sample_batch_id: str):
 # TODO_match
 async def compute_sample_batch_matches(sample_batches: List[SampleBatchComputeMatch]):
     room_ids = set()
-    for sample_batch in sample_batches:
-        # Add the workspace_id if provided, else add the sample_batch_id
-        room_ids.add(
-            sample_batch.workspace_id
-            if sample_batch.workspace_id
-            else sample_batch.sample_batch_id
-        )
+
+    # Creating a new async session
+    async with async_session() as session:
+        for sample_batch in sample_batches:
+            # If workspace_id is not provided, fetch it from the database
+            if not sample_batch.workspace_id:
+                result = await session.execute(
+                    select(SampleBatch.workspace_id).filter(
+                        SampleBatch.sample_batch_id == sample_batch.sample_batch_id
+                    )
+                )
+                sample_batch.workspace_id = result.scalar_one_or_none()
+
+            # Add the workspace_id if provided, else add the sample_batch_id
+            room_ids.add(
+                sample_batch.workspace_id
+                if sample_batch.workspace_id
+                else sample_batch.sample_batch_id
+            )
 
     total_batches = len(sample_batches)
 

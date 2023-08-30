@@ -24,7 +24,8 @@ export default {
     },
   },
   actions: {
-    async load({ rootState, state, commit, dispatch }, batch) {
+    async load({ rootState, state, commit, dispatch }, collection_id = null) {
+      if (state.activeCollection) await dispatch("unload");
       await dispatch("loadAllCollections");
       await dispatch("loadAllCompounds");
     },
@@ -57,11 +58,21 @@ export default {
       }
     },
 
-    async setActiveCollection({ commit }, collection) {
-      await commit("SET_ACTIVE_COLLECTION", collection);
+    async reload({ dispatch }, collection = null) {
+      const collectionToLoad = collection ? collection : state.activeCollection;
+      if (collectionToLoad) {
+        const collectionToLoadId = collectionToLoad.target_collection_id;
+        await dispatch("unload");
+        await dispatch("load");
+        await dispatch("updateCollectionSelection", {
+          collectionId: collectionToLoadId,
+          selectionValue: 2,
+        });
+      }
     },
 
     async unload({ rootState, commit, dispatch }) {
+      if (!state.activeCollection) return;
       await commit("SET_ACTIVE_COLLECTION", null);
       await commit("SET_TARGET_COLLECTIONS_ALL", []);
       await commit("SET_TARGET_COMPOUNDS_ALL", []);
@@ -98,19 +109,21 @@ export default {
         commit("SET_ACTIVE_COLLECTION", null);
       }
     },
+    // backend notifications
+    async onTargetsAllReload({ dispatch }) {
+      dispatch("reload");
+    },
   },
 
   getters: {
-    getCollectionById: (state) => (collectionId) => {
-      return (
-        state.targetCollectionsAll.find((coll) => coll.id === collectionId) ||
-        null
-      );
+    getTargetCollectionsAll: (state) => {
+      return state.targetCollectionsAll ? state.targetCollectionsAll : [];
     },
-    getCompoundById: (state) => (compoundId) => {
-      return (
-        state.targetCompoundsAll.find((comp) => comp.id === compoundId) || null
+    getTargetCollection: (state, getters) => (targetCollectionId) => {
+      const [targetCollection] = getters["getTargetCollectionsAll"].filter(
+        (row) => row.target_collection_id == targetCollectionId
       );
+      return targetCollection ?? null;
     },
     // get selected
     targetCollectionsSelected: (state) => {
