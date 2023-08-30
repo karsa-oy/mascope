@@ -128,14 +128,16 @@ export default {
           tickmode: "array",
           tickvals: this.sampleItems.map((item) => item.sample_item_id),
           ticktext: this.sampleItems.map((item) => item.sample_item_name),
-          gridcolor: "#757575",
+          gridcolor: "black",
+          gridwidth: 1,
         },
         yaxis: {
           title: "Intensity",
           showgrid: true,
           autorange: true,
           rangemode: "tozero",
-          gridcolor: "#757575",
+          gridcolor: "black",
+          gridwidth: 1,
         },
         showlegend: true,
       };

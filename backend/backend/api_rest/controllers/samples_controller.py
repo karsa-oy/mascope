@@ -582,6 +582,7 @@ async def init_batch_match_filter(batch_id: str, filter_params: FilterParams):
                 ).label("match_score"),
             )
             .select_from(Sample)
+            .where(Sample.sample_batch_id == batch_id)
             .join(Match, Sample.sample_item_id == Match.sample_item_id)
             .join(
                 MatchInterference,
@@ -604,7 +605,6 @@ async def init_batch_match_filter(batch_id: str, filter_params: FilterParams):
                 TargetCompound,
                 TargetIon.target_compound_id == TargetCompound.target_compound_id,
             )
-            .where(Sample.sample_batch_id == batch_id)
         )
 
         result = await session.execute(stmt)
@@ -685,6 +685,9 @@ async def init_sample_match_filter(
                 literal(2).label("selection"),
             )
             .select_from(Sample)
+            .where(
+                Sample.sample_item_id == sample_item_id,
+            )
             .join(Match, Sample.sample_item_id == Match.sample_item_id)
             .join(
                 MatchInterference,

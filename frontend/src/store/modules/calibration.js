@@ -1,4 +1,5 @@
 import { make } from "vuex-pathify";
+import { loadFromApi } from "./apiHelper.js";
 
 const state = {
   active: null,
@@ -24,19 +25,10 @@ export default {
         dispatch("unload");
       }
       const sampleItemId = sample.sample_item_id;
-      await rootState.api
-        .query(
-          `--sql
-                SELECT
-                    mz_calibration
-                FROM sample_file
-                NATURAL LEFT JOIN sample_item
-                WHERE sample_item_id == '${sampleItemId}'
-            `
-        )
-        .then((res) => {
-          commit("SET_MZ_FIT", res[0].mz_calibration);
-        });
+      const response = await rootState.api.httpClient.getSampleMzCalibration(
+        sampleItemId
+      );
+      await commit("SET_MZ_FIT", response.data);
     },
     async unload({ commit }) {
       await commit("SET_MZ_FIT", null);
@@ -45,9 +37,7 @@ export default {
     },
     async onCalibrationMzApplied({ dispatch }, sample_item_id) {
       await dispatch("unload");
-      await dispatch("api/reloadDb", null, { root: true }).then(() =>
-        dispatch("batch/reload", null, { root: true })
-      );
+      dispatch("batch/reload", null, { root: true });
     },
     async onCalibrationMzFitStats({ commit }, response) {
       let fit = response.fit;

@@ -202,7 +202,9 @@
             ></base-spreadsheet-input>
           </section>
           <footer class="modal-card-foot">
-            <b-button expanded @click="modalActive = false"> Cancel </b-button>
+            <b-button type="is-warning" expanded @click="modalActive = false">
+              Cancel
+            </b-button>
             <b-button
               type="is-primary"
               expanded

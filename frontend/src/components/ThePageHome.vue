@@ -51,17 +51,14 @@
                 </div>
               </div>
             </b-collapse>
-            <base-table
+            <b-table
               :key="sampleFileTableDataKey"
-              :rows="acquisitions ? acquisitions : []"
-              :cols="sampleFileCols ? sampleFileCols : []"
-              :checkable="true"
-              :checkSingle="true"
-              @selectRows="selectSampleFiles"
-              :height="sampleFileTableHeight"
-              :sortable="false"
+              :data="acquisitions ? acquisitions : []"
+              :columns="sampleFileCols ? sampleFileCols : []"
+              checkable
+              :checked-rows.sync="sampleFilesSelected"
             >
-            </base-table>
+            </b-table>
             <section style="padding: 0.5em">
               <b-button
                 type="is-primary"
@@ -82,12 +79,13 @@
                 :disabled="
                   !workspaceActive ||
                   !batchActive ||
+                  acquisitions === null ||
                   !acquisitions.length ||
                   sampleFilesSelected.length > 0
                 "
                 @click="launchProcessBatchModal"
               >
-                Process batch ({{ acquisitions.length }})
+                Process batch ({{ acquisitions ? acquisitions.length : 0 }})
               </b-button>
             </section>
           </div>
@@ -247,9 +245,6 @@ export default {
       } else {
         this.unloadInstrument();
       }
-    },
-    selectSampleFiles(newRows, oldRows) {
-      this.sampleFilesSelected = newRows;
     },
   },
   watch: {

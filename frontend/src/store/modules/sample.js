@@ -25,6 +25,7 @@ export default {
       // set sample active
       await commit("SET_ACTIVE", sample);
       await dispatch("loadMatches");
+      await dispatch("calibration/load", sample, { root: true });
     },
     async loadMatches({ rootState, rootGetters, state, commit }) {
       const sampleItemId = state.active.sample_item_id;
@@ -78,6 +79,15 @@ export default {
         dispatch("load", activeSample);
       }
     },
+    async create({ rootState }, sample) {
+      await rootState.api.httpClient.createSampleItem(sample);
+    },
+    async update({ rootState }, sample) {
+      await rootState.api.httpClient.updateSampleItem(
+        sample.sample_item_id,
+        sample
+      );
+    },
     async onSampleBatchExportPeaksFailed({ dispatch }, error) {
       await dispatch(
         "app/pushNotification",
@@ -93,7 +103,7 @@ export default {
       );
     },
     async onSampleItemCreated({ rootGetters, dispatch }, sample_item_id) {
-      await dispatch("batch/onSampleBatchReload", null, { root: true });
+      await dispatch("batch/reload", null, { root: true });
       const sample_item = rootGetters["batch/sampleItem"](sample_item_id);
       await dispatch("load", sample_item);
     },

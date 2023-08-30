@@ -321,6 +321,6 @@ export default {
 
 .icon > .mdi-chevron-right,
 .mdi-chevron-down {
-  color: rgb(0, 0, 0) !important;
+  color: white !important;
 }
 </style>

@@ -27,13 +27,7 @@ export default async function apiPlugin(store) {
     state: {
       ...api,
     },
-    actions: {
-      async reloadDb({ state }) {
-        const [dbcon, query] = await state.initDb();
-        state.dbcon = dbcon;
-        state.query = query;
-      },
-    },
+    actions: {},
   });
 
   apiLog("registered api store module");

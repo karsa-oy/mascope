@@ -75,7 +75,7 @@ export default {
         },
         hoverinfo: "name+y",
         plot_bgcolor: "#464752",
-        paper_bgcolor: "#000a",
+        paper_bgcolor: "#0008",
         autosize: true,
         useResizeHandler: true,
         modebar: {

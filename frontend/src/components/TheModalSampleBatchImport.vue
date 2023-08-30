@@ -8,7 +8,7 @@
       aria-modal
       @close="close"
     >
-      <div class="modal-card" style="width: 100vw">
+      <div class="modal-card" style="">
         <header class="modal-card-head">
           <h2 class="subtitle">Import a batch of samples</h2>
         </header>
@@ -31,10 +31,12 @@
           </base-spreadsheet-input>
         </section>
         <footer class="modal-card-foot">
-          <b-button expanded @click="modalActive = false"> Cancel </b-button>
+          <b-button expanded type="is-warning" @click="modalActive = false">
+            Cancel
+          </b-button>
           <b-button
-            type="is-primary"
             expanded
+            type="is-primary"
             :disabled="!readyToProcess"
             @click="
               () => {

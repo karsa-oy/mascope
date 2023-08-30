@@ -10,6 +10,7 @@ const state = {
   matchingProgress: 0,
   mzCalibration: null,
   recentAcquisitions: null,
+  sampleItemPending: null,
   scenthoundModeActive: false,
 };
 
@@ -165,9 +166,16 @@ export default {
     async onMatchItemComputeStarted({ commit }, data) {
       commit("SET_MATCHING_PROGRESS", data.progress);
     },
-    async onSampleFileCreated({ rootState, dispatch }, filename) {
-      await dispatch("api/reloadDb", null, { root: true });
+    async onSampleFileCreated({ state, dispatch, commit }, filename) {
       await dispatch("getRecentAcquisitions");
+      if (state.scenthoundModeActive) {
+        if (state.sampleItemPending) {
+          await dispatch("sample/create", state.sampleItemPending, {
+            root: true,
+          });
+          commit("SET_SAMPLE_ITEM_PENDING", null);
+        }
+      }
     },
   },
   getters: {},

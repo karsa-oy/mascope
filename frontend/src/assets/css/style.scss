@@ -42,14 +42,39 @@ $warning-light: findLightColor($warning);
 $warning-dark: findDarkColor($warning);
 $warning-invert: findColorInvert($warning);
 
+// Workspace tile
+.base-tile {
+  height: 200px;
+  width: 200px;
+  margin: 10px;
+  background-color: $warm-grey-light;
+}
+.tile-card-header {
+  @extend .card-header;
+  background-color: $moss-green-light !important;
+  border-top-left-radius: 0 !important;
+  border-top-right-radius: 0 !important;
+}
+.tile-card-content {
+  @extend .card-content;
+  background-color: $warm-grey-light;
+  color: black;
+}
+
+// Button
+$button-background-color: $cool-grey-light;
+$button-hover-color: $moss-green;
+$button-hover-border-color: $moss-green-light;
+
 // Page
 $body-background-color: black; //#454752;
-$dropdown-content-background-color: $warm-grey-light;
+$dropdown-content-background-color: $cool-grey-light;
 
 // Text
 $dropdown-item-color: black;
 // $family-primary: sans-serif;
-$label-color: white;
+$label-color: $warm-grey-light;
+$table-color: white;
 $text: white;
 $title-color: white;
 $subtitle-color: white;
@@ -59,17 +84,18 @@ $modal-card-head-background-color: inherit;
 $modal-card-body-background-color: inherit;
 
 // Table
-$table-background-color: white;
-$table-head-background-color: $warm-grey-light;
-$table-row-hover-background-color: $warm-grey-light;
+$table-background-color: $cool-grey;
+$table-cell-border: 1px solid $cool-grey;
+$table-head-background-color: $cool-grey-light;
+$table-row-hover-background-color: $cool-grey-light;
 .base-browser-row-focused {
-  background: $orange-light;
+  background: $burgundy-red-light;
 }
 .base-browser-row-fully-selected {
-  background: $warm-grey;
+  background: $burgundy-red;
 }
 .base-browser-row-partially-selected {
-  background: $warm-grey;
+  background: $burgundy-red;
 }
 
 // Lists and maps
