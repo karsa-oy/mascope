@@ -128,7 +128,7 @@ export default {
           tickmode: "array",
           tickvals: this.sampleItems.map((item) => item.sample_item_id),
           ticktext: this.sampleItems.map((item) => item.sample_item_name),
-          gridcolor: "black",
+          gridcolor: "#464752",
           gridwidth: 1,
         },
         yaxis: {
@@ -136,7 +136,7 @@ export default {
           showgrid: true,
           autorange: true,
           rangemode: "tozero",
-          gridcolor: "black",
+          gridcolor: "#464752",
           gridwidth: 1,
         },
         showlegend: true,

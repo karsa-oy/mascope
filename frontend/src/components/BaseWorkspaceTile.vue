@@ -1,17 +1,12 @@
 <template>
   <div class="base-tile">
     <header class="tile-card-header">
-      <p class="card-header-title" @click="onClick">
+      <p class="tile-card-header-title" @click="onClick">
         {{ workspace.workspace_name }}
       </p>
       <b-dropdown aria-role="list">
         <template #trigger>
-          <b-icon
-            icon="dots-horizontal"
-            size="small"
-            type="is-dark"
-            role="button"
-          ></b-icon>
+          <b-icon icon="dots-horizontal" size="small" role="button"></b-icon>
         </template>
         <b-dropdown-item
           aria-role="listitem"
