@@ -1,11 +1,25 @@
 <template>
-  <base-chart-plotly
-    id="ChartSampleIntensity"
-    :title="this.batchActive.sample_batch_name"
-    :data="data"
-    :layout="layout"
-    @click="onClick"
-  ></base-chart-plotly>
+  <div class="columns">
+    <div class="column is-1">
+      <br /><br /><br />
+      <b-field>
+        <template #label
+          ><div style="text-align: center">
+            <b-icon icon="math-log"></b-icon></div
+        ></template>
+        <b-switch v-model="yAxisLog"></b-switch>
+      </b-field>
+    </div>
+    <div class="column is-11">
+      <base-chart-plotly
+        id="ChartSampleIntensity"
+        :title="this.batchActive.sample_batch_name"
+        :data="data"
+        :layout="layout"
+        @click="onClick"
+      ></base-chart-plotly>
+    </div>
+  </div>
 </template>
 
 <script>
@@ -16,6 +30,11 @@ import { glasbeyHv } from "$lib/styles";
 export default {
   name: "ThePaneChartSampleIntensity",
   components: { BaseChartPlotly },
+  data: function () {
+    return {
+      yAxisLog: false,
+    };
+  },
   computed: {
     ...get({
       batchActive: "batch/active",
@@ -25,12 +44,6 @@ export default {
       sampleItems: "batch/sampleItems",
       targetCompounds: "batch/targetCompounds",
     }),
-    probable: function () {
-      return this.stats.filter((stat) => stat.rating == "probable");
-    },
-    possible: function () {
-      return this.stats.filter((stat) => stat.rating == "possible");
-    },
     data: function () {
       if (!(this.sampleItems && this.matchCompounds)) return [];
       let allCompoundIds = this.targetCompounds.map(
@@ -133,6 +146,7 @@ export default {
         },
         yaxis: {
           title: "Intensity",
+          type: this.yAxisLog ? "log" : "lin",
           showgrid: true,
           autorange: true,
           rangemode: "tozero",
