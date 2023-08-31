@@ -248,6 +248,10 @@ export default {
     },
   },
   watch: {
+    browseAcquisitions: function () {
+      // Reset selected files when switching between recent acquisitions/browse
+      this.sampleFilesSelected = [];
+    },
     instrumentSelected: function (newRows, oldRows) {
       if (newRows === null) return;
       if (newRows.length > 1) {
