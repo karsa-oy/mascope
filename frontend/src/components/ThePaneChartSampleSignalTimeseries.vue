@@ -29,7 +29,7 @@ export default {
           title: "Time [s]",
           autorange: true,
           showgrid: true,
-          gridcolor: "black",
+          gridcolor: "#464752",
           gridwidth: 1,
         },
         yaxis: {
@@ -37,7 +37,7 @@ export default {
           showgrid: true,
           autorange: true,
           rangemode: "tozero",
-          gridcolor: "black",
+          gridcolor: "#464752",
           gridwidth: 1,
         },
         dragmode: "zoom",

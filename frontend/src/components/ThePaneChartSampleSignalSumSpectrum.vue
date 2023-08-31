@@ -43,14 +43,14 @@ export default {
     xAxisConfiguration() {
       return {
         title: "m/z [Th]",
-        gridcolor: "black",
+        gridcolor: "#464752",
         gridwidth: 1,
       };
     },
     yAxisConfiguration() {
       return {
         title: "Signal intensity [cps]",
-        gridcolor: "black",
+        gridcolor: "#464752",
         gridwidth: 1,
       };
     },

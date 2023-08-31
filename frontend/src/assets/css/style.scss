@@ -1,3 +1,5 @@
+@use "sass:color";
+
 // Import Bulma's core
 @import "../node_modules/bulma/sass/utilities/_all.sass";
 
@@ -12,9 +14,17 @@ $orange: #f1613c;
 $orange-light: #facfc2;
 $cool-grey: #464752;
 $cool-grey-light: #b0b1ba;
+$cool-grey-lighter: color.scale($cool-grey-light, $lightness: +30%);
 $warm-grey: #c9c8b9;
 $warm-grey-light: #e4e3db;
 $light-blue: #e4e5f4;
+
+// Cool grey shades
+$cool-grey-0: color.scale($cool-grey, $lightness: -50%);
+$cool-grey-1: color.scale($cool-grey, $lightness: -40%);
+$cool-grey-2: color.scale($cool-grey, $lightness: -30%);
+$cool-grey-3: color.scale($cool-grey, $lightness: -20%);
+$cool-grey-4: color.scale($cool-grey, $lightness: -10%);
 
 // Set your colors
 $primary: $moss-green-light;
@@ -47,18 +57,21 @@ $warning-invert: findColorInvert($warning);
   height: 200px;
   width: 200px;
   margin: 10px;
-  background-color: $warm-grey-light;
+  background-color: $cool-grey;
 }
 .tile-card-header {
   @extend .card-header;
-  background-color: $moss-green-light !important;
+  background-color: $cool-grey-2 !important;
   border-top-left-radius: 0 !important;
   border-top-right-radius: 0 !important;
 }
+.tile-card-header-title {
+  @extend .card-header-title;
+  color: $cool-grey-light !important;
+}
 .tile-card-content {
   @extend .card-content;
-  background-color: $warm-grey-light;
-  color: black;
+  color: $cool-grey-light;
 }
 
 // Button
@@ -67,7 +80,7 @@ $button-hover-color: $moss-green;
 $button-hover-border-color: $moss-green-light;
 
 // Page
-$body-background-color: black; //#454752;
+$body-background-color: $cool-grey-0;
 $dropdown-content-background-color: $cool-grey-light;
 
 // Text
@@ -84,10 +97,12 @@ $modal-card-head-background-color: inherit;
 $modal-card-body-background-color: inherit;
 
 // Table
-$table-background-color: $cool-grey;
+$table-background-color: $cool-grey-2;
+$table-color: $cool-grey-lighter;
 $table-cell-border: 1px solid $cool-grey;
-$table-head-background-color: $cool-grey-light;
-$table-row-hover-background-color: $cool-grey-light;
+$table-head-cell-color: $cool-grey-light;
+$table-head-background-color: $cool-grey-3;
+$table-row-hover-background-color: $cool-grey-4;
 .base-browser-row-focused {
   background: $burgundy-red-light;
 }
@@ -98,67 +113,70 @@ $table-row-hover-background-color: $cool-grey-light;
   background: $burgundy-red;
 }
 
-// Lists and maps
-$custom-colors: null !default;
-$custom-shades: null !default;
+// Input
+$input-color: black;
+$input-border-color: transparent;
+$input-background-color: $cool-grey-light;
+$input-disabled-background-color: $cool-grey-4;
+$input-disabled-border-color: transparent;
+
+// Progress bar
+$progress-bar-background-color: $cool-grey-light;
 
 // Setup $colors to use as bulma classes (e.g. 'is-twitter')
-$colors: mergeColorMaps(
-  (
-    "white": (
-      $white,
-      $black,
-    ),
-    "black": (
-      $black,
-      $white,
-    ),
-    "light": (
-      $light,
-      $light-invert,
-    ),
-    "dark": (
-      $dark,
-      $dark-invert,
-    ),
-    "primary": (
-      $primary,
-      $primary-invert,
-      $primary-light,
-      $primary-dark,
-    ),
-    "link": (
-      $link,
-      $link-invert,
-      $link-light,
-      $link-dark,
-    ),
-    "info": (
-      $info,
-      $info-invert,
-      $info-light,
-      $info-dark,
-    ),
-    "success": (
-      $success,
-      $success-invert,
-      $success-light,
-      $success-dark,
-    ),
-    "warning": (
-      $warning,
-      $warning-invert,
-      $warning-light,
-      $warning-dark,
-    ),
-    "danger": (
-      $danger,
-      $danger-invert,
-      $danger-light,
-      $danger-dark,
-    ),
+$colors: (
+  "white": (
+    $white,
+    $black,
   ),
-  $custom-colors
+  "black": (
+    $black,
+    $white,
+  ),
+  "light": (
+    $light,
+    $light-invert,
+  ),
+  "dark": (
+    $dark,
+    $dark-invert,
+  ),
+  "primary": (
+    $primary,
+    $primary-invert,
+    $primary-light,
+    $primary-dark,
+  ),
+  "link": (
+    $link,
+    $link-invert,
+    $link-light,
+    $link-dark,
+  ),
+  "info": (
+    $info,
+    $info-invert,
+    $info-light,
+    $info-dark,
+  ),
+  "success": (
+    $success,
+    $success-invert,
+    $success-light,
+    $success-dark,
+  ),
+  "warning": (
+    $warning,
+    $warning-invert,
+    $warning-light,
+    $warning-dark,
+  ),
+  "danger": (
+    $danger,
+    $danger-invert,
+    $danger-light,
+    $danger-dark,
+  ),
 );
 
 // Links

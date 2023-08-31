@@ -74,8 +74,8 @@ export default {
           color: "#fff",
         },
         hoverinfo: "name+y",
-        plot_bgcolor: "#464752",
-        paper_bgcolor: "#0008",
+        plot_bgcolor: "#313239f0",
+        paper_bgcolor: "transparent",
         autosize: true,
         useResizeHandler: true,
         modebar: {
