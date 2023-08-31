@@ -315,11 +315,10 @@ export default {
       newCollectionName: "",
       newCollectionDesc: "",
       newTargetCompounds: [],
-      addToSampleBatch: true,
       // Delete Selected Collection
       targetCollectionActiveInfo: {},
       deleteUnusedCompounds: true,
-      //
+      // Manage Selected Collection Batches
       initialSampleBatchesChecked: [],
       sampleBatchesChecked: [],
     };
