@@ -5,6 +5,7 @@
       :levels="targetLevels"
       :menu="menu"
       :contextMenuIcon="contextMenuIcon"
+      @tagClicked="matchScoreTagClicked"
     >
     </base-browser>
   </section>
@@ -292,6 +293,19 @@ export default {
       this.activateModal({
         modal: "sampleItemTargetIon",
       });
+    },
+    matchScoreTagClicked(row) {
+      if (row.target_compound_id) {
+        // Compound or Ion match score tag clicked
+        if (!row.target_ion_id) {
+          // Compound tag clicked -> fetch corresponding ion id
+          // Note: This picks the first matching target ion if there are many
+          row = this.matchIons.filter(
+            (ion) => ion.target_compound_id === row.target_compound_id
+          )[0];
+        }
+        this.ionShow(row);
+      }
     },
   },
 };
