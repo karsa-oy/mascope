@@ -32,6 +32,14 @@ export default {
   components: { BaseChartPlotly },
   data: function () {
     return {
+      hovertemplate:
+        "<b># %{x}</b>" +
+        "<br>" +
+        "<b>%{text}</b>" +
+        "<br>" +
+        "y: %{y:,.0f}" +
+        "<br>" +
+        "%{customdata}",
       yAxisLog: false,
     };
   },
@@ -108,12 +116,7 @@ export default {
           y,
           customdata: this.sampleItems.map((item) => item.datetime),
           text: this.sampleItems.map((item) => item.sample_item_name),
-          hovertemplate:
-            "<b>%{text}</b>" +
-            "<br>" +
-            "y: %{y:,.0f}" +
-            "<br>" +
-            "%{customdata}",
+          hovertemplate: this.hovertemplate,
           mode: "markers",
           type: "scatter",
           marker: {
@@ -131,8 +134,7 @@ export default {
         y,
         customdata: this.sampleItems.map((item) => item.datetime),
         text: this.sampleItems.map((item) => item.sample_item_name),
-        hovertemplate:
-          "<b>%{text}</b>" + "<br>" + "y: %{y:,.0f}" + "<br>" + "%{customdata}",
+        hovertemplate: this.hovertemplate,
         mode: "markers",
         type: "scatter",
         marker: {
