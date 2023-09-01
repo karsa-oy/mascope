@@ -58,7 +58,7 @@ export default {
         },
         {
           disabled: this.allButtonsDisabled,
-          icon: "flask",
+          icon: "chart-scatter-plot",
           label: "Batch overview",
           path: "/batch-overview",
           visible: this.batchActive,

@@ -9,10 +9,10 @@
           <div
             style="
               position: fixed;
-              left: 6em;
-              bottom: 3em;
+              left: 9em;
+              bottom: 5em;
               z-index: -1;
-              width: 300px;
+              width: 200px;
             "
           >
             <b-image

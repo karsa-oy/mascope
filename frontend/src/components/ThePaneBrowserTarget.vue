@@ -186,7 +186,7 @@ export default {
           ],
           rows: this.targetIsotopeRows,
           defaultSort: ["mz", "asc"],
-          detailsIcon: this.sampleItemFocused ? "magnify" : null,
+          detailsIcon: this.sampleItemFocused ? "chart-bell-curve" : null,
           detailsOpen: this.sampleItemFocused ? this.ionShow : null,
           rowClick: doNothing,
         },
