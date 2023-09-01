@@ -138,9 +138,9 @@ async def visualization_ion_focus(
                         "y": timeseries_y.tobytes(),
                     }
                 )
-                if sum_timeseries is None:
+                if i == 0 and sum_timeseries is None:
                     sum_timeseries = match_timeseries
-                else:
+                elif i > 0 and sum_timeseries is not None:
                     sum_timeseries += match_timeseries
         # Target mz trace (red vertical line)
         spectrum_traces.append(
