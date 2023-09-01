@@ -213,6 +213,8 @@ export default {
         { field: "filename", label: "Filename" },
         { field: "datetime", label: "Datetime" },
         { field: "sample_item_type", label: "Sample type" },
+        { field: "tic", label: "TIC" },
+        { field: "filter_id", label: "Filter ID" },
         { field: "match_score", label: "Match score" },
       ];
       const matchCompoundCols = [
