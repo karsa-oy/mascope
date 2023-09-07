@@ -171,24 +171,24 @@ async def update_sample_batch(
                 session.add(new_target_collection_in_sample_batch)
 
         await session.commit()
-        # Inform clients about the update
-        if rematch:
-            background_tasks.add_task(
-                compute_sample_batch_matches,
-                [
-                    SampleBatchComputeMatch(
-                        sample_batch_id=existing_sample_batch.sample_batch_id
-                    )
-                ],
-            )
-        else:
-            await sio.emit(
-                "workspace_reload",
-                room=existing_sample_batch.workspace_id,
-                namespace="/",
-            )
+    # Inform clients about the update
+    if rematch:
+        background_tasks.add_task(
+            compute_sample_batch_matches,
+            [
+                SampleBatchComputeMatch(
+                    sample_batch_id=existing_sample_batch.sample_batch_id
+                )
+            ],
+        )
+    else:
+        await sio.emit(
+            "workspace_reload",
+            room=existing_sample_batch.workspace_id,
+            namespace="/",
+        )
 
-        return existing_sample_batch
+    return existing_sample_batch
 
 
 async def reload_sample_batch(sample_batch_id: str):

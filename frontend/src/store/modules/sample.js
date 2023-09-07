@@ -51,7 +51,6 @@ export default {
           let matchCollections = response.data.data.match_collections;
 
           const activeCollection = rootGetters["targets/activeCollection"];
-          console.log(activeCollection);
           if (matchCollections) {
             matchCollections = matchCollections.map((coll) => {
               if (
