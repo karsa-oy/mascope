@@ -40,9 +40,6 @@ function set_up_mascope_frontend() {
     pushd $MASCOPE_PROJECT/backend
     ln -s -f $(realpath $MASCOPE_PRIVATE_DATADIR) $MASCOPE_UI
     popd 
-    # add sql.js library
-    mkdir $MASCOPE_UI/node_modules
-    cp -r -f $MASCOPE_PROJECT/frontend/node_modules/sql.js $MASCOPE_UI/node_modules
     # (re)set up nginx configuration for the static mascope frontend
     sudo systemctl stop nginx
     sudo rm -r -f /var/www/mascope.site || true

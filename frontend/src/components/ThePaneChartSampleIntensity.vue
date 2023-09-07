@@ -32,6 +32,14 @@ export default {
   components: { BaseChartPlotly },
   data: function () {
     return {
+      hovertemplate:
+        "<b># %{x}</b>" +
+        "<br>" +
+        "<b>%{text}</b>" +
+        "<br>" +
+        "y: %{y:,.0f}" +
+        "<br>" +
+        "%{customdata}",
       yAxisLog: false,
     };
   },
@@ -106,6 +114,9 @@ export default {
           target_compound_id: targetCompoundId,
           x,
           y,
+          customdata: this.sampleItems.map((item) => item.datetime),
+          text: this.sampleItems.map((item) => item.sample_item_name),
+          hovertemplate: this.hovertemplate,
           mode: "markers",
           type: "scatter",
           marker: {
@@ -121,6 +132,9 @@ export default {
         name: "TIC",
         x,
         y,
+        customdata: this.sampleItems.map((item) => item.datetime),
+        text: this.sampleItems.map((item) => item.sample_item_name),
+        hovertemplate: this.hovertemplate,
         mode: "markers",
         type: "scatter",
         marker: {
@@ -140,7 +154,7 @@ export default {
           showgrid: true,
           tickmode: "array",
           tickvals: this.sampleItems.map((item) => item.sample_item_id),
-          ticktext: this.sampleItems.map((item) => item.sample_item_name),
+          ticktext: this.sampleItems.map((_, i) => i + 1),
           gridcolor: "#464752",
           gridwidth: 1,
         },

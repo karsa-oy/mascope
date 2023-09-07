@@ -50,12 +50,9 @@
           <template v-if="col.field == 'match_score'">
             <base-tag-match
               :display-match-score="col.displayMatchScore"
-              :match-score="
-                props.row.matched === undefined || props.row.matched
-                  ? props.row[col.field]
-                  : null
-              "
+              :row="props.row"
               :tooltip="col.tooltip ? col.tooltip(props.row) : {}"
+              @tagClicked="matchScoreTagClicked"
             ></base-tag-match>
           </template>
           <template v-else>
@@ -70,6 +67,7 @@
                 :levels="getChildLevels(props.row)"
                 :isRoot="false"
                 :rootRefresh="refresh"
+                @tagClicked="matchScoreTagClicked"
               >
               </base-browser>
             </td>
@@ -234,6 +232,9 @@ export default {
       } else {
         return `${className}-other`;
       }
+    },
+    matchScoreTagClicked: function (row) {
+      this.$emit("tagClicked", row);
     },
     rowClass: function (row) {
       switch (row.selection) {
