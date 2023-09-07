@@ -1,14 +1,5 @@
 <template>
   <div id="app">
-    <b-message
-      v-if="isDevelopmentMode"
-      title="Warning"
-      type="is-danger"
-      has-icon
-    >
-      NOTE: You are running the development version of Mascope. Any changes are
-      not persisted.
-    </b-message>
     <div v-if="appReady">
       <router-view></router-view>
     </div>
@@ -25,6 +16,7 @@
 
 <script>
 import { call, get } from "vuex-pathify";
+import { mapMutations } from "vuex";
 
 export default {
   data: function () {
@@ -50,11 +42,19 @@ export default {
     });
     // Return to home page at reload
     if (this.$route.path !== "/") this.$router.push("/");
+    if (this.isDevelopmentMode) {
+      this.activateNotification({
+        notification: "inDevelopment",
+      });
+    }
   },
   methods: {
     ...call({
       keydown: "key/down",
       keyup: "key/up",
+    }),
+    ...mapMutations({
+      activateNotification: "notification/activate",
     }),
   },
   watch: {

@@ -3,7 +3,7 @@ import asyncio
 from backend.server import sio
 from backend.db.id import gen_id
 
-from fastapi import HTTPException
+from fastapi import HTTPException, BackgroundTasks
 from sqlalchemy import asc, desc, func, select
 from sqlalchemy.orm import joinedload
 
@@ -117,7 +117,9 @@ async def get_target_collection_by_id(target_collection_id: str):
         return target_collection_dict
 
 
-async def create_target_collection(target_collection: TargetCollectionCreate):
+async def create_target_collection(
+    target_collection: TargetCollectionCreate, background_tasks: BackgroundTasks
+):
     async with async_session() as session:
         sample_batches_to_rematch = []
         message_logs = {}
@@ -193,7 +195,7 @@ async def create_target_collection(target_collection: TargetCollectionCreate):
                 for sample_batch in target_collection.sample_batches
             ]
             result = await create_target_collection_in_sample_batch(
-                target_collections_in_sample_batch, False, session
+                target_collections_in_sample_batch, False, None, session
             )
             added_collections_to_sample_batch = result[
                 "added_collections_to_sample_batch"
@@ -229,9 +231,10 @@ async def create_target_collection(target_collection: TargetCollectionCreate):
         # Run rematch for all sample batches in the list
         # TODO_match
         if sample_batches_to_rematch:
-            await compute_sample_batch_matches(sample_batches_to_rematch)
+            background_tasks.add_task(
+                compute_sample_batch_matches, sample_batches_to_rematch
+            )
 
-        await sio.emit("org_reload", namespace="/")
         await sio.emit(
             "targets_all_reload",
             namespace="/",
@@ -252,7 +255,9 @@ async def create_target_collection(target_collection: TargetCollectionCreate):
 
 
 async def delete_target_collection(
-    target_collection_id: str, delete_orphan_compounds: bool = False
+    target_collection_id: str,
+    background_tasks: BackgroundTasks,
+    delete_orphan_compounds: bool = False,
 ):
     async with async_session() as session:
         # Check if the target collection exists
@@ -321,7 +326,7 @@ async def delete_target_collection(
                 for sb in sample_batches_to_rematch
             ]
 
-            await compute_sample_batch_matches(sample_batches)
+            background_tasks.add_task(compute_sample_batch_matches, sample_batches)
 
             for workspace_id in workspaces_to_reload:
                 await sio.emit("targets_all_reload", room=workspace_id, namespace="/")
@@ -454,6 +459,7 @@ async def update_target_collection(
         # Rematch the affected sample batches compounds were added
         for sample_batch_id in sample_batches_to_rematch:
             # FIX replace with request
+            # TODO_background Use the fastApi background tasks
             task = asyncio.create_task(match_batch_compute(None, sample_batch_id))
             await task
 

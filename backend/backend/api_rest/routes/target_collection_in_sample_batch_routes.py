@@ -1,12 +1,10 @@
-from typing import List, Optional
-from fastapi import APIRouter
+from fastapi import APIRouter, BackgroundTasks
 from ..controllers.target_collection_in_sample_batch_controller import (
     get_target_collections_in_sample_batch,
     create_target_collection_in_sample_batch,
     delete_target_collections_in_sample_batch,
 )
 from ..models.pydantic_models.target_collection_in_sample_batch_pydantic_model import (
-    TargetCollectionInSampleBatchBase,
     TargetCollectionInSampleBatchPayload,
 )
 
@@ -32,13 +30,14 @@ async def get_target_collections_in_sample_batch_route(
 )
 async def create_target_collection_in_sample_batch_route(
     payload: TargetCollectionInSampleBatchPayload,
+    background_tasks: BackgroundTasks,
 ):
     # Unpack the payload
     target_collections_in_sample_batch = payload.target_collections
     skipRematch = payload.skipRematch
 
     result = await create_target_collection_in_sample_batch(
-        target_collections_in_sample_batch, skipRematch
+        target_collections_in_sample_batch, skipRematch, background_tasks
     )
     response = {
         "added_collections_to_sample_batch_count": len(
@@ -57,13 +56,14 @@ async def create_target_collection_in_sample_batch_route(
 )
 async def delete_target_collections_in_sample_batch_route(
     payload: TargetCollectionInSampleBatchPayload,
+    background_tasks: BackgroundTasks,
 ):
     # Unpack the payload
     target_collections_in_sample_batch = payload.target_collections
     skipRematch = payload.skipRematch
 
     result = await delete_target_collections_in_sample_batch(
-        target_collections_in_sample_batch, skipRematch
+        target_collections_in_sample_batch, skipRematch, background_tasks
     )
 
     response = {

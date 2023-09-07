@@ -52,6 +52,11 @@ $warning-light: findLightColor($warning);
 $warning-dark: findDarkColor($warning);
 $warning-invert: findColorInvert($warning);
 
+$notification: $cool-grey;
+$notification-light: $cool-grey-light;
+$notification-dark: $cool-grey-2;
+$notification-invert: $cool-grey-lighter;
+
 // Workspace tile
 .base-tile {
   height: 200px;
@@ -96,6 +101,26 @@ $subtitle-color: white;
 $modal-card-head-background-color: inherit;
 $modal-card-body-background-color: inherit;
 
+// Notification
+
+.message.is-notification {
+  background-color: rgba($notification, 0.9) !important;
+  animation: fadeIn 0.5s forwards;
+  box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.5);
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 400px;
+  z-index: 2000;
+}
+
+.message.is-notification.is-closing {
+  animation: fadeOut 0.5s;
+}
+.message.is-notification.in-development {
+  width: 500px;
+}
+
 // Table
 $table-background-color: $cool-grey-2;
 $table-color: $cool-grey-lighter;
@@ -122,6 +147,10 @@ $input-disabled-border-color: transparent;
 
 // Progress bar
 $progress-bar-background-color: $cool-grey-light;
+
+.batch-computation-progress-bar {
+  padding-top: 10px;
+}
 
 // Setup $colors to use as bulma classes (e.g. 'is-twitter')
 $colors: (
@@ -177,7 +206,32 @@ $colors: (
     $danger-light,
     $danger-dark,
   ),
+  "notification": (
+    $notification-dark,
+    $notification-light,
+    $notification,
+    $notification-invert,
+  ),
 );
+
+// Define animations
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
 
 // Links
 $link: $primary;

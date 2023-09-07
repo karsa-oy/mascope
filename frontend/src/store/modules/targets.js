@@ -58,24 +58,37 @@ export default {
       }
     },
 
-    async reload({ dispatch }, collection = null) {
+    async reload({ dispatch, rootState }, collection = null) {
       const collectionToLoad = collection ? collection : state.activeCollection;
       if (collectionToLoad) {
         const collectionToLoadId = collectionToLoad.target_collection_id;
         await dispatch("unload");
         await dispatch("load");
-        await dispatch("updateCollectionSelection", {
-          collectionId: collectionToLoadId,
-          selectionValue: 2,
-        });
+
+        // Check if the collection is present in the batch's targetCollections before reselecting it
+        const batchTargetCollections = rootState.batch.targetCollections;
+        if (
+          batchTargetCollections &&
+          batchTargetCollections.some(
+            (coll) => coll.target_collection_id === collectionToLoadId
+          )
+        ) {
+          await dispatch("updateCollectionSelection", {
+            collectionId: collectionToLoadId,
+            selectionValue: 2,
+          });
+        }
+      } else {
+        // If no active collection, just refresh the list of collections without selecting any
+        await dispatch("load");
       }
     },
 
     async unload({ rootState, commit, dispatch }) {
-      if (!state.activeCollection) return;
-      await commit("SET_ACTIVE_COLLECTION", null);
       await commit("SET_TARGET_COLLECTIONS_ALL", []);
       await commit("SET_TARGET_COMPOUNDS_ALL", []);
+      if (!state.activeCollection) return;
+      await commit("SET_ACTIVE_COLLECTION", null);
     },
 
     async updateCollectionSelection(
@@ -116,6 +129,9 @@ export default {
   },
 
   getters: {
+    activeCollection: (state) => {
+      return state.activeCollection ? state.activeCollection : null;
+    },
     getTargetCollectionsAll: (state) => {
       return state.targetCollectionsAll ? state.targetCollectionsAll : [];
     },

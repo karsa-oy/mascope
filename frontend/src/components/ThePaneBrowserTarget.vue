@@ -1,7 +1,5 @@
 <template>
   <section>
-    <button @click="reloadBatch">Reload Batch</button>
-    <button @click="rematchBatches">Rematch Batch</button>
     <base-browser
       name="Targets"
       :levels="targetLevels"
@@ -29,7 +27,6 @@ export default {
   data: function () {
     return {
       showOnlyChecked: false,
-      loadingInstance: null,
     };
   },
   computed: {
@@ -53,7 +50,6 @@ export default {
       targetCompounds: "batch/targetCompounds",
       targetIons: "batch/targetIons",
       targetIsotopes: "batch/targetIsotopes",
-      isLoading: "batch/isLoading",
     }),
     contextMenuIcon() {
       if (this.targetCollectionsSelected.length === 1) return "menu";
@@ -219,11 +215,19 @@ export default {
         label: "Edit collections of selected batch",
         onClick: this.editBatchCollections,
       };
+      let rematchBatchesButton = {
+        label: "Rematch selected batch (debug)",
+        onClick: this.rematchBatches,
+      };
       if (
         this.targetCollectionsSelected.length == 0 &&
         this.sampleBatchesSelected.length == 1
       ) {
-        return [createCollectionButton, editBatchCollectionsButton];
+        return [
+          createCollectionButton,
+          editBatchCollectionsButton,
+          rematchBatchesButton,
+        ];
       }
       if (this.targetCollectionsSelected.length == 0) {
         return [createCollectionButton];
@@ -235,16 +239,8 @@ export default {
           editBatchCollectionsButton,
           copySelectedCollectionToOtherBatchesButton,
           deleteCollectionButton,
+          rematchBatchesButton,
         ];
-      }
-    },
-  },
-  watch: {
-    isLoading(boolean) {
-      if (boolean) {
-        this.startLoading();
-      } else {
-        this.stopLoading();
       }
     },
   },
@@ -340,23 +336,8 @@ export default {
         modal: "sampleItemTargetIon",
       });
     },
-    async reloadBatch() {
-      const sample_batch_id = this.batchActive.sample_batch_id;
-      await this.reloadBatchInfo(sample_batch_id);
-    },
     async rematchBatches() {
       await this.computeBatchMatches(this.sampleBatchesSelected);
-    },
-    startLoading() {
-      // console.log(this.$el);
-      this.loadingInstance = this.$buefy.loading.open();
-    },
-
-    stopLoading() {
-      if (this.loadingInstance) {
-        this.loadingInstance.close();
-        this.loadingInstance = null;
-      }
     },
   },
 };

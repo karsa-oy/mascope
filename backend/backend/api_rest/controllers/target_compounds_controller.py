@@ -126,16 +126,15 @@ async def delete_target_compound(target_compound_id: str, session=None):
 
     if independent_transaction:
         await session.commit()
+        # Reload affected sample batches
+        for sample_batch_id in sample_batches_to_reload:
+            await sio.emit(
+                "sample_batch_reload",
+                room=sample_batch_id,
+                namespace="/",
+            )
     else:
         await session.flush()
-
-    # Reload affected sample batches
-    for sample_batch_id in sample_batches_to_reload:
-        await sio.emit(
-            "sample_batch_reload",
-            room=sample_batch_id,
-            namespace="/",
-        )
 
 
 async def create_target_compound(
@@ -510,6 +509,7 @@ async def update_target_compound(target_compounds: List[TargetCompoundUpdate]):
         # Rematch the affected sample batches where compound formula was updated
         for sample_batch_id in sample_batches_affected_rematch:
             # FIX replace with request
+            # TODO_background Use the fastApi background tasks
             task = asyncio.create_task(match_batch_compute(None, sample_batch_id))
             await task
 

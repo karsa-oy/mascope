@@ -180,6 +180,7 @@ async def create_target_compound_in_target_collection(
     if independent_transaction:
         await session.commit()
         # Run rematch for all sample batch ids in the set
+        # TODO_background Use the fastApi background tasks
         # FIX replace with request?
         for sample_batch_id in sample_batches_to_rematch:
             task = asyncio.create_task(

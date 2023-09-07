@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, BackgroundTasks
 from typing import List
 
 from ..controllers.sample_batches_controller import (
@@ -47,9 +47,11 @@ async def delete_sample_batch_route(sample_batch_id: str):
 
 @sample_batches_router.patch("/api/sample_batches/{sample_batch_id}")
 async def update_sample_batch_route(
-    sample_batch_id: str, sample_batch: SampleBatchUpdate
+    sample_batch_id: str,
+    sample_batch: SampleBatchUpdate,
+    background_tasks: BackgroundTasks,
 ):
-    return await update_sample_batch(sample_batch_id, sample_batch)
+    return await update_sample_batch(sample_batch_id, sample_batch, background_tasks)
 
 
 @sample_batches_router.post("/api/sample_batches/{sample_batch_id}/reload")

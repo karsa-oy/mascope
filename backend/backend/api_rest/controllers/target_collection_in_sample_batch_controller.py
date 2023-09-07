@@ -1,4 +1,5 @@
 import asyncio
+from fastapi import BackgroundTasks
 from sqlalchemy import asc, desc, func, and_
 from sqlalchemy.future import select
 from typing import List
@@ -66,6 +67,7 @@ async def get_target_collections_in_sample_batch(
 async def create_target_collection_in_sample_batch(
     target_collections_in_sample_batch: List[TargetCollectionInSampleBatchBase],
     skipRematch: bool = False,
+    background_tasks: BackgroundTasks = None,
     session=None,
 ):
     independent_transaction = False
@@ -177,7 +179,9 @@ async def create_target_collection_in_sample_batch(
                 SampleBatchComputeMatch(sample_batch_id=sample_batch_id)
                 for sample_batch_id in sample_batches_to_rematch
             ]
-            await compute_sample_batch_matches(sample_batches)
+            # Create a background task
+            if background_tasks:
+                background_tasks.add_task(compute_sample_batch_matches, sample_batches)
         elif skipRematch:
             # Reload the sample batches if compute_sample_batch_matches is skipped
             for sample_batch_id in sample_batches_to_rematch:
@@ -199,6 +203,7 @@ async def create_target_collection_in_sample_batch(
 async def delete_target_collections_in_sample_batch(
     target_collections_in_sample_batch: List[TargetCollectionInSampleBatchBase],
     skipRematch: bool = False,
+    background_tasks: BackgroundTasks = None,
 ):
     message_log = {}
     sample_batches_to_rematch = set()
@@ -275,7 +280,9 @@ async def delete_target_collections_in_sample_batch(
             SampleBatchComputeMatch(sample_batch_id=id)
             for id in sample_batches_to_rematch
         ]
-        await compute_sample_batch_matches(sample_batches)
+        # Create a background task
+        if background_tasks:
+            background_tasks.add_task(compute_sample_batch_matches, sample_batches)
     elif skipRematch:
         # Reload the sample batches if compute_sample_batch_matches is skipped
         for sample_batch_id in sample_batches_to_rematch:
