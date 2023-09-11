@@ -46,11 +46,8 @@ export default {
         responsive: true,
         modeBarButtonsToRemove: [
           "autoScale",
-          "select2d",
           "resetScale2d",
-          "lasso2d",
           "pan2d",
-          "zoom2d",
           "zoomIn2d",
           "zoomOut2d",
         ],
