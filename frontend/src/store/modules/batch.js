@@ -247,12 +247,12 @@ export default {
     async reloadBatchInfo({ rootState }, sample_batch_id) {
       await rootState.api.httpClient.reloadBatch(sample_batch_id);
     },
-    async computeBatchMatches({ rootState }, sample_batches) {
+    async matchComputeBatches({ rootState }, sample_batches) {
       const formattedBatches = sample_batches.map((batch) => ({
         sample_batch_id: batch.sample_batch_id,
         workspace_id: batch.workspace_id,
       }));
-      await rootState.api.httpClient.computeBatchMatches(formattedBatches);
+      await rootState.api.httpClient.matchComputeBatches(formattedBatches);
     },
 
     // selection

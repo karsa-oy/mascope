@@ -8,7 +8,8 @@ from sqlalchemy import asc, desc, func, select
 from sqlalchemy.orm import joinedload
 
 from backend.db_api_rest import async_session
-from backend.api.match import match_batch_compute
+
+# from backend.api.match import match_batch_compute
 from .target_compounds_controller import delete_target_compound, create_target_compound
 from .target_compound_in_target_collection_controller import (
     create_target_compound_in_target_collection,
@@ -17,9 +18,7 @@ from .target_compound_in_target_collection_controller import (
 from ..controllers.target_collection_in_sample_batch_controller import (
     create_target_collection_in_sample_batch,
 )
-from ..controllers.sample_batches_controller import (
-    compute_sample_batch_matches,
-)
+from ..controllers.match_compute_controller import match_compute_batches
 from ..models.models import (
     SampleBatch,
     TargetCollection,
@@ -231,9 +230,7 @@ async def create_target_collection(
         # Run rematch for all sample batches in the list
         # TODO_match
         if sample_batches_to_rematch:
-            background_tasks.add_task(
-                compute_sample_batch_matches, sample_batches_to_rematch
-            )
+            background_tasks.add_task(match_compute_batches, sample_batches_to_rematch)
 
         await sio.emit(
             "targets_all_reload",
@@ -326,7 +323,7 @@ async def delete_target_collection(
                 for sb in sample_batches_to_rematch
             ]
 
-            background_tasks.add_task(compute_sample_batch_matches, sample_batches)
+            background_tasks.add_task(match_compute_batches, sample_batches)
 
             for workspace_id in workspaces_to_reload:
                 await sio.emit("targets_all_reload", room=workspace_id, namespace="/")
@@ -457,11 +454,11 @@ async def update_target_collection(
         await session.commit()
 
         # Rematch the affected sample batches compounds were added
-        for sample_batch_id in sample_batches_to_rematch:
-            # FIX replace with request
-            # TODO_background Use the fastApi background tasks
-            task = asyncio.create_task(match_batch_compute(None, sample_batch_id))
-            await task
+        # for sample_batch_id in sample_batches_to_rematch:
+        # FIX replace with request
+        # TODO_background Use the fastApi background tasks
+        # task = asyncio.create_task(match_batch_compute(None, sample_batch_id))
+        # await task
 
         # Exclude rematched ids since they've been reloaded
         sample_batches_to_reload = sample_batches_to_reload - sample_batches_to_rematch

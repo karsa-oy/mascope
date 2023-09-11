@@ -1,6 +1,6 @@
 import asyncio
 from backend.server import sio
-from backend.api.match import match_batch_compute
+
 from fastapi import HTTPException
 from typing import List
 from sqlalchemy import asc, desc, func, and_
@@ -182,14 +182,14 @@ async def create_target_compound_in_target_collection(
         # Run rematch for all sample batch ids in the set
         # TODO_background Use the fastApi background tasks
         # FIX replace with request?
-        for sample_batch_id in sample_batches_to_rematch:
-            task = asyncio.create_task(
-                match_batch_compute(
-                    None,
-                    sample_batch_id,
-                )
-            )
-            await task
+        # for sample_batch_id in sample_batches_to_rematch:
+        #     task = asyncio.create_task(
+        #         match_batch_compute(
+        #             None,
+        #             sample_batch_id,
+        #         )
+        #     )
+        #     await task
     else:
         await session.flush()
 

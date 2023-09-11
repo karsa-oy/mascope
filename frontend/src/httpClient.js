@@ -51,6 +51,7 @@ const filesBaseUrl = "/sample_files";
 const itemsBaseUrl = "/sample_items";
 const calibrationBaseUrl = "/calibration";
 const matchesBaseUrl = "/matches";
+const matchComputeBaseUrl = "/match_compute";
 const targetCollectionsBaseUrl = "/target_collections";
 const targetCollectionsInSampleBatchBaseUrl =
   "/target_collections_in_sample_batch";
@@ -184,17 +185,6 @@ export function createHttpClient(host, api_port) {
         console.error("Failed to reload sample batch: ", error);
       }
     },
-    computeBatchMatches: async (sample_batches) => {
-      try {
-        return await httpClient.post(
-          `${batchesBaseUrl}/compute_matches`,
-          sample_batches
-        );
-      } catch (error) {
-        console.error("Failed to compute batch matches: ", error);
-      }
-    },
-
     // Samples
     getAllSamples: async (body) => {
       try {
@@ -387,6 +377,18 @@ export function createHttpClient(host, api_port) {
       }
     },
 
+    // Match compute
+    matchComputeBatches: async (sample_batches) => {
+      try {
+        return await httpClient.post(
+          `${matchComputeBaseUrl}/batches`,
+          sample_batches
+        );
+      } catch (error) {
+        console.error("Failed to compute batch matches: ", error);
+      }
+    },
+
     // Target collections
     getAllTargetCollections: async (params = {}) => {
       try {
@@ -461,8 +463,6 @@ export function createHttpClient(host, api_port) {
       collectionsToSampleBatch,
       skipRematch = false
     ) => {
-      // console.log(collectionsToSampleBatch);
-      // console.log(skipRematch);
       try {
         return await httpClient.post(targetCollectionsInSampleBatchBaseUrl, {
           target_collections: collectionsToSampleBatch,
@@ -480,8 +480,6 @@ export function createHttpClient(host, api_port) {
       collectionsToRemove,
       skipRematch = false
     ) => {
-      // console.log(collectionsToRemove);
-      // console.log(skipRematch);
       try {
         return await httpClient.delete(
           `${targetCollectionsInSampleBatchBaseUrl}`,

@@ -1,25 +1,21 @@
-import asyncio
-
 from fastapi import HTTPException, BackgroundTasks
 from sqlalchemy import asc, desc, func
 from sqlalchemy.future import select
-from datetime import datetime
 from sqlalchemy.orm import joinedload
-from typing import List
-
-
+from datetime import datetime
 from backend.db_api_rest import async_session
 from backend.server import sio
 from backend.db.id import gen_id
+
+# TODO_calibration delete after refactoringm calibration, circular import error
+from backend.api.match import match_batch_compute
 from ..models.models import SampleBatch, TargetCollectionInSampleBatch
 from ..models.pydantic_models.sample_batch_pydantic_model import (
     SampleBatchCreate,
     SampleBatchUpdate,
     SampleBatchComputeMatch,
-    ProgressProperties,
 )
-from backend.api.match import match_batch_compute
-from .sample_items_controller import get_sample_items
+from ..controllers.match_compute_controller import match_compute_batches
 
 
 async def get_sample_batches(
@@ -174,7 +170,7 @@ async def update_sample_batch(
     # Inform clients about the update
     if rematch:
         background_tasks.add_task(
-            compute_sample_batch_matches,
+            match_compute_batches,
             [
                 SampleBatchComputeMatch(
                     sample_batch_id=existing_sample_batch.sample_batch_id
@@ -199,94 +195,3 @@ async def reload_sample_batch(sample_batch_id: str):
     )
 
     return {"status": "success", "message": "Sample batch reloaded successfully"}
-
-
-# TODO_match
-async def compute_sample_batch_matches(sample_batches: List[SampleBatchComputeMatch]):
-    room_ids = set()
-    total_batches = len(sample_batches)
-    total_number_of_items = 0
-    items_per_batch = []
-
-    async with async_session() as session:
-        for sample_batch in sample_batches:
-            sample_items_info = await get_sample_items(
-                sample_batch_id=sample_batch.sample_batch_id
-            )
-            total_number_of_items += sample_items_info["results"]
-            items_per_batch.append(sample_items_info["results"])
-
-            # If workspace_id is not provided, fetch it from the database
-            if not sample_batch.workspace_id:
-                result = await session.execute(
-                    select(SampleBatch.workspace_id).filter(
-                        SampleBatch.sample_batch_id == sample_batch.sample_batch_id
-                    )
-                )
-                sample_batch.workspace_id = result.scalar_one_or_none()
-
-            # Add the workspace_id if provided, else add the sample_batch_id
-            room_ids.add(
-                sample_batch.workspace_id
-                if sample_batch.workspace_id
-                else sample_batch.sample_batch_id
-            )
-
-    item_weights_per_batch = [1.0 / items if items else 0 for items in items_per_batch]
-
-    # Emit "started" events to all workspaces or sample batches
-    for identifier in room_ids:
-        await sio.emit(
-            "match_batch_compute_started",
-            {"total_batches": total_batches},
-            room=identifier,
-            namespace="/",
-        )
-
-    for batch_index, sample_batch in enumerate(sample_batches, start=1):
-        # Emit progress event for all workspace
-        await sio.emit(
-            "match_batch_compute_progress",
-            {"current_batch": batch_index},
-            room=sample_batch.workspace_id,
-            namespace="/",
-        )
-        # Emit progress event for each batch
-        current_batch_message = f"Selected batch is processing now"
-        await sio.emit(
-            "match_batch_compute_progress",
-            {"current_batch_message": current_batch_message},
-            room=sample_batch.sample_batch_id,
-            namespace="/",
-        )
-
-        # Here, item_weight should be set to the appropriate value for the current batch
-        item_weight = item_weights_per_batch[batch_index - 1]
-
-        progress_properties = ProgressProperties(
-            item_weight=item_weight,
-            batch_index=batch_index,
-            workspace_id=sample_batch.workspace_id,
-            total_batches=total_batches,
-        )
-
-        task = asyncio.create_task(
-            match_batch_compute(
-                None,
-                sample_batch.sample_batch_id,
-                progress_properties=progress_properties,
-            )
-        )
-
-        await task
-
-    # Emit finished event once after all batches are done
-    for identifier in room_ids:
-        await sio.emit(
-            "match_batch_compute_finished",
-            {"total_batches": total_batches},
-            room=identifier,
-            namespace="/",
-        )
-
-    return {"status": f"Match computation for {total_batches} batches"}

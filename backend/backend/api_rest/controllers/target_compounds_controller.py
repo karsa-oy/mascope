@@ -8,7 +8,6 @@ from backend.server import sio
 from backend.db.id import gen_id
 from backend.lib.molmass import Formula
 from backend.db_api_rest import async_session
-from backend.api.match import match_batch_compute
 
 from .ionization_mechanisms_controller import get_ionization_mechanisms
 from .helpers_controller import get_affected_batches_and_collections
@@ -507,11 +506,11 @@ async def update_target_compound(target_compounds: List[TargetCompoundUpdate]):
         await session.commit()
 
         # Rematch the affected sample batches where compound formula was updated
-        for sample_batch_id in sample_batches_affected_rematch:
-            # FIX replace with request
-            # TODO_background Use the fastApi background tasks
-            task = asyncio.create_task(match_batch_compute(None, sample_batch_id))
-            await task
+        # for sample_batch_id in sample_batches_affected_rematch:
+        #     # FIX replace with request
+        #     # TODO_background Use the fastApi background tasks
+        #     task = asyncio.create_task(match_batch_compute(None, sample_batch_id))
+        #     await task
 
         # Exclude rematched ids since they've been reloaded
         sample_batches_affected_reload = (
