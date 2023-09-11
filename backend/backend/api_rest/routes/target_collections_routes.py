@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, BackgroundTasks
 from ..controllers.target_collections_controller import (
     get_target_collection_by_id,
     get_target_collections,
@@ -31,8 +31,10 @@ async def get_target_collection_by_id_route(target_collection_id: str):
 
 
 @target_collections_router.post("/api/target_collections")
-async def create_target_collection_route(target_collection: TargetCollectionCreate):
-    result = await create_target_collection(target_collection)
+async def create_target_collection_route(
+    target_collection: TargetCollectionCreate, background_tasks: BackgroundTasks
+):
+    result = await create_target_collection(target_collection, background_tasks)
     response = {
         "new_target_collection": result["new_target_collection"],
         "created_compounds_count": result["created_compounds_count"],
@@ -47,12 +49,15 @@ async def create_target_collection_route(target_collection: TargetCollectionCrea
 @target_collections_router.delete("/api/target_collections/{target_collection_id}")
 async def delete_target_collection_route(
     target_collection_id: str,
+    background_tasks: BackgroundTasks,
     delete_orphan_compounds: bool = Query(
         False,
         description="Delete orphan compounds associated with the target collection",
     ),
 ):
-    return await delete_target_collection(target_collection_id, delete_orphan_compounds)
+    return await delete_target_collection(
+        target_collection_id, background_tasks, delete_orphan_compounds
+    )
 
 
 @target_collections_router.patch("/api/target_collections/{target_collection_id}")

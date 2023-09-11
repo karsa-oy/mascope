@@ -10,6 +10,9 @@ from backend.lib.chemistry import match_mz
 from backend.lib.file import load_file
 from backend.lib.peak import detect_peaks, get_peaks, read_instrument_functions
 from backend.server import sio
+from ..api_rest.models.pydantic_models.sample_batch_pydantic_model import (
+    ProgressProperties,
+)
 
 
 async def compute_matches(
@@ -243,7 +246,45 @@ async def compute_raw_intensities(
     return isotope_interference_df
 
 
-async def item_compute(sample_item):
+async def emit_progress_update(
+    progress_properties: ProgressProperties, increment: float
+):
+    if not progress_properties:
+        return
+
+    item_weight = progress_properties.item_weight
+    item_index = progress_properties.item_index
+    batch_index = progress_properties.batch_index
+    total_batches = progress_properties.total_batches
+    workspace_id = progress_properties.workspace_id
+
+    # Calculate the progress contribution of completed batches
+    batch_progress = ((batch_index - 1) / total_batches) * 100
+
+    # Calculate the progress within the current batch
+    item_progress = ((item_index + increment) * item_weight) * 100
+
+    # Calculate the proportional progress of the current batch in terms of the overall progress
+    proportional_batch_progress = item_progress * (1 / total_batches)
+
+    # Combine both progresses
+    progress_percentage_all = batch_progress + proportional_batch_progress
+
+    await sio.emit(
+        "match_batch_compute_progress_percentage",
+        {
+            "progress_percentage": progress_percentage_all,
+            "progress_percentage_batch": proportional_batch_progress * total_batches,
+        },
+        room=workspace_id,
+        namespace="/",
+    )
+
+
+async def item_compute(
+    sample_item,
+    progress_properties: ProgressProperties = None,
+):
     with conn:
         sample_item_id = sample_item["sample_item_id"]
         filename = sample_item["filename"]
@@ -274,15 +315,23 @@ async def item_compute(sample_item):
             params=[sample_batch_id],
         )["target_collection_id"].tolist()
 
+    await emit_progress_update(progress_properties=progress_properties, increment=0.25)
+
     # Compute
     print("Computing interferences for file: %s" % filename)
     match_interference_df = await compute_raw_intensities(
         filename, target_collection_ids, ionization_mechanism_ids
     )
+
+    await emit_progress_update(progress_properties=progress_properties, increment=0.5)
     print("Computing matches for file: %s" % filename)
+
     match_isotope_df = await compute_matches(
         filename, target_collection_ids, ionization_mechanism_ids
     )
+
+    await emit_progress_update(progress_properties=progress_properties, increment=0.75)
+
     with conn:
         # save interferences to database
         # check if exists
@@ -360,6 +409,9 @@ async def item_compute(sample_item):
             ]
         ]
         match_isotope_df.to_sql("match", conn, if_exists="append", index=False)
+
+    await emit_progress_update(progress_properties=progress_properties, increment=1)
+
     return sample_item
 
 
@@ -383,7 +435,12 @@ def item_remove(sample_item_id):
 
 
 @sio.event(namespace="/")
-async def match_batch_compute(sid, sample_batch_id):
+async def match_batch_compute(
+    sid,
+    sample_batch_id,
+    progress_properties: ProgressProperties = None,
+):
+    print(f"...Computing matches of batch: {sample_batch_id} ...")
     # clear previous matches
     await match_batch_remove(sid, sample_batch_id)
 
@@ -401,9 +458,21 @@ async def match_batch_compute(sid, sample_batch_id):
             conn,
             params=[sample_batch_id],
         ).to_dict("records")
-    for sample_item in sample_items:
+
+    for item_index, sample_item in enumerate(sample_items):
         try:
-            await item_compute(sample_item)
+            print(
+                f"...Computing matches of sample item: {sample_item['sample_item_id']} ..."
+            )
+            progress_properties = ProgressProperties(
+                item_weight=progress_properties.item_weight,
+                item_index=item_index,
+                batch_index=progress_properties.batch_index,
+                workspace_id=progress_properties.workspace_id,
+                total_batches=progress_properties.total_batches,
+            )
+
+            await item_compute(sample_item, progress_properties=progress_properties)
         except Exception as e:
             print("Processing sample %s failed: %s" % (sample_item, e))
     # reload batch
@@ -437,7 +506,7 @@ async def match_batch_remove(sid, sample_batch_id):
             [sample_batch_id],
         )
     # reload workspace
-    await sio.emit("sample_batch_reload", sample_batch_id, namespace="/")
+    # await sio.emit("sample_batch_reload", sample_batch_id, namespace="/")
 
 
 @sio.event(namespace="/")

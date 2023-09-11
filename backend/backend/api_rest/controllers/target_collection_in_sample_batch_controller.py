@@ -1,15 +1,18 @@
 import asyncio
+from fastapi import BackgroundTasks
 from sqlalchemy import asc, desc, func, and_
 from sqlalchemy.future import select
-from fastapi import HTTPException
 from typing import List
 
 from backend.db_api_rest import async_session
 from backend.server import sio
-from backend.api.match import match_batch_compute
+from ..controllers.match_compute_controller import match_compute_batches
 from ..models.models import TargetCollectionInSampleBatch, SampleBatch, TargetCollection
 from ..models.pydantic_models.target_collection_in_sample_batch_pydantic_model import (
     TargetCollectionInSampleBatchBase,
+)
+from ..models.pydantic_models.sample_batch_pydantic_model import (
+    SampleBatchComputeMatch,
 )
 
 
@@ -61,6 +64,8 @@ async def get_target_collections_in_sample_batch(
 
 async def create_target_collection_in_sample_batch(
     target_collections_in_sample_batch: List[TargetCollectionInSampleBatchBase],
+    skipRematch: bool = False,
+    background_tasks: BackgroundTasks = None,
     session=None,
 ):
     independent_transaction = False
@@ -155,7 +160,6 @@ async def create_target_collection_in_sample_batch(
                 target_collection_in_sample_batch.sample_batch_id,
             )
         )
-
         # Add the sample batch id to the set
         sample_batches_to_rematch.add(
             new_target_collection_in_sample_batch.sample_batch_id
@@ -163,16 +167,28 @@ async def create_target_collection_in_sample_batch(
 
     if independent_transaction:
         await session.commit()
-        # Run rematch for all sample batch ids in the set
-        # FIX replace with request?
-        for sample_batch_id in sample_batches_to_rematch:
-            task = asyncio.create_task(
-                match_batch_compute(
-                    None,
-                    sample_batch_id,
+        await sio.emit(
+            "targets_all_reload",
+            namespace="/",
+        )
+        # TODO_match
+        if not skipRematch and sample_batches_to_rematch:
+            sample_batches = [
+                SampleBatchComputeMatch(sample_batch_id=sample_batch_id)
+                for sample_batch_id in sample_batches_to_rematch
+            ]
+            # Create a background task
+            if background_tasks:
+                background_tasks.add_task(match_compute_batches, sample_batches)
+        elif skipRematch:
+            # Reload the sample batches if match_compute_batches is skipped
+            for sample_batch_id in sample_batches_to_rematch:
+                await sio.emit(
+                    "sample_batch_reload",
+                    room=sample_batch_id,
+                    namespace="/",
                 )
-            )
-            await task
+
     else:
         await session.flush()
 
@@ -182,52 +198,101 @@ async def create_target_collection_in_sample_batch(
     }
 
 
-async def delete_target_collection_in_sample_batch(
-    target_collection_id: str, sample_batch_id: str
+async def delete_target_collections_in_sample_batch(
+    target_collections_in_sample_batch: List[TargetCollectionInSampleBatchBase],
+    skipRematch: bool = False,
+    background_tasks: BackgroundTasks = None,
 ):
-    async with async_session() as session:
+    message_log = {}
+    sample_batches_to_rematch = set()
+
+    session = async_session()
+
+    for i, item in enumerate(target_collections_in_sample_batch):
+        # Initialize messages list
+        message_log[i] = {
+            "status_code": 0,
+            "messages": [],
+        }
+
         # Check if target collection exists
         result = await session.execute(
             select(TargetCollection).filter(
-                TargetCollection.target_collection_id == target_collection_id
+                TargetCollection.target_collection_id == item.target_collection_id
             )
         )
         target_collection = result.scalar_one_or_none()
+
         if not target_collection:
-            raise HTTPException(status_code=404, detail="Target collection not found")
+            message_log[i]["status_code"] = 404
+            message_log[i]["messages"].append("Target collection not found")
+            continue
 
         # Check if sample batch exists
         result = await session.execute(
-            select(SampleBatch).filter(SampleBatch.sample_batch_id == sample_batch_id)
+            select(SampleBatch).filter(
+                SampleBatch.sample_batch_id == item.sample_batch_id
+            )
         )
         sample_batch = result.scalar_one_or_none()
+
         if not sample_batch:
-            raise HTTPException(status_code=404, detail="Sample batch not found")
+            message_log[i]["status_code"] = 404
+            message_log[i]["messages"].append("Sample batch not found")
+            continue
 
         # Check if the record exists
         result = await session.execute(
             select(TargetCollectionInSampleBatch).filter(
                 and_(
                     TargetCollectionInSampleBatch.target_collection_id
-                    == target_collection_id,
-                    TargetCollectionInSampleBatch.sample_batch_id == sample_batch_id,
+                    == item.target_collection_id,
+                    TargetCollectionInSampleBatch.sample_batch_id
+                    == item.sample_batch_id,
                 )
             )
         )
         target_collection_in_sample_batch = result.scalar_one_or_none()
-        if not target_collection_in_sample_batch:
-            raise HTTPException(
-                status_code=404,
-                detail="There is no such collection in the selected sample batch",
-            )
 
+        if not target_collection_in_sample_batch:
+            message_log[i]["status_code"] = 404
+            message_log[i]["messages"].append(
+                "There is no such collection in the selected sample batch"
+            )
+            continue
+
+        message_log[i]["status_code"] = 200
+        message_log[i]["messages"].append(
+            f"Target collection (id: {item.target_collection_id}) was removed from the sample batch (id: {item.sample_batch_id})"
+        )
+        # Add the sample batch id to the set
+        sample_batches_to_rematch.add(item.sample_batch_id)
         # Delete TargetCollectionInSampleBatch
         await session.delete(target_collection_in_sample_batch)
-        await session.commit()
 
-        # Reload affected sample batch
-        await sio.emit(
-            "sample_batch_reload",
-            room=sample_batch_id,
-            namespace="/",
-        )
+    await session.commit()
+
+    # TODO_match
+    if not skipRematch and sample_batches_to_rematch:
+        sample_batches = [
+            SampleBatchComputeMatch(sample_batch_id=id)
+            for id in sample_batches_to_rematch
+        ]
+        # Create a background task
+        if background_tasks:
+            background_tasks.add_task(match_compute_batches, sample_batches)
+    elif skipRematch:
+        # Reload the sample batches if match_compute_batches is skipped
+        for sample_batch_id in sample_batches_to_rematch:
+            await sio.emit(
+                "sample_batch_reload",
+                room=sample_batch_id,
+                namespace="/",
+            )
+
+    await sio.emit(
+        "targets_all_reload",
+        namespace="/",
+    )
+
+    return {"message_logs": message_log}

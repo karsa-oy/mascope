@@ -48,7 +48,25 @@ export default {
           filterParams
         );
         if (response && response.data) {
-          commit("SET_MATCH_COLLECTIONS", response.data.data.match_collections);
+          let matchCollections = response.data.data.match_collections;
+
+          const activeCollection = rootGetters["targets/activeCollection"];
+          if (matchCollections) {
+            matchCollections = matchCollections.map((coll) => {
+              if (
+                activeCollection &&
+                activeCollection.target_collection_id ===
+                  coll.target_collection_id
+              ) {
+                coll.selection = 2;
+              } else {
+                coll.selection = 0;
+              }
+              return coll;
+            });
+          }
+
+          commit("SET_MATCH_COLLECTIONS", matchCollections);
           commit("SET_MATCH_COMPOUNDS", response.data.data.match_compounds);
           commit("SET_MATCH_IONS", response.data.data.match_ions);
           commit("SET_MATCH_ISOTOPES", response.data.data.match_isotopes);
@@ -88,6 +106,25 @@ export default {
         sample
       );
     },
+    async updateCollectionSelection(
+      { commit, state },
+      { collectionId, selectionValue }
+    ) {
+      // Only one collection can be selected at a time
+      state.matchCollections
+        .filter(
+          (coll) =>
+            coll.target_collection_id !== collectionId && coll.selection === 2
+        )
+        .forEach((coll) => (coll.selection = 0));
+
+      const collection = state.matchCollections.find(
+        (coll) => coll.target_collection_id === collectionId
+      );
+      if (collection) {
+        collection.selection = selectionValue;
+      }
+    },
     async onSampleBatchExportPeaksFailed({ dispatch }, error) {
       await dispatch(
         "app/pushNotification",
@@ -108,5 +145,9 @@ export default {
       await dispatch("load", sample_item);
     },
   },
-  getters: {},
+  getters: {
+    matchCollections: (state) => {
+      return state.matchCollections ? state.matchCollections : [];
+    },
+  },
 };

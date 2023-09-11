@@ -39,7 +39,10 @@ export default {
       rootState.api.emit("unsubscribe", state.active.workspace_id);
       await commit("SET_ACTIVE", null);
       await commit("SET_BATCHES", []);
-      if (propagate) await dispatch("batch/unload", true, { root: true });
+      if (propagate) {
+        await dispatch("batch/unload", true, { root: true });
+        await dispatch("targets/unload", null, { root: true });
+      }
     },
     // backend notifications
     async onWorkspaceReload({ dispatch }) {
@@ -52,6 +55,14 @@ export default {
         (batch) => batch.sample_batch_id == sampleBatchId
       );
       return sampleBatch ?? null;
+    },
+    sampleBatches: (state) => {
+      return state.batches ? state.batches : [];
+    },
+    sampleBatchesSelected: (state, getters) => {
+      return getters["sampleBatches"].filter(
+        (sampleBatch) => sampleBatch.selection >= 2
+      );
     },
   },
 };

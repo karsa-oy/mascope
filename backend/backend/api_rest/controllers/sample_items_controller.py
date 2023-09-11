@@ -106,7 +106,7 @@ async def get_sample_items(
         }
 
 
-async def create_sample_item(sample_item: SampleItemCreate):
+async def create_sample_item(sample_item: SampleItemCreate, skipReload: bool = False):
     async with async_session() as session:
         new_sample_item = SampleItem(
             sample_item_id=gen_id(),
@@ -114,7 +114,7 @@ async def create_sample_item(sample_item: SampleItemCreate):
             filename=sample_item.filename,
             sample_item_name=sample_item.sample_item_name,
             sample_item_type=sample_item.sample_item_type,
-            sample_item_attributes=json.dumps(sample_item.sample_item_attributes),
+            sample_item_attributes=sample_item.sample_item_attributes,
             sample_item_utc_created=datetime.utcnow(),
             sample_item_utc_modified=datetime.utcnow(),
             filter_id=sample_item.filter_id,
@@ -129,12 +129,13 @@ async def create_sample_item(sample_item: SampleItemCreate):
                 detail="Failed to create sample item",
             )
 
-        await sio.emit(
-            "sample_item_created",
-            new_sample_item.sample_item_id,
-            room=new_sample_item.sample_batch_id,
-            namespace="/",
-        )
+        if not skipReload:
+            await sio.emit(
+                "sample_item_created",
+                new_sample_item.sample_item_id,
+                room=new_sample_item.sample_batch_id,
+                namespace="/",
+            )
         return new_sample_item
 
 
@@ -166,18 +167,12 @@ async def update_sample_item(sample_item_id: str, sample_item: SampleItemUpdate)
             )
 
         for key, value in sample_item.dict(exclude_unset=True).items():
-            if key == "sample_item_attributes":
-                value = json.dumps(value)  # Serialize the dictionary before storing
             setattr(db_sample_item, key, value)
 
         db_sample_item.sample_item_utc_modified = datetime.utcnow()
 
         await session.commit()
         await session.refresh(db_sample_item)
-
-        db_sample_item.sample_item_attributes = json.loads(
-            db_sample_item.sample_item_attributes
-        )  # Deserialize the data back into dictionary format
 
         await sio.emit(
             "sample_batch_reload",

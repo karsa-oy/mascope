@@ -181,7 +181,7 @@ export default {
       batchIonMechanismIds: "batch/paramIonMechanisms",
       batchTargetCollections: "batch/targetCollections",
       ionMechanismsAll: "app/ionMechanisms",
-      targetCollectionsAll: "app/targetCollections",
+      targetCollectionsAll: "targets/targetCollectionsAll",
       workspaceActive: "workspace/active",
     }),
     action() {

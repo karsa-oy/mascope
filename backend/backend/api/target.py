@@ -111,27 +111,6 @@ async def target_collection_update(sid, target_collections):
     # await sio.emit('org_reload', namespace='/')
 
 
-@sio.event(namespace="/")
-async def target_collection_delete(sid, target_collection_ids):
-    target_collection_id_refs = ",".join("?" * len(target_collection_ids))
-    with conn:
-        # Enable foreign keys to properly cascade record deletes
-        conn.execute("PRAGMA foreign_keys = 1")
-        # delete the collection records
-        conn.cursor().execute(
-            f"""
-            DELETE FROM target_collection
-            WHERE target_collection_id IN (
-                {target_collection_id_refs}
-            );
-            """,
-            target_collection_ids,
-        )
-        # Disable foreign keys to not cascade delete when updating
-        conn.execute("PRAGMA foreign_keys = 0")
-    await sio.emit("org_reload", namespace="/")
-
-
 # target compounds
 
 

@@ -12,7 +12,8 @@
 </template>
 
 <script>
-import { mapMutations } from "vuex";
+import { mapActions, mapMutations } from "vuex";
+
 import { sync, get, call } from "vuex-pathify";
 
 import BaseBrowser from "./BaseBrowser.vue";
@@ -36,6 +37,7 @@ export default {
     }),
     ...get({
       batchActive: "batch/active",
+      sampleBatchesSelected: "workspace/sampleBatchesSelected",
       matchCollections: "sample/matchCollections",
       matchCompounds: "sample/matchCompounds",
       matchIons: "sample/matchIons",
@@ -51,9 +53,9 @@ export default {
       targetIsotopes: "batch/targetIsotopes",
     }),
     contextMenuIcon() {
-      return this.targetCollectionsSelected.length == 1
-        ? "dots-horizontal"
-        : "plus";
+      if (this.targetCollectionsSelected.length === 1) return "menu";
+      if (this.sampleBatchesSelected.length === 1) return "dots-horizontal";
+      if (this.sampleBatchesSelected.length !== 1) return "plus";
     },
     targetCollectionRows: function () {
       return this.sampleItemFocused && this.matchCollections
@@ -110,7 +112,7 @@ export default {
           rows: this.targetCollectionRows,
           defaultSort: ["match_score", "desc"],
           detailsIcon: "default",
-          rowClick: doNothing,
+          rowClick: this.targetCollectionToggle,
         },
         {
           name: "Compound",
@@ -206,19 +208,40 @@ export default {
         label: "Delete target collection",
         onClick: this.collectionDelete,
       };
-      let addCollectionToBatchButton = {
-        label: "Add target collection to batch",
-        onClick: this.collectionAddToBatch,
+      let copySelectedCollectionToOtherBatchesButton = {
+        label: "Manage selected collection batches",
+        onClick: this.manageSelectedCollectionBatches,
       };
+      let editBatchCollectionsButton = {
+        label: "Edit collections of selected batch",
+        onClick: this.editBatchCollections,
+      };
+      let rematchBatchesButton = {
+        label: "Rematch selected batch (debug)",
+        onClick: this.rematchBatches,
+      };
+      if (
+        this.targetCollectionsSelected.length == 0 &&
+        this.sampleBatchesSelected.length == 1
+      ) {
+        return [
+          createCollectionButton,
+          editBatchCollectionsButton,
+          rematchBatchesButton,
+        ];
+      }
+      if (this.targetCollectionsSelected.length == 0) {
+        return [createCollectionButton];
+      }
       if (this.targetCollectionsSelected.length == 1) {
         return [
-          addCollectionToBatchButton,
-          createCollectionButton,
           // updateCollectionButton,
+          createCollectionButton,
+          editBatchCollectionsButton,
+          copySelectedCollectionToOtherBatchesButton,
           deleteCollectionButton,
+          rematchBatchesButton,
         ];
-      } else {
-        return [createCollectionButton];
       }
     },
   },
@@ -229,15 +252,35 @@ export default {
     });
   },
   methods: {
+    ...mapActions("batch", ["reloadBatchInfo", "matchComputeBatches"]),
     ...mapMutations({
       activateModal: "modal/activate",
     }),
     ...call({
       resetIonVisualization: "visualization/reset",
+      targetCollectionToggle: "batch/targetCollectionToggle",
     }),
-    collectionAddToBatch() {
+    manageSelectedCollectionBatches() {
       this.modalTargetCollectionOpProps = {
-        action: "addToBatch",
+        action: "manageSelectedCollectionBatches",
+        collection: this.targetCollectionsSelected[0],
+      };
+      this.activateModal({
+        modal: "targetCollectionOp",
+      });
+    },
+    async editBatchCollections() {
+      this.modalTargetCollectionOpProps = {
+        action: "editBatchCollections",
+        collection: this.targetCollectionsSelected[0],
+      };
+      this.activateModal({
+        modal: "targetCollectionOp",
+      });
+    },
+    collectionRemoveFromBatch() {
+      this.modalTargetCollectionOpProps = {
+        action: "removeFromBatch",
         collection: this.targetCollectionsSelected[0],
       };
       this.activateModal({
@@ -306,6 +349,9 @@ export default {
         }
         this.ionShow(row);
       }
+    },
+    async rematchBatches() {
+      await this.matchComputeBatches(this.sampleBatchesSelected);
     },
   },
 };

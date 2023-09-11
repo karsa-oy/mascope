@@ -51,6 +51,7 @@ const filesBaseUrl = "/sample_files";
 const itemsBaseUrl = "/sample_items";
 const calibrationBaseUrl = "/calibration";
 const matchesBaseUrl = "/matches";
+const matchComputeBaseUrl = "/match_compute";
 const targetCollectionsBaseUrl = "/target_collections";
 const targetCollectionsInSampleBatchBaseUrl =
   "/target_collections_in_sample_batch";
@@ -175,7 +176,15 @@ export function createHttpClient(host, api_port) {
         console.error("Failed to update batch", error);
       }
     },
-
+    reloadBatch: async (sample_batch_id) => {
+      try {
+        return await httpClient.post(
+          `${batchesBaseUrl}/${sample_batch_id}/reload`
+        );
+      } catch (error) {
+        console.error("Failed to reload sample batch: ", error);
+      }
+    },
     // Samples
     getAllSamples: async (body) => {
       try {
@@ -368,6 +377,18 @@ export function createHttpClient(host, api_port) {
       }
     },
 
+    // Match compute
+    matchComputeBatches: async (sample_batches) => {
+      try {
+        return await httpClient.post(
+          `${matchComputeBaseUrl}/batches`,
+          sample_batches
+        );
+      } catch (error) {
+        console.error("Failed to compute batch matches: ", error);
+      }
+    },
+
     // Target collections
     getAllTargetCollections: async (params = {}) => {
       try {
@@ -437,12 +458,16 @@ export function createHttpClient(host, api_port) {
         );
       }
     },
-    addTargetCollectionToSampleBatch: async (collectionsToSampleBatch) => {
+
+    addTargetCollectionToSampleBatch: async (
+      collectionsToSampleBatch,
+      skipRematch = false
+    ) => {
       try {
-        return await httpClient.post(
-          targetCollectionsInSampleBatchBaseUrl,
-          collectionsToSampleBatch
-        );
+        return await httpClient.post(targetCollectionsInSampleBatchBaseUrl, {
+          target_collections: collectionsToSampleBatch,
+          skipRematch,
+        });
       } catch (error) {
         console.error(
           "Failed to add target collection to sample batch: ",
@@ -450,17 +475,19 @@ export function createHttpClient(host, api_port) {
         );
       }
     },
-    removeTargetCollectionFromSampleBatch: async (
-      targetCollectionId,
-      sampleBatchId
+
+    removeTargetCollectionsFromSampleBatch: async (
+      collectionsToRemove,
+      skipRematch = false
     ) => {
       try {
         return await httpClient.delete(
-          `${targetCollectionsInSampleBatchBaseUrl}/${targetCollectionId}/${sampleBatchId}`
+          `${targetCollectionsInSampleBatchBaseUrl}`,
+          { data: { target_collections: collectionsToRemove, skipRematch } }
         );
       } catch (error) {
         console.error(
-          "Failed to remove target collection from sample batch: ",
+          "Failed to remove target collections from sample batch: ",
           error
         );
       }

@@ -1,21 +1,21 @@
-import asyncio
-
-from fastapi import HTTPException
+from fastapi import HTTPException, BackgroundTasks
 from sqlalchemy import asc, desc, func
 from sqlalchemy.future import select
-from datetime import datetime
 from sqlalchemy.orm import joinedload
-
-
+from datetime import datetime
 from backend.db_api_rest import async_session
 from backend.server import sio
 from backend.db.id import gen_id
+
+# TODO_calibration delete after refactoringm calibration, circular import error
+from backend.api.match import match_batch_compute
 from ..models.models import SampleBatch, TargetCollectionInSampleBatch
 from ..models.pydantic_models.sample_batch_pydantic_model import (
     SampleBatchCreate,
     SampleBatchUpdate,
+    SampleBatchComputeMatch,
 )
-from backend.api.match import match_batch_compute
+from ..controllers.match_compute_controller import match_compute_batches
 
 
 async def get_sample_batches(
@@ -113,7 +113,11 @@ async def delete_sample_batch(sample_batch_id: str):
         )
 
 
-async def update_sample_batch(sample_batch_id: str, sample_batch: SampleBatchUpdate):
+async def update_sample_batch(
+    sample_batch_id: str,
+    sample_batch: SampleBatchUpdate,
+    background_tasks: BackgroundTasks,
+):
     async with async_session() as session:
         stmt = (
             select(SampleBatch)
@@ -163,17 +167,31 @@ async def update_sample_batch(sample_batch_id: str, sample_batch: SampleBatchUpd
                 session.add(new_target_collection_in_sample_batch)
 
         await session.commit()
-        # Inform clients about the update
-        if rematch:
-            # FIX replace with request
-            task = sio.start_background_task(
-                match_batch_compute, None, existing_sample_batch.sample_batch_id
-            )
-            await asyncio.gather(task)
+    # Inform clients about the update
+    if rematch:
+        background_tasks.add_task(
+            match_compute_batches,
+            [
+                SampleBatchComputeMatch(
+                    sample_batch_id=existing_sample_batch.sample_batch_id
+                )
+            ],
+        )
+    else:
         await sio.emit(
             "workspace_reload",
             room=existing_sample_batch.workspace_id,
             namespace="/",
         )
 
-        return existing_sample_batch
+    return existing_sample_batch
+
+
+async def reload_sample_batch(sample_batch_id: str):
+    await sio.emit(
+        "sample_batch_reload",
+        room=sample_batch_id,
+        namespace="/",
+    )
+
+    return {"status": "success", "message": "Sample batch reloaded successfully"}

@@ -46,8 +46,10 @@ async def get_sample_item_by_id_route(sample_item_id: str):
 
 
 @sample_items_router.post("/api/sample_items")
-async def create_sample_item_route(sample_item: SampleItemCreate):
-    return await create_sample_item(sample_item)
+async def create_sample_item_route(
+    sample_item: SampleItemCreate, skipReload: bool = False
+):
+    return await create_sample_item(sample_item, skipReload)
 
 
 @sample_items_router.delete("/api/sample_items/{sample_item_id}")

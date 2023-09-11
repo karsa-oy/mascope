@@ -1,12 +1,11 @@
-from typing import List
-from fastapi import APIRouter
+from fastapi import APIRouter, BackgroundTasks
 from ..controllers.target_collection_in_sample_batch_controller import (
     get_target_collections_in_sample_batch,
     create_target_collection_in_sample_batch,
-    delete_target_collection_in_sample_batch,
+    delete_target_collections_in_sample_batch,
 )
 from ..models.pydantic_models.target_collection_in_sample_batch_pydantic_model import (
-    TargetCollectionInSampleBatchBase,
+    TargetCollectionInSampleBatchPayload,
 )
 
 target_collection_in_sample_batch_router = APIRouter()
@@ -30,10 +29,15 @@ async def get_target_collections_in_sample_batch_route(
     "/api/target_collections_in_sample_batch"
 )
 async def create_target_collection_in_sample_batch_route(
-    target_collections_in_sample_batch: List[TargetCollectionInSampleBatchBase],
+    payload: TargetCollectionInSampleBatchPayload,
+    background_tasks: BackgroundTasks,
 ):
+    # Unpack the payload
+    target_collections_in_sample_batch = payload.target_collections
+    skipRematch = payload.skipRematch
+
     result = await create_target_collection_in_sample_batch(
-        target_collections_in_sample_batch
+        target_collections_in_sample_batch, skipRematch, background_tasks
     )
     response = {
         "added_collections_to_sample_batch_count": len(
@@ -48,11 +52,21 @@ async def create_target_collection_in_sample_batch_route(
 
 
 @target_collection_in_sample_batch_router.delete(
-    "/api/target_collections_in_sample_batch/{target_collection_id}/{sample_batch_id}"
+    "/api/target_collections_in_sample_batch"
 )
-async def delete_target_collection_in_sample_batch_route(
-    target_collection_id: str, sample_batch_id: str
+async def delete_target_collections_in_sample_batch_route(
+    payload: TargetCollectionInSampleBatchPayload,
+    background_tasks: BackgroundTasks,
 ):
-    return await delete_target_collection_in_sample_batch(
-        target_collection_id, sample_batch_id
+    # Unpack the payload
+    target_collections_in_sample_batch = payload.target_collections
+    skipRematch = payload.skipRematch
+
+    result = await delete_target_collections_in_sample_batch(
+        target_collections_in_sample_batch, skipRematch, background_tasks
     )
+
+    response = {
+        "message-logs": result["message_logs"],
+    }
+    return response

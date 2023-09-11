@@ -55,6 +55,12 @@ export default {
   state,
   mutations: {
     ...make.mutations(state),
+    SET_COLLECTION_SELECTION: (state, { collectionId, selectionValue }) => {
+      const collection = state.targetCollections.find(
+        (coll) => coll.target_collection_id === collectionId
+      );
+      if (collection) collection.selection = selectionValue;
+    },
   },
   actions: {
     // data loading
@@ -63,7 +69,7 @@ export default {
       rootState.api.emit("subscribe", batch.sample_batch_id);
       await commit("SET_ACTIVE", batch);
       await dispatch("unpackParams");
-      await dispatch("loadTargets");
+      await dispatch("loadBatchTargets");
       await dispatch("loadBatch");
     },
 
@@ -109,7 +115,7 @@ export default {
       }
     },
 
-    async loadTargets({ rootState, state, commit }) {
+    async loadBatchTargets({ rootState, rootGetters, state, commit }) {
       const batchId = state.active.sample_batch_id;
       const ionMechanisms = state.active.build_params.ion_mechanisms;
 
@@ -123,8 +129,25 @@ export default {
         if (response && response.data) {
           const data = response.data.data;
 
-          // Setting targets using fetched data
-          commit("SET_TARGET_COLLECTIONS", data.target_collections);
+          let targetCollections = data.target_collections;
+
+          const activeCollection = rootGetters["targets/activeCollection"];
+          if (targetCollections) {
+            targetCollections = targetCollections.map((coll) => {
+              if (
+                activeCollection &&
+                activeCollection.target_collection_id ===
+                  coll.target_collection_id
+              ) {
+                coll.selection = 2;
+              } else {
+                coll.selection = 0;
+              }
+              return coll;
+            });
+          }
+
+          commit("SET_TARGET_COLLECTIONS", targetCollections);
           commit("SET_TARGET_COMPOUNDS", data.target_compounds);
           commit("SET_TARGET_IONS", data.target_ions);
           commit("SET_TARGET_ISOTOPES", data.target_isotopes);
@@ -135,7 +158,7 @@ export default {
     },
 
     async reload(
-      { rootGetters, getters, rootState, state, dispatch },
+      { rootGetters, getters, rootState, state, dispatch, commit },
       batch = null
     ) {
       const batchToLoad = batch ? batch : state.active;
@@ -149,6 +172,29 @@ export default {
           const sample = getters["sampleItem"](activeSample.sample_item_id);
           sample.selection = 3;
           await dispatch("sample/reload", sample, { root: true });
+        }
+        const activeCollection = rootState.targets.activeCollection;
+        if (activeCollection) {
+          const activeCollectionId = activeCollection.target_collection_id;
+          const matchingCollection = state.targetCollections.find(
+            (coll) => coll.target_collection_id === activeCollectionId
+          );
+          if (matchingCollection) {
+            commit("SET_COLLECTION_SELECTION", {
+              collectionId: activeCollectionId,
+              selectionValue: 2,
+            });
+          } else {
+            // Dispatch to targets module to update selection there as well
+            dispatch(
+              "targets/updateCollectionSelection",
+              {
+                collectionId: activeCollectionId,
+                selectionValue: 0,
+              },
+              { root: true }
+            );
+          }
         }
       }
     },
@@ -197,6 +243,18 @@ export default {
     // backend notifications
     async onSampleBatchReload({ dispatch }) {
       await dispatch("reload");
+    },
+
+    // backend event emitters
+    async reloadBatchInfo({ rootState }, sample_batch_id) {
+      await rootState.api.httpClient.reloadBatch(sample_batch_id);
+    },
+    async matchComputeBatches({ rootState }, sample_batches) {
+      const formattedBatches = sample_batches.map((batch) => ({
+        sample_batch_id: batch.sample_batch_id,
+        workspace_id: batch.workspace_id,
+      }));
+      await rootState.api.httpClient.matchComputeBatches(formattedBatches);
     },
 
     // selection
@@ -262,7 +320,10 @@ export default {
           break;
       }
     },
-    async targetCollectionToggle({ getters, state }, targetCollectionToggled) {
+    async targetCollectionToggle(
+      { commit, getters, state, dispatch, rootGetters },
+      targetCollectionToggled
+    ) {
       const targetCollectionToggledId =
         targetCollectionToggled.target_collection_id;
       state.targetCollections
@@ -277,17 +338,45 @@ export default {
       );
       switch (targetCollectionToggled.selection) {
         case 0:
-          // Select
-          targetCollectionToggled.selection = 2;
+          commit("SET_COLLECTION_SELECTION", {
+            collectionId: targetCollectionToggledId,
+            selectionValue: 2,
+          });
           break;
         case 2:
           // Unselect
-          targetCollectionToggled.selection = 0;
+          commit("SET_COLLECTION_SELECTION", {
+            collectionId: targetCollectionToggledId,
+            selectionValue: 0,
+          });
           break;
         case 3:
           // Stay focused
-          targetCollectionToggled.selection = 3;
+          commit("SET_COLLECTION_SELECTION", {
+            collectionId: targetCollectionToggledId,
+            selectionValue: 3,
+          });
           break;
+      }
+      // Dispatch to targets module to update selection there as well
+      dispatch(
+        "targets/updateCollectionSelection",
+        {
+          collectionId: targetCollectionToggledId,
+          selectionValue: targetCollectionToggled.selection,
+        },
+        { root: true }
+      );
+      // Dispatch to sample module if sample is active to update selection there as well
+      if (rootGetters["sample/matchCollections"].length > 0) {
+        dispatch(
+          "sample/updateCollectionSelection",
+          {
+            collectionId: targetCollectionToggledId,
+            selectionValue: targetCollectionToggled.selection,
+          },
+          { root: true }
+        );
       }
     },
   },
