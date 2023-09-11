@@ -1,11 +1,11 @@
-// GENERAL
+/* GENERAL */
 
 html,
 body {
   overflow: hidden !important;
 }
 
-// webkit scrollbars
+/* webkit scrollbars */
 
 html::-webkit-scrollbar {
   display: none;
@@ -28,11 +28,11 @@ body::-webkit-scrollbar {
   background-color: #454752;
 }
 
-// BUEFY FIXES
+/* BUEFY FIXES */
 
-// bulmaswatch superhero theme fixes
+/* bulmaswatch superhero theme fixes */
 
-// slider thumb text legibility fix
+/* slider thumb text legibility fix */
 .b-slider-thumb>span {
   color: #666 !important;
 }

@@ -83,6 +83,8 @@ export default {
         sample_batch_id: batchId,
         batch_matches_info: true,
         filter_params: { ...filterParams },
+        sort: "datetime_utc",
+        order: "asc",
       };
 
       // Add the sample_item_id_active if provided

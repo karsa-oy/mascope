@@ -25,7 +25,7 @@
 <script>
 import BaseChartPlotly from "./BaseChartPlotly.vue";
 import { call, get } from "vuex-pathify";
-import { glasbeyHv } from "$lib/styles";
+import { glasbeyLight } from "$lib/styles";
 
 export default {
   name: "ThePaneChartSampleIntensity",
@@ -61,7 +61,7 @@ export default {
       let compoundColors = Object.fromEntries(
         allCompoundIds.map((compoundId, index) => [
           [compoundId],
-          glasbeyHv[index],
+          glasbeyLight[index],
         ])
       );
       let data = [];
@@ -120,7 +120,7 @@ export default {
           mode: "markers",
           type: "scatter",
           marker: {
-            color: `rgb(${compoundColor[0]},${compoundColor[1]},${compoundColor[2]})`,
+            color: compoundColor, //`rgb(${compoundColor[0]},${compoundColor[1]},${compoundColor[2]})`,
             size: 10,
             symbol: compoundSymbol,
           },

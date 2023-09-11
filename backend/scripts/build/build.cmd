@@ -6,7 +6,6 @@ setlocal EnableDelayedExpansion
 set mypath=%~dp0
 call :get_full_path %mypath%\..\..
 set backend_path=!last_result!
-set my_setup_dir=%mypath%\setup
 set setup_dir=%mypath%\setup
 set env_file=%mypath%\setup\.env
 
@@ -31,15 +30,15 @@ pushd %backend_path%
 call poetry update
 call poetry build
 
-rm -r -f mascope_backend
+rmdir /s /q mascope_backend
 mkdir mascope_backend
 
-mv dist/*.whl mascope_backend\ || (echo Error finding .whl & exit /b 1)
-xcopy /s /y %my_setup_dir%\*.* mascope_backend\
+move dist\*.* mascope_backend\ || (echo Error finding .whl & exit /b 1)
 xcopy /s /y %setup_dir%\*.* mascope_backend\
 copy /y %env_file% mascope_backend\
 tar -c -z -f mascope_backend.tar.gz mascope_backend || (echo Error archiving mascope_backend & exit /b 1)
-rm -r -f mascope_backend
+rmdir /s /q mascope_backend
+rmdir /s /q dist
 echo Find new mascope_backend distribution package in %backend_path%\mascope_backend.tar.gz
 popd
 

@@ -1,13 +1,5 @@
 <template>
   <b-menu label="menu">
-    <div class="menu-header">
-      <div style="padding: 0.5em 0.65em 1em 0.5em">
-        <b-image
-          :src="require('../assets/karsa_logo_touch_icon_nega.png')"
-          alt="Karsa Logo"
-        ></b-image>
-      </div>
-    </div>
     <b-menu-list label="">
       <base-menu-button
         v-for="button of buttons"
