@@ -50,8 +50,8 @@ const samplesBaseUrl = "/samples";
 const filesBaseUrl = "/sample_files";
 const itemsBaseUrl = "/sample_items";
 const calibrationBaseUrl = "/calibration";
+const matchBaseUrl = "/match";
 const matchesBaseUrl = "/matches";
-const matchComputeBaseUrl = "/match_compute";
 const targetCollectionsBaseUrl = "/target_collections";
 const targetCollectionsInSampleBatchBaseUrl =
   "/target_collections_in_sample_batch";
@@ -378,10 +378,10 @@ export function createHttpClient(host, api_port) {
     },
 
     // Match compute
-    matchComputeBatches: async (sample_batches) => {
+    matchBatchesCompute: async (sample_batches) => {
       try {
         return await httpClient.post(
-          `${matchComputeBaseUrl}/batches`,
+          `${matchBaseUrl}/batches/compute`,
           sample_batches
         );
       } catch (error) {

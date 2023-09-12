@@ -505,8 +505,6 @@ async def match_batch_remove(sid, sample_batch_id):
         """,
             [sample_batch_id],
         )
-    # reload workspace
-    # await sio.emit("sample_batch_reload", sample_batch_id, namespace="/")
 
 
 @sio.event(namespace="/")

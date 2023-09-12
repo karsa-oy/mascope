@@ -12,6 +12,7 @@ from backend.lib.peak import detect_peaks, get_peaks, read_instrument_functions
 from backend.db.id import gen_id
 from backend.api_rest.models.models import (
     SampleBatch,
+    Sample,
     SampleItem,
     MatchInterference,
     Match,
@@ -495,7 +496,7 @@ async def match_batch_compute(
     await sio.emit("sample_batch_reload", room=sample_batch_id, namespace="/")
 
 
-async def match_compute_batches(sample_batches: List[SampleBatchComputeMatch]):
+async def match_batches_compute(sample_batches: List[SampleBatchComputeMatch]):
     total_batches = len(sample_batches)
     total_number_of_items = 0
     items_per_batch = []
@@ -559,29 +560,12 @@ async def match_compute_batches(sample_batches: List[SampleBatchComputeMatch]):
         )
 
         # Create computing matches task for the batch
-
-        # match_batch_compute fromt the match.py
-
-        # task = asyncio.create_task(
-        #     match_batch_compute(
-        #         None,
-        #         sample_batch.sample_batch_id,
-        #         progress_properties=progress_properties,
-        #     )
-        # )
-
         task = asyncio.create_task(
             match_batch_compute(
                 sample_batch.sample_batch_id, progress_properties=progress_properties
             )
         )
         await task
-
-        # background_tasks.add_task(
-        #     match_batch_compute,
-        #     sample_batch.sample_batch_id,
-        #     progress_properties=progress_properties,
-        # )
 
     # Step 4: Notify workspace clients that batch processing has finished
     for workspace_id in workspace_ids:

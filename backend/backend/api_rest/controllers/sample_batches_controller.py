@@ -15,7 +15,7 @@ from ..models.pydantic_models.sample_batch_pydantic_model import (
     SampleBatchUpdate,
     SampleBatchComputeMatch,
 )
-from ..controllers.match_compute_controller import match_compute_batches
+from .match_controller import match_batches_compute
 
 
 async def get_sample_batches(
@@ -170,7 +170,7 @@ async def update_sample_batch(
     # Inform clients about the update
     if rematch:
         background_tasks.add_task(
-            match_compute_batches,
+            match_batches_compute,
             [
                 SampleBatchComputeMatch(
                     sample_batch_id=existing_sample_batch.sample_batch_id

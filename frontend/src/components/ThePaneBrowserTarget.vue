@@ -252,7 +252,7 @@ export default {
     });
   },
   methods: {
-    ...mapActions("batch", ["reloadBatchInfo", "matchComputeBatches"]),
+    ...mapActions("batch", ["reloadBatchInfo", "matchBatchesCompute"]),
     ...mapMutations({
       activateModal: "modal/activate",
     }),
@@ -351,7 +351,7 @@ export default {
       }
     },
     async rematchBatches() {
-      await this.matchComputeBatches(this.sampleBatchesSelected);
+      await this.matchBatchesCompute(this.sampleBatchesSelected);
     },
   },
 };

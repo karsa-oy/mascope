@@ -9,7 +9,6 @@ from sqlalchemy.orm import joinedload
 
 from backend.db_api_rest import async_session
 
-# from backend.api.match import match_batch_compute
 from .target_compounds_controller import delete_target_compound, create_target_compound
 from .target_compound_in_target_collection_controller import (
     create_target_compound_in_target_collection,
@@ -18,7 +17,7 @@ from .target_compound_in_target_collection_controller import (
 from ..controllers.target_collection_in_sample_batch_controller import (
     create_target_collection_in_sample_batch,
 )
-from ..controllers.match_compute_controller import match_compute_batches
+from .match_controller import match_batches_compute
 from ..models.models import (
     SampleBatch,
     TargetCollection,
@@ -230,7 +229,7 @@ async def create_target_collection(
         # Run rematch for all sample batches in the list
         # TODO_match
         if sample_batches_to_rematch:
-            background_tasks.add_task(match_compute_batches, sample_batches_to_rematch)
+            background_tasks.add_task(match_batches_compute, sample_batches_to_rematch)
 
         await sio.emit(
             "targets_all_reload",
@@ -323,7 +322,7 @@ async def delete_target_collection(
                 for sb in sample_batches_to_rematch
             ]
 
-            background_tasks.add_task(match_compute_batches, sample_batches)
+            background_tasks.add_task(match_batches_compute, sample_batches)
 
             for workspace_id in workspaces_to_reload:
                 await sio.emit("targets_all_reload", room=workspace_id, namespace="/")
