@@ -9,9 +9,8 @@
   </div>
 </template>
 
-<style src="./assets/css/style.css"></style>
 <style lang="scss">
-@import "./assets/css/style.scss";
+@import "./assets/style.scss";
 </style>
 
 <script>
