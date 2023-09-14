@@ -159,6 +159,7 @@ export default {
         newSampleItem.sample_item_attributes = attributes;
         items.push(newSampleItem);
       }
+      // TODO_replace sio
       this.$api.emit("scenthound_process_samples", items);
     },
   },
