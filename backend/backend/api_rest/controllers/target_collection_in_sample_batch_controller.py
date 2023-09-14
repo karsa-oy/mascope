@@ -11,8 +11,8 @@ from ..models.models import TargetCollectionInSampleBatch, SampleBatch, TargetCo
 from ..models.pydantic_models.target_collection_in_sample_batch_pydantic_model import (
     TargetCollectionInSampleBatchBase,
 )
-from ..models.pydantic_models.sample_batch_pydantic_model import (
-    SampleBatchComputeMatch,
+from ..models.pydantic_models.match_pydantic_model import (
+    MatchComputeBatch,
 )
 
 
@@ -174,7 +174,7 @@ async def create_target_collection_in_sample_batch(
         # TODO_match
         if not skipRematch and sample_batches_to_rematch:
             sample_batches = [
-                SampleBatchComputeMatch(sample_batch_id=sample_batch_id)
+                MatchComputeBatch(sample_batch_id=sample_batch_id)
                 for sample_batch_id in sample_batches_to_rematch
             ]
             # Create a background task
@@ -275,8 +275,7 @@ async def delete_target_collections_in_sample_batch(
     # TODO_match
     if not skipRematch and sample_batches_to_rematch:
         sample_batches = [
-            SampleBatchComputeMatch(sample_batch_id=id)
-            for id in sample_batches_to_rematch
+            MatchComputeBatch(sample_batch_id=id) for id in sample_batches_to_rematch
         ]
         # Create a background task
         if background_tasks:

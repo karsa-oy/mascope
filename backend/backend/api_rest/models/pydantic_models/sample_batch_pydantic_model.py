@@ -44,26 +44,3 @@ class SampleBatchInDB(SampleBatchBase):
 
     class Config:
         orm_mode = True
-
-
-class SampleBatchComputeMatch(BaseModel):
-    sample_batch_id: str = Field(..., description="ID of the sample batch")
-    workspace_id: Optional[str] = Field(
-        None, description="ID of the workspace associated with the sample batch"
-    )
-
-
-class ProgressProperties(BaseModel):
-    item_weight: Optional[float] = Field(
-        None, description="Weight of the item in computation"
-    )
-    item_index: Optional[int] = Field(
-        None, description="Index of the item being processed"
-    )
-    batch_index: Optional[int] = Field(
-        None, description="Index of the batch being processed"
-    )
-    workspace_id: Optional[str] = Field(
-        None, description="ID of the associated workspace"
-    )
-    total_batches: Optional[int] = Field(None, description="Total number of batches")

@@ -534,9 +534,8 @@ export default {
       this.sampleItemName = null;
       this.sampleItemType = null;
     },
-    sampleMatch() {
-      // TODO_match replace sio
-      this.$api.emit("match_item_compute", this.sampleActive);
+    async sampleMatch() {
+      await this.matchItemCompute(this.sampleActive);
     },
     saveSampleInfoButtonPressed() {
       let sample = {

@@ -34,8 +34,8 @@ from ..models.pydantic_models.target_compound_in_target_collection_pydantic_mode
 from ..models.pydantic_models.target_collection_in_sample_batch_pydantic_model import (
     TargetCollectionInSampleBatchBase,
 )
-from ..models.pydantic_models.sample_batch_pydantic_model import (
-    SampleBatchComputeMatch,
+from ..models.pydantic_models.match_pydantic_model import (
+    MatchComputeBatch,
 )
 
 
@@ -318,7 +318,7 @@ async def delete_target_collection(
         # TODO_match
         if sample_batches_to_rematch:
             sample_batches = [
-                SampleBatchComputeMatch(sample_batch_id=sb[0], workspace_id=sb[1])
+                MatchComputeBatch(sample_batch_id=sb[0], workspace_id=sb[1])
                 for sb in sample_batches_to_rematch
             ]
 

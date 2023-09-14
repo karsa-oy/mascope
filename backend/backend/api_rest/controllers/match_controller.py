@@ -21,8 +21,9 @@ from backend.api_rest.models.models import (
     TargetIon,
     TargetIsotope,
 )
-from ..models.pydantic_models.sample_batch_pydantic_model import (
-    SampleBatchComputeMatch,
+from ..models.pydantic_models.match_pydantic_model import (
+    MatchComputeBatch,
+    MatchComputeItem,
     ProgressProperties,
 )
 from .sample_items_controller import get_sample_items
@@ -280,33 +281,48 @@ async def emit_progress_update(
     if not progress_properties:
         return
 
-    item_weight = progress_properties.item_weight
-    item_index = progress_properties.item_index
-    batch_index = progress_properties.batch_index
-    total_batches = progress_properties.total_batches
-    workspace_id = progress_properties.workspace_id
+    if progress_properties.match_compute_type == "batches":
+        item_weight = progress_properties.item_weight
+        item_index = progress_properties.item_index
+        batch_index = progress_properties.batch_index
+        total_batches = progress_properties.total_batches
+        workspace_id = progress_properties.workspace_id
 
-    # Calculate the progress contribution of completed batches
-    batch_progress = ((batch_index - 1) / total_batches) * 100
+        # Calculate the progress contribution of completed batches
+        batch_progress = ((batch_index - 1) / total_batches) * 100
 
-    # Calculate the progress within the current batch
-    item_progress = ((item_index + increment) * item_weight) * 100
+        # Calculate the progress within the current batch
+        item_progress = ((item_index + increment) * item_weight) * 100
 
-    # Calculate the proportional progress of the current batch in terms of the overall progress
-    proportional_batch_progress = item_progress * (1 / total_batches)
+        # Calculate the proportional progress of the current batch in terms of the overall progress
+        proportional_batch_progress = item_progress * (1 / total_batches)
 
-    # Combine both progresses
-    progress_percentage_all = batch_progress + proportional_batch_progress
+        # Combine both progresses
+        progress_percentage_all = batch_progress + proportional_batch_progress
 
-    await sio.emit(
-        "match_batch_compute_progress_percentage",
-        {
-            "progress_percentage": progress_percentage_all,
-            "progress_percentage_batch": proportional_batch_progress * total_batches,
-        },
-        room=workspace_id,
-        namespace="/",
-    )
+        await sio.emit(
+            "match_batch_compute_progress_percentage",
+            {
+                "progress_percentage": progress_percentage_all,
+                "progress_percentage_batch": proportional_batch_progress
+                * total_batches,
+            },
+            room=workspace_id,
+            namespace="/",
+        )
+
+    elif progress_properties.match_compute_type == "item":
+        sample_batch_id = progress_properties.sample_batch_id
+
+        progress_percentage_item = increment * 100
+        await sio.emit(
+            "match_item_update_compute_progress",
+            {
+                "progress_percentage": progress_percentage_item,
+            },
+            room=sample_batch_id,
+            namespace="/",
+        )
 
 
 async def item_compute(sample_item, progress_properties: ProgressProperties = None):
@@ -481,6 +497,7 @@ async def match_batch_compute(
                 f"...Computing matches of sample item: {sample_item.sample_item_id} ..."
             )
             progress_properties = ProgressProperties(
+                match_compute_type="batches",
                 item_weight=progress_properties.item_weight,
                 item_index=item_index,
                 batch_index=progress_properties.batch_index,
@@ -496,7 +513,7 @@ async def match_batch_compute(
     await sio.emit("sample_batch_reload", room=sample_batch_id, namespace="/")
 
 
-async def match_batches_compute(sample_batches: List[SampleBatchComputeMatch]):
+async def match_batches_compute(sample_batches: List[MatchComputeBatch]):
     total_batches = len(sample_batches)
     total_number_of_items = 0
     items_per_batch = []
@@ -577,3 +594,120 @@ async def match_batches_compute(sample_batches: List[SampleBatchComputeMatch]):
         )
 
     return {"status": f"Match computation for {total_batches} batches"}
+
+
+async def match_item_compute(sample_item: MatchComputeItem):
+    sample_item_id = sample_item.sample_item_id
+    sample_item_name = sample_item.sample_item_name
+    sample_batch_id = sample_item.sample_batch_id
+    filename = sample_item.filename
+    instrument = sample_item.instrument
+
+    # async with async_session() as session:
+    #     # Fetch the instrument
+    #     result = await session.execute(
+    #         select(Sample.instrument).where(Sample.filename == filename)
+    #     )
+    #     instrument = result.scalar()
+
+    try:
+        # notification for the batch users
+        await sio.emit(
+            "match_item_update_compute_started",
+            {
+                "sample_item_name": sample_item_name,
+            },
+            room=sample_batch_id,
+            namespace="/",
+        )
+
+        # notification for the instrument users
+        await sio.emit(
+            "match_item_compute_started",
+            {
+                "filename": filename,
+                "progress": 0,
+            },
+            room=instrument,
+            namespace="/",
+        )
+        await sio.emit(
+            "match_item_compute_progress", {}, room=instrument, namespace="/"
+        )
+
+        progress_properties = ProgressProperties(
+            match_compute_type="item",
+            sample_batch_id=sample_batch_id,
+        )
+
+        await item_compute(sample_item, progress_properties)
+
+        # notification for the batch users
+        await sio.emit(
+            "match_item_update_compute_finished",
+            {
+                "sample_item_name": sample_item_name,
+            },
+            room=sample_item_id,
+            namespace="/",
+        )
+
+        # notification for the instrument users
+        await sio.emit(
+            "match_item_compute_finished",
+            {
+                "filename": filename,
+                "progress": 100,
+            },
+            room=instrument,
+            namespace="/",
+        )
+
+        await sio.emit("sample_batch_reload", room=sample_item_id, namespace="/")
+    except Exception as e:
+        print(f"match_item_compute failed: {e}")
+
+        # notification for the instrument users
+        await sio.emit(
+            "match_item_compute_failed",
+            {
+                "filename": filename,
+                "progress": 100,
+            },
+            room=instrument,
+            namespace="/",
+        )
+
+        # notification for the batch users
+        await sio.emit(
+            "match_item_update_compute_failed",
+            {
+                "sample_item_name": sample_item_name,
+                "errorMessage": str(e),
+            },
+            room=sample_item_id,
+            namespace="/",
+        )
+
+
+async def match_item_remove(sample_item_id):
+    async with async_session() as session:
+        await session.execute(
+            delete(Match).where(Match.sample_item_id == sample_item_id)
+        )
+        await session.execute(
+            delete(MatchInterference).where(
+                MatchInterference.sample_item_id == sample_item_id
+            )
+        )
+
+        result = await session.execute(
+            select(SampleItem.sample_batch_id).where(
+                SampleItem.sample_item_id == sample_item_id
+            )
+        )
+        sample_batch_id = result.scalar_one()
+
+        await session.commit()
+
+    await sio.emit("sample_batch_reload", room=sample_batch_id, namespace="/")

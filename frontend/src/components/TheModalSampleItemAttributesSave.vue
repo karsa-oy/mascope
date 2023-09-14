@@ -306,7 +306,7 @@ import ThePaneBrowserTarget from "./ThePaneBrowserTarget.vue";
 import ThePaneSettingsCalibration from "./ThePaneSettingsCalibration.vue";
 
 import * as _ from "underscore";
-import { mapMutations } from "vuex";
+import { mapActions, mapMutations } from "vuex";
 import { call, get, sync } from "vuex-pathify";
 import { genId } from "../lib/util";
 
@@ -425,6 +425,7 @@ export default {
       sampleItemCreate: "sample/create",
       sampleItemUpdate: "sample/update",
     }),
+    ...mapActions("sample", ["matchItemCompute"]),
     ...mapMutations({
       deactivateModal: "modal/deactivate",
     }),
@@ -512,9 +513,8 @@ export default {
         }
       }
     },
-    sampleMatch() {
-      // TODO replace sio
-      this.$api.emit("match_item_compute", this.sampleActive);
+    async sampleMatch() {
+      await this.matchItemCompute(this.sampleActive);
     },
     async saveSampleItem() {
       await this.saveAttributes();

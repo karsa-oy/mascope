@@ -377,7 +377,7 @@ export function createHttpClient(host, api_port) {
       }
     },
 
-    // Match compute
+    // Match
     matchBatchesCompute: async (sample_batches) => {
       try {
         return await httpClient.post(
@@ -388,6 +388,22 @@ export function createHttpClient(host, api_port) {
         console.error("Failed to compute batch matches: ", error);
       }
     },
+
+    matchItemCompute: async (sample) => {
+      try {
+        return await httpClient.post(`${matchBaseUrl}/item/compute`, sample);
+      } catch (error) {
+        console.error("Failed to compute sample match: ", error);
+      }
+    },
+
+    // matchItemRemove: async (sample) => {
+    //   try {
+    //     return await httpClient.delete(`${matchBaseUrl}/item/remove`, sample);
+    //   } catch (error) {
+    //     console.error("Failed to remove sample match: ", error);
+    //   }
+    // },
 
     // Target collections
     getAllTargetCollections: async (params = {}) => {

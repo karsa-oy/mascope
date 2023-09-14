@@ -1,7 +1,7 @@
 from typing import List, Optional
 from pydantic import BaseModel, Field
 from .target_compound_pydantic_model import TargetCompoundBase, TargetCompoundUpdate
-from .sample_batch_pydantic_model import SampleBatchComputeMatch
+from .match_pydantic_model import MatchComputeBatch
 
 
 class TargetCollectionBase(BaseModel):
@@ -17,7 +17,7 @@ class TargetCollectionCreate(TargetCollectionBase):
     target_compounds: Optional[List[TargetCompoundBase]] = Field(
         None, description="Compounds in the target collection"
     )
-    sample_batches: Optional[List[SampleBatchComputeMatch]] = Field(
+    sample_batches: Optional[List[MatchComputeBatch]] = Field(
         None, description="List of sample batch ids related to the target collection"
     )
 

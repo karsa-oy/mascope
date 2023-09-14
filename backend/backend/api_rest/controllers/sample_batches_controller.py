@@ -13,7 +13,9 @@ from ..models.models import SampleBatch, TargetCollectionInSampleBatch
 from ..models.pydantic_models.sample_batch_pydantic_model import (
     SampleBatchCreate,
     SampleBatchUpdate,
-    SampleBatchComputeMatch,
+)
+from ..models.pydantic_models.match_pydantic_model import (
+    MatchComputeBatch,
 )
 from .match_controller import match_batches_compute
 
@@ -171,11 +173,7 @@ async def update_sample_batch(
     if rematch:
         background_tasks.add_task(
             match_batches_compute,
-            [
-                SampleBatchComputeMatch(
-                    sample_batch_id=existing_sample_batch.sample_batch_id
-                )
-            ],
+            [MatchComputeBatch(sample_batch_id=existing_sample_batch.sample_batch_id)],
         )
     else:
         await sio.emit(

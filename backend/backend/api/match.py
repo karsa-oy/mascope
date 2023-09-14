@@ -10,7 +10,7 @@ from backend.lib.chemistry import match_mz
 from backend.lib.file import load_file
 from backend.lib.peak import detect_peaks, get_peaks, read_instrument_functions
 from backend.server import sio
-from ..api_rest.models.pydantic_models.sample_batch_pydantic_model import (
+from ..api_rest.models.pydantic_models.match_pydantic_model import (
     ProgressProperties,
 )
 

@@ -245,7 +245,6 @@ export default {
       await dispatch("reload");
     },
 
-    // backend event emitters
     async reloadBatchInfo({ rootState }, sample_batch_id) {
       await rootState.api.httpClient.reloadBatch(sample_batch_id);
     },
