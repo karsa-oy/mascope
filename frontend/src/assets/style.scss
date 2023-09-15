@@ -57,6 +57,16 @@ $notification-light: $cool-grey-light;
 $notification-dark: $cool-grey-2;
 $notification-invert: $cool-grey-lighter;
 
+// webkit scrollbars
+::-webkit-scrollbar {
+  width: 10px;
+  height: 2px;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #454752;
+}
+
 // Workspace tile
 .base-tile {
   height: 200px;
