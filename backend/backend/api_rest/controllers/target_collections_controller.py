@@ -227,9 +227,13 @@ async def create_target_collection(
         await session.commit()
 
         # Run rematch for all sample batches in the list
-        # TODO_match
         if sample_batches_to_rematch:
-            background_tasks.add_task(match_batches_compute, sample_batches_to_rematch)
+            sample_batches = [
+                MatchComputeBatch(sample_batch_id=sample_batch.sample_batch_id)
+                for sample_batch in sample_batches_to_rematch
+            ]
+
+            background_tasks.add_task(match_batches_compute, sample_batches)
 
         await sio.emit(
             "targets_all_reload",
@@ -315,7 +319,6 @@ async def delete_target_collection(
         await session.commit()
 
         # Run rematch for all sample batches in the list
-        # TODO_match
         if sample_batches_to_rematch:
             sample_batches = [
                 MatchComputeBatch(sample_batch_id=sb[0], workspace_id=sb[1])

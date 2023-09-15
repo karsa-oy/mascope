@@ -485,6 +485,8 @@ export default {
     },
 
     mzCalibrationFit() {
+      // TODO_calibration
+      // TODO_replace sio
       this.mzCalibrationReset();
       this.$api.emit(
         "calibration_mz_fit",

@@ -171,7 +171,6 @@ async def create_target_collection_in_sample_batch(
             "targets_all_reload",
             namespace="/",
         )
-        # TODO_match
         if not skipRematch and sample_batches_to_rematch:
             sample_batches = [
                 MatchComputeBatch(sample_batch_id=sample_batch_id)
@@ -272,7 +271,6 @@ async def delete_target_collections_in_sample_batch(
 
     await session.commit()
 
-    # TODO_match
     if not skipRematch and sample_batches_to_rematch:
         sample_batches = [
             MatchComputeBatch(sample_batch_id=id) for id in sample_batches_to_rematch

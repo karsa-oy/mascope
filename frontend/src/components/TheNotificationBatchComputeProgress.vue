@@ -2,7 +2,7 @@
   <div v-if="notificationIsActive">
     <b-message
       type="is-notification"
-      title="Batch Computation Progress"
+      title="Batch Matches Computation Progress"
       :closable="true"
       @close="close"
       :class="{ 'is-closing': isClosing }"

@@ -2,7 +2,7 @@
   <div v-if="notificationIsActive">
     <b-message
       type="is-notification"
-      title="Sample Item Computation Progress"
+      title="Sample Matches Computation Progress"
       :closable="true"
       @close="close"
       :class="{ 'is-closing': isClosing }"
