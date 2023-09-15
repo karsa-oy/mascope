@@ -9,7 +9,7 @@
 </template>
 
 <script>
-import { mapMutations } from "vuex";
+import { mapActions, mapMutations } from "vuex";
 import { sync, get, call } from "vuex-pathify";
 import table from "../lib/table";
 
@@ -29,6 +29,7 @@ export default {
       batchMatchCompounds: "batch/matchCompounds",
       batchMatchIons: "batch/matchIons",
       batchTargetCollections: "batch/targetCollections",
+      sampleActive: "sample/active",
       sampleItems: "batch/sampleItems",
       sampleItemFocused: "batch/sampleItemFocused",
       targetCollections: "batch/targetCollections",
@@ -127,8 +128,12 @@ export default {
         label: `Delete sample item`,
         onClick: this.itemDelete,
       };
+      let rematchItemButton = {
+        label: `Rematch selected sample (debug)`,
+        onClick: this.itemRematch,
+      };
       let itemButtons = this.sampleItemFocused
-        ? [updateItemButton, deleteItemButton]
+        ? [updateItemButton, deleteItemButton, rematchItemButton]
         : [];
       // menu
       return this.sampleItemFocused ? itemButtons : batchButtons;
@@ -151,6 +156,7 @@ export default {
     ...mapMutations({
       activateModal: "modal/activate",
     }),
+    ...mapActions("sample", ["matchItemCompute"]),
     ...call({
       itemFocus: "batch/sampleItemFocus",
       itemToggle: "batch/sampleItemToggle",
@@ -301,6 +307,9 @@ export default {
         sampleItemRecordToLoad: this.sampleItemFocused,
       };
       this.activateModal({ modal: "sampleItemAttributesSave" });
+    },
+    async itemRematch() {
+      await this.matchItemCompute(this.sampleActive);
     },
     itemDelete() {
       this.$buefy.dialog.confirm({

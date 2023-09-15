@@ -603,12 +603,10 @@ async def match_item_compute(sample_item: MatchComputeItem):
     filename = sample_item.filename
     instrument = sample_item.instrument
 
-    # async with async_session() as session:
-    #     # Fetch the instrument
-    #     result = await session.execute(
-    #         select(Sample.instrument).where(Sample.filename == filename)
-    #     )
-    #     instrument = result.scalar()
+    print(f"...Computing matches for sample {sample_item_name}: {sample_item_id} ...")
+
+    # clear previous matches
+    await match_item_remove(sample_item_id, True)
 
     try:
         # notification for the batch users
@@ -690,7 +688,7 @@ async def match_item_compute(sample_item: MatchComputeItem):
         )
 
 
-async def match_item_remove(sample_item_id):
+async def match_item_remove(sample_item_id, skipReload: bool = False):
     async with async_session() as session:
         await session.execute(
             delete(Match).where(Match.sample_item_id == sample_item_id)
@@ -710,4 +708,5 @@ async def match_item_remove(sample_item_id):
 
         await session.commit()
 
-    await sio.emit("sample_batch_reload", room=sample_batch_id, namespace="/")
+    if not skipReload:
+        await sio.emit("sample_batch_reload", room=sample_batch_id, namespace="/")
