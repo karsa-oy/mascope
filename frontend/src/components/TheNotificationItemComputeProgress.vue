@@ -72,7 +72,6 @@ export default {
   watch: {
     itemMatchComputing(value) {
       if (value) {
-        console.log(value);
         this.activateNotification({
           notification: "itemComputeProgress",
         });

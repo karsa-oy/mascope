@@ -397,13 +397,15 @@ export function createHttpClient(host, api_port) {
       }
     },
 
-    // matchItemRemove: async (sample) => {
-    //   try {
-    //     return await httpClient.delete(`${matchBaseUrl}/item/remove`, sample);
-    //   } catch (error) {
-    //     console.error("Failed to remove sample match: ", error);
-    //   }
-    // },
+    matchItemRemove: async (sample_item_id) => {
+      try {
+        return await httpClient.delete(
+          `${matchBaseUrl}/item/remove/${sample_item_id}`
+        );
+      } catch (error) {
+        console.error("Failed to remove sample match: ", error);
+      }
+    },
 
     // Target collections
     getAllTargetCollections: async (params = {}) => {

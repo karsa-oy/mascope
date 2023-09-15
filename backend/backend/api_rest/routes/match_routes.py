@@ -30,9 +30,6 @@ async def match_sample_compute_route(
     return {"status": "Match computation started for sample item"}
 
 
-# @match_router.delete("/api/match/item/remove")
-# async def match_sample_remove_route(
-#     sample: MatchComputeBatch, background_tasks: BackgroundTasks
-# ):
-#     background_tasks.add_task(match_item_remove, sample)
-#     return {"status": "Removal of matches for sample item"}
+@match_router.delete("/api/match/item/remove/{sample_item_id}")
+async def match_sample_remove_route(sample_item_id: str):
+    return await match_item_remove(sample_item_id)
