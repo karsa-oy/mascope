@@ -57,19 +57,17 @@ export default {
     async matchSample({ rootState, dispatch }) {
       const sampleActive = rootState.sample.active;
       if (sampleActive) {
-        rootState.api.emit("match_item_compute", {
-          filename: sampleActive.filename,
-          sample_item_id: sampleActive.sample_item_id,
-          sample_batch_id: sampleActive.sample_batch_id,
-        });
+        await dispatch("sample/matchItemCompute", sampleActive, { root: true });
       } else {
-        // Try again in 1 second
+        // Try again in 1 second if scenthound is still opened
+        if (!state.scenthoundModeActive) return;
         setTimeout(() => {
           dispatch("matchSample");
         }, 1000);
       }
     },
     async mzCalibrateSample({ rootState, rootGetters, dispatch }) {
+      //TODO_calibration
       const sampleActive = rootState.sample.active;
       if (sampleActive) {
         rootState.api.emit(
@@ -82,7 +80,8 @@ export default {
           rootGetters["calibration/params"]
         );
       } else {
-        // Try again in 1 second
+        // Try again in 1 second if scenthound is still opened
+        if (!state.scenthoundModeActive) return;
         setTimeout(() => {
           dispatch("mzCalibrateSample");
         }, 1000);
