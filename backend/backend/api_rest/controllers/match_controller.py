@@ -2,7 +2,7 @@ import asyncio
 import numpy as np
 import pandas as pd
 from typing import List
-from sqlalchemy import select, and_, delete
+from sqlalchemy import select, and_
 from sqlalchemy.orm import joinedload
 from backend.db_api_rest import async_session
 from backend.server import sio
@@ -12,10 +12,7 @@ from backend.lib.peak import detect_peaks, get_peaks, read_instrument_functions
 from backend.db.id import gen_id
 from backend.api_rest.models.models import (
     SampleBatch,
-    Sample,
     SampleItem,
-    MatchInterference,
-    Match,
     TargetCollection,
     TargetCompoundInTargetCollection,
     TargetIon,
@@ -27,6 +24,11 @@ from ..models.pydantic_models.match_pydantic_model import (
     ProgressProperties,
 )
 from .sample_items_controller import get_sample_items
+from .matches_controller import create_matches, delete_matches
+from .match_interferences_controller import (
+    create_match_interferences,
+    delete_match_interferences,
+)
 
 
 async def compute_matches(
@@ -364,93 +366,25 @@ async def item_compute(sample_item, progress_properties: ProgressProperties = No
     await emit_progress_update(progress_properties=progress_properties, increment=0.75)
 
     # Step 3: Check for existing interferences and save them to database
-    async with async_session() as session:
-        # Extract the required target_isotope_id values
-        target_isotope_refs = match_interference_df["target_isotope_id"].tolist()
+    if len(match_interference_df) == 0:
+        print("No match interferences found")
+        return sample_item
 
-        # Select interferences that match the criteria
-        stmt = select(MatchInterference.match_interference_id).where(
-            and_(
-                MatchInterference.sample_item_id == sample_item_id,
-                MatchInterference.target_isotope_id.in_(target_isotope_refs),
-            )
-        )
-
-        result = await session.execute(stmt)
-
-        match_interferences = result.all()
-
-        if match_interferences:
-            raise RuntimeError("Match interferences exist! Not going to overwrite")
-
-        # Prepare the data for insertion
-        match_interference_for_insertion = [
-            MatchInterference(
-                **{
-                    key: value
-                    for key, value in record.items()
-                    if key in MatchInterference.__table__.columns
-                },
-                sample_item_id=sample_item_id,
-            )
-            for record in match_interference_df.to_dict(orient="records")
-        ]
-
-        # Insert the data
-        session.add_all(match_interference_for_insertion)
-
-        # Commit the transaction to save the data
-        await session.commit()
+    await create_match_interferences(match_interference_df, sample_item_id)
 
     # Step 4: Check for existing matches and save them
     if len(match_isotope_df) == 0:
         print("No matches found")
         return sample_item
 
-    async with async_session() as session:
-        # Extract the required target_isotope_id values
-        target_isotope_refs = match_isotope_df["target_isotope_id"].tolist()
-
-        # Select matches that match the criteria
-        stmt = select(Match.match_id).where(
-            and_(
-                Match.sample_item_id == sample_item_id,
-                Match.target_isotope_id.in_(target_isotope_refs),
-            )
-        )
-
-        result = await session.execute(stmt)
-
-        matches = result.all()
-
-        if matches:
-            raise RuntimeError("Matches exist! Not going to overwrite")
-
-        # Prepare the data for insertion
-        match_isotope_for_insertion = [
-            Match(
-                **{
-                    key: value
-                    for key, value in record.items()
-                    if key in Match.__table__.columns
-                },
-                sample_item_id=sample_item_id,
-            )
-            for record in match_isotope_df.to_dict(orient="records")
-        ]
-
-        # Insert the data
-        session.add_all(match_isotope_for_insertion)
-
-        # Commit the transaction to save the data
-        await session.commit()
+    await create_matches(match_isotope_df, sample_item_id)
 
     await emit_progress_update(progress_properties=progress_properties, increment=1)
 
     return sample_item
 
 
-async def match_batch_remove(sample_batch_id):
+async def match_batch_remove(sample_batch_id, skipReload: bool = False):
     async with async_session() as session:
         # Get sample items related to the given sample batch
         sample_items = await session.execute(
@@ -460,19 +394,12 @@ async def match_batch_remove(sample_batch_id):
         )
         sample_item_ids = [sample_item.sample_item_id for sample_item in sample_items]
 
-        # Delete records from match table
-        await session.execute(
-            delete(Match).where(Match.sample_item_id.in_(sample_item_ids))
-        )
+        for sample_item_id in sample_item_ids:
+            await delete_matches(sample_item_id)
+            await delete_match_interferences(sample_item_id)
 
-        # Delete records from match_interference table
-        await session.execute(
-            delete(MatchInterference).where(
-                MatchInterference.sample_item_id.in_(sample_item_ids)
-            )
-        )
-
-        await session.commit()
+        if not skipReload:
+            await sio.emit("sample_batch_reload", room=sample_batch_id, namespace="/")
 
 
 async def match_batch_compute(
@@ -481,7 +408,7 @@ async def match_batch_compute(
     print(f"...Computing matches of batch: {sample_batch_id} ...")
 
     # clear previous matches
-    await match_batch_remove(sample_batch_id)
+    await match_batch_remove(sample_batch_id, True)
 
     async with async_session() as session:
         # Fetch item ids
@@ -689,24 +616,15 @@ async def match_item_compute(sample_item: MatchComputeItem):
 
 
 async def match_item_remove(sample_item_id, skipReload: bool = False):
-    async with async_session() as session:
-        await session.execute(
-            delete(Match).where(Match.sample_item_id == sample_item_id)
-        )
-        await session.execute(
-            delete(MatchInterference).where(
-                MatchInterference.sample_item_id == sample_item_id
-            )
-        )
-
-        result = await session.execute(
-            select(SampleItem.sample_batch_id).where(
-                SampleItem.sample_item_id == sample_item_id
-            )
-        )
-        sample_batch_id = result.scalar_one()
-
-        await session.commit()
+    await delete_matches(sample_item_id)
+    await delete_match_interferences(sample_item_id)
 
     if not skipReload:
+        async with async_session() as session:
+            result = await session.execute(
+                select(SampleItem.sample_batch_id).where(
+                    SampleItem.sample_item_id == sample_item_id
+                )
+            )
+            sample_batch_id = result.scalar_one()
         await sio.emit("sample_batch_reload", room=sample_batch_id, namespace="/")

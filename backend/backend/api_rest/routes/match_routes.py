@@ -3,6 +3,7 @@ from typing import List
 
 from ..controllers.match_controller import (
     match_batches_compute,
+    match_batch_remove,
     match_item_compute,
     match_item_remove,
 )
@@ -20,6 +21,11 @@ async def match_batches_compute_route(
 ):
     background_tasks.add_task(match_batches_compute, sample_batches)
     return {"status": "Match computation started for sample batches"}
+
+
+@match_router.delete("/api/match/batch/remove/{sample_batch_id}")
+async def match_batch_remove_route(sample_batch_id: str):
+    return await match_batch_remove(sample_batch_id)
 
 
 @match_router.post("/api/match/item/compute")

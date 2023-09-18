@@ -1,6 +1,5 @@
 from fastapi import HTTPException
-from sqlalchemy import asc, desc, func
-from sqlalchemy.future import select
+from sqlalchemy import asc, desc, func, select, delete, and_
 from backend.db_api_rest import async_session
 from ..models.models import MatchInterference
 
@@ -75,3 +74,54 @@ async def get_match_interference_by_id(match_interference_id: str):
             )
 
         return match_interference.to_dict()
+
+
+async def delete_match_interferences(sample_item_id: str):
+    async with async_session() as session:
+        await session.execute(
+            delete(MatchInterference).where(
+                MatchInterference.sample_item_id == sample_item_id
+            )
+        )
+        await session.commit()
+
+
+async def create_match_interferences(match_interference_df, sample_item_id):
+    print("Saving match interferences to database")
+    # Check for existing interferences and save them to database
+    async with async_session() as session:
+        # Extract the required target_isotope_id values
+        target_isotope_refs = match_interference_df["target_isotope_id"].tolist()
+
+        # Select interferences that match the criteria
+        stmt = select(MatchInterference.match_interference_id).where(
+            and_(
+                MatchInterference.sample_item_id == sample_item_id,
+                MatchInterference.target_isotope_id.in_(target_isotope_refs),
+            )
+        )
+
+        result = await session.execute(stmt)
+        match_interferences = result.all()
+
+        if match_interferences:
+            raise RuntimeError("Match interferences exist! Not going to overwrite")
+
+        # Prepare the data for insertion
+        match_interference_for_insertion = [
+            MatchInterference(
+                **{
+                    key: value
+                    for key, value in record.items()
+                    if key in MatchInterference.__table__.columns
+                },
+                sample_item_id=sample_item_id,
+            )
+            for record in match_interference_df.to_dict(orient="records")
+        ]
+
+        # Insert the data
+        session.add_all(match_interference_for_insertion)
+
+        # Commit the transaction to save the data
+        await session.commit()
