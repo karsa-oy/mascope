@@ -2,7 +2,7 @@
   <div v-if="notificationIsActive">
     <b-message
       type="is-notification"
-      title="Batch Matches Computation Progress"
+      title="Sample Matches Computation Progress"
       :closable="true"
       @close="close"
       :class="{ 'is-closing': isClosing }"
@@ -10,7 +10,6 @@
       <div>
         <section>
           <p>{{ progressMessage }}</p>
-          <p>{{ currentBatchMessage }}</p>
         </section>
         <section class="batch-computation-progress-bar">
           <b-progress
@@ -19,7 +18,13 @@
             show-value
             size="is-medium"
             format="percent"
-            :type="progressPercentage == 100 ? 'is-success' : 'is-primary'"
+            :type="
+              computeError
+                ? 'is-danger'
+                : progressPercentage == 100
+                ? 'is-success'
+                : 'is-primary'
+            "
           ></b-progress>
         </section>
       </div>
@@ -32,7 +37,7 @@ import { mapMutations, mapState } from "vuex";
 import { sync, get, call } from "vuex-pathify";
 
 export default {
-  name: "TheNotificationBatchComputeProgress",
+  name: "TheNotificationItemComputeProgress",
   data() {
     return {
       isClosing: false,
@@ -40,14 +45,14 @@ export default {
   },
   computed: {
     ...sync({
-      notificationIsActive: "notification/batchComputeProgressActive",
+      notificationIsActive: "notification/itemComputeProgressActive",
       progressMessage: "notification/progressMessage",
-      currentBatchMessage: "notification/currentBatchMessage",
       progressPercentage: "notification/progressPercentage",
     }),
     ...get({
-      batchMatchComputing: "notification/batchMatchComputing",
+      itemMatchComputing: "notification/itemMatchComputing",
       notificationActive: "notification/active",
+      computeError: "notification/computeError",
     }),
   },
   methods: {
@@ -65,13 +70,13 @@ export default {
     },
   },
   watch: {
-    batchMatchComputing(value) {
+    itemMatchComputing(value) {
       if (value) {
         this.activateNotification({
-          notification: "batchComputeProgress",
+          notification: "itemComputeProgress",
         });
       } else {
-        if (this.notificationActive === "batchComputeProgress") {
+        if (this.notificationActive === "itemComputeProgress") {
           this.close();
         }
       }

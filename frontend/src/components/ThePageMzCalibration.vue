@@ -172,6 +172,8 @@ export default {
         let peakTofs = newRows.map((row) => row.sample_peak_tof);
         let peakMzs = newRows.map((row) => row.sample_peak_mz);
         let exactMzs = newRows.map((row) => row.mz);
+        // TODO_calibration
+        // TODO_replace sio
         await this.$api.emit("calibration_mz_fit", peakTofs, peakMzs, exactMzs);
       }
     },

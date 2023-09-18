@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from ..controllers.matches_controller import (
     get_match_by_id,
     get_matches,
+    delete_matches,
 )
 
 matches_router = APIRouter()
@@ -25,3 +26,9 @@ async def get_matches_route(
 @matches_router.get("/api/matches/{match_id}")
 async def get_match_by_id_route(match_id: str):
     return await get_match_by_id(match_id)
+
+
+@matches_router.delete("/api/matches/{sample_item_id}")
+async def delete_matches_route(sample_item_id: str):
+    await delete_matches(sample_item_id)
+    return {"status": "Matches successfully deleted"}

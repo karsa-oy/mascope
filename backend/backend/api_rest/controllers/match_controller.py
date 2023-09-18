@@ -2,7 +2,7 @@ import asyncio
 import numpy as np
 import pandas as pd
 from typing import List
-from sqlalchemy import select, and_, delete
+from sqlalchemy import select, and_
 from sqlalchemy.orm import joinedload
 from backend.db_api_rest import async_session
 from backend.server import sio
@@ -13,18 +13,22 @@ from backend.db.id import gen_id
 from backend.api_rest.models.models import (
     SampleBatch,
     SampleItem,
-    MatchInterference,
-    Match,
     TargetCollection,
     TargetCompoundInTargetCollection,
     TargetIon,
     TargetIsotope,
 )
-from ..models.pydantic_models.sample_batch_pydantic_model import (
-    SampleBatchComputeMatch,
+from ..models.pydantic_models.match_pydantic_model import (
+    MatchComputeBatch,
+    MatchComputeItem,
     ProgressProperties,
 )
 from .sample_items_controller import get_sample_items
+from .matches_controller import create_matches, delete_matches
+from .match_interferences_controller import (
+    create_match_interferences,
+    delete_match_interferences,
+)
 
 
 async def compute_matches(
@@ -279,33 +283,48 @@ async def emit_progress_update(
     if not progress_properties:
         return
 
-    item_weight = progress_properties.item_weight
-    item_index = progress_properties.item_index
-    batch_index = progress_properties.batch_index
-    total_batches = progress_properties.total_batches
-    workspace_id = progress_properties.workspace_id
+    if progress_properties.match_compute_type == "batches":
+        item_weight = progress_properties.item_weight
+        item_index = progress_properties.item_index
+        batch_index = progress_properties.batch_index
+        total_batches = progress_properties.total_batches
+        workspace_id = progress_properties.workspace_id
 
-    # Calculate the progress contribution of completed batches
-    batch_progress = ((batch_index - 1) / total_batches) * 100
+        # Calculate the progress contribution of completed batches
+        batch_progress = ((batch_index - 1) / total_batches) * 100
 
-    # Calculate the progress within the current batch
-    item_progress = ((item_index + increment) * item_weight) * 100
+        # Calculate the progress within the current batch
+        item_progress = ((item_index + increment) * item_weight) * 100
 
-    # Calculate the proportional progress of the current batch in terms of the overall progress
-    proportional_batch_progress = item_progress * (1 / total_batches)
+        # Calculate the proportional progress of the current batch in terms of the overall progress
+        proportional_batch_progress = item_progress * (1 / total_batches)
 
-    # Combine both progresses
-    progress_percentage_all = batch_progress + proportional_batch_progress
+        # Combine both progresses
+        progress_percentage_all = batch_progress + proportional_batch_progress
 
-    await sio.emit(
-        "match_batch_compute_progress_percentage",
-        {
-            "progress_percentage": progress_percentage_all,
-            "progress_percentage_batch": proportional_batch_progress * total_batches,
-        },
-        room=workspace_id,
-        namespace="/",
-    )
+        await sio.emit(
+            "match_batch_compute_progress_percentage",
+            {
+                "progress_percentage": progress_percentage_all,
+                "progress_percentage_batch": proportional_batch_progress
+                * total_batches,
+            },
+            room=workspace_id,
+            namespace="/",
+        )
+
+    elif progress_properties.match_compute_type == "item":
+        sample_batch_id = progress_properties.sample_batch_id
+
+        progress_percentage_item = increment * 100
+        await sio.emit(
+            "match_item_update_compute_progress",
+            {
+                "progress_percentage": progress_percentage_item,
+            },
+            room=sample_batch_id,
+            namespace="/",
+        )
 
 
 async def item_compute(sample_item, progress_properties: ProgressProperties = None):
@@ -347,93 +366,25 @@ async def item_compute(sample_item, progress_properties: ProgressProperties = No
     await emit_progress_update(progress_properties=progress_properties, increment=0.75)
 
     # Step 3: Check for existing interferences and save them to database
-    async with async_session() as session:
-        # Extract the required target_isotope_id values
-        target_isotope_refs = match_interference_df["target_isotope_id"].tolist()
+    if len(match_interference_df) == 0:
+        print("No match interferences found")
+        return sample_item
 
-        # Select interferences that match the criteria
-        stmt = select(MatchInterference.match_interference_id).where(
-            and_(
-                MatchInterference.sample_item_id == sample_item_id,
-                MatchInterference.target_isotope_id.in_(target_isotope_refs),
-            )
-        )
-
-        result = await session.execute(stmt)
-
-        match_interferences = result.all()
-
-        if match_interferences:
-            raise RuntimeError("Match interferences exist! Not going to overwrite")
-
-        # Prepare the data for insertion
-        match_interference_for_insertion = [
-            MatchInterference(
-                **{
-                    key: value
-                    for key, value in record.items()
-                    if key in MatchInterference.__table__.columns
-                },
-                sample_item_id=sample_item_id,
-            )
-            for record in match_interference_df.to_dict(orient="records")
-        ]
-
-        # Insert the data
-        session.add_all(match_interference_for_insertion)
-
-        # Commit the transaction to save the data
-        await session.commit()
+    await create_match_interferences(match_interference_df, sample_item_id)
 
     # Step 4: Check for existing matches and save them
     if len(match_isotope_df) == 0:
         print("No matches found")
         return sample_item
 
-    async with async_session() as session:
-        # Extract the required target_isotope_id values
-        target_isotope_refs = match_isotope_df["target_isotope_id"].tolist()
-
-        # Select matches that match the criteria
-        stmt = select(Match.match_id).where(
-            and_(
-                Match.sample_item_id == sample_item_id,
-                Match.target_isotope_id.in_(target_isotope_refs),
-            )
-        )
-
-        result = await session.execute(stmt)
-
-        matches = result.all()
-
-        if matches:
-            raise RuntimeError("Matches exist! Not going to overwrite")
-
-        # Prepare the data for insertion
-        match_isotope_for_insertion = [
-            Match(
-                **{
-                    key: value
-                    for key, value in record.items()
-                    if key in Match.__table__.columns
-                },
-                sample_item_id=sample_item_id,
-            )
-            for record in match_isotope_df.to_dict(orient="records")
-        ]
-
-        # Insert the data
-        session.add_all(match_isotope_for_insertion)
-
-        # Commit the transaction to save the data
-        await session.commit()
+    await create_matches(match_isotope_df, sample_item_id)
 
     await emit_progress_update(progress_properties=progress_properties, increment=1)
 
     return sample_item
 
 
-async def match_batch_remove(sample_batch_id):
+async def match_batch_remove(sample_batch_id, skipReload: bool = False):
     async with async_session() as session:
         # Get sample items related to the given sample batch
         sample_items = await session.execute(
@@ -443,19 +394,12 @@ async def match_batch_remove(sample_batch_id):
         )
         sample_item_ids = [sample_item.sample_item_id for sample_item in sample_items]
 
-        # Delete records from match table
-        await session.execute(
-            delete(Match).where(Match.sample_item_id.in_(sample_item_ids))
-        )
+        for sample_item_id in sample_item_ids:
+            await delete_matches(sample_item_id)
+            await delete_match_interferences(sample_item_id)
 
-        # Delete records from match_interference table
-        await session.execute(
-            delete(MatchInterference).where(
-                MatchInterference.sample_item_id.in_(sample_item_ids)
-            )
-        )
-
-        await session.commit()
+        if not skipReload:
+            await sio.emit("sample_batch_reload", room=sample_batch_id, namespace="/")
 
 
 async def match_batch_compute(
@@ -464,7 +408,7 @@ async def match_batch_compute(
     print(f"...Computing matches of batch: {sample_batch_id} ...")
 
     # clear previous matches
-    await match_batch_remove(sample_batch_id)
+    await match_batch_remove(sample_batch_id, True)
 
     async with async_session() as session:
         # Fetch item ids
@@ -480,6 +424,7 @@ async def match_batch_compute(
                 f"...Computing matches of sample item: {sample_item.sample_item_id} ..."
             )
             progress_properties = ProgressProperties(
+                match_compute_type="batches",
                 item_weight=progress_properties.item_weight,
                 item_index=item_index,
                 batch_index=progress_properties.batch_index,
@@ -495,7 +440,7 @@ async def match_batch_compute(
     await sio.emit("sample_batch_reload", room=sample_batch_id, namespace="/")
 
 
-async def match_compute_batches(sample_batches: List[SampleBatchComputeMatch]):
+async def match_batches_compute(sample_batches: List[MatchComputeBatch]):
     total_batches = len(sample_batches)
     total_number_of_items = 0
     items_per_batch = []
@@ -559,29 +504,12 @@ async def match_compute_batches(sample_batches: List[SampleBatchComputeMatch]):
         )
 
         # Create computing matches task for the batch
-
-        # match_batch_compute fromt the match.py
-
-        # task = asyncio.create_task(
-        #     match_batch_compute(
-        #         None,
-        #         sample_batch.sample_batch_id,
-        #         progress_properties=progress_properties,
-        #     )
-        # )
-
         task = asyncio.create_task(
             match_batch_compute(
                 sample_batch.sample_batch_id, progress_properties=progress_properties
             )
         )
         await task
-
-        # background_tasks.add_task(
-        #     match_batch_compute,
-        #     sample_batch.sample_batch_id,
-        #     progress_properties=progress_properties,
-        # )
 
     # Step 4: Notify workspace clients that batch processing has finished
     for workspace_id in workspace_ids:
@@ -593,3 +521,110 @@ async def match_compute_batches(sample_batches: List[SampleBatchComputeMatch]):
         )
 
     return {"status": f"Match computation for {total_batches} batches"}
+
+
+async def match_item_compute(sample_item: MatchComputeItem):
+    sample_item_id = sample_item.sample_item_id
+    sample_item_name = sample_item.sample_item_name
+    sample_batch_id = sample_item.sample_batch_id
+    filename = sample_item.filename
+    instrument = sample_item.instrument
+
+    print(f"...Computing matches for sample {sample_item_name}: {sample_item_id} ...")
+
+    # clear previous matches
+    await match_item_remove(sample_item_id, True)
+
+    try:
+        # notification for the batch users
+        await sio.emit(
+            "match_item_update_compute_started",
+            {
+                "sample_item_name": sample_item_name,
+            },
+            room=sample_batch_id,
+            namespace="/",
+        )
+
+        # notification for the instrument users
+        await sio.emit(
+            "match_item_compute_started",
+            {
+                "filename": filename,
+                "progress": 0,
+            },
+            room=instrument,
+            namespace="/",
+        )
+        await sio.emit(
+            "match_item_compute_progress", {}, room=instrument, namespace="/"
+        )
+
+        progress_properties = ProgressProperties(
+            match_compute_type="item",
+            sample_batch_id=sample_batch_id,
+        )
+
+        await item_compute(sample_item, progress_properties)
+
+        # notification for the batch users
+        await sio.emit(
+            "match_item_update_compute_finished",
+            {
+                "sample_item_name": sample_item_name,
+            },
+            room=sample_item_id,
+            namespace="/",
+        )
+
+        # notification for the instrument users
+        await sio.emit(
+            "match_item_compute_finished",
+            {
+                "filename": filename,
+                "progress": 100,
+            },
+            room=instrument,
+            namespace="/",
+        )
+
+        await sio.emit("sample_batch_reload", room=sample_item_id, namespace="/")
+    except Exception as e:
+        print(f"match_item_compute failed: {e}")
+
+        # notification for the instrument users
+        await sio.emit(
+            "match_item_compute_failed",
+            {
+                "filename": filename,
+                "progress": 100,
+            },
+            room=instrument,
+            namespace="/",
+        )
+
+        # notification for the batch users
+        await sio.emit(
+            "match_item_update_compute_failed",
+            {
+                "sample_item_name": sample_item_name,
+                "errorMessage": str(e),
+            },
+            room=sample_item_id,
+            namespace="/",
+        )
+
+
+async def match_item_remove(sample_item_id, skipReload: bool = False):
+    await delete_matches(sample_item_id)
+    await delete_match_interferences(sample_item_id)
+
+    if not skipReload:
+        async with async_session() as session:
+            result = await session.execute(
+                select(SampleItem.sample_batch_id).where(
+                    SampleItem.sample_item_id == sample_item_id
+                )
+            )
+            sample_batch_id = result.scalar_one()
+        await sio.emit("sample_batch_reload", room=sample_batch_id, namespace="/")

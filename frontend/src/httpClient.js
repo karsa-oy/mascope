@@ -50,8 +50,8 @@ const samplesBaseUrl = "/samples";
 const filesBaseUrl = "/sample_files";
 const itemsBaseUrl = "/sample_items";
 const calibrationBaseUrl = "/calibration";
+const matchBaseUrl = "/match";
 const matchesBaseUrl = "/matches";
-const matchComputeBaseUrl = "/match_compute";
 const targetCollectionsBaseUrl = "/target_collections";
 const targetCollectionsInSampleBatchBaseUrl =
   "/target_collections_in_sample_batch";
@@ -377,15 +377,33 @@ export function createHttpClient(host, api_port) {
       }
     },
 
-    // Match compute
-    matchComputeBatches: async (sample_batches) => {
+    // Match
+    matchBatchesCompute: async (sample_batches) => {
       try {
         return await httpClient.post(
-          `${matchComputeBaseUrl}/batches`,
+          `${matchBaseUrl}/batches/compute`,
           sample_batches
         );
       } catch (error) {
         console.error("Failed to compute batch matches: ", error);
+      }
+    },
+
+    matchItemCompute: async (sample) => {
+      try {
+        return await httpClient.post(`${matchBaseUrl}/item/compute`, sample);
+      } catch (error) {
+        console.error("Failed to compute sample match: ", error);
+      }
+    },
+
+    matchItemRemove: async (sample_item_id) => {
+      try {
+        return await httpClient.delete(
+          `${matchBaseUrl}/item/remove/${sample_item_id}`
+        );
+      } catch (error) {
+        console.error("Failed to remove sample match: ", error);
       }
     },
 

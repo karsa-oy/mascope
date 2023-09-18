@@ -1,6 +1,5 @@
 import pandas as pd
 from datetime import datetime
-from collections import defaultdict
 from fastapi import HTTPException
 from sqlalchemy import (
     asc,

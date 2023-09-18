@@ -8,14 +8,17 @@ from backend.server import sio
 from backend.db.id import gen_id
 
 # TODO_calibration delete after refactoringm calibration, circular import error
+# TODO_match
 from backend.api.match import match_batch_compute
 from ..models.models import SampleBatch, TargetCollectionInSampleBatch
 from ..models.pydantic_models.sample_batch_pydantic_model import (
     SampleBatchCreate,
     SampleBatchUpdate,
-    SampleBatchComputeMatch,
 )
-from ..controllers.match_compute_controller import match_compute_batches
+from ..models.pydantic_models.match_pydantic_model import (
+    MatchComputeBatch,
+)
+from .match_controller import match_batches_compute
 
 
 async def get_sample_batches(
@@ -170,12 +173,8 @@ async def update_sample_batch(
     # Inform clients about the update
     if rematch:
         background_tasks.add_task(
-            match_compute_batches,
-            [
-                SampleBatchComputeMatch(
-                    sample_batch_id=existing_sample_batch.sample_batch_id
-                )
-            ],
+            match_batches_compute,
+            [MatchComputeBatch(sample_batch_id=existing_sample_batch.sample_batch_id)],
         )
     else:
         await sio.emit(

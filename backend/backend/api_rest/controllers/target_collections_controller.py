@@ -1,5 +1,3 @@
-import asyncio
-
 from backend.server import sio
 from backend.db.id import gen_id
 
@@ -9,7 +7,6 @@ from sqlalchemy.orm import joinedload
 
 from backend.db_api_rest import async_session
 
-# from backend.api.match import match_batch_compute
 from .target_compounds_controller import delete_target_compound, create_target_compound
 from .target_compound_in_target_collection_controller import (
     create_target_compound_in_target_collection,
@@ -18,7 +15,7 @@ from .target_compound_in_target_collection_controller import (
 from ..controllers.target_collection_in_sample_batch_controller import (
     create_target_collection_in_sample_batch,
 )
-from ..controllers.match_compute_controller import match_compute_batches
+from .match_controller import match_batches_compute
 from ..models.models import (
     SampleBatch,
     TargetCollection,
@@ -35,8 +32,8 @@ from ..models.pydantic_models.target_compound_in_target_collection_pydantic_mode
 from ..models.pydantic_models.target_collection_in_sample_batch_pydantic_model import (
     TargetCollectionInSampleBatchBase,
 )
-from ..models.pydantic_models.sample_batch_pydantic_model import (
-    SampleBatchComputeMatch,
+from ..models.pydantic_models.match_pydantic_model import (
+    MatchComputeBatch,
 )
 
 
@@ -228,9 +225,13 @@ async def create_target_collection(
         await session.commit()
 
         # Run rematch for all sample batches in the list
-        # TODO_match
         if sample_batches_to_rematch:
-            background_tasks.add_task(match_compute_batches, sample_batches_to_rematch)
+            sample_batches = [
+                MatchComputeBatch(sample_batch_id=sample_batch.sample_batch_id)
+                for sample_batch in sample_batches_to_rematch
+            ]
+
+            background_tasks.add_task(match_batches_compute, sample_batches)
 
         await sio.emit(
             "targets_all_reload",
@@ -316,14 +317,13 @@ async def delete_target_collection(
         await session.commit()
 
         # Run rematch for all sample batches in the list
-        # TODO_match
         if sample_batches_to_rematch:
             sample_batches = [
-                SampleBatchComputeMatch(sample_batch_id=sb[0], workspace_id=sb[1])
+                MatchComputeBatch(sample_batch_id=sb[0], workspace_id=sb[1])
                 for sb in sample_batches_to_rematch
             ]
 
-            background_tasks.add_task(match_compute_batches, sample_batches)
+            background_tasks.add_task(match_batches_compute, sample_batches)
 
             for workspace_id in workspaces_to_reload:
                 await sio.emit("targets_all_reload", room=workspace_id, namespace="/")

@@ -1,4 +1,3 @@
-import asyncio
 from fastapi import BackgroundTasks
 from sqlalchemy import asc, desc, func, and_
 from sqlalchemy.future import select
@@ -6,13 +5,13 @@ from typing import List
 
 from backend.db_api_rest import async_session
 from backend.server import sio
-from ..controllers.match_compute_controller import match_compute_batches
+from .match_controller import match_batches_compute
 from ..models.models import TargetCollectionInSampleBatch, SampleBatch, TargetCollection
 from ..models.pydantic_models.target_collection_in_sample_batch_pydantic_model import (
     TargetCollectionInSampleBatchBase,
 )
-from ..models.pydantic_models.sample_batch_pydantic_model import (
-    SampleBatchComputeMatch,
+from ..models.pydantic_models.match_pydantic_model import (
+    MatchComputeBatch,
 )
 
 
@@ -171,17 +170,16 @@ async def create_target_collection_in_sample_batch(
             "targets_all_reload",
             namespace="/",
         )
-        # TODO_match
         if not skipRematch and sample_batches_to_rematch:
             sample_batches = [
-                SampleBatchComputeMatch(sample_batch_id=sample_batch_id)
+                MatchComputeBatch(sample_batch_id=sample_batch_id)
                 for sample_batch_id in sample_batches_to_rematch
             ]
             # Create a background task
             if background_tasks:
-                background_tasks.add_task(match_compute_batches, sample_batches)
+                background_tasks.add_task(match_batches_compute, sample_batches)
         elif skipRematch:
-            # Reload the sample batches if match_compute_batches is skipped
+            # Reload the sample batches if match_batches_compute is skipped
             for sample_batch_id in sample_batches_to_rematch:
                 await sio.emit(
                     "sample_batch_reload",
@@ -272,17 +270,15 @@ async def delete_target_collections_in_sample_batch(
 
     await session.commit()
 
-    # TODO_match
     if not skipRematch and sample_batches_to_rematch:
         sample_batches = [
-            SampleBatchComputeMatch(sample_batch_id=id)
-            for id in sample_batches_to_rematch
+            MatchComputeBatch(sample_batch_id=id) for id in sample_batches_to_rematch
         ]
         # Create a background task
         if background_tasks:
-            background_tasks.add_task(match_compute_batches, sample_batches)
+            background_tasks.add_task(match_batches_compute, sample_batches)
     elif skipRematch:
-        # Reload the sample batches if match_compute_batches is skipped
+        # Reload the sample batches if match_batches_compute is skipped
         for sample_batch_id in sample_batches_to_rematch:
             await sio.emit(
                 "sample_batch_reload",

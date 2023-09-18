@@ -1,6 +1,5 @@
 from fastapi import HTTPException
-from sqlalchemy import asc, desc, func
-from sqlalchemy.future import select
+from sqlalchemy import asc, desc, func, select, delete, and_
 
 from backend.db_api_rest import async_session
 from ..models.models import Match
@@ -57,3 +56,52 @@ async def get_match_by_id(match_id: str):
             )
 
         return match.to_dict()
+
+
+async def delete_matches(sample_item_id: str):
+    async with async_session() as session:
+        await session.execute(
+            delete(Match).where(Match.sample_item_id == sample_item_id)
+        )
+        await session.commit()
+
+
+async def create_matches(match_isotope_df, sample_item_id):
+    print("Saving matches to database")
+    # Check for existing matches and save them
+    async with async_session() as session:
+        # Extract the required target_isotope_id values
+        target_isotope_refs = match_isotope_df["target_isotope_id"].tolist()
+
+        # Select matches that match the criteria
+        stmt = select(Match.match_id).where(
+            and_(
+                Match.sample_item_id == sample_item_id,
+                Match.target_isotope_id.in_(target_isotope_refs),
+            )
+        )
+
+        result = await session.execute(stmt)
+        matches = result.all()
+
+        if matches:
+            raise RuntimeError("Matches exist! Not going to overwrite")
+
+        # Prepare the data for insertion
+        match_isotope_for_insertion = [
+            Match(
+                **{
+                    key: value
+                    for key, value in record.items()
+                    if key in Match.__table__.columns
+                },
+                sample_item_id=sample_item_id,
+            )
+            for record in match_isotope_df.to_dict(orient="records")
+        ]
+
+        # Insert the data
+        session.add_all(match_isotope_for_insertion)
+
+        # Commit the transaction to save the data
+        await session.commit()

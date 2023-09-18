@@ -125,6 +125,12 @@ export default {
         collection.selection = selectionValue;
       }
     },
+
+    async matchItemCompute({ rootState }, sample) {
+      await rootState.api.httpClient.matchItemCompute(sample);
+    },
+
+    // backend notifications
     async onSampleBatchExportPeaksFailed({ dispatch }, error) {
       await dispatch(
         "app/pushNotification",

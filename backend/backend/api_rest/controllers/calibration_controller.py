@@ -1,18 +1,21 @@
-from backend.db_api_rest import async_session
-from backend.api.match import item_remove as match_item_remove
-from backend.api.signal import signal_mz_calibration_update
+import pandas as pd
+from typing import List
 
+from backend.db_api_rest import async_session
+from backend.api.signal import signal_mz_calibration_update
 from backend.socket_events import sio
+
 from sqlalchemy import func, and_
 from sqlalchemy.future import select
 
-from backend.api_rest.controllers.sample_files_controller import update_sample_file
-from backend.api_rest.controllers.sample_files_controller import get_sample_files
-from backend.api_rest.controllers.sample_items_controller import get_sample_items
+from .match_controller import match_item_remove
+from .sample_files_controller import (
+    update_sample_file,
+    get_sample_files,
+)
+from .sample_items_controller import get_sample_items
 
-import pandas as pd
 
-from typing import List
 from ..models.pydantic_models.sample_file_pydantic_model import (
     SampleFileUpdate,
 )
@@ -46,8 +49,9 @@ async def calibration_mz_apply(fit: dict, sample_filenames: List[str]):
         sample_item_ids = [item["sample_item_id"] for item in sample_items["data"]]
 
         for sample_item_id in sample_item_ids:
+            # FAQ_match removes mathces in all samples assosiated with filename
             # Delete outdated matches
-            match_item_remove(sample_item_id)
+            await match_item_remove(sample_item_id)
 
             await sio.emit(
                 "calibration_mz_applied",

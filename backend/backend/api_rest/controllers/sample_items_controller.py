@@ -3,7 +3,6 @@ from sqlalchemy import asc, desc, func
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
 from datetime import datetime
-import json
 
 from backend.server import sio
 from backend.db_api_rest import async_session

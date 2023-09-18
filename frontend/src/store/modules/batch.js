@@ -245,16 +245,15 @@ export default {
       await dispatch("reload");
     },
 
-    // backend event emitters
     async reloadBatchInfo({ rootState }, sample_batch_id) {
       await rootState.api.httpClient.reloadBatch(sample_batch_id);
     },
-    async matchComputeBatches({ rootState }, sample_batches) {
+    async matchBatchesCompute({ rootState }, sample_batches) {
       const formattedBatches = sample_batches.map((batch) => ({
         sample_batch_id: batch.sample_batch_id,
         workspace_id: batch.workspace_id,
       }));
-      await rootState.api.httpClient.matchComputeBatches(formattedBatches);
+      await rootState.api.httpClient.matchBatchesCompute(formattedBatches);
     },
 
     // selection
