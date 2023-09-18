@@ -1,5 +1,3 @@
-import asyncio
-
 from backend.server import sio
 from backend.db.id import gen_id
 

@@ -49,7 +49,7 @@ async def calibration_mz_apply(fit: dict, sample_filenames: List[str]):
         sample_item_ids = [item["sample_item_id"] for item in sample_items["data"]]
 
         for sample_item_id in sample_item_ids:
-            # TODO_match removes mathces in all samples assosiated with filename
+            # FAQ_match removes mathces in all samples assosiated with filename
             # Delete outdated matches
             await match_item_remove(sample_item_id)
 
