@@ -358,7 +358,7 @@ import ThePaneBrowserTarget from "./ThePaneBrowserTarget.vue";
 import ThePaneSettingsCalibration from "./ThePaneSettingsCalibration.vue";
 
 import * as _ from "underscore";
-import { mapMutations } from "vuex";
+import { mapActions, mapMutations } from "vuex";
 import { call, get, sync } from "vuex-pathify";
 import { genId } from "../lib/util";
 
@@ -488,6 +488,7 @@ export default {
       sampleUnload: "sample/unload",
     }),
     ...mapMutations({}),
+    ...mapActions("sample", ["matchItemCompute"]),
     clone(obj) {
       return JSON.parse(JSON.stringify(obj));
     },
@@ -519,7 +520,6 @@ export default {
       this.mzCalibrationReset();
       // TODO_calibration
       // TODO_replace sio
-
       this.$api.emit(
         "calibration_mz_fit",
         this.sampleActive.sample_item_id,
