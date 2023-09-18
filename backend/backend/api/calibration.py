@@ -6,7 +6,7 @@ from hardware.tofwerk.calibration import mz_calibrate
 
 import importlib
 
-from backend.api.signal import calculate_tic, signal_mz_calibration_update
+from backend.lib.signal import calculate_tic, signal_mz_calibration_update
 from backend.db.conn import conn
 from backend.server import sio
 

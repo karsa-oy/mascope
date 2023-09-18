@@ -2,7 +2,7 @@ import pandas as pd
 from typing import List
 
 from backend.db_api_rest import async_session
-from backend.api.signal import signal_mz_calibration_update
+from backend.lib.signal import signal_mz_calibration_update
 from backend.socket_events import sio
 
 from sqlalchemy import func, and_
