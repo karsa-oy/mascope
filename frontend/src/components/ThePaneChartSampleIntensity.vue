@@ -13,7 +13,7 @@
     <div class="column is-11">
       <base-chart-plotly
         id="ChartSampleIntensity"
-        :title="this.batchActive.sample_batch_name"
+        :title="this.batchActive ? this.batchActive.sample_batch_name : ''"
         :data="data"
         :layout="layout"
         @click="onClick"
@@ -83,19 +83,20 @@ export default {
                 ["intensity", compoundMatch.sample_peak_area_sum],
               ])
             )[0];
-          if (!sampleItemCompoundStats) continue;
-          let sampleItemCompoundMatchScore =
-            sampleItemCompoundStats.match_score;
-          let sampleItemCompoundIntensity = sampleItemCompoundStats.intensity;
+          if (sampleItemCompoundStats) {
+            y.push(
+              sampleItemCompoundStats.match_score >=
+                this.paramPossibleMatchThreshold
+                ? sampleItemCompoundStats.intensity
+                : null
+            );
+          } else {
+            y.push(null);
+          }
 
-          y.push(
-            sampleItemCompoundMatchScore >= this.paramPossibleMatchThreshold
-              ? sampleItemCompoundIntensity
-              : null
-          );
           compoundMaxMatchScore = Math.max(
-            compoundMaxMatchScore,
-            sampleItemCompoundMatchScore
+            sampleItemCompoundStats ? sampleItemCompoundStats.match_score : 0,
+            compoundMaxMatchScore
           );
         }
         if (y.every((intensity) => intensity === null)) continue;
