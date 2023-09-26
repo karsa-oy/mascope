@@ -16,6 +16,7 @@ load_dotenv()
 
 async def export_peaks(sample_batch_df, sample_item_df):
     peak_data = []
+    [sample_batch_name] = sample_batch_df["sample_batch_name"].tolist()
     for index, row in sample_item_df.iterrows():
         try:
             sample_file = await detect_peaks(
@@ -28,8 +29,10 @@ async def export_peaks(sample_batch_df, sample_item_df):
         peak_data.extend(
             [
                 (
+                    sample_batch_name,
                     row["sample_item_name"],
                     row["sample_item_type"],
+                    row["filter_id"],
                     row["filename"],
                     peak.mz.item(),
                     peak.item(),
@@ -38,11 +41,20 @@ async def export_peaks(sample_batch_df, sample_item_df):
             ]
         )
     batch_peak_df = pd.DataFrame.from_records(
-        peak_data, columns=("sample name", "sample type", "filename", "mz", "intensity")
+        peak_data,
+        columns=(
+            "batch name",
+            "sample name",
+            "sample type",
+            "filter id",
+            "filename",
+            "mz",
+            "intensity",
+        ),
     )
 
     dt_str = datetime.now().isoformat().replace("-", "").replace(":", "").split(".")[0]
-    [sample_batch_name] = sample_batch_df["sample_batch_name"].tolist()
+
     peakfile_path = os.environ.get("MASCOPE_PRIVATE_DATADIR", ".")
     peakfile_filename = (
         dt_str + "_peaks_" + sample_batch_name.replace(" ", "_") + ".parquet"
@@ -74,7 +86,8 @@ async def sample_batch_export_peaks(sid, sample_batch_id):
             SELECT
                 filename,
                 sample_item_name,
-                sample_item_type
+                sample_item_type,
+                filter_id
             FROM sample_item
             WHERE sample_batch_id == ?
             """,
