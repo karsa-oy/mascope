@@ -5,13 +5,9 @@ import pandas as pd
 from colorcet import glasbey_hv as colormap
 
 from backend.db.conn import conn
-from backend.lib.file import load_coord, load_file
+from backend.lib.file import load_file
 from backend.lib.peak import filter_peaks, get_peaks
-from backend.lib.struct import LRUDict
 from backend.server import sio
-
-# Cache for data arrays
-cache = LRUDict(10)
 
 
 @sio.event(namespace="/")
@@ -49,19 +45,15 @@ async def visualization_ion_focus(
         mzs = target_ion_df["mz"].tolist()
         rel_abus = target_ion_df["relative_abundance"].tolist()
 
-    # Check if file is cached
-    cache_item = cache.get(filename, None)
-    if not cache_item:
-        # File not in cache, load
-        print("Loading file: %s" % filename)
-        cache_item = load_file(filename, vars=["signal", "peak_heights"])
-        cache[filename] = cache_item
+    # Load file
+    print("Loading file: %s" % filename)
+    sample_file = load_file(filename, vars=["signal", "peak_heights"])
 
     if t_range is None or t_range == [None, None]:
         # Full time range
-        t_range = [0, cache_item.props["length"]]
+        t_range = [0, sample_file.props["length"]]
 
-    cache_item_slice = cache_item.sel(time=slice(*t_range))
+    sample_file_slice = sample_file.sel(time=slice(*t_range))
     main_isotope_i = 0
     main_isotope_height = 0
     sum_timeseries = None
@@ -73,7 +65,7 @@ async def visualization_ion_focus(
         mz_range = (mz - dmz, mz + dmz)
         rel_abu = rel_abus[i]
 
-        isotope_slice = cache_item_slice.sel(mz=slice(*mz_range)).compute()
+        isotope_slice = sample_file_slice.sel(mz=slice(*mz_range)).compute()
         isotope_sum_spectrum = isotope_slice.sum(dim="time").compute()
         isotope_height = isotope_sum_spectrum.signal.sel(mz=mz, method="nearest")
         # Sum spectrum traces
@@ -179,12 +171,3 @@ async def visualization_ion_focus(
         },
     ]
     await sio.emit("visualization_signal_timeseries", timeseries_traces, room=sid)
-
-
-@sio.event(namespace="/")
-async def dataset_coord_updated(sid, filename, var, coord):
-    global cache
-    cache_item = cache.get(filename)
-    if cache_item:
-        new_coord = load_coord(filename, var, coord)
-        cache_item[coord] = new_coord

@@ -11,11 +11,8 @@ import xarray
 import zarr
 
 from backend.lib.logging import this_func_name
-from backend.lib.struct import ExtendableDataArray, LRUDict
+from backend.lib.struct import ExtendableDataArray
 from backend.lib.util import parse_path_from_item_filename
-
-# Cache for data arrays
-cache = LRUDict(10)
 
 
 class zarr_sdk:
