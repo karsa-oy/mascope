@@ -54,7 +54,7 @@
 </template>
 
 <script>
-import { mapMutations } from "vuex";
+import { mapMutations, mapActions } from "vuex";
 import { get, sync } from "vuex-pathify";
 import { parseAutosamplerCsv } from "../lib/util";
 
@@ -129,6 +129,7 @@ export default {
     // },
   },
   methods: {
+    ...mapActions("batch", ["autoSamplerImportBatch"]),
     ...mapMutations({
       deactivateModal: "modal/deactivate",
     }),
@@ -159,8 +160,11 @@ export default {
         newSampleItem.sample_item_attributes = attributes;
         items.push(newSampleItem);
       }
-      // TODO_replace sio
-      this.$api.emit("scenthound_process_samples", items);
+      const data = {
+        sample_batch: this.batchActive,
+        sample_items: items,
+      };
+      this.autoSamplerImportBatch(data);
     },
   },
   watch: {

@@ -15,10 +15,16 @@ from ..models.pydantic_models.sample_batch_pydantic_model import (
     SampleBatchCreate,
     SampleBatchUpdate,
 )
+from ..models.pydantic_models.sample_item_pydantic_model import (
+    SampleItemCreate,
+)
+from ..models.pydantic_models.calibration_pydantic_model import CalibrationMzFitParams
 from ..models.pydantic_models.match_pydantic_model import (
     MatchComputeBatch,
 )
 from .match_controller import match_batches_compute
+from .sample_items_controller import create_sample_item
+from .calibration_controller import calibration_mz_calibrate_batch
 
 
 async def get_sample_batches(
@@ -194,3 +200,60 @@ async def reload_sample_batch(sample_batch_id: str):
     )
 
     return {"status": "success", "message": "Sample batch reloaded successfully"}
+
+
+async def autosampler_import_batch(
+    sample_batch, sample_items, params: CalibrationMzFitParams, background_tasks
+):
+    created_sample_items = []
+
+    for sample_item in sample_items:
+        sample_item_model = SampleItemCreate(**sample_item)
+        created_item = await create_sample_item(sample_item_model, skipReload=True)
+        created_sample_items.append(created_item.to_dict())
+
+    background_tasks.add_task(
+        process_batch,
+        sample_batch,
+        created_sample_items,
+        params,
+    )
+
+
+async def process_batch(sample_batch, sample_items, params):
+    sample_batch_id = sample_batch.get("sample_batch_id")
+
+    # Step 1. Calibrate batch
+    try:
+        calibration_results = await calibration_mz_calibrate_batch(
+            sample_batch, sample_items, params
+        )
+    except Exception as e:
+        print("Failed to calibrate batch %s" % sample_batch["sample_batch_name"])
+        print(e)
+
+    # Step 2. Compute matches for the batch
+    try:
+        await match_batches_compute(
+            [MatchComputeBatch(sample_batch_id=sample_batch_id)]
+        )
+    except Exception as e:
+        print(
+            "Failed to compute matched for batch %s" % sample_batch["sample_batch_name"]
+        )
+        print(e)
+
+    # Step 3. Send the warning notification if calibration was failed and information about samples
+    failed_samples = [
+        sample
+        for sample in calibration_results
+        if sample["status"] == "calibration failed"
+    ]
+    if failed_samples:
+        await sio.emit(
+            "calibration_mz_calibrate_batch_failed",
+            {"type": "failed_calibration_samples", "samples": failed_samples},
+            room=sample_batch["sample_batch_id"],
+            namespace="/",
+        )
+    return
