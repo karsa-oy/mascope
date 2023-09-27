@@ -164,12 +164,12 @@ export default {
       const batchToLoad = batch ? batch : state.active;
       if (batchToLoad) {
         const batchToLoadId = batchToLoad.sample_batch_id;
-        const activeSample = rootState.sample.active;
+        const activeSampleId = rootState.sample.active?.sample_item_id || null;
         await dispatch("unload", false);
         const activeBatch = rootGetters["workspace/sampleBatch"](batchToLoadId);
         await dispatch("load", activeBatch);
-        if (activeSample) {
-          const sample = getters["sampleItem"](activeSample.sample_item_id);
+        if (activeSampleId) {
+          const sample = getters["sampleItem"](activeSampleId);
           sample.selection = 3;
           await dispatch("sample/reload", sample, { root: true });
         }
@@ -238,6 +238,11 @@ export default {
       for (const param in filterParams) {
         await commit(`SET_PARAM_${param.toUpperCase()}`, filterParams[param]);
       }
+    },
+
+    // autosampler
+    async autoSamplerImportBatch({ rootState }, data) {
+      await rootState.api.httpClient.autoSamplerImportBatch(data);
     },
 
     // backend notifications

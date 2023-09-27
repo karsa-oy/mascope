@@ -91,10 +91,8 @@ export default {
     async reload({ rootGetters, dispatch, state }, sample = null) {
       const sampleToLoad = sample ? sample : state.active;
       if (sampleToLoad) {
-        const sampleToLoadId = sampleToLoad.sample_item_id;
         await dispatch("unload");
-        const activeSample = rootGetters["batch/sampleItem"](sampleToLoadId);
-        dispatch("load", activeSample);
+        await dispatch("load", sampleToLoad);
       }
     },
     async create({ rootState }, sample) {
