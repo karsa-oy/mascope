@@ -36,7 +36,7 @@ async def create_sample_file_db_record(data):
     mz_calibration = data.get("mz_calibration")
     tic = cache.get(filename)["signal"].sum(dim="time").sum(dim="mz").compute().item()
 
-    sample_file = {
+    sample_file_db_record = {
         "filename": filename,
         "instrument": instrument_name,
         "datetime": date.isoformat(),
@@ -52,7 +52,9 @@ async def create_sample_file_db_record(data):
     url = f"http://{host}:{port}/api/sample_files"
 
     async with aiohttp.ClientSession() as session:
-        async with session.post(url, headers=headers, json=sample_file) as response:
+        async with session.post(
+            url, headers=headers, json=sample_file_db_record
+        ) as response:
             if response.status != 200:
                 print(
                     f"Failed to create database record! Status code: {response.status}"
@@ -77,7 +79,7 @@ async def streamer_processor(streamer):
         filename = data["filename"]
         instrument_name = filename.split("_")[0]
         spec_i = data["i"]
-        cache_item = cache.get(filename)
+        sample_file = cache.get(filename)
         notification_data = {
             "filename": filename,
             "instrument": instrument_name,
@@ -85,13 +87,13 @@ async def streamer_processor(streamer):
         }
         if spec_i is None:
             # File finished
-            zarr_sdk.finalize_signal_dataset({"value": data}, cache_item)
+            zarr_sdk.finalize_signal_dataset({"value": data}, sample_file)
             data.update(
                 {
-                    "committed_length": cache_item.props["committed_length"],
-                    "range": cache_item.props["range"],
-                    "mz_calibration": cache_item.props["mz_calibration"],
-                    "utc_offset": cache_item.props["utc_offset"],
+                    "committed_length": sample_file.props["committed_length"],
+                    "range": sample_file.props["range"],
+                    "mz_calibration": sample_file.props["mz_calibration"],
+                    "utc_offset": sample_file.props["utc_offset"],
                 }
             )
             filepath = data.pop("source_filepath")
@@ -108,15 +110,15 @@ async def streamer_processor(streamer):
         elif spec_i < 0:
             # New file
             try:
-                cache_item = zarr_sdk.init_signal_dataset({"value": data})
+                sample_file = zarr_sdk.init_signal_dataset({"value": data})
             except Exception as e:
                 print(
                     f"Error starting {data['filename']}: {e.__class__.__name__}({str(e)})"
                 )
                 cleanup()
                 return False
-            cache_item = AttrDict(cache_item)
-            cache[filename] = cache_item
+            sample_file = AttrDict(sample_file)
+            cache[filename] = sample_file
             if sio.connected:
                 await sio.emit(
                     "instrument_conversion_started",
@@ -124,7 +126,7 @@ async def streamer_processor(streamer):
                 )
         else:
             # New data to existing file
-            zarr_sdk.update_signal_dataset({"value": data}, cache_item)
+            zarr_sdk.update_signal_dataset({"value": data}, sample_file)
             if sio.connected:
                 await sio.emit(
                     "instrument_conversion_progress",
@@ -135,8 +137,8 @@ async def streamer_processor(streamer):
     async def handle_tps_data(data):
         filename = data["filename"]
         spec_i = data["i"]
-        cache_item = cache.get(filename)
-        if cache_item is None:
+        sample_file = cache.get(filename)
+        if sample_file is None:
             return
         if spec_i is None:
             # File finished
@@ -144,12 +146,12 @@ async def streamer_processor(streamer):
         elif spec_i < 0:
             # New file
             try:
-                zarr_sdk.init_tps_dataset({"value": data}, cache_item)
+                zarr_sdk.init_tps_dataset({"value": data}, sample_file)
             except FileExistsError:
                 return
         else:
             # New data to existing file
-            zarr_sdk.update_tps_dataset({"value": data}, cache_item)
+            zarr_sdk.update_tps_dataset({"value": data}, sample_file)
 
     # Main loop
     while not streamer.shutdown_event.is_set():
