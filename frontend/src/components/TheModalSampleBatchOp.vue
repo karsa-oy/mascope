@@ -280,7 +280,7 @@ export default {
         this.batchDesc = null;
         // set defaults
         [this.calibrationCollectionSelected] = this.targetCollectionsAll.filter(
-          (collection) => collection.target_collection_id === "xkSPp3eZrWXYSVDa"
+          (collection) => collection.target_collection_id === "hlj7HY8Z5coJIjKg"
         );
         this.ionMechanismsSelected = this.ionMechanismsAll.filter(
           (mech) => mech.ionization_mechanism === "+Br-"

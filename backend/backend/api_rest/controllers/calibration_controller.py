@@ -115,7 +115,11 @@ async def mz_fit(
     calibrant_to_tic = calibrant_signal_intensity / tic
     await emit_progress_update(progress_properties, 0.75)
 
-    if n_relevant_isotopes > 3 and len(good_matches_df) == n_relevant_isotopes:
+    if (
+        n_relevant_isotopes > 3
+        and len(good_matches_df) > 3
+        and (n_relevant_isotopes - len(good_matches_df) <= 2)
+    ):
         # Fit mz calibration
         fit, stats = mz_calibrate(
             good_matches_df["sample_peak_tof"],
