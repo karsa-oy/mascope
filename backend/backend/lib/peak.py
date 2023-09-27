@@ -313,6 +313,8 @@ def fit_n_peaks(
     tuple
         returns (lmfit result, peaks)
     """
+    if not len(y):
+        return None, None
     spec_norm = np.linalg.norm(y)
     residual_norm = spec_norm
     prev_fit = None
@@ -520,11 +522,11 @@ def get_batch_u_list(sample_batch_id):
     return np.unique(np.round(target_isotope_mzs))
 
 
-def get_peaks(cache_item, intensity_mode="area"):
+def get_peaks(sample_file, intensity_mode="area"):
     if intensity_mode == "area":
-        peaks = cache_item.peak_areas
+        peaks = sample_file.peak_areas
     elif intensity_mode == "height":
-        peaks = cache_item.peak_heights
+        peaks = sample_file.peak_heights
     else:
         raise ValueError("intensity_mode must be either 'height' or 'area'")
     peaks = peaks.dropna(dim="mz", how="all")
@@ -605,6 +607,10 @@ def read_instrument_functions(filename):
             """
         )
     peakshape = json.loads(instrument_function_df.peakshape[0])
-    p1, p2 = json.loads(instrument_function_df.resolution_function[0])
-    R = lambda m: m / (p1 * m + p2)
+    R_p = json.loads(instrument_function_df.resolution_function[0])
+    if len(R_p) == 2:
+        p1, p2 = R_p
+        R = lambda m: m / (p1 * m + p2)
+    elif len(R_p) == 3:
+        R = np.poly1d(R_p)
     return peakshape, R
