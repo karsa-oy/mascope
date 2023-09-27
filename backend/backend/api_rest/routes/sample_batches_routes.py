@@ -7,10 +7,12 @@ from ..controllers.sample_batches_controller import (
     delete_sample_batch,
     update_sample_batch,
     reload_sample_batch,
+    autosampler_import_batch,
 )
 from ..models.pydantic_models.sample_batch_pydantic_model import (
     SampleBatchCreate,
     SampleBatchUpdate,
+    autoSamplerImportBatchData,
 )
 
 sample_batches_router = APIRouter()
@@ -54,3 +56,13 @@ async def update_sample_batch_route(
 @sample_batches_router.post("/api/sample_batches/{sample_batch_id}/reload")
 async def reload_sample_batch_route(sample_batch_id: str):
     return await reload_sample_batch(sample_batch_id)
+
+
+@sample_batches_router.post("/api/sample_batches/import_batch")
+async def autosampler_import_batch_route(
+    data: autoSamplerImportBatchData,
+    background_tasks: BackgroundTasks,
+):
+    return await autosampler_import_batch(
+        data.sample_batch, data.sample_items, data.params, background_tasks
+    )

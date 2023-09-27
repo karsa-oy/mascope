@@ -1,22 +1,25 @@
 <template>
   <div>
-    <the-notification-in-development></the-notification-in-development>
+    <the-notification-warning></the-notification-warning>
     <the-notification-batch-compute-progress></the-notification-batch-compute-progress>
     <the-notification-item-compute-progress></the-notification-item-compute-progress>
+    <the-notification-calibration-progress></the-notification-calibration-progress>
   </div>
 </template>
 
 <script>
-import TheNotificationInDevelopment from "./TheNotificationInDevelopment.vue";
+import TheNotificationWarning from "./TheNotificationWarning.vue";
 import TheNotificationBatchComputeProgress from "./TheNotificationBatchComputeProgress.vue";
 import TheNotificationItemComputeProgress from "./TheNotificationItemComputeProgress.vue";
+import TheNotificationCalibrationProgress from "./TheNotificationCalibrationProgress.vue";
 
 export default {
   name: "TheNotificationAggregator",
   components: {
-    TheNotificationInDevelopment,
+    TheNotificationWarning,
     TheNotificationBatchComputeProgress,
     TheNotificationItemComputeProgress,
+    TheNotificationCalibrationProgress,
   },
 };
 </script>

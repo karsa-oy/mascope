@@ -3,13 +3,16 @@ import { make } from "vuex-pathify";
 const state = {
   active: null,
   // All Notifications
-  inDevelopmentActive: false,
+  warningActive: false,
   batchComputeProgressActive: false,
   itemComputeProgressActive: false,
+  calibrationProgressActive: false,
+  // warning notifications
+  warningNotification: null,
+  warningData: null,
   // Compute progress notification
   progressMessage: "",
   progressPercentage: 0,
-  computeError: false,
   // Item compute progress notification
   itemMatchComputing: false,
   // Batch compute progress notification
@@ -17,6 +20,12 @@ const state = {
   totalBatches: null,
   currentBatch: null,
   currentBatchMessage: "",
+  // Calibration progress notification
+  calibrationComputing: false,
+  calibrationAction: null,
+  // Errors
+  computeError: false,
+  calibrationError: false,
 };
 
 export default {
@@ -38,13 +47,25 @@ export default {
       }
       state.active = null;
     },
-
-    SET_COMPUTE_ERROR(state, value) {
-      state.computeError = value;
+    RESET_WARNING_NOTIFICATION(state) {
+      state.warningNotification = null;
+      state.warningData = null;
+    },
+    RESET_CALIBRATION_NOTIFICATION(state) {
+      state.progressMessage = "";
+      state.progressPercentage = 0;
+      state.calibrationError = false;
+      state.calibrationAction = null;
     },
   },
   actions: {
-    // backend notifications
+    // warning notification
+    showWarningNotification({ commit }, payload) {
+      commit("SET_WARNING_NOTIFICATION", payload.notification);
+      commit("SET_WARNING_DATA", payload.data);
+      commit("activate", { notification: "warning" });
+    },
+    // backend listeners
     // Batch compute progress notification
     async onMatchBatchComputeStarted({ commit }, data) {
       commit("SET_BATCH_MATCH_COMPUTING", true);
@@ -95,6 +116,7 @@ export default {
     },
     // Item compute progress notification
     async onMatchItemUpdateComputeStarted({ commit }, data) {
+      commit("RESET_CALIBRATION_NOTIFICATION");
       commit("SET_ITEM_MATCH_COMPUTING", true);
       commit(
         "SET_PROGRESS_MESSAGE",
@@ -135,6 +157,52 @@ export default {
           commit("SET_PROGRESS_MESSAGE", "");
           commit("SET_PROGRESS_PERCENTAGE", 0);
           commit("SET_COMPUTE_ERROR", false);
+        }, 500);
+      }, 5000);
+    },
+    // calibration notifications
+    async onCalibrationStarted({ commit }, data) {
+      commit("SET_CALIBRATION_COMPUTING", true);
+      commit("SET_CALIBRATION_ACTION", data.action);
+      commit(
+        "SET_PROGRESS_MESSAGE",
+        `Calibration process started: ${data.action}...`
+      );
+      commit("SET_PROGRESS_PERCENTAGE", data.progress_percentage);
+    },
+    async onCalibrationProgress({ commit }, data) {
+      if (data.progress_percentage) {
+        commit("SET_PROGRESS_PERCENTAGE", data.progress_percentage);
+      }
+    },
+    async onCalibrationFinished({ commit }, data) {
+      commit(
+        "SET_PROGRESS_MESSAGE",
+        `Calibration process finished: ${data.action}...`
+      );
+      commit("SET_PROGRESS_PERCENTAGE", data.progress_percentage || 100);
+      setTimeout(() => {
+        if (state.calibrationAction !== data.action) {
+          return; // Do not close if this is not the currently active action.
+        }
+        commit("SET_CALIBRATION_COMPUTING", false);
+        setTimeout(() => {
+          if (!state.calibrationProgressActive) return;
+          commit("RESET_CALIBRATION_NOTIFICATION");
+        }, 500);
+      }, 3000);
+    },
+    async onCalibrationFailed({ commit }, data) {
+      commit(
+        "SET_PROGRESS_MESSAGE",
+        `Calibration process ${data.action} failed: ${data.error}`
+      );
+      commit("SET_CALIBRATION_ERROR", true);
+      setTimeout(() => {
+        // TODO_configuration move 500 animation delay to config file and 3000 closing notification time
+        commit("SET_CALIBRATION_COMPUTING", false);
+        setTimeout(() => {
+          commit("RESET_CALIBRATION_NOTIFICATION");
         }, 500);
       }, 5000);
     },

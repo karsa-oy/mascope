@@ -11,6 +11,7 @@ from backend.lib.file import load_file
 from backend.lib.peak import detect_peaks, get_peaks, read_instrument_functions
 from backend.db.id import gen_id
 from backend.api_rest.models.models import (
+    Sample,
     SampleBatch,
     SampleItem,
     TargetCollection,
@@ -20,6 +21,7 @@ from backend.api_rest.models.models import (
 )
 from ..models.pydantic_models.match_pydantic_model import (
     MatchComputeBatch,
+    MZCalibration,
     MatchComputeItem,
     ProgressProperties,
 )
@@ -77,7 +79,6 @@ async def compute_matches(
     #########################
     # STEP 1 - Load or detect peaks #
     #########################
-
     # Find peaks and write to file
     u_list = list(np.unique(np.round(target_isotope_df.mz)))
     sample_file = await detect_peaks(filename, u_list, if_exists="append")
@@ -86,7 +87,6 @@ async def compute_matches(
     #########################
     # STEP 2 - Prepare data #
     #########################
-
     # init match df from target isotopes
     match_isotope_df = target_isotope_df.copy().assign(
         match_id=np.nan,
@@ -327,10 +327,20 @@ async def emit_progress_update(
         )
 
 
-async def item_compute(sample_item, progress_properties: ProgressProperties = None):
+async def item_compute(
+    sample_item: MatchComputeItem, progress_properties: ProgressProperties = None
+):
     sample_item_id = sample_item.sample_item_id
     filename = sample_item.filename
     sample_batch_id = sample_item.sample_batch_id
+    verified = sample_item.mz_calibration.verified
+
+    # Ensure mz_calibration.verified is True
+    if not verified:
+        print(
+            f"mz_calibration not verified for sample item: {sample_item.sample_item_id}"
+        )
+        return sample_item  # or raise an error or handle it as per your requirement
 
     # Step 1: Fetch sample batch and related ion mechanisms and target collection ids
     async with async_session() as session:
@@ -413,7 +423,7 @@ async def match_batch_compute(
     async with async_session() as session:
         # Fetch item ids
         result = await session.execute(
-            select(SampleItem).where(SampleItem.sample_batch_id == sample_batch_id)
+            select(Sample).where(Sample.sample_batch_id == sample_batch_id)
         )
 
         sample_items = result.scalars().all()
@@ -432,7 +442,24 @@ async def match_batch_compute(
                 total_batches=progress_properties.total_batches,
             )
 
-            await item_compute(sample_item, progress_properties=progress_properties)
+            # Check if 'verified' exists in mz_calibration. If not, provide a default value of False
+            verified_value = sample_item.mz_calibration.get("verified", False)
+
+            sample_item_pydantic = MatchComputeItem(
+                sample_item_id=sample_item.sample_item_id,
+                sample_item_name=sample_item.filename,
+                sample_batch_id=sample_item.sample_batch_id,
+                filename=sample_item.filename,
+                instrument=sample_item.instrument,
+                mz_calibration=MZCalibration(
+                    mode=sample_item.mz_calibration["mode"],
+                    par=sample_item.mz_calibration["par"],
+                    verified=verified_value,
+                ),
+            )
+            await item_compute(
+                sample_item_pydantic, progress_properties=progress_properties
+            )
         except Exception as e:
             print(f"Processing sample {sample_item} failed: {e}")
 

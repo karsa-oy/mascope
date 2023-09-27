@@ -408,7 +408,7 @@ export default {
       acquisitionProgress: "instrument/acquisitionProgress",
       batchActive: "batch/active",
       batches: "workspace/batches",
-      calibrationStatus: "instrument/calibrationStatus",
+      calibrationStatus: "calibration/calibrationStatus",
       conversionProgress: "instrument/conversionProgress",
       instrumentActive: "instrument/active",
       matchingProgress: "instrument/matchingProgress",
@@ -489,6 +489,7 @@ export default {
     }),
     ...mapMutations({}),
     ...mapActions("sample", ["matchItemCompute"]),
+    ...mapActions("calibration", ["calibrationMzFit", "calibrationMzApply"]),
     clone(obj) {
       return JSON.parse(JSON.stringify(obj));
     },
@@ -511,20 +512,19 @@ export default {
       this.sampleItemFilterId = genId(6, false);
     },
     async mzCalibrationApply() {
-      await this.$api.httpClient.mzCalibrationApply({
+      const payload = {
         fit: this.mzFit,
-        sample_filenames: [this.sampleFilename],
-      });
+        sample_filename: this.sampleFilename,
+      };
+      await this.calibrationMzApply(payload);
     },
     mzCalibrationFit() {
       this.mzCalibrationReset();
-      // TODO_calibration
-      // TODO_replace sio
-      this.$api.emit(
-        "calibration_mz_fit",
-        this.sampleActive.sample_item_id,
-        this.mzCalibrationParams
-      );
+      const payload = {
+        sample_item_id: this.sampleActive.sample_item_id,
+        params: this.mzCalibrationParams,
+      };
+      this.calibrationMzFit(payload);
     },
     reset() {
       this.resetAcquisitionStatus();

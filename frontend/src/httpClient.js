@@ -40,10 +40,6 @@ const handleError = (error) => {
   return Promise.reject(error);
 };
 
-const openLoading = () => {
-  return Vue.prototype.$buefy.loading.open();
-};
-
 const workspacesBaseUrl = "/workspaces";
 const batchesBaseUrl = "/sample_batches";
 const samplesBaseUrl = "/samples";
@@ -183,6 +179,13 @@ export function createHttpClient(host, api_port) {
         );
       } catch (error) {
         console.error("Failed to reload sample batch: ", error);
+      }
+    },
+    autoSamplerImportBatch: async (data) => {
+      try {
+        return await httpClient.post(`${batchesBaseUrl}/import_batch`, data);
+      } catch (error) {
+        console.error("Failed to import batch: ", error);
       }
     },
     // Samples
@@ -345,22 +348,53 @@ export function createHttpClient(host, api_port) {
         console.error("Failed to get sample mz calibration: ", error);
       }
     },
-    mzCalibrationApply: async (calibrationData, showLoading = false) => {
-      let loadingInstance = null;
+    calibrationMzApply: async (calibrationData) => {
       try {
-        if (showLoading) loadingInstance = openLoading();
-        const result = await httpClient.post(
+        return await httpClient.post(
           `${calibrationBaseUrl}/mz_apply`,
           calibrationData
         );
-        if (loadingInstance)
-          setTimeout(() => loadingInstance.close(), 1 * 1000);
-        return result;
       } catch (error) {
         console.error("Failed to apply mz calibration: ", error);
-        if (loadingInstance) loadingInstance.close();
       }
     },
+
+    calibrationMzFit: async (sample_item_id, params) => {
+      try {
+        return await httpClient.post(
+          `${calibrationBaseUrl}/mz_fit/${sample_item_id}`,
+          params
+        );
+      } catch (error) {
+        console.error("Failed to calibrate mz fit: ", error);
+      }
+    },
+
+    calibrationMzCalibrateSample: async (sample_item, params) => {
+      try {
+        return await httpClient.post(
+          `${calibrationBaseUrl}/mz_calibrate/sample`,
+          {
+            sample_item: sample_item,
+            params: params,
+          }
+        );
+      } catch (error) {
+        console.error("Failed to mz calibrate sample: ", error);
+      }
+    },
+
+    calibrationMzCalibrateBatch: async (data) => {
+      try {
+        return await httpClient.post(
+          `${calibrationBaseUrl}/mz_calibrate/batch`,
+          data
+        );
+      } catch (error) {
+        console.error("Failed to mz calibrate batch: ", error);
+      }
+    },
+
     // Matches
     getAllMatches: async (params = {}) => {
       try {
