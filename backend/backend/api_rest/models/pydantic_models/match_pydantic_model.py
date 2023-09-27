@@ -1,5 +1,13 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
+from typing import Optional, List
+
+
+class MZCalibration(BaseModel):
+    mode: int
+    par: List = []
+    verified: Optional[bool] = Field(
+        False, description="Define if the sample was calibrated"
+    )
 
 
 class MatchComputeBatch(BaseModel):
@@ -15,6 +23,7 @@ class MatchComputeItem(BaseModel):
     sample_batch_id: str = Field(..., description="ID of the sample batch")
     filename: str = Field(..., description="Filename of the sample item")
     instrument: str = Field(..., description="Instrument of the sample item")
+    mz_calibration: MZCalibration = Field(..., description="mz calibration object")
 
 
 class ProgressProperties(BaseModel):

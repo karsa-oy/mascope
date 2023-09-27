@@ -56,7 +56,9 @@ export default {
     },
     async matchSample({ rootState, dispatch }) {
       const sampleActive = rootState.sample.active;
-      if (sampleActive) {
+      const calibrationVerified =
+        rootState.sample.active.mz_calibration.verified;
+      if (sampleActive && calibrationVerified) {
         await dispatch("sample/matchItemCompute", sampleActive, { root: true });
       } else {
         // Try again in 1 second if scenthound is still opened
