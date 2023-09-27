@@ -116,6 +116,7 @@ export default {
     },
     // Item compute progress notification
     async onMatchItemUpdateComputeStarted({ commit }, data) {
+      commit("RESET_CALIBRATION_NOTIFICATION");
       commit("SET_ITEM_MATCH_COMPUTING", true);
       commit(
         "SET_PROGRESS_MESSAGE",
@@ -187,9 +188,7 @@ export default {
         commit("SET_CALIBRATION_COMPUTING", false);
         setTimeout(() => {
           if (!state.calibrationProgressActive) return;
-          commit("SET_PROGRESS_MESSAGE", "");
-          commit("SET_PROGRESS_PERCENTAGE", 0);
-          commit("SET_CALIBRATION_ACTION", null);
+          commit("RESET_CALIBRATION_NOTIFICATION");
         }, 500);
       }, 3000);
     },

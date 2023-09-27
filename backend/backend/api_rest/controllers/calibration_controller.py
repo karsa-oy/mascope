@@ -1,3 +1,15 @@
+"""
+Calibration Controller
+-----------------------
+
+This module contains all the functionalities related to the calibration processes. It provides endpoints and
+background tasks to process calibration and related operations.
+
+"""
+
+# -------------------------------------------------------------------
+# Imports
+# -------------------------------------------------------------------
 from hardware.tofwerk.calibration import mz_calibrate
 
 from backend.db_api_rest import async_session
@@ -23,101 +35,17 @@ from ..models.pydantic_models.calibration_pydantic_model import CalibrationMzFit
 from ..models.models import Sample, SampleBatch
 
 
-async def get_mz_calibration(
-    instrument: str = None,
-    sample_item_id: str = None,
-):
-    async with async_session() as session:
-        stmt = select(Sample.mz_calibration)
-        if instrument:
-            stmt = select(Sample.mz_calibration).where(
-                and_(
-                    Sample.instrument == instrument,
-                    Sample.mz_calibration.isnot(None),
-                    Sample.datetime_utc
-                    == select(func.max(Sample.datetime_utc))
-                    .where(
-                        and_(
-                            Sample.instrument == instrument,
-                            Sample.mz_calibration.isnot(None),
-                        )
-                    )
-                    .scalar_subquery(),
-                )
-            )
-        elif sample_item_id:
-            stmt = stmt.filter(Sample.sample_item_id == sample_item_id)
-
-        result = await session.execute(stmt)
-        mz_calibration = result.scalars().first()
-
-        return mz_calibration
-
-
-async def calibration_mz_apply(
-    fit: dict, sample_filename: str, autosampler_mode: bool = None
-):
-    # Read affected sample items
-    sample_items = await get_sample_items(filename=sample_filename)
-    sample_item_ids = [item["sample_item_id"] for item in sample_items["data"]]
-
-    for sample_item_id in sample_item_ids:
-        await sio.emit(
-            "calibration_mz_apply_started",
-            {
-                "action": "MZ Apply",
-                "sample_item_id": sample_item_id,
-                "progress": 0,
-            },
-            room=sample_item_id,
-            namespace="/",
-        )
-
-    # Retrieve the sample file directly using filename
-    sample_file_data = await get_sample_files(filename=sample_filename)
-
-    if not sample_file_data["data"]:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Sample file with filename {sample_filename} not found",
-        )
-
-    sample_file = sample_file_data["data"][0]
-
-    # Update zarr files
-    new_mz = signal_mz_calibration_update(fit, sample_file["filename"])
-    new_range = [new_mz[0], new_mz[-1]]
-
-    fit.update({"verified": True})
-
-    # Update database record
-    sample_file["mz_calibration"] = fit
-    sample_file["range"] = new_range
-    await update_sample_file(
-        sample_file["sample_file_id"], SampleFileUpdate(**sample_file)
-    )
-    for sample_item_id in sample_item_ids:
-        # FAQ_match removes mathces in all samples assosiated with filename
-
-        # Delete outdated matches
-        await match_item_remove(sample_item_id, True)
-
-        await sio.emit(
-            "calibration_mz_apply_finished",
-            {
-                "action": "MZ Apply",
-                "sample_item_id": sample_item_id,
-                "progress": 100,
-                "autosampler_mode": autosampler_mode,
-            },
-            room=sample_item_id,
-            namespace="/",
-        )
-
-    return sample_item_ids
-
-
+# -------------------------------------------------------------------
+# Utility Functions
+# -------------------------------------------------------------------
 async def emit_progress_update(progress_properties, increment):
+    """
+    Emit progress updates to the given sample item room.
+
+    :param progress_properties: Dictionary containing information about the current item being processed.
+    :param increment: Float representing the progress percentage increment.
+    """
+
     if not progress_properties:
         return
 
@@ -135,6 +63,9 @@ async def emit_progress_update(progress_properties, increment):
     )
 
 
+# -------------------------------------------------------------------
+# Main Logic Functions
+# -------------------------------------------------------------------
 async def mz_fit(
     filename,
     calibration_collection_id,
@@ -145,6 +76,13 @@ async def mz_fit(
     refine_window,
     sample_item_id,
 ):
+    """
+    Main function to fit mz. Fits the mass-to-charge ratio (m/z) for a given sample file.
+
+    :param ...:  parameters.
+    :return: fit, stats, error.
+    """
+
     fit = None
     stats = None
     error = None
@@ -215,171 +153,23 @@ async def mz_fit(
     return fit, stats, error
 
 
-async def calibration_mz_fit(
-    sample_item_id: str,
-    params: CalibrationMzFitParams,
-    background_tasks: BackgroundTasks = None,
-):
-    await sio.emit(
-        "calibration_mz_fit_started",
-        {
-            "action": "MZ Fit",
-            "progress_percentage": 0,
-        },
-        room=sample_item_id,
-        namespace="/",
-    )
-
-    async with async_session() as session:
-        result = await session.execute(
-            select(Sample.filename, Sample.sample_batch_id).where(
-                Sample.sample_item_id == sample_item_id
-            )
-        )
-        sample = result.one()
-        filename, sample_batch_id = sample.filename, sample.sample_batch_id
-
-    # unpack parameters
-    peak_intensity_min = params.peak_intensity_min
-    isotope_abundance_min = params.isotope_abundance_min
-    match_score_min = params.match_score_min
-    refine_window = params.refine_window
-
-    async with async_session() as session:
-        result = await session.execute(
-            select(SampleBatch.build_params).where(
-                SampleBatch.sample_batch_id == sample_batch_id
-            )
-        )
-        sample_batch = result.one()
-
-    # get mz calibration parameters
-    build_params = sample_batch.build_params
-    calibration_collection_id = build_params["calibration_collection"]
-    ionization_mechanism_ids = build_params["ion_mechanisms"]
-
-    if background_tasks:
-        background_tasks.add_task(
-            background_mz_fit,
-            filename,
-            calibration_collection_id,
-            ionization_mechanism_ids,
-            peak_intensity_min,
-            isotope_abundance_min,
-            match_score_min,
-            refine_window,
-            sample_item_id,
-        )
-
-        return {"message": "MZ Fit Calibration started"}
-    else:
-        fit, stats, error = await mz_fit(
-            filename,
-            calibration_collection_id,
-            ionization_mechanism_ids,
-            peak_intensity_min,
-            isotope_abundance_min,
-            match_score_min,
-            refine_window,
-            sample_item_id,
-        )
-        return fit, stats, error
-
-
-async def background_mz_fit(
-    filename,
-    calibration_collection_id,
-    ionization_mechanism_ids,
-    peak_intensity_min,
-    isotope_abundance_min,
-    match_score_min,
-    refine_window,
-    sample_item_id,
-):
-    fit, stats, error = await mz_fit(
-        filename,
-        calibration_collection_id,
-        ionization_mechanism_ids,
-        peak_intensity_min,
-        isotope_abundance_min,
-        match_score_min,
-        refine_window,
-        sample_item_id,
-    )
-
-    if fit:
-        await sio.emit(
-            "calibration_mz_fit_finished",
-            {
-                "action": "MZ Fit",
-                "progress_percentage": 100,
-                "fit": fit,
-                "stats": stats,
-                "error": error,
-            },
-            room=sample_item_id,
-        )
-    else:
-        await sio.emit(
-            "calibration_mz_fit_failed",
-            {
-                "action": "MZ Fit",
-                "progress_percentage": 100,
-                "fit": fit,
-                "stats": stats,
-                "error": error,
-            },
-            room=sample_item_id,
-        )
-
-
-async def calibration_mz_calibrate_sample(
-    sample_item,
-    params: CalibrationMzFitParams,
-    background_tasks,
-):
-    filename = sample_item.get("filename")
-    if not filename:
-        raise ValueError(f"Invalid sample item: {sample_item}")
-
-    async with async_session() as session:
-        result = await session.execute(
-            select(Sample.instrument).where(Sample.filename == filename).distinct()
-        )
-        instrument = result.one_or_none()
-
-    await sio.emit(
-        "calibration_mz_calibrate_sample_started",
-        {
-            "filename": filename,
-            "progress": 0,
-        },
-        room=sample_item["sample_item_id"],
-        namespace="/",
-    )
-    await sio.emit(
-        "calibration_mz_calibrate_sample_progress",
-        {},
-        room=sample_item["sample_item_id"],
-        namespace="/",
-    )
-
-    background_tasks.add_task(
-        mz_calibrate_sample,
-        sample_item,
-        params,
-        filename,
-    )
-
-    return {"message": "MZ sample calibration started, please wait for completion"}
-
-
 async def mz_calibrate_sample(
     sample_item,
     params,
     filename,
     autosampler_mode: bool = None,
 ):
+    """
+    Calibrates a single sample. It first fits the sample and then applies the calibration.
+    Notifications are sent based on the progress using socket IO.
+
+    :param sample_item: The sample item to calibrate.
+    :param params: Calibration parameters defined by the CalibrationMzFitParams pydantic model.
+    :param filename: Name of the file corresponding to the sample item.
+    :param autosampler_mode: Indicates whether the calibration is in autosampler mode or not.
+    :return: The calibration result for the given sample.
+    """
+
     # Initializing the result dictionary.
     result = {
         "status": "",
@@ -456,9 +246,316 @@ async def mz_calibrate_sample(
     return result
 
 
+# -------------------------------------------------------------------
+# Background Tasks
+# -------------------------------------------------------------------
+
+
+async def background_mz_fit(
+    filename,
+    calibration_collection_id,
+    ionization_mechanism_ids,
+    peak_intensity_min,
+    isotope_abundance_min,
+    match_score_min,
+    refine_window,
+    sample_item_id,
+):
+    """
+    Run mz_fit as a background task asynchronously.
+
+    :param ...: parameters.
+    """
+    fit, stats, error = await mz_fit(
+        filename,
+        calibration_collection_id,
+        ionization_mechanism_ids,
+        peak_intensity_min,
+        isotope_abundance_min,
+        match_score_min,
+        refine_window,
+        sample_item_id,
+    )
+
+    if fit:
+        await sio.emit(
+            "calibration_mz_fit_finished",
+            {
+                "action": "MZ Fit",
+                "progress_percentage": 100,
+                "fit": fit,
+                "stats": stats,
+                "error": error,
+            },
+            room=sample_item_id,
+        )
+    else:
+        await sio.emit(
+            "calibration_mz_fit_failed",
+            {
+                "action": "MZ Fit",
+                "progress_percentage": 100,
+                "fit": fit,
+                "stats": stats,
+                "error": error,
+            },
+            room=sample_item_id,
+        )
+
+
+# -------------------------------------------------------------------
+# Controller or Route Handlers
+# -------------------------------------------------------------------
+
+
+async def get_mz_calibration(
+    instrument: str = None,
+    sample_item_id: str = None,
+):
+    """
+    Retrieve the mz calibration for a given instrument or sample item ID.
+
+    :param instrument: (Optional) The instrument name.
+    :type instrument: str, optional
+    :param sample_item_id: (Optional) The sample item ID.
+    :type sample_item_id: str, optional
+    :return: The mz calibration for the given parameters.
+    :rtype: dict
+    """
+
+    async with async_session() as session:
+        stmt = select(Sample.mz_calibration)
+        if instrument:
+            stmt = select(Sample.mz_calibration).where(
+                and_(
+                    Sample.instrument == instrument,
+                    Sample.mz_calibration.isnot(None),
+                    Sample.datetime_utc
+                    == select(func.max(Sample.datetime_utc))
+                    .where(
+                        and_(
+                            Sample.instrument == instrument,
+                            Sample.mz_calibration.isnot(None),
+                        )
+                    )
+                    .scalar_subquery(),
+                )
+            )
+        elif sample_item_id:
+            stmt = stmt.filter(Sample.sample_item_id == sample_item_id)
+
+        result = await session.execute(stmt)
+        mz_calibration = result.scalars().first()
+
+        return mz_calibration
+
+
+async def calibration_mz_fit(
+    sample_item_id: str,
+    params: CalibrationMzFitParams,
+    background_tasks: BackgroundTasks = None,
+):
+    """
+    Start m/z fit calibration for a given sample item based on the calibration parameters. It also manages
+    background tasks and communicates the progress using socket IO.
+
+    :param sample_item_id: ID of the sample item.
+    :param params: Calibration parameters.
+    :param background_tasks: Optional background task parameter.
+    :return: Status message if called from route endpoint or fit, stats, error if called during automatica sample calibration from the mz_calibrate_sample.
+    """
+    await sio.emit(
+        "calibration_mz_fit_started",
+        {
+            "action": "MZ Fit",
+            "progress_percentage": 0,
+        },
+        room=sample_item_id,
+        namespace="/",
+    )
+
+    async with async_session() as session:
+        result = await session.execute(
+            select(Sample.filename, Sample.sample_batch_id).where(
+                Sample.sample_item_id == sample_item_id
+            )
+        )
+        sample = result.one()
+        filename, sample_batch_id = sample.filename, sample.sample_batch_id
+
+    # unpack parameters
+    peak_intensity_min = params.peak_intensity_min
+    isotope_abundance_min = params.isotope_abundance_min
+    match_score_min = params.match_score_min
+    refine_window = params.refine_window
+
+    async with async_session() as session:
+        result = await session.execute(
+            select(SampleBatch.build_params).where(
+                SampleBatch.sample_batch_id == sample_batch_id
+            )
+        )
+        sample_batch = result.one()
+
+    # get mz calibration parameters
+    build_params = sample_batch.build_params
+    calibration_collection_id = build_params["calibration_collection"]
+    ionization_mechanism_ids = build_params["ion_mechanisms"]
+
+    if background_tasks:
+        background_tasks.add_task(
+            background_mz_fit,
+            filename,
+            calibration_collection_id,
+            ionization_mechanism_ids,
+            peak_intensity_min,
+            isotope_abundance_min,
+            match_score_min,
+            refine_window,
+            sample_item_id,
+        )
+
+        return {"message": "MZ Fit Calibration started"}
+    else:
+        fit, stats, error = await mz_fit(
+            filename,
+            calibration_collection_id,
+            ionization_mechanism_ids,
+            peak_intensity_min,
+            isotope_abundance_min,
+            match_score_min,
+            refine_window,
+            sample_item_id,
+        )
+        return fit, stats, error
+
+
+async def calibration_mz_apply(
+    fit: dict, sample_filename: str, autosampler_mode: bool = None
+):
+    """
+    Apply m/z calibration to a sample file.
+
+    :param fit: Fit dictionary.
+    :param sample_filename: Name of the sample file.
+    :param autosampler_mode: Optional flag for autosampler mode. In the calibration.js store affects if the batch will be reloaded onCalibrationMzApplyFinished
+    :return: List of calibrated sample item IDs.
+    """
+
+    # Read affected sample items
+    sample_items = await get_sample_items(filename=sample_filename)
+    sample_item_ids = [item["sample_item_id"] for item in sample_items["data"]]
+
+    for sample_item_id in sample_item_ids:
+        await sio.emit(
+            "calibration_mz_apply_started",
+            {
+                "action": "MZ Apply",
+                "sample_item_id": sample_item_id,
+                "progress": 0,
+            },
+            room=sample_item_id,
+            namespace="/",
+        )
+
+    # Retrieve the sample file directly using filename
+    sample_file_data = await get_sample_files(filename=sample_filename)
+
+    if not sample_file_data["data"]:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Sample file with filename {sample_filename} not found",
+        )
+
+    sample_file = sample_file_data["data"][0]
+
+    # Update zarr files
+    new_mz = signal_mz_calibration_update(fit, sample_file["filename"])
+    new_range = [new_mz[0], new_mz[-1]]
+
+    fit.update({"verified": True})
+
+    # Update database record
+    sample_file["mz_calibration"] = fit
+    sample_file["range"] = new_range
+    await update_sample_file(
+        sample_file["sample_file_id"], SampleFileUpdate(**sample_file)
+    )
+    for sample_item_id in sample_item_ids:
+        # FAQ_match removes mathces in all samples assosiated with filename
+
+        # Delete outdated matches
+        await match_item_remove(sample_item_id, True)
+
+        await sio.emit(
+            "calibration_mz_apply_finished",
+            {
+                "action": "MZ Apply",
+                "sample_item_id": sample_item_id,
+                "progress": 100,
+                "autosampler_mode": autosampler_mode,
+            },
+            room=sample_item_id,
+            namespace="/",
+        )
+
+    return sample_item_ids
+
+
+async def calibration_mz_calibrate_sample(
+    sample_item,
+    params: CalibrationMzFitParams,
+    background_tasks,
+):
+    filename = sample_item.get("filename")
+    if not filename:
+        raise ValueError(f"Invalid sample item: {sample_item}")
+
+    async with async_session() as session:
+        result = await session.execute(
+            select(Sample.instrument).where(Sample.filename == filename).distinct()
+        )
+        instrument = result.one_or_none()
+
+    await sio.emit(
+        "calibration_mz_calibrate_sample_started",
+        {
+            "filename": filename,
+            "progress": 0,
+        },
+        room=sample_item["sample_item_id"],
+        namespace="/",
+    )
+    await sio.emit(
+        "calibration_mz_calibrate_sample_progress",
+        {},
+        room=sample_item["sample_item_id"],
+        namespace="/",
+    )
+
+    background_tasks.add_task(
+        mz_calibrate_sample,
+        sample_item,
+        params,
+        filename,
+    )
+
+    return {"message": "MZ sample calibration started, please wait for completion"}
+
+
 async def calibration_mz_calibrate_batch(
     sample_batch, sample_items, params: CalibrationMzFitParams
 ):
+    """
+    Calibrates the entire batch of samples and notifies about the progress
+    and completion using socket IO. In case of failure, an error message is emitted.
+
+    :param sample_batch: The batch of samples to be calibrated.
+    :param sample_items: List of sample items within the batch.
+    :param params: Calibration parameters defined by the CalibrationMzFitParams pydantic model.
+    :return: A list containing the calibration results for the batch.
+    """
+
     calibration_results = []
     sample_batch_id = sample_batch.get("sample_batch_id")
 
