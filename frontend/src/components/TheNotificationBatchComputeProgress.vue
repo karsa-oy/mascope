@@ -12,7 +12,7 @@
           <p>{{ progressMessage }}</p>
           <p>{{ currentBatchMessage }}</p>
         </section>
-        <section class="batch-computation-progress-bar">
+        <section class="notification-progress-bar">
           <b-progress
             :value="progressPercentage"
             :max="100"

@@ -15,7 +15,7 @@
 
 <script>
 import { call, get } from "vuex-pathify";
-import { mapMutations } from "vuex";
+import { mapMutations, mapActions } from "vuex";
 
 export default {
   data: function () {
@@ -42,7 +42,7 @@ export default {
     // Return to home page at reload
     if (this.$route.path !== "/") this.$router.push("/");
     if (this.isDevelopmentMode) {
-      this.activateNotification({
+      this.showWarningNotification({
         notification: "inDevelopment",
       });
     }
@@ -55,6 +55,7 @@ export default {
     ...mapMutations({
       activateNotification: "notification/activate",
     }),
+    ...mapActions("notification", ["showWarningNotification"]),
   },
   watch: {
     appPushNotification: {

@@ -2,7 +2,7 @@
   <div v-if="notificationIsActive">
     <b-message
       type="is-notification"
-      title="Sample Matches Computation Progress"
+      :title="' Calibration ' + calibrationAction + ' Progress'"
       :closable="true"
       @close="close"
       :class="{ 'is-closing': isClosing }"
@@ -12,17 +12,45 @@
           <p>{{ progressMessage }}</p>
         </section>
         <section class="notification-progress-bar">
+          <!-- For MZ Fit -->
           <b-progress
+            v-if="calibrationAction === 'MZ Fit'"
             :value="progressPercentage"
             :max="100"
             show-value
             size="is-medium"
             format="percent"
             :type="
-              computeError
+              calibrationError
                 ? 'is-danger'
                 : progressPercentage == 100
                 ? 'is-success'
+                : 'is-primary'
+            "
+          ></b-progress>
+          <!-- For MZ Apply -->
+          <b-progress
+            v-else-if="calibrationAction === 'MZ Apply'"
+            :value="progressPercentage"
+            size="is-medium"
+            :type="
+              progressPercentage == 100
+                ? calibrationError
+                  ? 'is-danger'
+                  : 'is-success'
+                : 'is-primary'
+            "
+          ></b-progress>
+          <!-- For Auto Sampler -->
+          <b-progress
+            v-else-if="calibrationAction === 'Auto Sampler'"
+            :value="progressPercentage"
+            size="is-medium"
+            :type="
+              progressPercentage == 100
+                ? calibrationError
+                  ? 'is-danger'
+                  : 'is-success'
                 : 'is-primary'
             "
           ></b-progress>
@@ -37,7 +65,7 @@ import { mapMutations, mapState } from "vuex";
 import { sync, get, call } from "vuex-pathify";
 
 export default {
-  name: "TheNotificationItemComputeProgress",
+  name: "TheNotificationCalibrationProgress",
   data() {
     return {
       isClosing: false,
@@ -45,14 +73,15 @@ export default {
   },
   computed: {
     ...sync({
-      notificationIsActive: "notification/itemComputeProgressActive",
+      notificationIsActive: "notification/calibrationProgressActive",
+      calibrationAction: "notification/calibrationAction",
       progressMessage: "notification/progressMessage",
       progressPercentage: "notification/progressPercentage",
     }),
     ...get({
-      itemMatchComputing: "notification/itemMatchComputing",
+      calibrationComputing: "notification/calibrationComputing",
       notificationActive: "notification/active",
-      computeError: "notification/computeError",
+      calibrationError: "notification/calibrationError",
     }),
   },
   methods: {
@@ -70,13 +99,13 @@ export default {
     },
   },
   watch: {
-    itemMatchComputing(value) {
+    calibrationComputing(value) {
       if (value) {
         this.activateNotification({
-          notification: "itemComputeProgress",
+          notification: "calibrationProgress",
         });
       } else {
-        if (this.notificationActive === "itemComputeProgress") {
+        if (this.notificationActive === "calibrationProgress") {
           this.close();
         }
       }
