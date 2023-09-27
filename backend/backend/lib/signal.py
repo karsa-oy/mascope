@@ -33,32 +33,32 @@ def remove_duplicate_mz_values(mz):
     return mz_unique
 
 
-def signal_mz_calibration_update(fit, filenames):
+def signal_mz_calibration_update(fit, filename):
     mode = fit["mode"]
     par = fit["par"]
     # Calculate new mz axis
-    nbr_samples = get_zarr_var_shape(filenames[0], "signal")[0]
+    nbr_samples = get_zarr_var_shape(filename, "signal")[0]
     par = np.array(par, dtype=np.double)
     new_mz = np.array([TwTof2Mass(tof, mode, par) for tof in range(nbr_samples)])
     new_mz = remove_duplicate_mz_values(new_mz)
     new_range = [new_mz[0], new_mz[-1]]
+
     # Update zarr file coordinates and props
-    for filename in filenames:
-        print("Calibrating file: %s" % filename)
-        if nbr_samples != get_zarr_var_shape(filename, "signal")[0]:
-            raise Exception("Number of TOF samples does not match")
-        update_props(filename, {"range": new_range, "mz_calibration": fit})
-        # Write new mz coordinates to zarr file
-        update_zarr_array_coord(filename, "signal", "mz", new_mz)
-        try:
-            update_zarr_array_coord(filename, "sum_signal", "mz", new_mz)
-        except PathNotFoundError:
-            pass
-        try:
-            peak_tofs = load_coord(filename, "peak_areas", "tof")
-            new_peak_mzs = new_mz[peak_tofs.astype(int)]
-            update_zarr_array_coord(filename, "peak_areas", "mz", new_peak_mzs)
-            update_zarr_array_coord(filename, "peak_heights", "mz", new_peak_mzs)
-        except PathNotFoundError:
-            pass
+    print("Calibrating file: %s" % filename)
+    if nbr_samples != get_zarr_var_shape(filename, "signal")[0]:
+        raise Exception("Number of TOF samples does not match")
+    update_props(filename, {"range": new_range, "mz_calibration": fit})
+    # Write new mz coordinates to zarr file
+    update_zarr_array_coord(filename, "signal", "mz", new_mz)
+    try:
+        update_zarr_array_coord(filename, "sum_signal", "mz", new_mz)
+    except PathNotFoundError:
+        pass
+    try:
+        peak_tofs = load_coord(filename, "peak_areas", "tof")
+        new_peak_mzs = new_mz[peak_tofs.astype(int)]
+        update_zarr_array_coord(filename, "peak_areas", "mz", new_peak_mzs)
+        update_zarr_array_coord(filename, "peak_heights", "mz", new_peak_mzs)
+    except PathNotFoundError:
+        pass
     return new_mz
