@@ -426,6 +426,7 @@ export default {
       sampleItemUpdate: "sample/update",
     }),
     ...mapActions("sample", ["matchItemCompute"]),
+    ...mapActions("calibration", ["calibrationMzFit", "calibrationMzApply"]),
     ...mapMutations({
       deactivateModal: "modal/deactivate",
     }),
@@ -475,24 +476,20 @@ export default {
       this.sampleItemFilterId = genId(6, false);
     },
     async mzCalibrationApply() {
-      await this.$api.httpClient.mzCalibrationApply(
-        {
-          fit: this.mzFit,
-          sample_filenames: [this.sampleFilename],
-        },
-        true
-      );
+      const payload = {
+        fit: this.mzFit,
+        sample_filename: this.sampleFilename,
+      };
+      await this.calibrationMzApply(payload);
     },
 
     mzCalibrationFit() {
-      // TODO_calibration
-      // TODO_replace sio
       this.mzCalibrationReset();
-      this.$api.emit(
-        "calibration_mz_fit",
-        this.sampleActive.sample_item_id,
-        this.mzCalibrationParams
-      );
+      const payload = {
+        sample_item_id: this.sampleActive.sample_item_id,
+        params: this.mzCalibrationParams,
+      };
+      this.calibrationMzFit(payload);
     },
     removeField(event) {
       // Field to remove label is in button element id, find it from the event data

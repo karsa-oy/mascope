@@ -2,7 +2,6 @@ import { dispatch, make } from "vuex-pathify";
 
 const state = {
   active: null,
-  calibrationStatus: null,
   acquisitionActiveFilename: null,
   acquisitionProgress: 0,
   acquisitions: null,
@@ -68,31 +67,10 @@ export default {
         }, 1000);
       }
     },
-    async mzCalibrateSample({ rootState, rootGetters, dispatch }) {
-      //TODO_calibration
-      const sampleActive = rootState.sample.active;
-      if (sampleActive) {
-        rootState.api.emit(
-          "calibration_mz_calibrate_sample",
-          {
-            filename: sampleActive.filename,
-            sample_item_id: sampleActive.sample_item_id,
-            sample_batch_id: sampleActive.sample_batch_id,
-          },
-          rootGetters["calibration/params"]
-        );
-      } else {
-        // Try again in 1 second if scenthound is still opened
-        if (!state.scenthoundModeActive) return;
-        setTimeout(() => {
-          dispatch("mzCalibrateSample");
-        }, 1000);
-      }
-    },
     async resetAcquisitionStatus({ commit }) {
       commit("SET_ACQUISITION_ACTIVE_FILENAME", null);
       commit("SET_ACQUISITION_PROGRESS", 0);
-      commit("SET_CALIBRATION_STATUS", null);
+      commit("calibration/SET_CALIBRATION_STATUS", null, { root: true });
       commit("SET_CONVERSION_PROGRESS", 0);
       commit("SET_MATCHING_PROGRESS", 0);
     },
@@ -124,27 +102,13 @@ export default {
       commit("SET_ACQUISITION_ACTIVE_FILENAME", data.filename);
       commit("SET_ACQUISITION_PROGRESS", data.progress);
     },
-    async onCalibrationMzCalibrateFailed({ commit }, data) {
-      commit("SET_CALIBRATION_STATUS", { ...data, failed: true });
-    },
-    async onCalibrationMzCalibrateFinished({ state, commit }, data) {
-      commit("SET_CALIBRATION_STATUS", data);
-      // Start matching
-      if (state.scenthoundModeActive) {
-        dispatch("instrument/matchSample", null, { root: true });
-      }
-    },
-    async onCalibrationMzCalibrateProgress({ commit }, data) {
-      commit("SET_CALIBRATION_STATUS", data);
-    },
-    async onCalibrationMzCalibrateStarted({ commit }, data) {
-      commit("SET_CALIBRATION_STATUS", data);
-    },
     async onInstrumentConversionFinished({ state, commit, dispatch }, data) {
       commit("SET_CONVERSION_PROGRESS", data.progress);
       // Wait for sample to be saved, then start mass calibration
       if (state.scenthoundModeActive) {
-        dispatch("mzCalibrateSample");
+        dispatch("calibration/calibrationMzCalibrateSample", null, {
+          root: true,
+        });
       }
     },
     async onInstrumentConversionProgress({ commit }, data) {
