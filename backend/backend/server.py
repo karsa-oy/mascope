@@ -1,3 +1,6 @@
+# Import this here to avoid "free(): invalid pointer" error on Linux
+from hardware.tofwerk.lib.TwTool import *
+
 import socketio
 from fastapi import FastAPI
 

@@ -1,6 +1,3 @@
-from hardware.tofwerk.lib.TwTool import *
-
-# these 3 imports require loaded library from TwTool
 import backend.api.instrument
 import backend.api.sample
 import backend.api.schema
