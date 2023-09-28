@@ -62,7 +62,7 @@ export default {
     // warning notification
     showWarningNotification({ commit }, payload) {
       commit("SET_WARNING_NOTIFICATION", payload.notification);
-      commit("SET_WARNING_DATA", payload.data);
+      commit("SET_WARNING_DATA", payload?.data || null);
       commit("activate", { notification: "warning" });
     },
     // backend listeners
@@ -96,11 +96,30 @@ export default {
         commit("SET_PROGRESS_PERCENTAGE", data.progress_percentage);
       }
     },
-    async onMatchBatchComputeFinished({ commit, state, dispatch }) {
-      commit(
-        "SET_PROGRESS_MESSAGE",
-        `Finished computation for ${state.totalBatches} batches`
-      );
+    async onMatchBatchComputeFinished({ commit, state, dispatch }, data) {
+      let progressMessage = `Finished computation for ${
+        state.totalBatches
+      } batch${state.totalBatches === 1 ? "" : "es"}`;
+
+      if (
+        data.samples_compute_failed &&
+        data.samples_compute_failed.length > 0
+      ) {
+        commit("SET_COMPUTE_ERROR", true);
+        progressMessage += ` with ${data.samples_compute_failed.length} sample${
+          data.samples_compute_failed.length === 1 ? "" : "s"
+        } failed to compute matches`;
+
+        // Show warning notification after 3 seconds with info about failed to compute matches samples
+        setTimeout(() => {
+          dispatch("showWarningNotification", {
+            notification: "batchComputeFailedSamples",
+            data: data.samples_compute_failed,
+          });
+        }, 4000);
+      }
+
+      commit("SET_PROGRESS_MESSAGE", progressMessage);
       commit("SET_CURRENT_BATCH_MESSAGE", "");
       commit("SET_PROGRESS_PERCENTAGE", 100);
       setTimeout(() => {
@@ -110,9 +129,10 @@ export default {
         commit("SET_CURRENT_BATCH", null);
         setTimeout(() => {
           commit("SET_PROGRESS_MESSAGE", "");
+          commit("SET_COMPUTE_ERROR", false);
           commit("SET_PROGRESS_PERCENTAGE", 0);
         }, 500);
-      }, 3000);
+      }, 4000);
     },
     // Item compute progress notification
     async onMatchItemUpdateComputeStarted({ commit }, data) {
@@ -144,13 +164,19 @@ export default {
         }, 500);
       }, 3000);
     },
-    async onMatchItemUpdateComputeFailed({ commit }, data) {
+    async onMatchItemUpdateComputeFailed({ dispatch, commit }, data) {
       commit(
         "SET_PROGRESS_MESSAGE",
-        `Computing matches failed for "${data.sample_item_name}": ${data.errorMessage}`
+        `Computing matches failed for "${data.sample_item_name}"`
       );
+      commit("SET_PROGRESS_PERCENTAGE", 100);
       commit("SET_COMPUTE_ERROR", true);
       setTimeout(() => {
+        // Show warning notification after 3 seconds with info about failed to compute matches samples
+        dispatch("showWarningNotification", {
+          notification: "itemComputeFailed",
+          data: data.errorMessage,
+        });
         // TODO_configuration move 500 animation delay to config file and 3000 closing notification time
         commit("SET_ITEM_MATCH_COMPUTING", false);
         setTimeout(() => {
@@ -158,7 +184,7 @@ export default {
           commit("SET_PROGRESS_PERCENTAGE", 0);
           commit("SET_COMPUTE_ERROR", false);
         }, 500);
-      }, 5000);
+      }, 3000);
     },
     // calibration notifications
     async onCalibrationStarted({ commit }, data) {

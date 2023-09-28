@@ -42,6 +42,56 @@
       <p>Please check the samples.</p>
     </b-message>
 
+    <!-- Failed to Compute Matches Samples during batch compute Warning -->
+    <b-message
+      v-if="warningNotification === 'itemComputeFailed'"
+      type="is-notification"
+      title="Match Computation Error Warning"
+      has-icon
+      icon="alert"
+      icon-size="is-medium"
+      :closable="true"
+      @close="close"
+      :class="{
+        'is-closing': isClosing,
+      }"
+    >
+      <p>There was an error during match computation.</p>
+      <p>{{ warningData }}</p>
+    </b-message>
+
+    <!-- Warning with samples failed to compute matches during batch compute -->
+    <b-message
+      v-if="warningNotification === 'batchComputeFailedSamples'"
+      type="is-notification"
+      title="Match Computation Error Warning"
+      has-icon
+      icon="alert"
+      icon-size="is-medium"
+      :closable="true"
+      @close="close"
+      :class="{
+        'is-closing': isClosing,
+        'failed-computation': 'failed-computation',
+      }"
+    >
+      <p>
+        There was an error during match computation for the
+        {{ warningData.length }} following sample{{
+          warningData.length === 1 ? "" : "s"
+        }}:
+      </p>
+      <ul>
+        <li
+          v-for="sample in warningData"
+          :key="sample.sample_item.sample_item_id"
+        >
+          <strong>{{ sample.sample_item.sample_item_name }}</strong> encountered
+          an error: {{ sample.error_message }}.
+        </li>
+      </ul>
+    </b-message>
+
     <!-- Other types of warning messages here -->
   </div>
 </template>
@@ -63,6 +113,13 @@ export default {
       warningNotification: "notification/warningNotification",
       warningData: "notification/warningData",
     }),
+  },
+  watch: {
+    notificationIsActive(newVal) {
+      if (!newVal) {
+        this.resetWarningNotification();
+      }
+    },
   },
   methods: {
     ...mapMutations({

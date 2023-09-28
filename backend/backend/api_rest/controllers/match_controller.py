@@ -337,10 +337,10 @@ async def item_compute(
 
     # Ensure mz_calibration.verified is True
     if not verified:
-        print(
-            f"mz_calibration not verified for sample item: {sample_item.sample_item_id}"
-        )
-        return sample_item  # or raise an error or handle it as per your requirement
+        error_message = f"M/Z calibrationis not verified for sample file: {filename}. Please try to calibrate the file."
+        print(error_message)
+
+        raise ValueError(error_message)
 
     # Step 1: Fetch sample batch and related ion mechanisms and target collection ids
     async with async_session() as session:
@@ -416,6 +416,7 @@ async def match_batch_compute(
     sample_batch_id, progress_properties: ProgressProperties = None
 ):
     print(f"...Computing matches of batch: {sample_batch_id} ...")
+    samples_compute_failed = []
 
     # clear previous matches
     await match_batch_remove(sample_batch_id, True)
@@ -429,10 +430,7 @@ async def match_batch_compute(
         sample_items = result.scalars().all()
 
     for item_index, sample_item in enumerate(sample_items):
-        try:
-            print(
-                f"...Computing matches of sample item: {sample_item.sample_item_id} ..."
-            )
+        if progress_properties is not None:
             progress_properties = ProgressProperties(
                 match_compute_type="batches",
                 item_weight=progress_properties.item_weight,
@@ -442,29 +440,49 @@ async def match_batch_compute(
                 total_batches=progress_properties.total_batches,
             )
 
-            # Check if 'verified' exists in mz_calibration. If not, provide a default value of False
-            verified_value = sample_item.mz_calibration.get("verified", False)
+        # Check if 'verified' exists in mz_calibration. If not, provide a default value of False
+        verified_value = sample_item.mz_calibration.get("verified", False)
 
-            sample_item_pydantic = MatchComputeItem(
-                sample_item_id=sample_item.sample_item_id,
-                sample_item_name=sample_item.filename,
-                sample_batch_id=sample_item.sample_batch_id,
-                filename=sample_item.filename,
-                instrument=sample_item.instrument,
-                mz_calibration=MZCalibration(
-                    mode=sample_item.mz_calibration["mode"],
-                    par=sample_item.mz_calibration["par"],
-                    verified=verified_value,
-                ),
+        sample_item_pydantic = MatchComputeItem(
+            sample_item_id=sample_item.sample_item_id,
+            sample_item_name=sample_item.sample_item_name,
+            sample_batch_id=sample_item.sample_batch_id,
+            filename=sample_item.filename,
+            instrument=sample_item.instrument,
+            mz_calibration=MZCalibration(
+                mode=sample_item.mz_calibration["mode"],
+                par=sample_item.mz_calibration["par"],
+                verified=verified_value,
+            ),
+        )
+
+        try:
+            print(
+                f"...Computing matches of sample item: {sample_item.sample_item_id} ..."
             )
             await item_compute(
                 sample_item_pydantic, progress_properties=progress_properties
             )
         except Exception as e:
             print(f"Processing sample {sample_item} failed: {e}")
+            samples_compute_failed.append(
+                {
+                    "sample_item": {
+                        "sample_item_id": sample_item_pydantic.sample_item_id,
+                        "sample_item_name": sample_item_pydantic.sample_item_name,
+                        "filename": sample_item_pydantic.filename,
+                    },
+                    "error_message": str(e),
+                }
+            )
 
     # reload batch
     await sio.emit("sample_batch_reload", room=sample_batch_id, namespace="/")
+
+    if samples_compute_failed:
+        return {"samples_compute_failed": samples_compute_failed}
+
+    return None
 
 
 async def match_batches_compute(sample_batches: List[MatchComputeBatch]):
@@ -472,6 +490,7 @@ async def match_batches_compute(sample_batches: List[MatchComputeBatch]):
     total_number_of_items = 0
     items_per_batch = []
     workspace_ids = set()
+    samples_compute_failed_all = []  # to collect failed samples from all batches
 
     # Step 1: Gather data for each batch and set workspace_ids
     async with async_session() as session:
@@ -536,18 +555,29 @@ async def match_batches_compute(sample_batches: List[MatchComputeBatch]):
                 sample_batch.sample_batch_id, progress_properties=progress_properties
             )
         )
-        await task
+        task_result = await task
+
+        if task_result and "samples_compute_failed" in task_result:
+            samples_compute_failed_all.extend(task_result["samples_compute_failed"])
 
     # Step 4: Notify workspace clients that batch processing has finished
     for workspace_id in workspace_ids:
         await sio.emit(
             "match_batch_compute_finished",
-            {"total_batches": total_batches},
+            {
+                "total_batches": total_batches,
+                "samples_compute_failed": samples_compute_failed_all,
+            },
             room=workspace_id,
             namespace="/",
         )
 
-    return {"status": f"Match computation for {total_batches} batches"}
+    if samples_compute_failed_all:
+        return {
+            "status": f"Match computation for {total_batches} batches. Failed samples: {samples_compute_failed_all}"
+        }
+    else:
+        return {"status": f"Match computation for {total_batches} batches"}
 
 
 async def match_item_compute(sample_item: MatchComputeItem):

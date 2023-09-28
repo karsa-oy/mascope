@@ -19,7 +19,13 @@
             show-value
             size="is-medium"
             format="percent"
-            :type="progressPercentage == 100 ? 'is-success' : 'is-primary'"
+            :type="
+              computeError
+                ? 'is-warning'
+                : progressPercentage == 100
+                ? 'is-success'
+                : 'is-primary'
+            "
           ></b-progress>
         </section>
       </div>
@@ -48,6 +54,7 @@ export default {
     ...get({
       batchMatchComputing: "notification/batchMatchComputing",
       notificationActive: "notification/active",
+      computeError: "notification/computeError",
     }),
   },
   methods: {
