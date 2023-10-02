@@ -6,6 +6,7 @@ setlocal EnableDelayedExpansion
 set mypath=%~dp0
 call :get_full_path %mypath%\..\..
 set frontend_path=!last_result!
+set my_setup_dir=%mypath%\setup
 set setup_dir=%mypath%\setup
 set env_file=%mypath%\setup\.env
 
@@ -29,14 +30,15 @@ echo Build MASCOPE frontend package...
 pushd %frontend_path%
 call yarn build
 
+rm -r -f mascope_ui
 mkdir mascope_ui
 
-xcopy /s /y dist mascope_ui\ || (echo Error finding dist & exit /b 1)
+mv dist mascope_ui\ || (echo Error finding dist & exit /b 1)
+xcopy /s /y %my_setup_dir%\*.* mascope_ui\
 xcopy /s /y %setup_dir%\*.* mascope_ui\
 copy /y %env_file% mascope_ui\
 tar -c -z -f mascope_ui.tar.gz mascope_ui || (echo Error archiving mascope_ui & exit /b 1)
-rmdir /s /q mascope_ui
-rmdir /s /q dist
+rm -r -f mascope_ui
 echo Find new mascope_ui distribution package in %frontend_path%\mascope_ui.tar.gz
 popd
 
@@ -47,7 +49,9 @@ echo MASCOPE_PUBLIC_API_PORT = %MASCOPE_PUBLIC_API_PORT%
 echo MASCOPE_PRIVATE_ENV = %MASCOPE_PRIVATE_ENV%
 echo MASCOPE_PRIVATE_DATADIR = %MASCOPE_PRIVATE_DATADIR%
 
+exit /b 0
 
 
 :get_full_path
 set last_result=%~f1
+exit /b 0

@@ -6,6 +6,7 @@ setlocal EnableDelayedExpansion
 set mypath=%~dp0
 call :get_full_path %mypath%\..\..
 set backend_path=!last_result!
+set my_setup_dir=%mypath%\setup
 set setup_dir=%mypath%\setup
 set env_file=%mypath%\setup\.env
 
@@ -30,28 +31,25 @@ pushd %backend_path%
 call poetry update
 call poetry build
 
-rmdir /s /q mascope_backend
+rm -r -f mascope_backend
 mkdir mascope_backend
 
-move dist\*.* mascope_backend\ || (echo Error finding .whl & exit /b 1)
+mv dist/*.whl mascope_backend\ || (echo Error finding .whl & exit /b 1)
+xcopy /s /y %my_setup_dir%\*.* mascope_backend\
 xcopy /s /y %setup_dir%\*.* mascope_backend\
 copy /y %env_file% mascope_backend\
 tar -c -z -f mascope_backend.tar.gz mascope_backend || (echo Error archiving mascope_backend & exit /b 1)
-rmdir /s /q mascope_backend
-rmdir /s /q dist
+rm -r -f mascope_backend
 echo Find new mascope_backend distribution package in %backend_path%\mascope_backend.tar.gz
 popd
 
 echo Backend build configuration:
 echo MASCOPE_PUBLIC_MODE = %MASCOPE_PUBLIC_MODE%
+echo MASCOPE_PUBLIC_HOST = %MASCOPE_PUBLIC_HOST%
 echo MASCOPE_PUBLIC_PORT = %MASCOPE_PUBLIC_PORT%
 echo MASCOPE_PUBLIC_API_PORT = %MASCOPE_PUBLIC_API_PORT%
 echo MASCOPE_PRIVATE_ENV = %MASCOPE_PRIVATE_ENV%
 echo MASCOPE_PRIVATE_DATADIR = %MASCOPE_PRIVATE_DATADIR%
-echo MASCOPE_PRIVATE_CONVERTER_DIR = %MASCOPE_PRIVATE_CONVERTER_DIR%
-echo MASCOPE_PRIVATE_LOG_DIR = %MASCOPE_PRIVATE_LOG_DIR%
-echo MASCOPE_PRIVATE_CONFIG_DIR = %MASCOPE_PRIVATE_CONFIG_DIR%
-
 
 exit /b 0
 

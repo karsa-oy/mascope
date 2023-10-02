@@ -75,21 +75,18 @@ export default {
         return {
           category: "probable",
           class: "is-danger",
-          icon: "close",
           weight: "font-size: bold",
         };
       } else if (this.matchScore >= this.possibleMatchThreshold) {
         return {
           category: "possible",
           class: "is-warning",
-          icon: "help",
           weight: "font-size: bold",
         };
       } else {
         return {
           category: "improbable",
           class: "is-success",
-          icon: "check-bold",
           weight: "",
         };
       }
