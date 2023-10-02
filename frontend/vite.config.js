@@ -6,8 +6,7 @@ export default ({ mode }) => {
   const dotEnvPath = path.resolve(process.cwd() + "/..");
   process.env = Object.assign(
     process.env,
-    // loadEnv(mode, dotEnvPath, 'MASCOPE_PUBLIC_')
-    loadEnv(mode, dotEnvPath, "MASCOPE_")
+    loadEnv(mode, dotEnvPath, "MASCOPE_PUBLIC_")
   );
 
   return defineConfig({
@@ -18,15 +17,6 @@ export default ({ mode }) => {
         strict: false,
         allow: ["/data/database/"],
       },
-      // proxy: {
-      //     '/socket.io': {
-      //         target: process.env.MASCOPE_PUBLIC_PROTOCOL+'://'+
-      //                 process.env.MASCOPE_PUBLIC_HOST+':'+
-      //                 process.env.MASCOPE_PUBLIC_API_PORT,
-      //         changeOrigin: true,
-      //         ws: true,
-      //     }
-      // }
     },
     resolve: {
       alias: [
@@ -45,7 +35,6 @@ export default ({ mode }) => {
       cssCodeSplit: false,
       target: "esnext",
     },
-    // envPrefix: 'MASCOPE_PUBLIC_'
-    envPrefix: "MASCOPE_",
+    envPrefix: "MASCOPE_PUBLIC_",
   });
 };

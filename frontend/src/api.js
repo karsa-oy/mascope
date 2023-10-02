@@ -3,7 +3,6 @@ import { createHttpClient } from "./httpClient.js";
 
 // LOAD ENV VARS
 const mode = import.meta.env.MASCOPE_PUBLIC_MODE;
-const protocol = import.meta.env.MASCOPE_PUBLIC_PROTOCOL;
 const host = location.hostname;
 const api_port = import.meta.env.MASCOPE_PUBLIC_API_PORT;
 
@@ -13,10 +12,10 @@ async function initSocket() {
   // INIT API SOCKET
 
   // create the socket in `/` namespace
-  let url = `${protocol}://${host}:${api_port}`;
+  let url = `ws://${host}:${api_port}`;
   if (mode === "production") {
     // production api server is routed to api_port via nginx reverse proxy
-    url = `${protocol}://${host}`;
+    url = `ws://${host}`;
   }
   const socket = io(url);
   apiLog("initialized socket for", mode, ":", url, socket);
