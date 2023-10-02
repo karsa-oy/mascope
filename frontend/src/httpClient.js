@@ -1,6 +1,17 @@
 import axios from "axios";
 import Vue from "vue";
 
+// Create the URL
+
+// LOAD ENV VARS
+const mode = import.meta.env.MASCOPE_PUBLIC_MODE;
+const host = location.hostname;
+const api_port = import.meta.env.MASCOPE_PUBLIC_API_PORT;
+
+// production api server is routed to api_port via nginx reverse proxy
+let url =
+  mode === "production" ? `http://${host}` : `http://${host}:${api_port}`;
+
 const logRequest = (request) => {
   console.log(
     `[httpClient] Starting request to: ${request.method.toUpperCase()} ${
@@ -63,7 +74,7 @@ const attributeTemplatesBaseUrl = "/attribute_templates";
 
 export function createHttpClient(host, api_port) {
   const axiosInstance = axios.create({
-    baseURL: `http://${host}:${api_port}/api`,
+    baseURL: `${url}/api`,
     timeout: 15000,
   });
   // Interceptor to log requests and responses
