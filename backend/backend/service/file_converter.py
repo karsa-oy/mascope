@@ -49,10 +49,7 @@ async def create_sample_file_db_record(data):
 
     headers = {"Content-Type": "application/json"}
 
-    # Setting the URL based on the mode
-    url = f"http://{host}/api/sample_files"
-    if mode != "production":
-        url = f"http://{host}:{port}/api/sample_files"
+    url = f"http://{host}:{port}/api/sample_files"
 
     async with aiohttp.ClientSession() as session:
         async with session.post(
@@ -261,7 +258,6 @@ load_dotenv()
 #
 host = None
 port = None
-mode = None
 cache = None
 file_queue = Queue()
 shutdown_event = Event()
@@ -271,7 +267,6 @@ sio = socketio.AsyncClient(logger=True, ssl_verify=False)
 def run():
     global host
     global port
-    global mode
     global cache
     global file_queue
     global shutdown_event
@@ -281,7 +276,6 @@ def run():
 
     host = args.get("host", "127.0.0.1")
     port = args.get("port", os.environ.get("MASCOPE_PUBLIC_API_PORT"))
-    mode = args.get("mode", os.environ.get("MASCOPE_PUBLIC_MODE"))
 
     streamer_type = args["streamer_type"]
     if streamer_type == "H5":
