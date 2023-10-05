@@ -12,7 +12,7 @@
       label="Minimum isotope abundance"
       path="batch/paramMinIsotopeAbundance"
       @paramChange="reloadMatches"
-      :range="{ min: 0, max: 1, step: .01 }"
+      :range="{ min: 0, max: 1, step: 0.01 }"
       disabled
     >
     </base-param-field>
@@ -20,7 +20,7 @@
       label="Isotope ratio tolerance"
       path="batch/paramIsotopeRatioTolerance"
       @paramChange="reloadMatches"
-      :range="{ min: 0, max: 1, step: .1 }"
+      :range="{ min: 0, max: 1, step: 0.1 }"
     >
     </base-param-field>
     <base-param-field
@@ -34,7 +34,7 @@
       label="Minimum isotope correlation"
       path="batch/paramMinIsotopeCorrelation"
       @paramChange="reloadMatches"
-      :range="{ min: 0, max: 1, step: .1 }"
+      :range="{ min: 0, max: 1, step: 0.1 }"
     >
     </base-param-field>
     <base-param-field
@@ -50,12 +50,11 @@
       path="batch/paramPossibleMatchThreshold"
       @paramChange="reloadMatches"
       :range="{ min: 0, max: paramProbableMatchThreshold, step: 0.1 }"
-      type="is-primary"
+      type="is-warning"
     >
     </base-param-field>
   </section>
 </template>
-
 
 <script>
 import BaseParamField from "./BaseParamField.vue";
@@ -77,18 +76,18 @@ export default {
   },
   methods: {
     ...call({
-      batchLoadMatches: "batch/loadMatches",
-      batchLoadSamples: "batch/loadSamples",
+      batchLoadBatch: "batch/loadBatch",
       reloadMatchesSample: "sample/loadMatches",
     }),
     reloadMatches() {
       if (!this.batchActive) return;
-      this.reloadMatchesBatch();
-      if (this.sampleFocused) this.reloadMatchesSample();
-    },
-    async reloadMatchesBatch() {
-      await this.batchLoadSamples();
-      this.batchLoadMatches();
+      const activeSampleItemId = this.sampleFocused
+        ? this.sampleFocused.sample_item_id
+        : null;
+      this.batchLoadBatch(activeSampleItemId);
+      if (this.sampleFocused) {
+        this.reloadMatchesSample();
+      }
     },
   },
 };

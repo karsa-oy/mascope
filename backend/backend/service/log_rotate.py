@@ -1,8 +1,9 @@
 import argparse
 import os
-import sys
 import shutil
+import sys
 import time
+
 
 def parse_cmd_args():
     """
@@ -12,14 +13,14 @@ def parse_cmd_args():
     """
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "-l", "--log_file",
-        help="path to generated log file",
-        type=str, required=False
+        "-l", "--log_file", help="path to generated log file", type=str, required=False
     )
     parser.add_argument(
-        "-n", "--records_per_file",
+        "-n",
+        "--records_per_file",
         help="number of log records per log file",
-        type=int, default=1000
+        type=int,
+        default=1000,
     )
     return vars(parser.parse_args())
 
@@ -32,21 +33,22 @@ class RotationLogger:
 
     def dump_to_file(self, *arg):
         def rotate_log():
-            old_log = self.log_file + '.old'
+            old_log = self.log_file + ".old"
             try:
                 if os.path.isfile(old_log):
                     os.remove(old_log)
                 shutil.move(self.log_file, old_log)
-                return ''
+                return ""
             except Exception as e:
                 return f"Exception: {e.__class__.__name__}({str(e)}"
-        error_msg = ''
+
+        error_msg = ""
         if self.record_cnt % self.records_per_file == 0:
             error_msg = rotate_log()
-        with open(self.log_file, 'a') as f:
+        with open(self.log_file, "a") as f:
             if error_msg:
                 f.write(error_msg)
-            r = ' '.join([f"{a}" for a in arg])
+            r = " ".join([f"{a}" for a in arg])
             f.write(r)
 
     def log(self, *arg):
@@ -56,9 +58,11 @@ class RotationLogger:
         else:
             print(*arg)
 
+
 def line_prefix():
     t = time.localtime(time.time())
     return f"{t.tm_hour}:{t.tm_min}:{t.tm_sec} {t.tm_mday}.{t.tm_mon}"
+
 
 def run():
     kwargs = parse_cmd_args()
@@ -72,7 +76,8 @@ def run():
             # at 1st Ctrl-C don't quit - let input provider finish
             exc_cnt += 1
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     # Log piped stdin to log_rotate;
     # Use 'src |& log_rotate' to pipe both stdout and stderr to stdin.
     run()

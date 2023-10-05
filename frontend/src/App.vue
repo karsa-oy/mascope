@@ -1,8 +1,5 @@
 <template>
   <div id="app">
-    <b-message v-if="isDevelopmentMode" type="is-danger" has-icon>
-      NOTE: You are running the development version of Mascope. Any changes are not persisted.
-    </b-message>
     <div v-if="appReady">
       <router-view></router-view>
     </div>
@@ -12,11 +9,13 @@
   </div>
 </template>
 
-<style src="./assets/css/style.css"></style>
-<style src="./assets/css/logo.css"></style>
+<style lang="scss">
+@import "./assets/style.scss";
+</style>
 
 <script>
 import { call, get } from "vuex-pathify";
+import { mapMutations, mapActions } from "vuex";
 
 export default {
   data: function () {
@@ -30,7 +29,7 @@ export default {
     }),
     isDevelopmentMode() {
       return this.appMode === "development";
-    }
+    },
   },
   created() {
     // add event listeners
@@ -41,20 +40,29 @@ export default {
       this.keyup(event);
     });
     // Return to home page at reload
-    if (this.$route.path !== '/') this.$router.push('/');
+    if (this.$route.path !== "/") this.$router.push("/");
+    if (this.isDevelopmentMode) {
+      this.showWarningNotification({
+        notification: "inDevelopment",
+      });
+    }
   },
   methods: {
     ...call({
       keydown: "key/down",
       keyup: "key/up",
     }),
+    ...mapMutations({
+      activateNotification: "notification/activate",
+    }),
+    ...mapActions("notification", ["showWarningNotification"]),
   },
   watch: {
     appPushNotification: {
       handler() {
         this.$buefy.dialog.alert(this.appPushNotification);
       },
-      deep: true
+      deep: true,
     },
   },
 };

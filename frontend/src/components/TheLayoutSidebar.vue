@@ -6,6 +6,20 @@
           <the-main-menu></the-main-menu>
         </b-sidebar>
         <div class="page-container">
+          <div
+            style="
+              position: fixed;
+              left: 9em;
+              bottom: 5em;
+              z-index: -1;
+              width: 200px;
+            "
+          >
+            <b-image
+              :src="require('../assets/karsa_logo_white_rgb.png')"
+              alt="Karsa Logo"
+            ></b-image>
+          </div>
           <slot></slot>
         </div>
       </section>
@@ -28,7 +42,7 @@ export default {
 
 <style>
 .sidebar-content {
-  background-color: #29282e !important;
+  background-color: #464752 !important;
 }
 
 .page-container {

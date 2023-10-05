@@ -5,7 +5,7 @@
       <slot name="header"></slot>
       <b-dropdown v-if="menu" aria-role="list" position="is-bottom-left">
         <template #trigger>
-          <b-button :icon-left=contextMenuIcon size="is-small" />
+          <b-button :icon-left="contextMenuIcon" size="is-small" />
         </template>
         <template v-for="item of menu">
           <b-dropdown-item
@@ -50,12 +50,9 @@
           <template v-if="col.field == 'match_score'">
             <base-tag-match
               :display-match-score="col.displayMatchScore"
-              :match-score="
-                props.row.matched === undefined || props.row.matched
-                ? props.row[col.field]
-                : null
-              "
+              :row="props.row"
               :tooltip="col.tooltip ? col.tooltip(props.row) : {}"
+              @tagClicked="matchScoreTagClicked"
             ></base-tag-match>
           </template>
           <template v-else>
@@ -70,6 +67,7 @@
                 :levels="getChildLevels(props.row)"
                 :isRoot="false"
                 :rootRefresh="refresh"
+                @tagClicked="matchScoreTagClicked"
               >
               </base-browser>
             </td>
@@ -100,7 +98,7 @@ export default {
     contextMenuIcon: {
       type: String,
       required: false,
-      default: "dots-horizontal"
+      default: "dots-horizontal",
     },
     name: {
       type: String,
@@ -176,7 +174,7 @@ export default {
         this.currentLevel.detailsOpen(row);
         this.refresh();
       };
-      return handleDetailsOpen
+      return handleDetailsOpen;
     },
     rowClick: function () {
       let handleClick = (row) => {
@@ -234,6 +232,9 @@ export default {
       } else {
         return `${className}-other`;
       }
+    },
+    matchScoreTagClicked: function (row) {
+      this.$emit("tagClicked", row);
     },
     rowClass: function (row) {
       switch (row.selection) {
@@ -319,20 +320,8 @@ export default {
   display: none;
 }
 
-.base-browser-row-focused {
-  background: #a5690e;
-}
-
-.base-browser-row-fully-selected {
-  background: #4c7799;
-}
-
-.base-browser-row-partially-selected {
-  background: #496275;
-}
-
 .icon > .mdi-chevron-right,
 .mdi-chevron-down {
-  color: rgb(255, 255, 255) !important;
+  color: white !important;
 }
 </style>

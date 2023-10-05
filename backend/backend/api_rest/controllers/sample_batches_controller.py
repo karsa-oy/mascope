@@ -1,0 +1,256 @@
+from fastapi import HTTPException, BackgroundTasks
+from sqlalchemy import asc, desc, func
+from sqlalchemy.future import select
+from sqlalchemy.orm import joinedload
+from datetime import datetime
+from backend.db_api_rest import async_session
+from backend.server import sio
+from backend.db.id import gen_id
+
+from ..models.models import SampleBatch, TargetCollectionInSampleBatch
+from ..models.pydantic_models.sample_batch_pydantic_model import (
+    SampleBatchCreate,
+    SampleBatchUpdate,
+)
+from ..models.pydantic_models.sample_item_pydantic_model import (
+    SampleItemCreate,
+)
+from ..models.pydantic_models.calibration_pydantic_model import CalibrationMzFitParams
+from ..models.pydantic_models.match_pydantic_model import (
+    MatchComputeBatch,
+)
+from .match_controller import match_batches_compute
+from .sample_items_controller import create_sample_item
+from .calibration_controller import calibration_mz_calibrate_batch
+
+
+async def get_sample_batches(
+    workspace_id: str, sort: str, order: str, page: int, limit: int
+):
+    async with async_session() as session:
+        stmt = select(SampleBatch)
+
+        if workspace_id:
+            stmt = stmt.filter(SampleBatch.workspace_id == workspace_id)
+
+        if sort:
+            if order == "desc":
+                stmt = stmt.order_by(desc(getattr(SampleBatch, sort)))
+            else:
+                stmt = stmt.order_by(asc(getattr(SampleBatch, sort)))
+
+        # Get total count
+        count_stmt = select(func.count()).select_from(stmt)
+        total = await session.scalar(count_stmt)
+
+        # Get paginated results
+        stmt = stmt.offset(page * limit).limit(limit)
+        result = await session.execute(stmt)
+        sample_batches = result.scalars().all()
+
+        return {
+            "results": total,
+            "data": [sample_batch.to_dict() for sample_batch in sample_batches],
+        }
+
+
+async def get_sample_batch_by_id(sample_batch_id: str):
+    async with async_session() as session:
+        stmt = select(SampleBatch).filter(
+            SampleBatch.sample_batch_id == sample_batch_id
+        )
+        result = await session.execute(stmt)
+        sample_batch = result.scalars().first()
+
+        if not sample_batch:
+            raise HTTPException(
+                status_code=404,
+                detail=f"SampleBatch with ID {sample_batch_id} not found",
+            )
+
+        return sample_batch.to_dict()
+
+
+async def create_sample_batch(sample_batch: SampleBatchCreate):
+    async with async_session() as session:
+        new_sample_batch = SampleBatch(
+            sample_batch_id=gen_id(16),
+            workspace_id=sample_batch.workspace_id,
+            sample_batch_name=sample_batch.sample_batch_name,
+            sample_batch_description=sample_batch.sample_batch_description,
+            build_params=sample_batch.build_params,
+            filter_params=sample_batch.filter_params,
+            sample_batch_utc_created=datetime.utcnow(),
+        )
+        session.add(new_sample_batch)
+        await session.commit()
+        await session.refresh(new_sample_batch)
+
+        # associations to target collections
+        for target_collection_id in sample_batch.target_collection_id:
+            new_target_collection_in_sample_batch = TargetCollectionInSampleBatch(
+                target_collection_id=target_collection_id,
+                sample_batch_id=new_sample_batch.sample_batch_id,
+            )
+            session.add(new_target_collection_in_sample_batch)
+        await session.commit()
+
+        # emit the event to inform the clients about the new workspace
+        await sio.emit(
+            "workspace_reload", room=sample_batch.workspace_id, namespace="/"
+        )
+
+        return new_sample_batch
+
+
+async def delete_sample_batch(sample_batch_id: str):
+    async with async_session() as session:
+        result = await session.execute(
+            select(SampleBatch).filter(SampleBatch.sample_batch_id == sample_batch_id)
+        )
+        sample_batch = result.scalar_one_or_none()
+        if not sample_batch:
+            raise HTTPException(status_code=404, detail="Sample batch not found")
+
+        await session.delete(sample_batch)
+        await session.commit()
+        await sio.emit(
+            "workspace_reload", room=sample_batch.workspace_id, namespace="/"
+        )
+
+
+async def update_sample_batch(
+    sample_batch_id: str,
+    sample_batch: SampleBatchUpdate,
+    background_tasks: BackgroundTasks,
+):
+    async with async_session() as session:
+        stmt = (
+            select(SampleBatch)
+            .options(joinedload(SampleBatch.target_collection))
+            .where(SampleBatch.sample_batch_id == sample_batch_id)
+        )
+        result = await session.execute(stmt)
+        existing_sample_batch = result.scalars().first()
+        if not existing_sample_batch:
+            raise HTTPException(status_code=404, detail="Sample batch not found")
+
+        # Determine whether a rematch is needed
+        rematch = False
+        if set(sample_batch.build_params["ion_mechanisms"]) != set(
+            existing_sample_batch.build_params["ion_mechanisms"]
+        ):
+            rematch = True
+        if set(sample_batch.target_collection_id) != {
+            item.target_collection_id
+            for item in existing_sample_batch.target_collection
+        }:
+            rematch = True
+
+        # Update the existing sample batch
+        update_data = sample_batch.dict(exclude_unset=True)
+        for key, value in update_data.items():
+            if key in ["build_params", "filter_params"]:
+                # Skip build_params and filter_params for now as they are done below
+                continue
+            setattr(existing_sample_batch, key, value)
+        existing_sample_batch.sample_batch_utc_modified = datetime.utcnow()
+
+        # Update the build_params and filter_params with the stringified versions
+        existing_sample_batch.build_params = sample_batch.build_params
+        existing_sample_batch.filter_params = sample_batch.filter_params
+
+        # Update target collections associations
+        if "target_collection_id" in update_data:
+            # Remove all previous associations
+            existing_sample_batch.target_collection.clear()
+            # Add new associations
+            for target_collection_id in sample_batch.target_collection_id:
+                new_target_collection_in_sample_batch = TargetCollectionInSampleBatch(
+                    target_collection_id=target_collection_id,
+                    sample_batch_id=existing_sample_batch.sample_batch_id,
+                )
+                session.add(new_target_collection_in_sample_batch)
+
+        await session.commit()
+    # Inform clients about the update
+    if rematch:
+        background_tasks.add_task(
+            match_batches_compute,
+            [MatchComputeBatch(sample_batch_id=existing_sample_batch.sample_batch_id)],
+        )
+    else:
+        await sio.emit(
+            "workspace_reload",
+            room=existing_sample_batch.workspace_id,
+            namespace="/",
+        )
+
+    return existing_sample_batch
+
+
+async def reload_sample_batch(sample_batch_id: str):
+    await sio.emit(
+        "sample_batch_reload",
+        room=sample_batch_id,
+        namespace="/",
+    )
+
+    return {"status": "success", "message": "Sample batch reloaded successfully"}
+
+
+async def autosampler_import_batch(
+    sample_batch, sample_items, params: CalibrationMzFitParams, background_tasks
+):
+    created_sample_items = []
+
+    for sample_item in sample_items:
+        sample_item_model = SampleItemCreate(**sample_item)
+        created_item = await create_sample_item(sample_item_model, skipReload=True)
+        created_sample_items.append(created_item.to_dict())
+
+    background_tasks.add_task(
+        process_batch,
+        sample_batch,
+        created_sample_items,
+        params,
+    )
+
+
+async def process_batch(sample_batch, sample_items, params):
+    sample_batch_id = sample_batch.get("sample_batch_id")
+
+    # Step 1. Calibrate batch
+    try:
+        calibration_results = await calibration_mz_calibrate_batch(
+            sample_batch, sample_items, params
+        )
+    except Exception as e:
+        print("Failed to calibrate batch %s" % sample_batch["sample_batch_name"])
+        print(e)
+
+    # Step 2. Compute matches for the batch
+    try:
+        await match_batches_compute(
+            [MatchComputeBatch(sample_batch_id=sample_batch_id)]
+        )
+    except Exception as e:
+        print(
+            "Failed to compute matched for batch %s" % sample_batch["sample_batch_name"]
+        )
+        print(e)
+
+    # Step 3. Send the warning notification if calibration was failed and information about samples
+    failed_samples = [
+        sample
+        for sample in calibration_results
+        if sample["status"] == "calibration failed"
+    ]
+    if failed_samples:
+        await sio.emit(
+            "calibration_mz_calibrate_batch_failed",
+            {"type": "failed_calibration_samples", "samples": failed_samples},
+            room=sample_batch["sample_batch_id"],
+            namespace="/",
+        )
+    return

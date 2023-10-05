@@ -5,13 +5,15 @@
       :levels="targetLevels"
       :menu="menu"
       :contextMenuIcon="contextMenuIcon"
+      @tagClicked="matchScoreTagClicked"
     >
     </base-browser>
   </section>
 </template>
 
 <script>
-import { mapMutations } from "vuex";
+import { mapActions, mapMutations } from "vuex";
+
 import { sync, get, call } from "vuex-pathify";
 
 import BaseBrowser from "./BaseBrowser.vue";
@@ -35,6 +37,7 @@ export default {
     }),
     ...get({
       batchActive: "batch/active",
+      sampleBatchesSelected: "workspace/sampleBatchesSelected",
       matchCollections: "sample/matchCollections",
       matchCompounds: "sample/matchCompounds",
       matchIons: "sample/matchIons",
@@ -50,27 +53,26 @@ export default {
       targetIsotopes: "batch/targetIsotopes",
     }),
     contextMenuIcon() {
-      return this.targetCollectionsSelected.length == 1
-        ? "dots-horizontal"
-        : "plus"
+      if (this.targetCollectionsSelected.length === 1) return "menu";
+      if (this.sampleBatchesSelected.length === 1) return "dots-horizontal";
+      if (this.sampleBatchesSelected.length !== 1) return "plus";
     },
-    targetCollectionRows: function() {
+    targetCollectionRows: function () {
       return this.sampleItemFocused && this.matchCollections
-      ? this.matchCollections
-      : this.targetCollections;
+        ? this.matchCollections
+        : this.targetCollections;
     },
-    targetCompoundRows: function() {
+    targetCompoundRows: function () {
       return this.sampleItemFocused && this.matchCompounds
-      ? this.matchCompounds
-      : this.targetCompounds;
-
+        ? this.matchCompounds
+        : this.targetCompounds;
     },
-    targetIonRows: function() {
+    targetIonRows: function () {
       return this.sampleItemFocused && this.matchIons
-      ? this.matchIons
-      : this.targetIons;
+        ? this.matchIons
+        : this.targetIons;
     },
-    targetIsotopeRows: function() {
+    targetIsotopeRows: function () {
       return this.sampleItemFocused && this.matchIsotopes
         ? this.matchIsotopes
         : this.targetIsotopes;
@@ -82,8 +84,16 @@ export default {
           name: "Collection",
           slug: "target_collection",
           cols: [
-            { field: "target_collection_name", label: "Collection", width: "30%" },
-            { field: "target_collection_description", label: "Description", width: "60%" },
+            {
+              field: "target_collection_name",
+              label: "Collection",
+              width: "30%",
+            },
+            {
+              field: "target_collection_description",
+              label: "Description",
+              width: "60%",
+            },
             {
               field: "match_score",
               label: "Score",
@@ -102,13 +112,17 @@ export default {
           rows: this.targetCollectionRows,
           defaultSort: ["match_score", "desc"],
           detailsIcon: "default",
-          rowClick: doNothing,
+          rowClick: this.targetCollectionToggle,
         },
         {
           name: "Compound",
           slug: "target_compound",
           cols: [
-            { field: "target_compound_formula", label: "Compound", width: "45%" },
+            {
+              field: "target_compound_formula",
+              label: "Compound",
+              width: "45%",
+            },
             { field: "target_compound_name", label: "", width: "45%" },
             {
               field: "match_score",
@@ -167,16 +181,14 @@ export default {
               hidden,
               tooltip: (row) => {
                 return {
-                  "Peak intensity": this.formatter.format(
-                    row.sample_peak_area
-                  ),
+                  "Peak intensity": this.formatter.format(row.sample_peak_area),
                 };
               },
             },
           ],
           rows: this.targetIsotopeRows,
           defaultSort: ["mz", "asc"],
-          detailsIcon: this.sampleItemFocused ? "magnify" : null,
+          detailsIcon: this.sampleItemFocused ? "chart-bell-curve" : null,
           detailsOpen: this.sampleItemFocused ? this.ionShow : null,
           rowClick: doNothing,
         },
@@ -196,19 +208,40 @@ export default {
         label: "Delete target collection",
         onClick: this.collectionDelete,
       };
-      let addCollectionToBatchButton = {
-        label: "Add target collection to batch",
-        onClick: this.collectionAddToBatch,
+      let copySelectedCollectionToOtherBatchesButton = {
+        label: "Manage selected collection batches",
+        onClick: this.manageSelectedCollectionBatches,
       };
+      let editBatchCollectionsButton = {
+        label: "Edit collections of selected batch",
+        onClick: this.editBatchCollections,
+      };
+      let rematchBatchesButton = {
+        label: "Rematch selected batch (debug)",
+        onClick: this.rematchBatches,
+      };
+      if (
+        this.targetCollectionsSelected.length == 0 &&
+        this.sampleBatchesSelected.length == 1
+      ) {
+        return [
+          createCollectionButton,
+          editBatchCollectionsButton,
+          rematchBatchesButton,
+        ];
+      }
+      if (this.targetCollectionsSelected.length == 0) {
+        return [createCollectionButton];
+      }
       if (this.targetCollectionsSelected.length == 1) {
         return [
-          addCollectionToBatchButton,
-          createCollectionButton,
           // updateCollectionButton,
+          createCollectionButton,
+          editBatchCollectionsButton,
+          copySelectedCollectionToOtherBatchesButton,
           deleteCollectionButton,
+          rematchBatchesButton,
         ];
-      } else {
-        return [createCollectionButton];
       }
     },
   },
@@ -219,15 +252,35 @@ export default {
     });
   },
   methods: {
+    ...mapActions("batch", ["reloadBatchInfo", "matchBatchesCompute"]),
     ...mapMutations({
       activateModal: "modal/activate",
     }),
     ...call({
       resetIonVisualization: "visualization/reset",
+      targetCollectionToggle: "batch/targetCollectionToggle",
     }),
-    collectionAddToBatch() {
+    manageSelectedCollectionBatches() {
       this.modalTargetCollectionOpProps = {
-        action: "addToBatch",
+        action: "manageSelectedCollectionBatches",
+        collection: this.targetCollectionsSelected[0],
+      };
+      this.activateModal({
+        modal: "targetCollectionOp",
+      });
+    },
+    async editBatchCollections() {
+      this.modalTargetCollectionOpProps = {
+        action: "editBatchCollections",
+        collection: this.targetCollectionsSelected[0],
+      };
+      this.activateModal({
+        modal: "targetCollectionOp",
+      });
+    },
+    collectionRemoveFromBatch() {
+      this.modalTargetCollectionOpProps = {
+        action: "removeFromBatch",
         collection: this.targetCollectionsSelected[0],
       };
       this.activateModal({
@@ -266,23 +319,39 @@ export default {
     ionShow(row) {
       this.resetIonVisualization();
       this.$api.emit(
-        'visualization_ion_focus',
+        "visualization_ion_focus",
         this.sampleItemFocused.sample_item_id,
         row.target_ion_id,
         this.minIsotopeAbundance,
         this.peakMinIntensity,
-        this.mzTolerance,
-        )
+        this.mzTolerance
+      );
       const targetIon = this.targetIons.filter(
         (ion) => ion.target_ion_id == row.target_ion_id
-        )[0];
+      )[0];
       this.modalSampleItemTargetIonProps = {
         ...row,
-        target_ion_formula: targetIon.target_ion_formula
-        };
+        target_ion_formula: targetIon.target_ion_formula,
+      };
       this.activateModal({
         modal: "sampleItemTargetIon",
       });
+    },
+    matchScoreTagClicked(row) {
+      if (row.target_compound_id) {
+        // Compound or Ion match score tag clicked
+        if (!row.target_ion_id) {
+          // Compound tag clicked -> fetch corresponding ion id
+          // Note: This picks the first matching target ion if there are many
+          row = this.matchIons.filter(
+            (ion) => ion.target_compound_id === row.target_compound_id
+          )[0];
+        }
+        this.ionShow(row);
+      }
+    },
+    async rematchBatches() {
+      await this.matchBatchesCompute(this.sampleBatchesSelected);
     },
   },
 };

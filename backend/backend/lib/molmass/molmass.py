@@ -78,25 +78,33 @@ Revisions
 
 """
 
-__version__ = '2020.6.10'
+__version__ = "2020.6.10"
 
 __all__ = (
-    'analyze', 'Formula', 'FormulaError', 'Spectrum', 'Composition',
-    'test', 'main', 'from_elements',
-    'from_sequence', 'from_string', 'hill_sorted',
-    'GROUPS'
+    "analyze",
+    "Formula",
+    "FormulaError",
+    "Spectrum",
+    "Composition",
+    "test",
+    "main",
+    "from_elements",
+    "from_sequence",
+    "from_string",
+    "hill_sorted",
+    "GROUPS",
 )
 
-import sys
-import re
-import math
 import copy
+import math
+import re
+import sys
 from functools import reduce
 
 try:
-    from elements import ELEMENTS, Isotope, ELECTRON
+    from elements import ELECTRON, ELEMENTS, Isotope
 except ImportError:
-    from .elements import ELEMENTS, Isotope, ELECTRON
+    from .elements import ELECTRON, ELEMENTS, Isotope
 
 
 def analyze(formula, maxatoms=250):
@@ -110,40 +118,45 @@ def analyze(formula, maxatoms=250):
         f = Formula(formula)
 
         if len(str(f)) <= 50:
-            result.append(f'Formula: {f}')
-        result.append("Charge: %s%s" %(('+' if f.charge>0 else ''), f.charge))
+            result.append(f"Formula: {f}")
+        result.append("Charge: %s%s" % (("+" if f.charge > 0 else ""), f.charge))
         if formula != f.formula:
-            result.append(f'Hill notation: {f.formula}')
+            result.append(f"Hill notation: {f.formula}")
         if f.formula != f.empirical:
-            result.append(f'Empirical formula: {f.empirical}')
+            result.append(f"Empirical formula: {f.empirical}")
 
         prec = precision_digits(f.mass, 9)
         if f.mass != f.isotope.mass:
-            result.append(f'\nAverage mass: {f.mass:.{prec}f}')
-        result.extend((
-            f'Monoisotopic mass: {f.isotope.mass:.{prec}f}',
-            f'm/z:  {f.mz:.{prec}f}',
-            f'Nominal mass: {f.isotope.massnumber}'))
+            result.append(f"\nAverage mass: {f.mass:.{prec}f}")
+        result.extend(
+            (
+                f"Monoisotopic mass: {f.isotope.mass:.{prec}f}",
+                f"m/z:  {f.mz:.{prec}f}",
+                f"Nominal mass: {f.isotope.massnumber}",
+            )
+        )
 
         c = f.composition()
         if len(c) > 1:
-            result.extend(('\nElemental Composition\n', str(c)))
+            result.extend(("\nElemental Composition\n", str(c)))
 
         if f.atoms < maxatoms:
             s = f.spectrum()
             if len(s) > 1:
-                result.extend((
-                    '\nMass Distribution',
-                    f'\nMost abundant mass: {s.peak[0]:.{prec}f} '
-                    f'({ s.peak[1] * 100:.3f}%)',
-                    f'Mean mass: {s.mean:.{prec}f}\n',
-                    str(s)
-                ))
+                result.extend(
+                    (
+                        "\nMass Distribution",
+                        f"\nMost abundant mass: {s.peak[0]:.{prec}f} "
+                        f"({ s.peak[1] * 100:.3f}%)",
+                        f"Mean mass: {s.mean:.{prec}f}\n",
+                        str(s),
+                    )
+                )
 
     except Exception as exc:
-        result.append(f'Error: {exc}')
+        result.append(f"Error: {exc}")
 
-    return '\n'.join(result)
+    return "\n".join(result)
 
 
 class lazyattr:
@@ -154,7 +167,7 @@ class lazyattr:
         # crude hack to keep docstrings and allow doctests
         if func.__doc__:
             self.__doc__ = func.__doc__
-            lazyattr.docstrings.__doc__ += '\n\n' + func.__doc__
+            lazyattr.docstrings.__doc__ += "\n\n" + func.__doc__
 
     def __get__(self, instance, owner):
         if instance is None:
@@ -186,7 +199,7 @@ class Formula:
 
     """
 
-    def __init__(self, formula='', groups=None):
+    def __init__(self, formula="", groups=None):
         self._formula = from_string(formula, groups)
 
     def __str__(self):
@@ -205,8 +218,8 @@ class Formula:
 
         """
         if not isinstance(number, int) or number < 1:
-            raise TypeError('can only multipy with positive number')
-        return Formula(f'({self._formula}){number}')
+            raise TypeError("can only multipy with positive number")
+        return Formula(f"({self._formula}){number}")
 
     def __rmul__(self, number):
         """Return this formula repeated number times as new Formula.
@@ -229,19 +242,19 @@ class Formula:
 
         """
         if not isinstance(other, Formula):
-            raise TypeError('can only add Formula instance')
+            raise TypeError("can only add Formula instance")
         charge = self.charge + other.charge
         if charge == 0:
-            return Formula(f'({self.formula})({other.formula})')
+            return Formula(f"({self.formula})({other.formula})")
         elif charge == 1:
-            return Formula(f'({self.formula})({other.formula})+')
+            return Formula(f"({self.formula})({other.formula})+")
         elif charge == -1:
-            return Formula(f'({self.formula})({other.formula})-')
+            return Formula(f"({self.formula})({other.formula})-")
         elif charge > 0:
-            return Formula(f'({self.formula})({other.formula})_{charge}+')
+            return Formula(f"({self.formula})({other.formula})_{charge}+")
         elif charge < 0:
-            return Formula(f'({self.formula})({other.formula})_{-charge}-')
-            
+            return Formula(f"({self.formula})({other.formula})_{-charge}-")
+
     def __radd__(self, other):
         if other == 0:
             return self
@@ -258,22 +271,18 @@ class Formula:
 
         """
         if not isinstance(other, Formula):
-            raise TypeError('can only subtract Formula instance')
+            raise TypeError("can only subtract Formula instance")
         _elements = copy.deepcopy(self._elements)
         for symbol, isotopes in other._elements.items():
             if symbol not in _elements:
-                raise ValueError(f'element {symbol} not in {self}')
+                raise ValueError(f"element {symbol} not in {self}")
             element = _elements[symbol]
             for massnumber, count in isotopes.items():
                 if massnumber not in element:
-                    raise ValueError(
-                        f'element {massnumber}{symbol} not in {self}'
-                    )
+                    raise ValueError(f"element {massnumber}{symbol} not in {self}")
                 element[massnumber] -= count
                 if element[massnumber] < 0:
-                    raise ValueError(
-                        f'negative number of element {massnumber}{symbol}'
-                    )
+                    raise ValueError(f"negative number of element {massnumber}{symbol}")
                 if element[massnumber] == 0:
                     del element[massnumber]
                 if not element:
@@ -296,21 +305,19 @@ class Formula:
         """
         formula = self._formula
         if not formula:
-            raise FormulaError('empty formula', formula, 0)
+            raise FormulaError("empty formula", formula, 0)
 
-        validchars = set('([{<123456789ABCDEFGHIKLMNOPRSTUVWXYZ_+-')
+        validchars = set("([{<123456789ABCDEFGHIKLMNOPRSTUVWXYZ_+-")
 
         if not formula[0] in validchars:
-            raise FormulaError(
-                f"unexpected character '{formula[0]}'", formula, 0
-            )
+            raise FormulaError(f"unexpected character '{formula[0]}'", formula, 0)
 
-        validchars |= set(']})>0abcdefghiklmnoprstuy')
+        validchars |= set("]})>0abcdefghiklmnoprstuy")
 
         elements = {}
-        ele = ''      # parsed element
-        num = 0       # number
-        level = 0     # parenthesis level
+        ele = ""  # parsed element
+        num = 0  # number
+        level = 0  # parenthesis level
         counts = [1]  # parenthesis level multiplication
         i = len(formula)
         charge_mode = False
@@ -319,13 +326,11 @@ class Formula:
             char = formula[i]
             if char not in validchars:
                 raise FormulaError(f"unexpected character {char}'", formula, i)
-            if char in '([{<':
+            if char in "([{<":
                 level -= 1
                 if level < 0 or num != 0:
-                    raise FormulaError(
-                        "missing closing parenthesis ')]}>'", formula, i
-                    )
-            elif char in ')]}>':
+                    raise FormulaError("missing closing parenthesis ')]}>'", formula, i)
+            elif char in ")]}>":
                 charge_mode = False
                 if num == 0:
                     num = 1
@@ -343,13 +348,12 @@ class Formula:
                 if charge_mode:
                     num = 1
                 else:
-                    num = int(formula[i:j + 1])
+                    num = int(formula[i : j + 1])
                 if num == 0:
                     raise FormulaError("count is zero", formula, i)
             elif char.islower():
                 if not formula[i - 1].isupper():
-                    raise FormulaError(
-                        f"unexpected character '{char}'", formula, i)
+                    raise FormulaError(f"unexpected character '{char}'", formula, i)
                 ele = char
             elif char.isupper():
                 ele = char + ele
@@ -357,20 +361,18 @@ class Formula:
                     num = 1
                 if ele not in ELEMENTS:
                     raise FormulaError(f"unknown symbol '{ele}'", formula, i)
-                iso = ''
+                iso = ""
                 j = i
                 while i and formula[i - 1].isdigit():
                     i -= 1
                     iso = formula[i] + iso
-                if iso and i and not formula[i - 1] in '([{<':
+                if iso and i and not formula[i - 1] in "([{<":
                     i = j
-                    iso = ''
+                    iso = ""
                 if iso:
                     iso = int(iso)
                     if iso not in ELEMENTS[ele].isotopes:
-                        raise FormulaError(
-                            f"unknown isotope '{iso}{ele}'", formula, i
-                        )
+                        raise FormulaError(f"unknown isotope '{iso}{ele}'", formula, i)
                 else:
                     iso = 0
                 number = num * counts[level]
@@ -382,21 +384,20 @@ class Formula:
                         item[iso] = number
                 else:
                     elements[ele] = {iso: number}
-                ele = ''
+                ele = ""
                 num = 0
 
         if num != 0:
-            raise FormulaError('number preceding formula', formula, 0)
+            raise FormulaError("number preceding formula", formula, 0)
 
         if level != 0:
-            raise FormulaError(
-                "missing opening parenthesis '([{<'", formula, 0)
+            raise FormulaError("missing opening parenthesis '([{<'", formula, 0)
 
         if not elements:
-            raise FormulaError('invalid formula', formula, 0)
+            raise FormulaError("invalid formula", formula, 0)
 
         return elements
-    
+
     @lazyattr
     def charge(self):
         """Return formula charge.
@@ -418,7 +419,7 @@ class Formula:
         charge = 0
         m = re.search("\]{1,}([0-9]*)([+-]{1,})$", self._formula)
         if m:
-            if m.groups()[0] == '':
+            if m.groups()[0] == "":
                 charge = int("%s1" % m.groups()[1])
             else:
                 charge = int("%s%s" % (m.groups()[1], m.groups()[0]))
@@ -485,10 +486,8 @@ class Formula:
         6
 
         """
-        return gcd(
-            {list(i)[0] for i in (j.values() for j in self._elements.values())}
-        )
-        
+        return gcd({list(i)[0] for i in (j.values() for j in self._elements.values())})
+
     @lazyattr
     def mz(self):
         """Return monoisotopic mass corrected by ion charge.
@@ -504,10 +503,10 @@ class Formula:
         >>> _(Formula('SO4_2-').mz)
         48.0318
 
-        """        
+        """
         if self.charge != 0:
             return (self.isotope.mass - ELECTRON.mass * self.charge) / abs(self.charge)
-            
+
         return 0
 
     @lazyattr
@@ -535,7 +534,7 @@ class Formula:
                     result += ele.isotopes[massnumber].mass * count
                 else:
                     result += ele.mass * count
-                    
+
         return result
 
     @lazyattr
@@ -562,8 +561,8 @@ class Formula:
                     isotope = ele.isotopes[ele.nominalmass]
                 result.mass += isotope.mass * count
                 result.massnumber += isotope.massnumber * count
-                result.abundance *= isotope.abundance ** count
-                
+                result.abundance *= isotope.abundance**count
+
         return result
 
     def composition(self, isotopic=True):
@@ -593,7 +592,7 @@ class Formula:
                     count = iso[massnumber]
                     if massnumber:
                         mass = ele.isotopes[massnumber].mass * count
-                        symbol = f'{massnumber}{symbol}'
+                        symbol = f"{massnumber}{symbol}"
                     else:
                         mass = ele.mass * count
                     result.append((symbol, count, mass, mass / self.mass))
@@ -660,9 +659,9 @@ class Formula:
                                     s[1] += f
                                 else:
                                     spectrum[k] = [m, f]
-                                    
+
         return Spectrum(spectrum)
-        
+
     def mz_spectrum(self, minfract=1e-9, isotope_threshold=1e-3):
         """Return low resolution mz spectrum as Spectrum instance.
 
@@ -691,14 +690,18 @@ class Formula:
         """
         spectrum = self.spectrum(minfract=minfract)
         mz_spectrum = {}
-        
+
         # Correct mass with charge
         for key, val in spectrum.items():
             percentage = val[1]
             if percentage >= isotope_threshold:
-                mz = (val[0] - ELECTRON.mass * self.charge) / abs(self.charge) if self.charge != 0 else val[0]
+                mz = (
+                    (val[0] - ELECTRON.mass * self.charge) / abs(self.charge)
+                    if self.charge != 0
+                    else val[0]
+                )
                 mz_spectrum[key] = [mz, percentage]
-            
+
         return Spectrum(mz_spectrum)
 
 
@@ -756,17 +759,17 @@ class Spectrum(dict):
 
     def __str__(self):
         if len(self) == 0:
-            return ''
-        result = ['Relative mass    Fraction %      Intensity']
+            return ""
+        result = ["Relative mass    Fraction %      Intensity"]
         prec = precision_digits(self.peak[0], 9)
         norm = 100.0 / self.peak[1]
         for mass, fraction in self.values():
             result.append(
-                '{:<13.{}f}   {:11.6f}   {:12.6f}'.format(
+                "{:<13.{}f}   {:11.6f}   {:12.6f}".format(
                     mass, prec, fraction * 100.0, fraction * norm
                 )
             )
-        return '\n'.join(result)
+        return "\n".join(result)
 
 
 class Composition(tuple):
@@ -796,29 +799,29 @@ class Composition(tuple):
 
     def __str__(self):
         if len(self) == 0:
-            return ''
+            return ""
         prec = precision_digits(self.total[1], 9)
-        result = ['Element  Number  Relative mass  Fraction %']
+        result = ["Element  Number  Relative mass  Fraction %"]
         for symbol, count, mass, fraction in self:
             result.append(
-                '{:<6s} {:8}  {:13.{}f} {:11.4f}'.format(
+                "{:<6s} {:8}  {:13.{}f} {:11.4f}".format(
                     symbol, count, mass, prec, fraction * 100
                 )
             )
         if len(self) > 1:
             count, mass, fraction = self.total
             result.append(
-                '{:<6s} {:8}  {:13.{}f} {:11.4f}'.format(
-                    'Total:', count, mass, prec, fraction * 100
+                "{:<6s} {:8}  {:13.{}f} {:11.4f}".format(
+                    "Total:", count, mass, prec, fraction * 100
                 )
             )
-        return '\n'.join(result)
+        return "\n".join(result)
 
 
 class FormulaError(Exception):
     """Custom exception to report errors in the Formula object."""
 
-    def __init__(self, msg, formula='', pos=-1):
+    def __init__(self, msg, formula="", pos=-1):
         self.position = pos
         self.message = msg
         self.formula = formula
@@ -840,23 +843,23 @@ def from_string(formula, groups=None):
     common chemical groups, peptides, oligos, and mass fractions.
     """
     try:
-        formula = formula.strip().replace(' ', '')
+        formula = formula.strip().replace(" ", "")
     except AttributeError as exc:
-        raise FormulaError('not a string') from exc
+        raise FormulaError("not a string") from exc
 
     # abbreviations of common chemical groups
     if groups is None:
         groups = GROUPS
     if groups:
         for grp in reversed(sorted(groups)):
-            formula = formula.replace(grp, f'({groups[grp]})')
-    
+            formula = formula.replace(grp, f"({groups[grp]})")
+
     # Charge
     charge = 0
     m = re.search("([_]{1,})([0-9]{1,})([+-]{1,})$", formula)
     if m:
         # Search for multi-charged (e.g. *_2-)
-        if m.groups()[1] == '':
+        if m.groups()[1] == "":
             # Do we ever end up in here?
             charge = int("%s1" % m.groups()[2])
         else:
@@ -887,25 +890,25 @@ def from_string(formula, groups=None):
         formula = formula.strip("[").strip("]")
 
     # arithmetic
-    formula = formula.replace('.', '+')
-    if '+' in formula:
-        for match in re.findall(
-            r'(?:\+|^)((\d+)\*?(.*?))(?:(?=\+)|$)', formula
-        ):
-            formula = formula.replace(match[0], f'({match[2]}){match[1]}')
-        formula = formula.replace('+', '')
-    if '-' in formula:
+    formula = formula.replace(".", "+")
+    if "+" in formula:
+        for match in re.findall(r"(?:\+|^)((\d+)\*?(.*?))(?:(?=\+)|$)", formula):
+            formula = formula.replace(match[0], f"({match[2]}){match[1]}")
+        formula = formula.replace("+", "")
+    if "-" in formula:
         # Check for parenthesis
-        for match in re.findall(
-            r'([(]{1,})([\w]*)([-]{1,})([\w]*)([)]{1,})', formula
-        ):
+        for match in re.findall(r"([(]{1,})([\w]*)([-]{1,})([\w]*)([)]{1,})", formula):
             a, b = match[1], match[3]
-            sub = (Formula(a) - Formula(b))
-            formula = formula.replace( ''.join(match), sub.formula )
-        
-    #Charge
+            sub = Formula(a) - Formula(b)
+            formula = formula.replace("".join(match), sub.formula)
+
+    # Charge
     if charge != 0:
-        formula = '[%s]%s%s'% (formula, abs(charge) if abs(charge)>1 else "", "+" if charge>0 else "-")
+        formula = "[%s]%s%s" % (
+            formula,
+            abs(charge) if abs(charge) > 1 else "",
+            "+" if charge > 0 else "-",
+        )
 
     return formula
 
@@ -923,7 +926,7 @@ def from_elements(elements, divisor=1, *fmt):
 
     """
     if not fmt:
-        fmt = ('{}', '{}{}', '[{}{}]', '[{}{}]{}')
+        fmt = ("{}", "{}{}", "[{}{}]", "[{}{}]{}")
     formula = []
     for symbol in hill_sorted(elements):
         isotopes = elements[symbol]
@@ -939,7 +942,7 @@ def from_elements(elements, divisor=1, *fmt):
                     formula.append(fmt[0].format(symbol))
                 else:
                     formula.append(fmt[1].format(symbol, count))
-    return ''.join(formula)
+    return "".join(formula)
 
 
 def from_sequence(sequence, items):
@@ -963,10 +966,10 @@ def from_sequence(sequence, items):
     for key in sorted(items):
         num = counts[key]
         if num == 1:
-            formula.append(f'({items[key]})')
+            formula.append(f"({items[key]})")
         elif num:
-            formula.append(f'({items[key]}){num}')
-    return ''.join(formula)
+            formula.append(f"({items[key]}){num}")
+    return "".join(formula)
 
 
 def hill_sorted(symbols):
@@ -979,12 +982,12 @@ def hill_sorted(symbols):
 
     """
     symbols = set(symbols)
-    if 'C' in symbols:
-        symbols.remove('C')
-        yield 'C'
-        if 'H' in symbols:
-            symbols.remove('H')
-            yield 'H'
+    if "C" in symbols:
+        symbols.remove("C")
+        yield "C"
+        if "H" in symbols:
+            symbols.remove("H")
+            yield "H"
     yield from sorted(symbols)
 
 
@@ -1040,118 +1043,118 @@ def precision_digits(f, width):
 
 # Common chemical groups
 GROUPS = {
-    'Abu': 'C4H7NO',
-    'Acet': 'C2H3O',
-    'Acm': 'C3H6NO',
-    'Adao': 'C10H15O',
-    'Aib': 'C4H7NO',
-    'Ala': 'C3H5NO',
-    'Arg': 'C6H12N4O',
-    'Argp': 'C6H11N4O',
-    'Asn': 'C4H6N2O2',
-    'Asnp': 'C4H5N2O2',
-    'Asp': 'C4H5NO3',
-    'Aspp': 'C4H4NO3',
-    'Asu': 'C8H13NO3',
-    'Asup': 'C8H12NO3',
-    'Boc': 'C5H9O2',
-    'Bom': 'C8H9O',
-    'Bpy': 'C10H8N2',  # Bipyridine
-    'Brz': 'C8H6BrO2',
-    'Bu': 'C4H9',
-    'Bum': 'C5H11O',
-    'Bz': 'C7H5O',
-    'Bzl': 'C7H7',
-    'Bzlo': 'C7H7O',
-    'Cha': 'C9H15NO',
-    'Chxo': 'C6H11O',
-    'Cit': 'C6H11N3O2',
-    'Citp': 'C6H10N3O2',
-    'Clz': 'C8H6ClO2',
-    'Cp': 'C5H5',
-    'Cy': 'C6H11',
-    'Cys': 'C3H5NOS',
-    'Cysp': 'C3H4NOS',
-    'Dde': 'C10H13O2',
-    'Dnp': 'C6H3N2O4',
-    'Et': 'C2H5',
-    'Fmoc': 'C15H11O2',
-    'For': 'CHO',
-    'Gln': 'C5H8N2O2',
-    'Glnp': 'C5H7N2O2',
-    'Glp': 'C5H5NO2',
-    'Glu': 'C5H7NO3',
-    'Glup': 'C5H6NO3',
-    'Gly': 'C2H3NO',
-    'Hci': 'C7H13N3O2',
-    'Hcip': 'C7H12N3O2',
-    'His': 'C6H7N3O',
-    'Hisp': 'C6H6N3O',
-    'Hser': 'C4H7NO2',
-    'Hserp': 'C4H6NO2',
-    'Hx': 'C6H11',
-    'Hyp': 'C5H7NO2',
-    'Hypp': 'C5H6NO2',
-    'Ile': 'C6H11NO',
-    'Ivdde': 'C14H21O2',
-    'Leu': 'C6H11NO',
-    'Lys': 'C6H12N2O',
-    'Lysp': 'C6H11N2O',
-    'Mbh': 'C15H15O2',
-    'Me': 'CH3',
-    'Mebzl': 'C8H9',
-    'Meobzl': 'C8H9O',
-    'Met': 'C5H9NOS',
-    'Mmt': 'C20H17O',
-    'Mtc': 'C14H19O3S',
-    'Mtr': 'C10H13O3S',
-    'Mts': 'C9H11O2S',
-    'Mtt': 'C20H17',
-    'Nle': 'C6H11NO',
-    'Npys': 'C5H3N2O2S',
-    'Nva': 'C5H9NO',
-    'Odmab': 'C20H26NO3',
-    'Orn': 'C5H10N2O',
-    'Ornp': 'C5H9N2O',
-    'Pbf': 'C13H17O3S',
-    'Pen': 'C5H9NOS',
-    'Penp': 'C5H8NOS',
-    'Ph': 'C6H5',
-    'Phe': 'C9H9NO',
-    'Phepcl': 'C9H8ClNO',
-    'Phg': 'C8H7NO',
-    'Pmc': 'C14H19O3S',
-    'Ppa': 'C8H7O2',
-    'Pro': 'C5H7NO',
-    'Prop': 'C3H7',
-    'Py': 'C5H5N',
-    'Pyr': 'C5H5NO2',
-    'Sar': 'C3H5NO',
-    'Ser': 'C3H5NO2',
-    'Serp': 'C3H4NO2',
-    'Sta': 'C8H15NO2',
-    'Stap': 'C8H14NO2',
-    'Tacm': 'C6H12NO',
-    'Tbdms': 'C6H15Si',
-    'Tbu': 'C4H9',
-    'Tbuo': 'C4H9O',
-    'Tbuthio': 'C4H9S',
-    'Tfa': 'C2F3O',
-    'Thi': 'C7H7NOS',
-    'Thr': 'C4H7NO2',
-    'Thrp': 'C4H6NO2',
-    'Tips': 'C9H21Si',
-    'Tms': 'C3H9Si',
-    'Tos': 'C7H7O2S',
-    'Trp': 'C11H10N2O',
-    'Trpp': 'C11H9N2O',
-    'Trt': 'C19H15',
-    'Tyr': 'C9H9NO2',
-    'Tyrp': 'C9H8NO2',
-    'Val': 'C5H9NO',
-    'Valoh': 'C5H9NO2',
-    'Valohp': 'C5H8NO2',
-    'Xan': 'C13H9O',
+    "Abu": "C4H7NO",
+    "Acet": "C2H3O",
+    "Acm": "C3H6NO",
+    "Adao": "C10H15O",
+    "Aib": "C4H7NO",
+    "Ala": "C3H5NO",
+    "Arg": "C6H12N4O",
+    "Argp": "C6H11N4O",
+    "Asn": "C4H6N2O2",
+    "Asnp": "C4H5N2O2",
+    "Asp": "C4H5NO3",
+    "Aspp": "C4H4NO3",
+    "Asu": "C8H13NO3",
+    "Asup": "C8H12NO3",
+    "Boc": "C5H9O2",
+    "Bom": "C8H9O",
+    "Bpy": "C10H8N2",  # Bipyridine
+    "Brz": "C8H6BrO2",
+    "Bu": "C4H9",
+    "Bum": "C5H11O",
+    "Bz": "C7H5O",
+    "Bzl": "C7H7",
+    "Bzlo": "C7H7O",
+    "Cha": "C9H15NO",
+    "Chxo": "C6H11O",
+    "Cit": "C6H11N3O2",
+    "Citp": "C6H10N3O2",
+    "Clz": "C8H6ClO2",
+    "Cp": "C5H5",
+    "Cy": "C6H11",
+    "Cys": "C3H5NOS",
+    "Cysp": "C3H4NOS",
+    "Dde": "C10H13O2",
+    "Dnp": "C6H3N2O4",
+    "Et": "C2H5",
+    "Fmoc": "C15H11O2",
+    "For": "CHO",
+    "Gln": "C5H8N2O2",
+    "Glnp": "C5H7N2O2",
+    "Glp": "C5H5NO2",
+    "Glu": "C5H7NO3",
+    "Glup": "C5H6NO3",
+    "Gly": "C2H3NO",
+    "Hci": "C7H13N3O2",
+    "Hcip": "C7H12N3O2",
+    "His": "C6H7N3O",
+    "Hisp": "C6H6N3O",
+    "Hser": "C4H7NO2",
+    "Hserp": "C4H6NO2",
+    "Hx": "C6H11",
+    "Hyp": "C5H7NO2",
+    "Hypp": "C5H6NO2",
+    "Ile": "C6H11NO",
+    "Ivdde": "C14H21O2",
+    "Leu": "C6H11NO",
+    "Lys": "C6H12N2O",
+    "Lysp": "C6H11N2O",
+    "Mbh": "C15H15O2",
+    "Me": "CH3",
+    "Mebzl": "C8H9",
+    "Meobzl": "C8H9O",
+    "Met": "C5H9NOS",
+    "Mmt": "C20H17O",
+    "Mtc": "C14H19O3S",
+    "Mtr": "C10H13O3S",
+    "Mts": "C9H11O2S",
+    "Mtt": "C20H17",
+    "Nle": "C6H11NO",
+    "Npys": "C5H3N2O2S",
+    "Nva": "C5H9NO",
+    "Odmab": "C20H26NO3",
+    "Orn": "C5H10N2O",
+    "Ornp": "C5H9N2O",
+    "Pbf": "C13H17O3S",
+    "Pen": "C5H9NOS",
+    "Penp": "C5H8NOS",
+    "Ph": "C6H5",
+    "Phe": "C9H9NO",
+    "Phepcl": "C9H8ClNO",
+    "Phg": "C8H7NO",
+    "Pmc": "C14H19O3S",
+    "Ppa": "C8H7O2",
+    "Pro": "C5H7NO",
+    "Prop": "C3H7",
+    "Py": "C5H5N",
+    "Pyr": "C5H5NO2",
+    "Sar": "C3H5NO",
+    "Ser": "C3H5NO2",
+    "Serp": "C3H4NO2",
+    "Sta": "C8H15NO2",
+    "Stap": "C8H14NO2",
+    "Tacm": "C6H12NO",
+    "Tbdms": "C6H15Si",
+    "Tbu": "C4H9",
+    "Tbuo": "C4H9O",
+    "Tbuthio": "C4H9S",
+    "Tfa": "C2F3O",
+    "Thi": "C7H7NOS",
+    "Thr": "C4H7NO2",
+    "Thrp": "C4H6NO2",
+    "Tips": "C9H21Si",
+    "Tms": "C3H9Si",
+    "Tos": "C7H7O2S",
+    "Trp": "C11H10N2O",
+    "Trpp": "C11H9N2O",
+    "Trt": "C19H15",
+    "Tyr": "C9H9NO2",
+    "Tyrp": "C9H8NO2",
+    "Val": "C5H9NO",
+    "Valoh": "C5H9NO2",
+    "Valohp": "C5H8NO2",
+    "Xan": "C13H9O",
 }
 
 
@@ -1163,33 +1166,33 @@ def test(verbose=False):
 
     # these formulas should pass
     for data in [
-        (''.join(e.symbol for e in ELEMENTS), '', 14693.181589000998),
-        ('12C', '[12C]', 12.0),
-        ('12CC', 'C[12C]', 24.0107),
-        ('Co(Bpy)(CO)4', '', 327.16),
-        ('CH3CH2Cl', 'C2H5Cl', 64.5147),
-        ('C1000H1000', 'CH', 13018.68),
-        ('Ru2(CO)8', 'C4O4Ru', 426.2232),
-        ('RuClH(CO)(PPh3)3', 'C55H46ClOP3Ru', 952.41392),
-        ('PhSiMe3', 'C9H14Si', 150.29566),
-        ('Ph(CO)C(CH3)3', 'C11H14O', 162.23156),
-        ('HGlyGluTyrOH', 'C16H21N3O7', 367.35864),
-        ('[13C]Cl4', '[13C]Cl4', 154.8153),
-        ('C5(PhBu(EtCHBr)2)3', 'C53H78Br6', 1194.626),
-        ('AgCuRu4(H)2[CO]12{PPh3}2', 'C48H32AgCuO12P2Ru4', 1438.4022),
-        ('PhNH2.HCl', 'C6H8ClN', 129.5892),
-        ('NH3.BF3', 'BF3H3N', 84.8357),
-        ('CuSO4.5H2O', 'CuH10O9S', 249.68),
+        ("".join(e.symbol for e in ELEMENTS), "", 14693.181589000998),
+        ("12C", "[12C]", 12.0),
+        ("12CC", "C[12C]", 24.0107),
+        ("Co(Bpy)(CO)4", "", 327.16),
+        ("CH3CH2Cl", "C2H5Cl", 64.5147),
+        ("C1000H1000", "CH", 13018.68),
+        ("Ru2(CO)8", "C4O4Ru", 426.2232),
+        ("RuClH(CO)(PPh3)3", "C55H46ClOP3Ru", 952.41392),
+        ("PhSiMe3", "C9H14Si", 150.29566),
+        ("Ph(CO)C(CH3)3", "C11H14O", 162.23156),
+        ("HGlyGluTyrOH", "C16H21N3O7", 367.35864),
+        ("[13C]Cl4", "[13C]Cl4", 154.8153),
+        ("C5(PhBu(EtCHBr)2)3", "C53H78Br6", 1194.626),
+        ("AgCuRu4(H)2[CO]12{PPh3}2", "C48H32AgCuO12P2Ru4", 1438.4022),
+        ("PhNH2.HCl", "C6H8ClN", 129.5892),
+        ("NH3.BF3", "BF3H3N", 84.8357),
+        ("CuSO4.5H2O", "CuH10O9S", 249.68),
     ]:
         if verbose:
-            print(f"Trying Formula('{data[0]}') ...", end='')
+            print(f"Trying Formula('{data[0]}') ...", end="")
         try:
             f = Formula(data[0])
             f.empirical
             f.mass
             f.spectrum
         except FormulaError as exc:
-            print('Error:', exc)
+            print("Error:", exc)
             continue
         if data[1] and f.empirical != data[1]:
             print(
@@ -1200,31 +1203,44 @@ def test(verbose=False):
             continue
         if data[2] and abs(f.mass - data[2]) > 0.1:
             print(
-                'Failure for {}:\n    Expected {}, got {}'.format(
+                "Failure for {}:\n    Expected {}, got {}".format(
                     data[0], data[2], f.mass
                 )
             )
             continue
         if verbose:
-            print('ok')
+            print("ok")
 
     # these formulas are expected to fail
     for data in [
-        '', '()', '2', 'a', '(a)', 'C:H', 'H:', 'C[H', 'H)2',
-        'A', 'Aa', '2lC', '1C', '[11C]', 'H0', '()0', '(H)0C',
-        'Ox: 0.26, 30Si: 0.74',
+        "",
+        "()",
+        "2",
+        "a",
+        "(a)",
+        "C:H",
+        "H:",
+        "C[H",
+        "H)2",
+        "A",
+        "Aa",
+        "2lC",
+        "1C",
+        "[11C]",
+        "H0",
+        "()0",
+        "(H)0C",
+        "Ox: 0.26, 30Si: 0.74",
     ]:
         if verbose:
-            print(f"Trying Formula('{data}') ...", end='')
+            print(f"Trying Formula('{data}') ...", end="")
         try:
             f = Formula(data).empirical
         except FormulaError as exc:
             if verbose:
-                print('ok\nExpected error:', exc)
+                print("ok\nExpected error:", exc)
         else:
-            print(
-                f"Failure expected for '{data}', got '{Formula(data).formula}'"
-            )
+            print(f"Failure expected for '{data}', got '{Formula(data).formula}'")
 
 
 def main(argv=None):
@@ -1238,16 +1254,21 @@ def main(argv=None):
         return re.search(r, __doc__).group(1) if __doc__ else d
 
     parser = optparse.OptionParser(
-        usage='usage: %prog [options] formula',
-        description=search_doc('\n\n([^|]*?)\n\n', ''),
-        version='%prog {}'.format(search_doc(':Version: (.*)', 'Unknown')),
-        prog='molmass'
+        usage="usage: %prog [options] formula",
+        description=search_doc("\n\n([^|]*?)\n\n", ""),
+        version="%prog {}".format(search_doc(":Version: (.*)", "Unknown")),
+        prog="molmass",
     )
     opt = parser.add_option
 
-    opt('--test', dest='test', action='store_true', default=False,
-        help='test the module')
-    opt('-v', '--verbose', dest='verbose', action='store_true', default=False)
+    opt(
+        "--test",
+        dest="test",
+        action="store_true",
+        default=False,
+        help="test the module",
+    )
+    opt("-v", "--verbose", dest="verbose", action="store_true", default=False)
 
     settings, formula = parser.parse_args()
 
@@ -1255,20 +1276,20 @@ def main(argv=None):
         test(settings.verbose)
         return 0
     if formula:
-        formula = ''.join(formula)
+        formula = "".join(formula)
     else:
-        parser.error('no formula specified')
+        parser.error("no formula specified")
 
     try:
         results = analyze(formula)
     except Exception as exc:
-        print('\nError: \n  ', exc, sep='')
+        print("\nError: \n  ", exc, sep="")
         raise exc
     else:
-        print('\n', results, sep='')
+        print("\n", results, sep="")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     from pprint import pprint  # noqa: used by doctest
 
     sys.exit(main())

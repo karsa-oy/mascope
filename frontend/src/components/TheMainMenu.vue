@@ -22,9 +22,7 @@ export default {
       workspaceActive: "workspace/active",
     }),
     allButtonsDisabled() {
-      return this.scenthoundModeActive && this.acquisitionActive
-        ? true
-        : false;
+      return this.scenthoundModeActive && this.acquisitionActive ? true : false;
     },
     buttons() {
       return [
@@ -36,7 +34,9 @@ export default {
           visible: true,
         },
         {
-          disabled: this.allButtonsDisabled || !(this.batchActive && this.instrumentActive),
+          disabled:
+            this.allButtonsDisabled ||
+            !(this.batchActive && this.instrumentActive),
           icon: "dog-side",
           label: "Scenthound",
           path: "/scenthound",
@@ -47,35 +47,35 @@ export default {
           icon: "file-plus",
           label: "Sample management",
           path: "/sample-management",
-          visible: false//this.workspaceActive,
+          visible: false, //this.workspaceActive,
         },
         {
           disabled: this.allButtonsDisabled,
           icon: "format-horizontal-align-center",
           label: "m/z calibration",
           path: "/mz-calibration",
-          visible: false//this.workspaceActive,
+          visible: false, //this.workspaceActive,
         },
         {
           disabled: this.allButtonsDisabled,
-          icon: "flask",
+          icon: "chart-scatter-plot",
           label: "Batch overview",
           path: "/batch-overview",
-          visible: false//this.workspaceActive,
+          visible: this.batchActive,
         },
         {
           disabled: this.allButtonsDisabled,
           icon: "sine-wave",
           label: "Sample signal",
           path: "/sample-signal",
-          visible: false//this.workspaceActive,
+          visible: false, //this.workspaceActive,
         },
         {
           disabled: this.allButtonsDisabled,
           icon: "table-multiple",
           label: "Data management",
           path: "/data-management",
-          visible: false//this.workspaceActive,
+          visible: false, //this.workspaceActive,
         },
       ].filter((b) => b.visible);
     },

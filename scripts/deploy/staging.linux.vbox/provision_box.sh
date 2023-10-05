@@ -40,9 +40,6 @@ function set_up_mascope_frontend() {
     pushd $MASCOPE_PROJECT/backend
     ln -s -f $(realpath $MASCOPE_PRIVATE_DATADIR) $MASCOPE_UI
     popd 
-    # add sql.js library
-    mkdir $MASCOPE_UI/node_modules
-    cp -r -f $MASCOPE_PROJECT/frontend/node_modules/sql.js $MASCOPE_UI/node_modules
     # (re)set up nginx configuration for the static mascope frontend
     sudo systemctl stop nginx
     sudo rm -r -f /var/www/mascope.site || true
@@ -80,23 +77,23 @@ function start_mascope_backend() {
     echo AAA start mascope-api process...
     PYTHONUNBUFFERED=1 poetry run mascope-api |& poetry run log-rotate -n=7000 -l=$MASCOPE_PRIVATE_LOG_DIR/mascope_api.log &
 
-    echo AAA start file convertor for KLTOF1...
-    PYTHONUNBUFFERED=1 poetry run file-converter --config ./backend/service/file_converter_config/KLTOF1.yaml --ping |& poetry run log-rotate -n=5000 -l=$MASCOPE_PRIVATE_LOG_DIR/converter_KLTOF1.log &
+    # echo AAA start file convertor for KLTOF1...
+    # PYTHONUNBUFFERED=1 poetry run file-converter --config ./backend/service/file_converter_config/KLTOF1.yaml --ping |& poetry run log-rotate -n=5000 -l=$MASCOPE_PRIVATE_LOG_DIR/converter_KLTOF1.log &
 
-    echo AAA start file convertor for KLTOF2...
-    PYTHONUNBUFFERED=1 poetry run file-converter --config ./backend/service/file_converter_config/KLTOF2.yaml --ping |& poetry run log-rotate -n=5000 -l=$MASCOPE_PRIVATE_LOG_DIR/converter_KLTOF2.log &
+    # echo AAA start file convertor for KLTOF2...
+    # PYTHONUNBUFFERED=1 poetry run file-converter --config ./backend/service/file_converter_config/KLTOF2.yaml --ping |& poetry run log-rotate -n=5000 -l=$MASCOPE_PRIVATE_LOG_DIR/converter_KLTOF2.log &
 
-    echo AAA start file convertor for KORBI1...
-    PYTHONUNBUFFERED=1 poetry run file-converter --config ./backend/service/file_converter_config/KORBI1.yaml --ping |& poetry run log-rotate -n=5000 -l=$MASCOPE_PRIVATE_LOG_DIR/converter_KORBI1.log &
+    # echo AAA start file convertor for KORBI1...
+    # PYTHONUNBUFFERED=1 poetry run file-converter --config ./backend/service/file_converter_config/KORBI1.yaml --ping |& poetry run log-rotate -n=5000 -l=$MASCOPE_PRIVATE_LOG_DIR/converter_KORBI1.log &
 
-    echo AAA start file downloader for KLTOF1...
-    PYTHONUNBUFFERED=1 poetry run file-downloader --config ./backend/service/file_downloader_config/KLTOF1.yaml --ping |& poetry run log-rotate -n=1000 -l=$MASCOPE_PRIVATE_LOG_DIR/downloader_KLTOF1.log &
+    # echo AAA start file downloader for KLTOF1...
+    # PYTHONUNBUFFERED=1 poetry run file-downloader --config ./backend/service/file_downloader_config/KLTOF1.yaml --ping |& poetry run log-rotate -n=1000 -l=$MASCOPE_PRIVATE_LOG_DIR/downloader_KLTOF1.log &
 
-    echo AAA start file downloader for KLTOF2...
-    PYTHONUNBUFFERED=1 poetry run file-downloader --config ./backend/service/file_downloader_config/KLTOF2.yaml --ping |& poetry run log-rotate -n=1000 -l=$MASCOPE_PRIVATE_LOG_DIR/downloader_KLTOF2.log &
+    # echo AAA start file downloader for KLTOF2...
+    # PYTHONUNBUFFERED=1 poetry run file-downloader --config ./backend/service/file_downloader_config/KLTOF2.yaml --ping |& poetry run log-rotate -n=1000 -l=$MASCOPE_PRIVATE_LOG_DIR/downloader_KLTOF2.log &
 
-    echo AAA start file downloader for KORBI1...
-    PYTHONUNBUFFERED=1 poetry run file-downloader --config ./backend/service/file_downloader_config/KORBI1.yaml --ping |& poetry run log-rotate -n=1000 -l=$MASCOPE_PRIVATE_LOG_DIR/downloader_KORBI1.log &
+    # echo AAA start file downloader for KORBI1...
+    # PYTHONUNBUFFERED=1 poetry run file-downloader --config ./backend/service/file_downloader_config/KORBI1.yaml --ping |& poetry run log-rotate -n=1000 -l=$MASCOPE_PRIVATE_LOG_DIR/downloader_KORBI1.log &
 
     popd
 }

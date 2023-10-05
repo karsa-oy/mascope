@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "backend"
-version = "1.0"
-description = "User-friendly chemical detection platform"
+version = "1.2"
+description = "Karsa Mascope"
 authors = ["Karsa Oy <support@karsa.fi>"]
 license = "Proprietary"
 include = ["backend","hardware"]
@@ -60,3 +60,7 @@ requests = "^2.28.1"
 websocket-client = "^1.4.0"
 openpyxl = "^3.0.10"
 pyarrow = "^11.0.0"
+asgiref = "^3.6.0"
+sqlalchemy = "^2.0.12"
+fastapi = "^0.95.1"
+aiosqlite = "^0.19.0"

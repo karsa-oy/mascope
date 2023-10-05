@@ -5,37 +5,34 @@ Created on Tue Apr  2 13:27:15 2019
 @author: Karsa
 """
 
-import h5py
+from ctypes import create_string_buffer
+from datetime import datetime, timedelta
+from ntpath import basename
+from os import path
 
+import h5py
 import numpy as np
 import scipy.sparse as sparse
 
-from os import path
-from ntpath import basename
-from datetime import datetime, timedelta
-
-from .lib.TwH5 import (
-    TwH5Desc,
-    TwGetH5Descriptor,
-    TwCloseH5,
-    TwGetSumSpectrumFromH5,
-    TwGetTofSpectrumFromH5,
-    TwGetTofData,
-    TwGetStickSpectrumFromH5,
-    TwGetPeakData,
-    TwGetRegUserDataFromH5)
-
-from .lib.TofDaq import TwRetVal
-
 from .instrument import KInstrument
-from .util import filetime2datetime
-
-from ctypes import create_string_buffer 
+from .lib.TofDaq import TwRetVal
+from .lib.TwH5 import (
+    TwCloseH5,
+    TwGetH5Descriptor,
+    TwGetPeakData,
+    TwGetRegUserDataFromH5,
+    TwGetStickSpectrumFromH5,
+    TwGetSumSpectrumFromH5,
+    TwGetTofData,
+    TwGetTofSpectrumFromH5,
+    TwH5Desc,
+)
+from backend.lib.util import filetime2datetime
 
 
 class KSpectra(KInstrument):
     """Class to provide an API for loading data from Tofwerk H5 files.
-    
+
     KSpectra is a middle layer in the data access API, and the user should
     use KEvent class instead, for simpler API.
 
@@ -60,7 +57,7 @@ class KSpectra(KInstrument):
     dt_loc : array
         Datetime vector of all data points (local time)
     length : float
-        Data file length in seconds      
+        Data file length in seconds
 
     """
 
@@ -77,23 +74,22 @@ class KSpectra(KInstrument):
 
         if not path.isfile(filename):
             raise ValueError(
-                "Input argument 'filename' (%s) is not a valid data file."
-                %filename
-                )
+                "Input argument 'filename' (%s) is not a valid data file." % filename
+            )
         desc = TwH5Desc()
         ret = TwGetH5Descriptor(filename.encode(), desc)
         if ret != 4:
-            raise Exception('Trying to fetch descriptor for file %s ' % filename +
-                            'failed: %s' % TwRetVal(ret).name
-                            )
+            raise Exception(
+                "Trying to fetch descriptor for file %s " % filename
+                + "failed: %s" % TwRetVal(ret).name
+            )
 
         KInstrument.__init__(self, desc)
 
-        with h5py.File(filename, 'r') as h5f:
-            polarity = h5f.attrs['IonMode']
-            dt0 = filetime2datetime(
-                h5f['TimingData'].attrs['AcquisitionTimeZero'][0])
-            bt = h5f['TimingData/BufTimes']
+        with h5py.File(filename, "r") as h5f:
+            polarity = h5f.attrs["IonMode"]
+            dt0 = filetime2datetime(h5f["TimingData"].attrs["AcquisitionTimeZero"][0])
+            bt = h5f["TimingData/BufTimes"]
             t = bt[()].reshape((-1,))
         ncomplete = desc.nbrWrites * desc.nbrBufs
         t = t[:ncomplete]
@@ -102,11 +98,11 @@ class KSpectra(KInstrument):
 
         # Try to parse local time from filename
         try:
-            pattern = u'Data_%Y.%m.%d_%Hh%Mm%Ss.h5'
-            #datestr = basename(filename)
-            #datestr = path.splitext(datestr)[0]
-            #datestr = datestr.split('_')[-1]
-            dt0_loc = datetime.strptime(basename(filename), pattern)
+            pattern = "%Y.%m.%d_%Hh%Mm%Ss"
+            datestr = basename(filename)
+            datestr = path.splitext(datestr)[0]
+            datestr = "_".join(datestr.split("_")[1:])
+            dt0_loc = datetime.strptime(datestr, pattern)
             dt0_loc += timedelta(microseconds=dt0.microsecond)
             dt1_loc = dt0_loc + timedelta(seconds=dts)
             self.dt0_loc = dt0_loc  # start datetime local
@@ -114,7 +110,7 @@ class KSpectra(KInstrument):
             # local datetime of datapoints
             self.dt_loc = np.asarray([dt0_loc + timedelta(seconds=ti) for ti in t])
         except Exception as e:
-            print('Parsing local time from filename failed: %s' %e)
+            print("Parsing local time from filename failed: %s" % e)
             dt0_loc = dt1_loc = None
 
         self.filename = filename
@@ -122,13 +118,14 @@ class KSpectra(KInstrument):
         self.t = t  # time elapsed
         self.dt0 = dt0  # start datetime UTC
         self.dt1 = dt1  # end datetime UTC
-        self.dt = np.asarray([dt0 + timedelta(seconds=ti)
-                              for ti in t])  # UTC datetime of datapoints
+        self.dt = np.asarray(
+            [dt0 + timedelta(seconds=ti) for ti in t]
+        )  # UTC datetime of datapoints
         self.length = (dt1 - dt0).total_seconds()
 
     def __del__(self):
         """Close the file on delete"""
-        
+
         try:
             TwCloseH5(self.filename.encode())
         except:
@@ -136,9 +133,9 @@ class KSpectra(KInstrument):
 
     def _t2flatind(self, t0=None, t1=None, dt=None):
         """Convert time range into flat indices
-        
-        Start time (t0) and either end time (t1) or length (dt) are 
-        required to specify the time range for which to calculate the 
+
+        Start time (t0) and either end time (t1) or length (dt) are
+        required to specify the time range for which to calculate the
         index range.
 
         Parameters
@@ -155,7 +152,7 @@ class KSpectra(KInstrument):
         ind : tuple
             2-Tuple with the range: (start_index, end_index)
         """
-        
+
         ind = None
         if t0 is not None:
             t0ind = np.argmin(np.abs(self.t - t0))
@@ -170,7 +167,7 @@ class KSpectra(KInstrument):
 
     def _t2bufind(self, t0=None, t1=None, dt=None):
         """Convert time range into Buf/Write indices
-        
+
         Refer to Tofwerk documentation about the indexing
 
         Parameters
@@ -187,7 +184,7 @@ class KSpectra(KInstrument):
         ind : tuple
             4-Tuple with the range: (buf0, buf1, write0, write1)
         """
-        
+
         # Convert times (in seconds elapsed) to Buf and Write index
         ind = None
         datashape = (self.desc.nbrWrites, self.desc.nbrBufs)
@@ -242,23 +239,14 @@ class KSpectra(KInstrument):
             bi0, bi1, wi0, wi1 = ind
             spec = np.zeros((self.desc.nbrSamples,), dtype=np.float32)
             ret = TwGetTofSpectrumFromH5(
-                self.filename.encode(),
-                spec,
-                0,
-                0,
-                bi0,
-                bi1,
-                wi0,
-                wi1,
-                True,
-                True)
+                self.filename.encode(), spec, 0, 0, bi0, bi1, wi0, wi1, True, True
+            )
         if ret != 4:
-            raise Exception('Loading spectrum failed with code %s'
-                            %TwRetVal(ret).name)
+            raise Exception("Loading spectrum failed with code %s" % TwRetVal(ret).name)
         # Take specified sample number range
         if si1 is None:
             si1 = self.desc.nbrSamples
-        spec = spec[si0:(si1 + 1)]
+        spec = spec[si0 : (si1 + 1)]
         return spec  # mV/ext
 
     def load_spectra(self, ind=None, si0=0, si1=None):
@@ -302,26 +290,17 @@ class KSpectra(KInstrument):
             bi0 = 0
             nwrite = self.desc.nbrWrites
         data_shape = (nwrite, nbuf, nsmpl)
-        signal = np.zeros(data_shape, dtype='float32')
+        signal = np.zeros(data_shape, dtype="float32")
         ret = TwGetTofData(
-            self.filename.encode(),
-            si0,
-            nsmpl,
-            0,
-            1,
-            0,
-            nbuf,
-            wi0,
-            nwrite,
-            signal)
+            self.filename.encode(), si0, nsmpl, 0, 1, 0, nbuf, wi0, nwrite, signal
+        )
         if ret != 4:
-            raise Exception('Loading spectra failed with code %s'
-                            %TwRetVal(ret).name)
+            raise Exception("Loading spectra failed with code %s" % TwRetVal(ret).name)
         # Rearrange dimensions
         signal.shape = (-1, nsmpl)
         signal = np.transpose(signal)
         # Remove empty spectra in case of incomplete writes
-        signal = signal[:, :len(self.t)]
+        signal = signal[:, : len(self.t)]
         return signal
 
     def load_stickspec(self, ind=None, pi0=0, pi1=None):
@@ -351,7 +330,7 @@ class KSpectra(KInstrument):
             indices correspond to unit masses if pi0=0.
         """
 
-        stickspec = np.zeros((self.desc.nbrPeaks + 1, ), dtype=np.float32)
+        stickspec = np.zeros((self.desc.nbrPeaks + 1,), dtype=np.float32)
         if ind is None:
             bi0 = 0
             bi1 = self.desc.nbrBufs - 1
@@ -360,24 +339,17 @@ class KSpectra(KInstrument):
         else:
             bi0, bi1, wi0, wi1 = ind
         ret = TwGetStickSpectrumFromH5(
-            self.filename.encode(),
-            stickspec,
-            0,
-            0,
-            bi0,
-            bi1,
-            wi0,
-            wi1,
-            True,
-            True)
+            self.filename.encode(), stickspec, 0, 0, bi0, bi1, wi0, wi1, True, True
+        )
         if ret != 4:
-            raise Exception('Loading UMR spectrum failed with code %s'
-                            %TwRetVal(ret).name)
+            raise Exception(
+                "Loading UMR spectrum failed with code %s" % TwRetVal(ret).name
+            )
         # Move indices by one so that index==amu
         stickspec = np.roll(stickspec, 1)
         if pi1 is None:
             pi1 = self.desc.nbrPeaks
-        stickspec = stickspec[pi0:(pi1 + 1)]
+        stickspec = stickspec[pi0 : (pi1 + 1)]
         return stickspec  # mV/ext
 
     def load_stickspectra(self, ind=None, pi0=0, pi1=None):
@@ -409,9 +381,9 @@ class KSpectra(KInstrument):
 
         if pi1 is None:
             pi1 = self.desc.nbrPeaks - 1
-            
+
         nsticks = pi1 - pi0 + 1
-            
+
         nbuf = self.desc.nbrBufs
         if ind is not None:
             bi0, bi1, wi0, wi1 = ind
@@ -426,29 +398,21 @@ class KSpectra(KInstrument):
         data_shape = (nwrite, nbuf, nsticks)
         stickdata = np.zeros(data_shape, dtype=np.float32)
         ret = TwGetPeakData(
-            self.filename.encode(),
-            pi0,
-            nsticks,
-            0,
-            1,
-            0,
-            nbuf,
-            wi0,
-            nwrite,
-            stickdata)
+            self.filename.encode(), pi0, nsticks, 0, 1, 0, nbuf, wi0, nwrite, stickdata
+        )
         if ret != 4:
-            raise Exception('Loading UMR spectrum failed with code %s'
-                            %TwRetVal(ret).name)
+            raise Exception(
+                "Loading UMR spectrum failed with code %s" % TwRetVal(ret).name
+            )
         # Rearrange dimensions
         stickdata.shape = (-1, nsticks)
         stickdata = np.transpose(stickdata)
         # Move indices by one so that index==amu, unless pi0 is not 0
         if pi0 == 0:
-            stickdata = np.vstack(
-                [np.zeros((stickdata.shape[1], )), stickdata])
+            stickdata = np.vstack([np.zeros((stickdata.shape[1],)), stickdata])
         return stickdata  # mV/ext
-    
-    def load_tps_data(self, ind=None, loc=b'TPS2'):
+
+    def load_tps_data(self, ind=None, loc=b"TPS2"):
         """Load TPS parameter data from the file.
 
         Parameters
@@ -469,40 +433,26 @@ class KSpectra(KInstrument):
         nbuf = self.desc.nbrBufs
         nwrite = self.desc.nbrWrites
         # Query data size
-        getsize = np.zeros((1,1), dtype=int)
-        TwGetRegUserDataFromH5(
-               self.filename.encode(),
-               loc,
-               -1,
-               -1,
-               getsize,
-               None,
-               None)
+        getsize = np.zeros((1, 1), dtype=int)
+        TwGetRegUserDataFromH5(self.filename.encode(), loc, -1, -1, getsize, None, None)
         # Initialize data buffer
-        nel = int( getsize.item() / (nbuf*nwrite) )
+        nel = int(getsize.item() / (nbuf * nwrite))
         data_shape = (nwrite, nbuf, nel)
         data = np.zeros(data_shape)
-        info = create_string_buffer(b'', 256*nel)
+        info = create_string_buffer(b"", 256 * nel)
         # Load all data
-        TwGetRegUserDataFromH5(
-               self.filename.encode(),
-               loc,
-               -1,
-               -1,
-               getsize,
-               data,
-               info)
+        TwGetRegUserDataFromH5(self.filename.encode(), loc, -1, -1, getsize, data, info)
         # Character array into string array
-        info = np.asarray(info).view('S256').ravel()
+        info = np.asarray(info).view("S256").ravel()
         info = info.tolist()
-        info = [ i.decode('unicode_escape') for i in info ]
+        info = [i.decode("unicode_escape") for i in info]
         if ind is not None:
             # Select requested data
             bi0, bi1, wi0, wi1 = ind
-            data = data[wi0:wi1+1, :, :]
+            data = data[wi0 : wi1 + 1, :, :]
             data.shape = (-1, nel)
             i0 = bi0
-            i1 = -(nbuf-bi1)+1
+            i1 = -(nbuf - bi1) + 1
             if i1 == 0:
                 i1 = None
             data = data[i0:i1, :]

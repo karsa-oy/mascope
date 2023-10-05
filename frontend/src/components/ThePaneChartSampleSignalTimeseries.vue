@@ -21,9 +21,7 @@ export default {
       traces: "visualization/tracesSignalTimeseries",
     }),
     data: function () {
-      return this.traces
-        ? this.traces
-        : [];
+      return this.traces ? this.traces : [];
     },
     layout: function () {
       return {
@@ -31,14 +29,16 @@ export default {
           title: "Time [s]",
           autorange: true,
           showgrid: true,
-          gridcolor: "#757575",
+          gridcolor: "#464752",
+          gridwidth: 1,
         },
         yaxis: {
           title: "Peak height [cps]",
           showgrid: true,
           autorange: true,
           rangemode: "tozero",
-          gridcolor: "#757575",
+          gridcolor: "#464752",
+          gridwidth: 1,
         },
         dragmode: "zoom",
         showlegend: true,

@@ -1,14 +1,15 @@
 # -*- coding: utf-8 -*-
 
-import numpy as np
-from .msspectrum.spectrum import Spectrum
-from .msspectrum.utils import take_closest, binary_search_mz_values
 from heapq import heappop, heappush, heapreplace
+
+import numpy as np
+
 from .msAlign import find_alpt
+from .msspectrum.spectrum import Spectrum
+from .msspectrum.utils import binary_search_mz_values, take_closest
 
 
 class MassSpectraAligner:
-
     def __init__(self, window_size=10, ref_spec=None):
         """[summary]
 
@@ -39,7 +40,9 @@ class MassSpectraAligner:
             mzs = [mz for mz in s.mz_values]
             peaks_list.append(mzs)
 
-        self.reference_mz = find_alpt(peaks_list, self.window_size * 10**-6, self.ref_spec)
+        self.reference_mz = find_alpt(
+            peaks_list, self.window_size * 10**-6, self.ref_spec
+        )
 
     def transform(self, spectra):
         new_spectra = []
@@ -63,8 +66,9 @@ class MassSpectraAligner:
         nf_int = []
         for i, mz in enumerate(spec.mz_values):
             try:
-                possible_matches = binary_search_mz_values(self.reference_mz, mz,
-                                                           float(self.window_size))
+                possible_matches = binary_search_mz_values(
+                    self.reference_mz, mz, float(self.window_size)
+                )
             except ValueError:
                 nf_mz.append(mz)
                 nf_int.append(spec.intensity_values[i])
@@ -85,8 +89,12 @@ class MassSpectraAligner:
         # not_aligned = Spectrum(np.asarray(nf_mz), np.asarray(nf_int),
         #                        spec.mz_precision, spec.metadata)
 
-        return Spectrum(np.asarray(aligned_mz), np.asarray(aligned_int),
-                        spec.mz_precision, spec.metadata)
+        return Spectrum(
+            np.asarray(aligned_mz),
+            np.asarray(aligned_int),
+            spec.mz_precision,
+            spec.metadata,
+        )
 
     def _apply_test(self, spec):
         # Find closest point that is not outside possible window
@@ -96,8 +104,9 @@ class MassSpectraAligner:
         aligned_int = []
         for i, mz in enumerate(spec.mz_values):
             try:
-                possible_matches = binary_search_mz_values(self.reference_mz, mz,
-                                                           float(self.window_size))
+                possible_matches = binary_search_mz_values(
+                    self.reference_mz, mz, float(self.window_size)
+                )
             except ValueError:
                 continue
 
@@ -108,12 +117,19 @@ class MassSpectraAligner:
                 aligned_mz.append(possible_matches[0])
                 aligned_int.append(spec.intensity_values[i])
 
-        return Spectrum(np.asarray(aligned_mz), np.asarray(aligned_int),
-                        spec.mz_precision, spec.metadata)
+        return Spectrum(
+            np.asarray(aligned_mz),
+            np.asarray(aligned_int),
+            spec.mz_precision,
+            spec.metadata,
+        )
 
-    def optimize_window(self, spectra, vlm_spectra,
-                        window=(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 18, 20, 22, 25, 28, 30)):
-
+    def optimize_window(
+        self,
+        spectra,
+        vlm_spectra,
+        window=(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 18, 20, 22, 25, 28, 30),
+    ):
         res = np.zeros(shape=(len(window)))
         n_align = np.zeros(shape=(len(window)))
         align_populations = []
@@ -147,8 +163,8 @@ class MassSpectraAligner:
     def _evaluate_alignment(self, spectra):
         a_idx = 0
         a_mz = self.reference_mz[a_idx]
-        a_lb = a_mz - (a_mz * self.window_size / 1000000.)
-        a_ub = a_mz + (a_mz * self.window_size / 1000000.)
+        a_lb = a_mz - (a_mz * self.window_size / 1000000.0)
+        a_ub = a_mz + (a_mz * self.window_size / 1000000.0)
         s_rep = {}
 
         h = []
@@ -166,7 +182,9 @@ class MassSpectraAligner:
             next_s = h[0][1]
 
             if spectra_idx[next_s] < spectra_max[next_s]:
-                mz, s = heapreplace(h, (spectra[next_s].mz_values[spectra_idx[next_s]], next_s))  # advance in s
+                mz, s = heapreplace(
+                    h, (spectra[next_s].mz_values[spectra_idx[next_s]], next_s)
+                )  # advance in s
                 spectra_idx[next_s] += 1
             else:  # last peak of a spectra next_s, remove it from heap
                 mz, s = heappop(h)
@@ -179,8 +197,8 @@ class MassSpectraAligner:
                 while (mz > a_ub) and (a_idx < len(self.reference_mz) - 1):
                     a_idx += 1
                     a_mz = self.reference_mz[a_idx]
-                    a_lb = a_mz - (a_mz * self.window_size / 1000000.)
-                    a_ub = a_mz + (a_mz * self.window_size / 1000000.)
+                    a_lb = a_mz - (a_mz * self.window_size / 1000000.0)
+                    a_ub = a_mz + (a_mz * self.window_size / 1000000.0)
 
             # if peak is within current alignment point
             if (mz >= a_lb) and (mz <= a_ub):

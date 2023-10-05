@@ -1,12 +1,20 @@
 # -*- coding: utf-8 -*-
 
-import numpy as np
 from bisect import bisect_left
-from .msspectrum.preprocessing.discrete import ThresholdedPeakFiltering, MassRangeSelection
-from .msspectrum.spectrum import Spectrum
-from .msspectrum.utils import binary_search_for_right_range, binary_search_for_left_range
 from copy import deepcopy
+
+import numpy as np
+
 from . import msAlign as ms
+from .msspectrum.preprocessing.discrete import (
+    MassRangeSelection,
+    ThresholdedPeakFiltering,
+)
+from .msspectrum.spectrum import Spectrum
+from .msspectrum.utils import (
+    binary_search_for_left_range,
+    binary_search_for_right_range,
+)
 
 
 def take_closest(my_list, my_number, lo=0):
@@ -26,7 +34,7 @@ def take_closest(my_list, my_number, lo=0):
     if after - my_number < my_number - before:
         return after, pos
     else:
-        return before, pos-1
+        return before, pos - 1
 
 
 def is_window_vlm(peaks, window_start_idx, window_end_idx, w):
@@ -36,21 +44,21 @@ def is_window_vlm(peaks, window_start_idx, window_end_idx, w):
     """
     start_mass = peaks[window_start_idx]
     end_mass = peaks[window_end_idx]
-    center_mass = np.mean(peaks[window_start_idx:window_end_idx + 1])
+    center_mass = np.mean(peaks[window_start_idx : window_end_idx + 1])
     window_lower_bound = center_mass * (1 - w)
     window_upper_bound = center_mass * (1 + w)
-    if(window_lower_bound > start_mass) or (window_upper_bound < end_mass):
+    if (window_lower_bound > start_mass) or (window_upper_bound < end_mass):
         return False
     # start mass and end mass are within window
 
     # check if peak before and after the indexes are within the window, if yes then not a VLM
-    mass_lower = 0.
+    mass_lower = 0.0
     if window_start_idx != 0:
         mass_lower = peaks[window_start_idx - 1]
 
-    mass_over = 1000000.
+    mass_over = 1000000.0
     if window_end_idx != (len(peaks) - 1):
-            mass_over = peaks[window_end_idx + 1]
+        mass_over = peaks[window_end_idx + 1]
 
     if (mass_lower >= window_lower_bound) or (mass_over <= window_upper_bound):
         return False
@@ -59,14 +67,20 @@ def is_window_vlm(peaks, window_start_idx, window_end_idx, w):
 
 
 class VirtualLockMassCorrector(object):
-    def __init__(self, window_size, minimum_peak_intensity, ref_spec=None, max_skipped_points=None):
+    def __init__(
+        self,
+        window_size,
+        minimum_peak_intensity,
+        ref_spec=None,
+        max_skipped_points=None,
+    ):
         """
         Initiate a VirtualLockMassCorrector object.
         :param window_size: The distance from left to right in ppm
         :param minimum_peak_intensity: Minimum peak intensity to be considered by the algorithm
         :param max_skipped_points: Maximum number of points that can be skipped during the transform step. None=any.
         """
-        
+
         self.window_size = window_size
         self.window_size_ppm = 1.0 * window_size / 10**6
         self.minimum_peak_intensity = minimum_peak_intensity
@@ -80,8 +94,9 @@ class VirtualLockMassCorrector(object):
         self._mz_precision = 4
 
     def _preprocess_spectra(self, spectra):
-        return ThresholdedPeakFiltering(threshold=self.minimum_peak_intensity,
-                                        remove_mz_values=True).fit_transform(spectra)
+        return ThresholdedPeakFiltering(
+            threshold=self.minimum_peak_intensity, remove_mz_values=True
+        ).fit_transform(spectra)
 
     def _find_vlm_peaks(self, spectra):
         spectra = self._preprocess_spectra(spectra)
@@ -90,7 +105,9 @@ class VirtualLockMassCorrector(object):
             mzs = [mz for mz in s.mz_values]
             peaks_list.append(mzs)
 
-        vlm_mz_values, vlm_list = ms.find_vlm(peaks_list, self.window_size * 10**-6, self.ref_spec)
+        vlm_mz_values, vlm_list = ms.find_vlm(
+            peaks_list, self.window_size * 10**-6, self.ref_spec
+        )
         return vlm_mz_values, vlm_list
 
     def _apply_correction(self, spectrum):
@@ -108,7 +125,9 @@ class VirtualLockMassCorrector(object):
         found_vlm, observed_mz = self._find_vlock_mass_in_spectra(spectrum_copy)
 
         # Cut peaks of m/z lower than first VLM and greater than last VLM
-        selector = MassRangeSelection(lower_range=observed_mz[0], upper_range=observed_mz[-1])
+        selector = MassRangeSelection(
+            lower_range=observed_mz[0], upper_range=observed_mz[-1]
+        )
         spectrum_copy = selector.fit_transform([spectrum])[0]
         spect_mz = spectrum_copy.mz_values
 
@@ -116,16 +135,23 @@ class VirtualLockMassCorrector(object):
         idx = 0
 
         while idx < (len(found_vlm) - 1):
-            corrected_mzs += self._correct_points_between(spect_mz, observed_mz[idx], observed_mz[idx + 1],
-                                                          found_vlm[idx], found_vlm[idx + 1])
+            corrected_mzs += self._correct_points_between(
+                spect_mz,
+                observed_mz[idx],
+                observed_mz[idx + 1],
+                found_vlm[idx],
+                found_vlm[idx + 1],
+            )
             idx += 1
 
         corrected_mzs += [found_vlm[-1]]  # need to add final VLM
 
-        new_spectrum = Spectrum(mz_values=np.asarray(corrected_mzs),
-                                intensity_values=spectrum_copy.intensity_values,
-                                mz_precision=spectrum_copy.mz_precision,
-                                metadata=spectrum_copy.metadata)
+        new_spectrum = Spectrum(
+            mz_values=np.asarray(corrected_mzs),
+            intensity_values=spectrum_copy.intensity_values,
+            mz_precision=spectrum_copy.mz_precision,
+            metadata=spectrum_copy.metadata,
+        )
         return new_spectrum
 
     def _find_vlock_mass_in_spectra(self, spectrum):
@@ -142,8 +168,9 @@ class VirtualLockMassCorrector(object):
         for vlm in self._vlm_mz:
             last_index = 0
             try:
-                best_match, position = take_closest(preprocessed_spect.mz_values, vlm,
-                                                    lo=last_index)
+                best_match, position = take_closest(
+                    preprocessed_spect.mz_values, vlm, lo=last_index
+                )
                 # Check if the vlm is in the window
                 mz_difference = abs(best_match - vlm)
                 # self.window_size is from center to side, not side to side.
@@ -164,7 +191,9 @@ class VirtualLockMassCorrector(object):
         np.around(observed_mz, decimals=self._mz_precision)
         return vlm_found, observed_mz
 
-    def _correct_points_between(self, mzs, observed_mz1, observed_mz2, ref_mz1, ref_mz2):
+    def _correct_points_between(
+        self, mzs, observed_mz1, observed_mz2, ref_mz1, ref_mz2
+    ):
         """
         :param observed_mz1: an observed mz of a virtual lock mass (smaller than the 2nd)
         :param observed_mz2: an observed mz of a virtual lock mass (greater than the first)
@@ -174,7 +203,9 @@ class VirtualLockMassCorrector(object):
         """
         if observed_mz1 <= 0 or observed_mz2 <= 0 or ref_mz1 <= 0 or ref_mz2 <= 0:
             raise ValueError("Mz and ratios cannot be null or negative")
-        function = self._create_correction_function(observed_mz1, observed_mz2, ref_mz1, ref_mz2)
+        function = self._create_correction_function(
+            observed_mz1, observed_mz2, ref_mz1, ref_mz2
+        )
 
         right = binary_search_for_right_range(mzs, observed_mz2)
         left = binary_search_for_left_range(mzs, observed_mz1)
@@ -202,16 +233,21 @@ class VirtualLockMassCorrector(object):
 
         return function
 
-    def optimize_window_size(self, spectrum,
-                             possible_values=(5, 10, 15, 20, 30, 40, 50, 60, 70, 80, 90, 100)):
+    def optimize_window_size(
+        self, spectrum, possible_values=(5, 10, 15, 20, 30, 40, 50, 60, 70, 80, 90, 100)
+    ):
         estimation_results = []
         for p in possible_values:
             vlm_estimator = VirtualLockMassCorrector(p, self.minimum_peak_intensity)
             vlm_estimator.fit(spectrum)
             estimation_results.append(len(vlm_estimator._vlm_mz))
             if len(estimation_results) > 3:
-                if estimation_results[-1] < estimation_results[-3] > estimation_results[-2]:
-                        break
+                if (
+                    estimation_results[-1]
+                    < estimation_results[-3]
+                    > estimation_results[-2]
+                ):
+                    break
         best_p = max(estimation_results)
         index = estimation_results.index(best_p)
         self.window_size = possible_values[index]
@@ -232,7 +268,9 @@ class VirtualLockMassCorrector(object):
 
         """
         if self._vlm_mz is None:
-            raise RuntimeError("The VLM corrector must be fitted before applying a correction.")
+            raise RuntimeError(
+                "The VLM corrector must be fitted before applying a correction."
+            )
         return np.asarray([self._apply_correction(spectrum) for spectrum in spectra])
 
     def _choose_vlm_points(self, n_skip=1):
@@ -256,7 +294,6 @@ class VirtualLockMassCorrector(object):
 
         i = 0
         while (i < len(spectrum.mz_values)) and (vlm_idx < len(observed_vlms)):
-
             if spectrum.mz_values[i] == observed_vlms[vlm_idx]:
                 vlm_tag[i] = True
                 vlm_idx += 1
@@ -266,7 +303,6 @@ class VirtualLockMassCorrector(object):
         return vlm_tag
 
     def _apply_loo_correction(self, spectrum):
-
         num_vlm_used = np.sum(self._used_vlm)
         if num_vlm_used < 3:
             raise ValueError("There must be at least 3 points to use virtual lock-mass")
@@ -282,13 +318,17 @@ class VirtualLockMassCorrector(object):
         use_found_vlm = found_vlm[self._used_vlm]
         use_observed_mz = observed_mz[self._used_vlm]
 
-        vlm_spectrum = Spectrum(mz_values=spectrum_copy.mz_values[spectrum_vlm_tags],
-                                intensity_values=spectrum_copy.intensity_values[spectrum_vlm_tags],
-                                mz_precision=spectrum_copy.mz_precision,
-                                metadata=spectrum_copy.metadata)
+        vlm_spectrum = Spectrum(
+            mz_values=spectrum_copy.mz_values[spectrum_vlm_tags],
+            intensity_values=spectrum_copy.intensity_values[spectrum_vlm_tags],
+            mz_precision=spectrum_copy.mz_precision,
+            metadata=spectrum_copy.metadata,
+        )
 
         # Cut peaks of m/z lower than first VLM and greater than last VLM
-        selector = MassRangeSelection(lower_range=use_observed_mz[0], upper_range=use_observed_mz[-1])
+        selector = MassRangeSelection(
+            lower_range=use_observed_mz[0], upper_range=use_observed_mz[-1]
+        )
         vlm_spectrum = selector.fit_transform([vlm_spectrum])[0]
         vlm_spect_mz = vlm_spectrum.mz_values
 
@@ -296,23 +336,31 @@ class VirtualLockMassCorrector(object):
         idx = 0
 
         while idx < (len(use_found_vlm) - 1):
-            corrected_vlm_mzs += self._correct_points_between(vlm_spect_mz, use_observed_mz[idx],
-                                                              use_observed_mz[idx + 1], use_found_vlm[idx],
-                                                              use_found_vlm[idx + 1])
+            corrected_vlm_mzs += self._correct_points_between(
+                vlm_spect_mz,
+                use_observed_mz[idx],
+                use_observed_mz[idx + 1],
+                use_found_vlm[idx],
+                use_found_vlm[idx + 1],
+            )
             idx += 1
 
         corrected_vlm_mzs += [use_found_vlm[-1]]  # need to add final VLM
 
-        new_vlm_spectrum = Spectrum(mz_values=np.asarray(corrected_vlm_mzs),
-                                    intensity_values=vlm_spectrum.intensity_values,
-                                    mz_precision=vlm_spectrum.mz_precision,
-                                    metadata=vlm_spectrum.metadata)
+        new_vlm_spectrum = Spectrum(
+            mz_values=np.asarray(corrected_vlm_mzs),
+            intensity_values=vlm_spectrum.intensity_values,
+            mz_precision=vlm_spectrum.mz_precision,
+            metadata=vlm_spectrum.metadata,
+        )
 
         return new_vlm_spectrum
 
     def leave_one_out_optimize(self, spectra, proportion=0.95):
         if not self._is_fitted:
-            raise RuntimeError("The VLM corrector must be fitted before applying a correction.")
+            raise RuntimeError(
+                "The VLM corrector must be fitted before applying a correction."
+            )
 
         vlm_max_dist = []
         for i in range(len(self._vlm_mz) - 2):
@@ -328,8 +376,12 @@ class VirtualLockMassCorrector(object):
 
             mzs = []
             for j in range(len(vlm_mzs)):
-                corr_function = self._create_correction_function(vlm_mzs[j][idx - 1], vlm_mzs[j][idx + 1],
-                                                                 self._vlm_mz[idx - 1], self._vlm_mz[idx + 1])
+                corr_function = self._create_correction_function(
+                    vlm_mzs[j][idx - 1],
+                    vlm_mzs[j][idx + 1],
+                    self._vlm_mz[idx - 1],
+                    self._vlm_mz[idx + 1],
+                )
                 mzs.append(corr_function(vlm_mzs[j][idx]))
             mzs = np.asarray(mzs)
             comp_mz = np.mean(mzs)

@@ -25,7 +25,6 @@
 </template>
 
 <script>
-
 import { sync } from "vuex-pathify";
 
 export default {
@@ -68,7 +67,8 @@ export default {
     }),
   },
   watch: {
-    param: function() {
+    param: function (newVal, oldVal) {
+      if (newVal === null) return;
       this.$emit("paramChange");
     },
   },
@@ -81,7 +81,7 @@ export default {
 }
 
 .b-slider.is-info .b-slider-fill {
-  background: #3298dc !important;
+  background: #cac7b8 !important;
 }
 
 .b-slider.is-success .b-slider-fill {

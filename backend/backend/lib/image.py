@@ -6,36 +6,36 @@ Created on Fri Mar  6 13:45:15 2020
 @author: Oskari Kausiala
 """
 
-import numpy as np
-import pandas as pd
-import datashader as ds
-import datashader.transfer_functions as tf
-
 import os
-import h5py
-import xarray
-
-from datetime import timedelta
+from base64 import b64decode, b64encode
 from copy import deepcopy
+from datetime import timedelta
+from io import BytesIO
 from multiprocessing import Process
 
-from PIL import Image
-from io import BytesIO
-from base64 import b64decode, b64encode
+import datashader as ds
+import datashader.transfer_functions as tf
+import h5py
+import numpy as np
+import pandas as pd
+import xarray
 from colorcet import fire
+from PIL import Image
 
-VIZ_TYPES_SUPPORTED = {'spectrogram', 'timeseries', 'waterfall'}
+VIZ_TYPES_SUPPORTED = {"spectrogram", "timeseries", "waterfall"}
 
 # JSON compatible template for plotly scatter trace
-DEFAULT_TRACE = {'x': [],
-                 'y': [],
-                 'name': '',
-                 'mode': 'lines',
-                 'type': 'scattergl',
-                 'line': {'color': '#fff'}, 
-                 'visible': True, 
-                 'hoverinfo': 'name,y'
-                 }
+DEFAULT_TRACE = {
+    "x": [],
+    "y": [],
+    "name": "",
+    "mode": "lines",
+    "type": "scattergl",
+    "line": {"color": "#fff"},
+    "visible": True,
+    "hoverinfo": "name,y",
+}
+
 
 def convert_to_base64(img):
     """Convert PIL image to base64 png string
@@ -53,10 +53,9 @@ def convert_to_base64(img):
     """
 
     b = BytesIO()
-    img.save(b, format='png')
-    return "data:image/png;base64,{0}".format(
-        b64encode(b.getvalue()).decode('utf-8')
-        )
+    img.save(b, format="png")
+    return "data:image/png;base64,{0}".format(b64encode(b.getvalue()).decode("utf-8"))
+
 
 def convert_base64_to_img(b64_img):
     """Convert base64 png string into PIL Image
@@ -72,19 +71,21 @@ def convert_base64_to_img(b64_img):
         Image object
     """
 
-    str_img = b64decode( b64_img.split(',')[1] )
+    str_img = b64decode(b64_img.split(",")[1])
     b = BytesIO(str_img)
     img = Image.open(b)
     return img
 
-def gen_heatmap_image(data_xarray,
-                      t_range=None,
-                      mz_range=None,
-                      y_range=None,
-                      img_width=None,
-                      img_height=600,
-                      cmap=fire
-                      ):
+
+def gen_heatmap_image(
+    data_xarray,
+    t_range=None,
+    mz_range=None,
+    y_range=None,
+    img_width=None,
+    img_height=600,
+    cmap=fire,
+):
     """Generate heatmap image to visualize spectra in 2D using datashader
 
     # TODO: At the moment ugly workarounds needed to generate 1 px wide heatmap
@@ -117,17 +118,17 @@ def gen_heatmap_image(data_xarray,
     # Ignore RuntimeWarning: "invalid value encountered in double_scalars
     # xres = (xcoords[-1] - xcoords[0]) / (w - 1)"
     # warnings.filterwarnings("ignore", category=RuntimeWarning)
-    if data_xarray.time.dtype == '<m8[ns]':
+    if data_xarray.time.dtype == "<m8[ns]":
         # Convert timedelta to float
         data_xarray = data_xarray.assign_coords(
-                {'time': [float(t.item()*1e-9) for t in data_xarray.time]}
-                )
-    
+            {"time": [float(t.item() * 1e-9) for t in data_xarray.time]}
+        )
+
     t0 = t1 = None
     if not data_xarray.time.shape:
         # Array has no time dimension, need to expand dimensions
         t0 = float(data_xarray.time)
-        data_xarray = data_xarray.expand_dims({'time': [t0]}, axis=1)
+        data_xarray = data_xarray.expand_dims({"time": [t0]}, axis=1)
 
     if img_width is None:
         img_width = len(data_xarray.time)
@@ -136,13 +137,11 @@ def gen_heatmap_image(data_xarray,
         # Only one spectrum to visualize, need to extend the array
         t0 = data_xarray.time[0].item()
         # Concatenate the array with itself
-        data_xarray = xarray.concat([data_xarray, data_xarray], dim='time')
-        t1 = t0 + 1 # Arbitrary t1 to avoid "empty take"
-       
+        data_xarray = xarray.concat([data_xarray, data_xarray], dim="time")
+        t1 = t0 + 1  # Arbitrary t1 to avoid "empty take"
+
     if t_range is None:
-        t_range = (t0 or data_xarray.time[0].item(),
-                   t1 or data_xarray.time[-1].item()
-                   )
+        t_range = (t0 or data_xarray.time[0].item(), t1 or data_xarray.time[-1].item())
 
     if mz_range is None:
         mz0 = data_xarray.mz[0].item()
@@ -152,30 +151,32 @@ def gen_heatmap_image(data_xarray,
     # Replace values < 0 with nan (not to be visualized, not to blow up the scale)
     data_xarray = data_xarray.where(data_xarray >= 0)
     # Drop rows with all nan to avoid gaps
-    data_xarray = data_xarray.dropna(dim='mz', how='all')
+    data_xarray = data_xarray.dropna(dim="mz", how="all")
     # Check if only zeros in the range
-    sig_max = data_xarray.sel(time=slice(*t_range),
-                              mz=slice(*mz_range)
-                              ).max().compute().item()
+    sig_max = (
+        data_xarray.sel(time=slice(*t_range), mz=slice(*mz_range))
+        .max()
+        .compute()
+        .item()
+    )
     if sig_max == 0:
         # No need to compute, just return black
-        img = Image.new('RGBA', (img_width, img_height), (0, 0, 0))
+        img = Image.new("RGBA", (img_width, img_height), (0, 0, 0))
         return img
 
-    cvs = ds.Canvas(x_range=t_range,
-                    y_range=mz_range,
-                    plot_height=img_height,
-                    plot_width=img_width
-                    )
-    agg = cvs.quadmesh(data_xarray, x='time', y='mz')
+    cvs = ds.Canvas(
+        x_range=t_range, y_range=mz_range, plot_height=img_height, plot_width=img_width
+    )
+    agg = cvs.quadmesh(data_xarray, x="time", y="mz")
 
     if y_range is not None:
         # Bottom left corner pixel to y_range[1] for scaling
         agg[0, 0] = y_range[1]
 
     img = tf.shade(agg, cmap=cmap)
-    #img = tf.set_background(img, "black")
+    # img = tf.set_background(img, "black")
     return img.to_pil()
+
 
 def gen_ridge_traces(ridge_df, t=None, mz=None):
     """Generate Plotly traces for ridges
@@ -192,30 +193,28 @@ def gen_ridge_traces(ridge_df, t=None, mz=None):
         instead of actual m/z.
     """
 
-    global DEFAULT_TRACE # Trace template
+    global DEFAULT_TRACE  # Trace template
 
     traces = []
     for _, row in ridge_df.iterrows():
         ridge = row.ridge
         if t is not None:
-            x = [ t[i] for i in ridge[1] ]
+            x = [t[i] for i in ridge[1]]
         else:
             x = ridge[1]
         if mz is not None:
-            y = [ mz[i] for i in ridge[0] ]
+            y = [mz[i] for i in ridge[0]]
         else:
             y = ridge[0]
         ridge_trace = deepcopy(DEFAULT_TRACE)
-        ridge_trace.update({'x': x, 'y': y, 'name': row.name})
+        ridge_trace.update({"x": x, "y": y, "name": row.name})
         traces.append(ridge_trace)
     return traces
 
-def gen_spec_stack_image(data_xarray,
-                         t_range,
-                         mz_range,
-                         avg_s=0.0,
-                         img_width=600,
-                         img_height=1200):
+
+def gen_spec_stack_image(
+    data_xarray, t_range, mz_range, avg_s=0.0, img_width=600, img_height=1200
+):
     """Generate spec images and stack them
 
     Parameters
@@ -244,52 +243,48 @@ def gen_spec_stack_image(data_xarray,
     """
 
     # Select subset of data within set ranges
-    sub_xarray = data_xarray.sel(mz=slice(mz_range[0], mz_range[1]),
-                                 time=slice(t_range[0], t_range[1])
-                                 )
+    sub_xarray = data_xarray.sel(
+        mz=slice(mz_range[0], mz_range[1]), time=slice(t_range[0], t_range[1])
+    )
 
     # Convert time dimension to timedelta for resampling
     sub_xarray = sub_xarray.assign_coords(
-                    {'time': [timedelta(seconds=t.item()) for t in sub_xarray.time]}
-                    )
+        {"time": [timedelta(seconds=t.item()) for t in sub_xarray.time]}
+    )
 
     # Check aceraging parameter
     if avg_s <= 0:
         # Set avg_s to data time resolution
-        avg_s = (sub_xarray.time[1] - sub_xarray.time[0]).item() # ns
-        avg_s *= 1e-9 # ns -> s
+        avg_s = (sub_xarray.time[1] - sub_xarray.time[0]).item()  # ns
+        avg_s *= 1e-9  # ns -> s
 
     # Resample to 'avg_s'
-    sub_xarray = sub_xarray.resample(time='%.1fS' % avg_s).mean()
+    sub_xarray = sub_xarray.resample(time="%.1fS" % avg_s).mean()
 
     # Generate trace per spectrum
     traces = []
     for spectrum in sub_xarray.transpose():
-        imgi = gen_spec_image(spectrum,
-                              y_range=None,
-                              img_width=img_width,
-                              img_height=200
-                              )
+        imgi = gen_spec_image(
+            spectrum, y_range=None, img_width=img_width, img_height=200
+        )
         t = spectrum.time.data.item() * 1e-9
-        traces.append({'t_range': [t, t],
-                       'img': imgi
-                       })
-    
+        traces.append({"t_range": [t, t], "img": imgi})
+
     # Stack images
-    img = stack_spec_images(traces,
-                            t_range=None,
-                            n_traces=None,
-                            img_width=img_width,
-                            img_height=img_height)
+    img = stack_spec_images(
+        traces, t_range=None, n_traces=None, img_width=img_width, img_height=img_height
+    )
     return img
-        
-def gen_spec_image(data_xarray,
-                   mz_range=None,
-                   y_range=None,
-                   img_width=600,
-                   img_height=200,
-                   cmap='white'
-                   ):
+
+
+def gen_spec_image(
+    data_xarray,
+    mz_range=None,
+    y_range=None,
+    img_width=600,
+    img_height=200,
+    cmap="white",
+):
     """Function to generate single spec trace image using datashader.
     Signals in the input array will be flattened time-wise.
 
@@ -316,9 +311,9 @@ def gen_spec_image(data_xarray,
     """
 
     # Flatten
-    if 'time' in data_xarray.dims:
+    if "time" in data_xarray.dims:
         # Sum timewise to get y
-        y = data_xarray.mean(dim='time')
+        y = data_xarray.mean(dim="time")
     else:
         y = data_xarray.values
 
@@ -329,7 +324,7 @@ def gen_spec_image(data_xarray,
 
     if y_range is None:
         # Set y_range[1] to max of signal
-        y_max = float( y.max() )
+        y_max = float(y.max())
         y_range = (0, y_max)
     # Make sure yrange[1] not zero
     y1 = max(1e-5, y_range[1])
@@ -338,22 +333,18 @@ def gen_spec_image(data_xarray,
     # mz axis
     mz = data_xarray.mz.data
     # Generate image for single trace
-    cvs = ds.Canvas(x_range=mz_range,
-                    y_range=y_range,
-                    plot_height=img_height,
-                    plot_width=img_width
-                    )
-    data_df = pd.DataFrame({'mz': mz, 'y': y})
+    cvs = ds.Canvas(
+        x_range=mz_range, y_range=y_range, plot_height=img_height, plot_width=img_width
+    )
+    data_df = pd.DataFrame({"mz": mz, "y": y})
     # Drop rows with all nan to avoid gaps
-    data_df.dropna(axis=0, how='all', subset=['y'], inplace=True)
-    agg = cvs.line(data_df, 'mz', 'y')
+    data_df.dropna(axis=0, how="all", subset=["y"], inplace=True)
+    agg = cvs.line(data_df, "mz", "y")
     img = tf.shade(agg, cmap=cmap)
     return img.to_pil()
 
-def gen_timeseries_trace(data_xarray,
-                         t_range=None,
-                         mz_range=None,
-                         y_range=None):
+
+def gen_timeseries_trace(data_xarray, t_range=None, mz_range=None, y_range=None):
     """Generate timeseries trace for certain time and mz ranges.
     All signals in the said mz range will be summed to make one trace.
 
@@ -383,17 +374,18 @@ def gen_timeseries_trace(data_xarray,
         t_range = (data_xarray.time[0], data_xarray.time[-1])
     if mz_range is None:
         mz_range = (data_xarray.mz[0], data_xarray.mz[-1])
-    sub_xarray = data_xarray.sel(mz=slice(mz_range[0],
-                                          mz_range[1]),
-                                 time=slice(t_range[0],
-                                            t_range[1])
-                                 )
+    sub_xarray = data_xarray.sel(
+        mz=slice(mz_range[0], mz_range[1]), time=slice(t_range[0], t_range[1])
+    )
     trace = deepcopy(DEFAULT_TRACE)
-    trace.update({'x': np.array(sub_xarray.time).tolist(),
-                  'y': np.array(sub_xarray.sum(dim='mz')).tolist()
-                  }
-                 )
+    trace.update(
+        {
+            "x": np.array(sub_xarray.time).tolist(),
+            "y": np.array(sub_xarray.sum(dim="mz")).tolist(),
+        }
+    )
     return trace
+
 
 def hstack_imgs(slice_imgs):
     """Merge image slices horizontally into one image
@@ -419,16 +411,14 @@ def hstack_imgs(slice_imgs):
         img_width += img.size[0]
         # Assume all slices have same height
         img_height = img.size[1]
-    merge_img = Image.new('RGBA',
-                          (img_width,
-                           img_height)
-                          )
+    merge_img = Image.new("RGBA", (img_width, img_height))
     x = 0
     for img in slice_imgs:
         # Paste slice
         merge_img.paste(img, (x, 0), img)
         x += img.size[0]
     return merge_img
+
 
 def read_img_from_h5(filename, location):
     """Read image from h5 file and return as PIL.Image.Image
@@ -447,17 +437,16 @@ def read_img_from_h5(filename, location):
 
     """
 
-    with h5py.File(filename, 'r') as h5f:
+    with h5py.File(filename, "r") as h5f:
         # Read image array from the file
         img_arr = h5f[location][()]
         # Convert to PIL.Image.Image and return
         return Image.fromarray(img_arr)
 
-def stack_spec_images(spec_traces,
-                      t_range=None,
-                      n_traces=None,
-                      img_width=600,
-                      img_height=1200):
+
+def stack_spec_images(
+    spec_traces, t_range=None, n_traces=None, img_width=600, img_height=1200
+):
     """Function to combine list of spec traces into a stack image.
 
     Horizontal axis is m/z, vertical axis is time.
@@ -489,12 +478,9 @@ def stack_spec_images(spec_traces,
         PIL Image containing the spec stack.
 
     """
-    
+
     # Initialize image
-    stack_img = Image.new(
-                    'RGBA',
-                    (img_width, img_height)
-                    )
+    stack_img = Image.new("RGBA", (img_width, img_height))
     # Number of images to combine
     n_imgs = len(spec_traces)
     # Number of traces to make room for
@@ -504,15 +490,15 @@ def stack_spec_images(spec_traces,
     if n_imgs == 0:
         return stack_img
     # Height of a single image
-    spec_img_height = spec_traces[0].get('img').size[1]
+    spec_img_height = spec_traces[0].get("img").size[1]
     # Vertical offset between images to be stacked
     if n_traces == 1:
-        offset = img_height-spec_img_height
+        offset = img_height - spec_img_height
         y_pos = offset
     else:
-        offset = (img_height-spec_img_height) / (n_traces-1)
-        y_pos = img_height-spec_img_height
-    # Set indices in case there are more images 
+        offset = (img_height - spec_img_height) / (n_traces - 1)
+        y_pos = img_height - spec_img_height
+    # Set indices in case there are more images
     if t_range is None:
         # No time range specified
         i0 = 0
@@ -522,10 +508,9 @@ def stack_spec_images(spec_traces,
         i0 = None
         i1 = None
         for i, trace in enumerate(spec_traces):
-            if (i0 is None and
-                trace.get('t_range')[0] >= t_range[0]):
+            if i0 is None and trace.get("t_range")[0] >= t_range[0]:
                 i0 = i
-            elif trace.get('t_range')[1] > t_range[1]:
+            elif trace.get("t_range")[1] > t_range[1]:
                 i1 = i
                 break
         if i1 is None:
@@ -533,10 +518,11 @@ def stack_spec_images(spec_traces,
     # Loop through images in reversed order
     # to make newest one appear on the bottom
     for trace in list(reversed(spec_traces))[i0:i1]:
-        img = trace.get('img')
+        img = trace.get("img")
         stack_img.paste(img, (0, int(y_pos)), img)
         y_pos -= offset
     return stack_img
+
 
 def write_img_to_h5(filename, location, img):
     """Write an image to h5 file as an array of uint8
@@ -549,19 +535,17 @@ def write_img_to_h5(filename, location, img):
         Dataset within the file to write the image into
     img : Image
         PIL Image to write to file
-    
+
     """
 
-    print('Writing image to : ' + location)
-    with h5py.File(filename, 'r+') as h5f:
+    print("Writing image to : " + location)
+    with h5py.File(filename, "r+") as h5f:
         if location in h5f:
             # Delete previous image if exists
-            del(h5f[location])
+            del h5f[location]
         # Write image as an array to file
         img_arr = np.array(img)
-        h5f.create_dataset(location,
-                           data=img_arr
-                           )
+        h5f.create_dataset(location, data=img_arr)
         # h5f.create_dataset(location,
         #                    np.shape(img),
         #                    h5py.h5t.STD_U8BE,
@@ -570,10 +554,11 @@ def write_img_to_h5(filename, location, img):
 
 
 VIZ_GENERATORS = {
-            'spectrogram': gen_heatmap_image,
-            'timeseries': gen_timeseries_trace,
-            'waterfall': gen_spec_image,
-            }
+    "spectrogram": gen_heatmap_image,
+    "timeseries": gen_timeseries_trace,
+    "waterfall": gen_spec_image,
+}
+
 
 class ImageGenerator(Process):
     def __init__(self, queue_in, queue_out, shutdown_event):
@@ -596,33 +581,32 @@ class ImageGenerator(Process):
                 break
             if data is not None:
                 # Select function to generate the image
-                viz_type = data['viz_type']
+                viz_type = data["viz_type"]
                 try:
                     viz_gen_func = VIZ_GENERATORS[viz_type]
                 except KeyError:
-                    print("Requested visualization type '%s' not available!" %viz_type)
+                    print("Requested visualization type '%s' not available!" % viz_type)
                     continue
-                data_array = data.pop('data')
-                mz_range = data.get('mz_range', None)
-                y_range = data.get('y_range', None)
+                data_array = data.pop("data")
+                mz_range = data.get("mz_range", None)
+                y_range = data.get("y_range", None)
                 try:
-                    viz = viz_gen_func(data_array,
-                                       mz_range=mz_range,
-                                       y_range=y_range
-                                       )
+                    viz = viz_gen_func(data_array, mz_range=mz_range, y_range=y_range)
                 except ZeroDivisionError:
-                    print("Caught ZeroDivisionError in %s" %str(viz_gen_func))
+                    print("Caught ZeroDivisionError in %s" % str(viz_gen_func))
                     continue
                 except Exception as e:
                     # TODO: check if this exception handling is right: without it process hangs
                     # after acq.stopped, often there goes exception: y must be real (y_range-[0, 15.135354995727539])
-                    print(f"ImageGenerator {os.getpid()} exception: {str(e)} for y_range {y_range}")
+                    print(
+                        f"ImageGenerator {os.getpid()} exception: {str(e)} for y_range {y_range}"
+                    )
                     continue
                 if isinstance(viz, Image.Image):
                     img_b = convert_to_base64(viz)
-                    data.update({'img': img_b})
+                    data.update({"img": img_b})
                 elif isinstance(viz, dict):
-                    data.update({'traces': [viz]})
+                    data.update({"traces": [viz]})
                 self.queue_out.put(data)
             else:
                 print(f"ImageGenerator stopped - PID: {os.getpid()}")

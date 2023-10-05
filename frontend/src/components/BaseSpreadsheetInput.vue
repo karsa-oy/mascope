@@ -64,11 +64,10 @@ export default {
       let clipboardText = await navigator.clipboard.readText();
       if (this.colsFromHeader) {
         let fields = table.readHeader(clipboardText);
-        let cols = fields.map(
-          (field) => ({
-            field: field.toLowerCase().replace(/ /g,"_").trim(),
-            label: field
-          }));
+        let cols = fields.map((field) => ({
+          field: field.toLowerCase().replace(/ /g, "_").trim(),
+          label: field,
+        }));
         this.$emit("colsPasted", cols);
         await this.$nextTick();
       }
@@ -76,7 +75,7 @@ export default {
         clipboardText,
         this.fields,
         this.colsFromHeader
-        );
+      );
       this.$emit("rowsPasted", this.rows);
     },
   },

@@ -29,8 +29,6 @@ FOR /F "eol=# tokens=*" %%i IN (%env_file%) DO SET %%i
 echo Build MASCOPE frontend package...
 pushd %frontend_path%
 call yarn build
-md dist\node_modules\sql.js
-xcopy /s /y .\node_modules\sql.js dist\node_modules\sql.js || (echo Error copying sql.js & exit /b 1)
 
 rm -r -f mascope_ui
 mkdir mascope_ui

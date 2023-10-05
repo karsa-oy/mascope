@@ -61,12 +61,12 @@ export default {
     maxPrecision: {
       type: Number,
       required: false,
-      default: 2
+      default: 2,
     },
     minPrecision: {
       type: Number,
       required: false,
-      default: 2
+      default: 2,
     },
     rows: {
       type: Array,
@@ -86,7 +86,7 @@ export default {
   data() {
     return {
       selected: [],
-    }
+    };
   },
   created: function () {
     this.formatter = new Intl.NumberFormat("en-US", {
@@ -107,16 +107,10 @@ export default {
     selected(newRows, oldRows) {
       if (this.checkSingle && newRows.length > 1) {
         this.selected = newRows.filter((row) => !oldRows.includes(row));
-        return
+        return;
       }
       this.$emit("selectRows", newRows, oldRows);
     },
   },
 };
 </script>
-
-<style>
-.b-table .table-wrapper.has-sticky-header tr:first-child th {
-  background-color: #2b3e50 !important;
-}
-</style>

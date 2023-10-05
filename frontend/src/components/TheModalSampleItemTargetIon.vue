@@ -8,16 +8,14 @@
       aria-modal
       @close="deactivateModal"
     >
-      <div class="modal-card" style="width:100%; height:100%">
+      <div class="modal-card" style="width: 100%; height: 100%">
         <header class="modal-card-head">
           <h2 class="subtitle">{{ modalTitle }}</h2>
         </header>
         <section class="modal-card-body">
           <the-pane-sample-signal></the-pane-sample-signal>
         </section>
-        <footer class="modal-card-foot">
-
-        </footer>
+        <footer class="modal-card-foot"></footer>
       </div>
     </b-modal>
   </section>
@@ -36,9 +34,7 @@ export default {
   },
   props: {},
   data: function () {
-    return {
-
-    };
+    return {};
   },
   computed: {
     ...get({
@@ -50,8 +46,10 @@ export default {
     }),
     modalTitle() {
       return this.sampleItem
-      ? this.sampleItem.sample_item_name + ": " + this.modalProps.target_ion_formula
-      : "";
+        ? this.sampleItem.sample_item_name +
+            ": " +
+            this.modalProps.target_ion_formula
+        : "";
     },
   },
   methods: {
@@ -59,8 +57,6 @@ export default {
       deactivateModal: "modal/deactivate",
     }),
   },
-  watch: {
-  },
+  watch: {},
 };
 </script>
-

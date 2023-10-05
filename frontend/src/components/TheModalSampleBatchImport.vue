@@ -8,29 +8,35 @@
       aria-modal
       @close="close"
     >
-      <div class="modal-card" style="width: 100vw">
+      <div class="modal-card" style="">
         <header class="modal-card-head">
           <h2 class="subtitle">Import a batch of samples</h2>
         </header>
-        <section class="modal-card-body" style="min-height: 250px;">
+        <section class="modal-card-body" style="min-height: 250px">
           <base-spreadsheet-input
             label="CSV"
             :cols="csvCols"
             :colsFromHeader="true"
-            @colsPasted="(cols) => {
-              csvCols = cols;
-            }"
-            @rowsPasted="(rows) => {
-              csvRows = rows;
-            }"
+            @colsPasted="
+              (cols) => {
+                csvCols = cols;
+              }
+            "
+            @rowsPasted="
+              (rows) => {
+                csvRows = rows;
+              }
+            "
           >
           </base-spreadsheet-input>
         </section>
         <footer class="modal-card-foot">
-          <b-button expanded @click="modalActive = false"> Cancel </b-button>
+          <b-button expanded type="is-warning" @click="modalActive = false">
+            Cancel
+          </b-button>
           <b-button
-            type="is-primary"
             expanded
+            type="is-primary"
             :disabled="!readyToProcess"
             @click="
               () => {
@@ -39,7 +45,7 @@
               }
             "
           >
-            Process ({{parsedRows.length}})
+            Process ({{ parsedRows.length }})
           </b-button>
         </footer>
       </div>
@@ -48,7 +54,7 @@
 </template>
 
 <script>
-import { mapMutations } from "vuex";
+import { mapMutations, mapActions } from "vuex";
 import { get, sync } from "vuex-pathify";
 import { parseAutosamplerCsv } from "../lib/util";
 
@@ -59,7 +65,7 @@ export default {
   name: "TheModalSampleBatchImport",
   components: {
     BaseSpreadsheetInput,
-    BaseTable
+    BaseTable,
   },
   props: {},
   data: function () {
@@ -81,9 +87,9 @@ export default {
     }),
     readyToProcess() {
       return (
-        this.parsedRows.length
-        && this.acquisitions
-        && this.parsedRows.length == this.acquisitions.length
+        this.parsedRows.length &&
+        this.acquisitions &&
+        this.parsedRows.length == this.acquisitions.length
       );
     },
     // readyToProcess() {
@@ -123,6 +129,7 @@ export default {
     // },
   },
   methods: {
+    ...mapActions("batch", ["autoSamplerImportBatch"]),
     ...mapMutations({
       deactivateModal: "modal/deactivate",
     }),
@@ -137,14 +144,14 @@ export default {
       for (let [i, row] of Object.entries(this.parsedRows)) {
         let newSampleItem = {
           filename: this.acquisitions[i].filename,
-          sample_batch_id: this.batchActive.sample_batch_id
+          sample_batch_id: this.batchActive.sample_batch_id,
         };
         let attributes = {};
         for (const key in row) {
-          const attr = key.toLowerCase().replaceAll(/[\s-]/g, '_');
-          if (attr.startsWith('sample_')) {
+          const attr = key.toLowerCase().replaceAll(/[\s-]/g, "_");
+          if (attr.startsWith("sample_")) {
             // sampl_name or sample_type
-            const prop = attr.replace('sample', 'sample_item');
+            const prop = attr.replace("sample", "sample_item");
             newSampleItem[prop] = row[key];
           } else {
             attributes[attr] = row[key];
@@ -153,7 +160,11 @@ export default {
         newSampleItem.sample_item_attributes = attributes;
         items.push(newSampleItem);
       }
-      this.$api.emit('scenthound_process_samples', items);
+      const data = {
+        sample_batch: this.batchActive,
+        sample_items: items,
+      };
+      this.autoSamplerImportBatch(data);
     },
   },
   watch: {
@@ -163,4 +174,3 @@ export default {
   },
 };
 </script>
-

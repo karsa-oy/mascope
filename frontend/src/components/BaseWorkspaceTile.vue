@@ -1,12 +1,12 @@
 <template>
-  <div class="card base-tile">
-    <header class="card-header">
-      <p class="card-header-title" @click="onClick">
+  <div class="base-tile">
+    <header class="tile-card-header">
+      <p class="tile-card-header-title" @click="onClick">
         {{ workspace.workspace_name }}
       </p>
       <b-dropdown aria-role="list">
         <template #trigger>
-          <b-icon icon="dots-horizontal" size="small" role="button"> </b-icon>
+          <b-icon icon="dots-horizontal" size="small" role="button"></b-icon>
         </template>
         <b-dropdown-item
           aria-role="listitem"
@@ -42,12 +42,11 @@
         </b-dropdown-item>
       </b-dropdown>
     </header>
-    <div class="card-content">
+    <div class="tile-card-content">
       {{ workspace.workspace_description }}
     </div>
   </div>
 </template>
-
 
 <script>
 import { mapMutations } from "vuex";
@@ -68,21 +67,15 @@ export default {
   methods: {
     ...call({
       workspaceLoad: "workspace/load",
+      targetsLoad: "targets/load",
     }),
     ...mapMutations({
       activateModal: "modal/activate",
     }),
     onClick() {
       this.workspaceLoad(this.workspace);
+      this.targetsLoad();
     },
   },
 };
 </script>
-
-<style scoped>
-.base-tile {
-  height: 200px;
-  width: 200px;
-  margin: 10px;
-}
-</style>

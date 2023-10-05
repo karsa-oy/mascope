@@ -21,9 +21,7 @@ export default {
       traces: "visualization/tracesSignalSumSpectrum",
     }),
     data: function () {
-      return this.traces
-        ? this.traces
-        : [];
+      return this.traces ? this.traces : [];
     },
     layout: function () {
       return {
@@ -44,15 +42,17 @@ export default {
     },
     xAxisConfiguration() {
       return {
-        title: 'm/z [Th]',
-        gridcolor: "#757575",
-      }
+        title: "m/z [Th]",
+        gridcolor: "#464752",
+        gridwidth: 1,
+      };
     },
     yAxisConfiguration() {
       return {
-        title: 'Signal intensity [cps]',
-        gridcolor: "#757575",
-      }
+        title: "Signal intensity [cps]",
+        gridcolor: "#464752",
+        gridwidth: 1,
+      };
     },
   },
 };

@@ -145,31 +145,35 @@ export default {
     actionIs(...actions) {
       return actions.includes(this.action);
     },
-    createWorkspace() {
+    async createWorkspace() {
       const newWorkspace = {
         workspace_name: this.workspaceName,
         workspace_description: this.workspaceDesc,
       };
-      this.$api.emit('workspace_create', [newWorkspace]);
+      await this.$api.httpClient.createWorkspace(newWorkspace);
     },
-    deleteWorkspace() {
-      this.$api.emit('workspace_delete', [this.oldWorkspace.workspace_id]);
+    async deleteWorkspace() {
+      await this.$api.httpClient.deleteWorkspace(
+        this.oldWorkspace.workspace_id
+      );
     },
     loadWorkspace() {
       this.workspaceName = this.oldWorkspace
         ? this.oldWorkspace.workspace_name
         : null;
-      this.workspaceDesc = this.oldWorkspace 
+      this.workspaceDesc = this.oldWorkspace
         ? this.oldWorkspace.workspace_description
         : null;
     },
-    updateWorkspace() {
+    async updateWorkspace() {
       const updatedWorkspace = {
-        ...this.oldWorkspace,
         workspace_name: this.workspaceName,
         workspace_description: this.workspaceDesc,
       };
-      this.$api.emit('workspace_update', [updatedWorkspace]);
+      await this.$api.httpClient.updateWorkspace(
+        this.oldWorkspace.workspace_id,
+        updatedWorkspace
+      );
     },
   },
 };

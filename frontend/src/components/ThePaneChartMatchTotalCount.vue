@@ -11,8 +11,6 @@
 <script>
 import BaseChartPlotly from "./BaseChartPlotly.vue";
 
-import { ratingColors } from "$lib/styles";
-
 import { mapActions } from "vuex";
 
 export default {
@@ -32,11 +30,11 @@ export default {
           values: this.stats.map((stat) => stat.matchCount),
           type: "pie",
           hole: 40,
-          marker: {
-            colors: this.stats
-              .map((stat) => stat.rating)
-              .map((rating) => ratingColors[rating]),
-          },
+          // marker: {
+          //   colors: this.stats
+          //     .map((stat) => stat.rating)
+          //     .map((rating) => ratingColors[rating]),
+          // },
         },
       ];
     },

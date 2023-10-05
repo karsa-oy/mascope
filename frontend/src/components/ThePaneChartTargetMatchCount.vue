@@ -63,7 +63,9 @@ export default {
           tickmode: "array",
           tickvals: this.stats.map((stat) => stat.id),
           ticktext: this.stats.map((stat) =>
-            stat.target_compound_name.trim() ? stat.target_compound_name : stat.target_compound_formula
+            stat.target_compound_name.trim()
+              ? stat.target_compound_name
+              : stat.target_compound_formula
           ),
           gridcolor: "#757575",
         },

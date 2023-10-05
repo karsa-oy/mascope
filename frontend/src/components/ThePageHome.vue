@@ -1,29 +1,25 @@
 <template>
   <section>
     <the-layout-sidebar>
-      <div class="columns" style="margin: 0 auto; width: 70vw;">
+      <div class="columns" style="margin: 0 auto; width: 70vw">
         <div class="column is-half">
           <section style="padding: 2em 2em 2em 2em">
             <h1 class="title is-4">Instruments:</h1>
           </section>
-          <b-field label="Select instrument to monitor">
-            <base-table
-              :rows="instruments"
-              :cols="[{ field: 'instrument', label: 'Instrument' }]"
-              :checkable="true"
-              :checkSingle="true"
-              @selectRows="selectInstrument"
-            >
-            </base-table>
-          </b-field>
+          <h2>Select instrument to monitor</h2>
+          <b-table
+            :data="instruments"
+            :columns="[{ field: 'instrument', label: 'Instrument' }]"
+            checkable
+            :header-checkable="false"
+            :checked-rows.sync="instrumentSelected"
+          >
+          </b-table>
           <div v-if="instrumentActive">
             <section style="padding: 2em 2em 2em 2em">
               <h1 class="title is-4">Acquisitions:</h1>
             </section>
-            <b-collapse
-              :open.sync="browseAcquisitions"
-              animation="slide"
-            >
+            <b-collapse :open.sync="browseAcquisitions" animation="slide">
               <template #trigger>
                 <section style="padding: 0.5em">
                   <b-button
@@ -55,22 +51,23 @@
                 </div>
               </div>
             </b-collapse>
-            <base-table
+            <b-table
               :key="sampleFileTableDataKey"
-              :rows="acquisitions ? acquisitions : []"
-              :cols="sampleFileCols ? sampleFileCols : []"
-              :checkable="true"
-              :checkSingle="true"
-              @selectRows="selectSampleFiles"
-              :height="sampleFileTableHeight"
-              :sortable="false"
+              :data="acquisitions ? acquisitions : []"
+              :columns="sampleFileCols ? sampleFileCols : []"
+              checkable
+              :checked-rows.sync="sampleFilesSelected"
             >
-            </base-table>
+            </b-table>
             <section style="padding: 0.5em">
               <b-button
                 type="is-primary"
                 style="position: fixed; left: 5em; bottom: 2em"
-                :disabled="!workspaceActive || !batchActive || sampleFilesSelected.length != 1"
+                :disabled="
+                  !workspaceActive ||
+                  !batchActive ||
+                  sampleFilesSelected.length != 1
+                "
                 @click="launchProcessSelectedModal"
               >
                 Process selected
@@ -78,11 +75,17 @@
               <b-button
                 v-if="browseAcquisitions"
                 type="is-primary"
-                style="position: fixed; left: 15em; bottom: 2em;"
-                :disabled="!workspaceActive || !batchActive || !acquisitions.length || sampleFilesSelected.length > 0"
+                style="position: fixed; left: 15em; bottom: 2em"
+                :disabled="
+                  !workspaceActive ||
+                  !batchActive ||
+                  acquisitions === null ||
+                  !acquisitions.length ||
+                  sampleFilesSelected.length > 0
+                "
                 @click="launchProcessBatchModal"
               >
-                Process batch ({{acquisitions.length}})
+                Process batch ({{ acquisitions ? acquisitions.length : 0 }})
               </b-button>
             </section>
           </div>
@@ -119,35 +122,7 @@
             </section>
           </template>
           <template v-else>
-            <section style="padding: 2em 2em 2em 2em">
-              <h1 class="title is-4">{{ workspaceHomeText }}</h1>
-            </section>
-            <the-pane-browser-sample></the-pane-browser-sample>
-            <b-collapse
-              v-if="batchActive"
-              :open="false"
-              animation="slide"
-            >
-              <template #trigger>
-                <section style="padding: 0.5em">
-                  <b-button
-                    icon-left="wrench"
-                    size="is-small"
-                    @click="
-                      (props) => {
-                        props.open = !props.open;
-                      }
-                    "
-                  >
-                  </b-button>
-                </section>
-              </template>
-              <the-pane-settings-batch></the-pane-settings-batch>
-            </b-collapse>
-            <div v-if="!sampleActive || sampleMatched">
-              <!-- hide target browser if selected sample is not matched -->
-              <the-pane-browser-target></the-pane-browser-target>
-            </div>
+            <the-pane-browser></the-pane-browser>
           </template>
         </div>
       </div>
@@ -159,10 +134,8 @@
 import BaseTable from "./BaseTable.vue";
 import BaseWorkspaceTile from "./BaseWorkspaceTile.vue";
 import TheLayoutSidebar from "./TheLayoutSidebar.vue";
-import ThePaneBrowserSample from "./ThePaneBrowserSample.vue";
-import ThePaneBrowserTarget from "./ThePaneBrowserTarget.vue";
+import ThePaneBrowser from "./ThePaneBrowser.vue";
 import ThePaneSettingsBatch from "./ThePaneSettingsBatch.vue";
-
 
 import { mapMutations } from "vuex";
 import { call, get, sync } from "vuex-pathify";
@@ -173,16 +146,16 @@ export default {
     BaseTable,
     BaseWorkspaceTile,
     TheLayoutSidebar,
-    ThePaneBrowserTarget,
-    ThePaneBrowserSample,
+    ThePaneBrowser,
     ThePaneSettingsBatch,
   },
   data: function () {
     return {
       browseAcquisitions: false,
+      instrumentSelected: [],
       sampleFileMinDatetime: new Date(
-        new Date().getTime() - (24*60*60*1000)
-        ), // now - 24h
+        new Date().getTime() - 24 * 60 * 60 * 1000
+      ), // now - 24h
       sampleFileMaxDatetime: new Date(), // now
       sampleFilesSelected: [],
       sampleFileTableDataKey: 0,
@@ -212,9 +185,7 @@ export default {
         : this.recentAcquisitions;
     },
     sampleFileCols() {
-      return [
-        {field: 'filename', label: 'Filename'}
-      ];
+      return [{ field: "filename", label: "Filename" }];
     },
     sampleFileTableHeight() {
       return "calc(50vh)";
@@ -228,7 +199,9 @@ export default {
     },
   },
   created: function () {
-    this.getAcquisitionsInRange();
+    this.instrumentSelected = this.instruments.filter(
+      (instrument) => instrument.instrument === this.instrumentActive
+    );
   },
   methods: {
     ...call({
@@ -243,12 +216,12 @@ export default {
     getAcquisitionsInRange() {
       this.getAcquisitions({
         min: this.sampleFileMinDatetime,
-        max: this.sampleFileMaxDatetime
+        max: this.sampleFileMaxDatetime,
       });
     },
     launchProcessBatchModal() {
       this.activateModal({
-        modal: 'sampleBatchImport',
+        modal: "sampleBatchImport",
       });
     },
     launchProcessSelectedModal() {
@@ -257,14 +230,14 @@ export default {
         this.sampleItemFocus(this.sampleActive);
       }
       this.sampleItemAttributesSaveProps = {
-        action: 'create',
+        action: "create",
         sampleItemRecordToLoad: this.sampleFilesSelected[0],
       };
       this.activateModal({
-        modal: 'sampleItemAttributesSave',
+        modal: "sampleItemAttributesSave",
       });
     },
-    selectInstrument(newRows, oldRows) {
+    selectInstrument(newRows) {
       const instrument = newRows.length ? newRows[0].instrument : null;
       if (instrument) {
         this.loadInstrument(instrument);
@@ -273,18 +246,29 @@ export default {
         this.unloadInstrument();
       }
     },
-    selectSampleFiles(newRows, oldRows) {
-      this.sampleFilesSelected = newRows;
-    },
   },
   watch: {
+    browseAcquisitions: function () {
+      // Reset selected files when switching between recent acquisitions/browse
+      this.sampleFilesSelected = [];
+    },
+    instrumentSelected: function (newRows, oldRows) {
+      if (newRows === null) return;
+      if (newRows.length > 1) {
+        this.instrumentSelected = newRows.filter(
+          (row) => !oldRows.includes(row)
+        );
+        return;
+      }
+      this.selectInstrument(newRows);
+    },
     sampleFileMinDatetime: function () {
       this.getAcquisitionsInRange();
     },
     sampleFileMaxDatetime: function () {
       this.getAcquisitionsInRange();
     },
-    recentAcquisitions: function() {
+    recentAcquisitions: function () {
       // This watcher triggers on database reload
       if (this.browseAcquisitions) this.getAcquisitionsInRange();
     },

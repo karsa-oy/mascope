@@ -9,7 +9,13 @@
       size="is-small"
       multilined
     >
-      <b-tag v-if="!(matchScore === null)" :icon="tag.icon" :class="tag.class" style="font-size: small">
+      <b-tag
+        v-if="!(matchScore === null)"
+        :icon="tag.icon"
+        :class="tag.class"
+        style="font-size: small"
+        @click="clicked"
+      >
         <span v-if="displayMatchScore" :style="tag.weight">
           {{ formatter.format(matchScore) }}
         </span>
@@ -35,8 +41,8 @@ export default {
       required: false,
       default: true,
     },
-    matchScore: {
-      type: [Number, null],
+    row: {
+      type: Object,
       required: false,
     },
     tooltip: {
@@ -57,32 +63,41 @@ export default {
       probableMatchThreshold: "batch/paramProbableMatchThreshold",
       possibleMatchThreshold: "batch/paramPossibleMatchThreshold",
     }),
+    matchScore: function () {
+      return this.row !== null
+        ? this.row.matched === undefined || this.row.matched
+          ? this.row.match_score
+          : null
+        : null;
+    },
     tag: function () {
       if (this.matchScore >= this.probableMatchThreshold) {
         return {
           category: "probable",
           class: "is-danger",
-          icon: "close",
           weight: "font-size: bold",
         };
       } else if (this.matchScore >= this.possibleMatchThreshold) {
         return {
           category: "possible",
-          class: "is-primary",
-          icon: "help",
+          class: "is-warning",
           weight: "font-size: bold",
         };
       } else {
         return {
           category: "improbable",
           class: "is-success",
-          icon: "check-bold",
           weight: "",
         };
       }
     },
     tooltipActive: function () {
       return Object.keys(this.tooltip).length > 0;
+    },
+  },
+  methods: {
+    clicked: function () {
+      this.$emit("tagClicked", this.row);
     },
   },
 };
