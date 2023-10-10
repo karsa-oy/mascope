@@ -130,6 +130,12 @@ $modal-card-body-background-color: inherit;
 .message.is-notification.in-development {
   width: 500px;
 }
+.message.is-notification.is-submitted {
+  background-color: rgba($success, 0.9) !important;
+}
+.message.is-notification.is-error {
+  background-color: rgba($danger, 0.9) !important;
+}
 
 // Table
 $table-background-color: $cool-grey-2;
@@ -160,6 +166,77 @@ $progress-bar-background-color: $cool-grey-light;
 
 .notification-progress-bar {
   padding-top: 10px;
+}
+
+// Range input
+input[type="range"] {
+  -webkit-appearance: none;
+  width: 20%;
+  margin: 5px 20px 5px 20px;
+  height: 8px;
+  border-radius: 5px;
+  background: linear-gradient(
+    to right,
+    $notification-dark 0%,
+    $notification 25%,
+    $notification-light 50%,
+    $moss-green-light 75%
+  );
+  outline: none;
+
+  // For the slider thumb
+  &::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--thumb-color, $moss-green-light);
+    cursor: pointer;
+    z-index: 2;
+  }
+
+  &::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--thumb-color, $moss-green-light);
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+}
+.comment-input textarea {
+  background-color: $cool-grey-0 !important;
+  color: white !important;
+  border-color: transparent !important;
+}
+// Isotopes table in the checklist
+.isotopes-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 20px 0 20px 0;
+  color: white;
+  border: 1px solid $cool-grey;
+
+  th,
+  td {
+    padding: 8px 12px;
+    border: 1px solid $cool-grey;
+    text-align: left;
+  }
+
+  thead {
+    background-color: $cool-grey-2;
+    th {
+      color: white;
+    }
+  }
+}
+
+.failed-filters ul {
+  margin: 0;
+  padding: 0;
+  list-style-type: none;
 }
 
 // Setup $colors to use as bulma classes (e.g. 'is-twitter')

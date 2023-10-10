@@ -358,6 +358,8 @@ async def get_sample_by_id(sample_item_id: str, filter_params: FilterParams):
             [
                 "match_score",
                 "match_mz_error",
+                "match_abundance_error",
+                "match_isotope_correlation",
                 "mz",
                 "relative_abundance",
                 "sample_item_id",

@@ -59,6 +59,7 @@ const itemsBaseUrl = "/sample_items";
 const calibrationBaseUrl = "/calibration";
 const matchBaseUrl = "/match";
 const matchesBaseUrl = "/matches";
+const matchRatingsBaseUrl = "/match_ratings";
 const targetCollectionsBaseUrl = "/target_collections";
 const targetCollectionsInSampleBatchBaseUrl =
   "/target_collections_in_sample_batch";
@@ -449,6 +450,15 @@ export function createHttpClient(host, api_port) {
         );
       } catch (error) {
         console.error("Failed to remove sample match: ", error);
+      }
+    },
+
+    // Match Ratings
+    submitMatchRating: async (newMatchRating) => {
+      try {
+        return await httpClient.post(matchRatingsBaseUrl, newMatchRating);
+      } catch (error) {
+        console.error("Failed to submit match rating: ", error);
       }
     },
 

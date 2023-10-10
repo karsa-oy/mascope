@@ -34,6 +34,7 @@ export default {
     ...sync({
       modalSampleItemTargetIonProps: "modal/sampleItemTargetIonProps",
       modalTargetCollectionOpProps: "modal/targetCollectionOpProps",
+      isotopesInFocus: "visualization/isotopesInFocus",
     }),
     ...get({
       batchActive: "batch/active",
@@ -329,6 +330,22 @@ export default {
       const targetIon = this.targetIons.filter(
         (ion) => ion.target_ion_id == row.target_ion_id
       )[0];
+
+      const isotopesInFocus = this.matchIsotopes
+        .filter((isotope) => isotope.target_ion_id === row.target_ion_id)
+        .map((isotope) => ({
+          target_isotope_id: isotope.target_isotope_id,
+          mz: parseFloat(isotope.mz.toFixed(4)),
+          match_score: isotope.match_score,
+          relative_abundance: isotope.relative_abundance,
+          sample_peak_area: isotope.sample_peak_area,
+          match_mz_error: isotope.match_mz_error,
+          match_abundance_error: isotope.match_abundance_error,
+          match_isotope_correlation: isotope.match_isotope_correlation,
+        }));
+
+      this.isotopesInFocus = isotopesInFocus;
+
       this.modalSampleItemTargetIonProps = {
         ...row,
         target_ion_formula: targetIon.target_ion_formula,
