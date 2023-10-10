@@ -4,12 +4,16 @@ const state = {
   active: null,
   // All Notifications
   warningActive: false,
+  generalActive: false,
   batchComputeProgressActive: false,
   itemComputeProgressActive: false,
   calibrationProgressActive: false,
   // warning notifications
   warningNotification: null,
   warningData: null,
+  // general notifications
+  generalNotification: null,
+  generalNotificationMessage: null,
   // Compute progress notification
   progressMessage: "",
   progressPercentage: 0,
@@ -51,6 +55,10 @@ export default {
       state.warningNotification = null;
       state.warningData = null;
     },
+    RESET_GENERAL_NOTIFICATION(state) {
+      state.generalNotification = null;
+      state.generalNotificationMessage = null;
+    },
     RESET_CALIBRATION_NOTIFICATION(state) {
       state.progressMessage = "";
       state.progressPercentage = 0;
@@ -64,6 +72,11 @@ export default {
       commit("SET_WARNING_NOTIFICATION", payload.notification);
       commit("SET_WARNING_DATA", payload?.data || null);
       commit("activate", { notification: "warning" });
+    },
+    showGeneralNotification({ dispatch, commit }, payload) {
+      commit("SET_GENERAL_NOTIFICATION", payload.notification);
+      commit("SET_GENERAL_NOTIFICATION_MESSAGE", payload.message);
+      commit("activate", { notification: "general" });
     },
     // backend listeners
     // Batch compute progress notification

@@ -12,6 +12,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql.schema import CheckConstraint
 from sqlalchemy.ext.declarative import declarative_base
+from datetime import datetime
 
 
 class BaseMixin(object):
@@ -101,6 +102,11 @@ class SampleItem(Base):
         back_populates="sample_item",
         cascade="all, delete, delete-orphan",
     )
+    match_rating = relationship(
+        "MatchRating",
+        back_populates="sample_item",
+        cascade="all, delete, delete-orphan",
+    )
 
     # Methods
     async def get_compound_intensity(self, session, compounds):
@@ -155,26 +161,6 @@ class SampleFile(Base):
 
     # Define relationships
     sample_item = relationship("SampleItem", back_populates="sample_file")
-
-
-class Match(Base):
-    __tablename__ = "match"
-    match_id = Column(String, primary_key=True)
-    target_isotope_id = Column(String, ForeignKey("target_isotope.target_isotope_id"))
-    sample_item_id = Column(String, ForeignKey("sample_item.sample_item_id"))
-    sample_peak_id = Column(Integer)
-    sample_peak_mz = Column(Float)
-    sample_peak_area = Column(Float)
-    sample_peak_area_relative = Column(Float)
-    sample_peak_tof = Column(Float)
-    match_abundance_error = Column(Float)
-    match_mz_error = Column(Float)
-    match_score = Column(Float)
-    match_isotope_correlation = Column(Float)
-
-    # Define relationships
-    sample_item = relationship("SampleItem", back_populates="match")
-    target_isotope = relationship("TargetIsotope", back_populates="match")
 
 
 class TargetCollection(Base):
@@ -274,6 +260,9 @@ class TargetIon(Base):
         back_populates="target_ion",
         cascade="all, delete, delete-orphan",
     )
+    match_rating = relationship(
+        "MatchRating", back_populates="target_ion", cascade="all, delete, delete-orphan"
+    )
 
 
 class IonizationMechanism(Base):
@@ -299,7 +288,6 @@ class TargetIsotope(Base):
     )
     # Define relationships
     target_ion = relationship("TargetIon", back_populates="target_isotope")
-    # TODO check cascade deletes to match and match_interference
     match_interference = relationship(
         "MatchInterference",
         back_populates="target_isotope",
@@ -310,6 +298,26 @@ class TargetIsotope(Base):
         back_populates="target_isotope",
         cascade="all, delete, delete-orphan",
     )
+
+
+class MatchRating(Base):
+    __tablename__ = "match_rating"
+
+    match_rating_id = Column(String(32), primary_key=True)
+    sample_item_id = Column(
+        String(16), ForeignKey("sample_item.sample_item_id"), nullable=False
+    )
+    target_ion_id = Column(
+        String(32), ForeignKey("target_ion.target_ion_id"), nullable=False
+    )
+    match_rating_utc_created = Column(TIMESTAMP, default=datetime.utcnow)
+    rating = Column(Integer, CheckConstraint("rating BETWEEN 0 AND 2"), nullable=False)
+    checklist = Column(JSON)
+    environment = Column(JSON)
+
+    # Define relationships
+    sample_item = relationship("SampleItem", back_populates="match_rating")
+    target_ion = relationship("TargetIon", back_populates="match_rating")
 
 
 class MatchInterference(Base):
@@ -326,6 +334,26 @@ class MatchInterference(Base):
     # Define relationships
     sample_item = relationship("SampleItem", back_populates="match_interference")
     target_isotope = relationship("TargetIsotope", back_populates="match_interference")
+
+
+class Match(Base):
+    __tablename__ = "match"
+    match_id = Column(String, primary_key=True)
+    target_isotope_id = Column(String, ForeignKey("target_isotope.target_isotope_id"))
+    sample_item_id = Column(String, ForeignKey("sample_item.sample_item_id"))
+    sample_peak_id = Column(Integer)
+    sample_peak_mz = Column(Float)
+    sample_peak_area = Column(Float)
+    sample_peak_area_relative = Column(Float)
+    sample_peak_tof = Column(Float)
+    match_abundance_error = Column(Float)
+    match_mz_error = Column(Float)
+    match_score = Column(Float)
+    match_isotope_correlation = Column(Float)
+
+    # Define relationships
+    sample_item = relationship("SampleItem", back_populates="match")
+    target_isotope = relationship("TargetIsotope", back_populates="match")
 
 
 class AttributeTemplate(Base):

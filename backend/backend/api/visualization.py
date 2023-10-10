@@ -34,7 +34,7 @@ async def visualization_ion_focus(
         # Get ion data
         target_ion_df = pd.read_sql(
             f"""--sql
-            SELECT mz, relative_abundance
+            SELECT mz, relative_abundance, target_isotope_id
             FROM target_isotope
             WHERE target_ion_id == ?
             AND relative_abundance >= ?
@@ -44,6 +44,7 @@ async def visualization_ion_focus(
         )
         mzs = target_ion_df["mz"].tolist()
         rel_abus = target_ion_df["relative_abundance"].tolist()
+        target_isotope_ids = target_ion_df["target_isotope_id"].tolist()
 
     # Load file
     print("Loading file: %s" % filename)
@@ -64,6 +65,7 @@ async def visualization_ion_focus(
         dmz = 0.5
         mz_range = (mz - dmz, mz + dmz)
         rel_abu = rel_abus[i]
+        current_target_isotope_id = target_isotope_ids[i]
 
         isotope_slice = sample_file_slice.sel(mz=slice(*mz_range)).compute()
         isotope_sum_spectrum = isotope_slice.sum(dim="time").compute()
@@ -81,6 +83,7 @@ async def visualization_ion_focus(
         spectrum_traces.append(
             {
                 "name": "{:d}".format(round(mz)),
+                "target_isotope_id": current_target_isotope_id,
                 "type": "scatter",
                 "mode": "lines",
                 "line": {"color": "rgb({},{},{})".format(*colormap[i])},

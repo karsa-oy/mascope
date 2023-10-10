@@ -124,7 +124,7 @@ export default {
   methods: {
     ...mapMutations({
       deactivateNotification: "notification/deactivate",
-      resetWarningNotification: "notification/RESET_WARNING_NOTIFICATION", // map the resetWarningNotification action
+      resetWarningNotification: "notification/RESET_WARNING_NOTIFICATION",
     }),
     close() {
       // TODO_configuration  move animation delay to config file

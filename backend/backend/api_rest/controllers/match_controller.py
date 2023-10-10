@@ -337,7 +337,7 @@ async def item_compute(
 
     # Ensure mz_calibration.verified is True
     if not verified:
-        error_message = f"M/Z calibrationis not verified for sample file: {filename}. Please try to calibrate the file."
+        error_message = f"m/z calibration is not verified for sample file: {filename}. Please try to calibrate the file."
         print(error_message)
 
         raise ValueError(error_message)
