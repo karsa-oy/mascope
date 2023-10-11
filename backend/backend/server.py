@@ -29,7 +29,7 @@ from .api_rest.routes.match_interferences_routes import match_interferences_rout
 from .api_rest.routes.instrument_functions_routes import instrument_functions_router
 from .api_rest.routes.attribute_templates_routes import attribute_templates_router
 from .api_rest.routes.match_routes import match_router
-
+from .api_rest.routes.match_rating_routes import match_rating_router
 from .api_rest.routes.samples_routes import samples_router
 
 
@@ -57,8 +57,10 @@ routers = [
     workspace_router,
     sample_files_router,
     calibration_router,
-    matches_router,
+    match_rating_router,
     match_router,
+    match_interferences_router,
+    matches_router,
     target_collections_router,
     target_collection_in_sample_batch_router,
     target_compounds_router,
@@ -66,7 +68,6 @@ routers = [
     target_ions_router,
     ionization_mechanisms_router,
     target_isotopes_router,
-    match_interferences_router,
     instrument_functions_router,
     attribute_templates_router,
     samples_router,

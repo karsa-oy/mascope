@@ -6,16 +6,177 @@
       :can-cancel="true"
       aria-role="dialog"
       aria-modal
-      @close="deactivateModal"
+      @close="deactivateModalResetForm"
     >
       <div class="modal-card" style="width: 100%; height: 100%">
         <header class="modal-card-head">
-          <h2 class="subtitle">{{ modalTitle }}</h2>
+          <h2
+            class="subtitle"
+            style="width: 100%; display: flex; justify-content: space-between"
+          >
+            {{ modalTitle }}
+            <base-tag-match
+              :row="modalProps"
+              :display-match-score="true"
+              :tooltip="{}"
+            ></base-tag-match>
+          </h2>
         </header>
         <section class="modal-card-body">
           <the-pane-sample-signal></the-pane-sample-signal>
+
+          <!-- Match Rating section -->
+          <div>
+            <label class="label"> Rate this match:</label>
+            <b-radio v-model="matchRating" native-value="2">Detection</b-radio>
+            <b-radio v-model="matchRating" native-value="0"
+              >No detection</b-radio
+            >
+            <b-radio v-model="matchRating" native-value="1">Ambiguous</b-radio>
+
+            <!-- Display the checklist when the rating is 'Ambiguous' or not alllign with the match algoritm -->
+            <div v-if="displayChecklist">
+              <label class="label" style="margin-top: 10px">
+                Please check the following data for more context:</label
+              >
+              <!-- Isotopes Information Table -->
+              <table class="isotopes-table">
+                <thead>
+                  <tr>
+                    <th>Isotope m/z</th>
+                    <th>Match Score</th>
+                    <th>Relative Abundance</th>
+                    <th>Batch Filtering Parameters</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="isotope in isotopesInFocus"
+                    :key="isotope.target_isotope_id"
+                  >
+                    <td :style="{ color: isotope.color }">
+                      {{ isotope.mz }}
+                    </td>
+                    <td>
+                      <base-tag-match
+                        :row="isotope"
+                        :display-match-score="true"
+                        :tooltip="{}"
+                      ></base-tag-match>
+                    </td>
+                    <td>{{ isotope.relative_abundance.toFixed(2) }}</td>
+                    <td>
+                      <div
+                        v-if="getFailedFilters(isotope).length > 0"
+                        class="failed-filters"
+                      >
+                        <ul>
+                          <li
+                            v-for="filter in getFailedFilters(isotope)"
+                            :key="filter.filter"
+                          >
+                            {{ filter.isotopeValue }}
+                            <span v-if="filter.threshold !== 'N/A'"
+                              >({{ filter.filter }} is
+                              {{ filter.threshold }})</span
+                            >
+                          </li>
+                        </ul>
+                      </div>
+                      <div v-else>
+                        All filter parameters are within acceptable thresholds.
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <label class="label" v-text="checklistLabel"></label>
+              <!-- Checklist -->
+              <label class="label"
+                >1) Is there a clear peak in the signal corresponding target
+                isotope?</label
+              >
+              <div
+                v-for="isotope in isotopesInFocus"
+                :key="isotope.target_isotope_id"
+              >
+                <span :style="{ color: isotope.color }"
+                  >m/z {{ isotope.mz }}</span
+                >
+                <input
+                  type="range"
+                  min="1"
+                  max="5"
+                  :value="Number(checklist.isotopeRating[isotope.mz])"
+                  @input="
+                    (event) =>
+                      (checklist.isotopeRating[isotope.mz] = Number(
+                        event.target.value
+                      ))
+                  "
+                  :style="`--thumb-color: ${getThumbColor(
+                    Number(checklist.isotopeRating[isotope.mz])
+                  )};`"
+                />
+
+                <span>{{
+                  getIsotopeRatingText(checklist.isotopeRating[isotope.mz])
+                }}</span>
+              </div>
+
+              <label class="label"
+                >2) Do the timeseries indicate a good match between the
+                isotopes?</label
+              >
+              <b-radio
+                v-model="checklist.timeseriesGoodMatch"
+                native-value="true"
+                >Yes</b-radio
+              >
+              <b-radio
+                v-model="checklist.timeseriesGoodMatch"
+                native-value="false"
+                >No</b-radio
+              >
+
+              <label class="label"
+                >3) Do the timeseries indicate expected behavior of the target
+                in question?</label
+              >
+              <b-radio
+                v-model="checklist.timeseriesExpectedBehavior"
+                native-value="2"
+                >Yes</b-radio
+              >
+              <b-radio
+                v-model="checklist.timeseriesExpectedBehavior"
+                native-value="0"
+                >No</b-radio
+              >
+              <b-radio
+                v-model="checklist.timeseriesExpectedBehavior"
+                native-value="1"
+                >Do not know</b-radio
+              >
+
+              <label class="label">4) Comment (optional):</label>
+              <b-input
+                type="textarea"
+                v-model="checklist.comment"
+                class="comment-input"
+              ></b-input>
+            </div>
+          </div>
         </section>
-        <footer class="modal-card-foot"></footer>
+        <footer class="modal-card-foot">
+          <button
+            class="button is-success"
+            @click="submitRating"
+            :disabled="!submitRatingEnable"
+          >
+            Submit Rating
+          </button>
+        </footer>
       </div>
     </b-modal>
   </section>
@@ -23,23 +184,40 @@
 
 <script>
 import ThePaneSampleSignal from "./ThePaneSampleSignal.vue";
+import BaseTagMatch from "./BaseTagMatch.vue";
 
-import { mapMutations } from "vuex";
+import { mapActions, mapMutations } from "vuex";
 import { get, sync } from "vuex-pathify";
 
 export default {
   name: "TheModalSampleItemTargetIon",
   components: {
     ThePaneSampleSignal,
+    BaseTagMatch,
   },
   props: {},
   data: function () {
-    return {};
+    return {
+      matchRating: null,
+      checklist: {
+        isotopeRating: {},
+        timeseriesGoodMatch: null,
+        timeseriesExpectedBehavior: null,
+        comment: "",
+      },
+    };
   },
   computed: {
     ...get({
       modalProps: "modal/sampleItemTargetIonProps",
       sampleItem: "sample/active",
+      isotopesInFocus: "visualization/isotopesInFocus",
+      filterParamPossibleMatchThreshold: "batch/paramPossibleMatchThreshold",
+      filterParamMzTolerance: "batch/paramMzTolerance",
+      filterParamIsotopeRatioTolerance: "batch/paramIsotopeRatioTolerance",
+      filterParamMinIsotopeAbundance: "batch/paramMinIsotopeAbundance",
+      filterParamPeakMinIntensity: "batch/paramPeakMinIntensity",
+      filterParamMinIsotopeCorrelation: "batch/paramMinIsotopeCorrelation",
     }),
     ...sync({
       modalActive: "modal/sampleItemTargetIonActive",
@@ -51,12 +229,177 @@ export default {
             this.modalProps.target_ion_formula
         : "";
     },
+    submitRatingEnable() {
+      if (this.matchRating === null) return false;
+      if (this.displayChecklist) {
+        return (
+          this.checklist.timeseriesGoodMatch !== null &&
+          this.checklist.timeseriesExpectedBehavior !== null
+        );
+      }
+      return true;
+    },
+    displayChecklist() {
+      if (this.matchRating === "1") {
+        return true;
+      }
+      if (
+        this.matchRating === "2" &&
+        this.modalProps.match_score < this.filterParamPossibleMatchThreshold
+      ) {
+        return true;
+      }
+      if (
+        this.matchRating === "0" &&
+        this.modalProps.match_score > this.filterParamPossibleMatchThreshold
+      ) {
+        return true;
+      }
+      return false;
+    },
+    checklistLabel() {
+      if (this.matchRating === "1") {
+        return "Please provide additional information why this match is ambiguous:";
+      }
+      return "If your rating doesn't align with the match algorithm, please fill out the checklist below:";
+    },
   },
   methods: {
+    ...mapActions("visualization", ["submitMatchRating"]),
     ...mapMutations({
       deactivateModal: "modal/deactivate",
     }),
+    resetForm() {
+      this.matchRating = null;
+      this.checklist = {
+        isotopeRating: {},
+        timeseriesGoodMatch: null,
+        timeseriesExpectedBehavior: null,
+        comment: "",
+      };
+      this.isotopesInFocus.forEach((isotope) => {
+        this.$set(this.checklist.isotopeRating, isotope.mz, 3);
+      });
+    },
+    deactivateModalResetForm() {
+      this.deactivateModal();
+      this.resetForm();
+    },
+    // Function to return display text for isotope rating
+    getIsotopeRatingText(value) {
+      switch (value) {
+        case 1:
+          return "no peak";
+        case 2:
+          return "weak or faint peak";
+        case 3:
+          return "hard to say";
+        case 4:
+          return "probable peak";
+        case 5:
+          return "clear peak";
+      }
+    },
+    getThumbColor(rating) {
+      switch (rating) {
+        case 1:
+          return "#232829"; // corresponding to $cool-grey-0
+        case 2:
+          return "#464752"; // corresponding to $cool-grey
+        case 3:
+          return "#b0b1ba"; // corresponding to $cool-grey-light
+        case 4:
+          return "#94aa83"; // corresponding to $moss-green-light
+        case 5:
+          return "#86b758"; // corresponding to $success
+        default:
+          return "#94aa83"; // corresponding to $moss-green-light
+      }
+    },
+    getFailedFilters(isotope) {
+      let failedFilters = [];
+      if (Math.abs(isotope.match_mz_error) > this.filterParamMzTolerance) {
+        failedFilters.push({
+          filter: "m/z tolerance",
+          isotopeValue: `Isotope m/z error is ${isotope.match_mz_error.toFixed(
+            2
+          )}`,
+          threshold: this.filterParamMzTolerance,
+        });
+      }
+      if (
+        Math.abs(isotope.match_abundance_error) >
+        this.filterParamIsotopeRatioTolerance
+      ) {
+        failedFilters.push({
+          filter: "Isotope ratio tolerance",
+          isotopeValue: `Match abundance error is ${isotope.match_abundance_error.toFixed(
+            2
+          )}`,
+          threshold: this.filterParamIsotopeRatioTolerance,
+        });
+      }
+      if (isotope.sample_peak_area < this.filterParamPeakMinIntensity) {
+        failedFilters.push({
+          filter: "Minimum peak intensity",
+          isotopeValue: `Sample peak area is ${isotope.sample_peak_area.toFixed(
+            2
+          )}`,
+          threshold: this.filterParamPeakMinIntensity,
+        });
+      }
+      if (
+        Math.max(isotope.match_isotope_correlation, 0) <
+        this.filterParamMinIsotopeCorrelation
+      ) {
+        failedFilters.push({
+          filter: "Minimum isotope correlation",
+          isotopeValue: `Match isotope correlation is ${isotope.match_isotope_correlation.toFixed(
+            2
+          )}`,
+          threshold: this.filterParamMinIsotopeCorrelation,
+        });
+      }
+      return failedFilters;
+    },
+    async submitRating() {
+      let payload = {
+        sample_item_id: this.sampleItem.sample_item_id,
+        target_ion_id: this.modalProps.target_ion_id,
+        rating: Number(this.matchRating),
+        environment: {
+          mz_calibration: this.sampleItem.mz_calibration,
+        },
+      };
+      if (this.matchRating === "1") {
+        payload.checklist = {
+          isotopes_rating: this.isotopesInFocus.map((isotope) => ({
+            isotope_rating: this.checklist.isotopeRating[isotope.mz],
+            target_isotope_id: isotope.target_isotope_id,
+          })),
+          timeseries_good_match: this.checklist.timeseriesGoodMatch === "true",
+          timeseries_expected_behavior: Number(
+            this.checklist.timeseriesExpectedBehavior
+          ),
+          comment: this.checklist.comment,
+        };
+      }
+
+      await this.submitMatchRating(payload);
+      this.resetForm();
+    },
   },
-  watch: {},
+  watch: {
+    isotopesInFocus: {
+      immediate: true,
+      handler(newVal) {
+        if (newVal) {
+          newVal.forEach((isotope) => {
+            this.$set(this.checklist.isotopeRating, isotope.mz, 3);
+          });
+        }
+      },
+    },
+  },
 };
 </script>
