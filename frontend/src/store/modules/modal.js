@@ -12,6 +12,7 @@ const state = {
     // workspaceId (required for edit or delete)
   },
   sampleBatchImportActive: false,
+  sampleBatchImportProps: {},
   sampleBatchOpActive: false,
   sampleBatchOpProps: {
     // action ('create', 'edit' or 'delete')

@@ -78,9 +78,9 @@ export default {
   },
   computed: {
     ...get({
-      acquisitions: "instrument/acquisitions",
       batchActive: "batch/active",
-      sampleItemSchema: "app/schema@sample_item",
+      sampleBatchImportProps: "modal/sampleBatchImportProps",
+      // sampleItemSchema: "app/schema@sample_item",
     }),
     ...sync({
       modalActive: "modal/sampleBatchImportActive",
@@ -88,8 +88,9 @@ export default {
     readyToProcess() {
       return (
         this.parsedRows.length &&
-        this.acquisitions &&
-        this.parsedRows.length == this.acquisitions.length
+        this.sampleBatchImportProps.sampleFilesSelected &&
+        this.parsedRows.length ==
+          this.sampleBatchImportProps.sampleFilesSelected.length
       );
     },
     // readyToProcess() {
@@ -143,7 +144,7 @@ export default {
       let items = [];
       for (let [i, row] of Object.entries(this.parsedRows)) {
         let newSampleItem = {
-          filename: this.acquisitions[i].filename,
+          filename: this.sampleBatchImportProps.sampleFilesSelected[i].filename,
           sample_batch_id: this.batchActive.sample_batch_id,
         };
         let attributes = {};

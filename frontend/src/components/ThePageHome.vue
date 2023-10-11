@@ -70,7 +70,7 @@
                 "
                 @click="launchProcessSelectedModal"
               >
-                Process selected
+                Process file
               </b-button>
               <b-button
                 v-if="browseAcquisitions"
@@ -81,11 +81,13 @@
                   !batchActive ||
                   acquisitions === null ||
                   !acquisitions.length ||
-                  sampleFilesSelected.length > 0
+                  sampleFilesSelected.length == 0
                 "
                 @click="launchProcessBatchModal"
               >
-                Process batch ({{ acquisitions ? acquisitions.length : 0 }})
+                Process batch ({{
+                  sampleFilesSelected ? sampleFilesSelected.length : 0
+                }})
               </b-button>
             </section>
           </div>
@@ -163,6 +165,7 @@ export default {
   },
   computed: {
     ...sync({
+      sampleBatchImportProps: "modal/sampleBatchImportProps",
       sampleItemAttributesSaveProps: "modal/sampleItemAttributesSaveProps",
       workspaceModalProps: "modal/workspaceSaveProps",
     }),
@@ -214,12 +217,17 @@ export default {
       activateModal: "modal/activate",
     }),
     getAcquisitionsInRange() {
+      // Reset selected files when changing range, to avoid ghost selections
+      this.sampleFilesSelected = [];
       this.getAcquisitions({
         min: this.sampleFileMinDatetime,
         max: this.sampleFileMaxDatetime,
       });
     },
     launchProcessBatchModal() {
+      this.sampleBatchImportProps = {
+        sampleFilesSelected: this.sampleFilesSelected,
+      };
       this.activateModal({
         modal: "sampleBatchImport",
       });
@@ -253,6 +261,9 @@ export default {
       this.sampleFilesSelected = [];
     },
     instrumentSelected: function (newRows, oldRows) {
+      // Reset selected files when switching instrument
+      this.sampleFilesSelected = [];
+      // Allow selecting only one instrument at a time
       if (newRows === null) return;
       if (newRows.length > 1) {
         this.instrumentSelected = newRows.filter(
