@@ -69,7 +69,7 @@ def get_exact_isotope_masses(molComp, abu_limit=0):
     """
 
     # Get number of isotopes within abundance limit
-    nbrIsotopes = np.zeros((1,), dtype=np.int)
+    nbrIsotopes = np.zeros((1,), dtype=np.int32)
     if TwGetIsotopePattern(molComp.encode(), abu_limit, nbrIsotopes, None, None) == 9:
         masses = np.zeros((nbrIsotopes[0],))
         abundances = np.zeros((nbrIsotopes[0],))
@@ -149,10 +149,10 @@ def guess_composition(target_mz, el_filter, tolerance=10e-6):
     if len(ratio_filter) > 0:
         nbrFilters = len(num_filter) + len(ratio_filter)
         elementIndex1 = np.array(
-            list(range(len(elements))) + list(list(zip(*ratio_filter))[0]), dtype=np.int
+            list(range(len(elements))) + list(list(zip(*ratio_filter))[0]), dtype=np.int32
         )  # Element index for count filters, first element index for ratio filters.
         elementIndex2 = np.array(
-            [-1] * len(elements) + list(list(zip(*ratio_filter))[1]), dtype=np.int
+            [-1] * len(elements) + list(list(zip(*ratio_filter))[1]), dtype=np.int32
         )  # -1 for count filters, second element for ratio filters.
         filterMinVal = np.array(
             list(list(zip(*num_filter))[0]) + list(list(zip(*ratio_filter))[2]),
@@ -165,14 +165,14 @@ def guess_composition(target_mz, el_filter, tolerance=10e-6):
     else:
         nbrFilters = len(num_filter) + len(ratio_filter)
         elementIndex1 = np.array(
-            range(len(elements)), dtype=np.int
+            range(len(elements)), dtype=np.int32
         )  # Element index for count filters, first element index for ratio filters.
         elementIndex2 = np.array(
-            [-1] * len(elements), dtype=np.int
+            [-1] * len(elements), dtype=np.int32
         )  # -1 for count filters, second element for ratio filters.
         filterMinVal = np.array(list(zip(*num_filter))[0], dtype=np.double)
         filterMaxVal = np.array(list(zip(*num_filter))[1], dtype=np.double)
-    nbrCompomers = np.array([0], dtype=np.int)
+    nbrCompomers = np.array([0], dtype=np.int32)
     # Guess
     TwDecomposeMass(
         target_mz,
@@ -191,7 +191,7 @@ def guess_composition(target_mz, el_filter, tolerance=10e-6):
     formulae = []
     diffs = []
     for i in range(nbrCompomers[0]):
-        sumFormulaLength = np.array([256], dtype=np.int)
+        sumFormulaLength = np.array([256], dtype=np.int32)
         sumFormula = create_string_buffer(b"", sumFormulaLength[0])
         mass = np.array([0], dtype=np.double)
         massError = np.array([0], dtype=np.double)
