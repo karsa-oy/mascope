@@ -184,15 +184,6 @@ export function createHttpClient(host, api_port) {
         console.error("Failed to update batch", error);
       }
     },
-    reloadBatch: async (sample_batch_id) => {
-      try {
-        return await httpClient.post(
-          `${batchesBaseUrl}/${sample_batch_id}/reload`
-        );
-      } catch (error) {
-        console.error("Failed to reload sample batch: ", error);
-      }
-    },
     autoSamplerImportBatch: async (data) => {
       try {
         return await httpClient.post(`${batchesBaseUrl}/import_batch`, data);

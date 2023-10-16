@@ -189,16 +189,6 @@ async def update_sample_batch(
     return existing_sample_batch
 
 
-async def reload_sample_batch(sample_batch_id: str):
-    await sio.emit(
-        "sample_batch_reload",
-        room=sample_batch_id,
-        namespace="/",
-    )
-
-    return {"status": "success", "message": "Sample batch reloaded successfully"}
-
-
 async def autosampler_import_batch(
     sample_batch, sample_items, params: CalibrationMzFitParams, background_tasks
 ):

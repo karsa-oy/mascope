@@ -250,9 +250,6 @@ export default {
       await dispatch("reload");
     },
 
-    async reloadBatchInfo({ rootState }, sample_batch_id) {
-      await rootState.api.httpClient.reloadBatch(sample_batch_id);
-    },
     async matchBatchesCompute({ rootState }, sample_batches) {
       const formattedBatches = sample_batches.map((batch) => ({
         sample_batch_id: batch.sample_batch_id,

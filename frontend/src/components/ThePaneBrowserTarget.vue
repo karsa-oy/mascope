@@ -253,7 +253,7 @@ export default {
     });
   },
   methods: {
-    ...mapActions("batch", ["reloadBatchInfo", "matchBatchesCompute"]),
+    ...mapActions("batch", ["matchBatchesCompute"]),
     ...mapMutations({
       activateModal: "modal/activate",
     }),
