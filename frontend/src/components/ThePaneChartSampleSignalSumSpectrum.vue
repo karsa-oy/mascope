@@ -1,10 +1,21 @@
 <template>
-  <base-chart-plotly
-    id="ChartSampleSignalSumSpectrum"
-    title="Sum spectrum"
-    :data="data"
-    :layout="layout"
-  ></base-chart-plotly>
+  <div>
+    <div class="intensity-container">
+      <b-field>
+        <b-input
+          class="intensity-input"
+          v-model="yAxisMax"
+          placeholder="Set intensity scale"
+        ></b-input>
+      </b-field>
+    </div>
+    <base-chart-plotly
+      id="ChartSampleSignalSumSpectrum"
+      title="Sum spectrum"
+      :data="traces"
+      :layout="layout"
+    ></base-chart-plotly>
+  </div>
 </template>
 
 <script>
@@ -15,6 +26,11 @@ import { get } from "vuex-pathify";
 export default {
   name: "ThePaneChartSampleSignalSumSpectrum",
   components: { BaseChartPlotly },
+  data() {
+    return {
+      yAxisMax: null,
+    };
+  },
   computed: {
     ...get({
       sampleFocused: "sample/active",
@@ -22,7 +38,9 @@ export default {
       isotopesInFocus: "visualization/isotopesInFocus",
     }),
     data: function () {
-      return this.traces ? this.traces : [];
+      return {
+        traces: this.traces ? this.traces : [],
+      };
     },
     layout: function () {
       const annotations = this.isotopesInFocus.map((isotope, index) => {
@@ -45,6 +63,7 @@ export default {
           yref: "paper",
         };
       });
+
       return {
         grid: {
           rows: 1,
@@ -70,11 +89,15 @@ export default {
       };
     },
     yAxisConfiguration() {
-      return {
+      let yAxisConfig = {
         title: "Signal intensity [cps]",
         gridcolor: "#464752",
         gridwidth: 1,
       };
+      if (this.yAxisMax !== null) {
+        yAxisConfig.range = [0, this.yAxisMax];
+      }
+      return yAxisConfig;
     },
   },
   methods: {

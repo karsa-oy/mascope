@@ -168,7 +168,40 @@ $progress-bar-background-color: $cool-grey-light;
   padding-top: 10px;
 }
 
-// Range input
+// Signal modal styles
+
+// Comment text input
+.comment-input textarea {
+  background-color: $cool-grey-0 !important;
+  color: white !important;
+  border-color: transparent !important;
+}
+
+// Intensity Yaxis input
+.intensity-container {
+  position: absolute;
+  top: 94px;
+  left: 49px;
+  z-index: 1000;
+  width: 114px;
+}
+
+.intensity-input input {
+  background-color: rgba($cool-grey-2, 0.8);
+  color: rgba(white, 0.7);
+  font-size: 12px;
+
+  &::placeholder {
+    color: white;
+    opacity: 0.4;
+  }
+
+  &:focus {
+    // border-color: $primary;
+  }
+}
+
+// Isotope rating range input
 input[type="range"] {
   -webkit-appearance: none;
   width: 20%;
@@ -184,7 +217,7 @@ input[type="range"] {
   );
   outline: none;
 
-  // For the slider thumb
+  // Slider thumb
   &::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
@@ -205,11 +238,7 @@ input[type="range"] {
     transition: background 0.2s;
   }
 }
-.comment-input textarea {
-  background-color: $cool-grey-0 !important;
-  color: white !important;
-  border-color: transparent !important;
-}
+
 // Isotopes table in the checklist
 .isotopes-table {
   width: 100%;

@@ -223,11 +223,20 @@ export default {
       modalActive: "modal/sampleItemTargetIonActive",
     }),
     modalTitle() {
-      return this.sampleItem
+      let title = this.sampleItem
         ? this.sampleItem.sample_item_name +
-            ": " +
-            this.modalProps.target_ion_formula
+          ": " +
+          this.modalProps.target_ion_formula
         : "";
+
+      if (this.modalProps.sample_peak_area_sum !== undefined) {
+        const ionSumIntensity = this.formatNumber(
+          this.modalProps.sample_peak_area_sum
+        );
+        title += ` | Intensity: ${ionSumIntensity}`;
+      }
+
+      return title;
     },
     submitRatingEnable() {
       if (this.matchRating === null) return false;
@@ -269,6 +278,11 @@ export default {
     ...mapMutations({
       deactivateModal: "modal/deactivate",
     }),
+    formatNumber(value) {
+      const roundedValue = Math.round(value);
+      const formatter = new Intl.NumberFormat("en-US");
+      return formatter.format(roundedValue);
+    },
     resetForm() {
       this.matchRating = null;
       this.checklist = {
