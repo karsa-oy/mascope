@@ -1,4 +1,5 @@
 import { dispatch, make } from "vuex-pathify";
+import { handleApiRequest } from "./apiHelper";
 
 const state = {
   active: null,
@@ -95,6 +96,8 @@ export default {
         await dispatch("load", sampleToLoad);
       }
     },
+
+    // http client endpoints
     async create({ rootState }, sample) {
       await rootState.api.httpClient.createSampleItem(sample);
     },
@@ -104,6 +107,25 @@ export default {
         sample
       );
     },
+    async deleteSampleItem({ rootState }, sampleItemId) {
+      await rootState.api.httpClient.deleteSampleItem(sampleItemId);
+    },
+    async matchItemCompute({ rootState }, sample) {
+      await rootState.api.httpClient.matchItemCompute(sample);
+    },
+
+    async copySample({ dispatch, rootState }, sampleItemCopyData) {
+      return await handleApiRequest({
+        dispatch,
+        rootState,
+        httpMethod: "copySampleItem",
+        requestData: sampleItemCopyData,
+        successMessage: `Sample "${sampleItemCopyData.sample_item_name}" was successfully copied to the "${sampleItemCopyData.workspace_name}/${sampleItemCopyData.sample_batch_name}".`,
+        errorMessage: `Failed to copy sample "${sampleItemCopyData.sample_item_name}".`,
+      });
+    },
+
+    // selection
     async updateCollectionSelection(
       { commit, state },
       { collectionId, selectionValue }
@@ -122,10 +144,6 @@ export default {
       if (collection) {
         collection.selection = selectionValue;
       }
-    },
-
-    async matchItemCompute({ rootState }, sample) {
-      await rootState.api.httpClient.matchItemCompute(sample);
     },
 
     // backend notifications

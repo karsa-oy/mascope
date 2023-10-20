@@ -76,7 +76,7 @@ const attributeTemplatesBaseUrl = "/attribute_templates";
 export function createHttpClient(host, api_port) {
   const axiosInstance = axios.create({
     baseURL: `${url}/api`,
-    timeout: 15000,
+    timeout: 20000,
   });
   // Interceptor to log requests and responses
   axiosInstance.interceptors.request.use(logRequest);
@@ -189,6 +189,16 @@ export function createHttpClient(host, api_port) {
         return await httpClient.post(`${batchesBaseUrl}/import_batch`, data);
       } catch (error) {
         console.error("Failed to import batch: ", error);
+      }
+    },
+    copySampleBatch: async (sampleBatchCopyData) => {
+      try {
+        return await httpClient.post(
+          `${batchesBaseUrl}/copy`,
+          sampleBatchCopyData
+        );
+      } catch (error) {
+        console.error("Failed to copy sample batch: ", error);
       }
     },
     // Samples
@@ -326,6 +336,16 @@ export function createHttpClient(host, api_port) {
         return await httpClient.delete(`${itemsBaseUrl}/${sample_item_id}`);
       } catch (error) {
         console.error("Failed to delete sample item: ", error);
+      }
+    },
+    copySampleItem: async (sampleItemCopyData) => {
+      try {
+        return await httpClient.post(
+          `${itemsBaseUrl}/copy`,
+          sampleItemCopyData
+        );
+      } catch (error) {
+        console.error("Failed to copy sample item: ", error);
       }
     },
 

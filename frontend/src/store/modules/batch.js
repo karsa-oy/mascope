@@ -1,5 +1,6 @@
 import { dispatch, make } from "vuex-pathify";
 import { camelToSnakeCase } from "../../lib/util";
+import { handleApiRequest } from "./apiHelper";
 
 const state = {
   active: null,
@@ -240,14 +241,31 @@ export default {
       }
     },
 
-    // autosampler
+    // http client endpoints
     async autoSamplerImportBatch({ rootState }, data) {
       await rootState.api.httpClient.autoSamplerImportBatch(data);
     },
+    async createBatch({ rootState }, newBatch) {
+      await rootState.api.httpClient.createBatch(newBatch);
+    },
 
-    // backend notifications
-    async onSampleBatchReload({ dispatch }) {
-      await dispatch("reload");
+    async deleteBatch({ rootState }, batches) {
+      await rootState.api.httpClient.deleteBatch(batches);
+    },
+
+    async updateBatch({ rootState }, newBatch) {
+      await rootState.api.httpClient.updateBatch(newBatch);
+    },
+
+    async copyBatch({ dispatch, rootState }, sampleBatchCopyData) {
+      return await handleApiRequest({
+        dispatch,
+        rootState,
+        httpMethod: "copySampleBatch",
+        requestData: sampleBatchCopyData,
+        successMessage: `Batch "${sampleBatchCopyData.sample_batch_name}" was successfully copied to the workspace "${sampleBatchCopyData.workspace_name}".`,
+        errorMessage: `Failed to copy batch "${sampleBatchCopyData.sample_batch_name}".`,
+      });
     },
 
     async matchBatchesCompute({ rootState }, sample_batches) {
@@ -256,6 +274,11 @@ export default {
         workspace_id: batch.workspace_id,
       }));
       await rootState.api.httpClient.matchBatchesCompute(formattedBatches);
+    },
+
+    // backend notifications
+    async onSampleBatchReload({ dispatch }) {
+      await dispatch("reload");
     },
 
     // selection
