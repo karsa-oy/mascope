@@ -92,6 +92,22 @@
       </ul>
     </b-message>
 
+    <!-- Empty Workspace Warning -->
+    <b-message
+      v-if="warningNotification === 'emptyWorkspace'"
+      type="is-notification"
+      title="Workspace Warning"
+      has-icon
+      icon="alert"
+      icon-size="is-medium"
+      :closable="true"
+      @close="close"
+      :class="{ 'is-closing': isClosing, 'empty-workspace': 'empty-workspace' }"
+    >
+      Selected workspace "{{ warningData }}" has no batches. Please first create
+      a new batch in this workspace.
+    </b-message>
+
     <!-- Other types of warning messages here -->
   </div>
 </template>
@@ -120,6 +136,12 @@ export default {
         this.resetWarningNotification();
       }
     },
+    warningNotification: {
+      handler() {
+        this.autoClose();
+      },
+      immediate: true,
+    },
   },
   methods: {
     ...mapMutations({
@@ -134,6 +156,11 @@ export default {
         this.resetWarningNotification();
         this.isClosing = false;
       }, 500);
+    },
+    autoClose() {
+      if (this.warningNotification === "emptyWorkspace") {
+        setTimeout(this.close, 5000);
+      }
     },
   },
 };

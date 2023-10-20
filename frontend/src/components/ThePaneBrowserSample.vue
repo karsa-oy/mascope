@@ -110,6 +110,10 @@ export default {
         label: "Update sample batch",
         onClick: this.batchUpdate,
       };
+      let copyBatchButton = {
+        label: "Copy selected batch",
+        onClick: this.batchCopy,
+      };
       let batchButtons =
         this.batchActiveCount == 0
           ? [createBatchButton]
@@ -118,6 +122,7 @@ export default {
               deleteBatchButton,
               exportBatchButton,
               exportBatchPeaksButton,
+              copyBatchButton,
             ];
       // sample items
       let updateItemButton = {
@@ -128,12 +133,21 @@ export default {
         label: `Delete sample item`,
         onClick: this.itemDelete,
       };
+      let copyItemButton = {
+        label: "Copy selected sample item",
+        onClick: this.itemCopy,
+      };
       let rematchItemButton = {
         label: `Rematch selected sample (debug)`,
         onClick: this.itemRematch,
       };
       let itemButtons = this.sampleItemFocused
-        ? [updateItemButton, deleteItemButton, rematchItemButton]
+        ? [
+            updateItemButton,
+            deleteItemButton,
+            copyItemButton,
+            rematchItemButton,
+          ]
         : [];
       // menu
       return this.sampleItemFocused ? itemButtons : batchButtons;
@@ -156,7 +170,7 @@ export default {
     ...mapMutations({
       activateModal: "modal/activate",
     }),
-    ...mapActions("sample", ["matchItemCompute"]),
+    ...mapActions("sample", ["matchItemCompute", "deleteSampleItem"]),
     ...call({
       itemFocus: "batch/sampleItemFocus",
       itemToggle: "batch/sampleItemToggle",
@@ -301,6 +315,15 @@ export default {
         modal: "sampleBatchOp",
       });
     },
+    batchCopy() {
+      this.modalSampleBatchOpProps = {
+        action: "copy",
+        batch: this.batchActive,
+      };
+      this.activateModal({
+        modal: "sampleBatchOp",
+      });
+    },
     async itemUpdate() {
       this.modalSampleItemAttributesSaveProps = {
         action: "update",
@@ -321,7 +344,7 @@ export default {
           const itemId = this.sampleItemFocused.sample_item_id;
           // defocus
           this.itemFocus(this.sampleItemFocused);
-          await this.$api.httpClient.deleteSampleItem(itemId);
+          await this.deleteSampleItem(itemId);
         },
       });
     },
@@ -329,21 +352,14 @@ export default {
       this.itemToggle(row);
       this.itemFocus(row);
     },
-    itemShow(row) {
-      if (
-        !this.sampleItemFocused ||
-        !(this.sampleItemFocused.sample_item_id == row.sample_item_id)
-      ) {
-        this.itemSelect(row);
-      }
-      if (this.sampleItemFocused) {
-        this.modalSampleItemOverviewProps = {
-          sampleItemRecordToLoad: row,
-        };
-        this.activateModal({
-          modal: "sampleItemOverview",
-        });
-      }
+    itemCopy() {
+      this.modalSampleItemOverviewProps = {
+        action: "copy",
+        sample: this.sampleItemFocused,
+      };
+      this.activateModal({
+        modal: "sampleItemOverview",
+      });
     },
   },
 };
