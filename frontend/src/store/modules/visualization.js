@@ -1,4 +1,5 @@
 import { commit, dispatch, make } from "vuex-pathify";
+import { handleApiRequest } from "./apiHelper";
 
 const state = {
   // chart data
@@ -19,33 +20,15 @@ export default {
       await commit("SET_TRACES_SIGNAL_TIMESERIES", null);
     },
     async submitMatchRating({ dispatch, rootState }, newMatchRating) {
-      try {
-        const response = await rootState.api.httpClient.submitMatchRating(
-          newMatchRating
-        );
-        if (response.status === 200) {
-          dispatch(
-            "notification/showGeneralNotification",
-            {
-              notification: "submitted",
-              message:
-                "Rating submitted successfully. Thanks for your feedback!",
-            },
-            { root: true }
-          );
-        }
-        return response;
-      } catch (error) {
-        console.error("Failed to submit match rating: ", error);
-        dispatch(
-          "notification/showGeneralNotification",
-          {
-            notification: "error",
-            message: `Failed to submit rating. Please try again.`,
-          },
-          { root: true }
-        );
-      }
+      return await handleApiRequest({
+        dispatch,
+        rootState,
+        httpMethod: "submitMatchRating",
+        requestData: newMatchRating,
+        successMessage:
+          "Rating submitted successfully. Thanks for your feedback!",
+        errorMessage: "Failed to submit rating. Please try again.",
+      });
     },
     async onVisualizationSignalSumSpectrum({ state, commit }, traces) {
       for (let trace of traces) {
