@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div style="position: relative">
     <div class="intensity-container">
       <b-field>
         <b-input
