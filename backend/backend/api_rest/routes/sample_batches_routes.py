@@ -7,11 +7,13 @@ from ..controllers.sample_batches_controller import (
     delete_sample_batch,
     update_sample_batch,
     autosampler_import_batch,
+    copy_sample_batch,
 )
 from ..models.pydantic_models.sample_batch_pydantic_model import (
     SampleBatchCreate,
     SampleBatchUpdate,
     autoSamplerImportBatchData,
+    SampleBatchCopy,
 )
 
 sample_batches_router = APIRouter()
@@ -60,3 +62,8 @@ async def autosampler_import_batch_route(
     return await autosampler_import_batch(
         data.sample_batch, data.sample_items, data.params, background_tasks
     )
+
+
+@sample_batches_router.post("/api/sample_batches/copy")
+async def copy_sample_batch_route(sample_batch_copy: SampleBatchCopy):
+    return await copy_sample_batch(sample_batch_copy)

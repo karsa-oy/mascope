@@ -1,4 +1,4 @@
-from fastapi import HTTPException, BackgroundTasks
+from fastapi import HTTPException, BackgroundTasks, status
 from sqlalchemy import asc, desc, func
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
@@ -7,10 +7,11 @@ from backend.db_api_rest import async_session
 from backend.server import sio
 from backend.db.id import gen_id
 
-from ..models.models import SampleBatch, TargetCollectionInSampleBatch
+from ..models.models import SampleBatch, TargetCollectionInSampleBatch, Workspace
 from ..models.pydantic_models.sample_batch_pydantic_model import (
     SampleBatchCreate,
     SampleBatchUpdate,
+    SampleBatchCopy,
 )
 from ..models.pydantic_models.sample_item_pydantic_model import (
     SampleItemCreate,
@@ -20,7 +21,7 @@ from ..models.pydantic_models.match_pydantic_model import (
     MatchComputeBatch,
 )
 from .match_controller import match_batches_compute
-from .sample_items_controller import create_sample_item
+from .sample_items_controller import create_sample_item, copy_sample_item
 from .calibration_controller import calibration_mz_calibrate_batch
 
 
@@ -244,3 +245,75 @@ async def process_batch(sample_batch, sample_items, params):
             namespace="/",
         )
     return
+
+
+async def copy_sample_batch(sample_batch_copy: SampleBatchCopy):
+    async with async_session() as session:
+        # Check if the provided workspace_id exists
+        workspace = await session.get(Workspace, sample_batch_copy.workspace_id)
+        if not workspace:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Workspace with ID {sample_batch_copy.workspace_id} not found",
+            )
+
+        # Fetch the original sample batch with related TargetCollectionInSampleBatch and SampleItem records
+        stmt = (
+            select(SampleBatch)
+            .options(
+                joinedload(SampleBatch.target_collection),
+                joinedload(SampleBatch.sample_item),
+            )
+            .filter(SampleBatch.sample_batch_id == sample_batch_copy.sample_batch_id)
+        )
+        result = await session.execute(stmt)
+        original_sample_batch = result.scalars().first()
+
+        if not original_sample_batch:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail=f"Sample batch not found"
+            )
+
+        # Create new sample batch record with a new ID, name, description, workspace and time of creation, but copy all other data
+        new_sample_batch_id = gen_id(16)
+        new_sample_batch_data = {
+            c.name: getattr(original_sample_batch, c.name)
+            for c in SampleBatch.__table__.columns
+            if c.name != "sample_batch_id"
+        }
+        new_sample_batch_data.update(
+            {
+                "sample_batch_id": new_sample_batch_id,
+                "workspace_id": sample_batch_copy.workspace_id,
+                "sample_batch_name": sample_batch_copy.sample_batch_name,
+                "sample_batch_description": sample_batch_copy.sample_batch_description,
+                "sample_batch_utc_created": datetime.utcnow(),
+            }
+        )
+        new_sample_batch = SampleBatch(**new_sample_batch_data)
+        session.add(new_sample_batch)
+
+        # Copy TargetCollectionInSampleBatch records associated with the original sample batch
+        for target_collection in original_sample_batch.target_collection:
+            new_target_collection_in_sample_batch = TargetCollectionInSampleBatch(
+                target_collection_id=target_collection.target_collection_id,
+                sample_batch_id=new_sample_batch_id,
+            )
+            session.add(new_target_collection_in_sample_batch)
+
+        # Copy sample items associated with the original sample batch
+        for sample_item in original_sample_batch.sample_item:
+            await copy_sample_item(
+                sample_item.sample_item_id,
+                new_sample_batch_id,
+                session=session,
+            )
+
+        await session.commit()
+
+        # Emit event to inform clients
+        await sio.emit(
+            "workspace_reload", room=new_sample_batch.workspace_id, namespace="/"
+        )
+
+        return new_sample_batch
