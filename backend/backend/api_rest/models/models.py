@@ -108,6 +108,7 @@ class SampleItem(Base):
         cascade="all, delete, delete-orphan",
     )
 
+    # TODO_restapi_restructure
     # Methods
     async def get_compound_intensity(self, session, compounds):
         sql = f"""

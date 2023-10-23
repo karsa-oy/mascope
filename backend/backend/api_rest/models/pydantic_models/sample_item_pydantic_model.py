@@ -37,3 +37,10 @@ class SampleItemInDB(SampleItemBase):
         json_encoders = {
             dt: lambda v: v.replace(tzinfo=timezone.utc).isoformat(timespec="seconds")
         }
+
+
+class SampleItemCopy(BaseModel):
+    sample_item_id: str = Field(..., description="ID of the copied sample item")
+    sample_batch_id: str = Field(
+        ..., description="ID of the sample batch where the sample item will be copied"
+    )

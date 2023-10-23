@@ -100,8 +100,8 @@
               @click="
                 () => {
                   actionIs('create')
-                    ? createBatch(newBatch)
-                    : updateBatch(newBatch);
+                    ? createSampleBatch(newBatch)
+                    : updateSampleBatch(newBatch);
                   deactivateModal();
                 }
               "
@@ -134,12 +134,64 @@
               expanded
               @click="
                 () => {
-                  deleteBatch([batchActive.sample_batch_id]);
+                  deleteSampleBatch([batchActive.sample_batch_id]);
                   deactivateModal();
                 }
               "
             >
               Delete
+            </b-button>
+          </footer>
+        </div>
+      </template>
+      <template v-if="actionIs('copy')">
+        <div class="modal-card">
+          <!-- style="background-color: inherit; height: 500px" -->
+          <header class="modal-card-head">
+            <h2 class="subtitle">{{ modalTitle }}</h2>
+          </header>
+          <section class="modal-card-body">
+            <b-field label="New batch name">
+              <b-input v-model="newBatchName"></b-input>
+            </b-field>
+            <b-field label="Description (optional)">
+              <b-input v-model="newBatchDescription"></b-input>
+            </b-field>
+
+            <!-- Workspace Selection -->
+            <b-field label="Select a workspace to copy the batch to:">
+              <b-select v-model="workspaceSelected">
+                <option :value="sameWorkspace" v-if="sameWorkspace">
+                  Same workspace: {{ sameWorkspace.workspace_name }}
+                </option>
+                <option
+                  v-for="workspace in filteredWorkspaces"
+                  :key="workspace.workspace_id"
+                  :value="workspace"
+                >
+                  {{ workspace.workspace_name }}
+                </option>
+              </b-select>
+            </b-field>
+          </section>
+          <footer class="modal-card-foot">
+            <b-button
+              type="is-warning"
+              icon-left="close"
+              expanded
+              @click="deactivateModal"
+            >
+              Cancel
+            </b-button>
+            <b-button
+              type="is-primary"
+              icon-left="content-save"
+              expanded
+              :loading="isCopying"
+              :disabled="!newBatchName || !workspaceSelected || isCopying"
+              @click="copySampleBatch"
+            >
+              {{ isCopying ? "Please Wait..." : "Copy Batch" }}
             </b-button>
           </footer>
         </div>
@@ -150,8 +202,9 @@
 
 <script>
 import ThePaneSettingsBatch from "./ThePaneSettingsBatch.vue";
-import { mapMutations } from "vuex";
+import { mapMutations, mapActions } from "vuex";
 import { call, get, sync } from "vuex-pathify";
+import { generateCopyName } from "../store/modules/apiHelper";
 
 export default {
   name: "TheModalSampleBatchOp",
@@ -165,6 +218,15 @@ export default {
       calibrationCollectionSelected: null,
       ionMechanismsSelected: [],
       targetCollectionsSelected: [],
+      // copy action
+      workspaceSelected: null,
+      newBatchName: this.batchActive
+        ? `${this.batchActive.sample_batch_name} Copy`
+        : null,
+      newBatchDescription: this.batchActive
+        ? this.batchActive.sample_batch_description
+        : null,
+      isCopying: false,
     };
   },
   created() {},
@@ -183,6 +245,7 @@ export default {
       ionMechanismsAll: "app/ionMechanisms",
       targetCollectionsAll: "targets/targetCollectionsAll",
       workspaceActive: "workspace/active",
+      allWorkspaces: "app/workspaces",
     }),
     action() {
       return this.modalProps.action;
@@ -232,6 +295,9 @@ export default {
         case "delete":
           title = `Delete sample batch ${this.batchName}`;
           break;
+        case "copy":
+          title = `Copy sample batch: ${this.batchName}`;
+          break;
       }
       return title;
     },
@@ -245,23 +311,58 @@ export default {
         (row) => row.target_collection_id
       );
     },
+    sameWorkspace() {
+      return this.workspaceActive ? this.workspaceActive : null;
+    },
+    filteredWorkspaces() {
+      if (this.workspaceActive) {
+        return this.allWorkspaces.filter((workspace) => {
+          return workspace.workspace_id !== this.workspaceActive.workspace_id;
+        });
+      }
+      return [];
+    },
   },
   methods: {
     ...call({
       batchUnload: "batch/unload",
     }),
+    ...mapActions("batch", [
+      "createBatch",
+      "deleteBatch",
+      "updateBatch",
+      "copyBatch",
+    ]),
     ...mapMutations({
       deactivateModal: "modal/deactivate",
     }),
     actionIs(...actions) {
       return actions.includes(this.action);
     },
-    async createBatch(newBatch) {
-      await this.$api.httpClient.createBatch(newBatch);
+    async createSampleBatch(newBatch) {
+      await this.createBatch(newBatch);
     },
-    async deleteBatch(batches) {
+    async deleteSampleBatch(batches) {
       this.batchUnload();
-      await this.$api.httpClient.deleteBatch(batches);
+      await this.deleteBatch(batches);
+    },
+    async updateSampleBatch(newBatch) {
+      await this.updateBatch(newBatch);
+    },
+    async copySampleBatch() {
+      this.isCopying = true;
+      const sampleBatchCopyData = {
+        // for http client
+        sample_batch_id: this.batchActive.sample_batch_id,
+        sample_batch_name: this.newBatchName,
+        sample_batch_description: this.newBatchDescription,
+        workspace_id: this.workspaceSelected.workspace_id,
+        // for notification
+        workspace_name: this.workspaceSelected.workspace_name,
+      };
+      await this.copyBatch(sampleBatchCopyData);
+      this.isCopying = false;
+      this.deactivateModal();
     },
 
     initCalibrationCollectionSelected() {
@@ -279,15 +380,37 @@ export default {
         this.batchName = null;
         this.batchDesc = null;
         // set defaults
-        [this.calibrationCollectionSelected] = this.targetCollectionsAll.filter(
-          (collection) => collection.target_collection_id === "hlj7HY8Z5coJIjKg"
-        );
+        this.calibrationCollectionSelected =
+          this.targetCollectionsAll.find(
+            (collection) =>
+              collection.target_collection_name === "Br calibrants"
+          ) ||
+          this.targetCollectionsAll.find(
+            (collection) =>
+              collection.target_collection_id === "xkSPp3eZrWXYSVDa"
+          );
         this.ionMechanismsSelected = this.ionMechanismsAll.filter(
           (mech) => mech.ionization_mechanism === "+Br-"
         );
-        this.targetCollectionsSelected = this.targetCollectionsAll.filter(
-          (collection) => collection.target_collection_id === "kNBOCx32dpehRWUw"
+        let explosivesTargets = this.targetCollectionsAll.filter(
+          (collection) =>
+            collection.target_collection_name === "Explosives targets"
         );
+        this.targetCollectionsSelected =
+          explosivesTargets.length > 0
+            ? explosivesTargets
+            : this.targetCollectionsAll.filter(
+                (collection) =>
+                  collection.target_collection_id === "kNBOCx32dpehRWUw"
+              );
+      } else if (this.action == "copy") {
+        this.batchName = this.batchActive.sample_batch_name;
+        // this.newBatchName = `${this.batchActive.sample_batch_name} Copy`;
+        this.newBatchName = this.batchActive
+          ? generateCopyName(this.batchActive.sample_batch_name)
+          : null;
+        this.newBatchDescription = this.batchActive.sample_batch_description;
+        this.workspaceSelected = null;
       } else {
         this.batchName = this.batchActive.sample_batch_name;
         this.batchDesc = this.batchActive.sample_batch_description;
@@ -309,9 +432,6 @@ export default {
       this.targetCollectionsSelected = this.targetCollectionsAll.filter((row) =>
         ids.includes(row.target_collection_id)
       );
-    },
-    async updateBatch(newBatch) {
-      await this.$api.httpClient.updateBatch(newBatch);
     },
   },
 };

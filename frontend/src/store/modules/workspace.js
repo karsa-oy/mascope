@@ -10,12 +10,13 @@ export default {
   state,
   mutations: make.mutations(state),
   actions: {
-    async load({ commit, rootState }, workspace) {
+    async load({ dispatch, commit, rootState }, workspace) {
       rootState.api.emit("subscribe", workspace.workspace_id);
-      const response = await rootState.api.httpClient.loadWorkspace(
+      const batchesData = await dispatch(
+        "fetchWorkspaceData",
         workspace.workspace_id
       );
-      const batches = response.data.data.map((batch) => {
+      const batches = batchesData.map((batch) => {
         return { ...batch, selection: 0 };
       });
       await commit("SET_BATCHES", batches);
@@ -42,6 +43,17 @@ export default {
       if (propagate) {
         await dispatch("batch/unload", true, { root: true });
         await dispatch("targets/unload", null, { root: true });
+      }
+    },
+    // http client endpoints
+    async fetchWorkspaceData({ rootState }, workspaceId) {
+      try {
+        const response = await rootState.api.httpClient.loadWorkspace(
+          workspaceId
+        );
+        return response.data.data;
+      } catch (error) {
+        console.error(`Failed to load data using: `, error);
       }
     },
     // backend notifications

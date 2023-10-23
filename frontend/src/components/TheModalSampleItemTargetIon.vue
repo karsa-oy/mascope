@@ -385,7 +385,7 @@ export default {
           mz_calibration: this.sampleItem.mz_calibration,
         },
       };
-      if (this.matchRating === "1") {
+      if (this.displayChecklist) {
         payload.checklist = {
           isotopes_rating: this.isotopesInFocus.map((isotope) => ({
             isotope_rating: this.checklist.isotopeRating[isotope.mz],

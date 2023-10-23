@@ -6,10 +6,12 @@ from ..controllers.sample_items_controller import (
     create_sample_item,
     delete_sample_item,
     update_sample_item,
+    copy_sample_item,
 )
 from ..models.pydantic_models.sample_item_pydantic_model import (
     SampleItemCreate,
     SampleItemUpdate,
+    SampleItemCopy,
 )
 
 sample_items_router = APIRouter()
@@ -60,3 +62,10 @@ async def delete_sample_item_route(sample_item_id: str):
 @sample_items_router.patch("/api/sample_items/{sample_item_id}")
 async def update_sample_item_route(sample_item_id: str, sample_item: SampleItemUpdate):
     return await update_sample_item(sample_item_id, sample_item)
+
+
+@sample_items_router.post("/api/sample_items/copy")
+async def copy_sample_item_route(sample_item: SampleItemCopy):
+    return await copy_sample_item(
+        sample_item.sample_item_id, sample_item.sample_batch_id
+    )
