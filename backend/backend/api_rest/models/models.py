@@ -59,7 +59,7 @@ class SampleBatch(Base):
     sample_batch_name = Column(String)
     sample_batch_description = Column(Text)
     build_params = Column(JSON)
-    filter_params = Column(JSON)
+    filter_params_batch = Column(JSON)
     sample_batch_utc_created = Column(TIMESTAMP)
     sample_batch_utc_modified = Column(TIMESTAMP)
 
@@ -247,6 +247,7 @@ class TargetIon(Base):
         String, ForeignKey("ionization_mechanism.ionization_mechanism_id")
     )
     target_ion_formula = Column(String)
+    filter_params_ion = Column(JSON)
 
     # Define relationships
     target_compound = relationship(

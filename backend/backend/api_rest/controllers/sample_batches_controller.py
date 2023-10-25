@@ -80,7 +80,7 @@ async def create_sample_batch(sample_batch: SampleBatchCreate):
             sample_batch_name=sample_batch.sample_batch_name,
             sample_batch_description=sample_batch.sample_batch_description,
             build_params=sample_batch.build_params,
-            filter_params=sample_batch.filter_params,
+            filter_params_batch=sample_batch.filter_params_batch,
             sample_batch_utc_created=datetime.utcnow(),
         )
         session.add(new_sample_batch)
@@ -151,15 +151,15 @@ async def update_sample_batch(
         # Update the existing sample batch
         update_data = sample_batch.dict(exclude_unset=True)
         for key, value in update_data.items():
-            if key in ["build_params", "filter_params"]:
-                # Skip build_params and filter_params for now as they are done below
+            if key in ["build_params", "filter_params_batch"]:
+                # Skip build_params and filter_params_batch for now as they are done below
                 continue
             setattr(existing_sample_batch, key, value)
         existing_sample_batch.sample_batch_utc_modified = datetime.utcnow()
 
-        # Update the build_params and filter_params with the stringified versions
+        # Update the build_params and filter_params_batch with the stringified versions
         existing_sample_batch.build_params = sample_batch.build_params
-        existing_sample_batch.filter_params = sample_batch.filter_params
+        existing_sample_batch.filter_params_batch = sample_batch.filter_params_batch
 
         # Update target collections associations
         if "target_collection_id" in update_data:
