@@ -261,7 +261,7 @@ export default {
               this.calibrationCollectionSelected.target_collection_id,
             ion_mechanisms: this.ionMechanismIds,
           },
-          filter_params: this.batchFilterParams,
+          filter_params_batch: this.batchFilterParams,
           target_collection_id: this.targetCollectionIds,
         };
       } else if (this.actionIs("update")) {
@@ -275,7 +275,7 @@ export default {
               this.calibrationCollectionSelected.target_collection_id,
             ion_mechanisms: this.ionMechanismIds,
           },
-          filter_params: this.batchFilterParams,
+          filter_params_batch: this.batchFilterParams,
           target_collection_id: this.targetCollectionIds,
           sample_batch_utc_created: this.batchActive.sample_batch_utc_created,
         };
