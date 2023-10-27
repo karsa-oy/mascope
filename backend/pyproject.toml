@@ -67,3 +67,4 @@ aiosqlite = "^0.19.0"
 # Local dependencies
 hardware = { path = "./hardware", develop = true }
 lib = { path = "./backend/lib", develop = true }
+service = { path = "./backend/service", develop = true }
