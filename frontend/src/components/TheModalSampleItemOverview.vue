@@ -43,7 +43,7 @@
             <!-- Batch Selection -->
             <b-field
               label="Select a batch to copy the item to:"
-              v-if="batches.length"
+              v-if="sameBatch || batches.length > 0"
             >
               <b-select v-model="batchSelected" expanded>
                 <option :value="sameBatch" v-if="sameBatch">
@@ -167,6 +167,7 @@ export default {
         this.workspaceSelected = null;
         this.batchSelected = null;
         this.batches = [];
+        this.sameBatch = null;
       }
     },
     async loadWorkspaceData() {
@@ -203,9 +204,9 @@ export default {
       const sampleItemCopyData = {
         // for http client
         sample_item_id: this.sampleItem.sample_item_id,
+        sample_item_name: this.newItemName,
         sample_batch_id: this.batchSelected.sample_batch_id,
         // for notification
-        sample_item_name: this.newItemName,
         sample_batch_name: this.batchSelected.sample_batch_name,
         workspace_name: this.workspaceSelected.workspace_name,
       };
