@@ -4,7 +4,7 @@ version = "1.2"
 description = "Karsa Mascope"
 authors = ["Karsa Oy <support@karsa.fi>"]
 license = "Proprietary"
-include = ["backend","hardware"]
+include = ["backend"]
 packages = [
     {include = "backend", from ="."},
 ]
@@ -15,9 +15,9 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
 mascope-api = 'backend:run'
-file-converter = 'backend.service.file_converter:run'
-file-downloader = 'backend.service.file_downloader:run'
-log-rotate = 'backend.service.log_rotate:run'
+file-converter = 'service.file_converter:run'
+file-downloader = 'service.file_downloader:run'
+log-rotate = 'service.log_rotate:run'
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.11"
