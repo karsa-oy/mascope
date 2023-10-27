@@ -65,7 +65,5 @@ async def update_sample_item_route(sample_item_id: str, sample_item: SampleItemU
 
 
 @sample_items_router.post("/api/sample_items/copy")
-async def copy_sample_item_route(sample_item: SampleItemCopy):
-    return await copy_sample_item(
-        sample_item.sample_item_id, sample_item.sample_batch_id
-    )
+async def copy_sample_item_route(sample_item_copy: SampleItemCopy):
+    return await copy_sample_item(sample_item_copy)
