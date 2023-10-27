@@ -30,18 +30,27 @@ export async function handleApiRequest({
   successNotificationType = "submitted",
   successMessage,
   errorMessage = "An error occurred while processing your request.",
+  progressNotificationPayload = null, // parameter for progress notification
 }) {
   try {
     const response = await rootState.api.httpClient[httpMethod](requestData);
     if (response.status === 200) {
-      dispatch(
-        "notification/showGeneralNotification",
-        {
-          notification: successNotificationType,
-          message: successMessage,
-        },
-        { root: true }
-      );
+      if (progressNotificationPayload) {
+        dispatch(
+          "notification/showProgressNotification",
+          progressNotificationPayload,
+          { root: true }
+        );
+      } else {
+        dispatch(
+          "notification/showGeneralNotification",
+          {
+            notification: successNotificationType,
+            message: successMessage,
+          },
+          { root: true }
+        );
+      }
     }
     return response;
   } catch (error) {
