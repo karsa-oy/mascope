@@ -265,6 +265,11 @@ export default {
         requestData: sampleBatchCopyData,
         successMessage: `Batch "${sampleBatchCopyData.sample_batch_name}" was successfully copied to the workspace "${sampleBatchCopyData.workspace_name}".`,
         errorMessage: `Failed to copy batch "${sampleBatchCopyData.sample_batch_name}".`,
+        progressNotificationPayload: {
+          action: "copy",
+          type: "Batch",
+          message: `Copying batch "${sampleBatchCopyData.sample_batch_name}" to the workspace "${sampleBatchCopyData.workspace_name}", please wait`,
+        },
       });
     },
 
