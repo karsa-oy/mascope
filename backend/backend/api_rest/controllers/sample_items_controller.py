@@ -19,6 +19,7 @@ from ..models.models import (
 from ..models.pydantic_models.sample_item_pydantic_model import (
     SampleItemCreate,
     SampleItemUpdate,
+    SampleItemCopy,
 )
 
 
@@ -188,7 +189,7 @@ async def update_sample_item(sample_item_id: str, sample_item: SampleItemUpdate)
         return db_sample_item
 
 
-async def copy_sample_item(sample_item_id: str, sample_batch_id: str, session=None):
+async def copy_sample_item(sample_item_copy: SampleItemCopy, session=None):
     independent_transaction = False
 
     if session is None:
@@ -204,7 +205,7 @@ async def copy_sample_item(sample_item_id: str, sample_batch_id: str, session=No
                 joinedload(SampleItem.match_interference),
                 joinedload(SampleItem.match_rating),
             )
-            .filter(SampleItem.sample_item_id == sample_item_id)
+            .filter(SampleItem.sample_item_id == sample_item_copy.sample_item_id)
         )
         result = await session.execute(stmt)
         original_sample_item = result.scalars().first()
@@ -213,46 +214,6 @@ async def copy_sample_item(sample_item_id: str, sample_batch_id: str, session=No
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail=f"Sample item not found"
             )
-
-        # # # # Sample item naming logic # # # #
-        # Initial new sample item name
-        new_sample_item_name = original_sample_item.sample_item_name
-        name_exists = True  # Control variable for the loop
-        copy_num = 0  # Starting copy number
-
-        while name_exists:
-            # Query to check if a sample item with the new name already exists in the specified sample batch
-            stmt = select(SampleItem).filter(
-                and_(
-                    SampleItem.sample_item_name == new_sample_item_name,
-                    SampleItem.sample_batch_id == sample_batch_id,
-                )
-            )
-            result = await session.execute(stmt)
-            existing_sample_item = result.scalar_one_or_none()
-
-            if existing_sample_item is None:
-                # Exit the loop if the name is unique, keep the original name
-                name_exists = False
-            else:
-                # Name pattern matching and modification
-                name_pattern = re.search(
-                    r"(.*\sCopy)(?:\((\d+)\))?$", new_sample_item_name
-                )
-
-                if name_pattern:
-                    base_name = name_pattern.group(1)
-                    copy_num = name_pattern.group(2)
-
-                    if copy_num:
-                        # Increment the number by 1 if it exists
-                        new_sample_item_name = f"{base_name}({int(copy_num) + 1})"
-                    else:
-                        # Append "(1)" if the name ends with " Copy"
-                        new_sample_item_name = f"{base_name}(1)"
-                else:
-                    # Append " Copy" if the name doesn't fit the pattern
-                    new_sample_item_name = f"{new_sample_item_name} Copy"
 
         # Create a new sample_item with a new ID, name, batch and time of creation, but copy all other data
         new_sample_item_id = gen_id()
@@ -264,8 +225,8 @@ async def copy_sample_item(sample_item_id: str, sample_batch_id: str, session=No
         new_sample_item_data.update(
             {
                 "sample_item_id": new_sample_item_id,
-                "sample_batch_id": sample_batch_id,
-                "sample_item_name": new_sample_item_name,
+                "sample_batch_id": sample_item_copy.sample_batch_id,
+                "sample_item_name": sample_item_copy.sample_item_name,
                 "sample_item_utc_created": datetime.utcnow(),
             }
         )
@@ -321,7 +282,11 @@ async def copy_sample_item(sample_item_id: str, sample_batch_id: str, session=No
             # Commit the transaction to save the data
             await session.commit()
             # Reload affected sample batch
-            await sio.emit("sample_batch_reload", room=sample_batch_id, namespace="/")
+            await sio.emit(
+                "sample_batch_reload",
+                room=sample_item_copy.sample_batch_id,
+                namespace="/",
+            )
         else:
             # If it is a nested transaction, commit it before returning, this creates a savepoint.
             await session.commit()
