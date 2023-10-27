@@ -41,6 +41,7 @@ class SampleItemInDB(SampleItemBase):
 
 class SampleItemCopy(BaseModel):
     sample_item_id: str = Field(..., description="ID of the copied sample item")
+    sample_item_name: str = Field(..., description="Name of the new sample item")
     sample_batch_id: str = Field(
         ..., description="ID of the sample batch where the sample item will be copied"
     )
