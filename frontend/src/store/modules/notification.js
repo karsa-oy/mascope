@@ -5,6 +5,7 @@ const state = {
   // All Notifications
   warningActive: false,
   generalActive: false,
+  progressActive: false,
   batchComputeProgressActive: false,
   itemComputeProgressActive: false,
   calibrationProgressActive: false,
@@ -15,8 +16,15 @@ const state = {
   generalNotification: null,
   generalNotificationMessage: null,
   // Compute progress notification
+  progressAction: null,
+  progressActionType: null,
+  progressData: {},
   progressMessage: "",
   progressPercentage: 0,
+  progressError: false,
+  // Copy progress notification
+  copyProgress: false,
+  // TODO_refactor_store move other progress notification to the generilised progress
   // Item compute progress notification
   itemMatchComputing: false,
   // Batch compute progress notification
@@ -51,6 +59,9 @@ export default {
       }
       state.active = null;
     },
+    SET_PROGRESS_STATE(state, { action, value }) {
+      state[action + "Progress"] = value;
+    },
     RESET_WARNING_NOTIFICATION(state) {
       state.warningNotification = null;
       state.warningData = null;
@@ -65,6 +76,14 @@ export default {
       state.calibrationError = false;
       state.calibrationAction = null;
     },
+    RESET_PROGRESS_NOTIFICATION(state) {
+      state.progressAction = null;
+      state.progressActionType = null;
+      state.progressData = {};
+      state.progressMessage = "";
+      state.progressPercentage = 0;
+      state.progressError = false;
+    },
   },
   actions: {
     // warning notification
@@ -73,10 +92,20 @@ export default {
       commit("SET_WARNING_DATA", payload?.data || null);
       commit("activate", { notification: "warning" });
     },
-    showGeneralNotification({ dispatch, commit }, payload) {
+    // general notification
+    showGeneralNotification({ commit }, payload) {
       commit("SET_GENERAL_NOTIFICATION", payload.notification);
       commit("SET_GENERAL_NOTIFICATION_MESSAGE", payload.message);
       commit("activate", { notification: "general" });
+    },
+    // progress notification
+    showProgressNotification({ commit }, payload) {
+      commit("SET_PROGRESS_STATE", { action: payload.action, value: true });
+      commit("SET_PROGRESS_ACTION", payload.action);
+      commit("SET_PROGRESS_ACTION_TYPE", payload?.type || null);
+      commit("SET_PROGRESS_DATA", payload?.data || {});
+      commit("SET_PROGRESS_MESSAGE", payload.message);
+      commit("SET_PROGRESS_PERCENTAGE", payload?.percentage || 0);
     },
     // backend listeners
     // Batch compute progress notification
@@ -226,7 +255,6 @@ export default {
         }
         commit("SET_CALIBRATION_COMPUTING", false);
         setTimeout(() => {
-          if (!state.calibrationProgressActive) return;
           commit("RESET_CALIBRATION_NOTIFICATION");
         }, 500);
       }, 3000);
@@ -242,6 +270,30 @@ export default {
         commit("SET_CALIBRATION_COMPUTING", false);
         setTimeout(() => {
           commit("RESET_CALIBRATION_NOTIFICATION");
+        }, 500);
+      }, 5000);
+    },
+
+    // copy notifications
+    async onCopyBatchFinished({ commit }, data) {
+      commit("SET_PROGRESS_MESSAGE", data.message);
+      commit("SET_PROGRESS_PERCENTAGE", data.progress_percentage || 100);
+      setTimeout(() => {
+        if (state.progressAction !== data.action) return;
+        commit("SET_PROGRESS_STATE", { action: data.action, value: false });
+        setTimeout(() => {
+          commit("RESET_PROGRESS_NOTIFICATION");
+        }, 500);
+      }, 4000);
+    },
+
+    async onCopyBatchFailed({ commit }, data) {
+      commit("SET_PROGRESS_MESSAGE", `${data.message}:  ${data.error}`);
+      commit("SET_PROGRESS_ERROR", true);
+      setTimeout(() => {
+        commit("SET_PROGRESS_STATE", { action: data.action, value: false });
+        setTimeout(() => {
+          commit("RESET_PROGRESS_NOTIFICATION");
         }, 500);
       }, 5000);
     },
