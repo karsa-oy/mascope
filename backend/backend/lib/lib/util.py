@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 import datetime_glob
 import yaml
 
-from .struct import AttrDict
+from .structs import AttrDict
 
 
 def copy_dict(d, ignore_keys=[]):

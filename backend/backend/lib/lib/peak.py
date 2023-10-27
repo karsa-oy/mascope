@@ -6,20 +6,15 @@ Created on Wed Apr 17 13:45:17 2019
 @author: Oskari Kausiala
 """
 import asyncio
-import json
 from concurrent.futures import ProcessPoolExecutor
 
 import lmfit
 import numpy as np
-import pandas as pd
 from scipy.interpolate import CubicSpline
-from scipy.signal import find_peaks
 from scipy.signal._peak_finding_utils import _select_by_peak_distance
 from scipy.stats import norm
 
-from backend.db.conn import conn
-from backend.lib.file import load_file, zarr_sdk
-from backend.lib.filter import smooth
+from .file_func import load_file, zarr_sdk
 
 
 def calculate_peak_area(x, peakshape, peak):
@@ -29,6 +24,7 @@ def calculate_peak_area(x, peakshape, peak):
 
 async def detect_peaks(
     filename,
+    instrument_functions,
     u_list=None,
     max_n_peaks=5,
     add_peak_threshold=0.9,
@@ -41,8 +37,8 @@ async def detect_peaks(
             Argument 'if_exists' must be one of 'fail', 'append', 'replace'
         """
         )
+    peakshape, R = instrument_functions
     dmz = 0.5
-    peakshape, R = read_instrument_functions(filename)
     old_peak_mzs = []
     old_peak_areas = []
     old_peak_heights = []
@@ -477,51 +473,6 @@ def gen_peak_kernel(params, x, ps):
     return kernel
 
 
-def get_batch_u_list(sample_batch_id):
-    # get sample batch
-    with conn:
-        [sample_batch] = pd.read_sql(
-            f"""
-            SELECT build_params
-            FROM sample_batch
-            WHERE sample_batch_id == ?
-            """,
-            conn,
-            params=[sample_batch_id],
-        ).to_dict("records")
-    build_params = json.loads(sample_batch["build_params"])
-    calibration_collection_id = build_params["calibration_collection"]
-    ion_mechanism_ids = build_params["ion_mechanisms"]
-    with conn:
-        target_collection_ids = pd.read_sql(
-            f"""
-            SELECT target_collection_id
-            FROM target_collection_in_sample_batch
-            WHERE sample_batch_id == ?
-            """,
-            conn,
-            params=[sample_batch_id],
-        )["target_collection_id"].tolist()
-    target_collection_ids.append(calibration_collection_id)
-    with conn:
-        target_collection_id_refs = ",".join("?" * len(target_collection_ids))
-        ion_mechanism_id_refs = ",".join("?" * len(ion_mechanism_ids))
-        target_isotope_mzs = pd.read_sql(
-            f"""
-            SELECT mz
-            FROM target_compound_in_target_collection
-            NATURAL JOIN target_compound
-            NATURAL JOIN target_ion
-            NATURAL JOIN target_isotope
-            WHERE target_collection_id IN ({target_collection_id_refs})
-            AND ionization_mechanism_id IN ({ion_mechanism_id_refs})
-            """,
-            conn,
-            params=[*target_collection_ids, *ion_mechanism_ids],
-        )["mz"].tolist()
-    return np.unique(np.round(target_isotope_mzs))
-
-
 def get_peaks(sample_file, intensity_mode="area"):
     if intensity_mode == "area":
         peaks = sample_file.peak_areas
@@ -557,60 +508,3 @@ def peak_kernel_residual(params, x, y, ps):
 
     kernel = gen_peak_kernel(params, x, ps)
     return y - kernel
-
-
-def read_instrument_functions(filename):
-    with conn:
-        sample_file_df = pd.read_sql(
-            f"""
-            SELECT
-                datetime_utc,
-                instrument
-            FROM
-                sample_file
-            WHERE
-                filename = ?
-            """,
-            conn,
-            params=[filename],
-        )
-        [instrument] = sample_file_df.instrument
-        [file_timestamp] = sample_file_df.datetime_utc
-        instrument_function_df = pd.read_sql(
-            f"""
-            SELECT
-                peakshape,
-                resolution_function
-            FROM
-                instrument_function
-            WHERE
-                instrument = ?
-                AND
-                datetime_utc = (
-                    SELECT
-                         MAX(datetime_utc)
-                    FROM
-                        instrument_function
-                    WHERE datetime_utc < ?
-                    AND instrument = ?
-                    LIMIT 1
-                )
-            """,
-            conn,
-            params=[instrument, file_timestamp, instrument],
-        )
-    if not len(instrument_function_df):
-        raise ValueError(
-            f"""
-            Instrument functions not found for instrument {instrument}
-            before date {file_timestamp}.
-            """
-        )
-    peakshape = json.loads(instrument_function_df.peakshape[0])
-    R_p = json.loads(instrument_function_df.resolution_function[0])
-    if len(R_p) == 2:
-        p1, p2 = R_p
-        R = lambda m: m / (p1 * m + p2)
-    elif len(R_p) == 3:
-        R = np.poly1d(R_p)
-    return peakshape, R

@@ -12,7 +12,7 @@ from ntpath import basename, dirname
 import datetime_glob
 import pandas as pd
 
-from .logging import NO_LOGGING_DEFAULT, parent_func_name
+from .logger import NO_LOGGING_DEFAULT, parent_func_name
 from .util import recursive_walk
 
 METADATA_VERSION_NUMBER = "0.01"
