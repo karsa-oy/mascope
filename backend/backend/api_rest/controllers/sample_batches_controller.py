@@ -15,6 +15,7 @@ from ..models.pydantic_models.sample_batch_pydantic_model import (
 )
 from ..models.pydantic_models.sample_item_pydantic_model import (
     SampleItemCreate,
+    SampleItemCopy,
 )
 from ..models.pydantic_models.calibration_pydantic_model import CalibrationMzFitParams
 from ..models.pydantic_models.match_pydantic_model import (
@@ -249,71 +250,115 @@ async def process_batch(sample_batch, sample_items, params):
 
 async def copy_sample_batch(sample_batch_copy: SampleBatchCopy):
     async with async_session() as session:
-        # Check if the provided workspace_id exists
-        workspace = await session.get(Workspace, sample_batch_copy.workspace_id)
-        if not workspace:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Workspace with ID {sample_batch_copy.workspace_id} not found",
-            )
+        try:
+            # Check if the provided workspace_id exists
+            workspace = await session.get(Workspace, sample_batch_copy.workspace_id)
+            if not workspace:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Workspace with ID {sample_batch_copy.workspace_id} not found",
+                )
 
-        # Fetch the original sample batch with related TargetCollectionInSampleBatch and SampleItem records
-        stmt = (
-            select(SampleBatch)
-            .options(
-                joinedload(SampleBatch.target_collection),
-                joinedload(SampleBatch.sample_item),
+            # Fetch the original sample batch with related TargetCollectionInSampleBatch and SampleItem records
+            stmt = (
+                select(SampleBatch)
+                .options(
+                    joinedload(SampleBatch.target_collection),
+                    joinedload(SampleBatch.sample_item),
+                )
+                .filter(
+                    SampleBatch.sample_batch_id == sample_batch_copy.sample_batch_id
+                )
             )
-            .filter(SampleBatch.sample_batch_id == sample_batch_copy.sample_batch_id)
-        )
-        result = await session.execute(stmt)
-        original_sample_batch = result.scalars().first()
+            result = await session.execute(stmt)
+            original_sample_batch = result.scalars().first()
 
-        if not original_sample_batch:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail=f"Sample batch not found"
-            )
+            if not original_sample_batch:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Sample batch not found",
+                )
 
-        # Create new sample batch record with a new ID, name, description, workspace and time of creation, but copy all other data
-        new_sample_batch_id = gen_id(16)
-        new_sample_batch_data = {
-            c.name: getattr(original_sample_batch, c.name)
-            for c in SampleBatch.__table__.columns
-            if c.name != "sample_batch_id"
-        }
-        new_sample_batch_data.update(
-            {
-                "sample_batch_id": new_sample_batch_id,
-                "workspace_id": sample_batch_copy.workspace_id,
-                "sample_batch_name": sample_batch_copy.sample_batch_name,
-                "sample_batch_description": sample_batch_copy.sample_batch_description,
-                "sample_batch_utc_created": datetime.utcnow(),
+            # Create new sample batch record with a new ID, name, description, workspace and time of creation, but copy all other data
+            new_sample_batch_id = gen_id(16)
+            new_sample_batch_data = {
+                c.name: getattr(original_sample_batch, c.name)
+                for c in SampleBatch.__table__.columns
+                if c.name != "sample_batch_id"
             }
-        )
-        new_sample_batch = SampleBatch(**new_sample_batch_data)
-        session.add(new_sample_batch)
-
-        # Copy TargetCollectionInSampleBatch records associated with the original sample batch
-        for target_collection in original_sample_batch.target_collection:
-            new_target_collection_in_sample_batch = TargetCollectionInSampleBatch(
-                target_collection_id=target_collection.target_collection_id,
-                sample_batch_id=new_sample_batch_id,
+            new_sample_batch_data.update(
+                {
+                    "sample_batch_id": new_sample_batch_id,
+                    "workspace_id": sample_batch_copy.workspace_id,
+                    "sample_batch_name": sample_batch_copy.sample_batch_name,
+                    "sample_batch_description": sample_batch_copy.sample_batch_description,
+                    "sample_batch_utc_created": datetime.utcnow(),
+                }
             )
-            session.add(new_target_collection_in_sample_batch)
+            new_sample_batch = SampleBatch(**new_sample_batch_data)
+            session.add(new_sample_batch)
 
-        # Copy sample items associated with the original sample batch
-        for sample_item in original_sample_batch.sample_item:
-            await copy_sample_item(
-                sample_item.sample_item_id,
-                new_sample_batch_id,
-                session=session,
+            # Copy TargetCollectionInSampleBatch records associated with the original sample batch
+            for target_collection in original_sample_batch.target_collection:
+                new_target_collection_in_sample_batch = TargetCollectionInSampleBatch(
+                    target_collection_id=target_collection.target_collection_id,
+                    sample_batch_id=new_sample_batch_id,
+                )
+                session.add(new_target_collection_in_sample_batch)
+
+            # Copy sample items associated with the original sample batch
+            for sample_item in original_sample_batch.sample_item:
+                sample_item_copy_data = SampleItemCopy(
+                    sample_item_id=sample_item.sample_item_id,
+                    sample_item_name=sample_item.sample_item_name,
+                    sample_batch_id=new_sample_batch_id,
+                )
+                await copy_sample_item(
+                    sample_item_copy=sample_item_copy_data,
+                    session=session,
+                )
+
+            await session.commit()
+
+            rooms_to_notify = [
+                new_sample_batch.workspace_id,
+                original_sample_batch.workspace_id,
+            ]
+            # Notify clients the copy process has finished
+            for room in rooms_to_notify:
+                await sio.emit(
+                    "copy_batch_finished",
+                    {
+                        "action": "copy",
+                        "type": "batch",
+                        "message": f"Batch '{sample_batch_copy.sample_batch_name}' was successfully copied.",
+                        "progress_percentage": 100,
+                    },
+                    room=room,
+                    namespace="/",
+                )
+
+            # Emit event to inform clients
+            await sio.emit(
+                "workspace_reload",
+                room=new_sample_batch.workspace_id,
+                namespace="/",
             )
 
-        await session.commit()
-
-        # Emit event to inform clients
-        await sio.emit(
-            "workspace_reload", room=new_sample_batch.workspace_id, namespace="/"
-        )
+        except Exception as e:
+            # Notify clients of an error
+            for room in rooms_to_notify:
+                await sio.emit(
+                    "copy_batch_failed",
+                    {
+                        "error": str(e),
+                        "action": "copy",
+                        "type": "batch",
+                        "message": f"Copy batch '{sample_batch_copy.sample_batch_name}' failed",
+                        "progress_percentage": 100,
+                    },
+                    room=room,
+                    namespace="/",
+                )
 
         return new_sample_batch
