@@ -31,7 +31,6 @@ const state = {
   sampleItemOverviewActive: false,
   sampleItemOverviewProps: {},
   sampleItemTargetIonActive: false,
-  sampleItemTargetIonProps: {},
 };
 
 export default {

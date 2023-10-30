@@ -32,8 +32,8 @@ export default {
   },
   computed: {
     ...sync({
-      modalSampleItemTargetIonProps: "modal/sampleItemTargetIonProps",
       modalTargetCollectionOpProps: "modal/targetCollectionOpProps",
+      ionInFocus: "visualization/ionInFocus",
       isotopesInFocus: "visualization/isotopesInFocus",
     }),
     ...get({
@@ -327,9 +327,6 @@ export default {
         this.peakMinIntensity,
         this.mzTolerance
       );
-      const targetIon = this.targetIons.filter(
-        (ion) => ion.target_ion_id == row.target_ion_id
-      )[0];
 
       const isotopesInFocus = this.matchIsotopes
         .filter((isotope) => isotope.target_ion_id === row.target_ion_id)
@@ -346,10 +343,12 @@ export default {
 
       this.isotopesInFocus = isotopesInFocus;
 
-      this.modalSampleItemTargetIonProps = {
-        ...row,
-        target_ion_formula: targetIon.target_ion_formula,
-      };
+      const ionInFocus = this.matchIons.filter(
+        (ion) => ion.target_ion_id === row.target_ion_id
+      )[0];
+
+      this.ionInFocus = ionInFocus;
+
       this.activateModal({
         modal: "sampleItemTargetIon",
       });
