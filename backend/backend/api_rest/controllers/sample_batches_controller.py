@@ -107,18 +107,48 @@ async def create_sample_batch(sample_batch: SampleBatchCreate):
 
 async def delete_sample_batch(sample_batch_id: str):
     async with async_session() as session:
-        result = await session.execute(
-            select(SampleBatch).filter(SampleBatch.sample_batch_id == sample_batch_id)
-        )
-        sample_batch = result.scalar_one_or_none()
-        if not sample_batch:
-            raise HTTPException(status_code=404, detail="Sample batch not found")
+        try:
+            result = await session.execute(
+                select(SampleBatch).filter(
+                    SampleBatch.sample_batch_id == sample_batch_id
+                )
+            )
+            sample_batch = result.scalar_one_or_none()
+            if not sample_batch:
+                # TODO_error_handling the HTTPException will not work for BackgroundTasks, use sio or other error handling logic
+                print(f"Sample batch with ID {sample_batch_id} not found")
+                raise ValueError(f"Sample batch with ID {sample_batch_id} not found")
 
-        await session.delete(sample_batch)
-        await session.commit()
-        await sio.emit(
-            "workspace_reload", room=sample_batch.workspace_id, namespace="/"
-        )
+            await session.delete(sample_batch)
+            await session.commit()
+            await sio.emit(
+                "workspace_reload", room=sample_batch.workspace_id, namespace="/"
+            )
+            await sio.emit(
+                "delete_finished",
+                {
+                    "action": "delete",
+                    "type": "batch",
+                    "status": "success",
+                    "message": f"Batch '{sample_batch.sample_batch_name}' was successfully deleted.",
+                },
+                room=sample_batch.workspace_id,
+                namespace="/",
+            )
+
+        except Exception as e:
+            await sio.emit(
+                "delete_finished",
+                {
+                    "error": str(e),
+                    "action": "delete",
+                    "type": "batch",
+                    "status": "error",
+                    "message": f"Deleting batch with ID '{sample_batch_id}' failed",
+                },
+                room=sample_batch.workspace_id,
+                namespace="/",
+            )
 
 
 async def update_sample_batch(
@@ -253,11 +283,13 @@ async def copy_sample_batch(sample_batch_copy: SampleBatchCopy):
         try:
             # Check if the provided workspace_id exists
             workspace = await session.get(Workspace, sample_batch_copy.workspace_id)
+
             if not workspace:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Workspace with ID {sample_batch_copy.workspace_id} not found",
+                error_message = (
+                    f"Workspace with ID {sample_batch_copy.workspace_id} not found"
                 )
+                print(error_message)
+                raise ValueError(error_message)
 
             # Fetch the original sample batch with related TargetCollectionInSampleBatch and SampleItem records
             stmt = (
@@ -274,10 +306,9 @@ async def copy_sample_batch(sample_batch_copy: SampleBatchCopy):
             original_sample_batch = result.scalars().first()
 
             if not original_sample_batch:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Sample batch not found",
-                )
+                error_message = f"Sample batch with ID {sample_batch_copy.sample_batch_id} not found"
+                print(error_message)
+                raise ValueError(error_message)
 
             # Create new sample batch record with a new ID, name, description, workspace and time of creation, but copy all other data
             new_sample_batch_id = gen_id(16)
