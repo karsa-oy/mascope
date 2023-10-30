@@ -24,6 +24,8 @@ const state = {
   progressError: false,
   // Copy progress notification
   copyProgress: false,
+  // Delete progress notification
+  deleteProgress: false,
   // TODO_refactor_store move other progress notification to the generilised progress
   // Item compute progress notification
   itemMatchComputing: false,
@@ -102,9 +104,9 @@ export default {
     showProgressNotification({ commit }, payload) {
       commit("SET_PROGRESS_STATE", { action: payload.action, value: true });
       commit("SET_PROGRESS_ACTION", payload.action);
+      commit("SET_PROGRESS_MESSAGE", payload.message);
       commit("SET_PROGRESS_ACTION_TYPE", payload?.type || null);
       commit("SET_PROGRESS_DATA", payload?.data || {});
-      commit("SET_PROGRESS_MESSAGE", payload.message);
       commit("SET_PROGRESS_PERCENTAGE", payload?.percentage || 0);
     },
     // backend listeners
@@ -279,7 +281,6 @@ export default {
       commit("SET_PROGRESS_MESSAGE", data.message);
       commit("SET_PROGRESS_PERCENTAGE", data.progress_percentage || 100);
       setTimeout(() => {
-        if (state.progressAction !== data.action) return;
         commit("SET_PROGRESS_STATE", { action: data.action, value: false });
         setTimeout(() => {
           commit("RESET_PROGRESS_NOTIFICATION");
@@ -296,6 +297,26 @@ export default {
           commit("RESET_PROGRESS_NOTIFICATION");
         }, 500);
       }, 5000);
+    },
+
+    // delete notifications
+    async onDeleteFinished({ commit }, data) {
+      if (data.status === "success") {
+        commit("SET_PROGRESS_MESSAGE", data.message);
+        commit("SET_PROGRESS_PERCENTAGE", data.progress_percentage || 100);
+      } else if (data.status === "error") {
+        commit("SET_PROGRESS_MESSAGE", `${data.message}:  ${data.error}`);
+        commit("SET_PROGRESS_ERROR", true);
+      }
+      setTimeout(
+        () => {
+          commit("SET_PROGRESS_STATE", { action: data.action, value: false });
+          setTimeout(() => {
+            commit("RESET_PROGRESS_NOTIFICATION");
+          }, 500);
+        },
+        data.status === "error" ? 5000 : 4000
+      );
     },
   },
 };

@@ -249,8 +249,20 @@ export default {
       await rootState.api.httpClient.createBatch(newBatch);
     },
 
-    async deleteBatch({ rootState }, batches) {
-      await rootState.api.httpClient.deleteBatch(batches);
+    async deleteBatch({ dispatch, rootState }, batch) {
+      return await handleApiRequest({
+        dispatch,
+        rootState,
+        httpMethod: "deleteBatch",
+        requestData: batch,
+        successMessage: `Batch "${batch.sample_batch_name}" was successfully deleted.`,
+        errorMessage: `Failed to delete batch "${batch.sample_batch_name}".`,
+        progressNotificationPayload: {
+          action: "delete",
+          type: "Batch",
+          message: `Deleting batch "${batch.sample_batch_name}", please wait`,
+        },
+      });
     },
 
     async updateBatch({ rootState }, newBatch) {
