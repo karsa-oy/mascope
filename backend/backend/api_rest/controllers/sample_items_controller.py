@@ -190,7 +190,7 @@ async def update_sample_item(sample_item_id: str, sample_item: SampleItemUpdate)
         return db_sample_item
 
 
-async def copy_sample_item(sample_item_copy: SampleItemCopy, sample_batch_reload=False):
+async def copy_sample_item(sample_item_copy: SampleItemCopy, http_call=False):
     try:
         async with async_session() as session:
             # Fetch the original sample_item along with related Match, MatchInterference, and MatchRating records
@@ -207,10 +207,14 @@ async def copy_sample_item(sample_item_copy: SampleItemCopy, sample_batch_reload
             original_sample_item = result.scalars().first()
 
             if not original_sample_item:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Sample item not found",
-                )
+                error_message = "Sample item not found"
+                if http_call:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail=error_message,
+                    )
+                else:
+                    raise ValueError(error_message)
 
             # Create a new sample_item with a new ID, name, batch and time of creation, but copy all other data
             new_sample_item_id = gen_id()
@@ -279,7 +283,7 @@ async def copy_sample_item(sample_item_copy: SampleItemCopy, sample_batch_reload
 
             await session.commit()
 
-            if sample_batch_reload:
+            if http_call:
                 # Reload affected sample batch
                 await sio.emit(
                     "sample_batch_reload",
@@ -290,6 +294,9 @@ async def copy_sample_item(sample_item_copy: SampleItemCopy, sample_batch_reload
     except Exception as e:
         error_message = str(e)
         user_message = "Failed to copy the sample item."
-        raise CustomException(user_message, error_message) from e
+        if http_call:
+            raise CustomException(user_message, error_message) from e
+        else:
+            raise ValueError(f"{user_message}: {error_message}") from e
 
     return new_sample_item
