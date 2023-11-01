@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+from fastapi.responses import JSONResponse
 
 from ..controllers.sample_items_controller import (
     get_sample_item_by_id,
@@ -13,6 +14,7 @@ from ..models.pydantic_models.sample_item_pydantic_model import (
     SampleItemUpdate,
     SampleItemCopy,
 )
+from ..models.exceptions import CustomException
 
 sample_items_router = APIRouter()
 
@@ -66,4 +68,9 @@ async def update_sample_item_route(sample_item_id: str, sample_item: SampleItemU
 
 @sample_items_router.post("/api/sample_items/copy")
 async def copy_sample_item_route(sample_item_copy: SampleItemCopy):
-    return await copy_sample_item(sample_item_copy)
+    try:
+        return await copy_sample_item(sample_item_copy, True)
+    except CustomException as e:
+        return JSONResponse(
+            status_code=400, content={"error": e.user_message, "detail": e.tech_message}
+        )
