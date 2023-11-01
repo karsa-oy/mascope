@@ -276,31 +276,17 @@ export default {
       }, 5000);
     },
 
-    // copy notifications
-    async onCopyBatchFinished({ commit }, data) {
-      commit("SET_PROGRESS_MESSAGE", data.message);
-      commit("SET_PROGRESS_PERCENTAGE", data.progress_percentage || 100);
-      setTimeout(() => {
-        commit("SET_PROGRESS_STATE", { action: data.action, value: false });
-        setTimeout(() => {
-          commit("RESET_PROGRESS_NOTIFICATION");
-        }, 500);
-      }, 4000);
-    },
-
-    async onCopyBatchFailed({ commit }, data) {
-      commit("SET_PROGRESS_MESSAGE", `${data.message}:  ${data.error}`);
-      commit("SET_PROGRESS_ERROR", true);
-      setTimeout(() => {
-        commit("SET_PROGRESS_STATE", { action: data.action, value: false });
-        setTimeout(() => {
-          commit("RESET_PROGRESS_NOTIFICATION");
-        }, 500);
-      }, 5000);
-    },
-
     // delete notifications
-    async onDeleteFinished({ commit }, data) {
+    async onDeleteFinished({ dispatch }, data) {
+      dispatch("onActionFinished", data);
+    },
+    // copy notifications
+    async onCopyFinished({ dispatch }, data) {
+      dispatch("onActionFinished", data);
+    },
+
+    // unified progress finished notification for actions
+    async onActionFinished({ commit }, data) {
       if (data.status === "success") {
         commit("SET_PROGRESS_MESSAGE", data.message);
         commit("SET_PROGRESS_PERCENTAGE", data.progress_percentage || 100);
@@ -308,14 +294,18 @@ export default {
         commit("SET_PROGRESS_MESSAGE", `${data.message}:  ${data.error}`);
         commit("SET_PROGRESS_ERROR", true);
       }
+      // Set a timeout to deactivate the modal and reset the progress notification state
       setTimeout(
         () => {
+          // Deactivate the modal by setting the progress state of the action to false.
+          // This will trigger the watcher in TheNotificationProgress.vue to close the modal.
           commit("SET_PROGRESS_STATE", { action: data.action, value: false });
+          // This clears out the progress message and other state for the next action.
           setTimeout(() => {
             commit("RESET_PROGRESS_NOTIFICATION");
-          }, 500);
+          }, 500); // TODO_configuration 500ms delay to reset the progress notification for fade-out animation
         },
-        data.status === "error" ? 5000 : 4000
+        data.status === "error" ? 5000 : 4000 // 5s delay for error, 4s delay for success
       );
     },
   },

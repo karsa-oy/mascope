@@ -351,17 +351,22 @@ async def copy_sample_batch(sample_batch_copy: SampleBatchCopy):
 
             await session.commit()
 
-            rooms_to_notify = [
-                new_sample_batch.workspace_id,
-                original_sample_batch.workspace_id,
-            ]
+            rooms_to_notify = list(
+                set(
+                    [
+                        new_sample_batch.workspace_id,
+                        original_sample_batch.workspace_id,
+                    ]
+                )
+            )
             # Notify clients the copy process has finished
             for room in rooms_to_notify:
                 await sio.emit(
-                    "copy_batch_finished",
+                    "copy_finished",
                     {
                         "action": "copy",
                         "type": "batch",
+                        "status": "success",
                         "message": f"Batch '{sample_batch_copy.sample_batch_name}' was successfully copied.",
                         "progress_percentage": 100,
                     },
@@ -377,14 +382,23 @@ async def copy_sample_batch(sample_batch_copy: SampleBatchCopy):
             )
 
         except Exception as e:
+            rooms_to_notify = list(
+                set(
+                    [
+                        new_sample_batch.workspace_id,
+                        original_sample_batch.workspace_id,
+                    ]
+                )
+            )
             # Notify clients of an error
             for room in rooms_to_notify:
                 await sio.emit(
-                    "copy_batch_failed",
+                    "copy_finished",
                     {
                         "error": str(e),
                         "action": "copy",
                         "type": "batch",
+                        "status": "error",
                         "message": f"Copy batch '{sample_batch_copy.sample_batch_name}' failed",
                         "progress_percentage": 100,
                     },
