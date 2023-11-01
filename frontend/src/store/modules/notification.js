@@ -288,9 +288,17 @@ export default {
     // unified progress finished notification for actions
     async onActionFinished({ commit }, data) {
       if (data.status === "success") {
+        // reopen the notification, if it was closed
+        commit("SET_PROGRESS_ACTION", data.action);
+        commit("SET_PROGRESS_STATE", { action: data.action, value: true });
+        // set the message and 100 progress
         commit("SET_PROGRESS_MESSAGE", data.message);
         commit("SET_PROGRESS_PERCENTAGE", data.progress_percentage || 100);
       } else if (data.status === "error") {
+        // reopen the notification, if it was closed
+        commit("SET_PROGRESS_ACTION", data.action);
+        commit("SET_PROGRESS_STATE", { action: data.action, value: true });
+        // set the error message and error flag
         commit("SET_PROGRESS_MESSAGE", `${data.message}:  ${data.error}`);
         commit("SET_PROGRESS_ERROR", true);
       }
