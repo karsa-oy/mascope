@@ -49,6 +49,8 @@ async def get_samples(
     limit: int = 10000,
     batch_matches_info: bool = False,
 ):
+    message = ""
+
     async with async_session() as session:
         stmt = select(Sample)
 

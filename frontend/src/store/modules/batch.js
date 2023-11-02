@@ -249,8 +249,20 @@ export default {
       await rootState.api.httpClient.createBatch(newBatch);
     },
 
-    async deleteBatch({ rootState }, batches) {
-      await rootState.api.httpClient.deleteBatch(batches);
+    async deleteBatch({ dispatch, rootState }, batch) {
+      return await handleApiRequest({
+        dispatch,
+        rootState,
+        httpMethod: "deleteBatch",
+        requestData: batch,
+        successMessage: `Batch "${batch.sample_batch_name}" was successfully deleted.`,
+        errorMessage: `Failed to delete batch "${batch.sample_batch_name}".`,
+        progressNotificationPayload: {
+          action: "delete",
+          type: "Batch",
+          message: `Deleting batch "${batch.sample_batch_name}", please wait`,
+        },
+      });
     },
 
     async updateBatch({ rootState }, newBatch) {
@@ -265,6 +277,11 @@ export default {
         requestData: sampleBatchCopyData,
         successMessage: `Batch "${sampleBatchCopyData.sample_batch_name}" was successfully copied to the workspace "${sampleBatchCopyData.workspace_name}".`,
         errorMessage: `Failed to copy batch "${sampleBatchCopyData.sample_batch_name}".`,
+        progressNotificationPayload: {
+          action: "copy",
+          type: "Batch",
+          message: `Copying batch "${sampleBatchCopyData.sample_batch_name}" to the workspace "${sampleBatchCopyData.workspace_name}", please wait`,
+        },
       });
     },
 

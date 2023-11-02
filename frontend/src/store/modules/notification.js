@@ -5,6 +5,7 @@ const state = {
   // All Notifications
   warningActive: false,
   generalActive: false,
+  progressActive: false,
   batchComputeProgressActive: false,
   itemComputeProgressActive: false,
   calibrationProgressActive: false,
@@ -15,8 +16,17 @@ const state = {
   generalNotification: null,
   generalNotificationMessage: null,
   // Compute progress notification
+  progressAction: null,
+  progressActionType: null,
+  progressData: {},
   progressMessage: "",
   progressPercentage: 0,
+  progressError: false,
+  // Copy progress notification
+  copyProgress: false,
+  // Delete progress notification
+  deleteProgress: false,
+  // TODO_refactor_store move other progress notification to the generilised progress
   // Item compute progress notification
   itemMatchComputing: false,
   // Batch compute progress notification
@@ -51,6 +61,9 @@ export default {
       }
       state.active = null;
     },
+    SET_PROGRESS_STATE(state, { action, value }) {
+      state[action + "Progress"] = value;
+    },
     RESET_WARNING_NOTIFICATION(state) {
       state.warningNotification = null;
       state.warningData = null;
@@ -65,6 +78,14 @@ export default {
       state.calibrationError = false;
       state.calibrationAction = null;
     },
+    RESET_PROGRESS_NOTIFICATION(state) {
+      state.progressAction = null;
+      state.progressActionType = null;
+      state.progressData = {};
+      state.progressMessage = "";
+      state.progressPercentage = 0;
+      state.progressError = false;
+    },
   },
   actions: {
     // warning notification
@@ -73,10 +94,20 @@ export default {
       commit("SET_WARNING_DATA", payload?.data || null);
       commit("activate", { notification: "warning" });
     },
-    showGeneralNotification({ dispatch, commit }, payload) {
+    // general notification
+    showGeneralNotification({ commit }, payload) {
       commit("SET_GENERAL_NOTIFICATION", payload.notification);
       commit("SET_GENERAL_NOTIFICATION_MESSAGE", payload.message);
       commit("activate", { notification: "general" });
+    },
+    // progress notification
+    showProgressNotification({ commit }, payload) {
+      commit("SET_PROGRESS_STATE", { action: payload.action, value: true });
+      commit("SET_PROGRESS_ACTION", payload.action);
+      commit("SET_PROGRESS_MESSAGE", payload.message);
+      commit("SET_PROGRESS_ACTION_TYPE", payload?.type || null);
+      commit("SET_PROGRESS_DATA", payload?.data || {});
+      commit("SET_PROGRESS_PERCENTAGE", payload?.percentage || 0);
     },
     // backend listeners
     // Batch compute progress notification
@@ -226,7 +257,6 @@ export default {
         }
         commit("SET_CALIBRATION_COMPUTING", false);
         setTimeout(() => {
-          if (!state.calibrationProgressActive) return;
           commit("RESET_CALIBRATION_NOTIFICATION");
         }, 500);
       }, 3000);
@@ -244,6 +274,47 @@ export default {
           commit("RESET_CALIBRATION_NOTIFICATION");
         }, 500);
       }, 5000);
+    },
+
+    // delete notifications
+    async onDeleteFinished({ dispatch }, data) {
+      dispatch("onActionFinished", data);
+    },
+    // copy notifications
+    async onCopyFinished({ dispatch }, data) {
+      dispatch("onActionFinished", data);
+    },
+
+    // unified progress finished notification for actions
+    async onActionFinished({ commit }, data) {
+      if (data.status === "success") {
+        // reopen the notification, if it was closed
+        commit("SET_PROGRESS_ACTION", data.action);
+        commit("SET_PROGRESS_STATE", { action: data.action, value: true });
+        // set the message and 100 progress
+        commit("SET_PROGRESS_MESSAGE", data.message);
+        commit("SET_PROGRESS_PERCENTAGE", data.progress_percentage || 100);
+      } else if (data.status === "error") {
+        // reopen the notification, if it was closed
+        commit("SET_PROGRESS_ACTION", data.action);
+        commit("SET_PROGRESS_STATE", { action: data.action, value: true });
+        // set the error message and error flag
+        commit("SET_PROGRESS_MESSAGE", `${data.message}:  ${data.error}`);
+        commit("SET_PROGRESS_ERROR", true);
+      }
+      // Set a timeout to deactivate the modal and reset the progress notification state
+      setTimeout(
+        () => {
+          // Deactivate the modal by setting the progress state of the action to false.
+          // This will trigger the watcher in TheNotificationProgress.vue to close the modal.
+          commit("SET_PROGRESS_STATE", { action: data.action, value: false });
+          // This clears out the progress message and other state for the next action.
+          setTimeout(() => {
+            commit("RESET_PROGRESS_NOTIFICATION");
+          }, 500); // TODO_configuration 500ms delay to reset the progress notification for fade-out animation
+        },
+        data.status === "error" ? 5000 : 4000 // 5s delay for error, 4s delay for success
+      );
     },
   },
 };

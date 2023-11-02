@@ -41,8 +41,11 @@ async def create_sample_batch_route(sample_batch: SampleBatchCreate):
 
 
 @sample_batches_router.delete("/api/sample_batches/{sample_batch_id}")
-async def delete_sample_batch_route(sample_batch_id: str):
-    return await delete_sample_batch(sample_batch_id)
+async def delete_sample_batch_route(
+    sample_batch_id: str, background_tasks: BackgroundTasks
+):
+    background_tasks.add_task(delete_sample_batch, sample_batch_id)
+    return {"status": f"The sample batch (ID '{sample_batch_id}') deletion has started"}
 
 
 @sample_batches_router.patch("/api/sample_batches/{sample_batch_id}")
@@ -65,5 +68,10 @@ async def autosampler_import_batch_route(
 
 
 @sample_batches_router.post("/api/sample_batches/copy")
-async def copy_sample_batch_route(sample_batch_copy: SampleBatchCopy):
-    return await copy_sample_batch(sample_batch_copy)
+async def copy_sample_batch_route(
+    sample_batch_copy: SampleBatchCopy, background_tasks: BackgroundTasks
+):
+    background_tasks.add_task(copy_sample_batch, sample_batch_copy)
+    return {
+        "status": f"The copying process for '{sample_batch_copy.sample_batch_name}' has started"
+    }

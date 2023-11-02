@@ -134,7 +134,7 @@
               expanded
               @click="
                 () => {
-                  deleteSampleBatch([batchActive.sample_batch_id]);
+                  deleteSampleBatch(batchActive);
                   deactivateModal();
                 }
               "
@@ -342,9 +342,9 @@ export default {
     async createSampleBatch(newBatch) {
       await this.createBatch(newBatch);
     },
-    async deleteSampleBatch(batches) {
+    async deleteSampleBatch(batch) {
       this.batchUnload();
-      await this.deleteBatch(batches);
+      await this.deleteBatch(batch);
     },
     async updateSampleBatch(newBatch) {
       await this.updateBatch(newBatch);
