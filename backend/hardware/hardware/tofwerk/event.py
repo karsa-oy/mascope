@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 import xarray
 
-from backend.lib.image import DEFAULT_TRACE, gen_heatmap_image, gen_spec_stack_image
+from lib.image import DEFAULT_TRACE, gen_heatmap_image, gen_spec_stack_image
 from .spectra import KSpectra
 
 # from .util import read_description, read_sampleid, write_description, write_sampleid

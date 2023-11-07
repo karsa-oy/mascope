@@ -7,7 +7,7 @@ from queue import Empty
 
 import socketio
 from hardware.tofwerk.tof_streamer import TofDaqStreamer
-from lib.util import load_env_yaml
+from service.lib.util import load_env_yaml
 
 
 def parse_cmd_args():

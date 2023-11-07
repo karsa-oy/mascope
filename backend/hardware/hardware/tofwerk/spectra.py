@@ -27,7 +27,7 @@ from .lib.TwH5 import (
     TwGetTofSpectrumFromH5,
     TwH5Desc,
 )
-from backend.lib.util import filetime2datetime
+from lib.util import filetime2datetime
 
 
 class KSpectra(KInstrument):

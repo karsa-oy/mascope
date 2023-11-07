@@ -6,8 +6,11 @@ import pandas as pd
 from dotenv import load_dotenv
 
 from backend.db.conn import conn
-from backend.lib.peak import detect_peaks, get_peaks
+from lib.peak import detect_peaks, get_peaks
 from backend.server import sio
+from backend.api_rest.controllers.instrument_functions_controller import (
+    read_instrument_functions,
+)
 
 load_dotenv()
 
@@ -19,8 +22,10 @@ async def export_peaks(sample_batch_df, sample_item_df):
     [sample_batch_name] = sample_batch_df["sample_batch_name"].tolist()
     for index, row in sample_item_df.iterrows():
         try:
+            filename = row["filename"]
+            instrument_functions = await read_instrument_functions(filename)
             sample_file = await detect_peaks(
-                row["filename"], u_list=None, if_exists="append"
+                filename, instrument_functions, u_list=None, if_exists="append"
             )
             peak_data_item = get_peaks(sample_file, "area").sum(dim="time")
         except Exception as e:

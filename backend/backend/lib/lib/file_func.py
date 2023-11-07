@@ -10,9 +10,9 @@ import numpy as np
 import xarray
 import zarr
 
-from backend.lib.logging import this_func_name
-from backend.lib.struct import ExtendableDataArray
-from backend.lib.util import parse_path_from_item_filename
+from .logger import this_func_name
+from .structs import ExtendableDataArray
+from .util import parse_path_from_item_filename
 
 
 class zarr_sdk:
