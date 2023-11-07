@@ -56,16 +56,18 @@ export default {
         //   return `Calibration ${this.calibrationAction} Progress`;
         case "copy":
           return `Copy ${this.progressActionType} Progress`;
+        case "delete":
+          return `Deleting ${this.progressActionType} Progress`;
       }
     },
     progressType() {
       switch (this.progressAction) {
-        // case "calibration":
-        //   return this.calibrationError
-        //     ? "is-danger"
-        //     : this.progressPercentage === 100
-        //     ? "is-success"
-        //     : "is-primary";
+        case "delete":
+          return this.progressError
+            ? "is-danger"
+            : this.progressPercentage === 100
+            ? "is-success"
+            : "is-primary";
         case "copy":
           return this.progressError
             ? "is-danger"

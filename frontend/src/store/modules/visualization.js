@@ -5,6 +5,7 @@ const state = {
   // chart data
   tracesSignalTimeseries: null,
   tracesSignalSumSpectrum: null,
+  ionInFocus: {},
   isotopesInFocus: [],
 };
 

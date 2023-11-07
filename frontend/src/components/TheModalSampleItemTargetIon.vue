@@ -16,7 +16,7 @@
           >
             {{ modalTitle }}
             <base-tag-match
-              :row="modalProps"
+              :row="ionInFocus"
               :display-match-score="true"
               :tooltip="{}"
             ></base-tag-match>
@@ -209,8 +209,8 @@ export default {
   },
   computed: {
     ...get({
-      modalProps: "modal/sampleItemTargetIonProps",
       sampleItem: "sample/active",
+      ionInFocus: "visualization/ionInFocus",
       isotopesInFocus: "visualization/isotopesInFocus",
       filterParamPossibleMatchThreshold: "batch/paramPossibleMatchThreshold",
       filterParamMzTolerance: "batch/paramMzTolerance",
@@ -226,12 +226,12 @@ export default {
       let title = this.sampleItem
         ? this.sampleItem.sample_item_name +
           ": " +
-          this.modalProps.target_ion_formula
+          this.ionInFocus.target_ion_formula
         : "";
 
-      if (this.modalProps.sample_peak_area_sum !== undefined) {
+      if (this.ionInFocus.sample_peak_area_sum !== undefined) {
         const ionSumIntensity = this.formatNumber(
-          this.modalProps.sample_peak_area_sum
+          this.ionInFocus.sample_peak_area_sum
         );
         title += ` | Intensity: ${ionSumIntensity}`;
       }
@@ -254,13 +254,13 @@ export default {
       }
       if (
         this.matchRating === "2" &&
-        this.modalProps.match_score < this.filterParamPossibleMatchThreshold
+        this.ionInFocus.match_score < this.filterParamPossibleMatchThreshold
       ) {
         return true;
       }
       if (
         this.matchRating === "0" &&
-        this.modalProps.match_score > this.filterParamPossibleMatchThreshold
+        this.ionInFocus.match_score > this.filterParamPossibleMatchThreshold
       ) {
         return true;
       }
@@ -379,7 +379,7 @@ export default {
     async submitRating() {
       let payload = {
         sample_item_id: this.sampleItem.sample_item_id,
-        target_ion_id: this.modalProps.target_ion_id,
+        target_ion_id: this.ionInFocus.target_ion_id,
         rating: Number(this.matchRating),
         environment: {
           mz_calibration: this.sampleItem.mz_calibration,

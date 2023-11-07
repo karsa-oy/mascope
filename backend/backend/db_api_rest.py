@@ -5,7 +5,15 @@ from backend.db import db_path
 
 # Database configuration
 DATABASE_URL = f"sqlite+aiosqlite:///{db_path}"
-engine = create_async_engine(DATABASE_URL)
+engine = create_async_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,  # Check connection liveness before using a connection from the pool
+    connect_args={
+        "timeout": 15
+    },  # Set a timeout of 15 seconds for establishing connections and waiting for table locks
+)
+
+
 async_session = sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
 
 

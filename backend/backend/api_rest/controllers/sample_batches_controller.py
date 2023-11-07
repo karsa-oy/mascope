@@ -21,6 +21,7 @@ from ..models.pydantic_models.calibration_pydantic_model import CalibrationMzFit
 from ..models.pydantic_models.match_pydantic_model import (
     MatchComputeBatch,
 )
+from ..models.exceptions import CustomException
 from .match_controller import match_batches_compute
 from .sample_items_controller import create_sample_item, copy_sample_item
 from .calibration_controller import calibration_mz_calibrate_batch
@@ -107,18 +108,48 @@ async def create_sample_batch(sample_batch: SampleBatchCreate):
 
 async def delete_sample_batch(sample_batch_id: str):
     async with async_session() as session:
-        result = await session.execute(
-            select(SampleBatch).filter(SampleBatch.sample_batch_id == sample_batch_id)
-        )
-        sample_batch = result.scalar_one_or_none()
-        if not sample_batch:
-            raise HTTPException(status_code=404, detail="Sample batch not found")
+        try:
+            result = await session.execute(
+                select(SampleBatch).filter(
+                    SampleBatch.sample_batch_id == sample_batch_id
+                )
+            )
+            sample_batch = result.scalar_one_or_none()
+            if not sample_batch:
+                # TODO_error_handling the HTTPException will not work for BackgroundTasks, use sio or other error handling logic
+                print(f"Sample batch with ID {sample_batch_id} not found")
+                raise ValueError(f"Sample batch with ID {sample_batch_id} not found")
 
-        await session.delete(sample_batch)
-        await session.commit()
-        await sio.emit(
-            "workspace_reload", room=sample_batch.workspace_id, namespace="/"
-        )
+            await session.delete(sample_batch)
+            await session.commit()
+            await sio.emit(
+                "workspace_reload", room=sample_batch.workspace_id, namespace="/"
+            )
+            await sio.emit(
+                "delete_finished",
+                {
+                    "action": "delete",
+                    "type": "batch",
+                    "status": "success",
+                    "message": f"Batch '{sample_batch.sample_batch_name}' was successfully deleted.",
+                },
+                room=sample_batch.workspace_id,
+                namespace="/",
+            )
+
+        except Exception as e:
+            await sio.emit(
+                "delete_finished",
+                {
+                    "error": str(e),
+                    "action": "delete",
+                    "type": "batch",
+                    "status": "error",
+                    "message": f"Deleting batch with ID '{sample_batch_id}' failed",
+                },
+                room=sample_batch.workspace_id,
+                namespace="/",
+            )
 
 
 async def update_sample_batch(
@@ -249,15 +280,17 @@ async def process_batch(sample_batch, sample_items, params):
 
 
 async def copy_sample_batch(sample_batch_copy: SampleBatchCopy):
-    async with async_session() as session:
-        try:
+    try:
+        async with async_session() as session:
             # Check if the provided workspace_id exists
             workspace = await session.get(Workspace, sample_batch_copy.workspace_id)
+
             if not workspace:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Workspace with ID {sample_batch_copy.workspace_id} not found",
+                error_message = (
+                    f"Workspace with ID {sample_batch_copy.workspace_id} not found"
                 )
+                print(error_message)
+                raise ValueError(error_message)
 
             # Fetch the original sample batch with related TargetCollectionInSampleBatch and SampleItem records
             stmt = (
@@ -274,10 +307,9 @@ async def copy_sample_batch(sample_batch_copy: SampleBatchCopy):
             original_sample_batch = result.scalars().first()
 
             if not original_sample_batch:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Sample batch not found",
-                )
+                error_message = f"Sample batch with ID {sample_batch_copy.sample_batch_id} not found"
+                print(error_message)
+                raise ValueError(error_message)
 
             # Create new sample batch record with a new ID, name, description, workspace and time of creation, but copy all other data
             new_sample_batch_id = gen_id(16)
@@ -306,59 +338,81 @@ async def copy_sample_batch(sample_batch_copy: SampleBatchCopy):
                 )
                 session.add(new_target_collection_in_sample_batch)
 
-            # Copy sample items associated with the original sample batch
-            for sample_item in original_sample_batch.sample_item:
-                sample_item_copy_data = SampleItemCopy(
-                    sample_item_id=sample_item.sample_item_id,
-                    sample_item_name=sample_item.sample_item_name,
-                    sample_batch_id=new_sample_batch_id,
-                )
-                await copy_sample_item(
-                    sample_item_copy=sample_item_copy_data,
-                    session=session,
-                )
-
             await session.commit()
 
-            rooms_to_notify = [
-                new_sample_batch.workspace_id,
-                original_sample_batch.workspace_id,
-            ]
-            # Notify clients the copy process has finished
-            for room in rooms_to_notify:
-                await sio.emit(
-                    "copy_batch_finished",
-                    {
-                        "action": "copy",
-                        "type": "batch",
-                        "message": f"Batch '{sample_batch_copy.sample_batch_name}' was successfully copied.",
-                        "progress_percentage": 100,
-                    },
-                    room=room,
-                    namespace="/",
-                )
+        # Copy sample items associated with the original sample batch
+        for sample_item in original_sample_batch.sample_item:
+            sample_item_copy_data = SampleItemCopy(
+                sample_item_id=sample_item.sample_item_id,
+                sample_item_name=sample_item.sample_item_name,
+                sample_batch_id=new_sample_batch_id,
+            )
+            await copy_sample_item(
+                sample_item_copy=sample_item_copy_data,
+            )
 
-            # Emit event to inform clients
+        rooms_to_notify = list(
+            set(
+                [
+                    new_sample_batch.workspace_id,
+                    original_sample_batch.workspace_id,
+                ]
+            )
+        )
+        # Notify clients the copy process has finished
+        for room in rooms_to_notify:
             await sio.emit(
-                "workspace_reload",
-                room=new_sample_batch.workspace_id,
+                "copy_finished",
+                {
+                    "action": "copy",
+                    "type": "batch",
+                    "status": "success",
+                    "message": f"Batch '{sample_batch_copy.sample_batch_name}' was successfully copied.",
+                    "progress_percentage": 100,
+                },
+                room=room,
                 namespace="/",
             )
 
-        except Exception as e:
-            # Notify clients of an error
-            for room in rooms_to_notify:
-                await sio.emit(
-                    "copy_batch_failed",
-                    {
-                        "error": str(e),
-                        "action": "copy",
-                        "type": "batch",
-                        "message": f"Copy batch '{sample_batch_copy.sample_batch_name}' failed",
-                        "progress_percentage": 100,
-                    },
-                    room=room,
-                    namespace="/",
-                )
+        # Emit event to inform clients
+        await sio.emit(
+            "workspace_reload",
+            room=new_sample_batch.workspace_id,
+            namespace="/",
+        )
 
-        return new_sample_batch
+    except Exception as e:
+        rooms_to_notify = list(
+            set(
+                [
+                    new_sample_batch.workspace_id,
+                    original_sample_batch.workspace_id,
+                ]
+            )
+        )
+        error_message = None
+        user_error_message = None
+        if isinstance(e, CustomException):
+            error_message = e.tech_message
+            user_error_message = e.user_message
+        else:
+            error_message = str(e)
+
+        # Notify clients about the error
+        for room in rooms_to_notify:
+            await sio.emit(
+                "copy_finished",
+                {
+                    "error": error_message,
+                    "user_error": user_error_message,
+                    "action": "copy",
+                    "type": "batch",
+                    "status": "error",
+                    "message": f"Copy batch '{sample_batch_copy.sample_batch_name}' failed",
+                    "progress_percentage": 100,
+                },
+                room=room,
+                namespace="/",
+            )
+
+    return new_sample_batch

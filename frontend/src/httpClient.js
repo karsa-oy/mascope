@@ -155,23 +155,16 @@ export function createHttpClient(host, api_port) {
         console.error("Failed to create sample batch: ", error);
       }
     },
-    deleteBatch: async (batches) => {
+    deleteBatch: async (batch) => {
       try {
-        const promises = batches.map((batch) =>
-          httpClient.delete(`${batchesBaseUrl}/${batch}`)
+        return await httpClient.delete(
+          `${batchesBaseUrl}/${batch.sample_batch_id}`
         );
-        const results = await Promise.allSettled(promises);
-        return results.map((result, index) => {
-          if (result.status === "rejected") {
-            throw new Error(
-              `Failed to delete batch with id ${batches[index]}: ${result.reason}`
-            );
-          } else {
-            return result.value;
-          }
-        });
       } catch (error) {
-        console.error("Failed to delete batches: ", error);
+        console.error(
+          `Failed to delete batch "${batch.sample_batch_name}".`,
+          error
+        );
       }
     },
     updateBatch: async (newBatch) => {

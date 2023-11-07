@@ -24,6 +24,8 @@ const state = {
   progressError: false,
   // Copy progress notification
   copyProgress: false,
+  // Delete progress notification
+  deleteProgress: false,
   // TODO_refactor_store move other progress notification to the generilised progress
   // Item compute progress notification
   itemMatchComputing: false,
@@ -102,9 +104,9 @@ export default {
     showProgressNotification({ commit }, payload) {
       commit("SET_PROGRESS_STATE", { action: payload.action, value: true });
       commit("SET_PROGRESS_ACTION", payload.action);
+      commit("SET_PROGRESS_MESSAGE", payload.message);
       commit("SET_PROGRESS_ACTION_TYPE", payload?.type || null);
       commit("SET_PROGRESS_DATA", payload?.data || {});
-      commit("SET_PROGRESS_MESSAGE", payload.message);
       commit("SET_PROGRESS_PERCENTAGE", payload?.percentage || 0);
     },
     // backend listeners
@@ -274,28 +276,45 @@ export default {
       }, 5000);
     },
 
+    // delete notifications
+    async onDeleteFinished({ dispatch }, data) {
+      dispatch("onActionFinished", data);
+    },
     // copy notifications
-    async onCopyBatchFinished({ commit }, data) {
-      commit("SET_PROGRESS_MESSAGE", data.message);
-      commit("SET_PROGRESS_PERCENTAGE", data.progress_percentage || 100);
-      setTimeout(() => {
-        if (state.progressAction !== data.action) return;
-        commit("SET_PROGRESS_STATE", { action: data.action, value: false });
-        setTimeout(() => {
-          commit("RESET_PROGRESS_NOTIFICATION");
-        }, 500);
-      }, 4000);
+    async onCopyFinished({ dispatch }, data) {
+      dispatch("onActionFinished", data);
     },
 
-    async onCopyBatchFailed({ commit }, data) {
-      commit("SET_PROGRESS_MESSAGE", `${data.message}:  ${data.error}`);
-      commit("SET_PROGRESS_ERROR", true);
-      setTimeout(() => {
-        commit("SET_PROGRESS_STATE", { action: data.action, value: false });
-        setTimeout(() => {
-          commit("RESET_PROGRESS_NOTIFICATION");
-        }, 500);
-      }, 5000);
+    // unified progress finished notification for actions
+    async onActionFinished({ commit }, data) {
+      if (data.status === "success") {
+        // reopen the notification, if it was closed
+        commit("SET_PROGRESS_ACTION", data.action);
+        commit("SET_PROGRESS_STATE", { action: data.action, value: true });
+        // set the message and 100 progress
+        commit("SET_PROGRESS_MESSAGE", data.message);
+        commit("SET_PROGRESS_PERCENTAGE", data.progress_percentage || 100);
+      } else if (data.status === "error") {
+        // reopen the notification, if it was closed
+        commit("SET_PROGRESS_ACTION", data.action);
+        commit("SET_PROGRESS_STATE", { action: data.action, value: true });
+        // set the error message and error flag
+        commit("SET_PROGRESS_MESSAGE", `${data.message}:  ${data.error}`);
+        commit("SET_PROGRESS_ERROR", true);
+      }
+      // Set a timeout to deactivate the modal and reset the progress notification state
+      setTimeout(
+        () => {
+          // Deactivate the modal by setting the progress state of the action to false.
+          // This will trigger the watcher in TheNotificationProgress.vue to close the modal.
+          commit("SET_PROGRESS_STATE", { action: data.action, value: false });
+          // This clears out the progress message and other state for the next action.
+          setTimeout(() => {
+            commit("RESET_PROGRESS_NOTIFICATION");
+          }, 500); // TODO_configuration 500ms delay to reset the progress notification for fade-out animation
+        },
+        data.status === "error" ? 5000 : 4000 // 5s delay for error, 4s delay for success
+      );
     },
   },
 };
