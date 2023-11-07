@@ -6,9 +6,9 @@ from sqlalchemy import select, and_
 from sqlalchemy.orm import joinedload
 from backend.db_api_rest import async_session
 from backend.server import sio
-from backend.lib.chemistry import match_mz
-from backend.lib.file import load_file
-from backend.lib.peak import detect_peaks, get_peaks, read_instrument_functions
+from lib.chemistry import match_mz
+from lib.file_func import load_file
+from lib.peak import detect_peaks, get_peaks
 from backend.db.id import gen_id
 from backend.api_rest.models.models import (
     Sample,
@@ -24,6 +24,9 @@ from ..models.pydantic_models.match_pydantic_model import (
     MZCalibration,
     MatchComputeItem,
     ProgressProperties,
+)
+from .instrument_functions_controller import (
+    read_instrument_functions,
 )
 from .sample_items_controller import get_sample_items
 from .matches_controller import create_matches, delete_matches
@@ -81,7 +84,10 @@ async def compute_matches(
     #########################
     # Find peaks and write to file
     u_list = list(np.unique(np.round(target_isotope_df.mz)))
-    sample_file = await detect_peaks(filename, u_list, if_exists="append")
+    instrument_functions = await read_instrument_functions(filename)
+    sample_file = await detect_peaks(
+        filename, instrument_functions, u_list, if_exists="append"
+    )
     peaks = get_peaks(sample_file, "area")
 
     #########################
@@ -254,7 +260,7 @@ async def compute_raw_intensities(
     sample_file_data = load_file(filename, vars=["signal"])
     sum_spectrum = sample_file_data.signal.sum(dim="time").compute()
 
-    _, R = read_instrument_functions(filename)
+    _, R = await read_instrument_functions(filename)
 
     # 3. Compute raw intensities for each target mz
     # init interference df from target isotopes

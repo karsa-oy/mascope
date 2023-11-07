@@ -11,8 +11,8 @@ from dotenv import load_dotenv
 sys.path.append(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 )
-from backend.service.lib.filesystem_watcher import FSWatcher
-from backend.service.lib.util import load_env_yaml
+from service.lib.filesystem_watcher import FSWatcher
+from service.lib.util import load_env_yaml
 
 file_queue = Queue()
 shutdown_event = Event()

@@ -20,11 +20,11 @@ from hardware.orbitrap.generator import RawStreamer
 from hardware.tofwerk.h5_streamer import H5Streamer
 from hardware.tofwerk.lib.TwTool import *
 
-from backend.lib.file import zarr_sdk
-from backend.lib.struct import AttrDict, LRUDict
-from backend.lib.util import timestamp_from_filename
-from backend.service.lib.filesystem_watcher import FSWatcher
-from backend.service.lib.util import load_env_yaml
+from lib.file_func import zarr_sdk
+from lib.structs import AttrDict, LRUDict
+from lib.util import timestamp_from_filename
+from service.lib.filesystem_watcher import FSWatcher
+from service.lib.util import load_env_yaml
 
 
 async def create_sample_file_db_record(data):

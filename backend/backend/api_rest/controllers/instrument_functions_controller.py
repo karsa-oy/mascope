@@ -1,8 +1,33 @@
+import numpy as np
+
 from fastapi import HTTPException
 from sqlalchemy import asc, desc, func
 from sqlalchemy.future import select
 from backend.db_api_rest import async_session
 from ..models.models import InstrumentFunction
+
+
+# -------------------------------------------------------------------
+# Main Logic Functions
+# -------------------------------------------------------------------
+
+
+async def read_instrument_functions(filename):
+    instrument_functions = await get_instrument_function_by_filename(filename)
+
+    peakshape = instrument_functions["peakshape"]
+    R_p = instrument_functions["resolution_function"]
+    if len(R_p) == 2:
+        p1, p2 = R_p
+        R = lambda m: m / (p1 * m + p2)
+    elif len(R_p) == 3:
+        R = np.poly1d(R_p)
+    return peakshape, R
+
+
+# -------------------------------------------------------------------
+# Controller or Route Handlers
+# -------------------------------------------------------------------
 
 
 async def get_instrument_functions(
