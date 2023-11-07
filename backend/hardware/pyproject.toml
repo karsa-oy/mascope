@@ -9,6 +9,7 @@ readme = "README.md"
 python = ">=3.10,<3.11"
 numpy = "^1.26.1"
 pythonnet = "^3.0.3"
+h5sparse = "^0.1.0"
 
 
 [build-system]

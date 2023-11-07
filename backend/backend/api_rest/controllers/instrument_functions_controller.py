@@ -1,10 +1,17 @@
 import numpy as np
 
 from fastapi import HTTPException
-from sqlalchemy import asc, desc, func
+from sqlalchemy import (
+    asc,
+    desc,
+    select,
+    func,
+    cast,
+    Float,
+)
 from sqlalchemy.future import select
 from backend.db_api_rest import async_session
-from ..models.models import InstrumentFunction
+from ..models.models import SampleFile, InstrumentFunction
 
 
 # -------------------------------------------------------------------
@@ -61,6 +68,36 @@ async def get_instrument_functions(
                 for instrument_function in instrument_functions
             ],
         }
+
+
+async def get_instrument_function_by_filename(filename: str):
+    async with async_session() as session:
+        stmt = select(SampleFile.datetime_utc, SampleFile.instrument).filter(
+            SampleFile.filename == filename
+        )
+        results = await session.execute(stmt)
+        result = results.first()
+        file_timestamp, instrument = result
+    async with async_session() as session:
+        stmt = (
+            select(InstrumentFunction)
+            .filter(InstrumentFunction.instrument == instrument)
+            .where(
+                cast(func.julianday(InstrumentFunction.datetime_utc), Float)
+                <= file_timestamp
+            )
+            .order_by(desc(InstrumentFunction.datetime_utc))
+        )
+        results = await session.execute(stmt)
+        instrument_function = results.scalars().first()
+
+        if not instrument_function:
+            raise HTTPException(
+                status_code=404,
+                detail=f"InstrumentFunction for filename {filename} not found",
+            )
+
+        return instrument_function.to_dict()
 
 
 async def get_instrument_function_by_id(instrument_function_id: str):

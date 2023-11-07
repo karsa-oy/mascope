@@ -158,8 +158,9 @@ async def visualization_ion_focus(
         # Sleep 0 to let other tasks be scheduled before next iteration
         await asyncio.sleep(0)
 
-    if not len(timeseries_traces):
+    if not sum_timeseries:
         return
+    # Sum timeseries trace
     timeseries_time = sum_timeseries.time.values.astype(np.float32)
     timeseries_y = sum_timeseries.values.astype(np.float32)
     timeseries_traces = [

@@ -746,6 +746,24 @@ files = [
 numpy = ">=1.17.3"
 
 [[package]]
+name = "h5sparse"
+version = "0.1.0"
+description = "Scipy sparse matrix in HDF5."
+category = "main"
+optional = false
+python-versions = "*"
+files = [
+    {file = "h5sparse-0.1.0-py2.py3-none-any.whl", hash = "sha256:03595909c9fd4e895c4b3f12ca7a1e7f95a5cb3610f07d862d7f59612e0302fa"},
+    {file = "h5sparse-0.1.0.tar.gz", hash = "sha256:b7e6fbfa2f2f61adaa169a3a0a52bc6f2178f5daff8fa6d972a8dcaa7f3cc8f7"},
+]
+
+[package.dependencies]
+h5py = "*"
+numpy = "*"
+scipy = "*"
+six = "*"
+
+[[package]]
 name = "hardware"
 version = "0.1.0"
 description = ""
@@ -756,6 +774,7 @@ files = []
 develop = true
 
 [package.dependencies]
+h5sparse = "^0.1.0"
 numpy = "^1.26.1"
 pythonnet = "^3.0.3"
 

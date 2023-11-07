@@ -1036,6 +1036,7 @@ files = []
 develop = true
 
 [package.dependencies]
+h5sparse = "^0.1.0"
 numpy = "^1.26.1"
 pythonnet = "^3.0.3"
 
