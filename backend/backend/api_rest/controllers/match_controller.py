@@ -201,6 +201,7 @@ async def compute_matches(
             )
         )
     )
+    match_isotope_df["match_isotope_correlation"].fillna(value=0, inplace=True)
     # calculate mz errors
     match_isotope_df.loc[:, "match_mz_error"] = (
         1e6
