@@ -24,6 +24,8 @@ const state = {
   progressError: false,
   // Copy progress notification
   copyProgress: false,
+  // Export progress notification
+  exportProgress: false,
   // Delete progress notification
   deleteProgress: false,
   // TODO_refactor_store move other progress notification to the generilised progress
@@ -284,6 +286,10 @@ export default {
     async onCopyFinished({ dispatch }, data) {
       dispatch("onActionFinished", data);
     },
+    // batch peaks export
+    async onBatchExportPeakDataFinished({ dispatch }, data) {
+      dispatch("onActionFinished", data);
+    },
 
     // unified progress finished notification for actions
     async onActionFinished({ commit }, data) {
@@ -291,6 +297,7 @@ export default {
         // reopen the notification, if it was closed
         commit("SET_PROGRESS_ACTION", data.action);
         commit("SET_PROGRESS_STATE", { action: data.action, value: true });
+        commit("SET_PROGRESS_ACTION_TYPE", data?.type || null);
         // set the message and 100 progress
         commit("SET_PROGRESS_MESSAGE", data.message);
         commit("SET_PROGRESS_PERCENTAGE", data.progress_percentage || 100);
@@ -298,6 +305,7 @@ export default {
         // reopen the notification, if it was closed
         commit("SET_PROGRESS_ACTION", data.action);
         commit("SET_PROGRESS_STATE", { action: data.action, value: true });
+        commit("SET_PROGRESS_ACTION_TYPE", data?.type || null);
         // set the error message and error flag
         commit("SET_PROGRESS_MESSAGE", `${data.message}:  ${data.error}`);
         commit("SET_PROGRESS_ERROR", true);

@@ -38,6 +38,8 @@ export default {
   data() {
     return {
       isClosing: false,
+      indefiniteProgressActions: ["delete", "copy", "export"],
+      valueProgressActions: ["matchCompute", "calibration"],
     };
   },
   computed: {
@@ -51,29 +53,32 @@ export default {
       progressError: "notification/progressError",
     }),
     progressTitle() {
+      const actionTypeCapitalized =
+        this.progressActionType.charAt(0).toUpperCase() +
+        this.progressActionType.slice(1);
+
       switch (this.progressAction) {
-        // case "calibration":
-        //   return `Calibration ${this.calibrationAction} Progress`;
         case "copy":
-          return `Copy ${this.progressActionType} Progress`;
+          return `Copy ${actionTypeCapitalized} Progress`;
         case "delete":
-          return `Deleting ${this.progressActionType} Progress`;
+          return `Deleting ${actionTypeCapitalized} Progress`;
+        case "export":
+          return `Export ${actionTypeCapitalized} Progress`;
+        default:
+          return `${
+            this.progressAction.charAt(0).toUpperCase() +
+            this.progressAction.slice(1)
+          } Progress`;
       }
     },
     progressType() {
-      switch (this.progressAction) {
-        case "delete":
-          return this.progressError
-            ? "is-danger"
-            : this.progressPercentage === 100
-            ? "is-success"
-            : "is-primary";
-        case "copy":
-          return this.progressError
-            ? "is-danger"
-            : this.progressPercentage === 100
-            ? "is-success"
-            : "is-primary";
+      // default case for actions with indefinite progress bars
+      if (this.indefiniteProgressActions.includes(this.progressAction)) {
+        return this.progressError
+          ? "is-danger"
+          : this.progressPercentage === 100
+          ? "is-success"
+          : "is-primary";
       }
     },
     // Dynamically compute the name of the progress state based on the action
