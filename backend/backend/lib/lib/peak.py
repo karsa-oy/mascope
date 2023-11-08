@@ -44,31 +44,34 @@ async def detect_peaks(
     old_peak_heights = []
     sample_file_data = load_file(filename, vars=["peak_areas", "peak_heights"])
     mz_top = sample_file_data.props["range"][1]
-    if u_list is not None:
-        # Fit peaks to given unit masses
-        if "peak_areas" in sample_file_data:
-            if if_exists == "fail":
-                raise FileExistsError("Peak data exists!")
-            old_peak_mzs = list(sample_file_data.peak_areas.mz.values)
-            old_peak_areas = list(sample_file_data.peak_areas.sum(dim="time").values)
-            old_peak_heights = list(
-                sample_file_data.peak_heights.sum(dim="time").values
-            )
-            u_list_fitted = list(np.unique(np.round(old_peak_mzs)))
-        else:
-            u_list_fitted = []
-        if if_exists == "append":
-            # Only fit unit masses not already fitted
-            u_list = [u for u in u_list if u not in u_list_fitted]
-        # Filter out too large values
-        u_list = [u for u in u_list if u <= mz_top]
-        if len(u_list) == 0:
-            return sample_file_data
 
-    sample_file_data = load_file(filename, vars=["signal"])
     if u_list is None:
         # Fit all peaks
         u_list = range(10, int(np.floor(mz_top)) + 1)
+
+    # Fit peaks to given unit masses
+    if "peak_areas" in sample_file_data:
+        if if_exists == "fail":
+            raise FileExistsError("Peak data exists!")
+        old_peak_mzs = list(sample_file_data.peak_areas.mz.values)
+        old_peak_areas = list(sample_file_data.peak_areas.sum(dim="time").values)
+        old_peak_heights = list(sample_file_data.peak_heights.sum(dim="time").values)
+        u_list_fitted = list(np.unique(np.round(old_peak_mzs)))
+    else:
+        u_list_fitted = []
+
+    if if_exists == "append":
+        # Only fit unit masses not already fitted
+        u_list = [u for u in u_list if u not in u_list_fitted]
+    # Filter out too large values
+    u_list = [u for u in u_list if u <= mz_top]
+
+    if len(u_list) == 0:
+        # Nothing to fit
+        return sample_file_data
+
+    sample_file_data = load_file(filename, vars=["signal"])
+
     print("Fitting unit masses: %s" % u_list)
     mz = sample_file_data.mz
     sum_spec = sample_file_data.signal.sum(dim="time").compute()
