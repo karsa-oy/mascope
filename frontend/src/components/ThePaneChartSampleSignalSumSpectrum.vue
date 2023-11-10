@@ -43,26 +43,40 @@ export default {
       };
     },
     layout: function () {
-      const annotations = this.isotopesInFocus.map((isotope, index) => {
-        if (isotope.sample_peak_area === 0) return null;
+      if (!this.traces) return {};
 
-        const xPosition = index === 0 ? 0.22 : 0.77; // Adjust these values to position the titles correctly
-        return {
-          text: `Target isotope intensity: ${this.formatNumber(
-            isotope.sample_peak_area.toFixed(0)
-          )}`,
-          font: {
-            size: 14,
-          },
-          showarrow: false,
-          align: "center",
-          x: xPosition,
-          xref: "paper",
-          xanchor: "center",
-          y: 1.12,
-          yref: "paper",
-        };
-      });
+      const annotations = this.isotopesInFocus
+        .map((isotope) => {
+          if (isotope.sample_peak_area === 0) return null;
+
+          // Find the trace that corresponds to the isotope in focus
+          const correspondingTrace = this.traces.find(
+            (trace) => trace.target_isotope_id === isotope.target_isotope_id
+          );
+          if (!correspondingTrace) return null;
+
+          // Calculate the center position for the x-axis
+          const xValues = correspondingTrace.x;
+          const xCenter =
+            xValues.length > 0
+              ? (Math.max(...xValues) + Math.min(...xValues)) / 2
+              : 0;
+
+          return {
+            text: `Target isotope intensity: ${this.formatNumber(
+              isotope.sample_peak_area.toFixed(0)
+            )}`,
+            x: xCenter,
+            xref: "x" + (correspondingTrace.xaxis === "x" ? "" : "2"),
+            xanchor: "center",
+            y: 1.06,
+            yref: "paper",
+            yanchor: "bottom",
+            font: { size: 14 },
+            showarrow: false,
+          };
+        })
+        .filter((annotation) => annotation !== null);
 
       return {
         grid: {

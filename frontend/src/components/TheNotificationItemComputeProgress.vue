@@ -10,8 +10,6 @@
       <div>
         <section>
           <p>{{ progressMessage }}</p>
-          <p v-if="progressDataMessage">{{ progressDataMessage }}</p>
-          <!-- <p>{{ progressDataMessage }}</p> -->
         </section>
         <section class="notification-progress-bar">
           <b-progress
@@ -49,7 +47,6 @@ export default {
     ...sync({
       notificationIsActive: "notification/itemComputeProgressActive",
       progressMessage: "notification/progressMessage",
-      progressDataMessage: "notification/progressDataMessage",
       progressPercentage: "notification/progressPercentage",
     }),
     ...get({
