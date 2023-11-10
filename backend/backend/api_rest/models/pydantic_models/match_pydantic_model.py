@@ -42,7 +42,12 @@ class ProgressProperties(BaseModel):
     workspace_id: Optional[str] = Field(
         None, description="ID of the associated workspace"
     )
-    total_batches: Optional[int] = Field(None, description="Total number of batches")
-    match_compute_type: Optional[str] = Field(
-        None, description="Type of match computation ('batches' or 'item')"
+    total_samples: Optional[int] = Field(
+        None, description="Total number of items to process"
     )
+    total_batches: Optional[int] = Field(None, description="Total number of batches")
+    progress_type: Optional[str] = Field(
+        None,
+        description="Type of progress computation ('match_batches' or 'match_item')",
+    )
+    sid: Optional[str] = Field(None, description="Session ID for the socket connection")

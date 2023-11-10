@@ -8,7 +8,7 @@ from sqlalchemy.orm import joinedload
 from datetime import datetime
 from backend.db_api_rest import async_session
 from backend.server import sio
-from backend.lib.peak import detect_peaks, get_peaks
+from lib.peak import detect_peaks, get_peaks
 from backend.db.id import gen_id
 
 from ..models.models import (
@@ -30,11 +30,14 @@ from ..models.pydantic_models.sample_item_pydantic_model import (
 from ..models.pydantic_models.calibration_pydantic_model import CalibrationMzFitParams
 from ..models.pydantic_models.match_pydantic_model import (
     MatchComputeBatch,
+    ProgressProperties,
 )
 from ..models.exceptions import CustomException
 from .match_controller import match_batches_compute
 from .sample_items_controller import create_sample_item, copy_sample_item
 from .calibration_controller import calibration_mz_calibrate_batch
+from .instrument_functions_controller import read_instrument_functions
+from .helpers_controller import emit_progress_update
 
 
 async def get_sample_batches(
@@ -449,12 +452,39 @@ async def sample_batch_export_peaks(sample_batch: SampleBatchExportPeaks, sid=No
             sample_items_df = pd.DataFrame(sample_items_dict_list)
 
         peak_data = []
+        total_samples = len(sample_items_df)
+        item_weight = 1 // total_samples
+
         for index, row in sample_items_df.iterrows():
+            progress_properties = ProgressProperties(
+                progress_type="export_peaks",
+                total_samples=total_samples,
+                item_weight=item_weight,
+                item_index=index,
+                sid=sid if sid is not None else None,
+            )
+
             try:
-                sample_file = await detect_peaks(
-                    row["filename"], u_list=None, if_exists="append"
+                filename = row["filename"]
+                instrument_functions = await read_instrument_functions(filename)
+
+                await emit_progress_update(
+                    progress_properties=progress_properties, increment=0.1
                 )
+
+                sample_file = await detect_peaks(
+                    filename, instrument_functions, u_list=None, if_exists="append"
+                )
+
+                await emit_progress_update(
+                    progress_properties=progress_properties, increment=0.9
+                )
+
                 peak_data_item = get_peaks(sample_file, "area").sum(dim="time")
+
+                await emit_progress_update(
+                    progress_properties=progress_properties, increment=1
+                )
             except Exception as e:
                 print(repr(e))
                 continue
