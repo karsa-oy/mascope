@@ -300,10 +300,6 @@ export default {
         message: `Export peak data for batch "${this.batchActive.sample_batch_name}"?`,
         confirmText: "Export",
         onConfirm: () => {
-          // this.$api.emit(
-          //   "sample_batch_export_peaks",
-          //   this.batchActive.sample_batch_id
-          // );
           this.batchExportPeakData(this.batchActive);
         },
       });
