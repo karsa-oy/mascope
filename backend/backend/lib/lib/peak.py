@@ -6,6 +6,7 @@ Created on Wed Apr 17 13:45:17 2019
 @author: Oskari Kausiala
 """
 import asyncio
+import os
 from concurrent.futures import ProcessPoolExecutor
 
 import lmfit
@@ -75,7 +76,9 @@ async def detect_peaks(
     print("Fitting unit masses: %s" % u_list)
     mz = sample_file_data.mz
     sum_spec = sample_file_data.signal.sum(dim="time").compute()
-    executor = ProcessPoolExecutor()
+    cpu_cores = os.cpu_count()
+    max_workers = max(1, cpu_cores // 2)
+    executor = ProcessPoolExecutor(max_workers=max_workers)
     loop = asyncio.get_event_loop()
     futures = [
         loop.run_in_executor(
