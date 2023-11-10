@@ -290,7 +290,7 @@ export default {
         progressNotificationPayload: {
           action: "export",
           type: "peaks",
-          message: `Exporting peak data for batch "${sampleBatch.sample_batch_name}", please wait`,
+          message: `Exporting peak data for batch "${sampleBatch.sample_batch_name}", please wait.`,
         },
       });
     },

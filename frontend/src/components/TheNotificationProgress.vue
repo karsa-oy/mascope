@@ -10,11 +10,23 @@
       <div>
         <section>
           <p>{{ progressMessage }}</p>
+          <p v-if="progressDataMessage">
+            {{ progressDataMessage }}
+          </p>
         </section>
         <section class="notification-progress-bar">
           <b-progress
             v-if="progressPercentage === 0"
             size="is-medium"
+            :type="progressType"
+          ></b-progress>
+          <b-progress
+            v-else-if="valueProgressActions.includes(progressAction)"
+            :value="progressPercentage"
+            :max="100"
+            show-value
+            size="is-medium"
+            format="percent"
             :type="progressType"
           ></b-progress>
           <b-progress
@@ -38,8 +50,8 @@ export default {
   data() {
     return {
       isClosing: false,
-      indefiniteProgressActions: ["delete", "copy", "export"],
-      valueProgressActions: ["matchCompute", "calibration"],
+      indefiniteProgressActions: ["delete", "copy"],
+      valueProgressActions: ["matchCompute", "calibration", "export"],
     };
   },
   computed: {
@@ -48,8 +60,8 @@ export default {
       progressAction: "notification/progressAction",
       progressActionType: "notification/progressActionType",
       progressMessage: "notification/progressMessage",
+      progressDataMessage: "notification/progressDataMessage",
       progressPercentage: "notification/progressPercentage",
-      progressData: "notification/progressData",
       progressError: "notification/progressError",
     }),
     progressTitle() {
@@ -72,14 +84,11 @@ export default {
       }
     },
     progressType() {
-      // default case for actions with indefinite progress bars
-      if (this.indefiniteProgressActions.includes(this.progressAction)) {
-        return this.progressError
-          ? "is-danger"
-          : this.progressPercentage === 100
-          ? "is-success"
-          : "is-primary";
-      }
+      return this.progressError
+        ? "is-danger"
+        : this.progressPercentage === 100
+        ? "is-success"
+        : "is-primary";
     },
     // Dynamically compute the name of the progress state based on the action
     progressStateName() {
