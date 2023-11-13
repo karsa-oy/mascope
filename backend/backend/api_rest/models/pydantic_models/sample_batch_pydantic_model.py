@@ -62,3 +62,8 @@ class SampleBatchCopy(BaseModel):
     sample_batch_description: Optional[str] = Field(
         None, description="Description of the new sample batch"
     )
+
+
+class SampleBatchExportPeaks(BaseModel):
+    sample_batch_id: str = Field(..., description="ID of the sample batch")
+    sample_batch_name: str = Field(..., description="Name of the sample batch")

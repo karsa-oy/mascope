@@ -30,6 +30,7 @@ from .instrument_functions_controller import (
 )
 from .sample_items_controller import get_sample_items
 from .matches_controller import create_matches, delete_matches
+from .helpers_controller import emit_progress_update
 from .match_interferences_controller import (
     create_match_interferences,
     delete_match_interferences,
@@ -284,56 +285,6 @@ async def compute_raw_intensities(
     return isotope_interference_df
 
 
-async def emit_progress_update(
-    progress_properties: ProgressProperties, increment: float
-):
-    if not progress_properties:
-        return
-
-    if progress_properties.match_compute_type == "batches":
-        item_weight = progress_properties.item_weight
-        item_index = progress_properties.item_index
-        batch_index = progress_properties.batch_index
-        total_batches = progress_properties.total_batches
-        workspace_id = progress_properties.workspace_id
-
-        # Calculate the progress contribution of completed batches
-        batch_progress = ((batch_index - 1) / total_batches) * 100
-
-        # Calculate the progress within the current batch
-        item_progress = ((item_index + increment) * item_weight) * 100
-
-        # Calculate the proportional progress of the current batch in terms of the overall progress
-        proportional_batch_progress = item_progress * (1 / total_batches)
-
-        # Combine both progresses
-        progress_percentage_all = batch_progress + proportional_batch_progress
-
-        await sio.emit(
-            "match_batch_compute_progress_percentage",
-            {
-                "progress_percentage": progress_percentage_all,
-                "progress_percentage_batch": proportional_batch_progress
-                * total_batches,
-            },
-            room=workspace_id,
-            namespace="/",
-        )
-
-    elif progress_properties.match_compute_type == "item":
-        sample_batch_id = progress_properties.sample_batch_id
-
-        progress_percentage_item = increment * 100
-        await sio.emit(
-            "match_item_update_compute_progress",
-            {
-                "progress_percentage": progress_percentage_item,
-            },
-            room=sample_batch_id,
-            namespace="/",
-        )
-
-
 async def item_compute(
     sample_item: MatchComputeItem, progress_properties: ProgressProperties = None
 ):
@@ -439,7 +390,7 @@ async def match_batch_compute(
     for item_index, sample_item in enumerate(sample_items):
         if progress_properties is not None:
             progress_properties = ProgressProperties(
-                match_compute_type="batches",
+                progress_type="match_batches",
                 item_weight=progress_properties.item_weight,
                 item_index=item_index,
                 batch_index=progress_properties.batch_index,
@@ -625,7 +576,7 @@ async def match_item_compute(sample_item: MatchComputeItem):
         )
 
         progress_properties = ProgressProperties(
-            match_compute_type="item",
+            progress_type="match_item",
             sample_batch_id=sample_batch_id,
         )
 

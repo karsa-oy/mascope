@@ -18,12 +18,14 @@ const state = {
   // Compute progress notification
   progressAction: null,
   progressActionType: null,
-  progressData: {},
   progressMessage: "",
+  progressDataMessage: "",
   progressPercentage: 0,
   progressError: false,
   // Copy progress notification
   copyProgress: false,
+  // Export progress notification
+  exportProgress: false,
   // Delete progress notification
   deleteProgress: false,
   // TODO_refactor_store move other progress notification to the generilised progress
@@ -81,8 +83,8 @@ export default {
     RESET_PROGRESS_NOTIFICATION(state) {
       state.progressAction = null;
       state.progressActionType = null;
-      state.progressData = {};
       state.progressMessage = "";
+      state.progressDataMessage = "";
       state.progressPercentage = 0;
       state.progressError = false;
     },
@@ -106,7 +108,6 @@ export default {
       commit("SET_PROGRESS_ACTION", payload.action);
       commit("SET_PROGRESS_MESSAGE", payload.message);
       commit("SET_PROGRESS_ACTION_TYPE", payload?.type || null);
-      commit("SET_PROGRESS_DATA", payload?.data || {});
       commit("SET_PROGRESS_PERCENTAGE", payload?.percentage || 0);
     },
     // backend listeners
@@ -284,6 +285,19 @@ export default {
     async onCopyFinished({ dispatch }, data) {
       dispatch("onActionFinished", data);
     },
+    // batch peaks export
+    async onBatchExportPeakDataProgress({ dispatch, commit }, data) {
+      commit("SET_PROGRESS_PERCENTAGE", data?.progress_percentage || 0);
+      commit("SET_PROGRESS_DATA_MESSAGE", data?.progress_data_message || "");
+    },
+    async onBatchExportPeakDataFinished({ dispatch }, data) {
+      dispatch("onActionFinished", data);
+      await dispatch(
+        "app/pushNotification",
+        { message: "Sample batch peak export finished", key: Math.random() },
+        { root: true }
+      );
+    },
 
     // unified progress finished notification for actions
     async onActionFinished({ commit }, data) {
@@ -291,6 +305,7 @@ export default {
         // reopen the notification, if it was closed
         commit("SET_PROGRESS_ACTION", data.action);
         commit("SET_PROGRESS_STATE", { action: data.action, value: true });
+        commit("SET_PROGRESS_ACTION_TYPE", data?.type || null);
         // set the message and 100 progress
         commit("SET_PROGRESS_MESSAGE", data.message);
         commit("SET_PROGRESS_PERCENTAGE", data.progress_percentage || 100);
@@ -298,6 +313,7 @@ export default {
         // reopen the notification, if it was closed
         commit("SET_PROGRESS_ACTION", data.action);
         commit("SET_PROGRESS_STATE", { action: data.action, value: true });
+        commit("SET_PROGRESS_ACTION_TYPE", data?.type || null);
         // set the error message and error flag
         commit("SET_PROGRESS_MESSAGE", `${data.message}:  ${data.error}`);
         commit("SET_PROGRESS_ERROR", true);

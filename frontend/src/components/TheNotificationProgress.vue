@@ -10,11 +10,23 @@
       <div>
         <section>
           <p>{{ progressMessage }}</p>
+          <p v-if="progressDataMessage">
+            {{ progressDataMessage }}
+          </p>
         </section>
         <section class="notification-progress-bar">
           <b-progress
             v-if="progressPercentage === 0"
             size="is-medium"
+            :type="progressType"
+          ></b-progress>
+          <b-progress
+            v-else-if="valueProgressActions.includes(progressAction)"
+            :value="progressPercentage"
+            :max="100"
+            show-value
+            size="is-medium"
+            format="percent"
             :type="progressType"
           ></b-progress>
           <b-progress
@@ -38,6 +50,8 @@ export default {
   data() {
     return {
       isClosing: false,
+      indefiniteProgressActions: ["delete", "copy"],
+      valueProgressActions: ["matchCompute", "calibration", "export"],
     };
   },
   computed: {
@@ -46,35 +60,35 @@ export default {
       progressAction: "notification/progressAction",
       progressActionType: "notification/progressActionType",
       progressMessage: "notification/progressMessage",
+      progressDataMessage: "notification/progressDataMessage",
       progressPercentage: "notification/progressPercentage",
-      progressData: "notification/progressData",
       progressError: "notification/progressError",
     }),
     progressTitle() {
+      const actionTypeCapitalized =
+        this.progressActionType.charAt(0).toUpperCase() +
+        this.progressActionType.slice(1);
+
       switch (this.progressAction) {
-        // case "calibration":
-        //   return `Calibration ${this.calibrationAction} Progress`;
         case "copy":
-          return `Copy ${this.progressActionType} Progress`;
+          return `Copy ${actionTypeCapitalized} Progress`;
         case "delete":
-          return `Deleting ${this.progressActionType} Progress`;
+          return `Deleting ${actionTypeCapitalized} Progress`;
+        case "export":
+          return `Export ${actionTypeCapitalized} Progress`;
+        default:
+          return `${
+            this.progressAction.charAt(0).toUpperCase() +
+            this.progressAction.slice(1)
+          } Progress`;
       }
     },
     progressType() {
-      switch (this.progressAction) {
-        case "delete":
-          return this.progressError
-            ? "is-danger"
-            : this.progressPercentage === 100
-            ? "is-success"
-            : "is-primary";
-        case "copy":
-          return this.progressError
-            ? "is-danger"
-            : this.progressPercentage === 100
-            ? "is-success"
-            : "is-primary";
-      }
+      return this.progressError
+        ? "is-danger"
+        : this.progressPercentage === 100
+        ? "is-success"
+        : "is-primary";
     },
     // Dynamically compute the name of the progress state based on the action
     progressStateName() {

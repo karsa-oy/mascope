@@ -1,8 +1,12 @@
 from sqlalchemy import select
 from backend.db_api_rest import async_session
+from backend.server import sio
 from ..models.models import (
     TargetCompoundInTargetCollection,
     TargetCollectionInSampleBatch,
+)
+from ..models.pydantic_models.match_pydantic_model import (
+    ProgressProperties,
 )
 
 
@@ -28,3 +32,68 @@ async def get_affected_batches_and_collections(target_compound_id: str):
         sample_batches_ids = {sb[0] for sb in sample_batches}
 
         return sample_batches_ids, target_collections_ids
+
+
+async def emit_progress_update(
+    progress_properties: ProgressProperties, increment: float
+):
+    if not progress_properties:
+        return
+
+    if progress_properties.progress_type == "match_batches":
+        item_weight = progress_properties.item_weight
+        item_index = progress_properties.item_index
+        batch_index = progress_properties.batch_index
+        total_batches = progress_properties.total_batches
+        workspace_id = progress_properties.workspace_id
+
+        # Calculate the progress contribution of completed batches
+        batch_progress = ((batch_index - 1) / total_batches) * 100
+
+        # Calculate the progress within the current batch
+        item_progress = ((item_index + increment) * item_weight) * 100
+
+        # Calculate the proportional progress of the current batch in terms of the overall progress
+        proportional_batch_progress = item_progress * (1 / total_batches)
+
+        # Combine both progresses
+        progress_percentage_all = batch_progress + proportional_batch_progress
+
+        await sio.emit(
+            "match_batch_compute_progress_percentage",
+            {
+                "progress_percentage": progress_percentage_all,
+                "progress_percentage_batch": proportional_batch_progress
+                * total_batches,
+            },
+            room=workspace_id,
+            namespace="/",
+        )
+
+    elif progress_properties.progress_type == "match_item":
+        sample_batch_id = progress_properties.sample_batch_id
+
+        progress_percentage_item = increment * 100
+        await sio.emit(
+            "match_item_update_compute_progress",
+            {
+                "progress_percentage": progress_percentage_item,
+            },
+            room=sample_batch_id,
+            namespace="/",
+        )
+    elif progress_properties.progress_type == "export_peaks":
+        total_samples = progress_properties.total_samples
+        item_index = progress_properties.item_index
+
+        progress_percentage = ((item_index + increment) / total_samples) * 100
+
+        await sio.emit(
+            "batch_export_peak_data_progress",
+            {
+                "progress_percentage": progress_percentage,
+                "progress_data_message": f"Processing sample {item_index + 1}/{total_samples}",
+            },
+            room=progress_properties.sid,
+            namespace="/",
+        )
