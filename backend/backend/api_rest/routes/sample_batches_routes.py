@@ -1,4 +1,4 @@
-from fastapi import APIRouter, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, Request
 
 from ..controllers.sample_batches_controller import (
     get_sample_batch_by_id,
@@ -8,12 +8,14 @@ from ..controllers.sample_batches_controller import (
     update_sample_batch,
     autosampler_import_batch,
     copy_sample_batch,
+    sample_batch_export_peaks,
 )
 from ..models.pydantic_models.sample_batch_pydantic_model import (
     SampleBatchCreate,
     SampleBatchUpdate,
     autoSamplerImportBatchData,
     SampleBatchCopy,
+    SampleBatchExportPeaks,
 )
 
 sample_batches_router = APIRouter()
@@ -41,8 +43,14 @@ async def create_sample_batch_route(sample_batch: SampleBatchCreate):
 
 
 @sample_batches_router.delete("/api/sample_batches/{sample_batch_id}")
-async def delete_sample_batch_route(sample_batch_id: str):
-    return await delete_sample_batch(sample_batch_id)
+async def delete_sample_batch_route(
+    request: Request,
+    sample_batch_id: str,
+    background_tasks: BackgroundTasks,
+):
+    sid = request.headers.get("X-SID")
+    background_tasks.add_task(delete_sample_batch, sample_batch_id, sid)
+    return {"status": f"The sample batch (ID '{sample_batch_id}') deletion has started"}
 
 
 @sample_batches_router.patch("/api/sample_batches/{sample_batch_id}")
@@ -65,5 +73,26 @@ async def autosampler_import_batch_route(
 
 
 @sample_batches_router.post("/api/sample_batches/copy")
-async def copy_sample_batch_route(sample_batch_copy: SampleBatchCopy):
-    return await copy_sample_batch(sample_batch_copy)
+async def copy_sample_batch_route(
+    request: Request,
+    sample_batch_copy: SampleBatchCopy,
+    background_tasks: BackgroundTasks,
+):
+    sid = request.headers.get("X-SID")
+    background_tasks.add_task(copy_sample_batch, sample_batch_copy, sid)
+    return {
+        "status": f"The copying process for '{sample_batch_copy.sample_batch_name}' has started"
+    }
+
+
+@sample_batches_router.post("/api/sample_batches/export_peaks")
+async def sample_batch_export_peaks_route(
+    request: Request,
+    sample_batch: SampleBatchExportPeaks,
+    background_tasks: BackgroundTasks,
+):
+    sid = request.headers.get("X-SID")
+    background_tasks.add_task(sample_batch_export_peaks, sample_batch, sid)
+    return {
+        "status": f"The export peaks process for batch '{sample_batch.sample_batch_name}' has started"
+    }

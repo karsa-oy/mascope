@@ -4,10 +4,9 @@ version = "1.2"
 description = "Karsa Mascope"
 authors = ["Karsa Oy <support@karsa.fi>"]
 license = "Proprietary"
-include = ["backend","hardware"]
+include = ["backend"]
 packages = [
     {include = "backend", from ="."},
-    {include = "hardware", from ="."},
 ]
 
 [build-system]
@@ -16,51 +15,53 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
 mascope-api = 'backend:run'
-file-converter = 'backend.service.file_converter:run'
-file-downloader = 'backend.service.file_downloader:run'
-log-rotate = 'backend.service.log_rotate:run'
+file-converter = 'service.file_converter:run'
+file-downloader = 'service.file_downloader:run'
+log-rotate = 'service.log_rotate:run'
 
 [tool.poetry.dependencies]
-python = ">=3.8,<3.11"
-# server and api
-uvicorn = "^0.19.0"
-websockets = "^10.3"
-python-socketio = "^5.6.0"
-# router
+python = ">=3.10,<3.11"
+
 aiohttp = "^3.8.1"
 aiohttp_cors = "^0.7.0"
-# data science
-datashader = "^0.14.1"
-numpy = "^1.23.0"
-pandas = "^1.4.3"
-scikit_learn = "^1.1.1"
-scipy = "^1.8.1"
-# other
+aiosqlite = "^0.19.0"
+asgiref = "^3.6.0"
 asynctest = "^0.13.0"
+Bottleneck = "^1.3.5"
 colorcet = "^3.0.0"
-dask = "^2022.6.1"
+dask = "^2023.10.0"
+datashader = "^0.15.2"
 datetime_glob = "^1.0.8"
 decorator = "^5.1.1"
+fastapi = "^0.95.1"
 h5py = "^3.7.0"
 h5sparse = "^0.1.0"
 lmfit = "^1.0.3"
 nanoid = "^2.0.0"
+nest-asyncio = "^1.5.5"
+numpy = "^1.23.0"
+openpyxl = "^3.0.10"
+pandas = "^2.1.1"
 Pillow = "^9.1.1"
-python-dotenv = "^0.20.0"
+pyarrow = "^11.0.0"
+python-dotenv = "^1.0.0"
 pythonnet = "^3.0.1"
 PyYAML = "^6.0"
-setuptools = "^62.6.0"
-sparse = "^0.13.0"
-watchdog = "^2.1.9"
-xarray = "^2022.3.0"
-zarr = "^2.12.0"
-nest-asyncio = "^1.5.5"
-Bottleneck = "^1.3.5"
+python-socketio = "^5.6.0"
 requests = "^2.28.1"
-websocket-client = "^1.4.0"
-openpyxl = "^3.0.10"
-pyarrow = "^11.0.0"
-asgiref = "^3.6.0"
+scikit_learn = "^1.1.1"
+scipy = "^1.8.1"
+setuptools = "^62.6.0"
+sparse = "^0.14.0"
 sqlalchemy = "^2.0.12"
-fastapi = "^0.95.1"
-aiosqlite = "^0.19.0"
+uvicorn = "^0.19.0"
+watchdog = "^3.0.0"
+websocket-client = "^1.4.0"
+websockets = "^10.3"
+xarray = "^2023.10.1"
+zarr = "^2.12.0"
+
+# Local dependencies
+hardware = { path = "./hardware", develop = true }
+lib = { path = "./backend/lib", develop = true }
+service = { path = "./backend/service", develop = true }

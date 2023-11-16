@@ -5,8 +5,8 @@ import pandas as pd
 from colorcet import glasbey_hv as colormap
 
 from backend.db.conn import conn
-from backend.lib.file import load_file
-from backend.lib.peak import filter_peaks, get_peaks
+from lib.file_func import load_file
+from lib.peak import filter_peaks, get_peaks
 from backend.server import sio
 
 
@@ -158,8 +158,9 @@ async def visualization_ion_focus(
         # Sleep 0 to let other tasks be scheduled before next iteration
         await asyncio.sleep(0)
 
-    if not len(timeseries_traces):
+    if sum_timeseries is None:
         return
+    # Sum timeseries trace
     timeseries_time = sum_timeseries.time.values.astype(np.float32)
     timeseries_y = sum_timeseries.values.astype(np.float32)
     timeseries_traces = [

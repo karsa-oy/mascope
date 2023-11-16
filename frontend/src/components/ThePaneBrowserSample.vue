@@ -171,6 +171,7 @@ export default {
       activateModal: "modal/activate",
     }),
     ...mapActions("sample", ["matchItemCompute", "deleteSampleItem"]),
+    ...mapActions("batch", ["batchExportPeakData"]),
     ...call({
       itemFocus: "batch/sampleItemFocus",
       itemToggle: "batch/sampleItemToggle",
@@ -299,10 +300,7 @@ export default {
         message: `Export peak data for batch "${this.batchActive.sample_batch_name}"?`,
         confirmText: "Export",
         onConfirm: () => {
-          this.$api.emit(
-            "sample_batch_export_peaks",
-            this.batchActive.sample_batch_id
-          );
+          this.batchExportPeakData(this.batchActive);
         },
       });
     },

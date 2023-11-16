@@ -12,6 +12,12 @@ const api_port = import.meta.env.MASCOPE_PUBLIC_API_PORT;
 let url =
   mode === "production" ? `http://${host}` : `http://${host}:${api_port}`;
 
+const getSessionId = () => {
+  // get session id for emitting sio finished events
+  const sid = Vue.prototype.$api.socket.id;
+  return sid;
+};
+
 const logRequest = (request) => {
   console.log(
     `[httpClient] Starting request to: ${request.method.toUpperCase()} ${
@@ -78,6 +84,20 @@ export function createHttpClient(host, api_port) {
     baseURL: `${url}/api`,
     timeout: 20000,
   });
+
+  // Request interceptor to add X-SID header to every request, 'X-' prefix is a convention for custom headers
+  axiosInstance.interceptors.request.use(
+    (config) => {
+      const sid = getSessionId();
+      if (sid) {
+        config.headers["X-SID"] = sid;
+      }
+      return config;
+    },
+    (error) => {
+      return Promise.reject(error);
+    }
+  );
   // Interceptor to log requests and responses
   axiosInstance.interceptors.request.use(logRequest);
   axiosInstance.interceptors.response.use(logResponse, handleError);
@@ -155,23 +175,16 @@ export function createHttpClient(host, api_port) {
         console.error("Failed to create sample batch: ", error);
       }
     },
-    deleteBatch: async (batches) => {
+    deleteBatch: async (batch) => {
       try {
-        const promises = batches.map((batch) =>
-          httpClient.delete(`${batchesBaseUrl}/${batch}`)
+        return await httpClient.delete(
+          `${batchesBaseUrl}/${batch.sample_batch_id}`
         );
-        const results = await Promise.allSettled(promises);
-        return results.map((result, index) => {
-          if (result.status === "rejected") {
-            throw new Error(
-              `Failed to delete batch with id ${batches[index]}: ${result.reason}`
-            );
-          } else {
-            return result.value;
-          }
-        });
       } catch (error) {
-        console.error("Failed to delete batches: ", error);
+        console.error(
+          `Failed to delete batch "${batch.sample_batch_name}".`,
+          error
+        );
       }
     },
     updateBatch: async (newBatch) => {
@@ -199,6 +212,16 @@ export function createHttpClient(host, api_port) {
         );
       } catch (error) {
         console.error("Failed to copy sample batch: ", error);
+      }
+    },
+    batchExportPeakData: async (sampleBatchData) => {
+      try {
+        return await httpClient.post(
+          `${batchesBaseUrl}/export_peaks`,
+          sampleBatchData
+        );
+      } catch (error) {
+        console.error("Failed to export sample batch peaks: ", error);
       }
     },
     // Samples

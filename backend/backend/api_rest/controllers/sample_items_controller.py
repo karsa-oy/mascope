@@ -19,7 +19,9 @@ from ..models.models import (
 from ..models.pydantic_models.sample_item_pydantic_model import (
     SampleItemCreate,
     SampleItemUpdate,
+    SampleItemCopy,
 )
+from ..models.exceptions import CustomException
 
 
 async def get_sample_item_by_id(sample_item_id: str):
@@ -188,142 +190,113 @@ async def update_sample_item(sample_item_id: str, sample_item: SampleItemUpdate)
         return db_sample_item
 
 
-async def copy_sample_item(sample_item_id: str, sample_batch_id: str, session=None):
-    independent_transaction = False
-
-    if session is None:
-        independent_transaction = True
-        session = async_session()
-
-    async with session.begin_nested() if not independent_transaction else session:
-        # Fetch the original sample_item along with related Match, MatchInterference, and MatchRating records
-        stmt = (
-            select(SampleItem)
-            .options(
-                joinedload(SampleItem.match),
-                joinedload(SampleItem.match_interference),
-                joinedload(SampleItem.match_rating),
-            )
-            .filter(SampleItem.sample_item_id == sample_item_id)
-        )
-        result = await session.execute(stmt)
-        original_sample_item = result.scalars().first()
-
-        if not original_sample_item:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail=f"Sample item not found"
-            )
-
-        # # # # Sample item naming logic # # # #
-        # Initial new sample item name
-        new_sample_item_name = original_sample_item.sample_item_name
-        name_exists = True  # Control variable for the loop
-        copy_num = 0  # Starting copy number
-
-        while name_exists:
-            # Query to check if a sample item with the new name already exists in the specified sample batch
-            stmt = select(SampleItem).filter(
-                and_(
-                    SampleItem.sample_item_name == new_sample_item_name,
-                    SampleItem.sample_batch_id == sample_batch_id,
+async def copy_sample_item(sample_item_copy: SampleItemCopy, http_call=False):
+    try:
+        async with async_session() as session:
+            # Fetch the original sample_item along with related Match, MatchInterference, and MatchRating records
+            stmt = (
+                select(SampleItem)
+                .options(
+                    joinedload(SampleItem.match),
+                    joinedload(SampleItem.match_interference),
+                    joinedload(SampleItem.match_rating),
                 )
+                .filter(SampleItem.sample_item_id == sample_item_copy.sample_item_id)
             )
             result = await session.execute(stmt)
-            existing_sample_item = result.scalar_one_or_none()
+            original_sample_item = result.scalars().first()
 
-            if existing_sample_item is None:
-                # Exit the loop if the name is unique, keep the original name
-                name_exists = False
-            else:
-                # Name pattern matching and modification
-                name_pattern = re.search(
-                    r"(.*\sCopy)(?:\((\d+)\))?$", new_sample_item_name
+            if not original_sample_item:
+                error_message = "Sample item not found"
+                if http_call:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail=error_message,
+                    )
+                else:
+                    raise ValueError(error_message)
+
+            # Create a new sample_item with a new ID, name, batch and time of creation, but copy all other data
+            new_sample_item_id = gen_id()
+            new_sample_item_data = {
+                c.name: getattr(original_sample_item, c.name)
+                for c in SampleItem.__table__.columns
+                if c.name != "sample_item_id"
+            }
+            new_sample_item_data.update(
+                {
+                    "sample_item_id": new_sample_item_id,
+                    "sample_batch_id": sample_item_copy.sample_batch_id,
+                    "sample_item_name": sample_item_copy.sample_item_name,
+                    "sample_item_utc_created": datetime.utcnow(),
+                }
+            )
+            new_sample_item = SampleItem(**new_sample_item_data)
+            session.add(new_sample_item)
+
+            # Copy related Match records
+            for match in original_sample_item.match:
+                new_match_data = {
+                    c.name: getattr(match, c.name)
+                    for c in Match.__table__.columns
+                    if c.name != "match_id"
+                }
+                new_match_data.update(
+                    {"match_id": gen_id(32), "sample_item_id": new_sample_item_id}
+                )
+                new_match = Match(**new_match_data)
+                session.add(new_match)
+
+            # Copy related MatchInterference records
+            for match_interference in original_sample_item.match_interference:
+                new_match_interference_data = {
+                    c.name: getattr(match_interference, c.name)
+                    for c in MatchInterference.__table__.columns
+                    if c.name != "match_interference_id"
+                }
+                new_match_interference_data.update(
+                    {
+                        "match_interference_id": gen_id(32),
+                        "sample_item_id": new_sample_item_id,
+                    }
+                )
+                new_match_interference = MatchInterference(
+                    **new_match_interference_data
+                )
+                session.add(new_match_interference)
+
+            # Copy related MatchRating records
+            for match_rating in original_sample_item.match_rating:
+                new_match_rating_data = {
+                    c.name: getattr(match_rating, c.name)
+                    for c in MatchRating.__table__.columns
+                    if c.name != "match_rating_id"
+                }
+                new_match_rating_data.update(
+                    {
+                        "match_rating_id": gen_id(32),
+                        "sample_item_id": new_sample_item_id,
+                    }
+                )
+                new_match_rating = MatchRating(**new_match_rating_data)
+                session.add(new_match_rating)
+
+            await session.commit()
+
+            if http_call:
+                # Reload affected sample batch
+                await sio.emit(
+                    "sample_batch_reload",
+                    room=sample_item_copy.sample_batch_id,
+                    namespace="/",
                 )
 
-                if name_pattern:
-                    base_name = name_pattern.group(1)
-                    copy_num = name_pattern.group(2)
-
-                    if copy_num:
-                        # Increment the number by 1 if it exists
-                        new_sample_item_name = f"{base_name}({int(copy_num) + 1})"
-                    else:
-                        # Append "(1)" if the name ends with " Copy"
-                        new_sample_item_name = f"{base_name}(1)"
-                else:
-                    # Append " Copy" if the name doesn't fit the pattern
-                    new_sample_item_name = f"{new_sample_item_name} Copy"
-
-        # Create a new sample_item with a new ID, name, batch and time of creation, but copy all other data
-        new_sample_item_id = gen_id()
-        new_sample_item_data = {
-            c.name: getattr(original_sample_item, c.name)
-            for c in SampleItem.__table__.columns
-            if c.name != "sample_item_id"
-        }
-        new_sample_item_data.update(
-            {
-                "sample_item_id": new_sample_item_id,
-                "sample_batch_id": sample_batch_id,
-                "sample_item_name": new_sample_item_name,
-                "sample_item_utc_created": datetime.utcnow(),
-            }
-        )
-        new_sample_item = SampleItem(**new_sample_item_data)
-        session.add(new_sample_item)
-
-        # Copy related Match records
-        for match in original_sample_item.match:
-            new_match_data = {
-                c.name: getattr(match, c.name)
-                for c in Match.__table__.columns
-                if c.name != "match_id"
-            }
-            new_match_data.update(
-                {"match_id": gen_id(32), "sample_item_id": new_sample_item_id}
-            )
-            new_match = Match(**new_match_data)
-            session.add(new_match)
-
-        # Copy related MatchInterference records
-        for match_interference in original_sample_item.match_interference:
-            new_match_interference_data = {
-                c.name: getattr(match_interference, c.name)
-                for c in MatchInterference.__table__.columns
-                if c.name != "match_interference_id"
-            }
-            new_match_interference_data.update(
-                {
-                    "match_interference_id": gen_id(32),
-                    "sample_item_id": new_sample_item_id,
-                }
-            )
-            new_match_interference = MatchInterference(**new_match_interference_data)
-            session.add(new_match_interference)
-
-        # Copy related MatchRating records
-        for match_rating in original_sample_item.match_rating:
-            new_match_rating_data = {
-                c.name: getattr(match_rating, c.name)
-                for c in MatchRating.__table__.columns
-                if c.name != "match_rating_id"
-            }
-            new_match_rating_data.update(
-                {
-                    "match_rating_id": gen_id(32),
-                    "sample_item_id": new_sample_item_id,
-                }
-            )
-            new_match_rating = MatchRating(**new_match_rating_data)
-            session.add(new_match_rating)
-
-        if independent_transaction:
-            # Commit the transaction to save the data
-            await session.commit()
-            # Reload affected sample batch
-            await sio.emit("sample_batch_reload", room=sample_batch_id, namespace="/")
+    except Exception as e:
+        error_message = str(e)
+        user_message = "Failed to copy the sample item."
+        if http_call:
+            raise CustomException(user_message, error_message) from e
         else:
-            # If it is a nested transaction, commit it before returning, this creates a savepoint.
-            await session.commit()
+            raise ValueError(f"{user_message}: {error_message}") from e
 
-        return new_sample_item
+    return new_sample_item

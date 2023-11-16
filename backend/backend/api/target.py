@@ -2,7 +2,7 @@ import pandas as pd
 
 from backend.db.conn import conn
 from backend.db.id import gen_id
-from backend.lib.molmass import Formula
+from lib.molmass import Formula
 from backend.server import sio
 
 # target collections

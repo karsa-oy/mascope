@@ -20,7 +20,7 @@ async def get_target_collections_route(
     sort: str = None,
     order: str = None,
     page: int = 0,
-    limit: int = 10,
+    limit: int = 100,
 ):
     return await get_target_collections(sort, order, page, limit)
 

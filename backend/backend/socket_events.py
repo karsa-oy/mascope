@@ -11,9 +11,9 @@ sio = socketio.AsyncServer(
 
 @sio.event(namespace="/")
 async def subscribe(sid, room):
-    sio.enter_room(sid, room)
+    await sio.enter_room(sid, room)
 
 
 @sio.event(namespace="/")
 async def unsubscribe(sid, room):
-    sio.leave_room(sid, room)
+    await sio.leave_room(sid, room)

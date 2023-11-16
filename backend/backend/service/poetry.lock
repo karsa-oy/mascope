@@ -125,18 +125,6 @@ files = [
 frozenlist = ">=1.1.0"
 
 [[package]]
-name = "altgraph"
-version = "0.17.4"
-description = "Python graph (network) package"
-category = "main"
-optional = false
-python-versions = "*"
-files = [
-    {file = "altgraph-0.17.4-py2.py3-none-any.whl", hash = "sha256:642743b4750de17e655e6711601b077bc6598dbfa3ba5fa2b2a35ce12b508dff"},
-    {file = "altgraph-0.17.4.tar.gz", hash = "sha256:1b5afbb98f6c4dcadb2e2ae6ab9fa994bbb8c1d75f4fa96d340f9437ae454406"},
-]
-
-[[package]]
 name = "asciitree"
 version = "0.3.3"
 description = "Draws ASCII trees."
@@ -746,24 +734,6 @@ files = [
 numpy = ">=1.17.3"
 
 [[package]]
-name = "h5sparse"
-version = "0.1.0"
-description = "Scipy sparse matrix in HDF5."
-category = "main"
-optional = false
-python-versions = "*"
-files = [
-    {file = "h5sparse-0.1.0-py2.py3-none-any.whl", hash = "sha256:03595909c9fd4e895c4b3f12ca7a1e7f95a5cb3610f07d862d7f59612e0302fa"},
-    {file = "h5sparse-0.1.0.tar.gz", hash = "sha256:b7e6fbfa2f2f61adaa169a3a0a52bc6f2178f5daff8fa6d972a8dcaa7f3cc8f7"},
-]
-
-[package.dependencies]
-h5py = "*"
-numpy = "*"
-scipy = "*"
-six = "*"
-
-[[package]]
 name = "hardware"
 version = "0.1.0"
 description = ""
@@ -774,13 +744,12 @@ files = []
 develop = true
 
 [package.dependencies]
-h5sparse = "^0.1.0"
 numpy = "^1.26.1"
 pythonnet = "^3.0.3"
 
 [package.source]
 type = "directory"
-url = "../../backend/hardware"
+url = "../../hardware"
 
 [[package]]
 name = "idna"
@@ -854,7 +823,7 @@ zarr = "^2.16.1"
 
 [package.source]
 type = "directory"
-url = "../../backend/backend/lib"
+url = "../lib"
 
 [[package]]
 name = "llvmlite"
@@ -925,21 +894,6 @@ files = [
     {file = "locket-1.0.0-py2.py3-none-any.whl", hash = "sha256:b6c819a722f7b6bd955b80781788e4a66a55628b858d347536b7e81325a3a5e3"},
     {file = "locket-1.0.0.tar.gz", hash = "sha256:5c0d4c052a8bbbf750e056a8e65ccd309086f4f0f18a2eac306a8dfa4112a632"},
 ]
-
-[[package]]
-name = "macholib"
-version = "1.16.3"
-description = "Mach-O header analysis and editing"
-category = "main"
-optional = false
-python-versions = "*"
-files = [
-    {file = "macholib-1.16.3-py2.py3-none-any.whl", hash = "sha256:0e315d7583d38b8c77e815b1ecbdbf504a8258d8b3e17b61165c6feb60d18f2c"},
-    {file = "macholib-1.16.3.tar.gz", hash = "sha256:07ae9e15e8e4cd9a788013d81f5908b3609aa76f9b1421bae9c4d7606ec86a30"},
-]
-
-[package.dependencies]
-altgraph = ">=0.17"
 
 [[package]]
 name = "multidict"
@@ -1274,18 +1228,6 @@ toolz = "*"
 complete = ["blosc", "numpy (>=1.9.0)", "pandas (>=0.19.0)", "pyzmq"]
 
 [[package]]
-name = "pefile"
-version = "2023.2.7"
-description = "Python PE parsing module"
-category = "main"
-optional = false
-python-versions = ">=3.6.0"
-files = [
-    {file = "pefile-2023.2.7-py3-none-any.whl", hash = "sha256:da185cd2af68c08a6cd4481f7325ed600a88f6a813bad9dea07ab3ef73d8d8d6"},
-    {file = "pefile-2023.2.7.tar.gz", hash = "sha256:82e6114004b3d6911c77c3953e3838654b04511b8b66e8583db70c65998017dc"},
-]
-
-[[package]]
 name = "pillow"
 version = "10.1.0"
 description = "Python Imaging Library (Fork)"
@@ -1405,51 +1347,6 @@ doc = ["nbsite", "sphinx-ioam-theme"]
 tests = ["flake8", "pytest"]
 
 [[package]]
-name = "pyinstaller"
-version = "5.6.2"
-description = "PyInstaller bundles a Python application and all its dependencies into a single package."
-category = "main"
-optional = false
-python-versions = "<3.12,>=3.7"
-files = [
-    {file = "pyinstaller-5.6.2-py3-none-macosx_10_13_universal2.whl", hash = "sha256:1b1e3b37a22fb36555d917f0c3dfb998159ff4af6d8fa7cc0074d630c6fe81ad"},
-    {file = "pyinstaller-5.6.2-py3-none-manylinux2014_aarch64.whl", hash = "sha256:05df5d2b9ca645cc6ef61d8a85451d2aabe5501997f1f50cd94306fd6bc0485d"},
-    {file = "pyinstaller-5.6.2-py3-none-manylinux2014_i686.whl", hash = "sha256:eb083c25f711769af0898852ea30dcb727ba43990bbdf9ffbaa9c77a7bd0d720"},
-    {file = "pyinstaller-5.6.2-py3-none-manylinux2014_ppc64le.whl", hash = "sha256:0d167d57036219914188f1400427dd297b975707e78c32a5511191e607be920a"},
-    {file = "pyinstaller-5.6.2-py3-none-manylinux2014_s390x.whl", hash = "sha256:32727232f446aa96e394f01b0c35b3de0dc3513c6ba3e26d1ef64c57edb1e9e5"},
-    {file = "pyinstaller-5.6.2-py3-none-manylinux2014_x86_64.whl", hash = "sha256:181856ade585b090379ae26b7017dc2c30620e36e3a804b381417a6dc3b2a82b"},
-    {file = "pyinstaller-5.6.2-py3-none-musllinux_1_1_aarch64.whl", hash = "sha256:77888f52b61089caa0bee70809bbce9e9b1c613c88b6cb0742ff2a45f1511cbb"},
-    {file = "pyinstaller-5.6.2-py3-none-musllinux_1_1_x86_64.whl", hash = "sha256:d888db9afedff290d362ee296d30eb339abeba707ca1565916ce1cd5947131c3"},
-    {file = "pyinstaller-5.6.2-py3-none-win32.whl", hash = "sha256:e026adc92c60158741d0bfca27eefaa2414801f61328cb84d0c88241fe8c2087"},
-    {file = "pyinstaller-5.6.2-py3-none-win_amd64.whl", hash = "sha256:04ecf805bde2ef25b8e3642410871e6747c22fa7254107f155b8cd179c2a13b6"},
-    {file = "pyinstaller-5.6.2.tar.gz", hash = "sha256:865025b6809d777bb0f66d8f8ab50cc97dc3dbe0ff09a1ef1f2fd646432714fc"},
-]
-
-[package.dependencies]
-altgraph = "*"
-macholib = {version = ">=1.8", markers = "sys_platform == \"darwin\""}
-pefile = {version = ">=2022.5.30", markers = "sys_platform == \"win32\""}
-pyinstaller-hooks-contrib = ">=2021.4"
-pywin32-ctypes = {version = ">=0.2.0", markers = "sys_platform == \"win32\""}
-setuptools = "*"
-
-[package.extras]
-encryption = ["tinyaes (>=1.0.0)"]
-hook-testing = ["execnet (>=1.5.0)", "psutil", "pytest (>=2.7.3)"]
-
-[[package]]
-name = "pyinstaller-hooks-contrib"
-version = "2023.10"
-description = "Community maintained hooks for PyInstaller"
-category = "main"
-optional = false
-python-versions = ">=3.7"
-files = [
-    {file = "pyinstaller-hooks-contrib-2023.10.tar.gz", hash = "sha256:4b4a998036abb713774cb26534ca06b7e6e09e4c628196017a10deb11a48747f"},
-    {file = "pyinstaller_hooks_contrib-2023.10-py2.py3-none-any.whl", hash = "sha256:6dc1786a8f452941245d5bb85893e2a33632ebdcbc4c23eea41f2ee08281b0c0"},
-]
-
-[[package]]
 name = "python-dateutil"
 version = "2.8.2"
 description = "Extensions to the standard Python datetime module"
@@ -1545,18 +1442,6 @@ python-versions = "*"
 files = [
     {file = "pytz-2023.3.post1-py2.py3-none-any.whl", hash = "sha256:ce42d816b81b68506614c11e8937d3aa9e41007ceb50bfdcb0749b921bf646c7"},
     {file = "pytz-2023.3.post1.tar.gz", hash = "sha256:7b4fddbeb94a1eba4b557da24f19fdf9db575192544270a9101d8509f9f43d7b"},
-]
-
-[[package]]
-name = "pywin32-ctypes"
-version = "0.2.2"
-description = "A (partial) reimplementation of pywin32 using ctypes/cffi"
-category = "main"
-optional = false
-python-versions = ">=3.6"
-files = [
-    {file = "pywin32-ctypes-0.2.2.tar.gz", hash = "sha256:3426e063bdd5fd4df74a14fa3cf80a0b42845a87e1d1e81f6549f9daec593a60"},
-    {file = "pywin32_ctypes-0.2.2-py3-none-any.whl", hash = "sha256:bf490a1a709baf35d688fe0ecf980ed4de11d2b3e37b51e5442587a75d9957e7"},
 ]
 
 [[package]]
@@ -1673,45 +1558,6 @@ numpy = ">=1.21.6,<1.28.0"
 dev = ["click", "cython-lint (>=0.12.2)", "doit (>=0.36.0)", "mypy", "pycodestyle", "pydevtool", "rich-click", "ruff", "types-psutil", "typing_extensions"]
 doc = ["jupytext", "matplotlib (>2)", "myst-nb", "numpydoc", "pooch", "pydata-sphinx-theme (==0.9.0)", "sphinx (!=4.1.0)", "sphinx-design (>=0.2.0)"]
 test = ["asv", "gmpy2", "mpmath", "pooch", "pytest", "pytest-cov", "pytest-timeout", "pytest-xdist", "scikit-umfpack", "threadpoolctl"]
-
-[[package]]
-name = "service"
-version = "0.1.0"
-description = ""
-category = "main"
-optional = false
-python-versions = ">=3.10,<3.11"
-files = []
-develop = true
-
-[package.dependencies]
-aiohttp = "^3.8.6"
-hardware = {path = "../../hardware", develop = true}
-lib = {path = "../lib", develop = true}
-python-dotenv = "^1.0.0"
-python-socketio = "^5.10.0"
-scipy = "^1.11.3"
-
-[package.source]
-type = "directory"
-url = "../../backend/backend/service"
-
-[[package]]
-name = "setuptools"
-version = "62.6.0"
-description = "Easily download, build, install, upgrade, and uninstall Python packages"
-category = "main"
-optional = false
-python-versions = ">=3.7"
-files = [
-    {file = "setuptools-62.6.0-py3-none-any.whl", hash = "sha256:c1848f654aea2e3526d17fc3ce6aeaa5e7e24e66e645b5be2171f3f6b4e5a178"},
-    {file = "setuptools-62.6.0.tar.gz", hash = "sha256:990a4f7861b31532871ab72331e755b5f14efbe52d336ea7f6118144dd478741"},
-]
-
-[package.extras]
-docs = ["furo", "jaraco.packaging (>=9)", "jaraco.tidelift (>=1.4)", "pygments-github-lexers (==0.0.5)", "rst.linker (>=1.9)", "sphinx", "sphinx-favicon", "sphinx-inline-tabs", "sphinx-reredirects", "sphinxcontrib-towncrier"]
-testing = ["build[virtualenv]", "filelock (>=3.4.0)", "flake8-2020", "ini2toml[lite] (>=0.9)", "jaraco.envs (>=2.2)", "jaraco.path (>=3.2.0)", "mock", "pip (>=19.1)", "pip-run (>=8.8)", "pytest (>=6)", "pytest-black (>=0.3.7)", "pytest-checkdocs (>=2.4)", "pytest-cov", "pytest-enabler (>=1.0.1)", "pytest-flake8", "pytest-mypy (>=0.9.1)", "pytest-perf", "pytest-xdist", "tomli-w (>=1.0.0)", "virtualenv (>=13.0.0)", "wheel"]
-testing-integration = ["build[virtualenv]", "filelock (>=3.4.0)", "jaraco.envs (>=2.2)", "jaraco.path (>=3.2.0)", "pytest", "pytest-enabler", "pytest-xdist", "tomli", "virtualenv (>=13.0.0)", "wheel"]
 
 [[package]]
 name = "simple-websocket"
@@ -2037,4 +1883,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.11"
-content-hash = "1df57195e738ddf85b089a3b105912ba508632a822aaa4d2b0e3f12c89818e6b"
+content-hash = "4cbf11478009625685952efd1a9ab913df243f2cec4f8967e6a3458b01dba5de"

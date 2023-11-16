@@ -249,8 +249,18 @@ export default {
       await rootState.api.httpClient.createBatch(newBatch);
     },
 
-    async deleteBatch({ rootState }, batches) {
-      await rootState.api.httpClient.deleteBatch(batches);
+    async deleteBatch({ dispatch, rootState }, batch) {
+      return await handleApiRequest({
+        dispatch,
+        rootState,
+        httpMethod: "deleteBatch",
+        requestData: batch,
+        progressNotificationPayload: {
+          action: "delete",
+          type: "batch",
+          message: `Deleting batch "${batch.sample_batch_name}", please wait`,
+        },
+      });
     },
 
     async updateBatch({ rootState }, newBatch) {
@@ -263,8 +273,25 @@ export default {
         rootState,
         httpMethod: "copySampleBatch",
         requestData: sampleBatchCopyData,
-        successMessage: `Batch "${sampleBatchCopyData.sample_batch_name}" was successfully copied to the workspace "${sampleBatchCopyData.workspace_name}".`,
-        errorMessage: `Failed to copy batch "${sampleBatchCopyData.sample_batch_name}".`,
+        progressNotificationPayload: {
+          action: "copy",
+          type: "batch",
+          message: `Copying batch "${sampleBatchCopyData.sample_batch_name}" to the workspace "${sampleBatchCopyData.workspace_name}", please wait`,
+        },
+      });
+    },
+
+    async batchExportPeakData({ dispatch, rootState }, sampleBatch) {
+      return await handleApiRequest({
+        dispatch,
+        rootState,
+        httpMethod: "batchExportPeakData",
+        requestData: sampleBatch,
+        progressNotificationPayload: {
+          action: "export",
+          type: "peaks",
+          message: `Exporting peak data for batch "${sampleBatch.sample_batch_name}", please wait.`,
+        },
       });
     },
 
