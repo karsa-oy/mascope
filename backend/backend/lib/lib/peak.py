@@ -22,6 +22,15 @@ def calculate_peak_area(x, peakshape, peak):
     pos, hei, res = peak
     return sum(gen_peak(x, pos, hei, res, peakshape))
 
+def calculate_tic(filename):
+    try:
+        sample_file_data = load_file(filename, vars=["sum_signal"])
+        sum_spectrum = sample_file_data.sum_signal
+    except FileNotFoundError:
+        sample_file_data = load_file(filename, vars=["signal"])
+        sum_spectrum = sample_file_data.signal.sum(dim="time")
+    tic = sum_spectrum.sum(dim="mz").compute().item()
+    return tic
 
 async def detect_peaks(
     filename,

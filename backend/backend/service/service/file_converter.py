@@ -17,11 +17,14 @@ import requests
 import socketio
 
 from dotenv import load_dotenv
+
+
 from hardware.orbitrap.generator import RawStreamer
 from hardware.tofwerk.h5_streamer import H5Streamer
 from hardware.tofwerk.lib.TwTool import *
 
 from lib.file_func import zarr_sdk
+from lib.peak import calculate_tic
 from lib.structs import AttrDict, LRUDict
 from lib.util import timestamp_from_filename
 from service.lib.filesystem_watcher import FSWatcher
@@ -36,7 +39,7 @@ def create_sample_file_db_record(data):
     date = timestamp_from_filename(filename)
     utc_offset = timedelta(seconds=int(data["utc_offset"]))
     mz_calibration = data.get("mz_calibration")
-    tic = cache.get(filename)["signal"].sum(dim="time").sum(dim="mz").compute().item()
+    tic = calculate_tic(filename)
 
     sample_file_db_record = {
         "filename": filename,
