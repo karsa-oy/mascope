@@ -240,13 +240,14 @@ class zarr_sdk:
     def write_sum_signal_dataset(item):
         filename_base = item.props["filename"]
         filename_sum_signal = filename_to_zarr_path(filename_base, "sum_signal")
-        sum_signal = item["signal"].sum(dim="time")
-        sum_signal_array = ExtendableDataArray(path=filename_sum_signal)
+        sample_file = load_file(filename_base, vars=["signal"])
+        sum_signal = sample_file.signal.sum(dim="time").compute()
+        sum_signal_array = ExtendableDataArray(path=filename_sum_signal, array_module=np)
         sum_signal_array.init_array(
             dims=("mz",),
             data=sum_signal.values,
             coords={
-                "mz": item["signal"].mz.values,
+                "mz": sum_signal.mz.values,
             },
             name="sum_signal",
         )
