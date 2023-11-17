@@ -80,6 +80,7 @@ def process_stream(streamer):
                 streamer.tps_queue.get()  # coordinates
                 streamer.tps_queue.get()  # data
 
+        data.update({"filename": data["filename"].replace(" ", "_")})
         filename = data["filename"]
         instrument_name = filename.split("_")[0]
         spec_i = data["i"]
@@ -143,6 +144,7 @@ def process_stream(streamer):
         return True
 
     def handle_tps_data(data):
+        data.update({"filename": data["filename"].replace(" ", "_")})
         filename = data["filename"]
         spec_i = data["i"]
         sample_file = cache.get(filename)
