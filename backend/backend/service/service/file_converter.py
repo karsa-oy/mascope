@@ -56,9 +56,7 @@ def create_sample_file_db_record(data):
 
     url = f"http://{host}:{port}/api/sample_files"
 
-    response = requests.post(
-            url, headers=headers, json=sample_file_db_record
-        )
+    response = requests.post(url, headers=headers, json=sample_file_db_record)
     if response.status_code != 200:
         raise Exception(
             f"Failed to create database record! Status code: {response.status_code}"
@@ -130,7 +128,7 @@ def process_stream(streamer):
             sample_file = AttrDict(sample_file)
             cache[filename] = sample_file
             try:
-                sio.emit('instrument_conversion_started', notification_data)
+                sio.emit("instrument_conversion_started", notification_data)
             except Exception as e:
                 print(f"Failed to emit notification: {e}")
         else:
@@ -138,7 +136,7 @@ def process_stream(streamer):
             zarr_sdk.update_signal_dataset({"value": data}, sample_file)
             try:
                 print(notification_data["progress"])
-                sio.emit('instrument_conversion_progress', notification_data)
+                sio.emit("instrument_conversion_progress", notification_data)
             except Exception as e:
                 print(f"Failed to emit notification: {e}")
         return True
@@ -314,7 +312,6 @@ def run():
         streamer_processor.start()
 
     source_path = args.get("source_dir", ".")
-    ping = args["ping"]
 
     if not os.path.exists(source_path):
         print(f"Creating missing source directory {source_path}")
@@ -324,8 +321,8 @@ def run():
         path=source_path,
         mask=file_mask,
         file_queue=file_queue,
-        recursive=False,
-        ping=ping,
+        recursive=args["recursive"],  # default False
+        ping=args["ping"],  # default False
         shutdown_event=shutdown_event,
     )
     fs_watcher.run_as_daemon()
@@ -337,6 +334,7 @@ def run():
     except:
         shutdown_event.set()
     streamer_processor.join()
+
 
 if __name__ == "__main__":
     run()

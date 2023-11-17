@@ -36,7 +36,9 @@ def strip_filepath(filepath):
 
 
 class RawStreamer(Thread):
-    def __init__(self, file_queue=Queue(), shutdown_event=Event(), lock=Lock(), mz_precision=3):
+    def __init__(
+        self, file_queue=Queue(), shutdown_event=Event(), lock=Lock(), mz_precision=3
+    ):
         print("RawStreamer initializing")
         Thread.__init__(self)
         # Parameters
