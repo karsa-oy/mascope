@@ -291,7 +291,11 @@ async def item_compute(
     sample_item_id = sample_item.sample_item_id
     filename = sample_item.filename
     sample_batch_id = sample_item.sample_batch_id
-    verified = sample_item.mz_calibration.verified
+    verified = (
+        sample_item.mz_calibration.verified
+        if sample_item.mz_calibration is not None
+        else True
+    )
 
     # Ensure mz_calibration.verified is True
     if not verified:
@@ -400,7 +404,7 @@ async def match_batch_compute(
 
         # Check if 'verified' exists in mz_calibration. If not, provide a default value of False
         verified_value = (
-            sample_item.mz_calibration.get("verified", False) 
+            sample_item.mz_calibration.get("verified", False)
             if sample_item.mz_calibration is not None
             else True
         )
@@ -412,18 +416,12 @@ async def match_batch_compute(
             filename=sample_item.filename,
             instrument=sample_item.instrument,
             mz_calibration=MZCalibration(
-                mode=(
-                    sample_item.mz_calibration["mode"]
-                    if sample_item.mz_calibration is not None
-                    else -1
-                    ),
-                par=(
-                    sample_item.mz_calibration["par"]
-                    if sample_item.mz_calibration is not None
-                    else []
-                    ),
+                mode=sample_item.mz_calibration["mode"],
+                par=sample_item.mz_calibration["par"],
                 verified=verified_value,
-            ),
+            )
+            if sample_item.mz_calibration is not None
+            else None,
         )
 
         try:
