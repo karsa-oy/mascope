@@ -36,10 +36,6 @@ function set_up_mascope_frontend() {
     # frontend web server
     rm -r -f $MASCOPE_UI || true
     cp -r -f $MASCOPE_PROJECT/frontend/dist $MASCOPE_UI
-    # create mascope db link (MASCOPE_PRIVATE_DATADIR may be relative to backend)
-    pushd $MASCOPE_PROJECT/backend
-    ln -s -f $(realpath $MASCOPE_PRIVATE_DATADIR) $MASCOPE_UI
-    popd 
     # (re)set up nginx configuration for the static mascope frontend
     sudo systemctl stop nginx
     sudo rm -r -f /var/www/mascope.site || true
