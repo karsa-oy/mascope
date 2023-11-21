@@ -261,8 +261,7 @@ def filename_to_zarr_path(base_filename, variable):
 
 
 def get_base_path():
-    data_path = os.environ.get("MASCOPE_PRIVATE_DATADIR", ".")
-    base_path = os.path.join(data_path, "instrument")
+    base_path = os.environ.get("MASCOPE_PRIVATE_INSTRUMENT_DIR", "./instrument")
     return base_path
 
 
