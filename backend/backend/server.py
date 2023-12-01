@@ -31,6 +31,7 @@ from .api_rest.routes.attribute_templates_routes import attribute_templates_rout
 from .api_rest.routes.match_routes import match_router
 from .api_rest.routes.match_rating_routes import match_rating_router
 from .api_rest.routes.samples_routes import samples_router
+from .api_rest.routes.peaks_routes import peaks_router
 
 
 fastapi_app = FastAPI()
@@ -71,6 +72,7 @@ routers = [
     instrument_functions_router,
     attribute_templates_router,
     samples_router,
+    peaks_router,
 ]
 
 for router in routers:
