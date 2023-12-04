@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Body
 from datetime import datetime, timedelta
 
 from ..controllers.sample_files_controller import (
@@ -78,7 +78,7 @@ async def get_sample_file_peaks_route(sample_file_id: str):
 
 @sample_files_router.post("/api/sample_files/{sample_file_id}/peak_timeseries")
 async def get_sample_file_peak_timeseries_route(
-    sample_file_id: str, body: GetSampleFilePeakTimeseriesBody
+    sample_file_id: str, body: GetSampleFilePeakTimeseriesBody = Body(..., embed=False)
 ):
     return await get_sample_file_peak_timeseries(
         sample_file_id=sample_file_id,
