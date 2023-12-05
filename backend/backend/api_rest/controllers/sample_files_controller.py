@@ -18,28 +18,6 @@ from lib.peak import get_peaks
 
 
 # ===================================================================
-# Helper functions
-# ===================================================================
-
-
-async def get_sample_file_filename_by_id(sample_file_id: str) -> str:
-    async with async_session() as session:
-        stmt = select(SampleFile.filename).filter(
-            SampleFile.sample_file_id == sample_file_id
-        )
-        result = await session.execute(stmt)
-        filename = result.scalars().first()
-
-        if not filename:
-            raise HTTPException(
-                status_code=404,
-                detail=f"SampleFile with ID {sample_file_id} not found",
-            )
-
-    return filename
-
-
-# ===================================================================
 # Controller functions
 # ===================================================================
 
@@ -192,7 +170,8 @@ async def get_sample_file_peaks(sample_file_id: str) -> dict:
         "intensity": peak intensity (area)
     :rtype: dict
     """
-    filename = await get_sample_file_filename_by_id(sample_file_id)
+    sample_file = await get_sample_file_by_id(sample_file_id)
+    filename = sample_file["filename"]
     try:
         sample_file = load_file(filename, vars=["peak_areas"])
         peaks = get_peaks(sample_file, "area").sum(dim="time")
@@ -231,7 +210,8 @@ async def get_sample_file_peak_timeseries(
     :rtype: dict
     """
 
-    filename = await get_sample_file_filename_by_id(sample_file_id)
+    sample_file = await get_sample_file_by_id(sample_file_id)
+    filename = sample_file["filename"]
     try:
         sample_file = load_file(filename, vars=["peak_heights"])
         peaks = get_peaks(sample_file, "height")
