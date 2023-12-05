@@ -38,3 +38,8 @@ class SampleFileInDB(SampleFileBase):
         json_encoders = {
             dt: lambda v: v.replace(tzinfo=timezone.utc).isoformat(timespec="seconds")
         }
+
+
+class GetSampleFilePeakTimeseriesBody(BaseModel):
+    peak_mz: float
+    peak_mz_tolerance_ppm: Optional[float] = 1
