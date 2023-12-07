@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Body
 from datetime import datetime, timedelta
 
 from ..controllers.sample_files_controller import (
@@ -7,10 +7,13 @@ from ..controllers.sample_files_controller import (
     create_sample_file,
     delete_sample_file,
     update_sample_file,
+    get_sample_file_peaks,
+    get_sample_file_peak_timeseries,
 )
 from ..models.pydantic_models.sample_file_pydantic_model import (
     SampleFileCreate,
     SampleFileUpdate,
+    GetSampleFilePeakTimeseriesBody,
 )
 
 sample_files_router = APIRouter()
@@ -66,3 +69,19 @@ async def delete_sample_file_route(sample_file_id: str):
 @sample_files_router.patch("/api/sample_files/{sample_file_id}")
 async def update_sample_file_route(sample_file_id: str, sample_file: SampleFileUpdate):
     return await update_sample_file(sample_file_id, sample_file)
+
+
+@sample_files_router.get("/api/sample_files/{sample_file_id}/peaks")
+async def get_sample_file_peaks_route(sample_file_id: str):
+    return await get_sample_file_peaks(sample_file_id)
+
+
+@sample_files_router.post("/api/sample_files/{sample_file_id}/peak_timeseries")
+async def get_sample_file_peak_timeseries_route(
+    sample_file_id: str, body: GetSampleFilePeakTimeseriesBody = Body(..., embed=False)
+):
+    return await get_sample_file_peak_timeseries(
+        sample_file_id=sample_file_id,
+        peak_mz=body.peak_mz,
+        peak_mz_tolerance_ppm=body.peak_mz_tolerance_ppm,
+    )
