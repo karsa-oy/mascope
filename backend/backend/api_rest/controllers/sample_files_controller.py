@@ -204,9 +204,9 @@ async def get_sample_file_peak_timeseries(
     :type peak_mz_tolerance_ppm: float
     :raises HTTPException: Raised if sample file is not found
     :return: Dictionary with keys:
-        "mz": m/z of the peak in sample file
-        "intensity": peak height at time points
-        "time": time coordinates
+        "mz": m/z of the peak in sample file (None if no peak within tolerance)
+        "intensity": peak height at time points (empty if no peak within tolerance)
+        "time": time coordinates (empty if no peak within tolerance)
     :rtype: dict
     """
 
