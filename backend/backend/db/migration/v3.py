@@ -10,7 +10,7 @@ import shutil
 from scipy.io import loadmat
 
 from backend.db.id import gen_id
-from backend.lib.file import filename_to_zarr_path, load_file
+from lib.file_func import filename_to_zarr_path, load_file
 
 # patch asyncio to supported run_until_complete
 # when an event loop is already running
