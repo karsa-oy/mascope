@@ -13,7 +13,7 @@ python-dotenv = "^1.0.0"
 scipy = "^1.11.3"
 
 # Local dependencies
-hardware = { path = "../../hardware", develop = true }
+hardware = { path = "../hardware", develop = true }
 lib = { path = "../lib", develop = true }
 
 [build-system]
