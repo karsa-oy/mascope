@@ -98,6 +98,8 @@ def timestamp_from_filename(filename):
         if dt:
             # Parsed succesfully
             break
+    if not dt:
+        raise ValueError(f"Could not parse timestamp from filename: {filename}")
     return dt.as_datetime()
 
 

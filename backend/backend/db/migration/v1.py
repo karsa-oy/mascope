@@ -8,15 +8,16 @@ nest_asyncio.apply()
 
 
 def run():
-    data_path = os.environ.get('MASCOPE_PRIVATE_DATADIR')
+    data_path = os.environ.get("MASCOPE_PRIVATE_DATABASE_DIR")
 
     # STEP 1 - setup new database
 
-    db_path = os.path.join(data_path, 'database', 'mascope.v1.db')
+    db_path = os.path.join(data_path, "mascope.v1.db")
     new_conn = sqlite3.connect(database=db_path)
 
     with new_conn:
-        new_conn.execute("""--sql
+        new_conn.execute(
+            """--sql
             -- workspaces
 
             CREATE TABLE IF NOT EXISTS workspace (
@@ -25,8 +26,10 @@ def run():
                 ,workspace_description TEXT
                 ,workspace_attributes JSON
             );
-        """)
-        new_conn.execute("""--sql
+        """
+        )
+        new_conn.execute(
+            """--sql
             -- ionization mechanisms
 
             CREATE TABLE IF NOT EXISTS config_mechanism (
@@ -35,8 +38,10 @@ def run():
                 ,mechanism VARCHAR
                 ,reagent VARCHAR
             );
-        """)
-        new_conn.execute("""--sql
+        """
+        )
+        new_conn.execute(
+            """--sql
             -- samples
 
             CREATE TABLE IF NOT EXISTS sample_batch (
@@ -51,8 +56,10 @@ def run():
                 ,calibration_sample_filename VARCHAR(256)
                     REFERENCES sample_file(filename)
             );
-        """)
-        new_conn.execute("""--sql
+        """
+        )
+        new_conn.execute(
+            """--sql
             CREATE TABLE IF NOT EXISTS sample_item (
                 sample_item_id VARCHAR(16) PRIMARY KEY
                 ,sample_batch_id VARCHAR(16) NOT NULL
@@ -63,8 +70,10 @@ def run():
                 ,sample_item_description TEXT
                 ,sample_item_attributes JSON
             );
-        """)
-        new_conn.execute("""--sql
+        """
+        )
+        new_conn.execute(
+            """--sql
             CREATE TABLE IF NOT EXISTS sample_file (
                 sample_file_id VARCHAR(256) PRIMARY KEY
                 ,filename VARCHAR(256) NOT NULL
@@ -78,16 +87,20 @@ def run():
                 ,mz_calibration JSON
                 ,sample_file_attributes JSON
             );
-        """)
-        new_conn.execute("""--sql
+        """
+        )
+        new_conn.execute(
+            """--sql
             CREATE TABLE IF NOT EXISTS attribute_template (
                 attribute_template_id VARCHAR(256) PRIMARY KEY
                 ,name VARCHAR(256) NOT NULL
                 ,type VARCHAR(64)
                 ,template JSON
             );
-        """)
-        new_conn.execute("""--sql
+        """
+        )
+        new_conn.execute(
+            """--sql
             -- targets
 
             CREATE TABLE IF NOT EXISTS target_collection (
@@ -95,16 +108,20 @@ def run():
                 ,target_collection_name VARCHAR(256) NOT NULL
                 ,target_collection_description TEXT
             );
-        """)
-        new_conn.execute("""--sql
+        """
+        )
+        new_conn.execute(
+            """--sql
             CREATE TABLE IF NOT EXISTS target_compound (
                 target_compound_id VARCHAR(32) PRIMARY KEY
                 ,target_compound_name TEXT
                 ,target_compound_formula VARCHAR(256) NOT NULL
                 ,cas_number VARCHAR(12)
             );
-        """)
-        new_conn.execute("""--sql
+        """
+        )
+        new_conn.execute(
+            """--sql
             CREATE TABLE IF NOT EXISTS target_ion (
                 target_ion_id VARCHAR(32) PRIMARY KEY
                 ,target_compound_id VARCHAR(32) NOT NULL
@@ -113,8 +130,10 @@ def run():
                     REFERENCES config_mechanism(mechanism_id)
                 ,target_ion_formula VARCHAR(256) NOT NULL
             );
-        """)
-        new_conn.execute("""--sql
+        """
+        )
+        new_conn.execute(
+            """--sql
             CREATE TABLE IF NOT EXISTS target_isotope (
                 target_isotope_id VARCHAR(32) PRIMARY KEY
                 ,target_ion_id VARCHAR(32) NOT NULL
@@ -123,16 +142,20 @@ def run():
                 ,relative_abundance FLOAT NOT NULL
                     CHECK (relative_abundance BETWEEN 0 AND 1)
             );
-        """)
-        new_conn.execute("""--sql
+        """
+        )
+        new_conn.execute(
+            """--sql
             CREATE TABLE IF NOT EXISTS target_compound_in_target_collection (
                 target_compound_id VARCHAR(32)
                     REFERENCES target_compound(target_compound_id)
                 ,target_collection_id VARCHAR(16)
                     REFERENCES target_collection(target_collection_id)
             );
-        """)
-        new_conn.execute("""--sql
+        """
+        )
+        new_conn.execute(
+            """--sql
             CREATE TABLE IF NOT EXISTS target_collection_in_sample_batch (
                 target_collection_id VARCHAR(16) NOT NULL
                     REFERENCES target_collection(target_collection_id)
@@ -141,8 +164,10 @@ def run():
                 ,PRIMARY KEY
                     (target_collection_id, sample_batch_id)
             );
-        """)
-        new_conn.execute("""--sql
+        """
+        )
+        new_conn.execute(
+            """--sql
             -- matches
 
             CREATE TABLE IF NOT EXISTS match (
@@ -161,9 +186,11 @@ def run():
                     ,match_score FLOAT NOT NULL
                         CHECK (match_score BETWEEN 0 AND 1)
             );
-        """)
+        """
+        )
 
-        new_conn.execute("""--sql
+        new_conn.execute(
+            """--sql
             INSERT INTO config_mechanism VALUES
                 ( 'SbcztiBgxHg', '-', '-H-',  NULL),
                 ( 'fVuWwQ82sJI', '-', '+Br-', 'CH2Br2'),
@@ -175,6 +202,7 @@ def run():
                 ( 'FkwMOO5RKoU', '+',  '+(C3H6O)H+', 'C3H6O'),
                 ( 'gXov_p6BmFY', '+',  '+(C6H10O2)H+', 'C6H10O2'),
                 ( 'xeh-m8RpSDI', '+',  '+(C6H15N)H+', 'C6H15N')
-        """)
+        """
+        )
         new_conn.commit()
     new_conn.close()

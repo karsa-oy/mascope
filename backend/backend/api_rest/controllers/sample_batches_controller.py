@@ -531,7 +531,7 @@ async def sample_batch_export_peaks(sample_batch: SampleBatchExportPeaks, sid=No
             datetime.now().isoformat().replace("-", "").replace(":", "").split(".")[0]
         )
 
-        peakfile_path = os.environ.get("MASCOPE_PRIVATE_DATADIR", ".")
+        peakfile_path = os.environ.get("MASCOPE_PRIVATE_INSTRUMENT_DIR", ".")
         peakfile_filename = (
             dt_str
             + "_peaks_"

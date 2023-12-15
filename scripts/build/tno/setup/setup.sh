@@ -44,7 +44,8 @@ function install_prerequisites() {
   stop_mascope_backend
 
   # make sure needed folders exist
-  [ ! -d "$MASCOPE_PRIVATE_DATADIR" ] && mkdir -p $MASCOPE_PRIVATE_DATADIR
+  [ ! -d "$MASCOPE_PRIVATE_DATABASE_DIR" ] && mkdir -p $MASCOPE_PRIVATE_DATABASE_DIR
+  [ ! -d "$MASCOPE_PRIVATE_INSTRUMENT_DIR" ] && mkdir -p $MASCOPE_PRIVATE_INSTRUMENT_DIR
   [ ! -d "$MASCOPE_PRIVATE_CONVERTER_DIR" ] && mkdir -p $MASCOPE_PRIVATE_CONVERTER_DIR
   [ ! -d "$MASCOPE_PRIVATE_LOG_DIR" ] && mkdir -p $MASCOPE_PRIVATE_LOG_DIR
   [ ! -d "$MASCOPE_PRIVATE_CONFIG_DIR" ] && mkdir -p $MASCOPE_PRIVATE_CONFIG_DIR

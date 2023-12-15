@@ -30,10 +30,9 @@ function install_prerequisites() {
 
     echo AAA setting up mascope frontend...
 
+    # copy new mascope frontend
     rm -r -f $MASCOPE_UI || true
     mv -f $MY_PATH/dist $MASCOPE_UI
-    # create mascope db link
-    ln -s -f $(realpath $MASCOPE_PRIVATE_DATADIR) $MASCOPE_UI
     # (re)set up nginx configuration for the static mascope frontend
     sudo systemctl stop nginx
     sudo rm -r -f /var/www/mascope.site || true

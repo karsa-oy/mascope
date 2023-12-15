@@ -89,7 +89,6 @@ def get_current_db_version():
 
 # env vars
 load_dotenv()
-data_dir = os.environ.get("MASCOPE_PRIVATE_DATADIR")
-db_dir = os.path.join(data_dir, "database")
+db_dir = os.environ.get("MASCOPE_PRIVATE_DATABASE_DIR")
 current_version = get_current_db_version()
 db_path = os.path.join(db_dir, f"mascope.v{current_version}.db")
