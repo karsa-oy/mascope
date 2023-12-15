@@ -65,13 +65,13 @@ export default {
         : null;
     },
     tag: function () {
-      if (this.matchScore >= this.probableMatchThreshold) {
+      if (this.row.match_category === 2) {
         return {
           category: "probable",
           class: "is-danger",
           weight: "font-size: bold",
         };
-      } else if (this.matchScore >= this.possibleMatchThreshold) {
+      } else if (this.row.match_category === 1) {
         return {
           category: "possible",
           class: "is-warning",

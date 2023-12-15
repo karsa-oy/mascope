@@ -37,7 +37,6 @@ export default {
       isotopesInFocus: "visualization/isotopesInFocus",
     }),
     ...get({
-      batchActive: "batch/active",
       sampleBatchesSelected: "workspace/sampleBatchesSelected",
       matchCollections: "sample/matchCollections",
       matchCompounds: "sample/matchCompounds",
@@ -61,9 +60,18 @@ export default {
         : this.targetCollections;
     },
     targetCompoundRows: function () {
-      return this.sampleItemFocused && this.matchCompounds
-        ? this.matchCompounds
-        : this.targetCompounds;
+      if (!this.sampleItemFocused || !this.matchCompounds) {
+        return this.targetCompounds;
+      }
+      return this.targetCompounds.map((targetCompound) => {
+        const matchCompound = this.matchCompounds.find(
+          (mc) => mc.target_compound_id === targetCompound.target_compound_id
+        );
+
+        return matchCompound
+          ? { ...targetCompound, ...matchCompound }
+          : targetCompound;
+      });
     },
     targetIonRows: function () {
       return this.sampleItemFocused && this.matchIons
@@ -256,7 +264,9 @@ export default {
     }),
     ...call({
       resetIonVisualization: "visualization/reset",
+      setFilterParams: "visualization/setFilterParams",
       targetCollectionToggle: "batch/targetCollectionToggle",
+      emitVisualization: "visualization/emitVisualization",
     }),
     manageSelectedCollectionBatches() {
       this.modalTargetCollectionOpProps = {
@@ -316,21 +326,14 @@ export default {
     },
     ionShow(row) {
       this.resetIonVisualization();
-      this.$api.emit(
-        "visualization_ion_focus",
-        this.sampleItemFocused.sample_item_id,
-        row.target_ion_id,
-        this.minIsotopeAbundance,
-        this.peakMinIntensity,
-        this.mzTolerance
-      );
 
       const isotopesInFocus = this.matchIsotopes
         .filter((isotope) => isotope.target_ion_id === row.target_ion_id)
         .map((isotope) => ({
           target_isotope_id: isotope.target_isotope_id,
-          mz: parseFloat(isotope.mz.toFixed(4)),
+          mz: isotope.mz.toFixed(4),
           match_score: isotope.match_score,
+          match_category: isotope.match_category,
           relative_abundance: isotope.relative_abundance,
           sample_peak_area: isotope.sample_peak_area,
           match_mz_error: isotope.match_mz_error,
@@ -345,6 +348,13 @@ export default {
       )[0];
 
       this.ionInFocus = ionInFocus;
+
+      this.setFilterParams();
+
+      this.emitVisualization({
+        sampleId: this.sampleItemFocused.sample_item_id,
+        ionId: row.target_ion_id,
+      });
 
       this.activateModal({
         modal: "sampleItemTargetIon",
