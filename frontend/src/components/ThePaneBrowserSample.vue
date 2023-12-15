@@ -25,7 +25,6 @@ export default {
       batches: "workspace/batches",
       batchActive: "batch/active",
       batchBuildParams: "batch/buildParams",
-      batchFilterParams: "batch/filterParams",
       batchMatchCompounds: "batch/matchCompounds",
       batchMatchIons: "batch/matchIons",
       batchTargetCollections: "batch/targetCollections",
@@ -218,7 +217,6 @@ export default {
       ];
       const batchParams = {
         ...this.batchBuildParams,
-        ...this.batchFilterParams,
       };
       Object.entries(batchParams).forEach(([key, val]) =>
         batchRows.push({

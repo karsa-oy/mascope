@@ -47,8 +47,6 @@ export default {
     ...get({
       batchActive: "batch/active",
       matchCompounds: "batch/matchCompounds",
-      paramPossibleMatchThreshold: "batch/paramPossibleMatchThreshold",
-      paramProbableMatchThreshold: "batch/paramProbableMatchThreshold",
       sampleItems: "batch/sampleItems",
       targetCompounds: "batch/targetCompounds",
     }),
