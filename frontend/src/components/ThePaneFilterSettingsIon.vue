@@ -201,11 +201,20 @@ export default {
       this.reloadMatches();
     },
     async saveFilterSettings() {
-      this.isSaving = true;
-      await this.saveFilterParams();
-      this.isSaving = false;
-      this.storeInitialParams();
-      await this.reloadMatches();
+      this.$buefy.dialog.confirm({
+        title: "Saving filtering parameters",
+        message: `Are you sure you want to save current filtering parameters of ion "${this.ionInFocus.target_ion_formula}" for "${this.ionInFocus.instrument}" instrument?`,
+        confirmText: "Save",
+        hasIcon: true,
+        icon: "content-save",
+        onConfirm: async () => {
+          this.isSaving = true;
+          await this.saveFilterParams();
+          this.isSaving = false;
+          this.storeInitialParams();
+          await this.reloadMatches();
+        },
+      });
     },
     undoChanges() {
       // Revert filter parameters to their initial values
@@ -216,8 +225,11 @@ export default {
     filterParamsDelete() {
       this.$buefy.dialog.confirm({
         title: "Deleting filtering parameters",
-        message: `Are you sure you want to delete filtering parameters of "${this.ionInFocus.instrument}" instrument for ion "${this.ionInFocus.target_ion_formula}"?`,
+        message: `Are you sure you want to delete filtering parameters of ion "${this.ionInFocus.target_ion_formula}" for "${this.ionInFocus.instrument}" instrument?`,
         confirmText: "Delete",
+        type: "is-danger",
+        hasIcon: true,
+        icon: "delete-alert",
         onConfirm: async () => {
           this.setDefaultFilterParams();
           await this.deleteInstrumentFilterParams();
