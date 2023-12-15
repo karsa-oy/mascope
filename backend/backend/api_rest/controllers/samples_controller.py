@@ -52,7 +52,7 @@ DEFAULT_POSSIBLE_MATCH_THRESHOLD = 0.7
 def aggregate_params(df: pd.DataFrame) -> pd.Series:
     """Aggregation function no get the aggregated parameters.
 
-    Set match_score and match_category of the top row (the most alarming ion).
+    Set match_score and match_category of the top row (the most alarming row).
     Sums sample_peak_area_sum/sample_peak_interference_sum for the group.
 
     :param df: The DataFrame containing the data to be aggregated.
@@ -82,7 +82,7 @@ async def set_ions_match_category(
     """Set the match_category field for each ion in the DataFrame.
 
     This function determines the match_category for each ion based on match score and predefined thresholds.
-    It uses provided filters, if no filters are provided then set the ion-specific filters for the, otherwise defaults to predefined thresholds.
+    It uses provided filters, if no filters are provided then set the ion-specific filters are used, otherwise defaults used as a fall back thresholds.
 
 
     :param match_ions_df: DataFrame containing ion data with match scores.
