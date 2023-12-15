@@ -14,9 +14,6 @@ class SampleBatchBase(BaseModel):
     build_params: Dict[str, Any] = Field(
         ..., description="Build parameters of the sample batch"
     )
-    filter_params_batch: Dict[str, Any] = Field(
-        ..., description="Filter parameters of the sample batch"
-    )
 
 
 class SampleBatchCreate(SampleBatchBase):
