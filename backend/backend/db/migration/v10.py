@@ -13,17 +13,17 @@ def run():
     new_conn = sqlite3.connect(database=new_db_path)
 
     with new_conn:
-        # STEP 2 - Add new field filter_params_ion to target_ion table
-        print("Adding filter_params_ion field to target_ion table")
+        # STEP 2 - Add new field filter_params to target_ion table
+        print("Adding filter_params field to target_ion table")
         new_conn.execute(
             """
             ALTER TABLE target_ion
-            ADD COLUMN filter_params_ion JSON;
+            ADD COLUMN filter_params JSON;
             """
         )
 
-        # STEP 3 - Rename filter_params to filter_params_batch in sample_batch table
-        print("Renaming filter_params to filter_params_batch in sample_batch table")
+        # STEP 3 - Drop filter_params field from sample_batch table
+        print("Dropping filter_params field from sample_batch table")
 
         # SQLite does not support the ALTER TABLE DROP COLUMN syntax.
         # To drop a column, you need to create a new table that has the same columns as the old table minus the column you want to drop.
@@ -39,7 +39,6 @@ def run():
                 sample_batch_name,
                 sample_batch_description,
                 build_params,
-                filter_params AS filter_params_batch,  -- Rename here
                 sample_batch_utc_created,
                 sample_batch_utc_modified
             FROM
