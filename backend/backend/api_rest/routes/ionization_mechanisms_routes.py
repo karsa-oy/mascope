@@ -1,7 +1,11 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Body
 from ..controllers.ionization_mechanisms_controller import (
-    get_ionization_mechanism_by_id,
     get_ionization_mechanisms,
+    get_ionization_mechanism,
+    create_ionization_mechanism,
+)
+from ..models.pydantic_models.ionization_mechanism_pydantic_model import (
+    IonizationMechanismCreate,
 )
 
 ionization_mechanisms_router = APIRouter()
@@ -31,5 +35,12 @@ async def get_ionization_mechanisms_route(
 @ionization_mechanisms_router.get(
     "/api/ionization_mechanisms/{ionization_mechanism_id}"
 )
-async def get_ionization_mechanism_by_id_route(ionization_mechanism_id: str):
-    return await get_ionization_mechanism_by_id(ionization_mechanism_id)
+async def get_ionization_mechanism_route(ionization_mechanism_id: str):
+    return await get_ionization_mechanism(ionization_mechanism_id)
+
+
+@ionization_mechanisms_router.post("/api/ionization_mechanisms")
+async def create_ionization_mechanism_route(
+    ionization_mechanism: IonizationMechanismCreate = Body(...),
+):
+    return await create_ionization_mechanism(ionization_mechanism)
