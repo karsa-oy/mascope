@@ -31,8 +31,6 @@
 </template>
 
 <script>
-import { get } from "vuex-pathify";
-
 export default {
   name: "BaseTagMatch",
   props: {
@@ -59,10 +57,6 @@ export default {
     });
   },
   computed: {
-    ...get({
-      probableMatchThreshold: "batch/paramProbableMatchThreshold",
-      possibleMatchThreshold: "batch/paramPossibleMatchThreshold",
-    }),
     matchScore: function () {
       return this.row !== null
         ? this.row.matched === undefined || this.row.matched
@@ -71,13 +65,13 @@ export default {
         : null;
     },
     tag: function () {
-      if (this.matchScore >= this.probableMatchThreshold) {
+      if (this.row.match_category === 2) {
         return {
           category: "probable",
           class: "is-danger",
           weight: "font-size: bold",
         };
-      } else if (this.matchScore >= this.possibleMatchThreshold) {
+      } else if (this.row.match_category === 1) {
         return {
           category: "possible",
           class: "is-warning",

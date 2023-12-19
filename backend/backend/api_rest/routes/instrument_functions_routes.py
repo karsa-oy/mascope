@@ -18,7 +18,7 @@ async def get_instrument_functions_route(
     return await get_instrument_functions(instrument, sort, order, page, limit)
 
 
-@instrument_functions_router.get("/api/instrument_function")
+@instrument_functions_router.get("/api/instrument_functions/")
 async def get_instrument_function_route(
     filename: str = Query(None, description="The filename to query for"),
     instrument_function_id: str = Query(

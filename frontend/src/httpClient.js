@@ -168,6 +168,16 @@ export function createHttpClient(host, api_port) {
         console.error("Failed to get batch: ", error);
       }
     },
+    loadBatchTargets: async (batchId, body) => {
+      try {
+        return await httpClient.post(
+          `${batchesBaseUrl}/${batchId}/targets`,
+          body
+        );
+      } catch (error) {
+        console.error("Failed to fetch batch targets: ", error);
+      }
+    },
     createBatch: async (newBatch) => {
       try {
         return await httpClient.post(batchesBaseUrl, newBatch);
@@ -233,44 +243,43 @@ export function createHttpClient(host, api_port) {
       }
     },
 
-    getSampleById: async (sample_item_id, filter_params) => {
+    getSample: async (sampleItemId) => {
       try {
-        return await httpClient.post(
-          `${samplesBaseUrl}/${sample_item_id}`,
-          filter_params
-        );
+        return await httpClient.get(`${samplesBaseUrl}/${sampleItemId}`);
       } catch (error) {
         console.error("Failed to get sample by id: ", error);
       }
     },
 
-    initBatchMatchFilter: async (body) => {
+    getSampleIonMatches: async (sampleItemId, body) => {
       try {
         return await httpClient.post(
-          `${samplesBaseUrl}/init_batch_match_filter`,
+          `${samplesBaseUrl}/${sampleItemId}/ion_matches`,
           body
+        );
+      } catch (error) {
+        console.error("Failed to get sample ion matches: ", error);
+      }
+    },
+
+    getBatchMatchFilter: async (batchId) => {
+      try {
+        return await httpClient.get(
+          `${samplesBaseUrl}/batch_match_filter/${batchId}`
         );
       } catch (error) {
         console.error("Failed to initialize batch match filter: ", error);
       }
     },
 
-    initSampleMatchFilter: async (body) => {
+    getSampleMatchFilter: async (sampleItemId, body) => {
       try {
         return await httpClient.post(
-          `${samplesBaseUrl}/init_sample_match_filter`,
+          `${samplesBaseUrl}/${sampleItemId}/sample_match_filter`,
           body
         );
       } catch (error) {
         console.error("Failed to initialize sample match filter: ", error);
-      }
-    },
-
-    loadBatchTargets: async (body) => {
-      try {
-        return await httpClient.post(`${samplesBaseUrl}_batch_targets`, body);
-      } catch (error) {
-        console.error("Failed to fetch batch targets: ", error);
       }
     },
 
@@ -699,11 +708,24 @@ export function createHttpClient(host, api_port) {
       }
     },
 
-    getTargetIonById: async (targetIonId) => {
+    getTargetIon: async (targetIonId) => {
       try {
         return await httpClient.get(`${targetIonsBaseUrl}/${targetIonId}`);
       } catch (error) {
-        console.error("Failed to get target ion by id: ", error);
+        console.error("Failed to get target ion: ", error);
+      }
+    },
+    updateTargetIon: async (data) => {
+      try {
+        return await httpClient.patch(
+          `${targetIonsBaseUrl}/${data.target_ion_id}`,
+          data.body
+        );
+      } catch (error) {
+        console.error(
+          `Failed to update target ion ${data.target_ion_formula}`,
+          error
+        );
       }
     },
 
@@ -771,11 +793,11 @@ export function createHttpClient(host, api_port) {
         console.error("Failed to get all instrument functions: ", error);
       }
     },
-    getInstrumentFunctionById: async (functionId) => {
+    getInstrumentFunction: async (params = {}) => {
       try {
-        return await httpClient.get(
-          `${instrumentFunctionsBaseUrl}/${functionId}`
-        );
+        return await httpClient.get(`${instrumentFunctionsBaseUrl}/`, {
+          params,
+        });
       } catch (error) {
         console.error("Failed to get instrument function by id: ", error);
       }

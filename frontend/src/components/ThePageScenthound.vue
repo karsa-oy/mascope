@@ -358,7 +358,7 @@ import ThePaneBrowserTarget from "./ThePaneBrowserTarget.vue";
 import ThePaneSettingsCalibration from "./ThePaneSettingsCalibration.vue";
 
 import * as _ from "underscore";
-import { mapActions, mapMutations } from "vuex";
+import { mapMutations } from "vuex";
 import { call, get, sync } from "vuex-pathify";
 import { genId } from "../lib/util";
 
@@ -416,12 +416,10 @@ export default {
       mzFit: "calibration/mzFit",
       mzFitError: "calibration/mzFitError",
       mzFitStats: "calibration/mzFitStats",
-      possibleMatchThreshold: "batch/paramPossibleMatchThreshold",
-      probableMatchThreshold: "batch/paramProbableMatchThreshold",
       sampleActive: "sample/active",
       sampleItems: "batch/sampleItems",
       sampleMatched: "sample/matched",
-      sampleMatchCollections: "sample/matchCollections",
+      sampleMatchCompounds: "sample/matchCompounds",
       sampleMzCalibrated: "sample/active@mz_calibration.verified",
     }),
     ...sync({
@@ -455,18 +453,18 @@ export default {
         : false;
     },
     sampleMatchClass() {
-      if (this.sampleMaxMatchScore === null) return "is-primary";
-      if (this.sampleMaxMatchScore >= this.probableMatchThreshold) {
+      if (this.sampleMaxMatchCategory === null) return "is-primary";
+      if (this.sampleMaxMatchCategory === 2) {
         return "is-danger";
-      } else if (this.sampleMaxMatchScore >= this.possibleMatchThreshold) {
+      } else if (this.sampleMaxMatchCategory === 1) {
         return "is-primary";
       } else {
         return "is-success";
       }
     },
-    sampleMaxMatchScore() {
-      return this.sampleMatchCollections
-        ? Math.max(...this.sampleMatchCollections.map((row) => row.match_score))
+    sampleMaxMatchCategory() {
+      return this.sampleMatchCompounds && this.sampleMatchCompounds.length > 0
+        ? this.sampleMatchCompounds[0].match_category
         : null;
     },
   },
@@ -482,14 +480,15 @@ export default {
     ...call({
       batchSelect: "batch/load",
       mzCalibrationReset: "calibration/unload",
+      calibrationMzFit: "calibration/calibrationMzFit",
+      calibrationMzApply: "calibration/calibrationMzApply",
       resetAcquisitionStatus: "instrument/resetAcquisitionStatus",
       sampleItemCreate: "sample/create",
       sampleItemUpdate: "sample/update",
       sampleUnload: "sample/unload",
+      matchItemCompute: "sample/matchItemCompute",
     }),
     ...mapMutations({}),
-    ...mapActions("sample", ["matchItemCompute"]),
-    ...mapActions("calibration", ["calibrationMzFit", "calibrationMzApply"]),
     clone(obj) {
       return JSON.parse(JSON.stringify(obj));
     },
@@ -599,8 +598,8 @@ export default {
         }
       }
     },
-    sampleMaxMatchScore() {
-      if (this.sampleMaxMatchScore >= this.possibleMatchThreshold) {
+    sampleMaxMatchCategory(newValue, oldValue) {
+      if (this.sampleMaxMatchCategory > 0) {
         this.activeStep = 2;
       }
     },

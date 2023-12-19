@@ -1,10 +1,16 @@
 import pandas as pd
 import os
 
-from fastapi import HTTPException, BackgroundTasks, status
-from sqlalchemy import asc, desc, func
-from sqlalchemy.future import select
+from fastapi import HTTPException, BackgroundTasks
+from sqlalchemy import (
+    asc,
+    desc,
+    select,
+    func,
+    literal,
+)
 from sqlalchemy.orm import joinedload
+from typing import List
 from datetime import datetime
 from backend.db_api_rest import async_session
 from backend.server import sio
@@ -12,10 +18,16 @@ from lib.peak import detect_peaks, get_peaks
 from backend.db.id import gen_id
 
 from ..models.models import (
+    Workspace,
     SampleBatch,
     SampleItem,
     TargetCollectionInSampleBatch,
-    Workspace,
+    TargetCollection,
+    TargetCompoundInTargetCollection,
+    TargetCompound,
+    TargetIon,
+    IonizationMechanism,
+    TargetIsotope,
 )
 from ..models.pydantic_models.sample_batch_pydantic_model import (
     SampleBatchCreate,
@@ -70,7 +82,7 @@ async def get_sample_batches(
         }
 
 
-async def get_sample_batch_by_id(sample_batch_id: str):
+async def get_sample_batch(sample_batch_id: str):
     async with async_session() as session:
         stmt = select(SampleBatch).filter(
             SampleBatch.sample_batch_id == sample_batch_id
@@ -95,7 +107,6 @@ async def create_sample_batch(sample_batch: SampleBatchCreate):
             sample_batch_name=sample_batch.sample_batch_name,
             sample_batch_description=sample_batch.sample_batch_description,
             build_params=sample_batch.build_params,
-            filter_params=sample_batch.filter_params,
             sample_batch_utc_created=datetime.utcnow(),
         )
         session.add(new_sample_batch)
@@ -218,15 +229,14 @@ async def update_sample_batch(
         # Update the existing sample batch
         update_data = sample_batch.dict(exclude_unset=True)
         for key, value in update_data.items():
-            if key in ["build_params", "filter_params"]:
-                # Skip build_params and filter_params for now as they are done below
+            if key in ["build_params"]:
+                # Skip build_params as they are done below
                 continue
             setattr(existing_sample_batch, key, value)
         existing_sample_batch.sample_batch_utc_modified = datetime.utcnow()
 
-        # Update the build_params and filter_params with the stringified versions
+        # Update the build_params with the stringified versions
         existing_sample_batch.build_params = sample_batch.build_params
-        existing_sample_batch.filter_params = sample_batch.filter_params
 
         # Update target collections associations
         if "target_collection_id" in update_data:
@@ -567,3 +577,165 @@ async def sample_batch_export_peaks(sample_batch: SampleBatchExportPeaks, sid=No
                 room=sid,
                 namespace="/",
             )
+
+
+async def get_batch_targets(sample_batch_id: str, ion_mechanisms: List[str]):
+    async with async_session() as session:
+        #   TargetCollections
+        # Fetch TargetCollections associated with the sample_batch_id
+        target_collections = await session.execute(
+            select(
+                TargetCollection,
+                literal(0).label("selection"),
+            )
+            .join(
+                TargetCollectionInSampleBatch,
+                TargetCollectionInSampleBatch.target_collection_id
+                == TargetCollection.target_collection_id,
+            )
+            .filter(TargetCollectionInSampleBatch.sample_batch_id == sample_batch_id)
+        )
+        target_collections = target_collections.scalars().all()
+
+        # Fetch the required target_collection_ids
+        target_collection_ids = [tc.target_collection_id for tc in target_collections]
+
+        #   TargetCompounds
+        # Fetch TargetCompounds associated with the fetched TargetCollections and add the associated target_collection_id
+        target_compounds_query = await session.execute(
+            select(TargetCompound)
+            .join(
+                TargetCompoundInTargetCollection,
+                TargetCompoundInTargetCollection.target_compound_id
+                == TargetCompound.target_compound_id,
+            )
+            .filter(
+                TargetCompoundInTargetCollection.target_collection_id.in_(
+                    [tc.target_collection_id for tc in target_collections]
+                )
+            )
+        )
+        target_compounds = target_compounds_query.scalars().all()
+
+        associations_list = []
+
+        associations = await session.execute(
+            select(
+                TargetCompoundInTargetCollection.target_compound_id,
+                TargetCompoundInTargetCollection.target_collection_id,
+            ).filter(
+                TargetCompoundInTargetCollection.target_collection_id.in_(
+                    target_collection_ids
+                )
+            )
+        )
+
+        for association in associations:
+            compound_id = association.target_compound_id
+            collection_id = association.target_collection_id
+            associations_list.append((compound_id, collection_id))
+
+        # Convert target_compounds to a dictionary for faster lookup
+        target_compounds_dict_lookup = {
+            tc.target_compound_id: tc for tc in target_compounds
+        }
+
+        target_compounds_dict = []
+        for compound_id, collection_id in associations_list:
+            tc = target_compounds_dict_lookup.get(compound_id)
+            if tc:
+                target_compounds_dict.append(
+                    {
+                        **tc.to_dict(),
+                        "target_collection_id": collection_id,
+                        "selection": 0,
+                    }
+                )
+
+        #   TargetIons
+        # Fetch TargetIons associated with the fetched TargetCompounds, ion_mechanisms, and relevant TargetCollections
+        target_ions_query = await session.execute(
+            select(TargetIon)
+            .distinct(TargetIon.target_ion_id)
+            .join(
+                TargetCompoundInTargetCollection,
+                TargetIon.target_compound_id
+                == TargetCompoundInTargetCollection.target_compound_id,
+            )
+            .join(
+                IonizationMechanism,
+                TargetIon.ionization_mechanism_id
+                == IonizationMechanism.ionization_mechanism_id,
+            )
+            .filter(
+                TargetCompoundInTargetCollection.target_collection_id.in_(
+                    target_collection_ids
+                ),
+                TargetIon.target_compound_id.in_(
+                    [tc.target_compound_id for tc in target_compounds]
+                ),
+                IonizationMechanism.ionization_mechanism_id.in_(ion_mechanisms),
+            )
+        )
+        target_ions = target_ions_query.scalars().all()
+
+        # Create a lookup dictionary for target_compound_id -> target_collection_id
+        target_compound_to_collection = {
+            tc["target_compound_id"]: tc["target_collection_id"]
+            for tc in target_compounds_dict
+        }
+
+        # Fetch all ionization mechanisms and create a lookup dictionary for them
+        ion_mechanisms_query = await session.execute(
+            select(
+                IonizationMechanism.ionization_mechanism_id,
+                IonizationMechanism.ionization_mechanism,
+            )
+        )
+        ion_mechanisms_associations = {
+            im.ionization_mechanism_id: im.ionization_mechanism
+            for im in ion_mechanisms_query
+        }
+
+        # Create TargetIons dictionary including the new fields
+        target_ions_dict = [
+            {
+                **ti.to_dict(),
+                "target_collection_id": target_compound_to_collection.get(
+                    ti.target_compound_id
+                ),
+                "ionization_mechanism": ion_mechanisms_associations.get(
+                    ti.ionization_mechanism_id
+                ),
+                "selection": 0,
+            }
+            for ti in target_ions
+        ]
+        #   TargetIsotopes
+        # Fetch TargetIsotopes associated with the fetched TargetIons
+        target_isotopes = await session.execute(
+            select(
+                TargetIsotope,
+                literal(0).label("selection"),
+            ).filter(
+                TargetIsotope.target_ion_id.in_(
+                    [ti.target_ion_id for ti in target_ions]
+                )
+            )
+        )
+        target_isotopes = target_isotopes.scalars().all()
+
+        return {
+            "target_collections_count": len(target_collections),
+            "target_compounds_count": len(target_compounds),
+            "target_ions_count": len(target_ions),
+            "target_isotopes_count": len(target_isotopes),
+            "target_collections": [
+                tc.to_dict(include_selection=True) for tc in target_collections
+            ],
+            "target_compounds": target_compounds_dict,
+            "target_ions": target_ions_dict,
+            "target_isotopes": [
+                ti.to_dict(include_selection=True) for ti in target_isotopes
+            ],
+        }
