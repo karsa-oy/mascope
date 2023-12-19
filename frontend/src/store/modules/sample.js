@@ -30,7 +30,6 @@ export default {
     },
     async loadMatches({ rootState, rootGetters, state, commit }) {
       const sampleItemId = state.active.sample_item_id;
-      const filterParams = rootGetters["batch/filterParams"];
 
       // Check if matches exist for the given sampleItemId
       try {
@@ -44,10 +43,7 @@ export default {
 
       // Get detailed sample data
       try {
-        const response = await rootState.api.httpClient.getSampleById(
-          sampleItemId,
-          filterParams
-        );
+        const response = await rootState.api.httpClient.getSample(sampleItemId);
         if (response && response.data) {
           let matchCollections = response.data.data.match_collections;
 

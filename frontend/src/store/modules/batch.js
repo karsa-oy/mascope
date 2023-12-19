@@ -18,30 +18,12 @@ const state = {
   // build parameters
   paramCalibrationCollection: null,
   paramIonMechanisms: null,
-  // filter parameters
-  paramIsotopeRatioTolerance: null,
-  paramMinIsotopeAbundance: null,
-  paramMinIsotopeCorrelation: null,
-  paramMzTolerance: null,
-  paramPeakMinIntensity: null,
-  paramPeakMinSeparation: null,
-  paramPossibleMatchThreshold: null,
-  paramProbableMatchThreshold: null,
 };
 
 const paramDefaults = {
   // build parameters
   paramCalibrationCollection: [],
   paramIonMechanisms: [],
-  // filter parameters
-  paramIsotopeRatioTolerance: 0.1,
-  paramMinIsotopeAbundance: 0.15,
-  paramMinIsotopeCorrelation: 0.8,
-  paramMzTolerance: 15,
-  paramPeakMinIntensity: 0,
-  paramPeakMinSeparation: null,
-  paramPossibleMatchThreshold: 0.7,
-  paramProbableMatchThreshold: 0.8,
 };
 
 // initialize parameter values in state with defaults
@@ -79,11 +61,9 @@ export default {
       sampleItemIdActive = null
     ) {
       const batchId = state.active.sample_batch_id;
-      const filterParams = getters["filterParams"];
       const reqBody = {
         sample_batch_id: batchId,
         batch_matches_info: true,
-        filter_params: { ...filterParams },
         sort: "datetime_utc",
         order: "asc",
       };
@@ -121,11 +101,13 @@ export default {
       const ionMechanisms = state.active.build_params.ion_mechanisms;
 
       const body = {
-        sample_batch_id: batchId,
         ion_mechanisms: ionMechanisms,
       };
       try {
-        const response = await rootState.api.httpClient.loadBatchTargets(body);
+        const response = await rootState.api.httpClient.loadBatchTargets(
+          batchId,
+          body
+        );
 
         if (response && response.data) {
           const data = response.data.data;
@@ -234,10 +216,6 @@ export default {
       const buildParams = state.active.build_params;
       for (const param in buildParams) {
         await commit(`SET_PARAM_${param.toUpperCase()}`, buildParams[param]);
-      }
-      const filterParams = state.active.filter_params;
-      for (const param in filterParams) {
-        await commit(`SET_PARAM_${param.toUpperCase()}`, filterParams[param]);
       }
     },
 
@@ -436,18 +414,6 @@ export default {
       return {
         calibration_collection: state.paramCalibrationCollection,
         ion_mechanisms: state.paramIonMechanisms,
-      };
-    },
-    filterParams: (state) => {
-      return {
-        isotope_ratio_tolerance: state.paramIsotopeRatioTolerance,
-        min_isotope_abundance: state.paramMinIsotopeAbundance,
-        min_isotope_correlation: state.paramMinIsotopeCorrelation,
-        mz_tolerance: state.paramMzTolerance,
-        peak_min_intensity: state.paramPeakMinIntensity,
-        peak_min_separation: state.paramPeakMinSeparation,
-        possible_match_threshold: state.paramPossibleMatchThreshold,
-        probable_match_threshold: state.paramProbableMatchThreshold,
       };
     },
     // get all rows as proxy array

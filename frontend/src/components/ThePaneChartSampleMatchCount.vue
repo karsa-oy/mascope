@@ -21,8 +21,6 @@ export default {
       sampleItems: "batch/sampleItems",
       targetCompounds: "batch/targetCompounds",
       matchCompounds: "batch/matchCompounds",
-      possibleMatchThreshold: "batch/paramPossibleMatchThreshold",
-      probableMatchThreshold: "batch/paramProbableMatchThreshold",
     }),
     data: function () {
       if (!(this.sampleItems && this.matchCompounds)) return [];

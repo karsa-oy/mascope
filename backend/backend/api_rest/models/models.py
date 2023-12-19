@@ -59,7 +59,6 @@ class SampleBatch(Base):
     sample_batch_name = Column(String)
     sample_batch_description = Column(Text)
     build_params = Column(JSON)
-    filter_params = Column(JSON)
     sample_batch_utc_created = Column(TIMESTAMP)
     sample_batch_utc_modified = Column(TIMESTAMP)
 
@@ -69,6 +68,10 @@ class SampleBatch(Base):
         "SampleItem",
         back_populates="sample_batch",
         cascade="all, delete, delete-orphan",
+    )
+    sample = relationship(
+        "Sample",
+        back_populates="sample_batch",
     )
     target_collection = relationship(
         "TargetCollectionInSampleBatch",
@@ -247,6 +250,7 @@ class TargetIon(Base):
         String, ForeignKey("ionization_mechanism.ionization_mechanism_id")
     )
     target_ion_formula = Column(String)
+    filter_params = Column(JSON)
 
     # Define relationships
     target_compound = relationship(
@@ -381,7 +385,7 @@ class Sample(Base):
     # all columns read-only
     sample_item_id = Column(String, primary_key=True)
     sample_file_id = Column(String)
-    sample_batch_id = Column(String)
+    sample_batch_id = Column(String, ForeignKey("sample_batch.sample_batch_id"))
     sample_item_name = Column(String)
     filename = Column(String)
     instrument = Column(String)
@@ -396,3 +400,6 @@ class Sample(Base):
     datetime_utc = Column(TIMESTAMP)
     sample_item_utc_created = Column(TIMESTAMP)
     sample_item_utc_modified = Column(TIMESTAMP)
+
+    # Define relationships
+    sample_batch = relationship("SampleBatch", back_populates="sample")

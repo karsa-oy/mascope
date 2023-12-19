@@ -4,7 +4,7 @@ from sqlalchemy.future import select
 from datetime import datetime
 from backend.db_api_rest import async_session
 
-from backend.server import sio
+from backend.socket_events import sio
 
 from backend.db.id import gen_id
 from ..models.models import SampleFile
@@ -12,6 +12,18 @@ from ..models.pydantic_models.sample_file_pydantic_model import (
     SampleFileCreate,
     SampleFileUpdate,
 )
+
+from lib.file_func import load_file
+from lib.peak import get_peaks
+
+
+# ===================================================================
+# Controller functions
+# ===================================================================
+
+# ---------------------
+# CRUD functions
+# ---------------------
 
 
 async def get_sample_files(
@@ -140,3 +152,90 @@ async def update_sample_file(sample_file_id: str, sample_file: SampleFileUpdate)
         await session.refresh(db_sample_file)
 
         return db_sample_file
+
+
+# ---------------------
+# Peak functions
+# ---------------------
+
+
+async def get_sample_file_peaks(sample_file_id: str) -> dict:
+    """Get peaks of given sample file
+
+    :param sample_file_id: Sample file ID
+    :type sample_file_id: str
+    :raises HTTPException: Raised if sample file is not found
+    :return: Dictionary with keys:
+        "mz": list of m/z of the peaks in sample file
+        "intensity": peak intensity (area)
+    :rtype: dict
+    """
+    sample_file = await get_sample_file_by_id(sample_file_id)
+    filename = sample_file["filename"]
+    try:
+        sample_file = load_file(filename, vars=["peak_areas"])
+        peaks = get_peaks(sample_file, "area").sum(dim="time")
+    except FileNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Sample file with name {filename} not found",
+        )
+
+    return {
+        "mz": list(peaks.mz.values.astype(float)),
+        "intensity": list(peaks.values.astype(float)),
+    }
+
+
+async def get_sample_file_peak_timeseries(
+    sample_file_id: str, peak_mz: float, peak_mz_tolerance_ppm: float
+) -> dict:
+    """Get timeseries of a given peak in a given sample file.
+
+    Returns the timeseries of a closest peak to a given m/z, if found
+    within given m/z tolerance.
+
+    :param sample_file_id: Sample file ID
+    :type sample_file_id: str
+    :param peak_mz: m/z of the peak to get timeseries for
+    :type peak_mz: float
+    :param peak_mz_tolerance_ppm: Tolerance for m/z difference
+        for the requested peak and the nearest one found from data
+    :type peak_mz_tolerance_ppm: float
+    :raises HTTPException: Raised if sample file is not found
+    :return: Dictionary with keys:
+        "mz": m/z of the peak in sample file (None if no peak within tolerance)
+        "intensity": peak height at time points (empty if no peak within tolerance)
+        "time": time coordinates (empty if no peak within tolerance)
+    :rtype: dict
+    """
+
+    sample_file = await get_sample_file_by_id(sample_file_id)
+    filename = sample_file["filename"]
+    try:
+        sample_file = load_file(filename, vars=["peak_heights"])
+        peaks = get_peaks(sample_file, "height")
+    except FileNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Sample file with name {filename} not found",
+        )
+    # From sample file peaks, select nearest to requested peak m/z
+    peak_timeseries = peaks.sel(mz=peak_mz, method="nearest")
+    peak_mz_data = peak_timeseries.mz.item()
+    # Calculate difference of the sample peak m/z to requested peak m/z
+    mz_diff = peak_mz_data - peak_mz  # [Th]
+    mz_diff_ppm = mz_diff / peak_mz * 1e6  # [ppm]
+    if abs(mz_diff_ppm) > peak_mz_tolerance_ppm:
+        # No peak found within given m/z tolerance
+        return {
+            "mz": None,
+            "intensity": [],
+            "time": [],
+        }
+
+    return {
+        "mz": peak_mz_data,
+        "intensity": list(peak_timeseries.values),
+        "time": list(peak_timeseries.time.values),
+    }

@@ -73,9 +73,6 @@
                 >
                 </b-table>
               </b-tab-item>
-              <b-tab-item label="Settings">
-                <the-pane-settings-batch></the-pane-settings-batch>
-              </b-tab-item>
             </b-tabs>
           </section>
           <footer class="modal-card-foot">
@@ -201,16 +198,12 @@
 </template>
 
 <script>
-import ThePaneSettingsBatch from "./ThePaneSettingsBatch.vue";
 import { mapMutations, mapActions } from "vuex";
 import { call, get, sync } from "vuex-pathify";
 import { generateCopyName } from "../store/modules/apiHelper";
 
 export default {
   name: "TheModalSampleBatchOp",
-  components: {
-    ThePaneSettingsBatch,
-  },
   data: function () {
     return {
       batchName: null,
@@ -239,7 +232,6 @@ export default {
       batchActive: "batch/active",
       batches: "workspace/batches",
       batchCalibrationCollectionId: "batch/paramCalibrationCollection",
-      batchFilterParams: "batch/filterParams",
       batchIonMechanismIds: "batch/paramIonMechanisms",
       batchTargetCollections: "batch/targetCollections",
       ionMechanismsAll: "app/ionMechanisms",
@@ -261,7 +253,6 @@ export default {
               this.calibrationCollectionSelected.target_collection_id,
             ion_mechanisms: this.ionMechanismIds,
           },
-          filter_params: this.batchFilterParams,
           target_collection_id: this.targetCollectionIds,
         };
       } else if (this.actionIs("update")) {
@@ -275,7 +266,6 @@ export default {
               this.calibrationCollectionSelected.target_collection_id,
             ion_mechanisms: this.ionMechanismIds,
           },
-          filter_params: this.batchFilterParams,
           target_collection_id: this.targetCollectionIds,
           sample_batch_utc_created: this.batchActive.sample_batch_utc_created,
         };

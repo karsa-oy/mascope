@@ -47,8 +47,6 @@ export default {
     ...get({
       batchActive: "batch/active",
       matchCompounds: "batch/matchCompounds",
-      paramPossibleMatchThreshold: "batch/paramPossibleMatchThreshold",
-      paramProbableMatchThreshold: "batch/paramProbableMatchThreshold",
       sampleItems: "batch/sampleItems",
       targetCompounds: "batch/targetCompounds",
     }),
@@ -70,7 +68,7 @@ export default {
       // Loop through target compounds, make traces and push to data
       for (let targetCompoundId of allCompoundIds) {
         let y = [];
-        let compoundMaxMatchScore = 0;
+        let compoundMaxMatchCategory;
         for (let sampleItemId of x) {
           let itemMatches = this.matchCompounds.filter(
             (row) => row.sample_item_id === sampleItemId
@@ -79,31 +77,25 @@ export default {
             .filter((match) => match.target_compound_id === targetCompoundId)
             .map((compoundMatch) =>
               Object.fromEntries([
-                ["match_score", compoundMatch.match_score],
+                ["match_category", compoundMatch.match_category],
                 ["intensity", compoundMatch.sample_peak_area_sum],
               ])
             )[0];
           if (sampleItemCompoundStats) {
             y.push(
-              sampleItemCompoundStats.match_score >=
-                this.paramPossibleMatchThreshold
+              sampleItemCompoundStats.match_category > 0
                 ? sampleItemCompoundStats.intensity
                 : null
             );
           } else {
             y.push(null);
           }
-
-          compoundMaxMatchScore = Math.max(
-            sampleItemCompoundStats ? sampleItemCompoundStats.match_score : 0,
-            compoundMaxMatchScore
-          );
+          compoundMaxMatchCategory =
+            sampleItemCompoundStats?.match_category || 0;
         }
         if (y.every((intensity) => intensity === null)) continue;
         let compoundSymbol =
-          compoundMaxMatchScore >= this.paramProbableMatchThreshold
-            ? "square"
-            : "square-open";
+          compoundMaxMatchCategory === 2 ? "square" : "square-open";
         let compoundColor = compoundColors[targetCompoundId];
         let compound = this.targetCompounds.filter(
           (target) => target.target_compound_id === targetCompoundId

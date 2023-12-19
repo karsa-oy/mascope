@@ -1,8 +1,10 @@
-from fastapi import APIRouter, BackgroundTasks, Request
+from fastapi import APIRouter, BackgroundTasks, Request, Query, Body
+from typing import List
 
 from ..controllers.sample_batches_controller import (
-    get_sample_batch_by_id,
     get_sample_batches,
+    get_sample_batch,
+    get_batch_targets,
     create_sample_batch,
     delete_sample_batch,
     update_sample_batch,
@@ -32,9 +34,11 @@ async def get_sample_batches_route(
     return await get_sample_batches(workspace_id, sort, order, page, limit)
 
 
-@sample_batches_router.get("/api/sample_batches/{sample_batch_id}")
-async def get_sample_batch_by_id_route(sample_batch_id: str):
-    return await get_sample_batch_by_id(sample_batch_id)
+@sample_batches_router.get("/api/sample_batches/")
+async def get_sample_batch_route(
+    sample_batch_id: str = Query(..., description="The sample batch ID"),
+):
+    return await get_sample_batch(sample_batch_id)
 
 
 @sample_batches_router.post("/api/sample_batches")
@@ -96,3 +100,12 @@ async def sample_batch_export_peaks_route(
     return {
         "status": f"The export peaks process for batch '{sample_batch.sample_batch_name}' has started"
     }
+
+
+@sample_batches_router.post("/api/sample_batches/{sample_batch_id}/targets")
+async def get_batch_targets_route(
+    sample_batch_id: str,
+    ion_mechanisms: List[str] = Body(..., embed=True),
+):
+    result = await get_batch_targets(sample_batch_id, ion_mechanisms)
+    return {"message": "Fetched targets successfully.", "data": result}

@@ -1,9 +1,11 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Query, Body
 
 from ..controllers.target_ions_controller import (
-    get_target_ion_by_id,
     get_target_ions,
+    get_target_ion,
+    update_target_ion,
 )
+from ..models.pydantic_models.target_ion_pydantic_model import TargetIonUpdate
 
 target_ions_router = APIRouter()
 
@@ -30,5 +32,17 @@ async def get_target_ions_route(
 
 
 @target_ions_router.get("/api/target_ions/{target_ion_id}")
-async def get_target_ion_by_id_route(target_ion_id: str):
-    return await get_target_ion_by_id(target_ion_id)
+async def get_target_ion_route(
+    target_ion_id: str,
+):
+    return await get_target_ion(
+        target_ion_id=target_ion_id,
+    )
+
+
+@target_ions_router.patch("/api/target_ions/{target_ion_id}")
+async def update_target_collection_route(
+    target_ion_id: str,
+    target_ion_update: TargetIonUpdate = Body(...),
+):
+    return await update_target_ion(target_ion_id, target_ion_update)

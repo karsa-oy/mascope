@@ -47,7 +47,7 @@ async def detect_peaks(
         raise ValueError(
             """
             Argument 'if_exists' must be one of 'fail', 'append', 'replace'
-        """
+            """
         )
     peakshape, R = instrument_functions
     dmz = 0.5
