@@ -82,3 +82,9 @@ export function generateCopyName(originalName) {
     return `${cleanedName} Copy`;
   }
 }
+
+export function snakeToCamel(snakeCaseStr) {
+  return snakeCaseStr.replace(/(_\w)/g, (match) => {
+    return match[1].toUpperCase();
+  });
+}

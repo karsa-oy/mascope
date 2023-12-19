@@ -2,7 +2,12 @@ from fastapi import HTTPException
 from sqlalchemy import asc, desc, func
 from sqlalchemy.future import select
 from backend.db_api_rest import async_session
+from backend.db.id import gen_id
+
 from ..models.models import IonizationMechanism
+from ..models.pydantic_models.ionization_mechanism_pydantic_model import (
+    IonizationMechanismCreate,
+)
 
 
 async def get_ionization_mechanisms(
@@ -50,7 +55,7 @@ async def get_ionization_mechanisms(
         }
 
 
-async def get_ionization_mechanism_by_id(ionization_mechanism_id: str):
+async def get_ionization_mechanism(ionization_mechanism_id: str):
     async with async_session() as session:
         stmt = select(IonizationMechanism).filter(
             IonizationMechanism.ionization_mechanism_id == ionization_mechanism_id
@@ -65,3 +70,24 @@ async def get_ionization_mechanism_by_id(ionization_mechanism_id: str):
             )
 
         return ionization_mechanism.to_dict()
+
+
+async def create_ionization_mechanism(ionization_mechanism: IonizationMechanismCreate):
+    async with async_session() as session:
+        new_ionization_mechanism = IonizationMechanism(
+            ionization_mechanism_id=gen_id(11),
+            ionization_mechanism_polarity=ionization_mechanism.ionization_mechanism_polarity,
+            ionization_mechanism=ionization_mechanism.ionization_mechanism,
+            reagent=ionization_mechanism.reagent,
+        )
+        session.add(new_ionization_mechanism)
+        await session.commit()
+        await session.refresh(new_ionization_mechanism)
+
+        if not new_ionization_mechanism:
+            raise HTTPException(
+                status_code=400,
+                detail="Failed to create ionization mechanism",
+            )
+
+        return new_ionization_mechanism.to_dict()

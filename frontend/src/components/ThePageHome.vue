@@ -137,7 +137,6 @@ import BaseTable from "./BaseTable.vue";
 import BaseWorkspaceTile from "./BaseWorkspaceTile.vue";
 import TheLayoutSidebar from "./TheLayoutSidebar.vue";
 import ThePaneBrowser from "./ThePaneBrowser.vue";
-import ThePaneSettingsBatch from "./ThePaneSettingsBatch.vue";
 
 import { mapMutations } from "vuex";
 import { call, get, sync } from "vuex-pathify";
@@ -149,7 +148,6 @@ export default {
     BaseWorkspaceTile,
     TheLayoutSidebar,
     ThePaneBrowser,
-    ThePaneSettingsBatch,
   },
   data: function () {
     return {

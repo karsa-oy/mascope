@@ -184,6 +184,7 @@ async def create_target_compound(
                         "ionization_mechanism_id"
                     ],
                     target_ion_formula=raw_ion.formula + charge_string(raw_ion),
+                    filter_params={},
                 )
 
                 nonlocal target_ions
@@ -212,6 +213,7 @@ async def create_target_compound(
                 target_compound_id=target_compound.target_compound_id,
                 ionization_mechanism_id=ionization_mechanism["ionization_mechanism_id"],
                 target_ion_formula=(f"{target_compound_mass:.4f}" + mechanism),
+                filter_params={},
             )
 
             nonlocal target_ions

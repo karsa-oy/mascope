@@ -25,6 +25,26 @@
         <section class="modal-card-body">
           <the-pane-sample-signal></the-pane-sample-signal>
 
+          <!-- Ion-specific Filter Settings section -->
+          <b-collapse :open="false" animation="slide">
+            <template #trigger>
+              <!-- <section style="padding: 0em"> -->
+              <section style="display: flex; justify-content: flex-end">
+                <b-button
+                  icon-right="wrench"
+                  size="is-small"
+                  @click="
+                    (props) => {
+                      props.open = !props.open;
+                    }
+                  "
+                  >Settings
+                </b-button>
+              </section>
+            </template>
+            <the-pane-filter-settings-ion></the-pane-filter-settings-ion>
+          </b-collapse>
+
           <!-- Match Rating section -->
           <div>
             <label class="label"> Rate this match:</label>
@@ -46,7 +66,7 @@
                     <th>Isotope m/z</th>
                     <th>Match Score</th>
                     <th>Relative Abundance</th>
-                    <th>Batch Filtering Parameters</th>
+                    <th>Match Filtering Thresholds</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -184,15 +204,17 @@
 
 <script>
 import ThePaneSampleSignal from "./ThePaneSampleSignal.vue";
+import ThePaneFilterSettingsIon from "./ThePaneFilterSettingsIon.vue";
 import BaseTagMatch from "./BaseTagMatch.vue";
 
-import { mapActions, mapMutations } from "vuex";
-import { get, sync } from "vuex-pathify";
+import { mapMutations } from "vuex";
+import { call, get, sync } from "vuex-pathify";
 
 export default {
   name: "TheModalSampleItemTargetIon",
   components: {
     ThePaneSampleSignal,
+    ThePaneFilterSettingsIon,
     BaseTagMatch,
   },
   props: {},
@@ -212,12 +234,13 @@ export default {
       sampleItem: "sample/active",
       ionInFocus: "visualization/ionInFocus",
       isotopesInFocus: "visualization/isotopesInFocus",
-      filterParamPossibleMatchThreshold: "batch/paramPossibleMatchThreshold",
-      filterParamMzTolerance: "batch/paramMzTolerance",
-      filterParamIsotopeRatioTolerance: "batch/paramIsotopeRatioTolerance",
-      filterParamMinIsotopeAbundance: "batch/paramMinIsotopeAbundance",
-      filterParamPeakMinIntensity: "batch/paramPeakMinIntensity",
-      filterParamMinIsotopeCorrelation: "batch/paramMinIsotopeCorrelation",
+      paramMzTolerance: "visualization/paramMzTolerance",
+      paramMinIsotopeAbundance: "visualization/paramMinIsotopeAbundance",
+      paramIsotopeRatioTolerance: "visualization/paramIsotopeRatioTolerance",
+      paramPeakMinIntensity: "visualization/paramPeakMinIntensity",
+      paramMinIsotopeCorrelation: "visualization/paramMinIsotopeCorrelation",
+      paramProbableMatchThreshold: "visualization/paramProbableMatchThreshold",
+      paramPossibleMatchThreshold: "visualization/paramPossibleMatchThreshold",
     }),
     ...sync({
       modalActive: "modal/sampleItemTargetIonActive",
@@ -254,13 +277,13 @@ export default {
       }
       if (
         this.matchRating === "2" &&
-        this.ionInFocus.match_score < this.filterParamPossibleMatchThreshold
+        this.ionInFocus.match_score < this.paramPossibleMatchThreshold
       ) {
         return true;
       }
       if (
         this.matchRating === "0" &&
-        this.ionInFocus.match_score > this.filterParamPossibleMatchThreshold
+        this.ionInFocus.match_score > this.paramPossibleMatchThreshold
       ) {
         return true;
       }
@@ -274,7 +297,10 @@ export default {
     },
   },
   methods: {
-    ...mapActions("visualization", ["submitMatchRating"]),
+    ...call({
+      submitMatchRating: "visualization/submitMatchRating",
+      resetVisualization: "visualization/reset",
+    }),
     ...mapMutations({
       deactivateModal: "modal/deactivate",
     }),
@@ -298,6 +324,7 @@ export default {
     deactivateModalResetForm() {
       this.deactivateModal();
       this.resetForm();
+      this.resetVisualization();
     },
     // Function to return display text for isotope rating
     getIsotopeRatingText(value) {
@@ -332,46 +359,46 @@ export default {
     },
     getFailedFilters(isotope) {
       let failedFilters = [];
-      if (Math.abs(isotope.match_mz_error) > this.filterParamMzTolerance) {
+      if (Math.abs(isotope.match_mz_error) > this.paramMzTolerance) {
         failedFilters.push({
           filter: "m/z tolerance",
           isotopeValue: `Isotope m/z error is ${isotope.match_mz_error.toFixed(
             2
           )}`,
-          threshold: this.filterParamMzTolerance,
+          threshold: this.paramMzTolerance,
         });
       }
       if (
         Math.abs(isotope.match_abundance_error) >
-        this.filterParamIsotopeRatioTolerance
+        this.paramIsotopeRatioTolerance
       ) {
         failedFilters.push({
           filter: "Isotope ratio tolerance",
           isotopeValue: `Match abundance error is ${isotope.match_abundance_error.toFixed(
             2
           )}`,
-          threshold: this.filterParamIsotopeRatioTolerance,
+          threshold: this.paramIsotopeRatioTolerance,
         });
       }
-      if (isotope.sample_peak_area < this.filterParamPeakMinIntensity) {
+      if (isotope.sample_peak_area < this.paramPeakMinIntensity) {
         failedFilters.push({
           filter: "Minimum peak intensity",
           isotopeValue: `Sample peak area is ${isotope.sample_peak_area.toFixed(
             2
           )}`,
-          threshold: this.filterParamPeakMinIntensity,
+          threshold: this.paramPeakMinIntensity,
         });
       }
       if (
         Math.max(isotope.match_isotope_correlation, 0) <
-        this.filterParamMinIsotopeCorrelation
+        this.paramMinIsotopeCorrelation
       ) {
         failedFilters.push({
           filter: "Minimum isotope correlation",
           isotopeValue: `Match isotope correlation is ${isotope.match_isotope_correlation.toFixed(
             2
           )}`,
-          threshold: this.filterParamMinIsotopeCorrelation,
+          threshold: this.paramMinIsotopeCorrelation,
         });
       }
       return failedFilters;
