@@ -53,6 +53,10 @@ class GetSamplesBody(BaseModel):
     page: Optional[int] = 0
     limit: Optional[int] = 10000
     batch_matches_info: Optional[bool] = False
+    match_samples: Optional[bool] = True
+    match_compounds: Optional[bool] = True
+    match_ions: Optional[bool] = True
+    match_isotopes: Optional[bool] = False
 
 
 class GetSampleIonMatchesBody(BaseModel):

@@ -358,7 +358,7 @@ import ThePaneBrowserTarget from "./ThePaneBrowserTarget.vue";
 import ThePaneSettingsCalibration from "./ThePaneSettingsCalibration.vue";
 
 import * as _ from "underscore";
-import { mapActions, mapMutations } from "vuex";
+import { mapMutations } from "vuex";
 import { call, get, sync } from "vuex-pathify";
 import { genId } from "../lib/util";
 
@@ -489,8 +489,6 @@ export default {
       matchItemCompute: "sample/matchItemCompute",
     }),
     ...mapMutations({}),
-    // ...mapActions("sample", ["matchItemCompute"]),
-    // ...mapActions("calibration", ["calibrationMzFit", "calibrationMzApply"]),
     clone(obj) {
       return JSON.parse(JSON.stringify(obj));
     },
@@ -601,7 +599,7 @@ export default {
       }
     },
     sampleMaxMatchCategory(newValue, oldValue) {
-      if (this.sampleMaxMatchCategory === 2) {
+      if (this.sampleMaxMatchCategory > 0) {
         this.activeStep = 2;
       }
     },

@@ -145,26 +145,26 @@ async def aggregate_match_isotopes(
         [
             "match_score",
             "match_category",
+            "mz",
             "match_mz_error",
+            "relative_abundance",
             "match_abundance_error",
             "match_isotope_correlation",
-            "mz",
-            "relative_abundance",
-            "sample_item_id",
-            "filename",
-            "sample_item_name",
-            "sample_item_type",
             "sample_peak_area",
             "sample_peak_area_relative",
             "sample_peak_mz",
             "sample_peak_tof",
             "sample_peak_interference",
+            "instrument",
+            "filename",
+            "sample_item_name",
+            "sample_item_id",
+            "sample_item_type",
             "target_isotope_id",
             "target_ion_id",
             "target_ion_formula",
             "target_ion_mechanism",
             "filter_params",
-            "instrument",
             "target_compound_id",
             "target_collection_id",
             "target_collection_name",
@@ -180,8 +180,14 @@ async def aggregate_match_isotopes(
             "target_collection_id",
             "target_collection_name",
             "target_collection_description",
+            "target_compound_name",
+            "target_compound_formula",
+            "target_ion_formula",
+            "target_ion_mechanism",
+            "filter_params",
+            "sample_item_type",
         ]
-    ).drop_duplicates(subset="target_isotope_id")
+    ).drop_duplicates(subset=["target_isotope_id", "sample_item_id"])
 
     return match_isotopes_data_df, match_isotopes_df
 
@@ -473,9 +479,12 @@ async def get_samples(
     page: int = 0,
     limit: int = 10000,
     batch_matches_info: bool = False,
+    match_samples: bool = False,
+    match_compounds: bool = False,
+    match_ions: bool = False,
+    match_isotopes: bool = False,
 ):
     message = ""
-
     async with async_session() as session:
         stmt = select(Sample)
 
@@ -570,25 +579,30 @@ async def get_samples(
                 }
                 return result_dict
 
-            # 1) Aggregate fields for matchIons
-            match_ions_data_df, match_ions_df = await aggregate_match_ions(
+            # 1) Aggregate fields for matchIsotopes
+            match_isotopes_data_df, match_isotopes_df = await aggregate_match_isotopes(
                 batch_match_filter_df
+            )
+
+            # 2) Aggregate fields for matchIons
+            match_ions_data_df, match_ions_df = await aggregate_match_ions(
+                match_isotopes_data_df
             )
 
             # set match_category field for ions
             match_ions_data_df = await set_ions_match_category(match_ions_data_df)
             match_ions_df = await set_ions_match_category(match_ions_df)
 
-            # 2) Aggregate fields for matchCompounds
+            # 3) Aggregate fields for matchCompounds
             (
                 match_compounds_data_df,
                 match_compounds_df,
             ) = await aggregate_match_compounds(match_ions_data_df)
-            # 3)  Aggregate fields for matchSamples
-            # Calculate and add fields match_score, sample_peak_area_sum, sample_peak_interference_sum, matched, selection
+            # 4)  Aggregate fields for matchSamples
+            # Calculate and add fields match_score, sample_peak_area_sum, sample_peak_interference_sum, matched
             match_samples_df = await aggregate_match_samples(match_compounds_data_df)
 
-            # 4)  Merge fields for samples data
+            # 5)  Merge fields for samples data
             samples_df = await compile_samples_df(samples_df, match_samples_df)
 
         result_dict = {
@@ -596,24 +610,51 @@ async def get_samples(
             "data": samples_df.to_dict("records"),
             "message": message,
         }
-        # If batch_matches_info is true, calculate matches and add match dataframes to the result
+
+        # Conditionally add match data to the result if batch_matches_info is True
         if batch_matches_info and sample_batch_id:
-            result_dict["batch_matches_info"] = {
-                "matches": {
-                    "match_ions": len(match_ions_df),
-                    "match_compounds": len(match_compounds_df),
-                    "match_samples": len(match_samples_df),
-                },
-                "match_samples": match_samples_df.sort_values(
+            batch_matches_info_dict = {"matches": {}}
+
+            # Add each match type conditionally
+            if match_samples:
+                batch_matches_info_dict["matches"]["match_samples"] = len(
+                    match_samples_df
+                )
+                batch_matches_info_dict["match_samples"] = match_samples_df.sort_values(
                     by=["match_category", "match_score"], ascending=[False, False]
-                ).to_dict("records"),
-                "match_compounds": match_compounds_df.sort_values(
+                ).to_dict("records")
+
+            if match_compounds:
+                batch_matches_info_dict["matches"]["match_compounds"] = len(
+                    match_compounds_df
+                )
+                batch_matches_info_dict[
+                    "match_compounds"
+                ] = match_compounds_df.sort_values(
                     by=["match_category", "match_score"], ascending=[False, False]
-                ).to_dict("records"),
-                "match_ions": match_ions_df.sort_values(
+                ).to_dict(
+                    "records"
+                )
+
+            if match_ions:
+                batch_matches_info_dict["matches"]["match_ions"] = len(match_ions_df)
+                batch_matches_info_dict["match_ions"] = match_ions_df.sort_values(
                     by=["match_category", "match_score"], ascending=[False, False]
-                ).to_dict("records"),
-            }
+                ).to_dict("records")
+
+            if match_isotopes:
+                batch_matches_info_dict["matches"]["match_isotopes"] = len(
+                    match_isotopes_df
+                )
+                batch_matches_info_dict[
+                    "match_isotopes"
+                ] = match_isotopes_df.sort_values(
+                    by=["match_category", "match_score"], ascending=[False, False]
+                ).to_dict(
+                    "records"
+                )
+
+            result_dict["batch_matches_info"] = batch_matches_info_dict
 
         return result_dict
 
@@ -809,26 +850,30 @@ async def init_batch_match_filter(sample_batch_id: str):
             select(
                 Sample.filename,
                 Sample.instrument,
-                TargetIsotope.relative_abundance,
                 Sample.sample_item_id,
                 Sample.sample_item_name,
                 Sample.sample_item_type,
-                TargetCompound.target_compound_formula,
-                TargetCompound.target_compound_id,
-                TargetCompound.target_compound_name,
                 TargetCollection.target_collection_id,
                 TargetCollection.target_collection_name,
                 TargetCollection.target_collection_description,
+                TargetCompound.target_compound_formula,
+                TargetCompound.target_compound_id,
+                TargetCompound.target_compound_name,
                 TargetIon.target_ion_formula,
                 TargetIon.target_ion_id,
                 TargetIon.filter_params,
                 IonizationMechanism.ionization_mechanism.label("target_ion_mechanism"),
                 TargetIsotope.target_isotope_id,
+                TargetIsotope.mz,
+                TargetIsotope.relative_abundance,
+                MatchInterference.sample_peak_interference,
                 Match.match_mz_error,
                 Match.match_abundance_error,
                 Match.match_isotope_correlation,
-                MatchInterference.sample_peak_interference,
                 Match.sample_peak_area,
+                Match.sample_peak_area_relative,
+                Match.sample_peak_mz,
+                Match.sample_peak_tof,
                 Match.match_score,
             )
             .select_from(Sample)
@@ -899,6 +944,8 @@ async def init_batch_match_filter(sample_batch_id: str):
                 isotope_ratio_tolerance = ion_filters["isotope_ratio_tolerance"]
                 peak_min_intensity = ion_filters["peak_min_intensity"]
                 min_isotope_correlation = ion_filters["min_isotope_correlation"]
+                probable_match_threshold = ion_filters["probable_match_threshold"]
+                possible_match_threshold = ion_filters["possible_match_threshold"]
             else:
                 # Use default filter parameters if target ion-specific filter_params are not provided
                 mz_tolerance = DEFAULT_MZ_TOLERANCE
@@ -906,6 +953,8 @@ async def init_batch_match_filter(sample_batch_id: str):
                 isotope_ratio_tolerance = DEFAULT_ISOTOPE_RATIO_TOLERANCE
                 peak_min_intensity = DEFAULT_PEAK_MIN_INTENSITY
                 min_isotope_correlation = DEFAULT_MIN_ISOTOPE_CORRELATION
+                probable_match_threshold = DEFAULT_PROBABLE_MATCH_THRESHOLD
+                possible_match_threshold = DEFAULT_POSSIBLE_MATCH_THRESHOLD
 
             # Apply the filters to each row
             row["match_score"] = (
@@ -935,6 +984,16 @@ async def init_batch_match_filter(sample_batch_id: str):
                     ]
                 )
                 else 0
+            )
+
+            # Assign match category based on thresholds
+            match_score = row["match_score"]
+            row["match_category"] = (
+                2  # Probable match
+                if match_score >= probable_match_threshold
+                else 1  # Possible match
+                if possible_match_threshold <= match_score < probable_match_threshold
+                else 0  # No match
             )
 
         message = (

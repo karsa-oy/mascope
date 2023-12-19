@@ -34,6 +34,10 @@ async def get_samples_route(
         page=body.page,
         limit=body.limit,
         batch_matches_info=body.batch_matches_info,
+        match_samples=body.match_samples,
+        match_compounds=body.match_compounds,
+        match_ions=body.match_ions,
+        match_isotopes=body.match_isotopes,
     )
 
     response = {
