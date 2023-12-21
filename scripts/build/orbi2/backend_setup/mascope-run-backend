@@ -37,8 +37,8 @@ function run_mascope_backend() {
   echo AAA start mascope api server...
   PYTHONUNBUFFERED=1 mascope-api |& log-rotate -n=7000 -l=$MASCOPE_PRIVATE_LOG_DIR/mascope_api.log &
 
-  echo AAA start file converter for KLTOF1...
-  PYTHONUNBUFFERED=1 file-converter --config $MASCOPE_PRIVATE_CONFIG_DIR/file_converter_config/KLTOF1.yaml --ping |& log-rotate -n=5000 -l=$MASCOPE_PRIVATE_LOG_DIR/converter_KLTOF1.log &
+  echo AAA start file converter for KORBI2...
+  PYTHONUNBUFFERED=1 file-converter --config $MASCOPE_PRIVATE_CONFIG_DIR/file_converter_config/KORBI2.yaml --ping |& log-rotate -n=5000 -l=$MASCOPE_PRIVATE_LOG_DIR/converter_KORBI2.log &
 }
 
 

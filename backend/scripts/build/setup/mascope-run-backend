@@ -73,7 +73,7 @@ install_candies
 run_mascope_backend
 
 echo 
-echo AAA MASCOPE backend should be runninig. Check progress logs in $MASCOPE_PRIVATE_LOG_DIR 
+echo AAA MASCOPE backend should be running. Check progress logs in $MASCOPE_PRIVATE_LOG_DIR 
 echo 
 
 exit 0

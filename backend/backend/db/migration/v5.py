@@ -5,7 +5,7 @@ import sqlite3
 import shutil
 
 from backend.db.conn import conn
-from backend.lib.file import filename_to_zarr_path
+from lib.file_func import filename_to_zarr_path
 
 # patch asyncio to supported run_until_complete
 # when an event loop is already running
