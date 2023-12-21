@@ -28,7 +28,6 @@ function stop_mascope_backend() {
   # kill mascope backend services and corresponding log-rotates from prev.session if any
   pkill -f mascope-api || true
   pkill -f file-converter || true
-  pkill -f file-downloader || true
   pkill log-rotate || true
   sudo lsof -t -i:$MASCOPE_PUBLIC_API_PORT && sudo kill -9 $(sudo lsof -t -i:$MASCOPE_PUBLIC_API_PORT) || true
 }
@@ -48,7 +47,6 @@ function install_prerequisites() {
   [ ! -d "$MASCOPE_PRIVATE_DATABASE_DIR" ] && mkdir -p $MASCOPE_PRIVATE_DATABASE_DIR
   [ ! -d "$MASCOPE_PRIVATE_INSTRUMENT_DIR" ] && mkdir -p $MASCOPE_PRIVATE_INSTRUMENT_DIR
   [ ! -d "$MASCOPE_PRIVATE_CONVERTER_DIR" ] && mkdir -p $MASCOPE_PRIVATE_CONVERTER_DIR
-  [ ! -d "$MASCOPE_PRIVATE_DOWNLOADER_DIR" ] && mkdir -p $MASCOPE_PRIVATE_DOWNLOADER_DIR
   [ ! -d "$MASCOPE_PRIVATE_LOG_DIR" ] && mkdir -p $MASCOPE_PRIVATE_LOG_DIR
   [ ! -d "$MASCOPE_PRIVATE_CONFIG_DIR" ] && mkdir -p $MASCOPE_PRIVATE_CONFIG_DIR
   
