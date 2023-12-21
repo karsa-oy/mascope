@@ -6,7 +6,10 @@ authors = ["Karsa Oy <support@karsa.fi>"]
 license = "Proprietary"
 include = ["backend"]
 packages = [
-    {include = "backend", from ="."},
+    {include = "backend"},
+    {include = "hardware", from ="hardware"},
+    {include = "lib", from ="lib"},
+    {include = "service", from ="service"},
 ]
 
 [build-system]
@@ -61,7 +64,8 @@ websockets = "^10.3"
 xarray = "^2023.10.1"
 zarr = "^2.12.0"
 
+[tool.poetry.group.dev.dependencies]
 # Local dependencies
 hardware = { path = "./hardware", develop = true }
-lib = { path = "./backend/lib", develop = true }
-service = { path = "./backend/service", develop = true }
+lib = { path = "./lib", develop = true }
+service = { path = "./service", develop = true }
