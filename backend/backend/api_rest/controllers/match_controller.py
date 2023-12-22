@@ -207,7 +207,7 @@ async def compute_matches(
     match_isotope_df.loc[:, "match_mz_error"] = (
         1e6
         * (match_isotope_df["sample_peak_mz"] - match_isotope_df["mz"])
-        / match_isotope_df["sample_peak_mz"]
+        / match_isotope_df["mz"]
     )
 
     def score(row):
