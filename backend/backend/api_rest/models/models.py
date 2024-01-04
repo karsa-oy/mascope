@@ -69,10 +69,10 @@ class SampleBatch(Base):
         back_populates="sample_batch",
         cascade="all, delete, delete-orphan",
     )
-    sample = relationship(
-        "Sample",
-        back_populates="sample_batch",
-    )
+    # sample = relationship(
+    #     "Sample",
+    #     back_populates="sample_batch",
+    # )
     target_collection = relationship(
         "TargetCollectionInSampleBatch",
         back_populates="sample_batch",
@@ -402,4 +402,4 @@ class Sample(Base):
     sample_item_utc_modified = Column(TIMESTAMP)
 
     # Define relationships
-    sample_batch = relationship("SampleBatch", back_populates="sample")
+    # sample_batch = relationship("SampleBatch", back_populates="sample")

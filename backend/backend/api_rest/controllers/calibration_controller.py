@@ -449,7 +449,19 @@ async def calibration_mz_fit(
                 Sample.sample_item_id == sample_item_id
             )
         )
-        sample = result.one()
+        sample = result.one_or_none()
+
+        if not sample:
+            # if called from the route function
+            if background_tasks:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Sample with ID {sample_item_id} not found",
+                )
+            # if called from the mz_calibrate_sample
+            else:
+                raise ValueError(f"Sample with ID {sample_item_id} not found")
+
         filename, sample_batch_id = sample.filename, sample.sample_batch_id
 
     # unpack parameters

@@ -64,7 +64,7 @@ async def get_target_collections(sort: str, order: str, page: int, limit: int):
         }
 
 
-async def get_target_collection_by_id(target_collection_id: str):
+async def get_target_collection(target_collection_id: str):
     async with async_session() as session:
         stmt = (
             select(TargetCollection)

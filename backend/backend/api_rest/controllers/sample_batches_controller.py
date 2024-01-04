@@ -581,6 +581,19 @@ async def sample_batch_export_peaks(sample_batch: SampleBatchExportPeaks, sid=No
 
 async def get_batch_targets(sample_batch_id: str, ion_mechanisms: List[str]):
     async with async_session() as session:
+        # Retrieve the sample details
+        stmt = select(SampleBatch).filter(
+            SampleBatch.sample_batch_id == sample_batch_id
+        )
+        result = await session.execute(stmt)
+        sample_batch = result.scalars().first()
+
+        if not sample_batch:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Sample batch with ID {sample_batch_id} not found",
+            )
+
         #   TargetCollections
         # Fetch TargetCollections associated with the sample_batch_id
         target_collections = await session.execute(
@@ -725,7 +738,7 @@ async def get_batch_targets(sample_batch_id: str, ion_mechanisms: List[str]):
         )
         target_isotopes = target_isotopes.scalars().all()
 
-        return {
+        data = {
             "target_collections_count": len(target_collections),
             "target_compounds_count": len(target_compounds),
             "target_ions_count": len(target_ions),
@@ -738,4 +751,9 @@ async def get_batch_targets(sample_batch_id: str, ion_mechanisms: List[str]):
             "target_isotopes": [
                 ti.to_dict(include_selection=True) for ti in target_isotopes
             ],
+        }
+
+        return {
+            "message": "Batch targets are fetched successfully.",
+            "data": data,
         }

@@ -34,9 +34,9 @@ async def get_sample_batches_route(
     return await get_sample_batches(workspace_id, sort, order, page, limit)
 
 
-@sample_batches_router.get("/api/sample_batches/")
+@sample_batches_router.get("/api/sample_batches/{sample_batch_id}")
 async def get_sample_batch_route(
-    sample_batch_id: str = Query(..., description="The sample batch ID"),
+    sample_batch_id: str,
 ):
     return await get_sample_batch(sample_batch_id)
 
@@ -107,5 +107,4 @@ async def get_batch_targets_route(
     sample_batch_id: str,
     ion_mechanisms: List[str] = Body(..., embed=True),
 ):
-    result = await get_batch_targets(sample_batch_id, ion_mechanisms)
-    return {"message": "Fetched targets successfully.", "data": result}
+    return await get_batch_targets(sample_batch_id, ion_mechanisms)

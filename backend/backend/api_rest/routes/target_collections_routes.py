@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Query, BackgroundTasks
 from ..controllers.target_collections_controller import (
-    get_target_collection_by_id,
+    get_target_collection,
     get_target_collections,
     create_target_collection,
     delete_target_collection,
@@ -26,8 +26,8 @@ async def get_target_collections_route(
 
 
 @target_collections_router.get("/api/target_collections/{target_collection_id}")
-async def get_target_collection_by_id_route(target_collection_id: str):
-    return await get_target_collection_by_id(target_collection_id)
+async def get_target_collection_route(target_collection_id: str):
+    return await get_target_collection(target_collection_id)
 
 
 @target_collections_router.post("/api/target_collections")
