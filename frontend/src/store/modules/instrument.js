@@ -1,4 +1,5 @@
-import { dispatch, make } from "vuex-pathify";
+import { make } from "vuex-pathify";
+import { getApiData } from "./apiHelper.js";
 
 const state = {
   active: null,
@@ -18,34 +19,7 @@ export default {
   state,
   mutations: make.mutations(state),
   actions: {
-    async getAcquisitions({ rootState, state, commit }, datetimeRange) {
-      const minDatetime = datetimeRange.min.toISOString();
-      const maxDatetime = datetimeRange.max.toISOString();
-
-      const response = await rootState.api.httpClient.getAllSampleFiles({
-        minDatetime,
-        maxDatetime,
-        instrument: state.active,
-        sort: "datetime_utc",
-        order: "asc",
-      });
-      commit("SET_ACQUISITIONS", response.data.data);
-    },
-    async getRecentAcquisitions({ rootState, state, commit }) {
-      const response = await rootState.api.httpClient.getRecentSampleFiles({
-        instrument: state.active,
-        sort: "datetime_utc",
-        order: "asc",
-      });
-      commit("SET_RECENT_ACQUISITIONS", response.data.data);
-    },
-    async getMzCalibration({ rootState, state, commit }) {
-      const response = await rootState.api.httpClient.getLastMzCalibration({
-        instrument: state.active,
-      });
-      const mz_calibration = response.data ? response.data : null;
-      commit("SET_MZ_CALIBRATION", mz_calibration);
-    },
+    // data loading
     async load({ rootState, commit, dispatch }, instrument) {
       if (state.active) await dispatch("unload");
       rootState.api.emit("subscribe", instrument);
@@ -53,6 +27,41 @@ export default {
       await dispatch("getMzCalibration");
       await dispatch("getRecentAcquisitions");
     },
+
+    async getMzCalibration({ commit, dispatch }) {
+      const mzCalibration = await dispatch("getLastMzCalibration");
+      commit("SET_MZ_CALIBRATION", mzCalibration);
+    },
+
+    async getAcquisitions({ commit, dispatch }, datetimeRange) {
+      const sampleFiles = await dispatch("getSampleFiles", datetimeRange);
+      commit("SET_ACQUISITIONS", sampleFiles);
+    },
+
+    async getRecentAcquisitions({ commit, dispatch }) {
+      const sampleFiles = await dispatch("getRecentSampleFiles");
+      commit("SET_RECENT_ACQUISITIONS", sampleFiles);
+    },
+
+    async resetAcquisitionStatus({ commit }) {
+      commit("SET_ACQUISITION_ACTIVE_FILENAME", null);
+      commit("SET_ACQUISITION_PROGRESS", 0);
+      commit("calibration/SET_CALIBRATION_STATUS", null, { root: true });
+      commit("SET_CONVERSION_PROGRESS", 0);
+      commit("SET_MATCHING_PROGRESS", 0);
+    },
+
+    async unload({ rootState, state, commit, dispatch }) {
+      if (!state.active) return;
+      rootState.api.emit("unsubscribe", state.active);
+      commit("SET_ACTIVE", null);
+      commit("SET_MZ_CALIBRATION", null);
+      commit("SET_ACQUISITIONS", null);
+      commit("SET_RECENT_ACQUISITIONS", null);
+      await dispatch("resetAcquisitionStatus");
+      commit("SET_SCENTHOUND_MODE_ACTIVE", false);
+    },
+
     async matchSample({ rootState, dispatch }) {
       const sampleActive = rootState.sample.active;
       const calibrationVerified =
@@ -67,24 +76,62 @@ export default {
         }, 1000);
       }
     },
-    async resetAcquisitionStatus({ commit }) {
-      commit("SET_ACQUISITION_ACTIVE_FILENAME", null);
-      commit("SET_ACQUISITION_PROGRESS", 0);
-      commit("calibration/SET_CALIBRATION_STATUS", null, { root: true });
-      commit("SET_CONVERSION_PROGRESS", 0);
-      commit("SET_MATCHING_PROGRESS", 0);
+
+    // http client endpoints
+    async getSampleFiles({ state, dispatch }, datetimeRange) {
+      const minDatetime = datetimeRange.min.toISOString();
+      const maxDatetime = datetimeRange.max.toISOString();
+
+      const reqData = {
+        minDatetime,
+        maxDatetime,
+        instrument: state.active,
+        sort: "datetime_utc",
+        order: "asc",
+      };
+
+      const sampleFiles = await getApiData({
+        dispatch,
+        httpMethod: "getAllSampleFiles",
+        requestData: reqData,
+        errorMessage: `Failed to get all sample files.`,
+      });
+
+      return sampleFiles.data;
     },
-    async unload({ rootState, state, commit, dispatch }) {
-      if (!state.active) return;
-      rootState.api.emit("unsubscribe", state.active);
-      commit("SET_ACTIVE", null);
-      commit("SET_MZ_CALIBRATION", null);
-      commit("SET_ACQUISITIONS", null);
-      commit("SET_RECENT_ACQUISITIONS", null);
-      await dispatch("resetAcquisitionStatus");
-      commit("SET_SCENTHOUND_MODE_ACTIVE", false);
+
+    async getRecentSampleFiles({ state, dispatch }) {
+      const reqData = {
+        instrument: state.active,
+        sort: "datetime_utc",
+        order: "asc",
+      };
+
+      const sampleFiles = await getApiData({
+        dispatch,
+        httpMethod: "getRecentSampleFiles",
+        requestData: reqData,
+        errorMessage: `Failed to get recent acquisitions.`,
+      });
+
+      return sampleFiles.data;
     },
-    // notifications
+
+    async getLastMzCalibration({ state, dispatch }) {
+      const reqData = {
+        instrument: state.active,
+      };
+
+      const mzCalibration = await getApiData({
+        dispatch,
+        httpMethod: "getMzCalibration",
+        requestData: reqData,
+        errorMessage: `Failed to get last mz calibration.`,
+      });
+
+      return mzCalibration;
+    },
+    // backend notifications
     async onInstrumentAcquisitionFinished({ commit }, data) {
       commit("SET_ACQUISITION_ACTIVE_FILENAME", data.filename);
       commit("SET_ACQUISITION_PROGRESS", data.progress);

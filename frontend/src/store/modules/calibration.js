@@ -1,5 +1,5 @@
 import { make } from "vuex-pathify";
-import { loadFromApi } from "./apiHelper.js";
+import { getApiData } from "./apiHelper.js";
 
 const state = {
   active: null,
@@ -20,50 +20,66 @@ export default {
     ...make.mutations(state),
   },
   actions: {
-    async load({ commit, rootState }, sample) {
+    // data loading
+    async load({ commit, dispatch }, sample) {
       // reset if previous calibration loaded
       if (state.active) {
         dispatch("unload");
       }
-      const sampleItemId = sample.sample_item_id;
-      const response = await rootState.api.httpClient.getSampleMzCalibration(
-        sampleItemId
+      const sampleMzCalibration = await dispatch(
+        "getSampleMzCalibration",
+        sample
       );
-      await commit("SET_MZ_FIT", response.data);
+      await commit("SET_MZ_FIT", sampleMzCalibration);
     },
+
     async unload({ commit }) {
       await commit("SET_MZ_FIT", null);
       await commit("SET_MZ_FIT_ERROR", null);
       await commit("SET_MZ_FIT_STATS", null);
     },
-    async calibrationMzFit({ commit, rootState }, payload) {
-      const { sample_item_id, params } = payload;
-      const response = await rootState.api.httpClient.calibrationMzFit(
-        sample_item_id,
-        params
-      );
+
+    // http client endpoints
+    async getSampleMzCalibration({ dispatch }, { sample_item_id }) {
+      return await getApiData({
+        dispatch,
+        httpMethod: "getMzCalibration",
+        requestData: {
+          sample_item_id,
+        },
+        errorMessage: `Failed to get sample mz calibration.`,
+      });
     },
 
-    async calibrationMzApply({ rootState }, payload) {
-      const { fit, sample_filename } = payload;
-      await rootState.api.httpClient.calibrationMzApply({
-        fit: fit,
-        sample_filename: sample_filename,
+    async calibrationMzFit({ dispatch }, requestData) {
+      await getApiData({
+        dispatch,
+        httpMethod: "calibrationMzFit",
+        requestData: requestData,
+        errorMessage: `Failed to calibrate mz fit of sample ${requestData.sampleName}.`,
+      });
+    },
+
+    async calibrationMzApply({ dispatch }, requestData) {
+      await getApiData({
+        dispatch,
+        httpMethod: "calibrationMzApply",
+        requestData: requestData,
+        errorMessage: `Failed to apply mz calibration for sample file ${requestData.sample_filename}.`,
       });
     },
     async calibrationMzCalibrateSample({ rootState, rootGetters, dispatch }) {
       const sampleActive = rootState.sample.active;
       if (sampleActive) {
-        const response =
-          await rootState.api.httpClient.calibrationMzCalibrateSample(
-            {
-              filename: sampleActive.filename,
-              sample_item_id: sampleActive.sample_item_id,
-              sample_item_name: sampleActive.sample_item_name,
-              sample_batch_id: sampleActive.sample_batch_id,
-            },
-            rootGetters["calibration/params"]
-          );
+        await rootState.api.httpClient.calibrationMzCalibrateSample(
+          {
+            filename: sampleActive.filename,
+            sample_item_id: sampleActive.sample_item_id,
+            sample_item_name: sampleActive.sample_item_name,
+            sample_batch_id: sampleActive.sample_batch_id,
+          },
+          rootGetters["calibration/params"]
+        );
       } else {
         if (!rootState.instrument.scenthoundModeActive) return;
         setTimeout(() => {
@@ -74,6 +90,7 @@ export default {
     async calibrationMzCalibrateBatch({ rootState }, data) {
       await rootState.api.httpClient.calibrationMzCalibrateBatch(data);
     },
+
     // backend notifications
     // mz_fit
     async onCalibrationMzFitStarted({ commit, dispatch }, data) {

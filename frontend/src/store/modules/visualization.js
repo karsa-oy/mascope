@@ -1,12 +1,9 @@
-import { commit, dispatch, make } from "vuex-pathify";
-import { handleApiRequest, snakeToCamel } from "./apiHelper";
+import { make } from "vuex-pathify";
+import { handleApiRequest, getApiData, snakeToCamel } from "./apiHelper";
 
 const state = {
-  // chart data
-  tracesSignalTimeseries: null,
-  tracesSignalSumSpectrum: null,
-  ionInFocus: {},
-  isotopesInFocus: [],
+  activeIon: null,
+  activeIsotopes: null,
   // filter parameters
   paramMzTolerance: 0,
   paramMinIsotopeAbundance: 0,
@@ -15,6 +12,9 @@ const state = {
   paramMinIsotopeCorrelation: 0,
   paramProbableMatchThreshold: 0,
   paramPossibleMatchThreshold: 0,
+  // chart data
+  tracesSignalTimeseries: null,
+  tracesSignalSumSpectrum: null,
 };
 
 // TODO_configuration Default filter parameters
@@ -35,12 +35,59 @@ export default {
     ...make.mutations(state),
   },
   actions: {
-    async emitVisualization(
-      { rootState, state, dispatch },
-      { sampleId, ionId }
-    ) {
+    // data loading
+    async load({ commit, dispatch }, ion) {
+      await dispatch("unload");
+      await commit("SET_ACTIVE_ION", ion);
+      await dispatch("setFilterParams");
+      await dispatch("loadMatches");
+      await dispatch("emitVisualization");
+    },
+
+    async loadMatches({ commit, dispatch, state }, params = null) {
+      const sampleId = params?.sampleId || state.activeIon.sample_item_id;
+      const ionId = params?.ionId || state.activeIon.target_ion_id;
+
+      const sampleIonData = await dispatch("getSampleIonData", {
+        sampleId,
+        ionId,
+      });
+
+      const existingIsotopes = state.activeIsotopes;
+
+      const activeIsotopes = sampleIonData.match_isotopes.map((isotope) => {
+        let existingIsotope = null;
+        if (existingIsotopes) {
+          existingIsotope = state.activeIsotopes.find(
+            (existing) =>
+              existing.target_isotope_id === isotope.target_isotope_id
+          );
+        }
+
+        return {
+          target_isotope_id: isotope.target_isotope_id,
+          color: existingIsotope?.color || null, // Preserve color if exists
+          mz: isotope.mz.toFixed(4),
+          match_score: isotope.match_score,
+          match_category: isotope.match_category,
+          relative_abundance: isotope.relative_abundance,
+          sample_peak_area: isotope.sample_peak_area,
+          match_mz_error: isotope.match_mz_error,
+          match_abundance_error: isotope.match_abundance_error,
+          match_isotope_correlation: isotope.match_isotope_correlation,
+        };
+      });
+
+      commit("SET_ACTIVE_ION", sampleIonData.match_ions[0]);
+      commit("SET_ACTIVE_ISOTOPES", activeIsotopes);
+    },
+
+    async emitVisualization({ rootState, state, dispatch }, params) {
+      const sampleId = params?.sampleId || state.activeIon.sample_item_id;
+      const ionId = params?.ionId || state.activeIon.target_ion_id;
+
       if (state.tracesSignalTimeseries && state.tracesSignalSumSpectrum)
-        await dispatch("reset");
+        await dispatch("resetVisualization");
       rootState.api.emit(
         "visualization_ion_focus",
         sampleId,
@@ -50,32 +97,33 @@ export default {
         state.paramMzTolerance
       );
     },
-    async reset({ commit }) {
+
+    async reload({ dispatch, state }) {
+      await dispatch("loadMatches");
+      await dispatch("emitVisualization");
+    },
+
+    async resetVisualization({ commit }) {
+      if (!state.tracesSignalTimeseries && !state.tracesSignalSumSpectrum)
+        return;
       await commit("SET_TRACES_SIGNAL_SUM_SPECTRUM", null);
       await commit("SET_TRACES_SIGNAL_TIMESERIES", null);
     },
 
-    async reloadMatches({ dispatch, state }) {
-      const reqData = {
-        sample_item_id: state.ionInFocus.sample_item_id,
-        target_ion_id: state.ionInFocus.target_ion_id,
-        filter_params: {
-          mz_tolerance: state.paramMzTolerance,
-          isotope_ratio_tolerance: state.paramIsotopeRatioTolerance,
-          peak_min_intensity: state.paramPeakMinIntensity,
-          min_isotope_abundance: state.paramMinIsotopeAbundance,
-          min_isotope_correlation: state.paramMinIsotopeCorrelation,
-          probable_match_threshold: state.paramProbableMatchThreshold,
-          possible_match_threshold: state.paramPossibleMatchThreshold,
-        },
-      };
-      await dispatch("getSampleIonMatches", reqData);
+    async unload({ state, commit, dispatch }) {
+      // visualisation
+      dispatch("resetVisualization");
+      if (!state.activeIon) return;
+      commit("SET_ACTIVE_ION", null);
+      commit("SET_ACTIVE_ISOTOPES", null);
     },
+
+    // parameters
     async setFilterParams({ commit }, params = null) {
       // Use provided params, then check if there is ion-specific filter params for that ion and sampleItem instrument
       const filterParams =
         params ||
-        state.ionInFocus.filter_params?.[state.ionInFocus.instrument] ||
+        state?.activeIon?.filter_params?.[state.activeIon.instrument] ||
         {};
 
       // Use instrument-specific filter params or fallback to defaults
@@ -91,6 +139,31 @@ export default {
     },
 
     // http client endpoints
+    async getSampleIonData({ state, dispatch }, { sampleId, ionId }) {
+      const body = {
+        target_ion_id: ionId,
+        filter_params: {
+          mz_tolerance: state.paramMzTolerance,
+          isotope_ratio_tolerance: state.paramIsotopeRatioTolerance,
+          peak_min_intensity: state.paramPeakMinIntensity,
+          min_isotope_abundance: state.paramMinIsotopeAbundance,
+          min_isotope_correlation: state.paramMinIsotopeCorrelation,
+          probable_match_threshold: state.paramProbableMatchThreshold,
+          possible_match_threshold: state.paramPossibleMatchThreshold,
+        },
+      };
+      const sampleIonData = await getApiData({
+        dispatch,
+        httpMethod: "getSampleIonMatches",
+        requestData: {
+          sampleId,
+          body,
+        },
+        errorMessage: `Failed to load sample ion data.`,
+      });
+      return sampleIonData.data;
+    },
+
     async submitMatchRating({ dispatch, rootState }, newMatchRating) {
       return await handleApiRequest({
         dispatch,
@@ -104,11 +177,11 @@ export default {
     },
     async saveFilterParams({ dispatch, state, rootState }) {
       const targetIonUpdate = {
-        target_ion_id: state.ionInFocus.target_ion_id,
-        target_ion_formula: state.ionInFocus.target_ion_formula,
+        target_ion_id: state.activeIon.target_ion_id,
+        target_ion_formula: state.activeIon.target_ion_formula,
         body: {
           filter_params: {
-            [state.ionInFocus.instrument]: {
+            [state.activeIon.instrument]: {
               mz_tolerance: state.paramMzTolerance,
               isotope_ratio_tolerance: state.paramIsotopeRatioTolerance,
               peak_min_intensity: state.paramPeakMinIntensity,
@@ -131,10 +204,10 @@ export default {
     },
     async deleteInstrumentFilterParams({ dispatch, state, rootState }) {
       const targetIonUpdate = {
-        target_ion_id: state.ionInFocus.target_ion_id,
-        target_ion_formula: state.ionInFocus.target_ion_formula,
+        target_ion_id: state.activeIon.target_ion_id,
+        target_ion_formula: state.activeIon.target_ion_formula,
         body: {
-          delete_instrument_filters: state.ionInFocus.instrument,
+          delete_instrument_filters: state.activeIon.instrument,
         },
       };
       return await handleApiRequest({
@@ -147,46 +220,16 @@ export default {
           "Failed to delete filtering parameters. Please try again.",
       });
     },
-    async getSampleIonMatches({ commit, state, rootState }, reqData) {
-      const response = await rootState.api.httpClient.getSampleIonMatches(
-        reqData.sample_item_id,
-        { ...reqData }
-      );
 
-      const isotopesInFocus = response.data.data.match_isotopes.map(
-        (isotope) => {
-          const existingIsotope = state.isotopesInFocus.find(
-            (existing) =>
-              existing.target_isotope_id === isotope.target_isotope_id
-          );
-
-          return {
-            target_isotope_id: isotope.target_isotope_id,
-            color: existingIsotope?.color || "rgb(48,162,218)", // Preserve color if exists
-            mz: isotope.mz.toFixed(4),
-            match_score: isotope.match_score,
-            match_category: isotope.match_category,
-            relative_abundance: isotope.relative_abundance,
-            sample_peak_area: isotope.sample_peak_area,
-            match_mz_error: isotope.match_mz_error,
-            match_abundance_error: isotope.match_abundance_error,
-            match_isotope_correlation: isotope.match_isotope_correlation,
-          };
-        }
-      );
-
-      commit("SET_ISOTOPES_IN_FOCUS", isotopesInFocus);
-      commit("SET_ION_IN_FOCUS", response.data.data.match_ions[0]);
-    },
     // backend notifications
     async onVisualizationSignalSumSpectrum({ state, commit }, traces) {
       for (let trace of traces) {
         trace.x = new Float32Array(trace.x);
         trace.y = new Float32Array(trace.y);
 
-        // Check if the trace has target_isotope_id and update the corresponding isotope in isotopesInFocus
+        // Check if the trace has target_isotope_id and update the corresponding isotope in activeIsotopes
         if (trace.target_isotope_id) {
-          const isotope = state.isotopesInFocus.find(
+          const isotope = state.activeIsotopes.find(
             (iso) => iso.target_isotope_id === trace.target_isotope_id
           );
           if (isotope) {
@@ -216,8 +259,8 @@ export default {
     },
   },
   getters: {
-    isotopesInFocus: (state) => {
-      return state.isotopesInFocus ? state.isotopesInFocus : [];
+    activeIsotopes: (state) => {
+      return state.activeIsotopes ? state.activeIsotopes : [];
     },
     defaultFilterParams: (state) => {
       // Transform paramDefaults keys to camelCase and prepend 'param'
