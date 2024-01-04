@@ -6,7 +6,7 @@
       :can-cancel="true"
       aria-role="dialog"
       aria-modal
-      @close="deactivateModalResetForm"
+      @close="deactivateModalResetData"
     >
       <div class="modal-card" style="width: 100%; height: 100%">
         <header class="modal-card-head">
@@ -16,7 +16,7 @@
           >
             {{ modalTitle }}
             <base-tag-match
-              :row="ionInFocus"
+              :row="activeIon"
               :display-match-score="true"
               :tooltip="{}"
             ></base-tag-match>
@@ -71,7 +71,7 @@
                 </thead>
                 <tbody>
                   <tr
-                    v-for="isotope in isotopesInFocus"
+                    v-for="isotope in activeIsotopes"
                     :key="isotope.target_isotope_id"
                   >
                     <td :style="{ color: isotope.color }">
@@ -117,7 +117,7 @@
                 isotope?</label
               >
               <div
-                v-for="isotope in isotopesInFocus"
+                v-for="isotope in activeIsotopes"
                 :key="isotope.target_isotope_id"
               >
                 <span :style="{ color: isotope.color }"
@@ -232,8 +232,8 @@ export default {
   computed: {
     ...get({
       sampleItem: "sample/active",
-      ionInFocus: "visualization/ionInFocus",
-      isotopesInFocus: "visualization/isotopesInFocus",
+      activeIon: "visualization/activeIon",
+      activeIsotopes: "visualization/activeIsotopes",
       paramMzTolerance: "visualization/paramMzTolerance",
       paramMinIsotopeAbundance: "visualization/paramMinIsotopeAbundance",
       paramIsotopeRatioTolerance: "visualization/paramIsotopeRatioTolerance",
@@ -246,17 +246,13 @@ export default {
       modalActive: "modal/sampleItemTargetIonActive",
     }),
     modalTitle() {
-      let title = this.sampleItem
-        ? this.sampleItem.sample_item_name +
-          ": " +
-          this.ionInFocus.target_ion_formula
-        : "";
+      let title = this.sampleItem ? this.sampleItem.sample_item_name : "";
 
-      if (this.ionInFocus.sample_peak_area_sum !== undefined) {
+      if (this.activeIon) {
         const ionSumIntensity = this.formatNumber(
-          this.ionInFocus.sample_peak_area_sum
+          this.activeIon.sample_peak_area_sum
         );
-        title += ` | Intensity: ${ionSumIntensity}`;
+        title += `: ${this.activeIon.target_ion_formula} | Intensity: ${ionSumIntensity}`;
       }
 
       return title;
@@ -277,13 +273,13 @@ export default {
       }
       if (
         this.matchRating === "2" &&
-        this.ionInFocus.match_score < this.paramPossibleMatchThreshold
+        this.activeIon.match_score < this.paramPossibleMatchThreshold
       ) {
         return true;
       }
       if (
         this.matchRating === "0" &&
-        this.ionInFocus.match_score > this.paramPossibleMatchThreshold
+        this.activeIon.match_score > this.paramPossibleMatchThreshold
       ) {
         return true;
       }
@@ -299,7 +295,7 @@ export default {
   methods: {
     ...call({
       submitMatchRating: "visualization/submitMatchRating",
-      resetVisualization: "visualization/reset",
+      unloadIonData: "visualization/unload",
     }),
     ...mapMutations({
       deactivateModal: "modal/deactivate",
@@ -317,14 +313,14 @@ export default {
         timeseriesExpectedBehavior: null,
         comment: "",
       };
-      this.isotopesInFocus.forEach((isotope) => {
+      this.activeIsotopes.forEach((isotope) => {
         this.$set(this.checklist.isotopeRating, isotope.mz, 3);
       });
     },
-    deactivateModalResetForm() {
+    deactivateModalResetData() {
       this.deactivateModal();
       this.resetForm();
-      this.resetVisualization();
+      this.unloadIonData();
     },
     // Function to return display text for isotope rating
     getIsotopeRatingText(value) {
@@ -406,7 +402,7 @@ export default {
     async submitRating() {
       let payload = {
         sample_item_id: this.sampleItem.sample_item_id,
-        target_ion_id: this.ionInFocus.target_ion_id,
+        target_ion_id: this.activeIon.target_ion_id,
         rating: Number(this.matchRating),
         environment: {
           mz_calibration: this.sampleItem.mz_calibration,
@@ -414,7 +410,7 @@ export default {
       };
       if (this.displayChecklist) {
         payload.checklist = {
-          isotopes_rating: this.isotopesInFocus.map((isotope) => ({
+          isotopes_rating: this.activeIsotopes.map((isotope) => ({
             isotope_rating: this.checklist.isotopeRating[isotope.mz],
             target_isotope_id: isotope.target_isotope_id,
           })),
@@ -431,7 +427,7 @@ export default {
     },
   },
   watch: {
-    isotopesInFocus: {
+    activeIsotopes: {
       immediate: true,
       handler(newVal) {
         if (newVal) {

@@ -422,11 +422,12 @@ export default {
   methods: {
     ...call({
       mzCalibrationReset: "calibration/unload",
+      calibrationMzFit: "calibration/calibrationMzFit",
+      calibrationMzApply: "calibration/calibrationMzApply",
       sampleItemCreate: "sample/create",
       sampleItemUpdate: "sample/update",
+      matchItemCompute: "sample/matchItemCompute",
     }),
-    ...mapActions("sample", ["matchItemCompute"]),
-    ...mapActions("calibration", ["calibrationMzFit", "calibrationMzApply"]),
     ...mapMutations({
       deactivateModal: "modal/deactivate",
     }),
@@ -475,22 +476,23 @@ export default {
     generateFilterId() {
       this.sampleItemFilterId = genId(6, false);
     },
+    async mzCalibrationFit() {
+      this.mzCalibrationReset();
+      const requestData = {
+        sampleId: this.sampleActive.sample_item_id,
+        sampleName: this.sampleActive.sample_item_name,
+        body: this.mzCalibrationParams,
+      };
+      await this.calibrationMzFit(requestData);
+    },
     async mzCalibrationApply() {
-      const payload = {
+      const requestData = {
         fit: this.mzFit,
         sample_filename: this.sampleFilename,
       };
-      await this.calibrationMzApply(payload);
+      await this.calibrationMzApply(requestData);
     },
 
-    mzCalibrationFit() {
-      this.mzCalibrationReset();
-      const payload = {
-        sample_item_id: this.sampleActive.sample_item_id,
-        params: this.mzCalibrationParams,
-      };
-      this.calibrationMzFit(payload);
-    },
     removeField(event) {
       // Field to remove label is in button element id, find it from the event data
       let fieldToRemove = event.target.id;

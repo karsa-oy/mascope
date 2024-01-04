@@ -12,7 +12,7 @@
 </template>
 
 <script>
-import { mapActions, mapMutations } from "vuex";
+import { mapMutations } from "vuex";
 
 import { sync, get, call } from "vuex-pathify";
 
@@ -33,8 +33,7 @@ export default {
   computed: {
     ...sync({
       modalTargetCollectionOpProps: "modal/targetCollectionOpProps",
-      ionInFocus: "visualization/ionInFocus",
-      isotopesInFocus: "visualization/isotopesInFocus",
+      activeIon: "visualization/activeIon",
     }),
     ...get({
       sampleBatchesSelected: "workspace/sampleBatchesSelected",
@@ -258,15 +257,13 @@ export default {
     });
   },
   methods: {
-    ...mapActions("batch", ["matchBatchesCompute"]),
     ...mapMutations({
       activateModal: "modal/activate",
     }),
     ...call({
-      resetIonVisualization: "visualization/reset",
-      setFilterParams: "visualization/setFilterParams",
+      matchBatchesCompute: "batch/matchBatchesCompute",
+      loadSampleIon: "visualization/load",
       targetCollectionToggle: "batch/targetCollectionToggle",
-      emitVisualization: "visualization/emitVisualization",
     }),
     manageSelectedCollectionBatches() {
       this.modalTargetCollectionOpProps = {
@@ -324,37 +321,12 @@ export default {
         modal: "targetCollectionOp",
       });
     },
-    ionShow(row) {
-      this.resetIonVisualization();
-
-      const isotopesInFocus = this.matchIsotopes
-        .filter((isotope) => isotope.target_ion_id === row.target_ion_id)
-        .map((isotope) => ({
-          target_isotope_id: isotope.target_isotope_id,
-          mz: isotope.mz.toFixed(4),
-          match_score: isotope.match_score,
-          match_category: isotope.match_category,
-          relative_abundance: isotope.relative_abundance,
-          sample_peak_area: isotope.sample_peak_area,
-          match_mz_error: isotope.match_mz_error,
-          match_abundance_error: isotope.match_abundance_error,
-          match_isotope_correlation: isotope.match_isotope_correlation,
-        }));
-
-      this.isotopesInFocus = isotopesInFocus;
-
-      const ionInFocus = this.matchIons.filter(
+    async ionShow(row) {
+      const activeIon = this.matchIons.filter(
         (ion) => ion.target_ion_id === row.target_ion_id
       )[0];
 
-      this.ionInFocus = ionInFocus;
-
-      this.setFilterParams();
-
-      this.emitVisualization({
-        sampleId: this.sampleItemFocused.sample_item_id,
-        ionId: row.target_ion_id,
-      });
+      await this.loadSampleIon(activeIon);
 
       this.activateModal({
         modal: "sampleItemTargetIon",

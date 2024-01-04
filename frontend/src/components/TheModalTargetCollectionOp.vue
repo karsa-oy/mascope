@@ -160,14 +160,7 @@
               expanded
               @click="
                 () => {
-                  createTargetCollection({
-                    target_collection_name: newCollectionName,
-                    target_collection_description: newCollectionDesc,
-                    target_compounds: newTargetCompounds,
-                    sample_batches: this.batchesToAddTo
-                      ? this.batchesToAddTo
-                      : [],
-                  });
+                  createCollection(newCollection);
                   deactivateModal();
                 }
               "
@@ -210,15 +203,7 @@
               expanded
               @click="
                 () => {
-                  updateTargetCollection([
-                    {
-                      target_collection_id:
-                        selectedCollection.target_collection_id,
-                      target_collection_name: newCollectionName,
-                      target_collection_description: newCollectionDesc,
-                      target_compounds: newTargetCompounds,
-                    },
-                  ]);
+                  updateCollection(newCollection);
                   deactivateModal();
                 }
               "
@@ -246,7 +231,7 @@
               :label="`Are you sure you want to delete the collection ${targetCollectionActiveInfo.target_collection_name} ?`"
             >
               <b-radio
-                v-model="deleteUnusedCompounds"
+                v-model="deleteOrphanCompounds"
                 :native-value="false"
                 type="is-info"
               >
@@ -255,7 +240,7 @@
             </b-field>
             <b-field>
               <b-radio
-                v-model="deleteUnusedCompounds"
+                v-model="deleteOrphanCompounds"
                 :native-value="true"
                 type="is-primary"
               >
@@ -278,9 +263,10 @@
               expanded
               @click="
                 () => {
-                  deleteTargetCollection(
-                    selectedCollection.target_collection_id
-                  );
+                  deleteCollection({
+                    ...selectedCollection,
+                    deleteOrphanCompounds,
+                  });
                   deactivateModal();
                 }
               "
@@ -295,7 +281,7 @@
 </template>
 
 <script>
-import { mapActions, mapMutations } from "vuex";
+import { mapMutations } from "vuex";
 import { sync, call, get } from "vuex-pathify";
 
 import BaseSpreadsheetInput from "./BaseSpreadsheetInput.vue";
@@ -317,7 +303,7 @@ export default {
       newTargetCompounds: [],
       // Delete Selected Collection
       targetCollectionActiveInfo: {},
-      deleteUnusedCompounds: true,
+      deleteOrphanCompounds: true,
       // Manage Selected Collection Batches
       initialSampleBatchesChecked: [],
       sampleBatchesChecked: [],
@@ -335,7 +321,7 @@ export default {
       batchActive: "batch/active",
       targetCollectionActive: "targets/activeCollection",
       batchTargetCollections: "batch/targetCollections",
-      targetCollectionsAll: "targets/targetCollectionsAll",
+      targetCollectionsAll: "targets/getTargetCollectionsAll",
     }),
     fields() {
       return this.cols.map((col) => col.field);
@@ -426,16 +412,14 @@ export default {
         }));
 
         const skipRematch = addedCollections.length > 0;
-        await this.$api.httpClient.removeTargetCollectionsFromSampleBatch(
+        await this.removeTargetCollectionsFromSampleBatch({
           collectionsToRemove,
-          skipRematch
-        );
+          skipRematch,
+        });
       }
 
       if (addedCollections.length > 0) {
-        await this.$api.httpClient.addTargetCollectionToSampleBatch(
-          addedCollections
-        );
+        await this.addTargetCollectionToSampleBatch(addedCollections);
       }
     },
     async manageSelectedCollectionBatches(batches, target_collection) {
@@ -462,22 +446,20 @@ export default {
       if (removedBatches.length === 0 && addedBatches.length === 0) return;
 
       if (removedBatches.length > 0) {
-        const batchesToRemove = removedBatches.map((batch) => ({
+        const collectionsToRemove = removedBatches.map((batch) => ({
           sample_batch_id: batch.sample_batch_id,
           target_collection_id: target_collection.target_collection_id,
         }));
 
         const skipRematch = addedBatches.length > 0;
-        await this.$api.httpClient.removeTargetCollectionsFromSampleBatch(
-          batchesToRemove,
-          skipRematch
-        );
+        await this.removeTargetCollectionsFromSampleBatch({
+          collectionsToRemove,
+          skipRematch,
+        });
       }
 
       if (addedBatches.length > 0) {
-        await this.$api.httpClient.addTargetCollectionToSampleBatch(
-          addedBatches
-        );
+        await this.addTargetCollectionToSampleBatch(addedBatches);
       }
     },
 
@@ -524,6 +506,8 @@ export default {
         sample_batch_id: row.sample_batch_id,
       }));
     },
+    // TODO_replace sio api
+    // TODO_refactor_store
     updateTargetCollection(target_collection) {
       this.$api.emit("target_collection_update", target_collection);
     },

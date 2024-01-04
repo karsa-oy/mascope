@@ -91,8 +91,8 @@
 </template>
 
 <script>
-import { mapActions, mapMutations } from "vuex";
-import { get, sync } from "vuex-pathify";
+import { mapMutations } from "vuex";
+import { call, get, sync } from "vuex-pathify";
 import { generateCopyName } from "../store/modules/apiHelper";
 
 export default {
@@ -150,9 +150,11 @@ export default {
     },
   },
   methods: {
-    ...mapActions("workspace", ["fetchWorkspaceData"]),
-    ...mapActions("sample", ["copySample"]),
-    ...mapActions("notification", ["showWarningNotification"]),
+    ...call({
+      gethWorkspaceBatches: "workspace/gethWorkspaceBatches",
+      copySample: "sample/copySample",
+      showWarningNotification: "notification/showWarningNotification",
+    }),
     ...mapMutations({
       deactivateModal: "modal/deactivate",
     }),
@@ -173,11 +175,11 @@ export default {
     async loadWorkspaceData() {
       if (!this.workspaceSelected) return;
 
-      const workspaceData = await this.fetchWorkspaceData(
+      const workspaceBatches = await this.gethWorkspaceBatches(
         this.workspaceSelected.workspace_id
       );
 
-      this.batches = workspaceData || [];
+      this.batches = workspaceBatches || [];
 
       if (!this.batches.length) {
         this.showWarningNotification({

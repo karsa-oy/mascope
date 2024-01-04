@@ -97,8 +97,8 @@
               @click="
                 () => {
                   actionIs('create')
-                    ? createSampleBatch(newBatch)
-                    : updateSampleBatch(newBatch);
+                    ? createBatch(newBatch)
+                    : updateBatch(newBatch);
                   deactivateModal();
                 }
               "
@@ -198,7 +198,7 @@
 </template>
 
 <script>
-import { mapMutations, mapActions } from "vuex";
+import { mapMutations } from "vuex";
 import { call, get, sync } from "vuex-pathify";
 import { generateCopyName } from "../store/modules/apiHelper";
 
@@ -316,28 +316,20 @@ export default {
   methods: {
     ...call({
       batchUnload: "batch/unload",
+      createBatch: "batch/createBatch",
+      updateBatch: "batch/updateBatch",
+      deleteBatch: "batch/deleteBatch",
+      copyBatch: "batch/copyBatch",
     }),
-    ...mapActions("batch", [
-      "createBatch",
-      "deleteBatch",
-      "updateBatch",
-      "copyBatch",
-    ]),
     ...mapMutations({
       deactivateModal: "modal/deactivate",
     }),
     actionIs(...actions) {
       return actions.includes(this.action);
     },
-    async createSampleBatch(newBatch) {
-      await this.createBatch(newBatch);
-    },
     async deleteSampleBatch(batch) {
       this.batchUnload();
       await this.deleteBatch(batch);
-    },
-    async updateSampleBatch(newBatch) {
-      await this.updateBatch(newBatch);
     },
     async copySampleBatch() {
       this.isCopying = true;

@@ -4,14 +4,14 @@
     <base-param-field
       label="m/z tolerance [ppm]"
       path="visualization/paramMzTolerance"
-      @paramChange="reloadVisualization"
+      @paramChange="reload"
       :range="{ min: 0, max: 100, step: 1 }"
     >
     </base-param-field>
     <base-param-field
       label="Minimum isotope abundance"
       path="visualization/paramMinIsotopeAbundance"
-      @paramChange="reloadVisualization"
+      @paramChange="reload"
       :range="{ min: 0, max: 1, step: 0.01 }"
       disabled
     >
@@ -19,21 +19,21 @@
     <base-param-field
       label="Isotope ratio tolerance"
       path="visualization/paramIsotopeRatioTolerance"
-      @paramChange="reloadMatches"
+      @paramChange="loadMatches"
       :range="{ min: 0, max: 1, step: 0.1 }"
     >
     </base-param-field>
     <base-param-field
       label="Minimum peak intensity"
       path="visualization/paramPeakMinIntensity"
-      @paramChange="reloadVisualization"
+      @paramChange="reload"
       :range="{ min: 0, max: 10000, step: 500 }"
     >
     </base-param-field>
     <base-param-field
       label="Minimum isotope correlation"
       path="visualization/paramMinIsotopeCorrelation"
-      @paramChange="reloadMatches"
+      @paramChange="loadMatches"
       :range="{ min: 0, max: 1, step: 0.1 }"
     >
     </base-param-field>
@@ -99,8 +99,8 @@
           size="is-small"
           @click="filterParamsDelete"
           :disabled="
-            this.ionInFocus.filter_params &&
-            this.ionInFocus.instrument in this.ionInFocus.filter_params
+            this.activeIon?.filter_params &&
+            this.activeIon.instrument in this.activeIon.filter_params
               ? false
               : true
           "
@@ -151,9 +151,7 @@ export default {
     }),
     ...get({
       batchActive: "batch/active",
-      sampleFocused: "sample/active",
-      ionInFocus: "visualization/ionInFocus",
-      isotopesInFocus: "visualization/isotopesInFocus",
+      activeIon: "visualization/activeIon",
       defaultFilterParams: "visualization/defaultFilterParams",
     }),
     paramsChanged() {
@@ -170,11 +168,8 @@ export default {
   },
   methods: {
     ...call({
-      batchLoadBatch: "batch/loadBatch",
-      reloadMatchesSample: "sample/loadMatches",
-      getSampleIonMatches: "visualization/getSampleIonMatches",
-      emitVisualization: "visualization/emitVisualization",
-      reloadMatches: "visualization/reloadMatches",
+      reload: "visualization/reload",
+      loadMatches: "visualization/loadMatches",
       saveFilterParams: "visualization/saveFilterParams",
       deleteInstrumentFilterParams:
         "visualization/deleteInstrumentFilterParams",
@@ -184,26 +179,19 @@ export default {
       if (this.paramProbableMatchThreshold < this.paramPossibleMatchThreshold) {
         this.paramPossibleMatchThreshold = this.paramProbableMatchThreshold;
       }
-      this.reloadMatches();
+      this.loadMatches();
     },
     onPossibleMatchThresholdChange() {
       if (this.paramProbableMatchThreshold < this.paramPossibleMatchThreshold) {
         this.paramProbableMatchThreshold = this.paramPossibleMatchThreshold;
       }
-      this.reloadMatches();
+      this.loadMatches();
     },
 
-    reloadVisualization() {
-      this.emitVisualization({
-        sampleId: this.sampleFocused.sample_item_id,
-        ionId: this.ionInFocus.target_ion_id,
-      });
-      this.reloadMatches();
-    },
     async saveFilterSettings() {
       this.$buefy.dialog.confirm({
         title: "Saving filtering parameters",
-        message: `Are you sure you want to save current filtering parameters of ion "${this.ionInFocus.target_ion_formula}" for "${this.ionInFocus.instrument}" instrument?`,
+        message: `Are you sure you want to save current ${this.activeIon.target_ion_formula} filtering parameters for ${this.activeIon.instrument} instrument?`,
         confirmText: "Save",
         hasIcon: true,
         icon: "content-save",
@@ -212,7 +200,7 @@ export default {
           await this.saveFilterParams();
           this.isSaving = false;
           this.storeInitialParams();
-          await this.reloadMatches();
+          await this.loadMatches();
         },
       });
     },
@@ -225,7 +213,7 @@ export default {
     filterParamsDelete() {
       this.$buefy.dialog.confirm({
         title: "Deleting filtering parameters",
-        message: `Are you sure you want to delete filtering parameters of ion "${this.ionInFocus.target_ion_formula}" for "${this.ionInFocus.instrument}" instrument?`,
+        message: `Are you sure you want to delete ${this.activeIon.target_ion_formula} filtering parameters for ${this.activeIon.instrument} instrument?`,
         confirmText: "Delete",
         type: "is-danger",
         hasIcon: true,
@@ -233,7 +221,7 @@ export default {
         onConfirm: async () => {
           this.setDefaultFilterParams();
           await this.deleteInstrumentFilterParams();
-          await this.reloadMatches();
+          await this.loadMatches();
           this.storeInitialParams();
         },
       });

@@ -10,6 +10,16 @@
     >
       {{ generalNotificationMessage }}
     </b-message>
+    <!-- Deleted Notification -->
+    <b-message
+      v-if="generalNotification === 'deleted'"
+      type="is-notification"
+      has-icon
+      icon="delete-circle"
+      :class="{ 'is-closing': isClosing, 'is-error': 'is-error' }"
+    >
+      {{ generalNotificationMessage }}
+    </b-message>
     <!-- Error Notification -->
     <b-message
       v-if="generalNotification === 'error'"

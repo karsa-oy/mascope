@@ -35,7 +35,7 @@ export default {
     ...get({
       sampleFocused: "sample/active",
       traces: "visualization/tracesSignalSumSpectrum",
-      isotopesInFocus: "visualization/isotopesInFocus",
+      activeIsotopes: "visualization/activeIsotopes",
     }),
     data: function () {
       return {
@@ -45,7 +45,7 @@ export default {
     layout: function () {
       if (!this.traces) return {};
 
-      const annotations = this.isotopesInFocus
+      const annotations = this.activeIsotopes
         .map((isotope) => {
           if (isotope.sample_peak_area === 0) return null;
 
