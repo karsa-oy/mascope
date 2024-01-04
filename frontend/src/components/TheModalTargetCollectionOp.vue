@@ -356,22 +356,41 @@ export default {
         { field: "cas_number", label: "CAS Number" },
       ];
     },
+    newCollection() {
+      if (this.actionIs("create")) {
+        return {
+          target_collection_name: this.newCollectionName,
+          target_collection_description: this.newCollectionDesc,
+          target_compounds: this.newTargetCompounds,
+          sample_batches: this.batchesToAddTo ? this.batchesToAddTo : [],
+        };
+      } else if (this.actionIs("update")) {
+        return {
+          target_collection_id: this.selectedCollection.target_collection_id,
+          target_collection_name: this.newCollectionName,
+          target_collection_description: this.newCollectionDesc,
+          target_compounds: this.newTargetCompounds,
+        };
+      } else {
+        return null;
+      }
+    },
   },
   methods: {
+    ...call({
+      createCollection: "targets/createCollection",
+      updateCollection: "targets/updateCollection",
+      deleteCollection: "targets/deleteCollection",
+      removeTargetCollectionsFromSampleBatch:
+        "targets/removeTargetCollectionsFromSampleBatch",
+      addTargetCollectionToSampleBatch:
+        "targets/addTargetCollectionToSampleBatch",
+    }),
     ...mapMutations({
       deactivateModal: "modal/deactivate",
     }),
     actionIs(...actions) {
       return actions.includes(this.action);
-    },
-    async createTargetCollection(target_collection) {
-      await this.$api.httpClient.createTargetCollection(target_collection);
-    },
-    async deleteTargetCollection(target_collection_id) {
-      await this.$api.httpClient.deleteTargetCollection(
-        target_collection_id,
-        this.deleteUnusedCompounds
-      );
     },
     async editBatchCollections(target_collections, sample_batch) {
       const removedCollections = this.initialTargetCollectionsChecked.filter(
