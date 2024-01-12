@@ -195,6 +195,9 @@ export default {
   },
   methods: {
     getChildLevels: function (...parentRows) {
+      // TODO: Currently only looks one level up for parent id.
+      // Should check all levels (e.g. target_ion_id -> target_compound_id -> target_collection_id)
+
       // FAQ: parentRow and childRow shoud have the target_collection_id.
       // Both parentIdField and parentCollectionId are used for childRow to be correcly assigned to the right collection and to avoid dublicates.
       // If the parentRow do not have the target_collection_id (undefined) then childRow will assigned only by parentIdField.
