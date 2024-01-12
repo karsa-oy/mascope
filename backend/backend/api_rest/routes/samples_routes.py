@@ -8,6 +8,7 @@ from ..controllers.samples_controller import (
 )
 from ..models.pydantic_models.sample_pydantic_model import (
     GetSamplesBody,
+    GetSampleBody,
     MatchFilterBody,
     GetSampleIonMatchesBody,
 )
@@ -17,7 +18,7 @@ samples_router = APIRouter()
 
 @samples_router.post("/api/samples")
 async def get_samples_route(
-    body: GetSamplesBody = Body(..., embed=False),
+    body: GetSamplesBody,
 ):
     result = await get_samples(
         sample_item_id=body.sample_item_id,
@@ -38,8 +39,8 @@ async def get_samples_route(
         match_compounds=body.match_compounds,
         match_ions=body.match_ions,
         match_isotopes=body.match_isotopes,
+        alarms_list=body.alarms_list,
     )
-
     response = {
         "results": result["results"],
         "message": result["message"],
@@ -52,11 +53,12 @@ async def get_samples_route(
     return response
 
 
-@samples_router.get("/api/samples/{sample_item_id}")
+@samples_router.post("/api/samples/{sample_item_id}")
 async def get_sample_route(
     sample_item_id: str,
+    body: GetSampleBody,
 ):
-    result = await get_sample(sample_item_id)
+    result = await get_sample(sample_item_id, body.alarms_list)
     return {
         "message": result["message"],
         "data": result["data"],
@@ -66,10 +68,14 @@ async def get_sample_route(
 @samples_router.post("/api/samples/{sample_item_id}/ion_matches")
 async def get_sample_ion_matches_route(
     sample_item_id: str,
-    body: GetSampleIonMatchesBody = Body(..., embed=False),
+    body: GetSampleIonMatchesBody,
 ):
     result = await get_sample_ion_matches(
-        sample_item_id, body.target_ion_id, body.filter_params
+        sample_item_id,
+        body.target_ion_id,
+        body.target_collection_id,
+        body.filter_params,
+        body.alarms_list,
     )
     return {
         "message": result["message"],

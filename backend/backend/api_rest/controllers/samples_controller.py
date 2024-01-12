@@ -52,7 +52,7 @@ DEFAULT_POSSIBLE_MATCH_THRESHOLD = 0.7
 def aggregate_params(df: pd.DataFrame) -> pd.Series:
     """Aggregation function no get the aggregated parameters.
 
-    Set match_score and match_category of the top row (the most alarming row).
+    Set match_score, match_category and alarm_mode of the top row (the most alarming row).
     Sums sample_peak_area_sum/sample_peak_interference_sum for the group.
 
     :param df: The DataFrame containing the data to be aggregated.
@@ -65,6 +65,7 @@ def aggregate_params(df: pd.DataFrame) -> pd.Series:
         {
             "match_score": top_row["match_score"],
             "match_category": top_row["match_category"],
+            "alarm_mode": top_row["alarm_mode"],
             "sample_peak_area_sum": df["sample_peak_area_sum"].sum(),
             "sample_peak_interference_sum": df["sample_peak_interference_sum"].sum(),
         }
@@ -124,27 +125,48 @@ async def set_ions_match_category(
     return match_ions_df
 
 
-async def aggregate_match_isotopes(
-    sample_match_filter_df: pd.DataFrame,
-) -> (pd.DataFrame, pd.DataFrame):
-    """Aggregate fields for matchIsotopes from the provided sample match filter dataframe.
+async def set_alarm_mode(
+    dataframe: pd.DataFrame, alarms_list: List[str]
+) -> pd.DataFrame:
+    """
+    Set the alarm_mode field for each entry in the DataFrame based on the list of provided alarms_list.
 
-    This function processes the sample match filter dataframe to aggregate isotope data.
+    :param dataframe: DataFrame containing sample/batch match filter data.
+    :param alarms_list: List of collection types that should have alarm_mode set to True.
+    :type dataframe: pd.DataFrame
+    :type alarms_list: List[str]
+    :return: DataFrame with alarm_mode field set.
+    :rtype: pd.DataFrame
+    """
+    # Set alarm_mode based on whether the target_collection_type is in the alarms_list
+    dataframe["alarm_mode"] = dataframe["target_collection_type"].apply(
+        lambda x: True if x in alarms_list else False
+    )
+    return dataframe
+
+
+async def aggregate_match_isotopes(
+    match_filter_df: pd.DataFrame,
+) -> (pd.DataFrame, pd.DataFrame):
+    """Aggregate fields for matchIsotopes from the provided sample/batch match filter dataframe.
+
+    This function processes the sample/batch match filter dataframe to aggregate isotope data.
     It prepares two DataFrames:
     1) match_isotopes_data_df with detailed data for further aggregation,
     2) match_isotopes_df with reduced data for frontend display.
 
-    :param sample_match_filter_df: DataFrame containing sample match filter data to aggregate.
-    :type sample_match_filter_df: pd.DataFrame
+    :param match_filter_df: DataFrame containing sample/batch match filter data to aggregate.
+    :type match_filter_df: pd.DataFrame
     :return: Tuple of DataFrames with aggregated matchIsotopes data.
     :rtype: (pd.DataFrame, pd.DataFrame)
     """
     # Select relevant columns for detailed aggregation (backend processing)
-    match_isotopes_data_df = sample_match_filter_df.loc[
+    match_isotopes_data_df = match_filter_df.loc[
         :,
         [
             "match_score",
             "match_category",
+            "alarm_mode",
             "mz",
             "match_mz_error",
             "relative_abundance",
@@ -169,6 +191,7 @@ async def aggregate_match_isotopes(
             "target_collection_id",
             "target_collection_name",
             "target_collection_description",
+            "target_collection_type",
             "target_compound_name",
             "target_compound_formula",
         ],
@@ -180,6 +203,8 @@ async def aggregate_match_isotopes(
             "target_collection_id",
             "target_collection_name",
             "target_collection_description",
+            "target_collection_type",
+            "alarm_mode",
             "target_compound_name",
             "target_compound_formula",
             "target_ion_formula",
@@ -193,9 +218,10 @@ async def aggregate_match_isotopes(
 
 
 async def aggregate_match_ions(
-    isotopes_df: pd.DataFrame,
+    isotopes_df: pd.DataFrame, filter_params: Optional[FilterParams] = None
 ) -> (pd.DataFrame, pd.DataFrame):
     """Aggregate fields for matchIons from isotopes dataframe.
+     Provided filters are passed to set_ions_match_category, if none filter_params are provided, stored ion-specidic or default params will be applied.
 
     This function groups the isotopes dataframe by by target_ion_id and other related field.
 
@@ -208,6 +234,8 @@ async def aggregate_match_ions(
 
     :param isotopes_df: DataFrame containing isotope data to aggregate.
     :type isotopes_df: pd.DataFrame
+    :param filter_params: Optional ion-specific filter parameters to set_ions_match_category.
+    :type filter_params: Optional[FilterParams]
     :return: Tuple of DataFrames with aggregated matchIons data.
     :rtype: (pd.DataFrame, pd.DataFrame)
     """
@@ -228,6 +256,8 @@ async def aggregate_match_ions(
                 "target_collection_id",
                 "target_collection_name",
                 "target_collection_description",
+                "target_collection_type",
+                "alarm_mode",
             ]
         )
         .agg(
@@ -256,11 +286,19 @@ async def aggregate_match_ions(
             "target_collection_id",
             "target_collection_name",
             "target_collection_description",
+            "target_collection_type",
+            "alarm_mode",
             "target_compound_name",
             "target_compound_formula",
             "sample_item_type",
         ]
     ).drop_duplicates(subset=["target_ion_id", "sample_item_id"])
+
+    # set match_category field for ions
+    match_ions_data_df = await set_ions_match_category(
+        match_ions_data_df, filter_params
+    )
+    match_ions_df = await set_ions_match_category(match_ions_df, filter_params)
 
     return match_ions_data_df, match_ions_df
 
@@ -301,6 +339,7 @@ async def aggregate_match_compounds(
                 "target_collection_id",
                 "target_collection_name",
                 "target_collection_description",
+                "target_collection_type",
             ]
         )
         .apply(aggregate_params)
@@ -318,6 +357,8 @@ async def aggregate_match_compounds(
             "target_collection_id",
             "target_collection_name",
             "target_collection_description",
+            "target_collection_type",
+            "alarm_mode",
             "sample_item_type",
         ]
     ).drop_duplicates(subset=["target_compound_id", "sample_item_id"])
@@ -349,6 +390,7 @@ async def aggregate_match_collections(compounds_df: pd.DataFrame) -> pd.DataFram
                 "target_collection_id",
                 "target_collection_name",
                 "target_collection_description",
+                "target_collection_type",
             ]
         )
         .apply(aggregate_params)
@@ -365,10 +407,10 @@ async def aggregate_match_collections(compounds_df: pd.DataFrame) -> pd.DataFram
 async def aggregate_match_samples(compounds_df: pd.DataFrame) -> pd.DataFrame:
     """Aggregate fields for matchSamples from compounds dataframe.
 
-    This function sorts the compounds dataframe by match_category and match_score in descending order
+    This function sorts the compounds dataframe by  alarm_mode, match_category and match_score in descending order
     and then groups by sample_item_id and other relevant fields to compute the aggregated
     values for match_score, match_category, sample_peak_area_sum, and sample_peak_interference_sum.
-    It preserves the highest match_score of compound from the most alarming match_category (the most alarming compound of sample)
+    It preserves the highest match_score of compound where alarm_mode and match_category is the highest (the most alarming compound of sample)
     and sums up the sample_peak_area_sum and sample_peak_interference_sum for the entire group.
 
     :param compounds_df: DataFrame containing compound data to aggregate.
@@ -378,7 +420,8 @@ async def aggregate_match_samples(compounds_df: pd.DataFrame) -> pd.DataFrame:
     """
     match_samples_df = (
         compounds_df.sort_values(
-            by=["match_category", "match_score"], ascending=[False, False]
+            by=["alarm_mode", "match_category", "match_score"],
+            ascending=[False, False, False],
         )
         .drop_duplicates(subset=["target_compound_id", "sample_item_id"])
         .groupby(
@@ -426,6 +469,7 @@ async def compile_samples_df(
             "sample_item_id",
             "match_score",
             "match_category",
+            "alarm_mode",
             "sample_peak_area_sum",
             "sample_peak_interference_sum",
         ]
@@ -448,6 +492,7 @@ async def compile_samples_df(
             "match_category",
             "sample_peak_area_sum",
             "sample_peak_interference_sum",
+            "alarm_mode",
         ]
     ] = samples_df[
         [
@@ -455,6 +500,7 @@ async def compile_samples_df(
             "match_category",
             "sample_peak_area_sum",
             "sample_peak_interference_sum",
+            "alarm_mode",
         ]
     ].fillna(
         0
@@ -487,6 +533,7 @@ async def get_samples(
     match_compounds: bool = False,
     match_ions: bool = False,
     match_isotopes: bool = False,
+    alarms_list: List[str] = None,
 ):
     message = ""
     async with async_session() as session:
@@ -583,30 +630,32 @@ async def get_samples(
                 }
                 return result_dict
 
-            # 1) Aggregate fields for matchIsotopes
+            # 1) Set the alarm_mode based on alarms_list
+            batch_match_filter_df = await set_alarm_mode(
+                batch_match_filter_df, alarms_list
+            )
+
+            # 2) Aggregate fields for matchIsotopes
             match_isotopes_data_df, match_isotopes_df = await aggregate_match_isotopes(
                 batch_match_filter_df
             )
 
-            # 2) Aggregate fields for matchIons
+            # 3) Aggregate fields for matchIons
             match_ions_data_df, match_ions_df = await aggregate_match_ions(
                 match_isotopes_data_df
             )
 
-            # set match_category field for ions
-            match_ions_data_df = await set_ions_match_category(match_ions_data_df)
-            match_ions_df = await set_ions_match_category(match_ions_df)
-
-            # 3) Aggregate fields for matchCompounds
+            # 4) Aggregate fields for matchCompounds
             (
                 match_compounds_data_df,
                 match_compounds_df,
             ) = await aggregate_match_compounds(match_ions_data_df)
-            # 4)  Aggregate fields for matchSamples
+
+            # 5)  Aggregate fields for matchSamples
             # Calculate and add fields match_score, sample_peak_area_sum, sample_peak_interference_sum, matched
             match_samples_df = await aggregate_match_samples(match_compounds_data_df)
 
-            # 5)  Merge fields for samples data
+            # 6)  Merge fields for samples data
             samples_df = await compile_samples_df(samples_df, match_samples_df)
 
         result_dict = {
@@ -663,7 +712,10 @@ async def get_samples(
         return result_dict
 
 
-async def get_sample(sample_item_id: str):
+async def get_sample(
+    sample_item_id: str,
+    alarms_list: List[str] = None,
+):
     async with async_session() as session:
         stmt = select(Sample).filter(Sample.sample_item_id == sample_item_id)
         result = await session.execute(stmt)
@@ -708,39 +760,39 @@ async def get_sample(sample_item_id: str):
                 "message": message,
             }
 
-        # 1) Aggregate fields for matchIsotopes
+        # 1) Set the alarm_mode based on alarms_list
+        sample_match_filter_df = await set_alarm_mode(
+            sample_match_filter_df, alarms_list
+        )
+
+        # 2) Aggregate fields for matchIsotopes
         match_isotopes_data_df, match_isotopes_df = await aggregate_match_isotopes(
             sample_match_filter_df
         )
 
-        # 2) Aggregate fields for matchIons
+        # 3) Aggregate fields for matchIons
         match_ions_data_df, match_ions_df = await aggregate_match_ions(
             match_isotopes_data_df
         )
 
-        # set match_category field for ions
-        match_ions_data_df = await set_ions_match_category(match_ions_data_df)
-        match_ions_df = await set_ions_match_category(match_ions_df)
-
-        # 3) Aggregate fields for matchCompounds
+        # 4) Aggregate fields for matchCompounds
         match_compounds_data_df, match_compounds_df = await aggregate_match_compounds(
             match_ions_data_df
         )
 
-        # 4) Aggregate fields for matchCollections
+        # 5) Aggregate fields for matchCollections
         match_collections_df = await aggregate_match_collections(
             match_compounds_data_df
         )
 
-        # 5) Aggregate fields for sample_df
-
+        # 6) Aggregate fields for sample_df
         # Convert sample into dataframe
         sample_df = pd.DataFrame([sample.to_dict()])
 
         # Calculate and add fields match_score, sample_peak_area_sum, sample_peak_interference_sum, matched, selection
         match_samples_df = await aggregate_match_samples(match_compounds_data_df)
 
-        # Merge with samples_df
+        # 7)  Merge fields for samples data
         sample_df = await compile_samples_df(sample_df, match_samples_df)
 
         # Add the selection field
@@ -781,7 +833,11 @@ async def get_sample(sample_item_id: str):
 
 
 async def get_sample_ion_matches(
-    sample_item_id: str, target_ion_id: str, filter_params: FilterParams
+    sample_item_id: str,
+    target_ion_id: str,
+    target_collection_id: str,
+    filter_params: FilterParams,
+    alarms_list: List[str] = None,
 ):
     async with async_session() as session:
         # Retrieve the sample details
@@ -819,18 +875,53 @@ async def get_sample_ion_matches(
                 "message": message,
             }
 
-        # 1) Aggregate fields for matchIsotopes
-        match_isotopes_data_df, match_isotopes_df = await aggregate_match_isotopes(
+        # 1) Set the alarm_mode based on alarms_list
+        sample_match_filter_df = await set_alarm_mode(
+            sample_match_filter_df, alarms_list
+        )
+
+        # 2) Aggregate fields for matchIsotopes
+        match_isotopes_data_df, _ = await aggregate_match_isotopes(
             sample_match_filter_df
         )
 
-        # 2) Aggregate fields for matchIons
-        _, match_ions_df = await aggregate_match_ions(match_isotopes_data_df)
+        # Prepare a simplified DataFrame for frontend manually to keep alarm_mode and target_collection data
+        # Filter match_isotopes_df  duplicates (if compound is present in 2 different collections) based on target_collection_id
+        match_isotopes_df = match_isotopes_data_df[
+            match_isotopes_data_df["target_collection_id"] == target_collection_id
+        ].drop(
+            columns=[
+                "target_collection_name",
+                "target_collection_description",
+                "target_compound_name",
+                "target_compound_formula",
+                "target_ion_formula",
+                "target_ion_mechanism",
+                "filter_params",
+                "sample_item_type",
+            ]
+        )
 
-        # set match_category field for ions
-        match_ions_df = await set_ions_match_category(match_ions_df, filter_params)
+        # 3) Aggregate fields for matchIons
+        match_ions_data_df, _ = await aggregate_match_ions(
+            match_isotopes_data_df, filter_params
+        )
 
-        # Prepare the final output
+        # Prepare a simplified DataFrame for frontend manually to keep alarm_mode and target_collection data
+        # Filter match_ions_df  duplicates (if compound is present in 2 different collections) based on target_collection_id
+        match_ions_df = match_ions_data_df[
+            match_ions_data_df["target_collection_id"] == target_collection_id
+        ].drop(
+            columns=[
+                "target_collection_name",
+                "target_collection_description",
+                "target_compound_name",
+                "target_compound_formula",
+                "sample_item_type",
+            ]
+        )
+
+        # Prepare the final output.
         return {
             "data": {
                 "matches": {
@@ -860,6 +951,7 @@ async def init_batch_match_filter(sample_batch_id: str):
                 TargetCollection.target_collection_id,
                 TargetCollection.target_collection_name,
                 TargetCollection.target_collection_description,
+                TargetCollection.target_collection_type,
                 TargetCompound.target_compound_formula,
                 TargetCompound.target_compound_id,
                 TargetCompound.target_compound_name,
@@ -1046,6 +1138,7 @@ async def init_sample_match_filter(
                 TargetCollection.target_collection_id,
                 TargetCollection.target_collection_name,
                 TargetCollection.target_collection_description,
+                TargetCollection.target_collection_type,
                 TargetCompound.target_compound_formula,
                 TargetCompound.target_compound_id,
                 TargetCompound.target_compound_name,
