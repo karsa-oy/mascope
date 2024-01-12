@@ -72,7 +72,7 @@ export default {
       dispatch("calibration/unload", null, { root: true });
     },
 
-    async reload({ rootGetters, dispatch, state }, sample = null) {
+    async reload({ dispatch, state }, sample = null) {
       const sampleToLoad = sample ? sample : state.active;
       if (sampleToLoad) {
         await dispatch("unload");
@@ -81,11 +81,20 @@ export default {
     },
 
     // http client endpoints
-    async getSampleData({ dispatch }, sampleItemId) {
+    async getSampleData({ rootGetters, dispatch }, sampleId) {
+      const alarmsList = rootGetters["targets/alarmsList"];
+
+      const body = {
+        alarms_list: alarmsList,
+      };
+
       const sampleData = await getApiData({
         dispatch,
         httpMethod: "getSample",
-        requestData: sampleItemId,
+        requestData: {
+          sampleId,
+          body,
+        },
         errorMessage: `Failed to load the sample data.`,
       });
       return sampleData.data;

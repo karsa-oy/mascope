@@ -166,7 +166,7 @@ export function createHttpClient(host, api_port) {
         console.error("Failed to get batch: ", error);
       }
     },
-    loadBatchTargets: async ({ batchId, body }) => {
+    getBatchTargets: async ({ batchId, body }) => {
       try {
         return await httpClient.post(
           `${batchesBaseUrl}/${batchId}/targets`,
@@ -241,11 +241,11 @@ export function createHttpClient(host, api_port) {
       }
     },
 
-    getSample: async (sampleItemId) => {
+    getSample: async ({ sampleId, body }) => {
       try {
-        return await httpClient.get(`${samplesBaseUrl}/${sampleItemId}`);
+        return await httpClient.post(`${samplesBaseUrl}/${sampleId}`, body);
       } catch (error) {
-        console.error("Failed to get sample by id: ", error);
+        console.error("Failed to get sample: ", error);
       }
     },
 
@@ -540,19 +540,21 @@ export function createHttpClient(host, api_port) {
         console.error("Failed to create target collection: ", error);
       }
     },
-    updateTargetCollection: async (
-      targetCollectionId,
-      updatedTargetCollection
-    ) => {
+
+    updateTargetCollection: async (newTargetCollection) => {
       try {
         return await httpClient.patch(
-          `${targetCollectionsBaseUrl}/${targetCollectionId}`,
-          updatedTargetCollection
+          `${targetCollectionsBaseUrl}/${newTargetCollection.target_collection_id}`,
+          newTargetCollection
         );
       } catch (error) {
-        console.error("Failed to update target collection: ", error);
+        console.error(
+          `Failed to update target collection ${newTargetCollection.target_collection_name} `,
+          error
+        );
       }
     },
+
     deleteTargetCollection: async (collection) => {
       try {
         return await httpClient.delete(
