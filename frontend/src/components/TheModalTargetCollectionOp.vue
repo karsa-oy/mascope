@@ -72,6 +72,9 @@
             <b-field label="Description">
               <b-input v-model="newCollectionDesc" :disabled="true"> </b-input>
             </b-field>
+            <b-field label="Type">
+              <b-input v-model="newCollectionType" :disabled="true"> </b-input>
+            </b-field>
             <b-field
               :label="`Select batches for target collection ${targetCollectionActiveInfo.target_collection_name}`"
             >
@@ -130,6 +133,27 @@
             >
               <b-input v-model="newCollectionDesc"></b-input>
             </b-field>
+            <b-field label="Collection type">
+              <b-dropdown aria-role="list" v-model="newCollectionType" expanded>
+                <template #trigger>
+                  <b-button
+                    :label="newCollectionType || 'Select Type'"
+                    icon-right="menu-down"
+                    expanded
+                    style="align: left"
+                  />
+                </template>
+                <b-dropdown-item
+                  aria-role="listitem"
+                  v-for="collectionType in collectionTypes"
+                  :key="collectionType"
+                  :value="collectionType"
+                >
+                  {{ collectionType }}
+                </b-dropdown-item>
+              </b-dropdown>
+            </b-field>
+
             <base-spreadsheet-input
               label="Target compounds"
               :cols="targetCompoundCols"
@@ -158,6 +182,12 @@
               type="is-primary"
               icon-left="content-save"
               expanded
+              :disabled="
+                !this.newCollectionName ||
+                // !this.newCollectionDesc ||
+                !this.newCollectionType ||
+                this.newTargetCompounds.length === 0
+              "
               @click="
                 () => {
                   createCollection(newCollection);
@@ -188,11 +218,32 @@
             >
               <b-input v-model="newCollectionDesc"></b-input>
             </b-field>
-            <base-spreadsheet-input
+
+            <b-field label="Collection type">
+              <b-dropdown aria-role="list" v-model="newCollectionType" expanded>
+                <template #trigger>
+                  <b-button
+                    :label="newCollectionType || 'Select Type'"
+                    icon-right="menu-down"
+                    expanded
+                    style="align: left"
+                  />
+                </template>
+                <b-dropdown-item
+                  aria-role="listitem"
+                  v-for="collectionType in collectionTypes"
+                  :key="collectionType"
+                  :value="collectionType"
+                >
+                  {{ collectionType }}
+                </b-dropdown-item>
+              </b-dropdown>
+            </b-field>
+            <!-- <base-spreadsheet-input
               label="Target compounds"
               :cols="targetCompoundCols"
               @rowsPasted="loadTargetCompounds"
-            ></base-spreadsheet-input>
+            ></base-spreadsheet-input> -->
           </section>
           <footer class="modal-card-foot">
             <b-button type="is-warning" expanded @click="modalActive = false">
@@ -201,6 +252,11 @@
             <b-button
               type="is-primary"
               expanded
+              :disabled="
+                !this.newCollectionName ||
+                // !this.newCollectionDesc ||
+                !this.newCollectionType
+              "
               @click="
                 () => {
                   updateCollection(newCollection);
@@ -298,8 +354,9 @@ export default {
       selectedBatchInfo: {},
       // Copy Selected Collection To Batches
       batchesToAddTo: [],
-      newCollectionName: "",
-      newCollectionDesc: "",
+      newCollectionName: null,
+      newCollectionDesc: null,
+      newCollectionType: null,
       newTargetCompounds: [],
       // Delete Selected Collection
       targetCollectionActiveInfo: {},
@@ -321,7 +378,8 @@ export default {
       batchActive: "batch/active",
       targetCollectionActive: "targets/activeCollection",
       batchTargetCollections: "batch/targetCollections",
-      targetCollectionsAll: "targets/getTargetCollectionsAll",
+      targetCollectionsAll: "targets/getAllCollections",
+      collectionTypes: "targets/collectionTypes",
     }),
     fields() {
       return this.cols.map((col) => col.field);
@@ -347,6 +405,7 @@ export default {
         return {
           target_collection_name: this.newCollectionName,
           target_collection_description: this.newCollectionDesc,
+          target_collection_type: this.newCollectionType,
           target_compounds: this.newTargetCompounds,
           sample_batches: this.batchesToAddTo ? this.batchesToAddTo : [],
         };
@@ -355,7 +414,7 @@ export default {
           target_collection_id: this.selectedCollection.target_collection_id,
           target_collection_name: this.newCollectionName,
           target_collection_description: this.newCollectionDesc,
-          target_compounds: this.newTargetCompounds,
+          target_collection_type: this.newCollectionType,
         };
       } else {
         return null;
@@ -464,10 +523,18 @@ export default {
     },
 
     initData() {
+      if (this.action == "create") {
+        this.newCollectionName = null;
+        this.newCollectionDesc = null;
+        this.newCollectionType = null;
+        this.newTargetCompounds = [];
+        this.batchesToAddTo = [];
+      }
       if (this.selectedCollection) {
         this.newCollectionName = this.selectedCollection.target_collection_name;
         this.newCollectionDesc =
           this.selectedCollection.target_collection_description;
+        this.newCollectionType = this.selectedCollection.target_collection_type;
         this.targetCollectionActiveInfo = this.targetCollectionActive;
       }
       if (this.selectedBatch) {

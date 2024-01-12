@@ -65,24 +65,45 @@ export default {
         : null;
     },
     tag: function () {
-      if (this.row.match_category === 2) {
-        return {
-          category: "probable",
-          class: "is-danger",
-          weight: "font-size: bold",
-        };
-      } else if (this.row.match_category === 1) {
-        return {
-          category: "possible",
-          class: "is-warning",
-          weight: "font-size: bold",
-        };
+      if (this.row.alarm_mode) {
+        switch (this.row.match_category) {
+          case 2:
+            return {
+              category: "probable",
+              class: "is-danger",
+              // weight: "font-weight: bold",
+            };
+          case 1:
+            return {
+              category: "possible",
+              class: "is-warning",
+              // weight: "font-weight: bold",
+            };
+          default:
+            return {
+              category: "improbable",
+              class: "is-success",
+              // weight: "font-weight: bold",
+            };
+        }
       } else {
-        return {
-          category: "improbable",
-          class: "is-success",
-          weight: "",
-        };
+        switch (this.row.match_category) {
+          case 2:
+            return {
+              category: "probable",
+              class: "is-danger-pale",
+            };
+          case 1:
+            return {
+              category: "possible",
+              class: "is-warning-pale",
+            };
+          default:
+            return {
+              category: "improbable",
+              class: "is-success-pale",
+            };
+        }
       }
     },
     tooltipActive: function () {
