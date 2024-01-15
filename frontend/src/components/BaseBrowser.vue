@@ -198,19 +198,31 @@ export default {
       // TODO: Currently only looks one level up for parent id.
       // Should check all levels (e.g. target_ion_id -> target_compound_id -> target_collection_id)
 
+      // FAQ: parentRow and childRow shoud have the target_collection_id.
+      // Both parentIdField and parentCollectionId are used for childRow to be correcly assigned to the right collection and to avoid dublicates.
+      // If the parentRow do not have the target_collection_id (undefined) then childRow will assigned only by parentIdField.
+
       let childLevels = [];
       // init iteration parameters
       let currentLevel = cloneDeep(this.currentLevel);
       currentLevel.rows = cloneDeep(parentRows);
       let nextLevels = cloneDeep(this.levels).splice(1);
-      // loop through next levels, removing as we go
+
       while (nextLevels.length > 0) {
-        let parentIdField = currentLevel.slug + "_id";
-        let parentIds = currentLevel.rows.map((row) => row[parentIdField]);
+        const parentIdField = `${currentLevel.slug}_id`;
+        const parentIds = currentLevel.rows.map((row) => row[parentIdField]);
+        // set the parentCollectionId if available
+        const parentCollectionId =
+          parentRows[0]?.target_collection_id ?? undefined;
+
         let childLevel = nextLevels.shift();
         if (childLevel.rows && childLevel.rows.length > 0) {
-          childLevel.rows = childLevel.rows.filter((childRow) =>
-            parentIds.includes(childRow[parentIdField])
+          childLevel.rows = childLevel.rows.filter(
+            (childRow) =>
+              parentIds.includes(childRow[parentIdField]) &&
+              // check if the childRow is assigned to the same collection as the parentRow.This condition is ignored if parentCollectionId is undefined
+              (parentCollectionId === undefined ||
+                childRow.target_collection_id === parentCollectionId)
           );
           // push results
           childLevels.push(childLevel);

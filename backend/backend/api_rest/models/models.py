@@ -69,10 +69,6 @@ class SampleBatch(Base):
         back_populates="sample_batch",
         cascade="all, delete, delete-orphan",
     )
-    # sample = relationship(
-    #     "Sample",
-    #     back_populates="sample_batch",
-    # )
     target_collection = relationship(
         "TargetCollectionInSampleBatch",
         back_populates="sample_batch",
@@ -111,45 +107,6 @@ class SampleItem(Base):
         cascade="all, delete, delete-orphan",
     )
 
-    # TODO_restapi_restructure
-    # Methods
-    async def get_compound_intensity(self, session, compounds):
-        sql = f"""
-            SELECT
-                target_compound_formula,
-                IFNULL(SUM(sample_peak_area_sum), 0) AS intensity
-            FROM (
-                SELECT
-                    sample_item_id,
-                    target_compound_formula,
-                    target_compound_id,
-                    SUM(sample_peak_area) AS sample_peak_area_sum
-                FROM
-                    match
-                    NATURAL LEFT JOIN target_isotope
-                    NATURAL LEFT JOIN target_ion
-                    NATURAL LEFT JOIN target_compound
-                WHERE (
-                    sample_item_id = :sample_item_id
-                    AND target_compound_formula IN ({','.join(f':param_{i}' for i in range(len(compounds)))})
-                )
-                GROUP BY target_compound_id, target_ion_id
-            )
-            GROUP BY target_compound_id;
-            """
-
-        # Bind the parameters
-        params = {
-            "sample_item_id": self.sample_item_id,
-            **{f"param_{i}": compound for i, compound in enumerate(compounds)},
-        }
-
-        result = await session.execute(text(sql), params)
-
-        # Store the results in the SampleItem object
-        for row in result:
-            setattr(self, row[0], row[1])
-
 
 class SampleFile(Base):
     __tablename__ = "sample_file"
@@ -172,6 +129,7 @@ class TargetCollection(Base):
     target_collection_id = Column(String(16), primary_key=True)
     target_collection_name = Column(String(256))
     target_collection_description = Column(Text)
+    target_collection_type = Column(String(64), nullable=False)
 
     # Define relationships
     sample_batch = relationship(
@@ -400,6 +358,3 @@ class Sample(Base):
     datetime_utc = Column(TIMESTAMP)
     sample_item_utc_created = Column(TIMESTAMP)
     sample_item_utc_modified = Column(TIMESTAMP)
-
-    # Define relationships
-    # sample_batch = relationship("SampleBatch", back_populates="sample")

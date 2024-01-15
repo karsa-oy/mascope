@@ -1,6 +1,7 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from typing import Optional, List, Dict, Any
 from .calibration_pydantic_model import CalibrationMzFitParams
+from .sample_pydantic_model import GetSampleBody
 
 
 class SampleBatchBase(BaseModel):
@@ -42,6 +43,13 @@ class SampleBatchInDB(SampleBatchBase):
 
     class Config:
         orm_mode = True
+
+
+class GetBatchTargetsBody(GetSampleBody):
+    ion_mechanisms: List[str] = Field(
+        ...,
+        description="List of string IDs representing ionization mechanisms used in the sample batch",
+    )
 
 
 class autoSamplerImportBatchData(BaseModel):

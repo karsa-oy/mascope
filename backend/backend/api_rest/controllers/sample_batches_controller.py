@@ -99,6 +99,247 @@ async def get_sample_batch(sample_batch_id: str):
         return sample_batch.to_dict()
 
 
+async def get_batch_targets(
+    sample_batch_id: str,
+    ion_mechanisms: List[str],
+    alarms_list: List[str],
+):
+    async with async_session() as session:
+        # Retrieve the sample details
+        stmt = select(SampleBatch).filter(
+            SampleBatch.sample_batch_id == sample_batch_id
+        )
+        result = await session.execute(stmt)
+        sample_batch = result.scalars().first()
+
+        if not sample_batch:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Sample batch with ID {sample_batch_id} not found",
+            )
+
+        #   TargetCollections
+        # Fetch TargetCollections associated with the sample_batch_id
+        target_collections = await session.execute(
+            select(
+                TargetCollection,
+                # literal(0).label("selection"),
+            )
+            .join(
+                TargetCollectionInSampleBatch,
+                TargetCollectionInSampleBatch.target_collection_id
+                == TargetCollection.target_collection_id,
+            )
+            .filter(TargetCollectionInSampleBatch.sample_batch_id == sample_batch_id)
+        )
+        target_collections = target_collections.scalars().all()
+
+        # Fetch the required target_collection_ids
+        target_collection_ids = [tc.target_collection_id for tc in target_collections]
+
+        target_collections_dict = []
+        for collection in target_collections:
+            # Set the alarm_mode based on collection type
+            target_collections_dict.append(
+                {
+                    **collection.to_dict(),
+                    # Determine alarm_mode based on collection type and alarms_list
+                    "alarm_mode": collection.target_collection_type in alarms_list,
+                    "selection": 0,
+                }
+            )
+
+        # Create a lookup dictionary for collection alarm_mode
+        collection_alarm_mode_lookup = {
+            collection["target_collection_id"]: collection["alarm_mode"]
+            for collection in target_collections_dict
+        }
+
+        #   TargetCompounds
+        # Fetch TargetCompounds associated with the fetched TargetCollections and add the associated target_collection_id
+        target_compounds_query = await session.execute(
+            select(TargetCompound)
+            .join(
+                TargetCompoundInTargetCollection,
+                TargetCompoundInTargetCollection.target_compound_id
+                == TargetCompound.target_compound_id,
+            )
+            .filter(
+                TargetCompoundInTargetCollection.target_collection_id.in_(
+                    [tc.target_collection_id for tc in target_collections]
+                )
+            )
+        )
+        target_compounds = target_compounds_query.scalars().all()
+
+        associations_list = []
+
+        associations = await session.execute(
+            select(
+                TargetCompoundInTargetCollection.target_compound_id,
+                TargetCompoundInTargetCollection.target_collection_id,
+            ).filter(
+                TargetCompoundInTargetCollection.target_collection_id.in_(
+                    target_collection_ids
+                )
+            )
+        )
+
+        for association in associations:
+            compound_id = association.target_compound_id
+            collection_id = association.target_collection_id
+            associations_list.append((compound_id, collection_id))
+
+        # Convert target_compounds to a dictionary for faster lookup
+        target_compounds_dict_lookup = {
+            tc.target_compound_id: tc for tc in target_compounds
+        }
+
+        target_compounds_dict = []
+        for compound_id, collection_id in associations_list:
+            tc = target_compounds_dict_lookup.get(compound_id)
+            if tc:
+                target_compounds_dict.append(
+                    {
+                        **tc.to_dict(),
+                        "target_collection_id": collection_id,
+                        "alarm_mode": collection_alarm_mode_lookup.get(
+                            collection_id, False
+                        ),
+                        "selection": 0,
+                    }
+                )
+
+        #   TargetIons
+        # Fetch TargetIons associated with the fetched TargetCompounds, ion_mechanisms, and relevant TargetCollections
+        target_ions_query = await session.execute(
+            select(TargetIon)
+            .distinct(TargetIon.target_ion_id)
+            .join(
+                TargetCompoundInTargetCollection,
+                TargetIon.target_compound_id
+                == TargetCompoundInTargetCollection.target_compound_id,
+            )
+            .join(
+                IonizationMechanism,
+                TargetIon.ionization_mechanism_id
+                == IonizationMechanism.ionization_mechanism_id,
+            )
+            .filter(
+                TargetCompoundInTargetCollection.target_collection_id.in_(
+                    target_collection_ids
+                ),
+                TargetIon.target_compound_id.in_(
+                    [tc.target_compound_id for tc in target_compounds]
+                ),
+                IonizationMechanism.ionization_mechanism_id.in_(ion_mechanisms),
+            )
+        )
+        target_ions = target_ions_query.scalars().all()
+
+        # Create a lookup dictionary for target_compound_id -> target_collection_id
+        target_compound_to_collections = {}
+        for compound_id, collection_id in associations_list:
+            if compound_id in target_compound_to_collections:
+                target_compound_to_collections[compound_id].append(collection_id)
+            else:
+                target_compound_to_collections[compound_id] = [collection_id]
+
+        # Fetch all ionization mechanisms and create a lookup dictionary for them
+        ion_mechanisms_query = await session.execute(
+            select(
+                IonizationMechanism.ionization_mechanism_id,
+                IonizationMechanism.ionization_mechanism,
+            )
+        )
+        ion_mechanisms_associations = {
+            im.ionization_mechanism_id: im.ionization_mechanism
+            for im in ion_mechanisms_query
+        }
+
+        # Create TargetIons dictionary including the new fields
+        target_ions_dict = []
+        for ti in target_ions:
+            # Get all target_collection_ids for the current ion's compound
+            collection_ids = target_compound_to_collections.get(
+                ti.target_compound_id, []
+            )
+            # Create a separate entry for each collection the ion's compound belongs to
+            for collection_id in collection_ids:
+                target_ions_dict.append(
+                    {
+                        **ti.to_dict(),
+                        "target_collection_id": collection_id,
+                        "alarm_mode": collection_alarm_mode_lookup.get(
+                            collection_id, False
+                        ),
+                        "ionization_mechanism": ion_mechanisms_associations.get(
+                            ti.ionization_mechanism_id
+                        ),
+                        "selection": 0,
+                    }
+                )
+        #   TargetIsotopes
+        # Fetch TargetIsotopes associated with the fetched TargetIons
+        target_isotopes = await session.execute(
+            select(
+                TargetIsotope,
+                literal(0).label("selection"),
+            ).filter(
+                TargetIsotope.target_ion_id.in_(
+                    [ti.target_ion_id for ti in target_ions]
+                )
+            )
+        )
+        target_isotopes = target_isotopes.scalars().all()
+
+        # Create a lookup dictionary for target_ion_id -> list of target_collection_ids
+        target_ion_to_collections = {}
+        for ti in target_ions_dict:
+            ion_id = ti["target_ion_id"]
+            collection_id = ti["target_collection_id"]
+            if ion_id in target_ion_to_collections:
+                target_ion_to_collections[ion_id].add(collection_id)
+            else:
+                target_ion_to_collections[ion_id] = {collection_id}
+
+        # Now use this lookup to create TargetIsotopes dictionary
+        target_isotopes_dict = []
+        for isotope in target_isotopes:
+            # Get all target_collection_ids for the current isotope's ion
+            collection_ids = list(
+                target_ion_to_collections.get(isotope.target_ion_id, [])
+            )
+            # Create a separate entry for each collection the isotope's ion belongs to
+            for collection_id in collection_ids:
+                target_isotopes_dict.append(
+                    {
+                        **isotope.to_dict(),
+                        "target_collection_id": collection_id,
+                        "alarm_mode": collection_alarm_mode_lookup.get(
+                            collection_id, False
+                        ),
+                        "selection": 0,
+                    }
+                )
+
+        data = {
+            "target_collections_count": len(target_collections_dict),
+            "target_compounds_count": len(target_compounds_dict),
+            "target_ions_count": len(target_ions_dict),
+            "target_isotopes_count": len(target_isotopes_dict),
+            "target_collections": target_collections_dict,
+            "target_compounds": target_compounds_dict,
+            "target_ions": target_ions_dict,
+            "target_isotopes": target_isotopes_dict,
+        }
+
+        return {
+            "message": "Batch targets are fetched successfully.",
+            "data": data,
+        }
+
+
 async def create_sample_batch(sample_batch: SampleBatchCreate):
     async with async_session() as session:
         new_sample_batch = SampleBatch(
@@ -128,74 +369,6 @@ async def create_sample_batch(sample_batch: SampleBatchCreate):
         )
 
         return new_sample_batch
-
-
-async def delete_sample_batch(sample_batch_id: str, sid=None):
-    try:
-        async with async_session() as session:
-            result = await session.execute(
-                select(SampleBatch).filter(
-                    SampleBatch.sample_batch_id == sample_batch_id
-                )
-            )
-            sample_batch = result.scalar_one_or_none()
-            if not sample_batch:
-                # TODO_error_handling the HTTPException will not work for BackgroundTasks, use sio or other error handling logic
-                print(f"Sample batch with ID {sample_batch_id} not found")
-                raise ValueError(f"Sample batch with ID {sample_batch_id} not found")
-
-            await session.delete(sample_batch)
-            await session.commit()
-
-            success_payload = {
-                "action": "delete",
-                "type": "batch",
-                "status": "success",
-                "message": f"Batch '{sample_batch.sample_batch_name}' was successfully deleted.",
-            }
-
-            await sio.emit(
-                "delete_finished",
-                success_payload,
-                room=sample_batch.workspace_id,
-                namespace="/",
-            )
-            # Notify sid if it has moved from this workspace
-            if sid:
-                sid_rooms = sio.rooms(sid, namespace="/")
-                if sample_batch.workspace_id not in sid_rooms:
-                    await sio.emit(
-                        "delete_finished", success_payload, room=sid, namespace="/"
-                    )
-
-            await sio.emit(
-                "workspace_reload", room=sample_batch.workspace_id, namespace="/"
-            )
-
-    except Exception as e:
-        error_payload = {
-            "error": str(e),
-            "action": "delete",
-            "type": "batch",
-            "status": "error",
-            "message": f"Deleting batch with ID '{sample_batch_id}' failed",
-        }
-
-        # Notify workspace
-        await sio.emit(
-            "delete_finished",
-            error_payload,
-            room=sample_batch.workspace_id,
-            namespace="/",
-        )
-
-        # Notify sid if it has moved from this workspace
-        if sid:
-            sid_rooms = sio.rooms(sid, namespace="/")
-            if sample_batch.workspace_id not in sid_rooms:
-                await sio.emit(
-                    "delete_finished", error_payload, room=sid, namespace="/"
-                )
 
 
 async def update_sample_batch(
@@ -265,6 +438,74 @@ async def update_sample_batch(
         )
 
     return existing_sample_batch
+
+
+async def delete_sample_batch(sample_batch_id: str, sid=None):
+    try:
+        async with async_session() as session:
+            result = await session.execute(
+                select(SampleBatch).filter(
+                    SampleBatch.sample_batch_id == sample_batch_id
+                )
+            )
+            sample_batch = result.scalar_one_or_none()
+            if not sample_batch:
+                # TODO_error_handling the HTTPException will not work for BackgroundTasks, use sio or other error handling logic
+                print(f"Sample batch with ID {sample_batch_id} not found")
+                raise ValueError(f"Sample batch with ID {sample_batch_id} not found")
+
+            await session.delete(sample_batch)
+            await session.commit()
+
+            success_payload = {
+                "action": "delete",
+                "type": "batch",
+                "status": "success",
+                "message": f"Batch '{sample_batch.sample_batch_name}' was successfully deleted.",
+            }
+
+            await sio.emit(
+                "delete_finished",
+                success_payload,
+                room=sample_batch.workspace_id,
+                namespace="/",
+            )
+            # Notify sid if it has moved from this workspace
+            if sid:
+                sid_rooms = sio.rooms(sid, namespace="/")
+                if sample_batch.workspace_id not in sid_rooms:
+                    await sio.emit(
+                        "delete_finished", success_payload, room=sid, namespace="/"
+                    )
+
+            await sio.emit(
+                "workspace_reload", room=sample_batch.workspace_id, namespace="/"
+            )
+
+    except Exception as e:
+        error_payload = {
+            "error": str(e),
+            "action": "delete",
+            "type": "batch",
+            "status": "error",
+            "message": f"Deleting batch with ID '{sample_batch_id}' failed",
+        }
+
+        # Notify workspace
+        await sio.emit(
+            "delete_finished",
+            error_payload,
+            room=sample_batch.workspace_id,
+            namespace="/",
+        )
+
+        # Notify sid if it has moved from this workspace
+        if sid:
+            sid_rooms = sio.rooms(sid, namespace="/")
+            if sample_batch.workspace_id not in sid_rooms:
+                await sio.emit(
+                    "delete_finished", error_payload, room=sid, namespace="/"
+                )
 
 
 async def autosampler_import_batch(
@@ -577,183 +818,3 @@ async def sample_batch_export_peaks(sample_batch: SampleBatchExportPeaks, sid=No
                 room=sid,
                 namespace="/",
             )
-
-
-async def get_batch_targets(sample_batch_id: str, ion_mechanisms: List[str]):
-    async with async_session() as session:
-        # Retrieve the sample details
-        stmt = select(SampleBatch).filter(
-            SampleBatch.sample_batch_id == sample_batch_id
-        )
-        result = await session.execute(stmt)
-        sample_batch = result.scalars().first()
-
-        if not sample_batch:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Sample batch with ID {sample_batch_id} not found",
-            )
-
-        #   TargetCollections
-        # Fetch TargetCollections associated with the sample_batch_id
-        target_collections = await session.execute(
-            select(
-                TargetCollection,
-                literal(0).label("selection"),
-            )
-            .join(
-                TargetCollectionInSampleBatch,
-                TargetCollectionInSampleBatch.target_collection_id
-                == TargetCollection.target_collection_id,
-            )
-            .filter(TargetCollectionInSampleBatch.sample_batch_id == sample_batch_id)
-        )
-        target_collections = target_collections.scalars().all()
-
-        # Fetch the required target_collection_ids
-        target_collection_ids = [tc.target_collection_id for tc in target_collections]
-
-        #   TargetCompounds
-        # Fetch TargetCompounds associated with the fetched TargetCollections and add the associated target_collection_id
-        target_compounds_query = await session.execute(
-            select(TargetCompound)
-            .join(
-                TargetCompoundInTargetCollection,
-                TargetCompoundInTargetCollection.target_compound_id
-                == TargetCompound.target_compound_id,
-            )
-            .filter(
-                TargetCompoundInTargetCollection.target_collection_id.in_(
-                    [tc.target_collection_id for tc in target_collections]
-                )
-            )
-        )
-        target_compounds = target_compounds_query.scalars().all()
-
-        associations_list = []
-
-        associations = await session.execute(
-            select(
-                TargetCompoundInTargetCollection.target_compound_id,
-                TargetCompoundInTargetCollection.target_collection_id,
-            ).filter(
-                TargetCompoundInTargetCollection.target_collection_id.in_(
-                    target_collection_ids
-                )
-            )
-        )
-
-        for association in associations:
-            compound_id = association.target_compound_id
-            collection_id = association.target_collection_id
-            associations_list.append((compound_id, collection_id))
-
-        # Convert target_compounds to a dictionary for faster lookup
-        target_compounds_dict_lookup = {
-            tc.target_compound_id: tc for tc in target_compounds
-        }
-
-        target_compounds_dict = []
-        for compound_id, collection_id in associations_list:
-            tc = target_compounds_dict_lookup.get(compound_id)
-            if tc:
-                target_compounds_dict.append(
-                    {
-                        **tc.to_dict(),
-                        "target_collection_id": collection_id,
-                        "selection": 0,
-                    }
-                )
-
-        #   TargetIons
-        # Fetch TargetIons associated with the fetched TargetCompounds, ion_mechanisms, and relevant TargetCollections
-        target_ions_query = await session.execute(
-            select(TargetIon)
-            .distinct(TargetIon.target_ion_id)
-            .join(
-                TargetCompoundInTargetCollection,
-                TargetIon.target_compound_id
-                == TargetCompoundInTargetCollection.target_compound_id,
-            )
-            .join(
-                IonizationMechanism,
-                TargetIon.ionization_mechanism_id
-                == IonizationMechanism.ionization_mechanism_id,
-            )
-            .filter(
-                TargetCompoundInTargetCollection.target_collection_id.in_(
-                    target_collection_ids
-                ),
-                TargetIon.target_compound_id.in_(
-                    [tc.target_compound_id for tc in target_compounds]
-                ),
-                IonizationMechanism.ionization_mechanism_id.in_(ion_mechanisms),
-            )
-        )
-        target_ions = target_ions_query.scalars().all()
-
-        # Create a lookup dictionary for target_compound_id -> target_collection_id
-        target_compound_to_collection = {
-            tc["target_compound_id"]: tc["target_collection_id"]
-            for tc in target_compounds_dict
-        }
-
-        # Fetch all ionization mechanisms and create a lookup dictionary for them
-        ion_mechanisms_query = await session.execute(
-            select(
-                IonizationMechanism.ionization_mechanism_id,
-                IonizationMechanism.ionization_mechanism,
-            )
-        )
-        ion_mechanisms_associations = {
-            im.ionization_mechanism_id: im.ionization_mechanism
-            for im in ion_mechanisms_query
-        }
-
-        # Create TargetIons dictionary including the new fields
-        target_ions_dict = [
-            {
-                **ti.to_dict(),
-                "target_collection_id": target_compound_to_collection.get(
-                    ti.target_compound_id
-                ),
-                "ionization_mechanism": ion_mechanisms_associations.get(
-                    ti.ionization_mechanism_id
-                ),
-                "selection": 0,
-            }
-            for ti in target_ions
-        ]
-        #   TargetIsotopes
-        # Fetch TargetIsotopes associated with the fetched TargetIons
-        target_isotopes = await session.execute(
-            select(
-                TargetIsotope,
-                literal(0).label("selection"),
-            ).filter(
-                TargetIsotope.target_ion_id.in_(
-                    [ti.target_ion_id for ti in target_ions]
-                )
-            )
-        )
-        target_isotopes = target_isotopes.scalars().all()
-
-        data = {
-            "target_collections_count": len(target_collections),
-            "target_compounds_count": len(target_compounds),
-            "target_ions_count": len(target_ions),
-            "target_isotopes_count": len(target_isotopes),
-            "target_collections": [
-                tc.to_dict(include_selection=True) for tc in target_collections
-            ],
-            "target_compounds": target_compounds_dict,
-            "target_ions": target_ions_dict,
-            "target_isotopes": [
-                ti.to_dict(include_selection=True) for ti in target_isotopes
-            ],
-        }
-
-        return {
-            "message": "Batch targets are fetched successfully.",
-            "data": data,
-        }

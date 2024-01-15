@@ -36,21 +36,30 @@ export default {
   },
   actions: {
     // data loading
-    async load({ commit, dispatch }, ion) {
+    async load(
+      { dispatch },
+      { sampleId, ionId, collectionId, filterParams = null }
+    ) {
       await dispatch("unload");
-      await commit("SET_ACTIVE_ION", ion);
-      await dispatch("setFilterParams");
-      await dispatch("loadMatches");
+      await dispatch(
+        "setFilterParams",
+        filterParams ? filterParams : paramDefaults
+      );
+
+      await dispatch("loadMatches", { sampleId, ionId, collectionId });
       await dispatch("emitVisualization");
     },
 
     async loadMatches({ commit, dispatch, state }, params = null) {
       const sampleId = params?.sampleId || state.activeIon.sample_item_id;
       const ionId = params?.ionId || state.activeIon.target_ion_id;
+      const collectionId =
+        params?.collectionId || state.activeIon.target_collection_id;
 
       const sampleIonData = await dispatch("getSampleIonData", {
         sampleId,
         ionId,
+        collectionId,
       });
 
       const existingIsotopes = state.activeIsotopes;
@@ -70,6 +79,8 @@ export default {
           mz: isotope.mz.toFixed(4),
           match_score: isotope.match_score,
           match_category: isotope.match_category,
+          alarm_mode: isotope.alarm_mode,
+          target_collection_type: isotope.target_collection_type,
           relative_abundance: isotope.relative_abundance,
           sample_peak_area: isotope.sample_peak_area,
           match_mz_error: isotope.match_mz_error,
@@ -139,9 +150,15 @@ export default {
     },
 
     // http client endpoints
-    async getSampleIonData({ state, dispatch }, { sampleId, ionId }) {
+    async getSampleIonData(
+      { rootGetters, state, dispatch },
+      { sampleId, ionId, collectionId }
+    ) {
+      const alarmsList = rootGetters["targets/alarmsList"];
+
       const body = {
         target_ion_id: ionId,
+        target_collection_id: collectionId,
         filter_params: {
           mz_tolerance: state.paramMzTolerance,
           isotope_ratio_tolerance: state.paramIsotopeRatioTolerance,
@@ -151,7 +168,9 @@ export default {
           probable_match_threshold: state.paramProbableMatchThreshold,
           possible_match_threshold: state.paramPossibleMatchThreshold,
         },
+        alarms_list: alarmsList,
       };
+
       const sampleIonData = await getApiData({
         dispatch,
         httpMethod: "getSampleIonMatches",

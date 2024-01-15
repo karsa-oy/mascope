@@ -189,35 +189,40 @@ export default {
       });
     },
 
-    async getBatchSamplesData({ dispatch }, batchId) {
-      const reqBody = {
+    async getBatchSamplesData({ dispatch, rootGetters }, batchId) {
+      const alarmsList = rootGetters["targets/alarmsList"];
+
+      const body = {
         sample_batch_id: batchId,
         batch_matches_info: true,
         sort: "datetime_utc",
         order: "asc",
+        alarms_list: alarmsList,
       };
 
       return await getApiData({
         dispatch,
         httpMethod: "getAllSamples",
-        requestData: reqBody,
+        requestData: body,
         errorMessage: `Failed to load batch samples data.`,
       });
     },
 
-    async getBatchTargets({ state, dispatch }, batchId) {
+    async getBatchTargets({ state, dispatch, rootGetters }, batchId) {
+      const alarmsList = rootGetters["targets/alarmsList"];
+
       const reqData = {
         batchId,
         body: {
           ion_mechanisms: state.paramIonMechanisms,
+          alarms_list: alarmsList,
         },
       };
-
       const batchTargetsData = await getApiData({
         dispatch,
-        httpMethod: "loadBatchTargets",
+        httpMethod: "getBatchTargets",
         requestData: reqData,
-        errorMessage: `Failed to load batch targets.`,
+        errorMessage: `Failed to get batch targets.`,
       });
 
       return batchTargetsData.data;

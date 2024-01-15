@@ -3,6 +3,10 @@ from pydantic import BaseModel, Field, validator
 from datetime import datetime
 
 
+# TODO_configuration possible collection types
+APP_COLLECTION_TYPES = ["TARGETS", "DIAGNOSTICS", "CALIBRANTS"]
+
+
 class FilterParams(BaseModel):
     mz_tolerance: int = Field(
         ..., description="Tolerance for mass-to-charge ratio (m/z) error."
@@ -38,7 +42,24 @@ class FilterParams(BaseModel):
         return possible_match_threshold
 
 
-class GetSamplesBody(BaseModel):
+#  Note that GetSampleBody also acts as a common base class that includes the alarms_list field and its validator
+class GetSampleBody(BaseModel):
+    alarms_list: List[str] = Field(
+        default=["TARGETS"],
+        description="List of collection types to set alarm mode to true",
+    )
+
+    @validator("alarms_list", each_item=True)
+    def validate_alarms_list(cls, item):
+        if item not in APP_COLLECTION_TYPES:
+            allowed_types = ", ".join(APP_COLLECTION_TYPES)
+            raise ValueError(
+                f"{item} is not a valid collection type. Allowed types are {allowed_types}."
+            )
+        return item
+
+
+class GetSamplesBody(GetSampleBody):
     sample_item_id: Optional[str] = None
     sample_item_id_active: Optional[str] = None
     sample_file_id: Optional[str] = None
@@ -59,8 +80,11 @@ class GetSamplesBody(BaseModel):
     match_isotopes: Optional[bool] = False
 
 
-class GetSampleIonMatchesBody(BaseModel):
+class GetSampleIonMatchesBody(GetSampleBody):
     target_ion_id: str = Field(..., description="ID of the target ion")
+    target_collection_id: str = Field(
+        ..., description="ID of the target collection to remove possible dublicates"
+    )
     filter_params: FilterParams = Field(
         ...,
         description="Ion-specific filter parameters, used for match_score and sample_peak_area filtering",

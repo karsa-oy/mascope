@@ -3,9 +3,17 @@ import { getApiData } from "./apiHelper";
 
 const state = {
   activeCollection: null,
+  // alarm_mode
+  alarmTargets: true,
+  alarmDiagnostics: false,
+  alarmCalibrants: false,
+  // all targets
   targetCollectionsAll: null,
   targetCompoundsAll: null,
 };
+
+// TODO_configuration possible collection types
+const collectionTypes = ["TARGETS", "DIAGNOSTICS", "CALIBRANTS"];
 
 export default {
   namespaced: true,
@@ -169,17 +177,54 @@ export default {
   },
 
   getters: {
+    // get collections
     activeCollection: (state) => {
       return state.activeCollection ? state.activeCollection : null;
     },
-    getTargetCollectionsAll: (state) => {
+
+    getAllCollections: (state) => {
       return state?.targetCollectionsAll || [];
     },
-    getTargetCollection: (state, getters) => (targetCollectionId) => {
-      const [targetCollection] = getters["getTargetCollectionsAll"].filter(
+    getTargetsCollections: (state) => {
+      return (
+        state.targetCollectionsAll?.filter(
+          (collection) => collection.target_collection_type === "TARGETS"
+        ) || []
+      );
+    },
+    getCalibrantsCollections: (state) => {
+      return (
+        state.targetCollectionsAll?.filter(
+          (collection) => collection.target_collection_type === "CALIBRANTS"
+        ) || []
+      );
+    },
+    getDiagnosticsCollections: (state) => {
+      return (
+        state.targetCollectionsAll?.filter(
+          (collection) => collection.target_collection_type === "DIAGNOSTICS"
+        ) || []
+      );
+    },
+    getCollection: (getters) => (targetCollectionId) => {
+      const [targetCollection] = getters["getAllCollections"].filter(
         (row) => row.target_collection_id == targetCollectionId
       );
       return targetCollection ?? null;
+    },
+    collectionTypes: () => collectionTypes,
+    // get alarm_mode list
+    alarmsList: (state, getters) => {
+      const alarmingTypes = [];
+      for (const [key, value] of Object.entries(state)) {
+        if (key.startsWith("alarm") && value) {
+          const collectionType = key.replace("alarm", "").toUpperCase();
+          if (getters.collectionTypes.includes(collectionType)) {
+            alarmingTypes.push(collectionType);
+          }
+        }
+      }
+      return alarmingTypes;
     },
     // get selected
     targetCollectionsSelected: (state) => {
