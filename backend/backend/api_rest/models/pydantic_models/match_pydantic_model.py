@@ -23,7 +23,9 @@ class MatchComputeItem(BaseModel):
     sample_batch_id: str = Field(..., description="ID of the sample batch")
     filename: str = Field(..., description="Filename of the sample item")
     instrument: str = Field(..., description="Instrument of the sample item")
-    mz_calibration: MZCalibration = Field(..., description="mz calibration object")
+    mz_calibration: Optional[MZCalibration] = Field(
+        None, description="mz calibration object"
+    )
 
 
 class ProgressProperties(BaseModel):

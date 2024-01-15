@@ -7,34 +7,39 @@ sys.path.append(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 )
 import argparse
-import asyncio
 from datetime import timedelta
 from multiprocessing import Event, Lock, Queue
 from queue import Empty
+from threading import Thread
+from time import sleep
 
+import requests
 import socketio
-import aiohttp
-import asyncio
+
 from dotenv import load_dotenv
+
+
 from hardware.orbitrap.generator import RawStreamer
 from hardware.tofwerk.h5_streamer import H5Streamer
 from hardware.tofwerk.lib.TwTool import *
 
 from lib.file_func import zarr_sdk
+from lib.peak import calculate_tic
 from lib.structs import AttrDict, LRUDict
 from lib.util import timestamp_from_filename
 from service.lib.filesystem_watcher import FSWatcher
 from service.lib.util import load_env_yaml
 
 
-async def create_sample_file_db_record(data):
+def create_sample_file_db_record(data):
     filename = data["filename"]
+    print(f"Creating sample file record for file: {filename}")
     instrument_name = filename.split("_")[0]
     committed_length = data["committed_length"]
     date = timestamp_from_filename(filename)
     utc_offset = timedelta(seconds=int(data["utc_offset"]))
     mz_calibration = data.get("mz_calibration")
-    tic = cache.get(filename)["signal"].sum(dim="time").sum(dim="mz").compute().item()
+    tic = calculate_tic(filename)
 
     sample_file_db_record = {
         "filename": filename,
@@ -51,22 +56,19 @@ async def create_sample_file_db_record(data):
 
     url = f"http://{host}:{port}/api/sample_files"
 
-    async with aiohttp.ClientSession() as session:
-        async with session.post(
-            url, headers=headers, json=sample_file_db_record
-        ) as response:
-            if response.status != 200:
-                print(
-                    f"Failed to create database record! Status code: {response.status}"
-                )
+    response = requests.post(url, headers=headers, json=sample_file_db_record)
+    if response.status_code != 200:
+        raise Exception(
+            f"Failed to create database record! Status code: {response.status_code}"
+        )
 
 
-async def streamer_processor(streamer):
+def process_stream(streamer):
     global cache
     global sio
 
     # Handlers
-    async def handle_spec_data(data):
+    def handle_spec_data(data):
         def cleanup():
             print("Canceling...")
             streamer.cancel_event.set()
@@ -76,6 +78,7 @@ async def streamer_processor(streamer):
                 streamer.tps_queue.get()  # coordinates
                 streamer.tps_queue.get()  # data
 
+        data.update({"filename": data["filename"].replace(" ", "_")})
         filename = data["filename"]
         instrument_name = filename.split("_")[0]
         spec_i = data["i"]
@@ -86,7 +89,9 @@ async def streamer_processor(streamer):
             "progress": streamer.progress,
         }
         if spec_i is None:
+            print("Got poison pill")
             # File finished
+            print("Finalizing signal dataset")
             zarr_sdk.finalize_signal_dataset({"value": data}, sample_file)
             data.update(
                 {
@@ -97,16 +102,19 @@ async def streamer_processor(streamer):
                 }
             )
             filepath = data.pop("source_filepath")
+            print("Deleting file from mailbox")
             os.remove(filepath)
             try:
-                await create_sample_file_db_record(data)
-            except socketio.exceptions.BadNamespaceError:
-                print("Failed to create database record! No connection to server.")
-            if sio.connected:
-                await sio.emit(
+                create_sample_file_db_record(data)
+            except Exception as e:
+                print(f"Failed to create database record!: {e}")
+            try:
+                sio.emit(
                     "instrument_conversion_finished",
                     notification_data,
                 )
+            except Exception as e:
+                print(f"Failed to emit notification: {e}")
         elif spec_i < 0:
             # New file
             try:
@@ -119,22 +127,22 @@ async def streamer_processor(streamer):
                 return False
             sample_file = AttrDict(sample_file)
             cache[filename] = sample_file
-            if sio.connected:
-                await sio.emit(
-                    "instrument_conversion_started",
-                    notification_data,
-                )
+            try:
+                sio.emit("instrument_conversion_started", notification_data)
+            except Exception as e:
+                print(f"Failed to emit notification: {e}")
         else:
             # New data to existing file
             zarr_sdk.update_signal_dataset({"value": data}, sample_file)
-            if sio.connected:
-                await sio.emit(
-                    "instrument_conversion_progress",
-                    notification_data,
-                )
+            try:
+                print(notification_data["progress"])
+                sio.emit("instrument_conversion_progress", notification_data)
+            except Exception as e:
+                print(f"Failed to emit notification: {e}")
         return True
 
-    async def handle_tps_data(data):
+    def handle_tps_data(data):
+        data.update({"filename": data["filename"].replace(" ", "_")})
         filename = data["filename"]
         spec_i = data["i"]
         sample_file = cache.get(filename)
@@ -157,12 +165,12 @@ async def streamer_processor(streamer):
     while not streamer.shutdown_event.is_set():
         try:
             spec_data = streamer.spec_queue.get_nowait()
-            success = await handle_spec_data(spec_data)
+            success = handle_spec_data(spec_data)
             if success and hasattr(streamer, "tps_queue"):
                 tps_data = streamer.tps_queue.get()
-                await handle_tps_data(tps_data)
+                handle_tps_data(tps_data)
         except Empty:
-            await asyncio.sleep(0.1)
+            sleep(0.1)
 
 
 def parse_cmd_args():
@@ -240,18 +248,18 @@ def parse_cmd_args():
     return {**file_args, **cmdline_args}
 
 
-async def main():
+def main():
     global sio
     url = f"http://{host}:{port}"
     print(f"Connecting to {url}...")
     while not shutdown_event.is_set():
         try:
-            await sio.connect(url)
+            sio.connect(url)
             break
         except:
-            await asyncio.sleep(1)
+            sleep(1)
     while not shutdown_event.is_set():
-        await asyncio.sleep(1)
+        sleep(1)
 
 
 load_dotenv()
@@ -261,7 +269,7 @@ port = None
 cache = None
 file_queue = Queue()
 shutdown_event = Event()
-sio = socketio.AsyncClient(logger=True, ssl_verify=False)
+sio = socketio.Client(logger=True, ssl_verify=False)
 
 
 def run():
@@ -298,13 +306,12 @@ def run():
         )
         for _ in range(n_jobs)
     ]
-    loop = asyncio.get_event_loop()
     for streamer in streamers:
         streamer.start()
-        loop.create_task(streamer_processor(streamer))
+        streamer_processor = Thread(target=process_stream, args=(streamer,))
+        streamer_processor.start()
 
     source_path = args.get("source_dir", ".")
-    ping = args["ping"]
 
     if not os.path.exists(source_path):
         print(f"Creating missing source directory {source_path}")
@@ -314,18 +321,19 @@ def run():
         path=source_path,
         mask=file_mask,
         file_queue=file_queue,
-        recursive=False,
-        ping=ping,
+        recursive=args["recursive"],  # default False
+        ping=args["ping"],  # default False
         shutdown_event=shutdown_event,
     )
     fs_watcher.run_as_daemon()
 
     try:
-        loop.run_until_complete(main())
+        main()
     except KeyboardInterrupt:
         shutdown_event.set()
     except:
         shutdown_event.set()
+    streamer_processor.join()
 
 
 if __name__ == "__main__":

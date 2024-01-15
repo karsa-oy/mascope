@@ -37,7 +37,7 @@ def strip_filepath(filepath):
 
 class RawStreamer(Thread):
     def __init__(
-        self, file_queue=Queue(), shutdown_event=Event(), lock=Lock(), mz_precision=4
+        self, file_queue=Queue(), shutdown_event=Event(), lock=Lock(), mz_precision=3
     ):
         print("RawStreamer initializing")
         Thread.__init__(self)
@@ -236,11 +236,12 @@ class RawStreamer(Thread):
                     # Empty
                     continue
                 else:
-                    # Shutdown
+                    # Done
                     break
             # Out of stream loop
             self._finalize()
-            self.raw.Dispose()
+            with self.lock:
+                self.raw.Dispose()
             self.active.clear()
             self.cancel_event.clear()
             print("RawStream finished")

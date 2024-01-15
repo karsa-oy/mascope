@@ -89,7 +89,7 @@ def timestamp_from_filename(filename):
     FILENAME_DATETIME_PATTERNS = [
         "*%Y.%m.%d*%Hh%Mm%Ss*",
         "*%Y%m%d_%H%M_*",
-        "*%Y%m%d_*",
+        "*%Y%m%d*%H%M*",
     ]
 
     for pattern in FILENAME_DATETIME_PATTERNS:

@@ -21,10 +21,10 @@ from backend.socket_events import sio
 from lib.file_func import (
     get_zarr_var_shape,
     load_coord,
-    load_file,
     update_props,
     update_zarr_array_coord,
 )
+from lib.peak import calculate_tic
 
 from zarr.errors import PathNotFoundError
 
@@ -78,12 +78,6 @@ async def emit_progress_update(progress_properties, increment):
 # -------------------------------------------------------------------
 # Main Logic Functions
 # -------------------------------------------------------------------
-def calculate_tic(filename):
-    sample_file_data = load_file(filename, vars=["signal"])
-    sum_spectrum = sample_file_data.signal.sum(dim="time")
-    tic = sum_spectrum.sum(dim="mz").compute().item()
-    return tic
-
 
 async def mz_fit(
     filename,

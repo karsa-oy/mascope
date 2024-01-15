@@ -291,7 +291,11 @@ async def item_compute(
     sample_item_id = sample_item.sample_item_id
     filename = sample_item.filename
     sample_batch_id = sample_item.sample_batch_id
-    verified = sample_item.mz_calibration.verified
+    verified = (
+        sample_item.mz_calibration.verified
+        if sample_item.mz_calibration is not None
+        else True
+    )
 
     # Ensure mz_calibration.verified is True
     if not verified:
@@ -399,7 +403,11 @@ async def match_batch_compute(
             )
 
         # Check if 'verified' exists in mz_calibration. If not, provide a default value of False
-        verified_value = sample_item.mz_calibration.get("verified", False)
+        verified_value = (
+            sample_item.mz_calibration.get("verified", False)
+            if sample_item.mz_calibration is not None
+            else True
+        )
 
         sample_item_pydantic = MatchComputeItem(
             sample_item_id=sample_item.sample_item_id,
@@ -411,7 +419,9 @@ async def match_batch_compute(
                 mode=sample_item.mz_calibration["mode"],
                 par=sample_item.mz_calibration["par"],
                 verified=verified_value,
-            ),
+            )
+            if sample_item.mz_calibration is not None
+            else None,
         )
 
         try:

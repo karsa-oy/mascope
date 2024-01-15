@@ -275,7 +275,7 @@ class H5Streamer(BaseGenerator, KInstrument):
                         # Empty
                         continue
                     else:
-                        # Shutdown
+                        # Done
                         break
                 # Out of buf loop
                 # Check for cancel and shutdown flags
