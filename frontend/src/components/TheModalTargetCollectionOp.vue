@@ -72,6 +72,9 @@
             <b-field label="Description">
               <b-input v-model="newCollectionDesc" :disabled="true"> </b-input>
             </b-field>
+            <b-field label="Type">
+              <b-input v-model="newCollectionType" :disabled="true"> </b-input>
+            </b-field>
             <b-field
               :label="`Select batches for target collection ${targetCollectionActiveInfo.target_collection_name}`"
             >
@@ -130,6 +133,27 @@
             >
               <b-input v-model="newCollectionDesc"></b-input>
             </b-field>
+            <b-field label="Collection type">
+              <b-dropdown aria-role="list" v-model="newCollectionType" expanded>
+                <template #trigger>
+                  <b-button
+                    :label="newCollectionType || 'Select Type'"
+                    icon-right="menu-down"
+                    expanded
+                    style="align: left"
+                  />
+                </template>
+                <b-dropdown-item
+                  aria-role="listitem"
+                  v-for="collectionType in collectionTypes"
+                  :key="collectionType"
+                  :value="collectionType"
+                >
+                  {{ collectionType }}
+                </b-dropdown-item>
+              </b-dropdown>
+            </b-field>
+
             <base-spreadsheet-input
               label="Target compounds"
               :cols="targetCompoundCols"
@@ -158,16 +182,15 @@
               type="is-primary"
               icon-left="content-save"
               expanded
+              :disabled="
+                !this.newCollectionName ||
+                // !this.newCollectionDesc ||
+                !this.newCollectionType ||
+                this.newTargetCompounds.length === 0
+              "
               @click="
                 () => {
-                  createTargetCollection({
-                    target_collection_name: newCollectionName,
-                    target_collection_description: newCollectionDesc,
-                    target_compounds: newTargetCompounds,
-                    sample_batches: this.batchesToAddTo
-                      ? this.batchesToAddTo
-                      : [],
-                  });
+                  createCollection(newCollection);
                   deactivateModal();
                 }
               "
@@ -195,11 +218,32 @@
             >
               <b-input v-model="newCollectionDesc"></b-input>
             </b-field>
-            <base-spreadsheet-input
+
+            <b-field label="Collection type">
+              <b-dropdown aria-role="list" v-model="newCollectionType" expanded>
+                <template #trigger>
+                  <b-button
+                    :label="newCollectionType || 'Select Type'"
+                    icon-right="menu-down"
+                    expanded
+                    style="align: left"
+                  />
+                </template>
+                <b-dropdown-item
+                  aria-role="listitem"
+                  v-for="collectionType in collectionTypes"
+                  :key="collectionType"
+                  :value="collectionType"
+                >
+                  {{ collectionType }}
+                </b-dropdown-item>
+              </b-dropdown>
+            </b-field>
+            <!-- <base-spreadsheet-input
               label="Target compounds"
               :cols="targetCompoundCols"
               @rowsPasted="loadTargetCompounds"
-            ></base-spreadsheet-input>
+            ></base-spreadsheet-input> -->
           </section>
           <footer class="modal-card-foot">
             <b-button type="is-warning" expanded @click="modalActive = false">
@@ -208,17 +252,14 @@
             <b-button
               type="is-primary"
               expanded
+              :disabled="
+                !this.newCollectionName ||
+                // !this.newCollectionDesc ||
+                !this.newCollectionType
+              "
               @click="
                 () => {
-                  updateTargetCollection([
-                    {
-                      target_collection_id:
-                        selectedCollection.target_collection_id,
-                      target_collection_name: newCollectionName,
-                      target_collection_description: newCollectionDesc,
-                      target_compounds: newTargetCompounds,
-                    },
-                  ]);
+                  updateCollection(newCollection);
                   deactivateModal();
                 }
               "
@@ -246,7 +287,7 @@
               :label="`Are you sure you want to delete the collection ${targetCollectionActiveInfo.target_collection_name} ?`"
             >
               <b-radio
-                v-model="deleteUnusedCompounds"
+                v-model="deleteOrphanCompounds"
                 :native-value="false"
                 type="is-info"
               >
@@ -255,7 +296,7 @@
             </b-field>
             <b-field>
               <b-radio
-                v-model="deleteUnusedCompounds"
+                v-model="deleteOrphanCompounds"
                 :native-value="true"
                 type="is-primary"
               >
@@ -278,9 +319,10 @@
               expanded
               @click="
                 () => {
-                  deleteTargetCollection(
-                    selectedCollection.target_collection_id
-                  );
+                  deleteCollection({
+                    ...selectedCollection,
+                    deleteOrphanCompounds,
+                  });
                   deactivateModal();
                 }
               "
@@ -295,7 +337,7 @@
 </template>
 
 <script>
-import { mapActions, mapMutations } from "vuex";
+import { mapMutations } from "vuex";
 import { sync, call, get } from "vuex-pathify";
 
 import BaseSpreadsheetInput from "./BaseSpreadsheetInput.vue";
@@ -312,12 +354,13 @@ export default {
       selectedBatchInfo: {},
       // Copy Selected Collection To Batches
       batchesToAddTo: [],
-      newCollectionName: "",
-      newCollectionDesc: "",
+      newCollectionName: null,
+      newCollectionDesc: null,
+      newCollectionType: null,
       newTargetCompounds: [],
       // Delete Selected Collection
       targetCollectionActiveInfo: {},
-      deleteUnusedCompounds: true,
+      deleteOrphanCompounds: true,
       // Manage Selected Collection Batches
       initialSampleBatchesChecked: [],
       sampleBatchesChecked: [],
@@ -335,7 +378,8 @@ export default {
       batchActive: "batch/active",
       targetCollectionActive: "targets/activeCollection",
       batchTargetCollections: "batch/targetCollections",
-      targetCollectionsAll: "targets/targetCollectionsAll",
+      targetCollectionsAll: "targets/getAllCollections",
+      collectionTypes: "targets/collectionTypes",
     }),
     fields() {
       return this.cols.map((col) => col.field);
@@ -356,22 +400,42 @@ export default {
         { field: "cas_number", label: "CAS Number" },
       ];
     },
+    newCollection() {
+      if (this.actionIs("create")) {
+        return {
+          target_collection_name: this.newCollectionName,
+          target_collection_description: this.newCollectionDesc,
+          target_collection_type: this.newCollectionType,
+          target_compounds: this.newTargetCompounds,
+          sample_batches: this.batchesToAddTo ? this.batchesToAddTo : [],
+        };
+      } else if (this.actionIs("update")) {
+        return {
+          target_collection_id: this.selectedCollection.target_collection_id,
+          target_collection_name: this.newCollectionName,
+          target_collection_description: this.newCollectionDesc,
+          target_collection_type: this.newCollectionType,
+        };
+      } else {
+        return null;
+      }
+    },
   },
   methods: {
+    ...call({
+      createCollection: "targets/createCollection",
+      updateCollection: "targets/updateCollection",
+      deleteCollection: "targets/deleteCollection",
+      removeTargetCollectionsFromSampleBatch:
+        "targets/removeTargetCollectionsFromSampleBatch",
+      addTargetCollectionToSampleBatch:
+        "targets/addTargetCollectionToSampleBatch",
+    }),
     ...mapMutations({
       deactivateModal: "modal/deactivate",
     }),
     actionIs(...actions) {
       return actions.includes(this.action);
-    },
-    async createTargetCollection(target_collection) {
-      await this.$api.httpClient.createTargetCollection(target_collection);
-    },
-    async deleteTargetCollection(target_collection_id) {
-      await this.$api.httpClient.deleteTargetCollection(
-        target_collection_id,
-        this.deleteUnusedCompounds
-      );
     },
     async editBatchCollections(target_collections, sample_batch) {
       const removedCollections = this.initialTargetCollectionsChecked.filter(
@@ -407,16 +471,14 @@ export default {
         }));
 
         const skipRematch = addedCollections.length > 0;
-        await this.$api.httpClient.removeTargetCollectionsFromSampleBatch(
+        await this.removeTargetCollectionsFromSampleBatch({
           collectionsToRemove,
-          skipRematch
-        );
+          skipRematch,
+        });
       }
 
       if (addedCollections.length > 0) {
-        await this.$api.httpClient.addTargetCollectionToSampleBatch(
-          addedCollections
-        );
+        await this.addTargetCollectionToSampleBatch(addedCollections);
       }
     },
     async manageSelectedCollectionBatches(batches, target_collection) {
@@ -443,30 +505,36 @@ export default {
       if (removedBatches.length === 0 && addedBatches.length === 0) return;
 
       if (removedBatches.length > 0) {
-        const batchesToRemove = removedBatches.map((batch) => ({
+        const collectionsToRemove = removedBatches.map((batch) => ({
           sample_batch_id: batch.sample_batch_id,
           target_collection_id: target_collection.target_collection_id,
         }));
 
         const skipRematch = addedBatches.length > 0;
-        await this.$api.httpClient.removeTargetCollectionsFromSampleBatch(
-          batchesToRemove,
-          skipRematch
-        );
+        await this.removeTargetCollectionsFromSampleBatch({
+          collectionsToRemove,
+          skipRematch,
+        });
       }
 
       if (addedBatches.length > 0) {
-        await this.$api.httpClient.addTargetCollectionToSampleBatch(
-          addedBatches
-        );
+        await this.addTargetCollectionToSampleBatch(addedBatches);
       }
     },
 
     initData() {
+      if (this.action == "create") {
+        this.newCollectionName = null;
+        this.newCollectionDesc = null;
+        this.newCollectionType = null;
+        this.newTargetCompounds = [];
+        this.batchesToAddTo = [];
+      }
       if (this.selectedCollection) {
         this.newCollectionName = this.selectedCollection.target_collection_name;
         this.newCollectionDesc =
           this.selectedCollection.target_collection_description;
+        this.newCollectionType = this.selectedCollection.target_collection_type;
         this.targetCollectionActiveInfo = this.targetCollectionActive;
       }
       if (this.selectedBatch) {
@@ -505,6 +573,8 @@ export default {
         sample_batch_id: row.sample_batch_id,
       }));
     },
+    // TODO_replace sio api
+    // TODO_refactor_store
     updateTargetCollection(target_collection) {
       this.$api.emit("target_collection_update", target_collection);
     },

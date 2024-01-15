@@ -30,8 +30,15 @@
                 </b-field>
               </b-tab-item>
               <b-tab-item label="Calibration" :disabled="action != 'create'">
+                <b-switch v-model="calibrationShowAllCollections"
+                  >Show All Collections</b-switch
+                >
                 <b-table
-                  :data="targetCollectionsAll"
+                  :data="
+                    calibrationShowAllCollections
+                      ? allCollections
+                      : calibrantsCollections
+                  "
                   :columns="[
                     { field: 'target_collection_name', label: 'Name' },
                     {
@@ -44,8 +51,15 @@
                 </b-table>
               </b-tab-item>
               <b-tab-item label="Target collections">
+                <b-switch v-model="targetsShowAllCollections"
+                  >Show All Collections</b-switch
+                >
                 <b-table
-                  :data="targetCollectionsAll"
+                  :data="
+                    targetsShowAllCollections
+                      ? allCollections
+                      : targetsCollections
+                  "
                   :columns="[
                     { field: 'target_collection_name', label: 'Name' },
                     {
@@ -97,8 +111,8 @@
               @click="
                 () => {
                   actionIs('create')
-                    ? createSampleBatch(newBatch)
-                    : updateSampleBatch(newBatch);
+                    ? createBatch(newBatch)
+                    : updateBatch(newBatch);
                   deactivateModal();
                 }
               "
@@ -198,7 +212,7 @@
 </template>
 
 <script>
-import { mapMutations, mapActions } from "vuex";
+import { mapMutations } from "vuex";
 import { call, get, sync } from "vuex-pathify";
 import { generateCopyName } from "../store/modules/apiHelper";
 
@@ -208,6 +222,10 @@ export default {
     return {
       batchName: null,
       batchDesc: null,
+      // populating collections
+      calibrationShowAllCollections: false,
+      targetsShowAllCollections: false,
+      // selected data
       calibrationCollectionSelected: null,
       ionMechanismsSelected: [],
       targetCollectionsSelected: [],
@@ -235,7 +253,9 @@ export default {
       batchIonMechanismIds: "batch/paramIonMechanisms",
       batchTargetCollections: "batch/targetCollections",
       ionMechanismsAll: "app/ionMechanisms",
-      targetCollectionsAll: "targets/targetCollectionsAll",
+      allCollections: "targets/getAllCollections",
+      calibrantsCollections: "targets/getCalibrantsCollections",
+      targetsCollections: "targets/getTargetsCollections",
       workspaceActive: "workspace/active",
       allWorkspaces: "app/workspaces",
     }),
@@ -316,28 +336,20 @@ export default {
   methods: {
     ...call({
       batchUnload: "batch/unload",
+      createBatch: "batch/createBatch",
+      updateBatch: "batch/updateBatch",
+      deleteBatch: "batch/deleteBatch",
+      copyBatch: "batch/copyBatch",
     }),
-    ...mapActions("batch", [
-      "createBatch",
-      "deleteBatch",
-      "updateBatch",
-      "copyBatch",
-    ]),
     ...mapMutations({
       deactivateModal: "modal/deactivate",
     }),
     actionIs(...actions) {
       return actions.includes(this.action);
     },
-    async createSampleBatch(newBatch) {
-      await this.createBatch(newBatch);
-    },
     async deleteSampleBatch(batch) {
       this.batchUnload();
       await this.deleteBatch(batch);
-    },
-    async updateSampleBatch(newBatch) {
-      await this.updateBatch(newBatch);
     },
     async copySampleBatch() {
       this.isCopying = true;
@@ -357,7 +369,7 @@ export default {
 
     initCalibrationCollectionSelected() {
       if (this.batchCalibrationCollectionId) {
-        [this.calibrationCollectionSelected] = this.targetCollectionsAll.filter(
+        [this.calibrationCollectionSelected] = this.allCollections.filter(
           (collection) =>
             collection.target_collection_id == this.batchCalibrationCollectionId
         );
@@ -371,25 +383,25 @@ export default {
         this.batchDesc = null;
         // set defaults
         this.calibrationCollectionSelected =
-          this.targetCollectionsAll.find(
+          this.allCollections.find(
             (collection) =>
               collection.target_collection_name === "Br calibrants"
           ) ||
-          this.targetCollectionsAll.find(
+          this.allCollections.find(
             (collection) =>
               collection.target_collection_id === "xkSPp3eZrWXYSVDa"
           );
         this.ionMechanismsSelected = this.ionMechanismsAll.filter(
           (mech) => mech.ionization_mechanism === "+Br-"
         );
-        let explosivesTargets = this.targetCollectionsAll.filter(
+        let explosivesTargets = this.allCollections.filter(
           (collection) =>
             collection.target_collection_name === "Explosives targets"
         );
         this.targetCollectionsSelected =
           explosivesTargets.length > 0
             ? explosivesTargets
-            : this.targetCollectionsAll.filter(
+            : this.allCollections.filter(
                 (collection) =>
                   collection.target_collection_id === "kNBOCx32dpehRWUw"
               );
@@ -419,7 +431,7 @@ export default {
       const ids = this.batchActive
         ? this.batchTargetCollections.map((row) => row.target_collection_id)
         : [];
-      this.targetCollectionsSelected = this.targetCollectionsAll.filter((row) =>
+      this.targetCollectionsSelected = this.allCollections.filter((row) =>
         ids.includes(row.target_collection_id)
       );
     },

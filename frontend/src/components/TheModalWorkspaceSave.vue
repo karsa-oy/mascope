@@ -43,7 +43,11 @@
             expanded
             @click="
               () => {
-                updateWorkspace();
+                updateWorkspace({
+                  workspace_id: this.oldWorkspace.workspace_id,
+                  workspace_name: this.workspaceName,
+                  workspace_description: this.workspaceDesc,
+                });
                 deactivateModal();
               }
             "
@@ -57,7 +61,10 @@
             expanded
             @click="
               () => {
-                createWorkspace();
+                createWorkspace({
+                  workspace_name: this.workspaceName,
+                  workspace_description: this.workspaceDesc,
+                });
                 deactivateModal();
               }
             "
@@ -71,7 +78,7 @@
             expanded
             @click="
               () => {
-                deleteWorkspace();
+                deleteWorkspace(this.oldWorkspace);
                 deactivateModal();
               }
             "
@@ -86,7 +93,7 @@
 
 <script>
 import { mapMutations } from "vuex";
-import { sync, get } from "vuex-pathify";
+import { sync, call, get } from "vuex-pathify";
 
 import table from "$lib/table";
 
@@ -139,23 +146,16 @@ export default {
     },
   },
   methods: {
+    ...call({
+      createWorkspace: "workspace/createWorkspace",
+      updateWorkspace: "workspace/updateWorkspace",
+      deleteWorkspace: "workspace/deleteWorkspace",
+    }),
     ...mapMutations({
       deactivateModal: "modal/deactivate",
     }),
     actionIs(...actions) {
       return actions.includes(this.action);
-    },
-    async createWorkspace() {
-      const newWorkspace = {
-        workspace_name: this.workspaceName,
-        workspace_description: this.workspaceDesc,
-      };
-      await this.$api.httpClient.createWorkspace(newWorkspace);
-    },
-    async deleteWorkspace() {
-      await this.$api.httpClient.deleteWorkspace(
-        this.oldWorkspace.workspace_id
-      );
     },
     loadWorkspace() {
       this.workspaceName = this.oldWorkspace
@@ -164,16 +164,6 @@ export default {
       this.workspaceDesc = this.oldWorkspace
         ? this.oldWorkspace.workspace_description
         : null;
-    },
-    async updateWorkspace() {
-      const updatedWorkspace = {
-        workspace_name: this.workspaceName,
-        workspace_description: this.workspaceDesc,
-      };
-      await this.$api.httpClient.updateWorkspace(
-        this.oldWorkspace.workspace_id,
-        updatedWorkspace
-      );
     },
   },
 };

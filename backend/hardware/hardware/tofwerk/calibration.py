@@ -11,7 +11,7 @@ def mz_calibrate(peak_tof, peak_mz, exact_mz):
     tofs = np.array(peak_tof, dtype=np.double)
     peak_mz = np.array(peak_mz)
     weight = np.ones((nbr_points,))  # TODO: Set weights?
-    nbr_params = np.array([2], dtype=np.int32)
+    nbr_params = np.array([2], dtype=np.int64)
     mass_calib_par = np.zeros((nbr_params[0],), dtype=np.double)
     legacy_a = legacy_b = np.array([None], dtype=np.double)
     # Calibrate

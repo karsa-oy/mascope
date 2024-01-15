@@ -73,7 +73,7 @@ export default {
       activateModal: "modal/activate",
     }),
     onClick() {
-      this.workspaceLoad(this.workspace);
+      this.workspaceLoad(this.workspace.workspace_id);
       this.targetsLoad();
     },
   },

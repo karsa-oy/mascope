@@ -1,8 +1,8 @@
 from fastapi import APIRouter
 
 from ..controllers.workspace_controller import (
-    get_workspace_by_id,
     get_workspaces,
+    get_workspace,
     create_workspace,
     update_workspace,
     delete_workspace,
@@ -27,7 +27,7 @@ async def get_workspaces_route(
 
 @workspace_router.get("/api/workspaces/{workspace_id}")
 async def get_workspace_by_id_route(workspace_id: str):
-    return await get_workspace_by_id(workspace_id)
+    return await get_workspace(workspace_id)
 
 
 @workspace_router.post("/api/workspaces")

@@ -83,7 +83,7 @@ import TheLayoutSidebar from "./TheLayoutSidebar.vue";
 import ThePaneBrowserSample from "./ThePaneBrowserSample.vue";
 import BaseTable from "./BaseTable.vue";
 
-import { sync, get } from "vuex-pathify";
+import { sync, get, call } from "vuex-pathify";
 
 export default {
   name: "ThePageSampleManagement",
@@ -118,9 +118,9 @@ export default {
     },
   },
   methods: {
-    async sampleItemCreate(items) {
-      await this.$api.httpClient.createSampleItem(newSampleItem);
-    },
+    ...call({
+      sampleItemCreate: "sample/create",
+    }),
     selectSampleFiles(newRows, oldRows) {
       let fields = this.sampleItemCols.map((col) => col.field);
       this.sampleItemRows = newRows.map((file) =>

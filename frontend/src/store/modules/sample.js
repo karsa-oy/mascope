@@ -1,5 +1,5 @@
 import { dispatch, make } from "vuex-pathify";
-import { handleApiRequest } from "./apiHelper";
+import { handleApiRequest, getApiData } from "./apiHelper";
 
 const state = {
   active: null,
@@ -16,62 +16,48 @@ export default {
   state,
   mutations: make.mutations(state),
   actions: {
+    // data loading
     async load({ rootState, commit, dispatch }, sample) {
       // reset if previous sample loaded
-      if (state.active) {
-        dispatch("unload");
-      }
+      if (state.active) await dispatch("unload");
       const sampleItemId = sample.sample_item_id;
       rootState.api.emit("subscribe", sampleItemId);
       // set sample active
       await commit("SET_ACTIVE", sample);
-      await dispatch("loadMatches");
+      await dispatch("loadSampleData", sampleItemId);
       await dispatch("calibration/load", sample, { root: true });
     },
-    async loadMatches({ rootState, rootGetters, state, commit }) {
-      const sampleItemId = state.active.sample_item_id;
 
+    async loadSampleData({ rootGetters, commit, dispatch }, sampleItemId) {
       // Check if matches exist for the given sampleItemId
-      try {
-        const response = await rootState.api.httpClient.getAllMatches({
-          sample_item_id: sampleItemId,
-        });
-        commit("SET_MATCHED", response.data.data.length > 0 ? 1 : 0);
-      } catch (error) {
-        console.error("Failed to check for matches: ", error);
-      }
+      const sampleMatches = await dispatch("getSampleMatches", sampleItemId);
+      commit("SET_MATCHED", sampleMatches.length > 0 ? 1 : 0);
 
       // Get detailed sample data
-      try {
-        const response = await rootState.api.httpClient.getSample(sampleItemId);
-        if (response && response.data) {
-          let matchCollections = response.data.data.match_collections;
+      const sampleData = await dispatch("getSampleData", sampleItemId);
 
-          const activeCollection = rootGetters["targets/activeCollection"];
-          if (matchCollections) {
-            matchCollections = matchCollections.map((coll) => {
-              if (
-                activeCollection &&
-                activeCollection.target_collection_id ===
-                  coll.target_collection_id
-              ) {
-                coll.selection = 2;
-              } else {
-                coll.selection = 0;
-              }
-              return coll;
-            });
+      // Set the selection of the active collection
+      let matchCollections = sampleData.match_collections;
+      const activeCollection = rootGetters["targets/activeCollection"];
+      if (matchCollections) {
+        matchCollections = matchCollections.map((coll) => {
+          if (
+            activeCollection &&
+            activeCollection.target_collection_id === coll.target_collection_id
+          ) {
+            coll.selection = 2;
+          } else {
+            coll.selection = 0;
           }
-
-          commit("SET_MATCH_COLLECTIONS", matchCollections);
-          commit("SET_MATCH_COMPOUNDS", response.data.data.match_compounds);
-          commit("SET_MATCH_IONS", response.data.data.match_ions);
-          commit("SET_MATCH_ISOTOPES", response.data.data.match_isotopes);
-        }
-      } catch (error) {
-        console.error("Failed to load matches: ", error);
+          return coll;
+        });
       }
+      commit("SET_MATCH_COLLECTIONS", matchCollections);
+      commit("SET_MATCH_COMPOUNDS", sampleData.match_compounds);
+      commit("SET_MATCH_IONS", sampleData.match_ions);
+      commit("SET_MATCH_ISOTOPES", sampleData.match_isotopes);
     },
+
     async unload({ rootState, state, commit, dispatch }) {
       if (!state.active) return;
       rootState.api.emit("unsubscribe", state.active.sample_item_id);
@@ -85,7 +71,8 @@ export default {
       // calibration
       dispatch("calibration/unload", null, { root: true });
     },
-    async reload({ rootGetters, dispatch, state }, sample = null) {
+
+    async reload({ dispatch, state }, sample = null) {
       const sampleToLoad = sample ? sample : state.active;
       if (sampleToLoad) {
         await dispatch("unload");
@@ -94,6 +81,37 @@ export default {
     },
 
     // http client endpoints
+    async getSampleData({ rootGetters, dispatch }, sampleId) {
+      const alarmsList = rootGetters["targets/alarmsList"];
+
+      const body = {
+        alarms_list: alarmsList,
+      };
+
+      const sampleData = await getApiData({
+        dispatch,
+        httpMethod: "getSample",
+        requestData: {
+          sampleId,
+          body,
+        },
+        errorMessage: `Failed to load the sample data.`,
+      });
+      return sampleData.data;
+    },
+
+    async getSampleMatches({ dispatch }, sampleItemId) {
+      const sampleMatches = await getApiData({
+        dispatch,
+        httpMethod: "getAllMatches",
+        requestData: {
+          sample_item_id: sampleItemId,
+        },
+        errorMessage: `Failed to check for matches of the sample.`,
+      });
+      return sampleMatches.data;
+    },
+
     async create({ rootState }, sample) {
       await rootState.api.httpClient.createSampleItem(sample);
     },
@@ -121,27 +139,6 @@ export default {
       });
     },
 
-    // selection
-    async updateCollectionSelection(
-      { commit, state },
-      { collectionId, selectionValue }
-    ) {
-      // Only one collection can be selected at a time
-      state.matchCollections
-        .filter(
-          (coll) =>
-            coll.target_collection_id !== collectionId && coll.selection === 2
-        )
-        .forEach((coll) => (coll.selection = 0));
-
-      const collection = state.matchCollections.find(
-        (coll) => coll.target_collection_id === collectionId
-      );
-      if (collection) {
-        collection.selection = selectionValue;
-      }
-    },
-
     // backend notifications
     async onSampleBatchExportPeaksFailed({ dispatch }, error) {
       await dispatch(
@@ -161,6 +158,27 @@ export default {
       await dispatch("batch/reload", null, { root: true });
       const sample_item = rootGetters["batch/sampleItem"](sample_item_id);
       await dispatch("load", sample_item);
+    },
+
+    // selection
+    async updateCollectionSelection(
+      { commit, state },
+      { collectionId, selectionValue }
+    ) {
+      // Only one collection can be selected at a time
+      state.matchCollections
+        .filter(
+          (coll) =>
+            coll.target_collection_id !== collectionId && coll.selection === 2
+        )
+        .forEach((coll) => (coll.selection = 0));
+
+      const collection = state.matchCollections.find(
+        (coll) => coll.target_collection_id === collectionId
+      );
+      if (collection) {
+        collection.selection = selectionValue;
+      }
     },
   },
   getters: {

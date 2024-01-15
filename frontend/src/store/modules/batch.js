@@ -1,6 +1,6 @@
-import { dispatch, make } from "vuex-pathify";
+import { make } from "vuex-pathify";
 import { camelToSnakeCase } from "../../lib/util";
-import { handleApiRequest } from "./apiHelper";
+import { handleApiRequest, getApiData } from "./apiHelper";
 
 const state = {
   active: null,
@@ -47,137 +47,97 @@ export default {
   },
   actions: {
     // data loading
-    async load({ rootState, state, commit, dispatch }, batch) {
+    async load({ rootState, state, dispatch }, batchId) {
       if (state.active) await dispatch("unload");
-      rootState.api.emit("subscribe", batch.sample_batch_id);
-      await commit("SET_ACTIVE", batch);
+      rootState.api.emit("subscribe", batchId);
+      await dispatch("loadBatch", batchId);
+      await dispatch("loadBatchSamplesData", batchId);
       await dispatch("unpackParams");
-      await dispatch("loadBatchTargets");
-      await dispatch("loadBatch");
+      await dispatch("loadBatchTargets", batchId);
     },
 
-    async loadBatch(
-      { rootState, state, commit, getters },
-      sampleItemIdActive = null
-    ) {
-      const batchId = state.active.sample_batch_id;
-      const reqBody = {
-        sample_batch_id: batchId,
-        batch_matches_info: true,
-        sort: "datetime_utc",
-        order: "asc",
-      };
-
-      // Add the sample_item_id_active if provided
-      if (sampleItemIdActive) {
-        reqBody.sample_item_id_active = sampleItemIdActive;
-      }
-
-      try {
-        const response = await rootState.api.httpClient.getAllSamples(reqBody);
-        if (response.data) {
-          response.data.data.forEach(
-            (row, i) => (row.index = (i + 1).toString())
-          );
-          commit("SET_SAMPLE_ITEMS", response.data.data);
-          if (!response.data.batch_matches_info) return;
-          commit(
-            "SET_MATCH_SAMPLES",
-            response.data.batch_matches_info.match_samples
-          );
-          commit(
-            "SET_MATCH_COMPOUNDS",
-            response.data.batch_matches_info.match_compounds
-          );
-          commit("SET_MATCH_IONS", response.data.batch_matches_info.match_ions);
-        }
-      } catch (error) {
-        console.error("Failed to load batch data: ", error);
-      }
+    async loadBatch({ commit, dispatch }, batchId) {
+      const batch = await dispatch("getBatch", batchId);
+      await commit("SET_ACTIVE", batch);
     },
 
-    async loadBatchTargets({ rootState, rootGetters, state, commit }) {
-      const batchId = state.active.sample_batch_id;
-      const ionMechanisms = state.active.build_params.ion_mechanisms;
+    async loadBatchSamplesData({ commit, dispatch }, batchId) {
+      const batchData = await dispatch("getBatchSamplesData", batchId);
 
-      const body = {
-        ion_mechanisms: ionMechanisms,
-      };
-      try {
-        const response = await rootState.api.httpClient.loadBatchTargets(
-          batchId,
-          body
-        );
+      batchData.data.forEach((row, i) => (row.index = (i + 1).toString()));
+      commit("SET_SAMPLE_ITEMS", batchData.data);
+      if (!batchData.batch_matches_info) return;
+      commit("SET_MATCH_SAMPLES", batchData.batch_matches_info?.match_samples);
+      commit(
+        "SET_MATCH_COMPOUNDS",
+        batchData.batch_matches_info?.match_compounds
+      );
+      commit("SET_MATCH_IONS", batchData.batch_matches_info?.match_ions);
+    },
 
-        if (response && response.data) {
-          const data = response.data.data;
+    async loadBatchTargets({ rootGetters, commit, dispatch }, batchId) {
+      const batchTargetsData = await dispatch("getBatchTargets", batchId);
 
-          let targetCollections = data.target_collections;
+      let targetCollections = batchTargetsData.target_collections;
 
-          const activeCollection = rootGetters["targets/activeCollection"];
-          if (targetCollections) {
-            targetCollections = targetCollections.map((coll) => {
-              if (
-                activeCollection &&
-                activeCollection.target_collection_id ===
-                  coll.target_collection_id
-              ) {
-                coll.selection = 2;
-              } else {
-                coll.selection = 0;
-              }
-              return coll;
-            });
+      const activeCollection = rootGetters["targets/activeCollection"];
+      if (targetCollections) {
+        targetCollections = targetCollections.map((coll) => {
+          if (
+            activeCollection &&
+            activeCollection.target_collection_id === coll.target_collection_id
+          ) {
+            coll.selection = 2;
+          } else {
+            coll.selection = 0;
           }
-
-          commit("SET_TARGET_COLLECTIONS", targetCollections);
-          commit("SET_TARGET_COMPOUNDS", data.target_compounds);
-          commit("SET_TARGET_IONS", data.target_ions);
-          commit("SET_TARGET_ISOTOPES", data.target_isotopes);
-        }
-      } catch (error) {
-        console.error("Failed to load batch targets: ", error);
+          return coll;
+        });
       }
+
+      commit("SET_TARGET_COLLECTIONS", targetCollections);
+      commit("SET_TARGET_COMPOUNDS", batchTargetsData.target_compounds);
+      commit("SET_TARGET_IONS", batchTargetsData.target_ions);
+      commit("SET_TARGET_ISOTOPES", batchTargetsData.target_isotopes);
     },
 
     async reload(
-      { rootGetters, getters, rootState, state, dispatch, commit },
+      { getters, rootState, state, dispatch, commit },
       batch = null
     ) {
       const batchToLoad = batch ? batch : state.active;
-      if (batchToLoad) {
-        const batchToLoadId = batchToLoad.sample_batch_id;
-        const activeSampleId = rootState.sample.active?.sample_item_id || null;
-        await dispatch("unload", false);
-        const activeBatch = rootGetters["workspace/sampleBatch"](batchToLoadId);
-        await dispatch("load", activeBatch);
-        if (activeSampleId) {
-          const sample = getters["sampleItem"](activeSampleId);
-          sample.selection = 3;
-          await dispatch("sample/reload", sample, { root: true });
-        }
-        const activeCollection = rootState.targets.activeCollection;
-        if (activeCollection) {
-          const activeCollectionId = activeCollection.target_collection_id;
-          const matchingCollection = state.targetCollections.find(
-            (coll) => coll.target_collection_id === activeCollectionId
-          );
-          if (matchingCollection) {
-            commit("SET_COLLECTION_SELECTION", {
+      if (!batchToLoad) return;
+
+      await dispatch("unload", false);
+      const batchToLoadId = batchToLoad.sample_batch_id;
+      await dispatch("load", batchToLoadId);
+      const activeSampleId = rootState.sample.active?.sample_item_id || null;
+      if (activeSampleId) {
+        const sample = getters["sampleItem"](activeSampleId);
+        sample.selection = 3;
+        await dispatch("sample/reload", sample, { root: true });
+      }
+      const activeCollection = rootState.targets.activeCollection;
+      if (activeCollection) {
+        const activeCollectionId = activeCollection.target_collection_id;
+        const matchingCollection = state.targetCollections.find(
+          (coll) => coll.target_collection_id === activeCollectionId
+        );
+        if (matchingCollection) {
+          commit("SET_COLLECTION_SELECTION", {
+            collectionId: activeCollectionId,
+            selectionValue: 2,
+          });
+        } else {
+          // Dispatch to targets module to update selection there as well
+          dispatch(
+            "targets/updateCollectionSelection",
+            {
               collectionId: activeCollectionId,
-              selectionValue: 2,
-            });
-          } else {
-            // Dispatch to targets module to update selection there as well
-            dispatch(
-              "targets/updateCollectionSelection",
-              {
-                collectionId: activeCollectionId,
-                selectionValue: 0,
-              },
-              { root: true }
-            );
-          }
+              selectionValue: 0,
+            },
+            { root: true }
+          );
         }
       }
     },
@@ -220,11 +180,62 @@ export default {
     },
 
     // http client endpoints
+    async getBatch({ dispatch }, batchId) {
+      return await getApiData({
+        dispatch,
+        httpMethod: "getBatch",
+        requestData: batchId,
+        errorMessage: `Failed to load batch.`,
+      });
+    },
+
+    async getBatchSamplesData({ dispatch, rootGetters }, batchId) {
+      const alarmsList = rootGetters["targets/alarmsList"];
+
+      const body = {
+        sample_batch_id: batchId,
+        batch_matches_info: true,
+        sort: "datetime_utc",
+        order: "asc",
+        alarms_list: alarmsList,
+      };
+
+      return await getApiData({
+        dispatch,
+        httpMethod: "getAllSamples",
+        requestData: body,
+        errorMessage: `Failed to load batch samples data.`,
+      });
+    },
+
+    async getBatchTargets({ state, dispatch, rootGetters }, batchId) {
+      const alarmsList = rootGetters["targets/alarmsList"];
+
+      const reqData = {
+        batchId,
+        body: {
+          ion_mechanisms: state.paramIonMechanisms,
+          alarms_list: alarmsList,
+        },
+      };
+      const batchTargetsData = await getApiData({
+        dispatch,
+        httpMethod: "getBatchTargets",
+        requestData: reqData,
+        errorMessage: `Failed to get batch targets.`,
+      });
+
+      return batchTargetsData.data;
+    },
+
     async autoSamplerImportBatch({ rootState }, data) {
       await rootState.api.httpClient.autoSamplerImportBatch(data);
     },
     async createBatch({ rootState }, newBatch) {
       await rootState.api.httpClient.createBatch(newBatch);
+    },
+    async updateBatch({ rootState }, newBatch) {
+      await rootState.api.httpClient.updateBatch(newBatch);
     },
 
     async deleteBatch({ dispatch, rootState }, batch) {
@@ -239,10 +250,6 @@ export default {
           message: `Deleting batch "${batch.sample_batch_name}", please wait`,
         },
       });
-    },
-
-    async updateBatch({ rootState }, newBatch) {
-      await rootState.api.httpClient.updateBatch(newBatch);
     },
 
     async copyBatch({ dispatch, rootState }, sampleBatchCopyData) {
@@ -295,7 +302,7 @@ export default {
       if (active_batch_id == batch.sample_batch_id) {
         dispatch("unload");
       } else {
-        dispatch("load", batch);
+        dispatch("load", batch.sample_batch_id);
         rootState.workspace.batches
           .filter((row) => row.sample_batch_id == batch.sample_batch_id)
           .forEach((row) => (row.selection = 2));
@@ -349,6 +356,7 @@ export default {
           break;
       }
     },
+    // target collection selection toggling
     async targetCollectionToggle(
       { commit, getters, state, dispatch, rootGetters },
       targetCollectionToggled

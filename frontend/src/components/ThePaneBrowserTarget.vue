@@ -12,7 +12,7 @@
 </template>
 
 <script>
-import { mapActions, mapMutations } from "vuex";
+import { mapMutations } from "vuex";
 
 import { sync, get, call } from "vuex-pathify";
 
@@ -33,8 +33,7 @@ export default {
   computed: {
     ...sync({
       modalTargetCollectionOpProps: "modal/targetCollectionOpProps",
-      ionInFocus: "visualization/ionInFocus",
-      isotopesInFocus: "visualization/isotopesInFocus",
+      activeIon: "visualization/activeIon",
     }),
     ...get({
       sampleBatchesSelected: "workspace/sampleBatchesSelected",
@@ -74,14 +73,39 @@ export default {
       });
     },
     targetIonRows: function () {
-      return this.sampleItemFocused && this.matchIons
-        ? this.matchIons
-        : this.targetIons;
+      if (!this.sampleItemFocused || !this.matchIons) {
+        return this.targetIons;
+      }
+      return this.targetIons.map((targetIon) => {
+        const matchIon = this.matchIons.find(
+          (mi) => mi.target_ion_id === targetIon.target_ion_id
+        );
+
+        return matchIon ? { ...targetIon, ...matchIon } : targetIon;
+      });
     },
     targetIsotopeRows: function () {
-      return this.sampleItemFocused && this.matchIsotopes
-        ? this.matchIsotopes
-        : this.targetIsotopes;
+      if (!this.sampleItemFocused || !this.matchIsotopes) {
+        return this.targetIsotopes;
+      }
+
+      const matchIsotopeIds = new Set(
+        this.matchIsotopes.map((mi) => mi.target_isotope_id)
+      );
+
+      return this.targetIsotopes
+        .filter(({ target_isotope_id }) =>
+          matchIsotopeIds.has(target_isotope_id)
+        )
+        .map((targetIsotope) => {
+          const matchIsotope = this.matchIsotopes.find(
+            (mis) => mis.target_isotope_id === targetIsotope.target_isotope_id
+          );
+
+          return matchIsotope
+            ? { ...targetIsotope, ...matchIsotope }
+            : targetIsotope;
+        });
     },
     targetLevels: function () {
       let hidden = this.matchIsotopes ? false : true;
@@ -195,7 +219,9 @@ export default {
           rows: this.targetIsotopeRows,
           defaultSort: ["mz", "asc"],
           detailsIcon: this.sampleItemFocused ? "chart-bell-curve" : null,
-          detailsOpen: this.sampleItemFocused ? this.ionShow : null,
+          detailsOpen: this.sampleItemFocused
+            ? this.matchScoreTagClicked
+            : null,
           rowClick: doNothing,
         },
       ];
@@ -241,12 +267,12 @@ export default {
       }
       if (this.targetCollectionsSelected.length == 1) {
         return [
-          // updateCollectionButton,
           createCollectionButton,
           editBatchCollectionsButton,
+          rematchBatchesButton,
+          updateCollectionButton,
           copySelectedCollectionToOtherBatchesButton,
           deleteCollectionButton,
-          rematchBatchesButton,
         ];
       }
     },
@@ -258,15 +284,13 @@ export default {
     });
   },
   methods: {
-    ...mapActions("batch", ["matchBatchesCompute"]),
     ...mapMutations({
       activateModal: "modal/activate",
     }),
     ...call({
-      resetIonVisualization: "visualization/reset",
-      setFilterParams: "visualization/setFilterParams",
+      matchBatchesCompute: "batch/matchBatchesCompute",
+      loadSampleIon: "visualization/load",
       targetCollectionToggle: "batch/targetCollectionToggle",
-      emitVisualization: "visualization/emitVisualization",
     }),
     manageSelectedCollectionBatches() {
       this.modalTargetCollectionOpProps = {
@@ -324,54 +348,33 @@ export default {
         modal: "targetCollectionOp",
       });
     },
-    ionShow(row) {
-      this.resetIonVisualization();
+    async ionShow({ ionId, collectionId }) {
+      const sampleId = this.sampleItemFocused.sample_item_id;
 
-      const isotopesInFocus = this.matchIsotopes
-        .filter((isotope) => isotope.target_ion_id === row.target_ion_id)
-        .map((isotope) => ({
-          target_isotope_id: isotope.target_isotope_id,
-          mz: isotope.mz.toFixed(4),
-          match_score: isotope.match_score,
-          match_category: isotope.match_category,
-          relative_abundance: isotope.relative_abundance,
-          sample_peak_area: isotope.sample_peak_area,
-          match_mz_error: isotope.match_mz_error,
-          match_abundance_error: isotope.match_abundance_error,
-          match_isotope_correlation: isotope.match_isotope_correlation,
-        }));
+      // pass the ion specific filter params if acvailable to the loadSampleIon function
+      const filterParams =
+        this.matchIons.filter((ion) => ion.target_ion_id === ionId)[0]
+          ?.filter_params[this.sampleItemFocused.instrument] || null;
 
-      this.isotopesInFocus = isotopesInFocus;
-
-      const ionInFocus = this.matchIons.filter(
-        (ion) => ion.target_ion_id === row.target_ion_id
-      )[0];
-
-      this.ionInFocus = ionInFocus;
-
-      this.setFilterParams();
-
-      this.emitVisualization({
-        sampleId: this.sampleItemFocused.sample_item_id,
-        ionId: row.target_ion_id,
-      });
+      await this.loadSampleIon({ sampleId, ionId, collectionId, filterParams });
 
       this.activateModal({
         modal: "sampleItemTargetIon",
       });
     },
     matchScoreTagClicked(row) {
-      if (row.target_compound_id) {
-        // Compound or Ion match score tag clicked
-        if (!row.target_ion_id) {
-          // Compound tag clicked -> fetch corresponding ion id
-          // Note: This picks the first matching target ion if there are many
-          row = this.matchIons.filter(
-            (ion) => ion.target_compound_id === row.target_compound_id
-          )[0];
-        }
-        this.ionShow(row);
-      }
+      const ionId =
+        // Ion or isotope tag clicked
+        row?.target_ion_id ??
+        // Compound tag clicked -> fetch corresponding ion id
+        this?.matchIons.filter(
+          (ion) => ion.target_compound_id === row.target_compound_id
+        )[0]?.target_ion_id ??
+        // Collection tag clicked
+        null;
+      if (!ionId) return;
+      const collectionId = row?.target_collection_id;
+      this.ionShow({ ionId, collectionId });
     },
     async rematchBatches() {
       await this.matchBatchesCompute(this.sampleBatchesSelected);

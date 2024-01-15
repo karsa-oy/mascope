@@ -99,11 +99,6 @@ async def get_instrument_function(
             stmt = select(InstrumentFunction).filter(
                 InstrumentFunction.instrument_function_id == instrument_function_id
             )
-        else:
-            raise HTTPException(
-                status_code=400,
-                detail="Must provide either filename or instrument_function_id",
-            )
 
         results = await session.execute(stmt)
         instrument_function = results.scalars().first()

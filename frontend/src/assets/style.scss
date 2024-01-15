@@ -36,11 +36,13 @@ $success: #86b758;
 $success-light: findLightColor($success);
 $success-dark: findDarkColor($success);
 $success-invert: findColorInvert($success);
+$success-pale: rgba(lighten($success, 20%), 0.5);
 
 $danger: #f8054a;
 $danger-light: findLightColor($danger);
 $danger-dark: findDarkColor($danger);
 $danger-invert: findColorInvert($danger);
+$danger-pale: rgba(lighten($danger, 20%), 0.5);
 
 $info: $light-blue;
 $info-light: findLightColor($info);
@@ -51,6 +53,7 @@ $warning: $orange;
 $warning-light: findLightColor($warning);
 $warning-dark: findDarkColor($warning);
 $warning-invert: findColorInvert($warning);
+$warning-pale: rgba(lighten($warning, 20%), 0.5);
 
 $notification: $cool-grey;
 $notification-light: $cool-grey-light;
@@ -264,6 +267,11 @@ input[type="range"] {
   list-style-type: none;
 }
 
+// b-switch
+.switch {
+  margin-bottom: 15px;
+}
+
 // Setup $colors to use as bulma classes (e.g. 'is-twitter')
 $colors: (
   "white": (
@@ -306,14 +314,32 @@ $colors: (
     $success-light,
     $success-dark,
   ),
+  "success-pale": (
+    $success-pale,
+    $success-invert,
+    $success-light,
+    $success-dark,
+  ),
   "warning": (
     $warning,
     $warning-invert,
     $warning-light,
     $warning-dark,
   ),
+  "warning-pale": (
+    $warning-pale,
+    $warning-invert,
+    $warning-light,
+    $warning-dark,
+  ),
   "danger": (
     $danger,
+    $danger-invert,
+    $danger-light,
+    $danger-dark,
+  ),
+  "danger-pale": (
+    $danger-pale,
     $danger-invert,
     $danger-light,
     $danger-dark,

@@ -1,10 +1,19 @@
 import { make } from "vuex-pathify";
+import { getApiData } from "./apiHelper";
 
 const state = {
   activeCollection: null,
-  targetCollectionsAll: [],
-  targetCompoundsAll: [],
+  // alarm_mode
+  alarmTargets: true,
+  alarmDiagnostics: false,
+  alarmCalibrants: false,
+  // all targets
+  targetCollectionsAll: null,
+  targetCompoundsAll: null,
 };
+
+// TODO_configuration possible collection types
+const collectionTypes = ["TARGETS", "DIAGNOSTICS", "CALIBRANTS"];
 
 export default {
   namespaced: true,
@@ -19,43 +28,28 @@ export default {
         collection.selection = selectionValue;
       }
     },
-    SET_ACTIVE_COLLECTION: (state, collection) => {
-      state.activeCollection = collection;
-    },
   },
   actions: {
-    async load({ rootState, state, commit, dispatch }, collection_id = null) {
+    // data loading
+    async load({ state, dispatch }) {
       if (state.activeCollection) await dispatch("unload");
       await dispatch("loadAllCollections");
       await dispatch("loadAllCompounds");
     },
 
-    async loadAllCollections({ commit, rootState }) {
-      try {
-        const response =
-          await rootState.api.httpClient.getAllTargetCollections();
-        if (response && response.data) {
-          const collections = response.data.data.map((collection) => {
-            return { ...collection, selection: 0 };
-          });
-          await commit("SET_TARGET_COLLECTIONS_ALL", collections);
-        }
-      } catch (error) {
-        console.error("Failed to load target collections: ", error);
-      }
+    async loadAllCollections({ commit, dispatch }) {
+      let collections = await dispatch("getAllTargetCollections");
+
+      collections = collections.map((collection) => {
+        return { ...collection, selection: 0 };
+      });
+
+      await commit("SET_TARGET_COLLECTIONS_ALL", collections);
     },
 
-    async loadAllCompounds({ commit, rootState }, collectionId) {
-      try {
-        const response = await rootState.api.httpClient.getAllTargetCompounds({
-          collectionId,
-        });
-        if (response && response.data) {
-          await commit("SET_TARGET_COMPOUNDS_ALL", response.data.data);
-        }
-      } catch (error) {
-        console.error("Failed to load target compounds: ", error);
-      }
+    async loadAllCompounds({ commit, dispatch }) {
+      const compounds = await dispatch("getAllTargetCompounds");
+      await commit("SET_TARGET_COMPOUNDS_ALL", compounds);
     },
 
     async reload({ dispatch, rootState }, collection = null) {
@@ -84,15 +78,77 @@ export default {
       }
     },
 
-    async unload({ rootState, commit, dispatch }) {
-      await commit("SET_TARGET_COLLECTIONS_ALL", []);
-      await commit("SET_TARGET_COMPOUNDS_ALL", []);
+    async unload({ commit }) {
+      await commit("SET_TARGET_COLLECTIONS_ALL", null);
+      await commit("SET_TARGET_COMPOUNDS_ALL", null);
       if (!state.activeCollection) return;
       await commit("SET_ACTIVE_COLLECTION", null);
     },
 
+    // http client endpoints
+    async getAllTargetCollections({ dispatch }) {
+      const collections = await getApiData({
+        dispatch,
+        httpMethod: "getAllTargetCollections",
+        errorMessage: `Failed to load all target collections.`,
+      });
+      return collections.data;
+    },
+
+    async getTargetCollection({ dispatch }, collectionId) {
+      return await getApiData({
+        dispatch,
+        httpMethod: "getTargetCollection",
+        requestData: collectionId,
+        errorMessage: `Failed to get target collection.`,
+      });
+    },
+
+    async getAllTargetCompounds({ dispatch }) {
+      const compounds = await getApiData({
+        dispatch,
+        httpMethod: "getAllTargetCompounds",
+        errorMessage: `Failed to load all target compounds.`,
+      });
+      return compounds.data;
+    },
+
+    async createCollection({ rootState }, newCollection) {
+      await rootState.api.httpClient.createTargetCollection(newCollection);
+    },
+
+    async updateCollection({ rootState }, newCollection) {
+      await rootState.api.httpClient.updateTargetCollection(newCollection);
+    },
+
+    async deleteCollection({ rootState }, collection) {
+      await rootState.api.httpClient.deleteTargetCollection(collection);
+    },
+
+    async removeTargetCollectionsFromSampleBatch(
+      { rootState },
+      { collectionsToRemove, skipRematch = false }
+    ) {
+      await rootState.api.httpClient.removeTargetCollectionsFromSampleBatch(
+        collectionsToRemove,
+        skipRematch
+      );
+    },
+
+    async addTargetCollectionToSampleBatch({ rootState }, addedCollections) {
+      await rootState.api.httpClient.addTargetCollectionToSampleBatch(
+        addedCollections
+      );
+    },
+
+    // backend notifications
+    async onTargetsAllReload({ dispatch }) {
+      dispatch("reload");
+    },
+
+    // selection
     async updateCollectionSelection(
-      { commit, state, getters, rootState },
+      { commit, dispatch, state, getters, rootState },
       { collectionId, selectionValue }
     ) {
       // Only one collection can be selected at a time
@@ -112,38 +168,69 @@ export default {
       // If a collection is selected, fetch its details
       const selectedCollections = getters.targetCollectionsSelected;
       if (selectionValue === 2 && selectedCollections.length === 1) {
-        const response = await rootState.api.httpClient.getTargetCollectionById(
-          collectionId
-        );
-        if (response && response.data) {
-          commit("SET_ACTIVE_COLLECTION", response.data);
-        }
+        const collection = await dispatch("getTargetCollection", collectionId);
+        await commit("SET_ACTIVE_COLLECTION", collection);
       } else {
         commit("SET_ACTIVE_COLLECTION", null);
       }
     },
-    // backend notifications
-    async onTargetsAllReload({ dispatch }) {
-      dispatch("reload");
-    },
   },
 
   getters: {
+    // get collections
     activeCollection: (state) => {
       return state.activeCollection ? state.activeCollection : null;
     },
-    getTargetCollectionsAll: (state) => {
-      return state.targetCollectionsAll ? state.targetCollectionsAll : [];
+
+    getAllCollections: (state) => {
+      return state?.targetCollectionsAll || [];
     },
-    getTargetCollection: (state, getters) => (targetCollectionId) => {
-      const [targetCollection] = getters["getTargetCollectionsAll"].filter(
+    getTargetsCollections: (state) => {
+      return (
+        state.targetCollectionsAll?.filter(
+          (collection) => collection.target_collection_type === "TARGETS"
+        ) || []
+      );
+    },
+    getCalibrantsCollections: (state) => {
+      return (
+        state.targetCollectionsAll?.filter(
+          (collection) => collection.target_collection_type === "CALIBRANTS"
+        ) || []
+      );
+    },
+    getDiagnosticsCollections: (state) => {
+      return (
+        state.targetCollectionsAll?.filter(
+          (collection) => collection.target_collection_type === "DIAGNOSTICS"
+        ) || []
+      );
+    },
+    getCollection: (getters) => (targetCollectionId) => {
+      const [targetCollection] = getters["getAllCollections"].filter(
         (row) => row.target_collection_id == targetCollectionId
       );
       return targetCollection ?? null;
     },
+    collectionTypes: () => collectionTypes,
+    // get alarm_mode list
+    alarmsList: (state, getters) => {
+      const alarmingTypes = [];
+      for (const [key, value] of Object.entries(state)) {
+        if (key.startsWith("alarm") && value) {
+          const collectionType = key.replace("alarm", "").toUpperCase();
+          if (getters.collectionTypes.includes(collectionType)) {
+            alarmingTypes.push(collectionType);
+          }
+        }
+      }
+      return alarmingTypes;
+    },
     // get selected
     targetCollectionsSelected: (state) => {
-      return state.targetCollectionsAll.filter((row) => row.selection >= 2);
+      return (
+        state.targetCollectionsAll?.filter((row) => row.selection >= 2) || []
+      );
     },
   },
 };

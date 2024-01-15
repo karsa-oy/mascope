@@ -38,7 +38,7 @@ async def get_workspaces(sort: str, order: str, page: int, limit: int):
         }
 
 
-async def get_workspace_by_id(workspace_id: str):
+async def get_workspace(workspace_id: str):
     async with async_session() as session:
         stmt = select(Workspace).filter(Workspace.workspace_id == workspace_id)
         result = await session.execute(stmt)
@@ -81,7 +81,9 @@ async def update_workspace(workspace_id: str, workspace: WorkspaceUpdate):
 
         existing_workspace.workspace_utc_modified = datetime.utcnow()
         await session.commit()
+        # emit the event to inform the clients about changes in the workspace
         await sio.emit("org_reload", namespace="/")
+        await sio.emit("workspace_reload", room=workspace_id, namespace="/")
         return existing_workspace
 
 
@@ -96,4 +98,6 @@ async def delete_workspace(workspace_id: str):
 
         await session.delete(workspace)
         await session.commit()
+        # emit the event to inform the clients about deletion of the workspace
         await sio.emit("org_reload", namespace="/")
+        await sio.emit("workspace_reload", room=workspace_id, namespace="/")

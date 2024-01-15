@@ -1,5 +1,4 @@
-from fastapi import APIRouter, BackgroundTasks
-from typing import List
+from fastapi import APIRouter, BackgroundTasks, Query, HTTPException
 from ..controllers.calibration_controller import (
     get_mz_calibration,
     calibration_mz_fit,
@@ -16,32 +15,45 @@ from ..models.pydantic_models.calibration_pydantic_model import (
 calibration_router = APIRouter()
 
 
-@calibration_router.post("/api/calibration/mz_apply")
-async def calibration_mz_apply_route(data: CalibrationMzApplyData):
-    return await calibration_mz_apply(data.fit, data.sample_filename)
-
-
-@calibration_router.get("/api/calibration/last_mz_calibration")
-async def get_last_mz_calibration_route(
-    instrument: str,
-):
-    return await get_mz_calibration(instrument=instrument)
-
-
-@calibration_router.get("/api/calibration/sample_mz_calibration/{sample_item_id}")
+@calibration_router.get("/api/calibration/mz_calibration")
 async def get_sample_mz_calibration_route(
-    sample_item_id: str,
+    sample_item_id: str = Query(
+        None, description="The sample item ID to query for sample mz_calibration"
+    ),
+    instrument: str = Query(
+        None,
+        description="The instrument name to query for the last mz_calibration of that instrument",
+    ),
 ):
-    return await get_mz_calibration(sample_item_id=sample_item_id)
+    if (sample_item_id and instrument) or (not sample_item_id and not instrument):
+        raise HTTPException(
+            status_code=400,
+            detail="Must provide either instrument either sample_item_id.",
+        )
+    return await get_mz_calibration(
+        instrument=instrument, sample_item_id=sample_item_id
+    )
 
 
-@calibration_router.post("/api/calibration/mz_fit/{sample_item_id}")
+@calibration_router.post("/api/calibration/mz_fit")
 async def calibration_mz_fit_route(
-    sample_item_id: str,
     params: CalibrationMzFitParams,
     background_tasks: BackgroundTasks,
+    sample_item_id: str = Query(
+        ..., description="The sample item ID to query for sample mz_calibration"
+    ),
 ):
     return await calibration_mz_fit(sample_item_id, params, background_tasks)
+
+
+@calibration_router.post("/api/calibration/mz_apply")
+async def calibration_mz_apply_route(
+    data: CalibrationMzApplyData,
+    sample_filename: str = Query(
+        ..., description="The sample filename to query for sample mz_apply"
+    ),
+):
+    return await calibration_mz_apply(data.fit, sample_filename)
 
 
 @calibration_router.post("/api/calibration/mz_calibrate/sample")

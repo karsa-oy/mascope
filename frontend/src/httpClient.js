@@ -112,9 +112,9 @@ export function createHttpClient(host, api_port) {
         console.error("Failed to get all workspaces: ", error);
       }
     },
-    getWorkspaceById: async (workspace_id) => {
+    getWorkspace: async (workspaceId) => {
       try {
-        return await httpClient.get(`${workspacesBaseUrl}/${workspace_id}`);
+        return await httpClient.get(`${workspacesBaseUrl}/${workspaceId}`);
       } catch (error) {
         console.error("Failed to get workspace: ", error);
       }
@@ -126,31 +126,29 @@ export function createHttpClient(host, api_port) {
         console.error("Failed to create workspace: ", error);
       }
     },
-    deleteWorkspace: async (workspace_id) => {
+    deleteWorkspace: async (workspace) => {
       try {
-        return await httpClient.delete(`${workspacesBaseUrl}/${workspace_id}`);
+        return await httpClient.delete(
+          `${workspacesBaseUrl}/${workspace.workspace_id}`
+        );
       } catch (error) {
-        console.error("Failed to delete workspace: ", error);
+        console.error(
+          `Failed to delete workspace ${workspace.workspace_name}: `,
+          error
+        );
       }
     },
-    updateWorkspace: async (workspace_id, updatedWorkspace) => {
+    updateWorkspace: async (newWorkspace) => {
       try {
         return await httpClient.patch(
-          `${workspacesBaseUrl}/${workspace_id}`,
-          updatedWorkspace
+          `${workspacesBaseUrl}/${newWorkspace.workspace_id}`,
+          newWorkspace
         );
       } catch (error) {
-        console.error("Failed to update workspace: ", error);
-      }
-    },
-    loadWorkspace: async (workspace_id) => {
-      try {
-        const response = await httpClient.get(
-          `${batchesBaseUrl}?workspace_id=${workspace_id}`
+        console.error(
+          `Failed to update workspace ${newWorkspace.workspace_name}: `,
+          error
         );
-        return response;
-      } catch (error) {
-        console.error("Failed to fetch sample batches: ", error);
       }
     },
     // Sample batches
@@ -161,14 +159,14 @@ export function createHttpClient(host, api_port) {
         console.error("Failed to get all sample batches: ", error);
       }
     },
-    getBatchById: async (sample_batch_id) => {
+    getBatch: async (batchId) => {
       try {
-        return await httpClient.get(`${batchesBaseUrl}/${sample_batch_id}`);
+        return await httpClient.get(`${batchesBaseUrl}/${batchId}`);
       } catch (error) {
         console.error("Failed to get batch: ", error);
       }
     },
-    loadBatchTargets: async (batchId, body) => {
+    getBatchTargets: async ({ batchId, body }) => {
       try {
         return await httpClient.post(
           `${batchesBaseUrl}/${batchId}/targets`,
@@ -243,18 +241,18 @@ export function createHttpClient(host, api_port) {
       }
     },
 
-    getSample: async (sampleItemId) => {
+    getSample: async ({ sampleId, body }) => {
       try {
-        return await httpClient.get(`${samplesBaseUrl}/${sampleItemId}`);
+        return await httpClient.post(`${samplesBaseUrl}/${sampleId}`, body);
       } catch (error) {
-        console.error("Failed to get sample by id: ", error);
+        console.error("Failed to get sample: ", error);
       }
     },
 
-    getSampleIonMatches: async (sampleItemId, body) => {
+    getSampleIonMatches: async ({ sampleId, body }) => {
       try {
         return await httpClient.post(
-          `${samplesBaseUrl}/${sampleItemId}/ion_matches`,
+          `${samplesBaseUrl}/${sampleId}/ion_matches`,
           body
         );
       } catch (error) {
@@ -382,46 +380,54 @@ export function createHttpClient(host, api_port) {
     },
 
     // Calibration
-    getLastMzCalibration: async (params = {}) => {
+    getMzCalibration: async (params) => {
       try {
-        return await httpClient.get(
-          `${calibrationBaseUrl}/last_mz_calibration`,
-          {
-            params,
-          }
-        );
+        return await httpClient.get(`${calibrationBaseUrl}/mz_calibration`, {
+          params,
+        });
       } catch (error) {
-        console.error("Failed to get last mz calibration: ", error);
+        console.error("Failed to get mz calibration: ", error);
       }
     },
-    getSampleMzCalibration: async (sample_item_id) => {
+    calibrationMzFit: async ({ sampleId, sampleName, body }) => {
       try {
-        return await httpClient.get(
-          `${calibrationBaseUrl}/sample_mz_calibration/${sample_item_id}`
-        );
-      } catch (error) {
-        console.error("Failed to get sample mz calibration: ", error);
-      }
-    },
-    calibrationMzApply: async (calibrationData) => {
-      try {
+        const config = {
+          params: {
+            sample_item_id: sampleId,
+          },
+        };
         return await httpClient.post(
-          `${calibrationBaseUrl}/mz_apply`,
-          calibrationData
+          `${calibrationBaseUrl}/mz_fit`,
+          body,
+          config
         );
       } catch (error) {
-        console.error("Failed to apply mz calibration: ", error);
+        console.error(
+          `Failed to calibrate mz fit of sample ${sampleName}: `,
+          error
+        );
       }
     },
 
-    calibrationMzFit: async (sample_item_id, params) => {
+    calibrationMzApply: async ({ fit, sample_filename }) => {
       try {
+        const config = {
+          params: {
+            sample_filename,
+          },
+        };
+        const body = { fit };
+
         return await httpClient.post(
-          `${calibrationBaseUrl}/mz_fit/${sample_item_id}`,
-          params
+          `${calibrationBaseUrl}/mz_apply`,
+          body,
+          config
         );
       } catch (error) {
-        console.error("Failed to calibrate mz fit: ", error);
+        console.error(
+          `Failed to apply mz calibration for ${sample_filename}: `,
+          error
+        );
       }
     },
 
@@ -514,13 +520,13 @@ export function createHttpClient(host, api_port) {
       }
     },
 
-    getTargetCollectionById: async (targetCollectionId) => {
+    getTargetCollection: async (collectionId) => {
       try {
         return await httpClient.get(
-          `${targetCollectionsBaseUrl}/${targetCollectionId}`
+          `${targetCollectionsBaseUrl}/${collectionId}`
         );
       } catch (error) {
-        console.error("Failed to get target collection by id: ", error);
+        console.error("Failed to get target collection: ", error);
       }
     },
 
@@ -534,30 +540,36 @@ export function createHttpClient(host, api_port) {
         console.error("Failed to create target collection: ", error);
       }
     },
-    updateTargetCollection: async (
-      targetCollectionId,
-      updatedTargetCollection
-    ) => {
+
+    updateTargetCollection: async (newTargetCollection) => {
       try {
         return await httpClient.patch(
-          `${targetCollectionsBaseUrl}/${targetCollectionId}`,
-          updatedTargetCollection
+          `${targetCollectionsBaseUrl}/${newTargetCollection.target_collection_id}`,
+          newTargetCollection
         );
       } catch (error) {
-        console.error("Failed to update target collection: ", error);
+        console.error(
+          `Failed to update target collection ${newTargetCollection.target_collection_name} `,
+          error
+        );
       }
     },
-    deleteTargetCollection: async (
-      targetCollectionId,
-      deleteOrphanCompounds = false
-    ) => {
+
+    deleteTargetCollection: async (collection) => {
       try {
         return await httpClient.delete(
-          `${targetCollectionsBaseUrl}/${targetCollectionId}`,
-          { params: { delete_orphan_compounds: deleteOrphanCompounds } }
+          `${targetCollectionsBaseUrl}/${collection.target_collection_id}`,
+          {
+            params: {
+              delete_orphan_compounds: collection.deleteOrphanCompounds,
+            },
+          }
         );
       } catch (error) {
-        console.error("Failed to delete target collection: ", error);
+        console.error(
+          `Failed to delete target collection ${collection.target_collection_name}: `,
+          error
+        );
       }
     },
 

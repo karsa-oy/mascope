@@ -510,20 +510,21 @@ export default {
     generateFilterId() {
       this.sampleItemFilterId = genId(6, false);
     },
+    async mzCalibrationFit() {
+      this.mzCalibrationReset();
+      const requestData = {
+        sampleId: this.sampleActive.sample_item_id,
+        sampleName: this.sampleActive.sample_item_name,
+        body: this.mzCalibrationParams,
+      };
+      await this.calibrationMzFit(requestData);
+    },
     async mzCalibrationApply() {
-      const payload = {
+      const requestData = {
         fit: this.mzFit,
         sample_filename: this.sampleFilename,
       };
-      await this.calibrationMzApply(payload);
-    },
-    mzCalibrationFit() {
-      this.mzCalibrationReset();
-      const payload = {
-        sample_item_id: this.sampleActive.sample_item_id,
-        params: this.mzCalibrationParams,
-      };
-      this.calibrationMzFit(payload);
+      await this.calibrationMzApply(requestData);
     },
     reset() {
       this.resetAcquisitionStatus();
@@ -571,7 +572,7 @@ export default {
       }
     },
     selectBatch(val) {
-      this.batchSelect(val);
+      this.batchSelect(val.sample_batch_id);
     },
   },
   watch: {
