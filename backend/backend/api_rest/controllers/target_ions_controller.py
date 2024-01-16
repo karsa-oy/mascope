@@ -1,10 +1,17 @@
 from fastapi import HTTPException
 from sqlalchemy import asc, desc, func, select
+from typing import List
 
 from backend.db_api_rest import async_session
 from backend.server import sio
+from backend.db.id import gen_id
+
+from lib.molmass import Formula
+
 from ..models.models import (
+    IonizationMechanism,
     TargetIon,
+    TargetIsotope,
     TargetCompound,
     TargetCollection,
     TargetCompoundInTargetCollection,
@@ -12,6 +19,7 @@ from ..models.models import (
     SampleBatch,
     Sample,
 )
+from ..models.pydantic_models.target_compound_pydantic_model import TargetCompoundBase
 from ..models.pydantic_models.target_ion_pydantic_model import TargetIonUpdate
 
 
@@ -73,6 +81,203 @@ async def get_target_ion(target_ion_id: str):
             raise HTTPException(status_code=404, detail=f"Target ion not found")
 
         return target_ion.to_dict()
+
+
+async def create_target_ions(
+    target_compound: TargetCompoundBase,
+    ionization_mechanisms: List[IonizationMechanism],
+    target_compound_mass: float = None,
+    session=None,
+) -> dict:
+    """Function to create target ion and target isotope records
+    derived from a given target compound and list of ionization mechanisms to apply.
+    If target compound mass is given, it will be used instead of compound formula.
+
+    :param target_compound: Target compound to derive ions and isotopes from
+    :type target_compound: TargetCompoundBase
+    :param ionization_mechanisms: List of ionization mechanisms to apply to the compound
+    :type ionization_mechanisms: List[IonizationMechanism]
+    :param target_compound_mass: Mass of the target compound (if formula is not known),
+    defaults to None. If None, formula will be used.
+    :type target_compound_mass: float, optional
+    :param session: Database session, if not given makes an independent transaction, defaults to None
+    :type session: SQLAlchemy.AsyncSession, optional
+    :return: Return created target ions and isotopes, and message log
+    :rtype: dict
+    """
+    independent_transaction = False
+
+    if session is None:
+        independent_transaction = True
+        session = async_session()
+
+    # Helper functions
+    def charge_string(raw_ion: Formula) -> str:
+        """Get charge string (+/-) based on ion formula
+
+        :param raw_ion: Formula instance of the ion
+        :type raw_ion: Formula
+        :return: Charge string, either + or -
+        :rtype: str
+        """
+        if raw_ion.charge == -1:
+            charge_string = "-"
+        elif raw_ion.charge == +1:
+            charge_string = "+"
+        else:
+            charge_string = ""
+        return charge_string
+
+    def generate_target_ions_from_composition(
+        target_compound: TargetCompoundBase,
+        ionization_mechanisms: List[IonizationMechanism],
+    ) -> tuple:
+        """Generate target ions and isotopes based on target compound composition and given ionization mechanisms
+
+        :param target_compound: Target compound to use as a base for the ions
+        :type target_compound: TargetCompoundBase
+        :param ionization_mechanisms: List of ionization mechanisms to apply to the target compound
+        :type ionization_mechanisms: List[IonizationMechanism]
+        :return: 2-tuple of (list of ions (instances of TargetIon), list of isotopes (instances of TargetIsotope))
+        :rtype: tuple
+        """
+
+        target_ions = []
+        target_isotopes = []
+
+        # generate and create ion records
+        for ionization_mechanism in ionization_mechanisms:
+            mechanism = ionization_mechanism.ionization_mechanism
+            try:
+                # get and save ions
+                raw_ion = Formula(
+                    "("
+                    + target_compound.target_compound_formula.rstrip()
+                    + mechanism[:-1]  # remove polarity sign before parenthesis
+                    + ")"
+                    + mechanism[-1]  # add polarity sign at the end
+                )
+            except ValueError as e:
+                print("Failed to parse ion formula: %s" % e)  # TODO: Catch the error
+            else:
+                # construct and save ion row
+                ion = TargetIon(
+                    target_ion_id=gen_id(16),
+                    target_compound_id=target_compound.target_compound_id,
+                    ionization_mechanism_id=ionization_mechanism.ionization_mechanism_id,
+                    target_ion_formula=raw_ion.formula + charge_string(raw_ion),
+                    filter_params={},
+                )
+
+                target_ions.append(ion)
+
+                # construct and save isotope rows
+                raw_isotopes = raw_ion.mz_spectrum().values()
+                target_isotopes.extend(
+                    [
+                        TargetIsotope(
+                            target_isotope_id=gen_id(16),
+                            target_ion_id=ion.target_ion_id,
+                            mz=mz,
+                            relative_abundance=rel_abu,
+                        )
+                        for mz, rel_abu in raw_isotopes
+                    ]
+                )
+        return target_ions, target_isotopes
+
+    def generate_target_ions_from_mass(
+        target_compound_mass: float,
+        target_compound: TargetCompoundBase,
+        ionization_mechanisms: List[IonizationMechanism],
+    ) -> tuple:
+        """Generate target ions and isotopes based on target compound mass and given ionization mechanisms
+
+        :param target_compound_mass: Mass of the target compound (composition not known)
+        :type target_compound_mass: float
+        :param target_compound: Target compound to use as a base for the ions
+        :type target_compound: TargetCompoundBase
+        :param ionization_mechanisms: List of ionization mechanisms to apply to the target compound
+        :type ionization_mechanisms: List[IonizationMechanism]
+        :return: 2-tuple of (list of ions (instances of TargetIon), list of isotopes (instances of TargetIsotope))
+        :rtype: tuple
+        """
+        target_ions = []
+        target_isotopes = []
+
+        # generate and create ion records
+        for ionization_mechanism in ionization_mechanisms:
+            mechanism = ionization_mechanism.ionization_mechanism
+            # construct and save ion row
+            ion = TargetIon(
+                target_ion_id=gen_id(16),
+                target_compound_id=target_compound.target_compound_id,
+                ionization_mechanism_id=ionization_mechanism.ionization_mechanism_id,
+                target_ion_formula=(f"{target_compound_mass:.4f}" + mechanism),
+                filter_params={},
+            )
+
+            target_ions.append(ion)
+            # construct and save isotope rows
+            raw_ion = Formula("(" + mechanism[1:-1] + ")" + mechanism[-1])
+            is_adduct = mechanism[0] == "+"
+            if is_adduct:
+                raw_isotopes = raw_ion.mz_spectrum().values()
+            else:
+                raw_isotopes = [(-raw_ion.mz, 1.0)]
+
+            target_isotopes.extend(
+                [
+                    TargetIsotope(
+                        target_isotope_id=gen_id(16),
+                        target_ion_id=ion.target_ion_id,
+                        mz=(target_compound_mass + reagent_mz),
+                        relative_abundance=reagent_rel_abu,
+                    )
+                    for reagent_mz, reagent_rel_abu in raw_isotopes
+                ]
+            )
+
+        return target_ions, target_isotopes
+
+    # Initialize message log
+    message_log = {}  # TODO: Populate with information
+
+    if target_compound_mass is None:
+        # Parsing into float failed, target compound is given by composition
+        (
+            target_ions,
+            target_isotopes,
+        ) = generate_target_ions_from_composition(
+            target_compound, ionization_mechanisms
+        )
+    else:
+        # Try if target compound is given by mass (try to parse composition into float)
+        target_compound_mass = float(target_compound.target_compound_formula)
+        (
+            target_ions,
+            target_isotopes,
+        ) = generate_target_ions_from_mass(
+            target_compound_mass, target_compound, ionization_mechanisms
+        )
+
+    for target_isotope in target_isotopes:
+        # Add the isotopes to be committed to the db
+        session.add(target_isotope)
+    for target_ion in target_ions:
+        # Add the ions to be committed to the db
+        session.add(target_ion)
+
+    if independent_transaction:
+        await session.commit()
+    else:
+        await session.flush()
+
+    return {
+        "created_ions": target_ions,
+        "created_isotopes": target_isotopes,
+        "message_logs": message_log,
+    }
 
 
 async def update_target_ion(target_ion_id: str, target_ion_update: TargetIonUpdate):

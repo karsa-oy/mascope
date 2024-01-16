@@ -200,7 +200,7 @@ class TargetCompound(Base):
 
 class TargetIon(Base):
     __tablename__ = "target_ion"
-    target_ion_id = Column(String, primary_key=True)
+    target_ion_id = Column(String(16), primary_key=True)
     target_compound_id = Column(
         String, ForeignKey("target_compound.target_compound_id", ondelete="CASCADE")
     )
@@ -241,7 +241,7 @@ class IonizationMechanism(Base):
 
 class TargetIsotope(Base):
     __tablename__ = "target_isotope"
-    target_isotope_id = Column(String, primary_key=True)
+    target_isotope_id = Column(String(16), primary_key=True)
     target_ion_id = Column(
         String, ForeignKey("target_ion.target_ion_id", ondelete="CASCADE")
     )

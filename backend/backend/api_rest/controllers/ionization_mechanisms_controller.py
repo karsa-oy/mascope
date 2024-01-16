@@ -4,7 +4,8 @@ from sqlalchemy.future import select
 from backend.db_api_rest import async_session
 from backend.db.id import gen_id
 
-from ..models.models import IonizationMechanism
+from .target_ions_controller import create_target_ions
+from ..models.models import IonizationMechanism, TargetCompound
 from ..models.pydantic_models.ionization_mechanism_pydantic_model import (
     IonizationMechanismCreate,
 )
@@ -72,22 +73,55 @@ async def get_ionization_mechanism(ionization_mechanism_id: str):
         return ionization_mechanism.to_dict()
 
 
-async def create_ionization_mechanism(ionization_mechanism: IonizationMechanismCreate):
-    async with async_session() as session:
-        new_ionization_mechanism = IonizationMechanism(
-            ionization_mechanism_id=gen_id(11),
-            ionization_mechanism_polarity=ionization_mechanism.ionization_mechanism_polarity,
-            ionization_mechanism=ionization_mechanism.ionization_mechanism,
-            reagent=ionization_mechanism.reagent,
+async def create_ionization_mechanism(
+    ionization_mechanism: IonizationMechanismCreate, session=None
+) -> dict:
+    """Function to create a new ionization mechanism. Generates corresponding ions
+    for each existing target compound in the database.
+
+    :param ionization_mechanism: Ionization mechanism to create
+    :type ionization_mechanism: IonizationMechanismCreate
+    :param session: Database session, if not given makes an independent transaction, defaults to None
+    :type session: SQLAlchemy.AsyncSession, optional
+    :raises HTTPException: Failed to create the ionization mechanism
+    :return: Created ionization mechanism
+    :rtype: dict
+    """
+    independent_transaction = False
+
+    if session is None:
+        independent_transaction = True
+        session = async_session()
+
+    new_ionization_mechanism = IonizationMechanism(
+        ionization_mechanism_id=gen_id(11),
+        ionization_mechanism_polarity=ionization_mechanism.ionization_mechanism_polarity,
+        ionization_mechanism=ionization_mechanism.ionization_mechanism,
+        reagent=ionization_mechanism.reagent,
+    )
+    session.add(new_ionization_mechanism)
+
+    # Get all target compounds
+    stmt = select(TargetCompound)
+    result = await session.execute(stmt)
+    target_compounds = result.scalars().all()
+    for i, target_compound in enumerate(target_compounds):
+        # Create target ions with new mechanism for each co
+        await create_target_ions(
+            target_compound, [new_ionization_mechanism], session=session
         )
-        session.add(new_ionization_mechanism)
+
+    if independent_transaction:
         await session.commit()
-        await session.refresh(new_ionization_mechanism)
+    else:
+        await session.flush()
 
-        if not new_ionization_mechanism:
-            raise HTTPException(
-                status_code=400,
-                detail="Failed to create ionization mechanism",
-            )
+    session.refresh(new_ionization_mechanism)
 
-        return new_ionization_mechanism.to_dict()
+    if not new_ionization_mechanism:
+        raise HTTPException(
+            status_code=400,
+            detail="Failed to create ionization mechanism",
+        )
+
+    return new_ionization_mechanism.to_dict()

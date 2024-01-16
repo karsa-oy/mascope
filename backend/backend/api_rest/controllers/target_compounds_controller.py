@@ -1,20 +1,17 @@
-import asyncio
-
 from fastapi import HTTPException
 from sqlalchemy import asc, desc, func, select, or_, and_
 from typing import List
 
 from backend.server import sio
 from backend.db.id import gen_id
-from lib.molmass import Formula
+
 from backend.db_api_rest import async_session
 
 from .ionization_mechanisms_controller import get_ionization_mechanisms
+from .target_ions_controller import create_target_ions
 from .helpers_controller import get_affected_batches_and_collections
 from ..models.models import (
     TargetCompound,
-    TargetIon,
-    TargetIsotope,
     TargetCompoundInTargetCollection,
     TargetCollectionInSampleBatch,
 )
@@ -138,7 +135,17 @@ async def delete_target_compound(target_compound_id: str, session=None):
 
 async def create_target_compound(
     target_compounds: List[TargetCompoundBase], session=None
-):
+) -> dict:
+    """Function to create a target compount record and derived target ions and isotopes
+
+    :param target_compounds: List of target compounds to create
+    :type target_compounds: List[TargetCompoundBase]
+    :param session: Database session, if not given makes an independent transaction, defaults to None
+    :type session: SQLAlchemy.AsyncSession, optional
+    :raises RuntimeError: Database is malformed
+    :return: Return created target compounds, skipped compounds (already existing) and message log
+    :rtype: dict
+    """
     independent_transaction = False
 
     if session is None:
@@ -151,91 +158,6 @@ async def create_target_compound(
             name = name.lower()
         return " ".join(name.strip().split())
 
-    def charge_string(raw_ion):
-        if raw_ion.charge == -1:
-            charge_string = "-"
-        elif raw_ion.charge == +1:
-            charge_string = "+"
-        else:
-            charge_string = ""
-        return charge_string
-
-    def generate_target_ions_from_composition():
-        # generate and create ion records
-        for ionization_mechanism in ionization_mechanisms:
-            mechanism = ionization_mechanism["ionization_mechanism"]
-            try:
-                # get and save ions
-                raw_ion = Formula(
-                    "("
-                    + target_compound.target_compound_formula.rstrip()
-                    + mechanism[:-1]
-                    + ")"
-                    + mechanism[-1]
-                )
-            except ValueError as e:
-                print("Failed to parse ion formula: %s" % e)
-            else:
-                # construct and save ion row
-                ion = TargetIon(
-                    target_ion_id=gen_id(),
-                    target_compound_id=target_compound.target_compound_id,
-                    ionization_mechanism_id=ionization_mechanism[
-                        "ionization_mechanism_id"
-                    ],
-                    target_ion_formula=raw_ion.formula + charge_string(raw_ion),
-                    filter_params={},
-                )
-
-                nonlocal target_ions
-                target_ions.append(ion)
-
-                # construct and save isotope rows
-                raw_isotopes = raw_ion.mz_spectrum().values()
-                nonlocal target_isotopes
-                target_isotopes += [
-                    TargetIsotope(
-                        target_isotope_id=gen_id(),
-                        target_ion_id=ion.target_ion_id,
-                        mz=mz,
-                        relative_abundance=rel_abu,
-                    )
-                    for [mz, rel_abu] in raw_isotopes
-                ]
-
-    def generate_target_ions_from_mass(target_compound_mass):
-        # generate and create ion records
-        for ionization_mechanism in ionization_mechanisms:
-            mechanism = ionization_mechanism["ionization_mechanism"]
-            # construct and save ion row
-            ion = TargetIon(
-                target_ion_id=gen_id(),
-                target_compound_id=target_compound.target_compound_id,
-                ionization_mechanism_id=ionization_mechanism["ionization_mechanism_id"],
-                target_ion_formula=(f"{target_compound_mass:.4f}" + mechanism),
-                filter_params={},
-            )
-
-            nonlocal target_ions
-            target_ions.append(ion)
-            # construct and save isotope rows
-            raw_ion = Formula("(" + mechanism[1:-1] + ")" + mechanism[-1])
-            is_adduct = mechanism[0] == "+"
-            if is_adduct:
-                raw_isotopes = raw_ion.mz_spectrum().values()
-            else:
-                raw_isotopes = [(-raw_ion.mz, 1.0)]
-            nonlocal target_isotopes
-            target_isotopes += [
-                TargetIsotope(
-                    target_isotope_id=gen_id(),
-                    target_ion_id=ion.target_ion_id,
-                    mz=(target_compound_mass + reagent_mz),
-                    relative_abundance=reagent_rel_abu,
-                )
-                for [reagent_mz, reagent_rel_abu] in raw_isotopes
-            ]
-
     # Fetch ionization mechanisms
     ionization_mechanisms_data = await get_ionization_mechanisms()
     ionization_mechanisms = ionization_mechanisms_data["data"]
@@ -245,8 +167,6 @@ async def create_target_compound(
     existing_target_compounds = []
     # initalized lists of targets to create
     target_compounds_to_create = []
-    target_ions = []
-    target_isotopes = []
     # Initialize message log
     message_log = {}
 
@@ -305,21 +225,22 @@ async def create_target_compound(
             # the database is inconsistent
             raise RuntimeError("Duplicate target compound in database")
 
+        # Proceed to generating target ions and isotopes for the compound
         try:
-            # Target compound given by mass
+            # Try if target compound is given by mass (try to parse composition into float)
             target_compound_mass = float(target_compound.target_compound_formula)
-            generate_target_ions_from_mass(target_compound_mass)
         except ValueError:
-            # Target compound given by composition
-            generate_target_ions_from_composition()
+            target_compound_mass = None
 
-    # Add the targets to the database and commit
-    for target_compound in target_compounds_to_create:
+        # Create target ions for the compound
+        await create_target_ions(
+            target_compound,
+            ionization_mechanisms,
+            target_compound_mass,
+            session=session,
+        )
+        # Add the compound to be committed to the db
         session.add(target_compound)
-    for target_ion in target_ions:
-        session.add(target_ion)
-    for target_isotope in target_isotopes:
-        session.add(target_isotope)
 
     if independent_transaction:
         await session.commit()
