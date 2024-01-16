@@ -11,6 +11,7 @@ from .ionization_mechanisms_controller import get_ionization_mechanisms
 from .target_ions_controller import create_target_ions
 from .helpers_controller import get_affected_batches_and_collections
 from ..models.models import (
+    IonizationMechanism,
     TargetCompound,
     TargetCompoundInTargetCollection,
     TargetCollectionInSampleBatch,
@@ -160,7 +161,10 @@ async def create_target_compound(
 
     # Fetch ionization mechanisms
     ionization_mechanisms_data = await get_ionization_mechanisms()
-    ionization_mechanisms = ionization_mechanisms_data["data"]
+    ionization_mechanisms = [
+        IonizationMechanism(**ionization_mechanism_dict)
+        for ionization_mechanism_dict in ionization_mechanisms_data["data"]
+    ]
 
     # initialize list of targets to return
     target_compound_ids = []

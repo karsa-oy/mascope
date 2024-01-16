@@ -147,7 +147,7 @@ async def create_target_ions(
 
         # generate and create ion records
         for ionization_mechanism in ionization_mechanisms:
-            mechanism = ionization_mechanism["ionization_mechanism"]
+            mechanism = ionization_mechanism.ionization_mechanism
             try:
                 # get and save ions
                 raw_ion = Formula(
@@ -164,9 +164,7 @@ async def create_target_ions(
                 ion = TargetIon(
                     target_ion_id=gen_id(16),
                     target_compound_id=target_compound.target_compound_id,
-                    ionization_mechanism_id=ionization_mechanism[
-                        "ionization_mechanism_id"
-                    ],
+                    ionization_mechanism_id=ionization_mechanism.ionization_mechanism_id,
                     target_ion_formula=raw_ion.formula + charge_string(raw_ion),
                     filter_params={},
                 )
@@ -209,12 +207,12 @@ async def create_target_ions(
 
         # generate and create ion records
         for ionization_mechanism in ionization_mechanisms:
-            mechanism = ionization_mechanism["ionization_mechanism"]
+            mechanism = ionization_mechanism.ionization_mechanism
             # construct and save ion row
             ion = TargetIon(
                 target_ion_id=gen_id(16),
                 target_compound_id=target_compound.target_compound_id,
-                ionization_mechanism_id=ionization_mechanism["ionization_mechanism_id"],
+                ionization_mechanism_id=ionization_mechanism.ionization_mechanism_id,
                 target_ion_formula=(f"{target_compound_mass:.4f}" + mechanism),
                 filter_params={},
             )
