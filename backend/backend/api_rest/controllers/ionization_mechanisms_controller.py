@@ -74,49 +74,48 @@ async def get_ionization_mechanism(ionization_mechanism_id: str):
 
 
 async def create_ionization_mechanism(
-    ionization_mechanism: IonizationMechanismCreate, session=None
+    ionization_mechanism: IonizationMechanismCreate,
 ) -> dict:
     """Function to create a new ionization mechanism. Generates corresponding ions
     for each existing target compound in the database.
 
     :param ionization_mechanism: Ionization mechanism to create
     :type ionization_mechanism: IonizationMechanismCreate
-    :param session: Database session, if not given makes an independent transaction, defaults to None
-    :type session: SQLAlchemy.AsyncSession, optional
     :raises HTTPException: Failed to create the ionization mechanism
     :return: Created ionization mechanism
     :rtype: dict
     """
-    independent_transaction = False
 
-    if session is None:
-        independent_transaction = True
-        session = async_session()
-
-    new_ionization_mechanism = IonizationMechanism(
-        ionization_mechanism_id=gen_id(11),
-        ionization_mechanism_polarity=ionization_mechanism.ionization_mechanism_polarity,
-        ionization_mechanism=ionization_mechanism.ionization_mechanism,
-        reagent=ionization_mechanism.reagent,
-    )
-    session.add(new_ionization_mechanism)
-
-    # Get all target compounds
-    stmt = select(TargetCompound)
-    result = await session.execute(stmt)
-    target_compounds = result.scalars().all()
-    for i, target_compound in enumerate(target_compounds):
-        # Create target ions with new mechanism for each co
-        await create_target_ions(
-            target_compound, [new_ionization_mechanism], session=session
+    async with async_session() as session:
+        new_ionization_mechanism = IonizationMechanism(
+            ionization_mechanism_id=gen_id(11),
+            ionization_mechanism_polarity=ionization_mechanism.ionization_mechanism_polarity,
+            ionization_mechanism=ionization_mechanism.ionization_mechanism,
+            reagent=ionization_mechanism.reagent,
         )
+        session.add(new_ionization_mechanism)
 
-    if independent_transaction:
+        # Get all target compounds
+        stmt = select(TargetCompound)
+        result = await session.execute(stmt)
+        target_compounds = result.scalars().all()
+        for i, target_compound in enumerate(target_compounds):
+            # Create target ions with new mechanism for each compound
+            try:
+                # Try if target compound is given by mass (try to parse composition into float)
+                target_compound_mass = float(target_compound.target_compound_formula)
+            except ValueError:
+                target_compound_mass = None
+
+            await create_target_ions(
+                target_compound,
+                [new_ionization_mechanism],
+                target_compound_mass,
+                session=session,
+            )
+
         await session.commit()
-    else:
-        await session.flush()
-
-    session.refresh(new_ionization_mechanism)
+        await session.refresh(new_ionization_mechanism)
 
     if not new_ionization_mechanism:
         raise HTTPException(
