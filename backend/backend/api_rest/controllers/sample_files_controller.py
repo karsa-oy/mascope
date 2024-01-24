@@ -236,6 +236,6 @@ async def get_sample_file_peak_timeseries(
 
     return {
         "mz": peak_mz_data,
-        "intensity": list(peak_timeseries.values),
-        "time": list(peak_timeseries.time.values),
+        "intensity": list(peak_timeseries.values.astype(float)),
+        "time": list(peak_timeseries.time.values.astype(float)),
     }
