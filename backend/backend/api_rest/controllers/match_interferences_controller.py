@@ -1,18 +1,20 @@
 from fastapi import HTTPException
 from sqlalchemy import asc, desc, func, select, delete, and_
+from typing import List, Optional
+
 from backend.db_api_rest import async_session
 from ..models.models import MatchInterference
 
 
 async def get_match_interferences(
-    target_isotope_id: str,
-    sample_item_id: str,
-    min_sample_peak_interference: float,
-    max_sample_peak_interference: float,
-    sort: str,
-    order: str,
-    page: int,
-    limit: int,
+    target_isotope_id: Optional[str] = None,
+    sample_item_id: Optional[str] = None,
+    min_sample_peak_interference: float = None,
+    max_sample_peak_interference: float = None,
+    sort: str = None,
+    order: str = None,
+    page: int = 0,
+    limit: int = 1000000,
 ):
     async with async_session() as session:
         stmt = select(MatchInterference)
@@ -76,13 +78,31 @@ async def get_match_interference_by_id(match_interference_id: str):
         return match_interference.to_dict()
 
 
-async def delete_match_interferences(sample_item_id: str):
+async def delete_match_interferences(
+    sample_item_ids: List[str], target_isotope_ids: Optional[List[str]] = None
+):
+    """
+    Deletes match interferences for specified sample items, optionally filtered by target isotope IDs.
+
+    This function deletes match interferences for a list of sample item IDs. If target isotope IDs are specified,
+    only interferences corresponding to these isotopes are deleted.
+
+    :param sample_item_ids: List of sample item IDs for which match interferences are to be deleted.
+    :type sample_item_ids: List[str]
+    :param target_isotope_ids: Optional list of target isotope IDs to filter match interferences, defaults to None
+    :type target_isotope_ids: Optional[List[str]], optional
+    """
     async with async_session() as session:
-        await session.execute(
-            delete(MatchInterference).where(
-                MatchInterference.sample_item_id == sample_item_id
-            )
+        query = delete(MatchInterference).where(
+            MatchInterference.sample_item_id.in_(sample_item_ids)
         )
+
+        if target_isotope_ids:
+            query = query.where(
+                MatchInterference.target_isotope_id.in_(target_isotope_ids)
+            )
+
+        await session.execute(query)
         await session.commit()
 
 

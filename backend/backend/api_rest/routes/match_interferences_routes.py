@@ -34,9 +34,3 @@ async def get_match_interferences_route(
 @match_interferences_router.get("/api/match_interferences/{match_interference_id}")
 async def get_match_interference_by_id_route(match_interference_id: str):
     return await get_match_interference_by_id(match_interference_id)
-
-
-@match_interferences_router.delete("/api/match_interferences/{sample_item_id}")
-async def delete_match_interferences_route(sample_item_id: str):
-    await delete_match_interferences(sample_item_id)
-    return {"status": "Match interferences successfully deleted"}
