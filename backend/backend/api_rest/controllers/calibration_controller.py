@@ -11,6 +11,7 @@ background tasks to process calibration and related operations.
 # Imports
 # -------------------------------------------------------------------
 import numpy as np
+import pandas as pd
 
 from hardware.tofwerk.calibration import mz_calibrate
 from hardware.tofwerk.lib.TwTool import TwTof2Mass
@@ -31,13 +32,16 @@ from zarr.errors import PathNotFoundError
 from fastapi import BackgroundTasks, HTTPException
 from sqlalchemy import select, func, and_
 
-from .match_controller import match_item_remove
+from .match_controller import match_sample_remove, compute_matches
 from .sample_files_controller import (
     update_sample_file,
     get_sample_files,
 )
 from .sample_items_controller import get_sample_items
-from .match_controller import compute_matches
+from .target_isotopes_controller import get_target_isotopes
+from .target_compound_in_target_collection_controller import (
+    get_target_compound_in_target_collection,
+)
 
 
 from ..models.pydantic_models.sample_file_pydantic_model import (
@@ -79,6 +83,7 @@ async def emit_progress_update(progress_properties, increment):
 # Main Logic Functions
 # -------------------------------------------------------------------
 
+
 async def mz_fit(
     filename,
     calibration_collection_id,
@@ -110,10 +115,24 @@ async def mz_fit(
         return fit, stats, error
 
     await emit_progress_update(progress_properties, 0.35)
+
     # Compute matches for calibration compounds
-    match_isotope_df = await compute_matches(
-        filename, [calibration_collection_id], ionization_mechanism_ids
+    # Fetch target compounds in the calibration collection
+    target_compounds_result = await get_target_compound_in_target_collection(
+        target_collection_id=calibration_collection_id,
     )
+    target_compound_ids = [
+        item["target_compound_id"] for item in target_compounds_result["data"]
+    ]
+
+    # Fetch target isotopes for specific filters
+    target_isotopes_result = await get_target_isotopes(
+        target_compound_ids=target_compound_ids,
+        ionization_mechanism_ids=ionization_mechanism_ids,
+    )
+    target_isotopes_df = pd.DataFrame(target_isotopes_result["data"])
+    match_isotope_df = await compute_matches(filename, target_isotopes_df)
+
     # Filter matches
     good_matches_df = match_isotope_df[
         (match_isotope_df.relative_abundance >= isotope_abundance_min)
@@ -558,9 +577,10 @@ async def calibration_mz_apply(
     )
     for sample_item_id in sample_item_ids:
         # FAQ_match removes mathces in all samples assosiated with filename
+        #  TODO shoud we rematch the non active samples?
 
         # Delete outdated matches
-        await match_item_remove(sample_item_id, True)
+        await match_sample_remove(sample_item_id)
 
         await sio.emit(
             "calibration_mz_apply_finished",

@@ -19,12 +19,12 @@ from ..models.pydantic_models.target_compound_in_target_collection_pydantic_mode
 
 
 async def get_target_compound_in_target_collection(
-    target_compound_id: str,
-    target_collection_id: str,
-    sort: str,
-    order: str,
-    page: int,
-    limit: int,
+    target_compound_id: str = None,
+    target_collection_id: str = None,
+    sort: str = None,
+    order: str = None,
+    page: int = 0,
+    limit: int = 100000,
 ):
     async with async_session() as session:
         stmt = select(TargetCompoundInTargetCollection)
