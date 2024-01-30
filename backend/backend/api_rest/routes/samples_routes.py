@@ -58,7 +58,9 @@ async def get_sample_route(
     sample_item_id: str,
     body: GetSampleBody,
 ):
-    result = await get_sample(sample_item_id, body.alarms_list)
+    result = await get_sample(
+        sample_item_id, body.alarms_list, body.sample_matches_info
+    )
     return {
         "message": result["message"],
         "data": result["data"],

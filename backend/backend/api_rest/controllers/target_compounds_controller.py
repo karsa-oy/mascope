@@ -1,8 +1,6 @@
-import asyncio
-
 from fastapi import HTTPException
 from sqlalchemy import asc, desc, func, select, or_, and_
-from typing import List
+from typing import List, Optional
 
 from backend.server import sio
 from backend.db.id import gen_id
@@ -25,12 +23,13 @@ from ..models.pydantic_models.target_compound_pydantic_model import (
 
 
 async def get_target_compounds(
-    target_compound_name: str,
-    target_compound_formula: str,
-    sort: str,
-    order: str,
-    page: int,
-    limit: int,
+    target_compound_name: Optional[str] = None,
+    target_compound_formula: Optional[str] = None,
+    sample_batch_id: Optional[str] = None,
+    sort: str = None,
+    order: str = None,
+    page: int = 0,
+    limit: int = 1000000,
 ):
     async with async_session() as session:
         stmt = select(TargetCompound)
@@ -43,6 +42,23 @@ async def get_target_compounds(
         if target_compound_formula:
             stmt = stmt.filter(
                 TargetCompound.target_compound_formula == target_compound_formula
+            )
+        if sample_batch_id:
+            stmt = (
+                stmt.join(
+                    TargetCompoundInTargetCollection,
+                    TargetCompoundInTargetCollection.target_compound_id
+                    == TargetCompound.target_compound_id,
+                )
+                .join(
+                    TargetCollectionInSampleBatch,
+                    TargetCollectionInSampleBatch.target_collection_id
+                    == TargetCompoundInTargetCollection.target_collection_id,
+                )
+                .filter(
+                    TargetCollectionInSampleBatch.sample_batch_id == sample_batch_id
+                )
+                .distinct()
             )
 
         if sort:

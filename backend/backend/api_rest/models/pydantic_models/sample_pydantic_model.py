@@ -42,8 +42,8 @@ class FilterParams(BaseModel):
         return possible_match_threshold
 
 
-#  Note that GetSampleBody also acts as a common base class that includes the alarms_list field and its validator
-class GetSampleBody(BaseModel):
+#  Note that AlarmsList acts as a common base class that includes the alarms_list field and its validator
+class AlarmsList(BaseModel):
     alarms_list: List[str] = Field(
         default=["TARGETS"],
         description="List of collection types to set alarm mode to true",
@@ -59,7 +59,14 @@ class GetSampleBody(BaseModel):
         return item
 
 
-class GetSamplesBody(GetSampleBody):
+class GetSampleBody(AlarmsList):
+    sample_matches_info: Optional[bool] = Field(
+        default=True,
+        description="Flag indicating whether the matches data should be calculated.",
+    )
+
+
+class GetSamplesBody(AlarmsList):
     sample_item_id: Optional[str] = None
     sample_item_id_active: Optional[str] = None
     sample_file_id: Optional[str] = None
@@ -80,7 +87,7 @@ class GetSamplesBody(GetSampleBody):
     match_isotopes: Optional[bool] = False
 
 
-class GetSampleIonMatchesBody(GetSampleBody):
+class GetSampleIonMatchesBody(AlarmsList):
     target_ion_id: str = Field(..., description="ID of the target ion")
     target_collection_id: str = Field(
         ..., description="ID of the target collection to remove possible dublicates"
