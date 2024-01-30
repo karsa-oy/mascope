@@ -288,7 +288,7 @@ export default {
       activateModal: "modal/activate",
     }),
     ...call({
-      matchBatchesCompute: "batch/matchBatchesCompute",
+      matchBatchesRematch: "batch/matchBatchesRematch",
       loadSampleIon: "visualization/load",
       targetCollectionToggle: "batch/targetCollectionToggle",
     }),
@@ -377,7 +377,7 @@ export default {
       this.ionShow({ ionId, collectionId });
     },
     async rematchBatches() {
-      await this.matchBatchesCompute(this.sampleBatchesSelected);
+      await this.matchBatchesRematch(this.sampleBatchesSelected);
     },
   },
 };

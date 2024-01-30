@@ -426,7 +426,7 @@ export default {
       calibrationMzApply: "calibration/calibrationMzApply",
       sampleItemCreate: "sample/create",
       sampleItemUpdate: "sample/update",
-      matchItemCompute: "sample/matchItemCompute",
+      matchSampleRematch: "sample/matchSampleRematch",
     }),
     ...mapMutations({
       deactivateModal: "modal/deactivate",
@@ -515,7 +515,7 @@ export default {
       }
     },
     async sampleMatch() {
-      await this.matchItemCompute(this.sampleActive);
+      await this.matchSampleRematch(this.sampleActive);
     },
     async saveSampleItem() {
       await this.saveAttributes();
