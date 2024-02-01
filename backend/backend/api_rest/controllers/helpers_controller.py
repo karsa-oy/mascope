@@ -37,6 +37,7 @@ async def get_affected_batches_and_collections(target_compound_id: str):
 async def emit_progress_update(
     progress_properties: ProgressProperties, increment: float
 ):
+    #  TODO: - optimize instrument/compute_sample_match notifications emits/listeners.
     if not progress_properties:
         return
 

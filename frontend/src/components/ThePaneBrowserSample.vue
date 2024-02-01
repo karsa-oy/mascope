@@ -169,12 +169,13 @@ export default {
     ...mapMutations({
       activateModal: "modal/activate",
     }),
-    ...mapActions("sample", ["matchItemCompute", "deleteSampleItem"]),
-    ...mapActions("batch", ["batchExportPeakData"]),
     ...call({
       itemFocus: "batch/sampleItemFocus",
       itemToggle: "batch/sampleItemToggle",
       batchToggle: "batch/batchToggle",
+      batchExportPeakData: "batch/batchExportPeakData",
+      matchSampleRematch: "sample/matchSampleRematch",
+      deleteSampleItem: "sample/deleteSampleItem",
     }),
     batchCreate() {
       this.modalSampleBatchOpProps = {
@@ -328,7 +329,7 @@ export default {
       this.activateModal({ modal: "sampleItemAttributesSave" });
     },
     async itemRematch() {
-      await this.matchItemCompute(this.sampleActive);
+      await this.matchSampleRematch(this.sampleActive);
     },
     itemDelete() {
       this.$buefy.dialog.confirm({

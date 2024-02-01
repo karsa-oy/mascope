@@ -214,7 +214,6 @@ export default {
       const reqData = {
         batchId,
         body: {
-          ion_mechanisms: state.paramIonMechanisms,
           alarms_list: alarmsList,
         },
       };
@@ -280,12 +279,15 @@ export default {
       });
     },
 
-    async matchBatchesCompute({ rootState }, sample_batches) {
-      const formattedBatches = sample_batches.map((batch) => ({
+    async matchBatchesRematch({ rootState }, batches) {
+      const formattedBatches = batches.map((batch) => ({
         sample_batch_id: batch.sample_batch_id,
         workspace_id: batch.workspace_id,
       }));
-      await rootState.api.httpClient.matchBatchesCompute(formattedBatches);
+      const body = {
+        sample_batches: formattedBatches,
+      };
+      await rootState.api.httpClient.matchBatchesRematch(body);
     },
 
     // backend notifications

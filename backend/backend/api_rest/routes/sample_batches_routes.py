@@ -12,10 +12,10 @@ from ..controllers.sample_batches_controller import (
     copy_sample_batch,
     sample_batch_export_peaks,
 )
+from ..models.pydantic_models.sample_pydantic_model import AlarmsList
 from ..models.pydantic_models.sample_batch_pydantic_model import (
     SampleBatchCreate,
     SampleBatchUpdate,
-    GetBatchTargetsBody,
     autoSamplerImportBatchData,
     SampleBatchCopy,
     SampleBatchExportPeaks,
@@ -43,10 +43,9 @@ async def get_sample_batch_route(
 
 
 @sample_batches_router.post("/api/sample_batches/{sample_batch_id}/targets")
-async def get_batch_targets_route(sample_batch_id: str, body: GetBatchTargetsBody):
+async def get_batch_targets_route(sample_batch_id: str, body: AlarmsList):
     return await get_batch_targets(
         sample_batch_id,
-        body.ion_mechanisms,
         body.alarms_list,
     )
 

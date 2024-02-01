@@ -715,7 +715,32 @@ async def get_samples(
 async def get_sample(
     sample_item_id: str,
     alarms_list: List[str] = None,
-):
+    sample_matches_info: bool = False,
+) -> dict:
+    """
+    Retrieves detailed information for a specific sample, including match data if requested.
+
+    This function fetches details for a given sample identified by its sample_item_id. It can optionally calculate and include match data
+    as matchIsotopes, matchIons, matchCompounds, and matchCollections, based on the sample's association with target entities.
+
+    If the `sample_matches_info` parameter is set to False, the function will return basic sample information without performing match calculations.
+    Default is True for http requests, False when called from other controllers.
+
+    :param sample_item_id: Unique identifier for the sample.
+    :type sample_item_id: str
+    :param alarms_list: List of alarming collections when fetching sample information, defaults to None
+    :type alarms_list: List[str], optional
+    :param sample_matches_info: Flag to determine if match information should be included, defaults to False.
+    :type sample_matches_info: bool, optional
+    :raises HTTPException: If the sample with the specified item ID is not found.
+    :return: A dictionary containing the sample information. If `sample_matches_info` is True, additional match data is included.
+    :rtype: dict
+
+    The returned dictionary includes the following keys:
+    - 'data': Contains the sample information and, if requested, aggregated match data.
+    - 'message': A message indicating the status of the operation.
+
+    """
     async with async_session() as session:
         stmt = select(Sample).filter(Sample.sample_item_id == sample_item_id)
         result = await session.execute(stmt)
@@ -727,8 +752,16 @@ async def get_sample(
                 detail=f"Sample with ID {sample_item_id} not found",
             )
 
-        # Calculate matchIsotopes, matchIons, matchCompounds, matchCollections
+        sample_dict = sample.to_dict()
 
+        # If no match information is required, return only the sample data
+        if not sample_matches_info:
+            return {
+                "data": sample_dict,
+                "message": "Sample retrieved successfully without match information.",
+            }
+
+        # Calculate matchIsotopes, matchIons, matchCompounds, matchCollections
         sample_match_filter_result = await init_sample_match_filter(
             sample.sample_item_id
         )
@@ -740,7 +773,6 @@ async def get_sample(
 
         # If sample_match_filter_df is empty, return the sample dictionary with empty fields
         if sample_match_filter_df.empty:
-            sample_dict = sample.to_dict()
             sample_dict.update(
                 {
                     "match_score": 0,
@@ -787,7 +819,7 @@ async def get_sample(
 
         # 6) Aggregate fields for sample_df
         # Convert sample into dataframe
-        sample_df = pd.DataFrame([sample.to_dict()])
+        sample_df = pd.DataFrame([sample_dict])
 
         # Calculate and add fields match_score, sample_peak_area_sum, sample_peak_interference_sum, matched, selection
         match_samples_df = await aggregate_match_samples(match_compounds_data_df)

@@ -486,7 +486,7 @@ export default {
       sampleItemCreate: "sample/create",
       sampleItemUpdate: "sample/update",
       sampleUnload: "sample/unload",
-      matchItemCompute: "sample/matchItemCompute",
+      matchSampleCompute: "sample/matchSampleCompute",
     }),
     ...mapMutations({}),
     clone(obj) {
@@ -538,7 +538,7 @@ export default {
       this.sampleItemType = null;
     },
     async sampleMatch() {
-      await this.matchItemCompute(this.sampleActive);
+      await this.matchSampleCompute(this.sampleActive);
     },
     saveSampleInfoButtonPressed() {
       let sample = {

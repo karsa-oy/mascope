@@ -15,7 +15,7 @@ from .target_compound_in_target_collection_controller import (
 from ..controllers.target_collection_in_sample_batch_controller import (
     create_target_collection_in_sample_batch,
 )
-from .match_controller import match_batches_compute
+from .match_controller import rematch_batches
 from ..models.models import (
     SampleBatch,
     TargetCollection,
@@ -247,7 +247,7 @@ async def create_target_collection(
                 for sample_batch in sample_batches_to_rematch
             ]
 
-            background_tasks.add_task(match_batches_compute, sample_batches)
+            background_tasks.add_task(rematch_batches, sample_batches)
 
         await sio.emit(
             "targets_all_reload",
@@ -408,7 +408,7 @@ async def update_target_collection(
                 for sample_batch in sample_batches_to_rematch
             ]
 
-            background_tasks.add_task(match_batches_compute, sample_batches)
+            background_tasks.add_task(rematch_batches, sample_batches)
 
         # Exclude rematched ids since they've been reloaded
         sample_batches_to_reload = sample_batches_to_reload - sample_batches_to_rematch
@@ -507,7 +507,7 @@ async def delete_target_collection(
                 for sb in sample_batches_to_rematch
             ]
 
-            background_tasks.add_task(match_batches_compute, sample_batches)
+            background_tasks.add_task(rematch_batches, sample_batches)
 
             for workspace_id in workspaces_to_reload:
                 await sio.emit("targets_all_reload", room=workspace_id, namespace="/")

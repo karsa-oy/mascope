@@ -473,32 +473,33 @@ export function createHttpClient(host, api_port) {
     },
 
     // Match
-    matchBatchesCompute: async (sample_batches) => {
+    matchBatchesRematch: async (body) => {
+      try {
+        return await httpClient.post(`${matchBaseUrl}/batches/rematch`, body);
+      } catch (error) {
+        console.error("Failed to rematch batches: ", error);
+      }
+    },
+
+    matchSampleCompute: async ({ sampleId, body = {} }) => {
       try {
         return await httpClient.post(
-          `${matchBaseUrl}/batches/compute`,
-          sample_batches
+          `${matchBaseUrl}/sample/${sampleId}/compute`,
+          body
         );
       } catch (error) {
-        console.error("Failed to compute batch matches: ", error);
+        console.error("Failed to compute mathes for sample: ", error);
       }
     },
 
-    matchItemCompute: async (sample) => {
+    matchSampleRematch: async ({ sampleId, body = {} }) => {
       try {
-        return await httpClient.post(`${matchBaseUrl}/item/compute`, sample);
-      } catch (error) {
-        console.error("Failed to compute sample match: ", error);
-      }
-    },
-
-    matchItemRemove: async (sample_item_id) => {
-      try {
-        return await httpClient.delete(
-          `${matchBaseUrl}/item/remove/${sample_item_id}`
+        return await httpClient.post(
+          `${matchBaseUrl}/sample/${sampleId}/rematch`,
+          body
         );
       } catch (error) {
-        console.error("Failed to remove sample match: ", error);
+        console.error("Failed to rematch sample: ", error);
       }
     },
 

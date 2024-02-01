@@ -67,7 +67,9 @@ export default {
       const calibrationVerified =
         rootState.sample.active.mz_calibration.verified;
       if (sampleActive && calibrationVerified) {
-        await dispatch("sample/matchItemCompute", sampleActive, { root: true });
+        await dispatch("sample/matchSampleCompute", sampleActive, {
+          root: true,
+        });
       } else {
         // Try again in 1 second if scenthound is still opened
         if (!state.scenthoundModeActive) return;

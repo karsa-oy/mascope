@@ -5,7 +5,7 @@ from typing import List
 
 from backend.db_api_rest import async_session
 from backend.server import sio
-from .match_controller import match_batches_compute
+from .match_controller import rematch_batches
 from ..models.models import TargetCollectionInSampleBatch, SampleBatch, TargetCollection
 from ..models.pydantic_models.target_collection_in_sample_batch_pydantic_model import (
     TargetCollectionInSampleBatchBase,
@@ -177,9 +177,9 @@ async def create_target_collection_in_sample_batch(
             ]
             # Create a background task
             if background_tasks:
-                background_tasks.add_task(match_batches_compute, sample_batches)
+                background_tasks.add_task(rematch_batches, sample_batches)
         elif skipRematch:
-            # Reload the sample batches if match_batches_compute is skipped
+            # Reload the sample batches if rematch_batches is skipped
             for sample_batch_id in sample_batches_to_rematch:
                 await sio.emit(
                     "sample_batch_reload",
@@ -276,9 +276,9 @@ async def delete_target_collections_in_sample_batch(
         ]
         # Create a background task
         if background_tasks:
-            background_tasks.add_task(match_batches_compute, sample_batches)
+            background_tasks.add_task(rematch_batches, sample_batches)
     elif skipRematch:
-        # Reload the sample batches if match_batches_compute is skipped
+        # Reload the sample batches if rematch_batches is skipped
         for sample_batch_id in sample_batches_to_rematch:
             await sio.emit(
                 "sample_batch_reload",

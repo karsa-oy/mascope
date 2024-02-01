@@ -124,8 +124,13 @@ export default {
     async deleteSampleItem({ rootState }, sampleItemId) {
       await rootState.api.httpClient.deleteSampleItem(sampleItemId);
     },
-    async matchItemCompute({ rootState }, sample) {
-      await rootState.api.httpClient.matchItemCompute(sample);
+    async matchSampleCompute({ rootState }, sample) {
+      const sampleId = sample.sample_item_id;
+      await rootState.api.httpClient.matchSampleCompute({ sampleId });
+    },
+    async matchSampleRematch({ rootState }, sample) {
+      const sampleId = sample.sample_item_id;
+      await rootState.api.httpClient.matchSampleRematch({ sampleId });
     },
 
     async copySample({ dispatch, rootState }, sampleItemCopyData) {

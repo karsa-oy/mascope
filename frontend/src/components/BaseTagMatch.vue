@@ -10,7 +10,7 @@
       multilined
     >
       <b-tag
-        v-if="!(matchScore === null)"
+        v-if="!(matchScore === null || isNaN(matchScore))"
         :icon="tag.icon"
         :class="tag.class"
         style="font-size: small"

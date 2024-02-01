@@ -1,17 +1,18 @@
 from fastapi import HTTPException
 from sqlalchemy import asc, desc, func, select, delete, and_
+from typing import List, Optional
 
 from backend.db_api_rest import async_session
 from ..models.models import Match
 
 
 async def get_matches(
-    sample_item_id: str,
-    target_isotope_id: str,
-    sort: str,
-    order: str,
-    page: int,
-    limit: int,
+    sample_item_id: Optional[str] = None,
+    target_isotope_id: Optional[str] = None,
+    sort: str = None,
+    order: str = None,
+    page: int = 0,
+    limit: int = 1000000,
 ):
     async with async_session() as session:
         stmt = select(Match)
@@ -58,11 +59,27 @@ async def get_match_by_id(match_id: str):
         return match.to_dict()
 
 
-async def delete_matches(sample_item_id: str):
+async def delete_matches(
+    sample_item_ids: List[str], target_isotope_ids: Optional[List[str]] = None
+):
+    """
+    Deletes matches for specified sample items, optionally filtered by target isotope IDs.
+
+    This function deletes matches for a list of sample item IDs. If target isotope IDs are provided,
+    only matches corresponding to these isotopes are deleted.
+
+    :param sample_item_ids: List of sample item IDs for which matches are to be deleted.
+    :type sample_item_ids: List[str]
+    :param target_isotope_ids: Optional list of target isotope IDs to filter matches, defaults to None
+    :type target_isotope_ids: Optional[List[str]], optional
+    """
     async with async_session() as session:
-        await session.execute(
-            delete(Match).where(Match.sample_item_id == sample_item_id)
-        )
+        query = delete(Match).where(Match.sample_item_id.in_(sample_item_ids))
+
+        if target_isotope_ids:
+            query = query.where(Match.target_isotope_id.in_(target_isotope_ids))
+
+        await session.execute(query)
         await session.commit()
 
 
