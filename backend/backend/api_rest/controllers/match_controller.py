@@ -392,7 +392,6 @@ async def filter_existing_sample_matches_and_interferences(
     try:
         # Step 1: Fetch existing matches and interferences for the given sample item.
         existing_matches = await get_matches(sample_item_id=sample_item_id)
-        existing_matches = await get_matches(sample_item_id=sample_item_id)
         existing_interferences = await get_match_interferences(
             sample_item_id=sample_item_id
         )
