@@ -212,14 +212,15 @@ export function createHttpClient(host, api_port) {
         console.error("Failed to import batch: ", error);
       }
     },
-    copySampleBatch: async (sampleBatchCopyData) => {
+    copySampleBatch: async ({ batchId, body }) => {
       try {
-        return await httpClient.post(
-          `${batchesBaseUrl}/copy`,
-          sampleBatchCopyData
-        );
+        return await httpClient.post(`${batchesBaseUrl}/${batchId}/copy`, body);
       } catch (error) {
-        console.error("Failed to copy sample batch: ", error);
+        // TODO_error_handling
+        const userErrorMessage =
+          error?.response?.data?.error ||
+          `Failed to copy sample batch: ${error}`;
+        throw new Error(userErrorMessage);
       }
     },
     batchExportPeakData: async (sampleBatchData) => {
@@ -368,14 +369,15 @@ export function createHttpClient(host, api_port) {
         console.error("Failed to delete sample item: ", error);
       }
     },
-    copySampleItem: async (sampleItemCopyData) => {
+    copySampleItem: async ({ sampleId, body }) => {
       try {
-        return await httpClient.post(
-          `${itemsBaseUrl}/copy`,
-          sampleItemCopyData
-        );
+        return await httpClient.post(`${itemsBaseUrl}/${sampleId}/copy`, body);
       } catch (error) {
-        console.error("Failed to copy sample item: ", error);
+        // TODO_error_handling
+        const userErrorMessage =
+          error?.response?.data?.error ||
+          `Failed to copy sample item: ${error}`;
+        throw new Error(userErrorMessage);
       }
     },
 

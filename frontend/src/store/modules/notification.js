@@ -315,7 +315,8 @@ export default {
         commit("SET_PROGRESS_STATE", { action: data.action, value: true });
         commit("SET_PROGRESS_ACTION_TYPE", data?.type || null);
         // set the error message and error flag
-        commit("SET_PROGRESS_MESSAGE", `${data.message}:  ${data.error}`);
+        commit("SET_PROGRESS_MESSAGE", `${data.message}`);
+        commit("SET_PROGRESS_PERCENTAGE", data.progress_percentage || 100);
         commit("SET_PROGRESS_ERROR", true);
       }
       // Set a timeout to deactivate the modal and reset the progress notification state

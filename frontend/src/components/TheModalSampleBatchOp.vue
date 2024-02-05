@@ -353,16 +353,16 @@ export default {
     },
     async copySampleBatch() {
       this.isCopying = true;
-      const sampleBatchCopyData = {
+      const batchCopyData = {
         // for http client
         sample_batch_id: this.batchActive.sample_batch_id,
+        workspace_id: this.workspaceSelected.workspace_id,
         sample_batch_name: this.newBatchName,
         sample_batch_description: this.newBatchDescription,
-        workspace_id: this.workspaceSelected.workspace_id,
         // for notification
         workspace_name: this.workspaceSelected.workspace_name,
       };
-      await this.copyBatch(sampleBatchCopyData);
+      await this.copyBatch(batchCopyData);
       this.isCopying = false;
       this.deactivateModal();
     },

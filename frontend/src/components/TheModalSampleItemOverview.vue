@@ -203,16 +203,16 @@ export default {
     },
     async copySampleItem() {
       this.isCopying = true;
-      const sampleItemCopyData = {
+      const sample = {
         // for http client
         sample_item_id: this.sampleItem.sample_item_id,
-        sample_item_name: this.newItemName,
         sample_batch_id: this.batchSelected.sample_batch_id,
+        sample_item_name: this.newItemName,
         // for notification
         sample_batch_name: this.batchSelected.sample_batch_name,
         workspace_name: this.workspaceSelected.workspace_name,
       };
-      await this.copySample(sampleItemCopyData);
+      await this.copySample(sample);
       this.isCopying = false;
       this.deactivateModal();
     },
