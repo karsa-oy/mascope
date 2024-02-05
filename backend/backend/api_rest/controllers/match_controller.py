@@ -613,7 +613,7 @@ async def match_sample_compute(
     :type independent_transaction: bool, optional
     :raises RuntimeError: Raised when no new target isotopes are available for match computation.
 
-    TODO: - optimize instrument/compute_sample_match notifications emits/listeners. item compoute for instrument usees (Scenthound), s
+    TODO: - optimize instrument/compute_sample_match notifications emits/listeners. item compute for instrument users (Scenthound)
           - sid can be passed to send the notifications for user who triggered computing (for example when copy the sample item)
     """
     try:
