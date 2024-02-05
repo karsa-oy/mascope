@@ -3,6 +3,7 @@ Match Controller
 
 This module contains all the functionalities and endpoints related to the matching/rematching processes and related operations. 
 """
+
 # -------------------------------------------------------------------
 # Imports
 # -------------------------------------------------------------------
@@ -31,8 +32,7 @@ from ..models.pydantic_models.match_pydantic_model import (
 from .instrument_functions_controller import (
     read_instrument_functions,
 )
-from .samples_controller import get_sample
-from .sample_items_controller import get_sample_items
+from .samples_controller import get_sample, get_samples
 from .matches_controller import get_matches, create_matches, delete_matches
 from .helpers_controller import emit_progress_update
 from .target_compounds_controller import get_target_compounds
@@ -190,16 +190,18 @@ async def compute_matches(
         ).apply(
             lambda ion_group: (
                 ion_group.assign(
-                    match_isotope_correlation=np.corrcoef(
-                        np.array(
-                            [
-                                peaks.sel(mz=peak_mz, method="nearest")
-                                for peak_mz in ion_group["sample_peak_mz"]
-                            ]
-                        )
-                    )[0, 1]
-                    if len(ion_group) > 1
-                    else 1
+                    match_isotope_correlation=(
+                        np.corrcoef(
+                            np.array(
+                                [
+                                    peaks.sel(mz=peak_mz, method="nearest")
+                                    for peak_mz in ion_group["sample_peak_mz"]
+                                ]
+                            )
+                        )[0, 1]
+                        if len(ion_group) > 1
+                        else 1
+                    )
                 )
             )
         )
@@ -612,6 +614,7 @@ async def match_sample_compute(
     :raises RuntimeError: Raised when no new target isotopes are available for match computation.
 
     TODO: - optimize instrument/compute_sample_match notifications emits/listeners. item compoute for instrument usees (Scenthound), s
+          - sid can be passed to send the notifications for user who triggered computing (for example when copy the sample item)
     """
     try:
         # Step 1: Gather sample information
@@ -849,8 +852,8 @@ async def rematch_batches(
 
     # Step 1: Gather data for each batch and set workspace_ids
     for sample_batch in sample_batches:
-        sample_items_info = await get_sample_items(
-            sample_batch_id=sample_batch.sample_batch_id
+        sample_items_info = await get_samples(
+            sample_batch_id=sample_batch.sample_batch_id, batch_matches_info=False
         )
         total_number_of_items += sample_items_info["results"]
         items_per_batch.append(sample_items_info["results"])
@@ -1066,7 +1069,9 @@ async def match_batch_remove(
         print(f"...Removing matches for batch: {sample_batch_id} ...")
 
         # Step 1: Retrieve all sample items associated with the sample batch.
-        sample_items_data = await get_sample_items(sample_batch_id=sample_batch_id)
+        sample_items_data = await get_samples(
+            sample_batch_id=sample_batch_id, batch_matches_info=False
+        )
         sample_item_ids = [
             sample_item["sample_item_id"] for sample_item in sample_items_data["data"]
         ]
