@@ -32,12 +32,11 @@ from ..models.models import (
 from ..models.pydantic_models.sample_batch_pydantic_model import (
     SampleBatchCreate,
     SampleBatchUpdate,
-    SampleBatchCopy,
+    SampleBatchCopyBody,
     SampleBatchExportPeaks,
 )
 from ..models.pydantic_models.sample_item_pydantic_model import (
     SampleItemCreate,
-    SampleItemCopy,
 )
 from ..models.pydantic_models.calibration_pydantic_model import CalibrationMzFitParams
 from ..models.pydantic_models.match_pydantic_model import (
@@ -45,12 +44,12 @@ from ..models.pydantic_models.match_pydantic_model import (
     RematchBatchesBody,
     ProgressProperties,
 )
-from ..models.exceptions import CustomException
 from .match_controller import rematch_batches
 from .sample_items_controller import create_sample_item, copy_sample_item
 from .calibration_controller import calibration_mz_calibrate_batch
 from .instrument_functions_controller import read_instrument_functions
 from .helpers_controller import emit_progress_update
+from ..exceptions import process_exception, ApiException, NotFoundException
 
 
 async def get_sample_batches(
@@ -662,39 +661,65 @@ async def process_batch(sample_batch, sample_items, params):
     return
 
 
-async def copy_sample_batch(sample_batch_copy: SampleBatchCopy, sid=None):
+async def copy_sample_batch(
+    sample_batch_id: str,
+    workspace_id: str,
+    sample_batch_name: str,
+    sample_batch_description: str,
+    sid=None,
+):
+    """
+    Copies a sample batch, including its associated sample items and target collections, into a specified workspace with a new name and description.
+    The function ensures all related entities like sample items and target collections are also copied over to maintain the integrity of the sample batch data.
+    Called as a background task from the endpoint, so it also handles sio notification and workspace reloading upon successful copying or if any errors occur.
+
+    Steps:
+    1. Validate the workspace into which the sample batch is being copied.
+    2. Fetch and validate the original sample batch from the database.
+    3. Create a new sample batch with updated information and copy all other data.
+    4. Copy TargetCollectionInSampleBatch records associated with the original sample batch.
+    5. Commit the new sample batch to the database.
+    6. Copy associated sample items from the original to the new sample batch.
+    7. Notify the workspace where the batch was copied and handle workspace reloading.
+
+    :param sample_batch_id: ID of the original sample batch to be copied.
+    :type sample_batch_id: str
+    :param workspace_id: ID of the workspace where the new sample batch will be placed.
+    :type workspace_id: str
+    :param sample_batch_name: Name for the new copied sample batch.
+    :type sample_batch_name: str
+    :param sample_batch_description: Description for the new copied sample batch.
+    :type sample_batch_description: str
+    :param sid: Session ID, used for emitting notifications to specific clients, defaults to None.
+    :type sid: _type_, optional
+    :raises NotFoundException: If the workspace or original sample batch is not found.
+    """
     try:
         async with async_session() as session:
-            # Check if the provided workspace_id exists
-            workspace = await session.get(Workspace, sample_batch_copy.workspace_id)
+            # Step 1: Validate the workspace into which the sample batch is being copied.
+            workspace = await session.get(Workspace, workspace_id)
 
             if not workspace:
-                error_message = (
-                    f"Workspace with ID {sample_batch_copy.workspace_id} not found"
-                )
-                print(error_message)
-                raise ValueError(error_message)
+                raise NotFoundException(f"Workspace with ID {workspace_id} not found")
 
-            # Fetch the original sample batch with related TargetCollectionInSampleBatch and SampleItem records
+            # Step 2: Fetch and validate the original sample batch from the database with related TargetCollectionInSampleBatch and SampleItem records
             stmt = (
                 select(SampleBatch)
                 .options(
                     joinedload(SampleBatch.target_collection),
                     joinedload(SampleBatch.sample_item),
                 )
-                .filter(
-                    SampleBatch.sample_batch_id == sample_batch_copy.sample_batch_id
-                )
+                .filter(SampleBatch.sample_batch_id == sample_batch_id)
             )
             result = await session.execute(stmt)
             original_sample_batch = result.scalars().first()
 
             if not original_sample_batch:
-                error_message = f"Sample batch with ID {sample_batch_copy.sample_batch_id} not found"
-                print(error_message)
-                raise ValueError(error_message)
+                raise NotFoundException(
+                    f"Sample batch with ID {sample_batch_id} not found"
+                )
 
-            # Create new sample batch record with a new ID, name, description, workspace and time of creation, but copy all other data
+            # Step 3: Create and add to session a new sample batch record with a new ID, name, description, workspace and time of creation, but copy all other data
             new_sample_batch_id = gen_id(16)
             new_sample_batch_data = {
                 c.name: getattr(original_sample_batch, c.name)
@@ -704,16 +729,16 @@ async def copy_sample_batch(sample_batch_copy: SampleBatchCopy, sid=None):
             new_sample_batch_data.update(
                 {
                     "sample_batch_id": new_sample_batch_id,
-                    "workspace_id": sample_batch_copy.workspace_id,
-                    "sample_batch_name": sample_batch_copy.sample_batch_name,
-                    "sample_batch_description": sample_batch_copy.sample_batch_description,
+                    "workspace_id": workspace_id,
+                    "sample_batch_name": sample_batch_name,
+                    "sample_batch_description": sample_batch_description,
                     "sample_batch_utc_created": datetime.utcnow(),
                 }
             )
             new_sample_batch = SampleBatch(**new_sample_batch_data)
             session.add(new_sample_batch)
 
-            # Copy TargetCollectionInSampleBatch records associated with the original sample batch
+            # Step 4: Copy TargetCollectionInSampleBatch records associated with the original sample batch
             for target_collection in original_sample_batch.target_collection:
                 new_target_collection_in_sample_batch = TargetCollectionInSampleBatch(
                     target_collection_id=target_collection.target_collection_id,
@@ -721,39 +746,37 @@ async def copy_sample_batch(sample_batch_copy: SampleBatchCopy, sid=None):
                 )
                 session.add(new_target_collection_in_sample_batch)
 
+            # Step 5: Commit the new sample batch to the database
             await session.commit()
 
-        # Copy sample items associated with the original sample batch
+        # Step 6: Copy sample items associated with the original sample batch
         for sample_item in original_sample_batch.sample_item:
-            sample_item_copy_data = SampleItemCopy(
+            await copy_sample_item(
                 sample_item_id=sample_item.sample_item_id,
                 sample_item_name=sample_item.sample_item_name,
                 sample_batch_id=new_sample_batch_id,
             )
-            await copy_sample_item(
-                sample_item_copy=sample_item_copy_data,
-            )
 
-        # Notify the workspace where the batch was copied to
+        # Step 7: Notify the workspace where the batch was copied and handle workspace reloading.
         success_payload = {
             "action": "copy",
             "type": "batch",
             "status": "success",
-            "message": f"Batch '{sample_batch_copy.sample_batch_name}' was successfully copied to '{workspace.workspace_name}'.",
+            "message": f"Batch '{sample_batch_name}' was successfully copied to '{workspace.workspace_name}'.",
             "progress_percentage": 100,
         }
 
         await sio.emit(
             "copy_finished",
             success_payload,
-            room=new_sample_batch.workspace_id,
+            room=workspace_id,
             namespace="/",
         )
 
         # If SID is provided and not part of the workspace where the batch was copied, notify SID
         if sid:
             sid_rooms = sio.rooms(sid, namespace="/")
-            if new_sample_batch.workspace_id not in sid_rooms:
+            if workspace_id not in sid_rooms:
                 await sio.emit(
                     "copy_finished", success_payload, room=sid, namespace="/"
                 )
@@ -761,31 +784,36 @@ async def copy_sample_batch(sample_batch_copy: SampleBatchCopy, sid=None):
         # Reload the workspace where the batch was copied to
         await sio.emit(
             "workspace_reload",
-            room=new_sample_batch.workspace_id,
+            room=workspace_id,
             namespace="/",
         )
 
+    # TODO_error_handling for background tasks we emit the sio with payload similar to http response structure
     except Exception as e:
-        error_message = None
-        user_error_message = None
-        if isinstance(e, CustomException):
-            error_message = e.tech_message
-            user_error_message = e.user_message
-        else:
-            error_message = str(e)
+        context_message = f"Failed to copy the sample batch '{sample_batch_name}'"
+        api_exc = process_exception(e, context_message)
+        user_error_message = api_exc.user_message
+        detail = api_exc.tech_message
 
         error_payload = {
             "action": "copy",
             "type": "batch",
-            "status": "success",
-            "message": f"Coping batch '{sample_batch_copy.sample_batch_name}' failed.",
+            "status": "error",
+            "message": user_error_message,  # should be "error" as in http responses
+            "error": detail,  # should be "detail" as in http responses
             "progress_percentage": 100,
         }
 
         if sid:
             await sio.emit("copy_finished", error_payload, room=sid, namespace="/")
 
-    return new_sample_batch
+        # Reload the workspace where the batch was copied to if
+        if workspace:
+            await sio.emit(
+                "workspace_reload",
+                room=workspace.workspace_id,
+                namespace="/",
+            )
 
 
 async def sample_batch_export_peaks(sample_batch: SampleBatchExportPeaks, sid=None):
