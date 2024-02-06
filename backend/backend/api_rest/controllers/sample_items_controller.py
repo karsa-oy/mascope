@@ -1,6 +1,5 @@
-import re
-from fastapi import HTTPException, status
-from sqlalchemy import asc, desc, func, and_
+from fastapi import HTTPException, status, BackgroundTasks
+from sqlalchemy import asc, desc, func
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
 from datetime import datetime
@@ -12,16 +11,17 @@ from backend.db.id import gen_id
 from ..models.models import (
     SampleFile,
     SampleItem,
+    SampleBatch,
     Match,
     MatchInterference,
-    MatchRating,
 )
 from ..models.pydantic_models.sample_item_pydantic_model import (
     SampleItemCreate,
     SampleItemUpdate,
-    SampleItemCopy,
 )
-from ..models.exceptions import CustomException
+from ..exceptions import process_exception, ApiException, NotFoundException
+
+from ..controllers.match_controller import match_sample_compute
 
 
 async def get_sample_items(
@@ -162,33 +162,84 @@ async def update_sample_item(sample_item_id: str, sample_item: SampleItemUpdate)
         return db_sample_item
 
 
-async def copy_sample_item(sample_item_copy: SampleItemCopy, http_call=False):
+async def copy_sample_item(
+    sample_item_id: str,
+    sample_batch_id: str,
+    sample_item_name: str,
+    independent_transaction: bool = False,
+    background_tasks: BackgroundTasks = None,
+    sid=None,
+) -> SampleItem:
+    """
+    Copies a sample item to a new sample batch with a new name. May me independent operation or a part of the copy sample batch operation.
+    The function duplicates the specified sample item and associates the new copy with a specified sample batch.
+    Copies matches, match interferences of the original sample if part of a larger copy batch operation, since targets and ionization mechanisms are the same for original batch and new batch.
+    Computes matches if it's an independent operation, since the targets and ionization mechanisms may differ between original batch and new batch.
+
+
+    Steps:
+    1. Validate the batch into which the sample is being copied.
+    2. Fetch and validate the original sample item from the database.
+    3. Create and add to session a new sample item with updated information.
+    4. Copy match and match interference records when called as part of copy_sample_batch.
+    5. Commit the transaction to the database.
+    6. Emit success notification to user if called independently.
+    7. Create task to compute the sample match data when called independently.
+
+    :param sample_item_id: ID of the original sample item to be copied.
+    :type sample_item_id: str
+    :param sample_batch_id: ID of the sample batch where the new item will be placed.
+    :type sample_batch_id: str
+    :param sample_item_name: Name for the new copied sample item.
+    :type sample_item_name: str
+    :param independent_transaction: Indicates if this operation is part of a larger transaction or standalone, defaults to False
+    :type independent_transaction: bool, optional
+    :param background_tasks: FastAPI background tasks for computing matches post-copy, defaults to None
+    :type background_tasks: BackgroundTasks, optional
+    :param sid: Session ID, used for emitting notifications to specific clients, defaults to None
+    :type sid: str, optional
+    :raises HTTPException: If the original sample item is not found.
+    :raises ValueError: For other validation or processing errors.
+    :return: The newly created sample item instance.
+    :rtype: SampleItem
+    """
     try:
         async with async_session() as session:
-            # Fetch the original sample_item along with related Match, MatchInterference, and MatchRating records
+
+            # Step 1: Validate the batch into which the sample is being copied.
+            batch = await session.get(SampleBatch, sample_batch_id)
+
+            if not batch:
+                raise NotFoundException(
+                    f"Sample batch with ID {sample_batch_id} not found"
+                )
+
+            # Step 2: Fetch and validate the original sample item along with related Match and MatchInterference records
             stmt = (
                 select(SampleItem)
                 .options(
                     joinedload(SampleItem.match),
                     joinedload(SampleItem.match_interference),
-                    joinedload(SampleItem.match_rating),
                 )
-                .filter(SampleItem.sample_item_id == sample_item_copy.sample_item_id)
+                .filter(SampleItem.sample_item_id == sample_item_id)
             )
             result = await session.execute(stmt)
             original_sample_item = result.scalars().first()
 
             if not original_sample_item:
                 error_message = "Sample item not found"
-                if http_call:
+                tech_message = (
+                    f"{error_message}: wrong sample_item_id: {sample_item_id}"
+                )
+                if independent_transaction:
                     raise HTTPException(
                         status_code=status.HTTP_404_NOT_FOUND,
                         detail=error_message,
                     )
                 else:
-                    raise ValueError(error_message)
+                    raise ValueError(tech_message)
 
-            # Create a new sample_item with a new ID, name, batch and time of creation, but copy all other data
+            # Step 3: Create and add to session the new sample item with a new ID, name, batch and time of creation, but copy all other data
             new_sample_item_id = gen_id()
             new_sample_item_data = {
                 c.name: getattr(original_sample_item, c.name)
@@ -198,77 +249,82 @@ async def copy_sample_item(sample_item_copy: SampleItemCopy, http_call=False):
             new_sample_item_data.update(
                 {
                     "sample_item_id": new_sample_item_id,
-                    "sample_batch_id": sample_item_copy.sample_batch_id,
-                    "sample_item_name": sample_item_copy.sample_item_name,
+                    "sample_batch_id": sample_batch_id,
+                    "sample_item_name": sample_item_name,
                     "sample_item_utc_created": datetime.utcnow(),
                 }
             )
             new_sample_item = SampleItem(**new_sample_item_data)
             session.add(new_sample_item)
 
-            # Copy related Match records
-            for match in original_sample_item.match:
-                new_match_data = {
-                    c.name: getattr(match, c.name)
-                    for c in Match.__table__.columns
-                    if c.name != "match_id"
-                }
-                new_match_data.update(
-                    {"match_id": gen_id(32), "sample_item_id": new_sample_item_id}
-                )
-                new_match = Match(**new_match_data)
-                session.add(new_match)
-
-            # Copy related MatchInterference records
-            for match_interference in original_sample_item.match_interference:
-                new_match_interference_data = {
-                    c.name: getattr(match_interference, c.name)
-                    for c in MatchInterference.__table__.columns
-                    if c.name != "match_interference_id"
-                }
-                new_match_interference_data.update(
-                    {
-                        "match_interference_id": gen_id(32),
-                        "sample_item_id": new_sample_item_id,
+            # Steps 4: Copy Match and MatchInterference records when called as part of copy_sample_batch
+            if not independent_transaction and not background_tasks:
+                # Copy related Match records
+                for match in original_sample_item.match:
+                    new_match_data = {
+                        c.name: getattr(match, c.name)
+                        for c in Match.__table__.columns
+                        if c.name != "match_id"
                     }
-                )
-                new_match_interference = MatchInterference(
-                    **new_match_interference_data
-                )
-                session.add(new_match_interference)
+                    new_match_data.update(
+                        {"match_id": gen_id(32), "sample_item_id": new_sample_item_id}
+                    )
+                    new_match = Match(**new_match_data)
+                    session.add(new_match)
 
-            # Copy related MatchRating records
-            for match_rating in original_sample_item.match_rating:
-                new_match_rating_data = {
-                    c.name: getattr(match_rating, c.name)
-                    for c in MatchRating.__table__.columns
-                    if c.name != "match_rating_id"
-                }
-                new_match_rating_data.update(
-                    {
-                        "match_rating_id": gen_id(32),
-                        "sample_item_id": new_sample_item_id,
+                # Copy related MatchInterference records
+                for match_interference in original_sample_item.match_interference:
+                    new_match_interference_data = {
+                        c.name: getattr(match_interference, c.name)
+                        for c in MatchInterference.__table__.columns
+                        if c.name != "match_interference_id"
                     }
-                )
-                new_match_rating = MatchRating(**new_match_rating_data)
-                session.add(new_match_rating)
+                    new_match_interference_data.update(
+                        {
+                            "match_interference_id": gen_id(32),
+                            "sample_item_id": new_sample_item_id,
+                        }
+                    )
+                    new_match_interference = MatchInterference(
+                        **new_match_interference_data
+                    )
+                    session.add(new_match_interference)
 
+            # Step 5: Commit the transaction
             await session.commit()
 
-            if http_call:
-                # Reload affected sample batch
-                await sio.emit(
-                    "sample_batch_reload",
-                    room=sample_item_copy.sample_batch_id,
-                    namespace="/",
-                )
+        # Step 6: Emit success notification to user if called independently
+        if independent_transaction and sid:
+            success_payload = {
+                "action": "copy",
+                "type": "sample",
+                "status": "success",
+                "message": f"Sample '{sample_item_name}' was successfully copied to '{batch.sample_batch_name}'.",
+                "progress_percentage": 100,
+            }
 
+            await sio.emit(
+                "copy_finished",
+                success_payload,
+                room=sid,
+                namespace="/",
+            )
+
+        # Step 7: Create task to compute the sample match data when called independently.
+        if independent_transaction and background_tasks:
+            background_tasks.add_task(
+                match_sample_compute,
+                sample_item_id=new_sample_item_id,
+                added_target_compound_ids=None,
+                added_ionization_mechanism_ids=None,
+                independent_transaction=independent_transaction,
+            )
+
+        return new_sample_item
+    # TODO_error_handling raise the ApiException that will be handled in copy sample endpoint or in copy batch operation
     except Exception as e:
-        error_message = str(e)
-        user_message = "Failed to copy the sample item."
-        if http_call:
-            raise CustomException(user_message, error_message) from e
-        else:
-            raise ValueError(f"{user_message}: {error_message}") from e
-
-    return new_sample_item
+        context_message = f"Failed to copy the sample item '{sample_item_name}'"
+        api_exc = process_exception(e, context_message)
+        raise ApiException(
+            api_exc.user_message, api_exc.tech_message, api_exc.status_code
+        )

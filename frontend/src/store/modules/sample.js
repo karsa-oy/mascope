@@ -133,14 +133,22 @@ export default {
       await rootState.api.httpClient.matchSampleRematch({ sampleId });
     },
 
-    async copySample({ dispatch, rootState }, sampleItemCopyData) {
+    async copySample({ dispatch, rootState }, sample) {
+      const sampleId = sample.sample_item_id;
+      const body = {
+        sample_batch_id: sample.sample_batch_id,
+        sample_item_name: sample.sample_item_name,
+      };
       return await handleApiRequest({
         dispatch,
         rootState,
         httpMethod: "copySampleItem",
-        requestData: sampleItemCopyData,
-        successMessage: `Sample "${sampleItemCopyData.sample_item_name}" was successfully copied to the "${sampleItemCopyData.workspace_name}/${sampleItemCopyData.sample_batch_name}".`,
-        errorMessage: `Failed to copy sample "${sampleItemCopyData.sample_item_name}".`,
+        requestData: { sampleId, body },
+        progressNotificationPayload: {
+          action: "copy",
+          type: "sample",
+          message: `Copying sample "${body.sample_item_name}" to "${body.workspace_name}/${body.sample_batch_name}", please wait`,
+        },
       });
     },
 
