@@ -44,50 +44,15 @@ export default {
         },
         {
           disabled: this.allButtonsDisabled,
-          icon: "file-plus",
-          label: "Sample management",
-          path: "/sample-management",
-          visible: false, //this.workspaceActive,
-        },
-        {
-          disabled: this.allButtonsDisabled,
-          icon: "format-horizontal-align-center",
-          label: "m/z calibration",
-          path: "/mz-calibration",
-          visible: false, //this.workspaceActive,
-        },
-        {
-          disabled: this.allButtonsDisabled,
           icon: "chart-scatter-plot",
           label: "Batch overview",
           path: "/batch-overview",
           visible: this.batchActive,
         },
-        {
-          disabled: this.allButtonsDisabled,
-          icon: "sine-wave",
-          label: "Sample signal",
-          path: "/sample-signal",
-          visible: false, //this.workspaceActive,
-        },
-        {
-          disabled: this.allButtonsDisabled,
-          icon: "table-multiple",
-          label: "Data management",
-          path: "/data-management",
-          visible: false, //this.workspaceActive,
-        },
       ].filter((b) => b.visible);
     },
     footerButtons() {
       return [
-        {
-          disabled: this.allButtonsDisabled,
-          icon: "tune",
-          label: "Settings",
-          path: "/settings",
-          visible: false,
-        },
         {
           disabled: this.allButtonsDisabled,
           icon: "logout-variant",

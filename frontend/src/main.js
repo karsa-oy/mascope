@@ -21,9 +21,6 @@ import VueRouter from "vue-router";
 
 import ThePageHome from "./components/ThePageHome.vue";
 import ThePageBatchOverview from "./components/ThePageBatchOverview.vue";
-//import ThePageSampleSignal from "./components/ThePageSampleSignal.vue";
-import ThePageSampleManagement from "./components/ThePageSampleManagement.vue";
-//import ThePageSettings from "./components/ThePageSettings.vue";
 import ThePageScenthound from "./components/ThePageScenthound.vue";
 
 Vue.use(VueRouter);
@@ -38,23 +35,10 @@ const router = new VueRouter({
     {
       path: "/batch-overview",
       component: ThePageBatchOverview,
-      //  }, {
-      //    path: '/sample-signal',
-      //    component: ThePageSampleSignal
-    },
-    {
-      path: "/sample-management",
-      component: ThePageSampleManagement,
-      //  }, {
-      //    path: '/settings',
-      //    component: ThePageSettings
     },
     {
       path: "/scenthound",
       component: ThePageScenthound,
-      //  }, {
-      //    path: "*",
-      //    redirect: '/'
     },
   ],
 });
