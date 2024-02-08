@@ -63,12 +63,14 @@ export async function handleApiRequest({
     }
     return response;
   } catch (error) {
+    // TODO_error_handling
     console.error(`Failed to process ${httpMethod}.`, error);
+    const userErrorMessage = `${errorMessage}. ${error}`;
     dispatch(
       "notification/showGeneralNotification",
       {
         notification: "error",
-        message: errorMessage,
+        message: userErrorMessage,
       },
       { root: true }
     );

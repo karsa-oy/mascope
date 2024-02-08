@@ -1,5 +1,5 @@
-from fastapi import APIRouter, BackgroundTasks, Request, Query, Body
-from typing import List
+from fastapi import APIRouter, BackgroundTasks, Request
+from fastapi.responses import JSONResponse
 
 from ..controllers.sample_batches_controller import (
     get_sample_batches,
@@ -17,9 +17,10 @@ from ..models.pydantic_models.sample_batch_pydantic_model import (
     SampleBatchCreate,
     SampleBatchUpdate,
     autoSamplerImportBatchData,
-    SampleBatchCopy,
+    SampleBatchCopyBody,
     SampleBatchExportPeaks,
 )
+from ..exceptions import ApiException
 
 sample_batches_router = APIRouter()
 
@@ -85,17 +86,35 @@ async def autosampler_import_batch_route(
     )
 
 
-@sample_batches_router.post("/api/sample_batches/copy")
+@sample_batches_router.post("/api/sample_batches/{sample_batch_id}/copy")
 async def copy_sample_batch_route(
     request: Request,
-    sample_batch_copy: SampleBatchCopy,
+    sample_batch_id: str,
+    body: SampleBatchCopyBody,
     background_tasks: BackgroundTasks,
 ):
-    sid = request.headers.get("X-SID")
-    background_tasks.add_task(copy_sample_batch, sample_batch_copy, sid)
-    return {
-        "status": f"The copying process for '{sample_batch_copy.sample_batch_name}' has started"
-    }
+    try:
+        sid = request.headers.get("X-SID")
+        background_tasks.add_task(
+            copy_sample_batch,
+            sample_batch_id,
+            body.workspace_id,
+            body.sample_batch_name,
+            body.sample_batch_description,
+            sid,
+        )
+        return JSONResponse(
+            status_code=200,
+            content={
+                "message": f"The copying process for '{body.sample_batch_name}' has started",
+            },
+        )
+    # TODO_error_handling
+    except ApiException as e:
+        return JSONResponse(
+            status_code=e.status_code,
+            content={"error": e.user_message, "detail": e.tech_message},
+        )
 
 
 @sample_batches_router.post("/api/sample_batches/export_peaks")

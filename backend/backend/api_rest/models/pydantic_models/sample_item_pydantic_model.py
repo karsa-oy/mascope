@@ -39,9 +39,12 @@ class SampleItemInDB(SampleItemBase):
         }
 
 
-class SampleItemCopy(BaseModel):
-    sample_item_id: str = Field(..., description="ID of the copied sample item")
-    sample_item_name: str = Field(..., description="Name of the new sample item")
+class SampleItemCopyBody(BaseModel):
     sample_batch_id: str = Field(
-        ..., description="ID of the sample batch where the sample item will be copied"
+        ..., description="ID of the sample batch where to copy sample item"
+    )
+    sample_item_name: str = Field(..., description="Name of the new sample item")
+    independent_transaction: Optional[bool] = Field(
+        default=True,
+        description="Flag indicating whether the sample item copy is an independent transaction and if the operation should emit a reload event for the sample batch and if the sample should be rematched for new batch targets.",
     )

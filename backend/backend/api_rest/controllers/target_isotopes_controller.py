@@ -164,8 +164,8 @@ async def get_target_isotopes_for_match_compute(
     added_ionization_mechanism_ids: Optional[List[str]],
 ) -> Tuple[List[dict], str]:
     """
-    Retrieves a list of unique target isotope IDs that are affected by the addition of specific compounds or
-    ionization mechanisms to a sample batch. Adds a description of applied filters.
+    Retrieves a list of unique target isotope IDs that are associated with specific added compounds or
+    ionization mechanisms and sample batch target compounds. Adds a description of applied filters.
     This function helps in identifying the isotopes that require new matches computation after the update in batch composition.
 
     Steps:
@@ -233,7 +233,7 @@ async def get_target_isotopes_for_match_remove(
 ) -> Tuple[List[str], str]:
     """
 
-    Retrieves a list of unique target isotope IDs that are affected by the removal of specific compounds or
+    Retrieves a list of unique target isotope IDs that are associated with specific added compounds or
     ionization mechanisms. Get ALL the assosiated isotopes, not filtering by sample_batch_id.
     This function aids in identifying the isotopes that should no longer have matches associated with them
     after the update in the batch composition. Adds a description of applied filters.

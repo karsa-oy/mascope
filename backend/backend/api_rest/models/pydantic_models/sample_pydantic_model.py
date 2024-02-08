@@ -80,7 +80,7 @@ class GetSamplesBody(AlarmsList):
     order: Optional[str] = None
     page: Optional[int] = 0
     limit: Optional[int] = 10000
-    batch_matches_info: Optional[bool] = False
+    batch_matches_info: Optional[bool] = True
     match_samples: Optional[bool] = True
     match_compounds: Optional[bool] = True
     match_ions: Optional[bool] = True
