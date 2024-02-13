@@ -50,8 +50,7 @@ class autoSamplerImportBatchData(BaseModel):
     params: CalibrationMzFitParams = CalibrationMzFitParams()
 
 
-class SampleBatchCopy(BaseModel):
-    sample_batch_id: str = Field(..., description="ID of the sample batch to be copied")
+class SampleBatchCopyBody(BaseModel):
     workspace_id: str = Field(
         ..., description="ID of the workspace where to copy the batch"
     )

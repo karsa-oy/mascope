@@ -1,13 +1,31 @@
 import argparse
 import asyncio
 import os
+import re
 import shutil
+import socketio
+import yaml
+
 from multiprocessing import Event
 from queue import Empty
 
-import socketio
 from hardware.tofwerk.tof_streamer import TofDaqStreamer
-from service.lib.util import load_env_yaml
+
+
+def load_env_yaml(yaml_file):
+    env_pattern = re.compile(r".*?\${(.*?)}.*?")
+
+    def env_constructor(loader, node):
+        value = loader.construct_scalar(node)
+        for group in env_pattern.findall(value):
+            value = value.replace(f"${{{group}}}", os.environ.get(group))
+        return value
+
+    yaml.add_implicit_resolver("!pathex", env_pattern)
+    yaml.add_constructor("!pathex", env_constructor)
+    with open(yaml_file, "r") as f:
+        res = yaml.load(f.read(), Loader=yaml.FullLoader)
+    return res
 
 
 def parse_cmd_args():

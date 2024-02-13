@@ -250,17 +250,22 @@ export default {
         },
       });
     },
-
-    async copyBatch({ dispatch, rootState }, sampleBatchCopyData) {
+    async copyBatch({ dispatch, rootState }, batchCopyData) {
+      const batchId = batchCopyData.sample_batch_id;
+      const body = {
+        workspace_id: batchCopyData.workspace_id,
+        sample_batch_name: batchCopyData.sample_batch_name,
+        sample_batch_description: batchCopyData.sample_batch_description,
+      };
       return await handleApiRequest({
         dispatch,
         rootState,
         httpMethod: "copySampleBatch",
-        requestData: sampleBatchCopyData,
+        requestData: { batchId, body },
         progressNotificationPayload: {
           action: "copy",
           type: "batch",
-          message: `Copying batch "${sampleBatchCopyData.sample_batch_name}" to the workspace "${sampleBatchCopyData.workspace_name}", please wait`,
+          message: `Copying batch "${batchCopyData.sample_batch_name}" to the workspace "${batchCopyData.workspace_name}", please wait`,
         },
       });
     },

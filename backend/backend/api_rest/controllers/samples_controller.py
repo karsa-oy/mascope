@@ -535,7 +535,7 @@ async def get_samples(
     match_isotopes: bool = False,
     alarms_list: List[str] = None,
 ):
-    message = ""
+    message = "Samples with no match info"
     async with async_session() as session:
         stmt = select(Sample)
 
@@ -595,7 +595,7 @@ async def get_samples(
         else:
             samples_df["selection"] = 0
 
-        if sample_batch_id:
+        if sample_batch_id and batch_matches_info:
             # Calculate and add fields match_score, sample_peak_area_sum, sample_peak_interference_sum, matched
             batch_match_filter_result = await init_batch_match_filter(sample_batch_id)
 

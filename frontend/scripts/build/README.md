@@ -1,14 +1,29 @@
-### Build production version of mascope frontend
+## Build production version of Mascope frontend
 
-#### Get build environment ready:
+**NOTE: The preferable method to deploy Mascope is to install it as a bundle package. Refer to the README under `/scripts` in the monorepo root.**
 
-- .env contains frontend parameters
+```
+build
+├───setup        # Configurations
+│   ├───nginx       # Nginx configurations
+│   ├───.env        # Environment variable configuration
+│   └───setup.sh    # Shell script to install Mascope backend
+└───build.cmd    # Build script
+```
 
-#### Build mascope frontend:
+### Configure the production environment
 
-- build is done on Windows host with dev.environment installed;
-- run build.cmd; resulting tar archive contains frontend package;
+The build environment must be configured according to the specifics of the deployment target.
 
-#### Deploy mascope frontend:
+- `.env` contains frontend parameters
 
-- untar the tar archive and run setup.sh
+### Build Mascope frontend
+
+- Build is done on Windows host with development environment installed.
+- Run `build.cmd`, the resulting tar archive contains the frontend package.
+
+**NOTE: In order to be able to run the build script, one must have added `/Git/usr/bin` to the Windows environment variable `PATH`.**
+
+### Deploy Mascope frontend
+
+- Untar the tar archive and run `setup.sh`.

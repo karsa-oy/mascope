@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>backend.api_rest.routes.sample_batches_routes &#8212; Mascope  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=d1102ebc" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/alabaster.css?v=12dfc556" />
+    <script src="../../../../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../../../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for backend.api_rest.routes.sample_batches_routes</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">fastapi</span> <span class="kn">import</span> <span class="n">APIRouter</span><span class="p">,</span> <span class="n">BackgroundTasks</span><span class="p">,</span> <span class="n">Request</span><span class="p">,</span> <span class="n">Query</span><span class="p">,</span> <span class="n">Body</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span>
+
+<span class="kn">from</span> <span class="nn">..controllers.sample_batches_controller</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">get_sample_batches</span><span class="p">,</span>
+    <span class="n">get_sample_batch</span><span class="p">,</span>
+    <span class="n">get_batch_targets</span><span class="p">,</span>
+    <span class="n">create_sample_batch</span><span class="p">,</span>
+    <span class="n">delete_sample_batch</span><span class="p">,</span>
+    <span class="n">update_sample_batch</span><span class="p">,</span>
+    <span class="n">autosampler_import_batch</span><span class="p">,</span>
+    <span class="n">copy_sample_batch</span><span class="p">,</span>
+    <span class="n">sample_batch_export_peaks</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span> <span class="nn">..models.pydantic_models.sample_pydantic_model</span> <span class="kn">import</span> <span class="n">AlarmsList</span>
+<span class="kn">from</span> <span class="nn">..models.pydantic_models.sample_batch_pydantic_model</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">SampleBatchCreate</span><span class="p">,</span>
+    <span class="n">SampleBatchUpdate</span><span class="p">,</span>
+    <span class="n">autoSamplerImportBatchData</span><span class="p">,</span>
+    <span class="n">SampleBatchCopy</span><span class="p">,</span>
+    <span class="n">SampleBatchExportPeaks</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">sample_batches_router</span> <span class="o">=</span> <span class="n">APIRouter</span><span class="p">()</span>
+
+
+<div class="viewcode-block" id="get_sample_batches_route">
+<a class="viewcode-back" href="../../../../backend.api_rest.routes.html#backend.api_rest.routes.sample_batches_routes.get_sample_batches_route">[docs]</a>
+<span class="nd">@sample_batches_router</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;/api/sample_batches&quot;</span><span class="p">)</span>
+<span class="k">async</span> <span class="k">def</span> <span class="nf">get_sample_batches_route</span><span class="p">(</span>
+    <span class="n">workspace_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">sort</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">order</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">page</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="n">limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">100</span><span class="p">,</span>
+<span class="p">):</span>
+    <span class="k">return</span> <span class="k">await</span> <span class="n">get_sample_batches</span><span class="p">(</span><span class="n">workspace_id</span><span class="p">,</span> <span class="n">sort</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">page</span><span class="p">,</span> <span class="n">limit</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="get_sample_batch_route">
+<a class="viewcode-back" href="../../../../backend.api_rest.routes.html#backend.api_rest.routes.sample_batches_routes.get_sample_batch_route">[docs]</a>
+<span class="nd">@sample_batches_router</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;/api/sample_batches/</span><span class="si">{sample_batch_id}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="k">async</span> <span class="k">def</span> <span class="nf">get_sample_batch_route</span><span class="p">(</span>
+    <span class="n">sample_batch_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+<span class="p">):</span>
+    <span class="k">return</span> <span class="k">await</span> <span class="n">get_sample_batch</span><span class="p">(</span><span class="n">sample_batch_id</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="get_batch_targets_route">
+<a class="viewcode-back" href="../../../../backend.api_rest.routes.html#backend.api_rest.routes.sample_batches_routes.get_batch_targets_route">[docs]</a>
+<span class="nd">@sample_batches_router</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="s2">&quot;/api/sample_batches/</span><span class="si">{sample_batch_id}</span><span class="s2">/targets&quot;</span><span class="p">)</span>
+<span class="k">async</span> <span class="k">def</span> <span class="nf">get_batch_targets_route</span><span class="p">(</span><span class="n">sample_batch_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">body</span><span class="p">:</span> <span class="n">AlarmsList</span><span class="p">):</span>
+    <span class="k">return</span> <span class="k">await</span> <span class="n">get_batch_targets</span><span class="p">(</span>
+        <span class="n">sample_batch_id</span><span class="p">,</span>
+        <span class="n">body</span><span class="o">.</span><span class="n">alarms_list</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="create_sample_batch_route">
+<a class="viewcode-back" href="../../../../backend.api_rest.routes.html#backend.api_rest.routes.sample_batches_routes.create_sample_batch_route">[docs]</a>
+<span class="nd">@sample_batches_router</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="s2">&quot;/api/sample_batches&quot;</span><span class="p">)</span>
+<span class="k">async</span> <span class="k">def</span> <span class="nf">create_sample_batch_route</span><span class="p">(</span><span class="n">sample_batch</span><span class="p">:</span> <span class="n">SampleBatchCreate</span><span class="p">):</span>
+    <span class="k">return</span> <span class="k">await</span> <span class="n">create_sample_batch</span><span class="p">(</span><span class="n">sample_batch</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="delete_sample_batch_route">
+<a class="viewcode-back" href="../../../../backend.api_rest.routes.html#backend.api_rest.routes.sample_batches_routes.delete_sample_batch_route">[docs]</a>
+<span class="nd">@sample_batches_router</span><span class="o">.</span><span class="n">delete</span><span class="p">(</span><span class="s2">&quot;/api/sample_batches/</span><span class="si">{sample_batch_id}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="k">async</span> <span class="k">def</span> <span class="nf">delete_sample_batch_route</span><span class="p">(</span>
+    <span class="n">request</span><span class="p">:</span> <span class="n">Request</span><span class="p">,</span>
+    <span class="n">sample_batch_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">background_tasks</span><span class="p">:</span> <span class="n">BackgroundTasks</span><span class="p">,</span>
+<span class="p">):</span>
+    <span class="n">sid</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;X-SID&quot;</span><span class="p">)</span>
+    <span class="n">background_tasks</span><span class="o">.</span><span class="n">add_task</span><span class="p">(</span><span class="n">delete_sample_batch</span><span class="p">,</span> <span class="n">sample_batch_id</span><span class="p">,</span> <span class="n">sid</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;status&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;The sample batch (ID &#39;</span><span class="si">{</span><span class="n">sample_batch_id</span><span class="si">}</span><span class="s2">&#39;) deletion has started&quot;</span><span class="p">}</span></div>
+
+
+
+<div class="viewcode-block" id="update_sample_batch_route">
+<a class="viewcode-back" href="../../../../backend.api_rest.routes.html#backend.api_rest.routes.sample_batches_routes.update_sample_batch_route">[docs]</a>
+<span class="nd">@sample_batches_router</span><span class="o">.</span><span class="n">patch</span><span class="p">(</span><span class="s2">&quot;/api/sample_batches/</span><span class="si">{sample_batch_id}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="k">async</span> <span class="k">def</span> <span class="nf">update_sample_batch_route</span><span class="p">(</span>
+    <span class="n">sample_batch_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">sample_batch</span><span class="p">:</span> <span class="n">SampleBatchUpdate</span><span class="p">,</span>
+    <span class="n">background_tasks</span><span class="p">:</span> <span class="n">BackgroundTasks</span><span class="p">,</span>
+<span class="p">):</span>
+    <span class="k">return</span> <span class="k">await</span> <span class="n">update_sample_batch</span><span class="p">(</span><span class="n">sample_batch_id</span><span class="p">,</span> <span class="n">sample_batch</span><span class="p">,</span> <span class="n">background_tasks</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="autosampler_import_batch_route">
+<a class="viewcode-back" href="../../../../backend.api_rest.routes.html#backend.api_rest.routes.sample_batches_routes.autosampler_import_batch_route">[docs]</a>
+<span class="nd">@sample_batches_router</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="s2">&quot;/api/sample_batches/import_batch&quot;</span><span class="p">)</span>
+<span class="k">async</span> <span class="k">def</span> <span class="nf">autosampler_import_batch_route</span><span class="p">(</span>
+    <span class="n">data</span><span class="p">:</span> <span class="n">autoSamplerImportBatchData</span><span class="p">,</span>
+    <span class="n">background_tasks</span><span class="p">:</span> <span class="n">BackgroundTasks</span><span class="p">,</span>
+<span class="p">):</span>
+    <span class="k">return</span> <span class="k">await</span> <span class="n">autosampler_import_batch</span><span class="p">(</span>
+        <span class="n">data</span><span class="o">.</span><span class="n">sample_batch</span><span class="p">,</span> <span class="n">data</span><span class="o">.</span><span class="n">sample_items</span><span class="p">,</span> <span class="n">data</span><span class="o">.</span><span class="n">params</span><span class="p">,</span> <span class="n">background_tasks</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="copy_sample_batch_route">
+<a class="viewcode-back" href="../../../../backend.api_rest.routes.html#backend.api_rest.routes.sample_batches_routes.copy_sample_batch_route">[docs]</a>
+<span class="nd">@sample_batches_router</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="s2">&quot;/api/sample_batches/copy&quot;</span><span class="p">)</span>
+<span class="k">async</span> <span class="k">def</span> <span class="nf">copy_sample_batch_route</span><span class="p">(</span>
+    <span class="n">request</span><span class="p">:</span> <span class="n">Request</span><span class="p">,</span>
+    <span class="n">sample_batch_copy</span><span class="p">:</span> <span class="n">SampleBatchCopy</span><span class="p">,</span>
+    <span class="n">background_tasks</span><span class="p">:</span> <span class="n">BackgroundTasks</span><span class="p">,</span>
+<span class="p">):</span>
+    <span class="n">sid</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;X-SID&quot;</span><span class="p">)</span>
+    <span class="n">background_tasks</span><span class="o">.</span><span class="n">add_task</span><span class="p">(</span><span class="n">copy_sample_batch</span><span class="p">,</span> <span class="n">sample_batch_copy</span><span class="p">,</span> <span class="n">sid</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">&quot;status&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;The copying process for &#39;</span><span class="si">{</span><span class="n">sample_batch_copy</span><span class="o">.</span><span class="n">sample_batch_name</span><span class="si">}</span><span class="s2">&#39; has started&quot;</span>
+    <span class="p">}</span></div>
+
+
+
+<div class="viewcode-block" id="sample_batch_export_peaks_route">
+<a class="viewcode-back" href="../../../../backend.api_rest.routes.html#backend.api_rest.routes.sample_batches_routes.sample_batch_export_peaks_route">[docs]</a>
+<span class="nd">@sample_batches_router</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="s2">&quot;/api/sample_batches/export_peaks&quot;</span><span class="p">)</span>
+<span class="k">async</span> <span class="k">def</span> <span class="nf">sample_batch_export_peaks_route</span><span class="p">(</span>
+    <span class="n">request</span><span class="p">:</span> <span class="n">Request</span><span class="p">,</span>
+    <span class="n">sample_batch</span><span class="p">:</span> <span class="n">SampleBatchExportPeaks</span><span class="p">,</span>
+    <span class="n">background_tasks</span><span class="p">:</span> <span class="n">BackgroundTasks</span><span class="p">,</span>
+<span class="p">):</span>
+    <span class="n">sid</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;X-SID&quot;</span><span class="p">)</span>
+    <span class="n">background_tasks</span><span class="o">.</span><span class="n">add_task</span><span class="p">(</span><span class="n">sample_batch_export_peaks</span><span class="p">,</span> <span class="n">sample_batch</span><span class="p">,</span> <span class="n">sid</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">&quot;status&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;The export peaks process for batch &#39;</span><span class="si">{</span><span class="n">sample_batch</span><span class="o">.</span><span class="n">sample_batch_name</span><span class="si">}</span><span class="s2">&#39; has started&quot;</span>
+    <span class="p">}</span></div>
+
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../../../index.html">Mascope</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../modules.html">backend</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../../index.html">Module code</a><ul>
+  <li><a href="../../../backend.html">backend</a><ul>
+  </ul></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2024, Karsa Oy.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 7.2.6</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 0.7.16</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

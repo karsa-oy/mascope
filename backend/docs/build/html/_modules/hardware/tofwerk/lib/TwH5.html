@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>hardware.tofwerk.lib.TwH5 &#8212; Mascope  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=d1102ebc" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/alabaster.css?v=12dfc556" />
+    <script src="../../../../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../../../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for hardware.tofwerk.lib.TwH5</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Python bindings to Tofwerk&#39;s TwH5 DLL</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">ctypes</span> <span class="k">as</span> <span class="nn">ct</span>
+<span class="kn">import</span> <span class="nn">os</span>
+
+<span class="c1"># from .TofDaq import TPeakPar  #TODO: commented out since not used and not compatible with linux</span>
+<span class="kn">import</span> <span class="nn">platform</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">numpy.ctypeslib</span> <span class="kn">import</span> <span class="n">ndpointer</span>
+
+<span class="n">libname</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;linux&quot;</span><span class="p">:</span> <span class="s2">&quot;libtwh5.so&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;linux2&quot;</span><span class="p">:</span> <span class="s2">&quot;libtwh5.so&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;darwin&quot;</span><span class="p">:</span> <span class="s2">&quot;libtwh5.dylib&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;win32&quot;</span><span class="p">:</span> <span class="s2">&quot;TwH5Dll.dll&quot;</span><span class="p">,</span>
+<span class="p">}</span>
+<span class="n">libpath</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+<span class="k">if</span> <span class="n">platform</span><span class="o">.</span><span class="n">architecture</span><span class="p">()</span> <span class="o">==</span> <span class="p">(</span><span class="s2">&quot;32bit&quot;</span><span class="p">,</span> <span class="s2">&quot;EPL&quot;</span><span class="p">):</span>
+    <span class="n">libpath</span> <span class="o">=</span> <span class="s2">&quot;linux_x86_64&quot;</span>
+<span class="k">if</span> <span class="n">platform</span><span class="o">.</span><span class="n">architecture</span><span class="p">()</span> <span class="o">==</span> <span class="p">(</span><span class="s2">&quot;64bit&quot;</span><span class="p">,</span> <span class="s2">&quot;EPL&quot;</span><span class="p">):</span>
+    <span class="n">libpath</span> <span class="o">=</span> <span class="s2">&quot;linux_x86_64&quot;</span>
+<span class="k">if</span> <span class="n">platform</span><span class="o">.</span><span class="n">architecture</span><span class="p">()</span> <span class="o">==</span> <span class="p">(</span><span class="s2">&quot;64bit&quot;</span><span class="p">,</span> <span class="s2">&quot;ELF&quot;</span><span class="p">):</span>
+    <span class="n">libpath</span> <span class="o">=</span> <span class="s2">&quot;linux_x86_64&quot;</span>
+
+<span class="k">if</span> <span class="n">platform</span><span class="o">.</span><span class="n">architecture</span><span class="p">()</span> <span class="o">==</span> <span class="p">(</span><span class="s2">&quot;32bit&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">):</span>
+    <span class="n">libpath</span> <span class="o">=</span> <span class="s2">&quot;macos_x86_64&quot;</span>
+<span class="k">if</span> <span class="n">platform</span><span class="o">.</span><span class="n">architecture</span><span class="p">()</span> <span class="o">==</span> <span class="p">(</span><span class="s2">&quot;64bit&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">):</span>
+    <span class="n">libpath</span> <span class="o">=</span> <span class="s2">&quot;macos_x86_64&quot;</span>
+
+<span class="k">if</span> <span class="n">platform</span><span class="o">.</span><span class="n">architecture</span><span class="p">()</span> <span class="o">==</span> <span class="p">(</span><span class="s2">&quot;32bit&quot;</span><span class="p">,</span> <span class="s2">&quot;WindowsPE&quot;</span><span class="p">):</span>
+    <span class="n">libpath</span> <span class="o">=</span> <span class="s2">&quot;windows_x86&quot;</span>
+<span class="k">if</span> <span class="n">platform</span><span class="o">.</span><span class="n">architecture</span><span class="p">()</span> <span class="o">==</span> <span class="p">(</span><span class="s2">&quot;64bit&quot;</span><span class="p">,</span> <span class="s2">&quot;WindowsPE&quot;</span><span class="p">):</span>
+    <span class="n">libpath</span> <span class="o">=</span> <span class="s2">&quot;windows_x64&quot;</span>
+
+
+<span class="n">h5lib</span> <span class="o">=</span> <span class="n">ct</span><span class="o">.</span><span class="n">cdll</span><span class="o">.</span><span class="n">LoadLibrary</span><span class="p">(</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)),</span>
+        <span class="s2">&quot;dlls&quot;</span><span class="p">,</span>
+        <span class="n">libpath</span><span class="p">,</span>
+        <span class="n">libname</span><span class="p">[</span><span class="n">sys</span><span class="o">.</span><span class="n">platform</span><span class="p">],</span>
+    <span class="p">)</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="TwH5Desc">
+<a class="viewcode-back" href="../../../../hardware.tofwerk.lib.html#hardware.tofwerk.lib.TwH5.TwH5Desc">[docs]</a>
+<span class="k">class</span> <span class="nc">TwH5Desc</span><span class="p">(</span><span class="n">ct</span><span class="o">.</span><span class="n">Structure</span><span class="p">):</span>
+    <span class="n">_fields_</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="p">(</span><span class="s2">&quot;nbrSamples&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;nbrPeaks&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;nbrWaveforms&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;nbrSegments&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;nbrBlocks&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;nbrMemories&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;nbrBufs&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;nbrWrites&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;nbrLogEntries&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;secondTof&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_int8</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;hasSumSpectrum&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_int8</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;hasSumSpectrum2&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_int8</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;hasBufTimes&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_int8</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;hasTofData&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_int8</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;hasTofData2&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_int8</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;hasPeakData&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_int8</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;hasPeakData2&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_int8</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;hasTpsData&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_int8</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;hasNbrMemories&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_int8</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;hasPressureData&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_int8</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;hasLogData&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_int8</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;hasMassCalibData&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_int8</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;hasMassCalib2Data&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_int8</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;hasCh1RawData&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_int8</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;hasCh2RawData&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_int8</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;hasRawDataDesc&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_int8</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;hasEventList&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_int8</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;alignmentDummy&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_int8</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;alignmentDummy2&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_int8</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;eventListMaxElementLength&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;daqMode&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;acquisitionMode&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;massCalibMode&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;massCalibMode2&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;nbrCalibParams&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;nbrCalibParams2&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;p&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_double</span> <span class="o">*</span> <span class="mi">16</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;p2&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_double</span> <span class="o">*</span> <span class="mi">16</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;tofPeriod&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_double</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;blockPeriod&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_double</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;sampleInterval&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_float</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;singleIonSignal&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_float</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;singleIonSignal2&quot;</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_float</span><span class="p">),</span>
+    <span class="p">]</span></div>
+
+
+
+<span class="n">_double_array</span> <span class="o">=</span> <span class="n">ndpointer</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">double</span><span class="p">,</span> <span class="n">flags</span><span class="o">=</span><span class="s2">&quot;CONTIGUOUS&quot;</span><span class="p">)</span>
+<span class="n">_float_array</span> <span class="o">=</span> <span class="n">ndpointer</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span> <span class="n">flags</span><span class="o">=</span><span class="s2">&quot;CONTIGUOUS&quot;</span><span class="p">)</span>
+
+<span class="n">geth5descriptor</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">h5lib</span><span class="o">.</span><span class="n">TwGetH5Descriptor</span> <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;posix&quot;</span> <span class="k">else</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">_TwGetH5Descriptor</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="TwGetH5Descriptor">
+<a class="viewcode-back" href="../../../../hardware.tofwerk.lib.html#hardware.tofwerk.lib.TwH5.TwGetH5Descriptor">[docs]</a>
+<span class="k">def</span> <span class="nf">TwGetH5Descriptor</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">h5Descriptor</span><span class="p">):</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">geth5descriptor</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">[</span><span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">POINTER</span><span class="p">(</span><span class="n">TwH5Desc</span><span class="p">)]</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">geth5descriptor</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">pointer</span><span class="p">(</span><span class="n">h5Descriptor</span><span class="p">))</span></div>
+
+
+
+<span class="n">closeh5</span> <span class="o">=</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">TwCloseH5</span> <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;posix&quot;</span> <span class="k">else</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">_TwCloseH5</span>
+
+
+<div class="viewcode-block" id="TwCloseH5">
+<a class="viewcode-back" href="../../../../hardware.tofwerk.lib.html#hardware.tofwerk.lib.TwH5.TwCloseH5">[docs]</a>
+<span class="k">def</span> <span class="nf">TwCloseH5</span><span class="p">(</span><span class="n">filename</span><span class="p">):</span>
+    <span class="n">closeh5</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">[</span><span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">closeh5</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span></div>
+
+
+
+<span class="n">closeall</span> <span class="o">=</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">TwCloseAll</span> <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;posix&quot;</span> <span class="k">else</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">_TwCloseAll</span>
+
+
+<div class="viewcode-block" id="TwCloseAll">
+<a class="viewcode-back" href="../../../../hardware.tofwerk.lib.html#hardware.tofwerk.lib.TwH5.TwCloseAll">[docs]</a>
+<span class="k">def</span> <span class="nf">TwCloseAll</span><span class="p">():</span>
+    <span class="k">return</span> <span class="n">closeall</span><span class="p">()</span></div>
+
+
+
+<span class="n">getsumspectrumfromh5</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">h5lib</span><span class="o">.</span><span class="n">TwGetSumSpectrumFromH5</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;posix&quot;</span>
+    <span class="k">else</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">_TwGetSumSpectrumFromH5</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="TwGetSumSpectrumFromH5">
+<a class="viewcode-back" href="../../../../hardware.tofwerk.lib.html#hardware.tofwerk.lib.TwH5.TwGetSumSpectrumFromH5">[docs]</a>
+<span class="k">def</span> <span class="nf">TwGetSumSpectrumFromH5</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">spectrum</span><span class="p">,</span> <span class="n">normalize</span><span class="p">):</span>
+    <span class="n">getsumspectrumfromh5</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">[</span><span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span> <span class="n">_double_array</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_int8</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">getsumspectrumfromh5</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">spectrum</span><span class="p">,</span> <span class="n">normalize</span><span class="p">)</span></div>
+
+
+
+<span class="n">gettofspectrumfromh5</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">h5lib</span><span class="o">.</span><span class="n">TwGetTofSpectrumFromH5</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;posix&quot;</span>
+    <span class="k">else</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">_TwGetTofSpectrumFromH5</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="TwGetTofSpectrumFromH5">
+<a class="viewcode-back" href="../../../../hardware.tofwerk.lib.html#hardware.tofwerk.lib.TwH5.TwGetTofSpectrumFromH5">[docs]</a>
+<span class="k">def</span> <span class="nf">TwGetTofSpectrumFromH5</span><span class="p">(</span>
+    <span class="n">filename</span><span class="p">,</span>
+    <span class="n">spectrum</span><span class="p">,</span>
+    <span class="n">segmentIndex</span><span class="p">,</span>
+    <span class="n">segmentEndIndex</span><span class="p">,</span>
+    <span class="n">bufIndex</span><span class="p">,</span>
+    <span class="n">bufEndIndex</span><span class="p">,</span>
+    <span class="n">writeIndex</span><span class="p">,</span>
+    <span class="n">writeEndIndex</span><span class="p">,</span>
+    <span class="n">bufWriteLinked</span><span class="p">,</span>
+    <span class="n">normalize</span><span class="p">,</span>
+<span class="p">):</span>
+    <span class="n">gettofspectrumfromh5</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">_float_array</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int8</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int8</span><span class="p">,</span>
+    <span class="p">]</span>
+    <span class="k">return</span> <span class="n">gettofspectrumfromh5</span><span class="p">(</span>
+        <span class="n">filename</span><span class="p">,</span>
+        <span class="n">spectrum</span><span class="p">,</span>
+        <span class="n">segmentIndex</span><span class="p">,</span>
+        <span class="n">segmentEndIndex</span><span class="p">,</span>
+        <span class="n">bufIndex</span><span class="p">,</span>
+        <span class="n">bufEndIndex</span><span class="p">,</span>
+        <span class="n">writeIndex</span><span class="p">,</span>
+        <span class="n">writeEndIndex</span><span class="p">,</span>
+        <span class="n">bufWriteLinked</span><span class="p">,</span>
+        <span class="n">normalize</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+
+
+<span class="n">gettofspectrum2fromh5</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">h5lib</span><span class="o">.</span><span class="n">TwGetTofSpectrum2FromH5</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;posix&quot;</span>
+    <span class="k">else</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">_TwGetTofSpectrum2FromH5</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="TwGetTofSpectrum2FromH5">
+<a class="viewcode-back" href="../../../../hardware.tofwerk.lib.html#hardware.tofwerk.lib.TwH5.TwGetTofSpectrum2FromH5">[docs]</a>
+<span class="k">def</span> <span class="nf">TwGetTofSpectrum2FromH5</span><span class="p">(</span>
+    <span class="n">filename</span><span class="p">,</span>
+    <span class="n">spectrum</span><span class="p">,</span>
+    <span class="n">segmentIndex</span><span class="p">,</span>
+    <span class="n">segmentEndIndex</span><span class="p">,</span>
+    <span class="n">bufIndex</span><span class="p">,</span>
+    <span class="n">bufEndIndex</span><span class="p">,</span>
+    <span class="n">writeIndex</span><span class="p">,</span>
+    <span class="n">writeEndIndex</span><span class="p">,</span>
+    <span class="n">bufWriteLinked</span><span class="p">,</span>
+    <span class="n">normalize</span><span class="p">,</span>
+<span class="p">):</span>
+    <span class="n">gettofspectrum2fromh5</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">_float_array</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int8</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int8</span><span class="p">,</span>
+    <span class="p">]</span>
+    <span class="k">return</span> <span class="n">gettofspectrum2fromh5</span><span class="p">(</span>
+        <span class="n">filename</span><span class="p">,</span>
+        <span class="n">spectrum</span><span class="p">,</span>
+        <span class="n">segmentIndex</span><span class="p">,</span>
+        <span class="n">segmentEndIndex</span><span class="p">,</span>
+        <span class="n">bufIndex</span><span class="p">,</span>
+        <span class="n">bufEndIndex</span><span class="p">,</span>
+        <span class="n">writeIndex</span><span class="p">,</span>
+        <span class="n">writeEndIndex</span><span class="p">,</span>
+        <span class="n">bufWriteLinked</span><span class="p">,</span>
+        <span class="n">normalize</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+
+
+<span class="n">getstickspectrumfromh5</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">h5lib</span><span class="o">.</span><span class="n">TwGetStickSpectrumFromH5</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;posix&quot;</span>
+    <span class="k">else</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">_TwGetStickSpectrumFromH5</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="TwGetStickSpectrumFromH5">
+<a class="viewcode-back" href="../../../../hardware.tofwerk.lib.html#hardware.tofwerk.lib.TwH5.TwGetStickSpectrumFromH5">[docs]</a>
+<span class="k">def</span> <span class="nf">TwGetStickSpectrumFromH5</span><span class="p">(</span>
+    <span class="n">filename</span><span class="p">,</span>
+    <span class="n">spectrum</span><span class="p">,</span>
+    <span class="n">segmentIndex</span><span class="p">,</span>
+    <span class="n">segmentEndIndex</span><span class="p">,</span>
+    <span class="n">bufIndex</span><span class="p">,</span>
+    <span class="n">bufEndIndex</span><span class="p">,</span>
+    <span class="n">writeIndex</span><span class="p">,</span>
+    <span class="n">writeEndIndex</span><span class="p">,</span>
+    <span class="n">bufWriteLinked</span><span class="p">,</span>
+    <span class="n">normalize</span><span class="p">,</span>
+<span class="p">):</span>
+    <span class="n">getstickspectrumfromh5</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">_float_array</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int8</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int8</span><span class="p">,</span>
+    <span class="p">]</span>
+    <span class="k">return</span> <span class="n">getstickspectrumfromh5</span><span class="p">(</span>
+        <span class="n">filename</span><span class="p">,</span>
+        <span class="n">spectrum</span><span class="p">,</span>
+        <span class="n">segmentIndex</span><span class="p">,</span>
+        <span class="n">segmentEndIndex</span><span class="p">,</span>
+        <span class="n">bufIndex</span><span class="p">,</span>
+        <span class="n">bufEndIndex</span><span class="p">,</span>
+        <span class="n">writeIndex</span><span class="p">,</span>
+        <span class="n">writeEndIndex</span><span class="p">,</span>
+        <span class="n">bufWriteLinked</span><span class="p">,</span>
+        <span class="n">normalize</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+
+
+<span class="c1"># getpeakparametersfromh5 = h5lib.TwGetPeakParametersFromH5 if os.name==&#39;posix&#39; else h5lib._TwGetPeakParametersFromH5</span>
+<span class="c1"># def TwGetPeakParametersFromH5(filename, peakPar, peakIndex):</span>
+<span class="c1">#     getpeakparametersfromh5.argtypes = [ct.c_char_p, ct.POINTER(TPeakPar), ct.c_int]</span>
+<span class="c1">#     return getpeakparametersfromh5(filename, ct.pointer(peakPar), peakIndex)</span>
+
+<span class="n">getspecxaxisfromh5</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">h5lib</span><span class="o">.</span><span class="n">TwGetSpecXaxisFromH5</span> <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;posix&quot;</span> <span class="k">else</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">_TwGetSpecXaxisFromH5</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="TwGetSpecXaxisFromH5">
+<a class="viewcode-back" href="../../../../hardware.tofwerk.lib.html#hardware.tofwerk.lib.TwH5.TwGetSpecXaxisFromH5">[docs]</a>
+<span class="k">def</span> <span class="nf">TwGetSpecXaxisFromH5</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">specAxis</span><span class="p">,</span> <span class="n">axisType</span><span class="p">,</span> <span class="n">unitLabel</span><span class="p">,</span> <span class="n">maxMass</span><span class="p">,</span> <span class="n">writeIndex</span><span class="p">):</span>
+    <span class="n">getspecxaxisfromh5</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">_double_array</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_double</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+    <span class="p">]</span>
+    <span class="k">return</span> <span class="n">getspecxaxisfromh5</span><span class="p">(</span>
+        <span class="n">filename</span><span class="p">,</span> <span class="n">specAxis</span><span class="p">,</span> <span class="n">axisType</span><span class="p">,</span> <span class="n">unitLabel</span><span class="p">,</span> <span class="n">maxMass</span><span class="p">,</span> <span class="n">writeIndex</span>
+    <span class="p">)</span></div>
+
+
+
+<span class="n">getsegmentprofilefromh5</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">h5lib</span><span class="o">.</span><span class="n">TwGetSegmentProfileFromH5</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;posix&quot;</span>
+    <span class="k">else</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">_TwGetSegmentProfileFromH5</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="TwGetSegmentProfileFromH5">
+<a class="viewcode-back" href="../../../../hardware.tofwerk.lib.html#hardware.tofwerk.lib.TwH5.TwGetSegmentProfileFromH5">[docs]</a>
+<span class="k">def</span> <span class="nf">TwGetSegmentProfileFromH5</span><span class="p">(</span>
+    <span class="n">filename</span><span class="p">,</span>
+    <span class="n">segmentProfile</span><span class="p">,</span>
+    <span class="n">peakIndex</span><span class="p">,</span>
+    <span class="n">bufStartIndex</span><span class="p">,</span>
+    <span class="n">bufEndIndex</span><span class="p">,</span>
+    <span class="n">writeStartIndex</span><span class="p">,</span>
+    <span class="n">writeEndIndex</span><span class="p">,</span>
+    <span class="n">bufWriteLinked</span><span class="p">,</span>
+<span class="p">):</span>
+    <span class="n">getsegmentprofilefromh5</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">_float_array</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int8</span><span class="p">,</span>
+    <span class="p">]</span>
+    <span class="k">return</span> <span class="n">getsegmentprofilefromh5</span><span class="p">(</span>
+        <span class="n">filename</span><span class="p">,</span>
+        <span class="n">segmentProfile</span><span class="p">,</span>
+        <span class="n">peakIndex</span><span class="p">,</span>
+        <span class="n">bufStartIndex</span><span class="p">,</span>
+        <span class="n">bufEndIndex</span><span class="p">,</span>
+        <span class="n">writeStartIndex</span><span class="p">,</span>
+        <span class="n">writeEndIndex</span><span class="p">,</span>
+        <span class="n">bufWriteLinked</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+
+
+<span class="n">getbufwriteprofilefromh5</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">h5lib</span><span class="o">.</span><span class="n">TwGetBufWriteProfileFromH5</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;posix&quot;</span>
+    <span class="k">else</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">_TwGetBufWriteProfileFromH5</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="TwGetBufWriteProfileFromH5">
+<a class="viewcode-back" href="../../../../hardware.tofwerk.lib.html#hardware.tofwerk.lib.TwH5.TwGetBufWriteProfileFromH5">[docs]</a>
+<span class="k">def</span> <span class="nf">TwGetBufWriteProfileFromH5</span><span class="p">(</span>
+    <span class="n">filename</span><span class="p">,</span> <span class="n">profile</span><span class="p">,</span> <span class="n">peakIndex</span><span class="p">,</span> <span class="n">segmentStartIndex</span><span class="p">,</span> <span class="n">segmentEndIndex</span>
+<span class="p">):</span>
+    <span class="n">getbufwriteprofilefromh5</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">_float_array</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+    <span class="p">]</span>
+    <span class="k">return</span> <span class="n">getbufwriteprofilefromh5</span><span class="p">(</span>
+        <span class="n">filename</span><span class="p">,</span> <span class="n">profile</span><span class="p">,</span> <span class="n">peakIndex</span><span class="p">,</span> <span class="n">segmentStartIndex</span><span class="p">,</span> <span class="n">segmentEndIndex</span>
+    <span class="p">)</span></div>
+
+
+
+<span class="n">getreguserdatafromh5</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">h5lib</span><span class="o">.</span><span class="n">TwGetRegUserDataFromH5</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;posix&quot;</span>
+    <span class="k">else</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">_TwGetRegUserDataFromH5</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="TwGetRegUserDataFromH5">
+<a class="viewcode-back" href="../../../../hardware.tofwerk.lib.html#hardware.tofwerk.lib.TwH5.TwGetRegUserDataFromH5">[docs]</a>
+<span class="k">def</span> <span class="nf">TwGetRegUserDataFromH5</span><span class="p">(</span>
+    <span class="n">filename</span><span class="p">,</span> <span class="n">location</span><span class="p">,</span> <span class="n">bufIndex</span><span class="p">,</span> <span class="n">writeIndex</span><span class="p">,</span> <span class="n">bufLength</span><span class="p">,</span> <span class="n">dataBuffer</span><span class="p">,</span> <span class="n">description</span>
+<span class="p">):</span>
+    <span class="k">if</span> <span class="n">dataBuffer</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">getreguserdatafromh5</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+            <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+            <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+            <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+            <span class="n">ndpointer</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">),</span>
+            <span class="n">ct</span><span class="o">.</span><span class="n">c_void_p</span><span class="p">,</span>
+            <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">getreguserdatafromh5</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+            <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+            <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+            <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+            <span class="n">ndpointer</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">),</span>
+            <span class="n">_double_array</span><span class="p">,</span>
+            <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="p">]</span>
+    <span class="k">return</span> <span class="n">getreguserdatafromh5</span><span class="p">(</span>
+        <span class="n">filename</span><span class="p">,</span> <span class="n">location</span><span class="p">,</span> <span class="n">bufIndex</span><span class="p">,</span> <span class="n">writeIndex</span><span class="p">,</span> <span class="n">bufLength</span><span class="p">,</span> <span class="n">dataBuffer</span><span class="p">,</span> <span class="n">description</span>
+    <span class="p">)</span></div>
+
+
+
+<span class="n">gettofdata</span> <span class="o">=</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">TwGetTofData</span> <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;posix&quot;</span> <span class="k">else</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">_TwGetTofData</span>
+
+
+<div class="viewcode-block" id="TwGetTofData">
+<a class="viewcode-back" href="../../../../hardware.tofwerk.lib.html#hardware.tofwerk.lib.TwH5.TwGetTofData">[docs]</a>
+<span class="k">def</span> <span class="nf">TwGetTofData</span><span class="p">(</span>
+    <span class="n">filename</span><span class="p">,</span>
+    <span class="n">sampleOffset</span><span class="p">,</span>
+    <span class="n">sampleCount</span><span class="p">,</span>
+    <span class="n">segOffset</span><span class="p">,</span>
+    <span class="n">segCount</span><span class="p">,</span>
+    <span class="n">bufOffset</span><span class="p">,</span>
+    <span class="n">bufCount</span><span class="p">,</span>
+    <span class="n">writeOffset</span><span class="p">,</span>
+    <span class="n">writeCount</span><span class="p">,</span>
+    <span class="n">dataBuffer</span><span class="p">,</span>
+<span class="p">):</span>
+    <span class="n">gettofdata</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">_float_array</span><span class="p">,</span>
+    <span class="p">]</span>
+    <span class="k">return</span> <span class="n">gettofdata</span><span class="p">(</span>
+        <span class="n">filename</span><span class="p">,</span>
+        <span class="n">sampleOffset</span><span class="p">,</span>
+        <span class="n">sampleCount</span><span class="p">,</span>
+        <span class="n">segOffset</span><span class="p">,</span>
+        <span class="n">segCount</span><span class="p">,</span>
+        <span class="n">bufOffset</span><span class="p">,</span>
+        <span class="n">bufCount</span><span class="p">,</span>
+        <span class="n">writeOffset</span><span class="p">,</span>
+        <span class="n">writeCount</span><span class="p">,</span>
+        <span class="n">dataBuffer</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+
+
+<span class="n">gettimingdata</span> <span class="o">=</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">TwGetTimingData</span> <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;posix&quot;</span> <span class="k">else</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">_TwGetTimingData</span>
+
+
+<div class="viewcode-block" id="TwGetTimingData">
+<a class="viewcode-back" href="../../../../hardware.tofwerk.lib.html#hardware.tofwerk.lib.TwH5.TwGetTimingData">[docs]</a>
+<span class="k">def</span> <span class="nf">TwGetTimingData</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">bufOffset</span><span class="p">,</span> <span class="n">bufCount</span><span class="p">,</span> <span class="n">writeOffset</span><span class="p">,</span> <span class="n">writeCount</span><span class="p">,</span> <span class="n">dataBuffer</span><span class="p">):</span>
+    <span class="n">gettimingdata</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">_double_array</span><span class="p">,</span>
+    <span class="p">]</span>
+    <span class="k">return</span> <span class="n">gettimingdata</span><span class="p">(</span>
+        <span class="n">filename</span><span class="p">,</span> <span class="n">bufOffset</span><span class="p">,</span> <span class="n">bufCount</span><span class="p">,</span> <span class="n">writeOffset</span><span class="p">,</span> <span class="n">writeCount</span><span class="p">,</span> <span class="n">dataBuffer</span>
+    <span class="p">)</span></div>
+
+
+
+<span class="n">getpeakdata</span> <span class="o">=</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">TwGetPeakData</span> <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;posix&quot;</span> <span class="k">else</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">_TwGetPeakData</span>
+
+
+<div class="viewcode-block" id="TwGetPeakData">
+<a class="viewcode-back" href="../../../../hardware.tofwerk.lib.html#hardware.tofwerk.lib.TwH5.TwGetPeakData">[docs]</a>
+<span class="k">def</span> <span class="nf">TwGetPeakData</span><span class="p">(</span>
+    <span class="n">filename</span><span class="p">,</span>
+    <span class="n">peakOffset</span><span class="p">,</span>
+    <span class="n">peakCount</span><span class="p">,</span>
+    <span class="n">segOffset</span><span class="p">,</span>
+    <span class="n">segCount</span><span class="p">,</span>
+    <span class="n">bufOffset</span><span class="p">,</span>
+    <span class="n">bufCount</span><span class="p">,</span>
+    <span class="n">writeOffset</span><span class="p">,</span>
+    <span class="n">writeCount</span><span class="p">,</span>
+    <span class="n">dataBuffer</span><span class="p">,</span>
+<span class="p">):</span>
+    <span class="n">getpeakdata</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">_float_array</span><span class="p">,</span>
+    <span class="p">]</span>
+    <span class="k">return</span> <span class="n">getpeakdata</span><span class="p">(</span>
+        <span class="n">filename</span><span class="p">,</span>
+        <span class="n">peakOffset</span><span class="p">,</span>
+        <span class="n">peakCount</span><span class="p">,</span>
+        <span class="n">segOffset</span><span class="p">,</span>
+        <span class="n">segCount</span><span class="p">,</span>
+        <span class="n">bufOffset</span><span class="p">,</span>
+        <span class="n">bufCount</span><span class="p">,</span>
+        <span class="n">writeOffset</span><span class="p">,</span>
+        <span class="n">writeCount</span><span class="p">,</span>
+        <span class="n">dataBuffer</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+
+
+<span class="n">getintattributefromh5</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">h5lib</span><span class="o">.</span><span class="n">TwGetIntAttributeFromH5</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;posix&quot;</span>
+    <span class="k">else</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">_TwGetIntAttributeFromH5</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="TwGetIntAttributeFromH5">
+<a class="viewcode-back" href="../../../../hardware.tofwerk.lib.html#hardware.tofwerk.lib.TwH5.TwGetIntAttributeFromH5">[docs]</a>
+<span class="k">def</span> <span class="nf">TwGetIntAttributeFromH5</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">location</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">attribute</span><span class="p">):</span>
+    <span class="n">getintattributefromh5</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">ndpointer</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span> <span class="n">flags</span><span class="o">=</span><span class="s2">&quot;CONTIGUOUS&quot;</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
+    <span class="p">]</span>
+    <span class="k">return</span> <span class="n">getintattributefromh5</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">location</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">attribute</span><span class="p">)</span></div>
+
+
+
+<span class="n">getuintattributefromh5</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">h5lib</span><span class="o">.</span><span class="n">TwGetUintAttributeFromH5</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;posix&quot;</span>
+    <span class="k">else</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">_TwGetUintAttributeFromH5</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="TwGetUintAttributeFromH5">
+<a class="viewcode-back" href="../../../../hardware.tofwerk.lib.html#hardware.tofwerk.lib.TwH5.TwGetUintAttributeFromH5">[docs]</a>
+<span class="k">def</span> <span class="nf">TwGetUintAttributeFromH5</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">location</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">attribute</span><span class="p">):</span>
+    <span class="n">getuintattributefromh5</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">ndpointer</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint32</span><span class="p">,</span> <span class="n">flags</span><span class="o">=</span><span class="s2">&quot;CONTIGUOUS&quot;</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
+    <span class="p">]</span>
+    <span class="k">return</span> <span class="n">getuintattributefromh5</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">location</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">attribute</span><span class="p">)</span></div>
+
+
+
+<span class="n">getint64attributefromh5</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">h5lib</span><span class="o">.</span><span class="n">TwGetInt64AttributeFromH5</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;posix&quot;</span>
+    <span class="k">else</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">_TwGetInt64AttributeFromH5</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="TwGetInt64AttributeFromH5">
+<a class="viewcode-back" href="../../../../hardware.tofwerk.lib.html#hardware.tofwerk.lib.TwH5.TwGetInt64AttributeFromH5">[docs]</a>
+<span class="k">def</span> <span class="nf">TwGetInt64AttributeFromH5</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">location</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">attribute</span><span class="p">):</span>
+    <span class="n">getint64attributefromh5</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">ndpointer</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">,</span> <span class="n">flags</span><span class="o">=</span><span class="s2">&quot;CONTIGUOUS&quot;</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
+    <span class="p">]</span>
+    <span class="k">return</span> <span class="n">getint64attributefromh5</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">location</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">attribute</span><span class="p">)</span></div>
+
+
+
+<span class="n">getuint64attributefromh5</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">h5lib</span><span class="o">.</span><span class="n">TwGetUint64AttributeFromH5</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;posix&quot;</span>
+    <span class="k">else</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">_TwGetUint64AttributeFromH5</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="TwGetUint64AttributeFromH5">
+<a class="viewcode-back" href="../../../../hardware.tofwerk.lib.html#hardware.tofwerk.lib.TwH5.TwGetUint64AttributeFromH5">[docs]</a>
+<span class="k">def</span> <span class="nf">TwGetUint64AttributeFromH5</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">location</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">attribute</span><span class="p">):</span>
+    <span class="n">getuint64attributefromh5</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">ndpointer</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint64</span><span class="p">,</span> <span class="n">flags</span><span class="o">=</span><span class="s2">&quot;CONTIGUOUS&quot;</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
+    <span class="p">]</span>
+    <span class="k">return</span> <span class="n">getuint64attributefromh5</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">location</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">attribute</span><span class="p">)</span></div>
+
+
+
+<span class="n">getfloatattributefromh5</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">h5lib</span><span class="o">.</span><span class="n">TwGetFloatAttributeFromH5</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;posix&quot;</span>
+    <span class="k">else</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">_TwGetFloatAttributeFromH5</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="TwGetFloatAttributeFromH5">
+<a class="viewcode-back" href="../../../../hardware.tofwerk.lib.html#hardware.tofwerk.lib.TwH5.TwGetFloatAttributeFromH5">[docs]</a>
+<span class="k">def</span> <span class="nf">TwGetFloatAttributeFromH5</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">location</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">attribute</span><span class="p">):</span>
+    <span class="n">getfloatattributefromh5</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">ndpointer</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span> <span class="n">flags</span><span class="o">=</span><span class="s2">&quot;CONTIGUOUS&quot;</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
+    <span class="p">]</span>
+    <span class="k">return</span> <span class="n">getfloatattributefromh5</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">location</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">attribute</span><span class="p">)</span></div>
+
+
+
+<span class="n">getdoubleattributefromh5</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">h5lib</span><span class="o">.</span><span class="n">TwGetDoubleAttributeFromH5</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;posix&quot;</span>
+    <span class="k">else</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">_TwGetDoubleAttributeFromH5</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="TwGetDoubleAttributeFromH5">
+<a class="viewcode-back" href="../../../../hardware.tofwerk.lib.html#hardware.tofwerk.lib.TwH5.TwGetDoubleAttributeFromH5">[docs]</a>
+<span class="k">def</span> <span class="nf">TwGetDoubleAttributeFromH5</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">location</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">attribute</span><span class="p">):</span>
+    <span class="n">getdoubleattributefromh5</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">ndpointer</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">double</span><span class="p">,</span> <span class="n">flags</span><span class="o">=</span><span class="s2">&quot;CONTIGUOUS&quot;</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
+    <span class="p">]</span>
+    <span class="k">return</span> <span class="n">getdoubleattributefromh5</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">location</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">attribute</span><span class="p">)</span></div>
+
+
+
+<span class="n">getstringattributefromh5</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">h5lib</span><span class="o">.</span><span class="n">TwGetStringAttributeFromH5</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;posix&quot;</span>
+    <span class="k">else</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">_TwGetStringAttributeFromH5</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="TwGetStringAttributeFromH5">
+<a class="viewcode-back" href="../../../../hardware.tofwerk.lib.html#hardware.tofwerk.lib.TwH5.TwGetStringAttributeFromH5">[docs]</a>
+<span class="k">def</span> <span class="nf">TwGetStringAttributeFromH5</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">location</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">attribute</span><span class="p">):</span>
+    <span class="n">getstringattributefromh5</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+    <span class="p">]</span>
+    <span class="k">return</span> <span class="n">getstringattributefromh5</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">location</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">attribute</span><span class="p">)</span></div>
+
+
+
+<span class="n">setintattributeinh5</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">h5lib</span><span class="o">.</span><span class="n">TwSetIntAttributeInH5</span> <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;posix&quot;</span> <span class="k">else</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">_TwSetIntAttributeInH5</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="TwSetIntAttributeInH5">
+<a class="viewcode-back" href="../../../../hardware.tofwerk.lib.html#hardware.tofwerk.lib.TwH5.TwSetIntAttributeInH5">[docs]</a>
+<span class="k">def</span> <span class="nf">TwSetIntAttributeInH5</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">location</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">attribute</span><span class="p">):</span>
+    <span class="n">setintattributeinh5</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">[</span><span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">setintattributeinh5</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">location</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">attribute</span><span class="p">)</span></div>
+
+
+
+<span class="n">setuintattributeinh5</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">h5lib</span><span class="o">.</span><span class="n">TwSetUintAttributeInH5</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;posix&quot;</span>
+    <span class="k">else</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">_TwSetUintAttributeInH5</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="TwSetUintAttributeInH5">
+<a class="viewcode-back" href="../../../../hardware.tofwerk.lib.html#hardware.tofwerk.lib.TwH5.TwSetUintAttributeInH5">[docs]</a>
+<span class="k">def</span> <span class="nf">TwSetUintAttributeInH5</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">location</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">attribute</span><span class="p">):</span>
+    <span class="n">setuintattributeinh5</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">[</span><span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_uint</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">setuintattributeinh5</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">location</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">attribute</span><span class="p">)</span></div>
+
+
+
+<span class="n">setint64attributeinh5</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">h5lib</span><span class="o">.</span><span class="n">TwSetInt64AttributeInH5</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;posix&quot;</span>
+    <span class="k">else</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">_TwSetInt64AttributeInH5</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="TwSetInt64AttributeInH5">
+<a class="viewcode-back" href="../../../../hardware.tofwerk.lib.html#hardware.tofwerk.lib.TwH5.TwSetInt64AttributeInH5">[docs]</a>
+<span class="k">def</span> <span class="nf">TwSetInt64AttributeInH5</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">location</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">attribute</span><span class="p">):</span>
+    <span class="n">setint64attributeinh5</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">[</span><span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_int64</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">setint64attributeinh5</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">location</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">attribute</span><span class="p">)</span></div>
+
+
+
+<span class="n">setuint64attributeinh5</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">h5lib</span><span class="o">.</span><span class="n">TwSetUint64AttributeInH5</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;posix&quot;</span>
+    <span class="k">else</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">_TwSetUint64AttributeInH5</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="TwSetUint64AttributeInH5">
+<a class="viewcode-back" href="../../../../hardware.tofwerk.lib.html#hardware.tofwerk.lib.TwH5.TwSetUint64AttributeInH5">[docs]</a>
+<span class="k">def</span> <span class="nf">TwSetUint64AttributeInH5</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">location</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">attribute</span><span class="p">):</span>
+    <span class="n">setuint64attributeinh5</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_uint64</span><span class="p">,</span>
+    <span class="p">]</span>
+    <span class="k">return</span> <span class="n">setuint64attributeinh5</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">location</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">attribute</span><span class="p">)</span></div>
+
+
+
+<span class="n">setfloatattributeinh5</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">h5lib</span><span class="o">.</span><span class="n">TwSetFloatAttributeInH5</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;posix&quot;</span>
+    <span class="k">else</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">_TwSetFloatAttributeInH5</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="TwSetFloatAttributeInH5">
+<a class="viewcode-back" href="../../../../hardware.tofwerk.lib.html#hardware.tofwerk.lib.TwH5.TwSetFloatAttributeInH5">[docs]</a>
+<span class="k">def</span> <span class="nf">TwSetFloatAttributeInH5</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">location</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">attribute</span><span class="p">):</span>
+    <span class="n">setfloatattributeinh5</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">[</span><span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_float</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">setfloatattributeinh5</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">location</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">attribute</span><span class="p">)</span></div>
+
+
+
+<span class="n">setdoubleattributeinh5</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">h5lib</span><span class="o">.</span><span class="n">TwSetDoubleAttributeInH5</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;posix&quot;</span>
+    <span class="k">else</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">_TwSetDoubleAttributeInH5</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="TwSetDoubleAttributeInH5">
+<a class="viewcode-back" href="../../../../hardware.tofwerk.lib.html#hardware.tofwerk.lib.TwH5.TwSetDoubleAttributeInH5">[docs]</a>
+<span class="k">def</span> <span class="nf">TwSetDoubleAttributeInH5</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">location</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">attribute</span><span class="p">):</span>
+    <span class="n">setdoubleattributeinh5</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_double</span><span class="p">,</span>
+    <span class="p">]</span>
+    <span class="k">return</span> <span class="n">setdoubleattributeinh5</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">location</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">attribute</span><span class="p">)</span></div>
+
+
+
+<span class="n">setstringattributeinh5</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">h5lib</span><span class="o">.</span><span class="n">TwSetStringAttributeInH5</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;posix&quot;</span>
+    <span class="k">else</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">_TwSetStringAttributeInH5</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="TwSetStringAttributeInH5">
+<a class="viewcode-back" href="../../../../hardware.tofwerk.lib.html#hardware.tofwerk.lib.TwH5.TwSetStringAttributeInH5">[docs]</a>
+<span class="k">def</span> <span class="nf">TwSetStringAttributeInH5</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">location</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">attribute</span><span class="p">):</span>
+    <span class="n">setstringattributeinh5</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+    <span class="p">]</span>
+    <span class="k">return</span> <span class="n">setstringattributeinh5</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">location</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">attribute</span><span class="p">)</span></div>
+
+
+
+<span class="n">TwProgressCallback</span> <span class="o">=</span> <span class="n">ct</span><span class="o">.</span><span class="n">CFUNCTYPE</span><span class="p">(</span><span class="n">ct</span><span class="o">.</span><span class="n">c_bool</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_double</span><span class="p">)</span>
+
+<span class="c1"># changepeaktable = h5lib.TwChangePeakTable if os.name==&#39;posix&#39; else h5lib._TwChangePeakTable</span>
+<span class="c1"># def TwChangePeakTable(filename, newPeakPar, nbrNewPeakPar, compressionLevel, callback):</span>
+<span class="c1">#     if callback is None:</span>
+<span class="c1">#         changepeaktable.argtypes = [ct.c_char_p, ct.POINTER(TPeakPar), ct.c_int, ct.c_int, ct.c_void_p]</span>
+<span class="c1">#     else:</span>
+<span class="c1">#         changepeaktable.argtypes = [ct.c_char_p, ct.POINTER(TPeakPar), ct.c_int, ct.c_int, TwProgressCallback]</span>
+<span class="c1">#     return changepeaktable(filename, newPeakPar, nbrNewPeakPar, compressionLevel, callback)</span>
+
+<span class="n">changepeaktablefromfile</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">h5lib</span><span class="o">.</span><span class="n">TwChangePeakTableFromFile</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;posix&quot;</span>
+    <span class="k">else</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">_TwChangePeakTableFromFile</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="TwChangePeakTableFromFile">
+<a class="viewcode-back" href="../../../../hardware.tofwerk.lib.html#hardware.tofwerk.lib.TwH5.TwChangePeakTableFromFile">[docs]</a>
+<span class="k">def</span> <span class="nf">TwChangePeakTableFromFile</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">massTable</span><span class="p">,</span> <span class="n">compressionLevel</span><span class="p">,</span> <span class="n">callback</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">callback</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">changepeaktablefromfile</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+            <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+            <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+            <span class="n">ct</span><span class="o">.</span><span class="n">c_void_p</span><span class="p">,</span>
+        <span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">changepeaktablefromfile</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+            <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+            <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+            <span class="n">TwProgressCallback</span><span class="p">,</span>
+        <span class="p">]</span>
+    <span class="k">return</span> <span class="n">changepeaktablefromfile</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">massTable</span><span class="p">,</span> <span class="n">compressionLevel</span><span class="p">,</span> <span class="n">callback</span><span class="p">)</span></div>
+
+
+
+<span class="n">getbuftimefromh5</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">h5lib</span><span class="o">.</span><span class="n">TwGetBufTimeFromH5</span> <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;posix&quot;</span> <span class="k">else</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">_TwGetBufTimeFromH5</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="TwGetBufTimeFromH5">
+<a class="viewcode-back" href="../../../../hardware.tofwerk.lib.html#hardware.tofwerk.lib.TwH5.TwGetBufTimeFromH5">[docs]</a>
+<span class="k">def</span> <span class="nf">TwGetBufTimeFromH5</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">bufTime</span><span class="p">,</span> <span class="n">bufIndex</span><span class="p">,</span> <span class="n">writeIndex</span><span class="p">):</span>
+    <span class="n">getbuftimefromh5</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">ndpointer</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">double</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+    <span class="p">]</span>
+    <span class="k">return</span> <span class="n">getbuftimefromh5</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">bufTime</span><span class="p">,</span> <span class="n">bufIndex</span><span class="p">,</span> <span class="n">writeIndex</span><span class="p">)</span></div>
+
+
+
+<span class="n">h5setmasscalib</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">h5lib</span><span class="o">.</span><span class="n">TwH5SetMassCalib</span> <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;posix&quot;</span> <span class="k">else</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">_TwH5SetMassCalib</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="TwH5SetMassCalib">
+<a class="viewcode-back" href="../../../../hardware.tofwerk.lib.html#hardware.tofwerk.lib.TwH5.TwH5SetMassCalib">[docs]</a>
+<span class="k">def</span> <span class="nf">TwH5SetMassCalib</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="n">nbrParams</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">nbrPoints</span><span class="p">,</span> <span class="n">mass</span><span class="p">,</span> <span class="n">tof</span><span class="p">,</span> <span class="n">weight</span><span class="p">):</span>
+    <span class="n">h5setmasscalib</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">_double_array</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">_double_array</span><span class="p">,</span>
+        <span class="n">_double_array</span><span class="p">,</span>
+        <span class="n">_double_array</span><span class="p">,</span>
+    <span class="p">]</span>
+    <span class="k">return</span> <span class="n">h5setmasscalib</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="n">nbrParams</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">nbrPoints</span><span class="p">,</span> <span class="n">mass</span><span class="p">,</span> <span class="n">tof</span><span class="p">,</span> <span class="n">weight</span><span class="p">)</span></div>
+
+
+
+<span class="n">getacquisitionlogfromh5</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">h5lib</span><span class="o">.</span><span class="n">TwGetAcquisitionLogFromH5</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;posix&quot;</span>
+    <span class="k">else</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">_TwGetAcquisitionLogFromH5</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="TwGetAcquisitionLogFromH5">
+<a class="viewcode-back" href="../../../../hardware.tofwerk.lib.html#hardware.tofwerk.lib.TwH5.TwGetAcquisitionLogFromH5">[docs]</a>
+<span class="k">def</span> <span class="nf">TwGetAcquisitionLogFromH5</span><span class="p">(</span><span class="n">location</span><span class="p">,</span> <span class="n">index</span><span class="p">,</span> <span class="n">timestamp</span><span class="p">,</span> <span class="n">logText</span><span class="p">):</span>
+    <span class="n">getacquisitionlogfromh5</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_int</span><span class="p">,</span>
+        <span class="n">ndpointer</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">),</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+    <span class="p">]</span>
+    <span class="k">return</span> <span class="n">getacquisitionlogfromh5</span><span class="p">(</span><span class="n">location</span><span class="p">,</span> <span class="n">index</span><span class="p">,</span> <span class="n">timestamp</span><span class="p">,</span> <span class="n">logText</span><span class="p">)</span></div>
+
+
+
+<span class="n">geteventlistdatafromh5</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">h5lib</span><span class="o">.</span><span class="n">TwGetEventListDataFromH5</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;posix&quot;</span>
+    <span class="k">else</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">_TwGetEventListDataFromH5</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="TwGetEventListDataFromH5">
+<a class="viewcode-back" href="../../../../hardware.tofwerk.lib.html#hardware.tofwerk.lib.TwH5.TwGetEventListDataFromH5">[docs]</a>
+<span class="k">def</span> <span class="nf">TwGetEventListDataFromH5</span><span class="p">(</span>
+    <span class="n">filename</span><span class="p">,</span>
+    <span class="n">segStartIndex</span><span class="p">,</span>
+    <span class="n">segEndIndex</span><span class="p">,</span>
+    <span class="n">bufStartIndex</span><span class="p">,</span>
+    <span class="n">bufEndIndex</span><span class="p">,</span>
+    <span class="n">writeStartIndex</span><span class="p">,</span>
+    <span class="n">writeEndIndex</span><span class="p">,</span>
+<span class="p">):</span>
+    <span class="n">uintptr</span> <span class="o">=</span> <span class="n">ct</span><span class="o">.</span><span class="n">POINTER</span><span class="p">(</span><span class="n">ct</span><span class="o">.</span><span class="n">c_uint</span><span class="p">)</span>
+    <span class="n">dataLength</span> <span class="o">=</span> <span class="n">uintptr</span><span class="p">()</span>
+    <span class="n">dataBuffer</span> <span class="o">=</span> <span class="n">ct</span><span class="o">.</span><span class="n">POINTER</span><span class="p">(</span><span class="n">uintptr</span><span class="p">)()</span>
+    <span class="n">rv</span> <span class="o">=</span> <span class="n">geteventlistdatafromh5</span><span class="p">(</span>
+        <span class="n">filename</span><span class="p">,</span>
+        <span class="n">segStartIndex</span><span class="p">,</span>
+        <span class="n">segEndIndex</span><span class="p">,</span>
+        <span class="n">bufStartIndex</span><span class="p">,</span>
+        <span class="n">bufEndIndex</span><span class="p">,</span>
+        <span class="n">writeStartIndex</span><span class="p">,</span>
+        <span class="n">writeEndIndex</span><span class="p">,</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">byref</span><span class="p">(</span><span class="n">dataBuffer</span><span class="p">),</span>
+        <span class="n">ct</span><span class="o">.</span><span class="n">byref</span><span class="p">(</span><span class="n">dataLength</span><span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">allTimestamps</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">allSamples</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">if</span> <span class="n">rv</span> <span class="o">==</span> <span class="mi">4</span><span class="p">:</span>
+        <span class="n">nbrSpectra</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="p">(</span><span class="n">segEndIndex</span> <span class="o">-</span> <span class="n">segStartIndex</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="o">*</span> <span class="p">(</span><span class="n">bufEndIndex</span> <span class="o">-</span> <span class="n">bufStartIndex</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="o">*</span> <span class="p">(</span><span class="n">writeEndIndex</span> <span class="o">-</span> <span class="n">writeStartIndex</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">ctypeslib</span><span class="o">.</span><span class="n">as_array</span><span class="p">(</span><span class="n">dataBuffer</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">dataLength</span><span class="p">[</span><span class="n">i</span><span class="p">],))</span>
+            <span class="k">if</span> <span class="n">dataLength</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span>
+            <span class="k">else</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="mi">0</span><span class="p">,),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint32</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">nbrSpectra</span><span class="p">)</span>
+        <span class="p">]</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">nbrSpectra</span><span class="p">):</span>
+            <span class="n">timeStamps</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">samples</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">nEl</span> <span class="o">=</span> <span class="n">dataLength</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+            <span class="n">index</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="k">while</span> <span class="n">index</span> <span class="o">&lt;</span> <span class="n">nEl</span><span class="p">:</span>
+                <span class="n">ts</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="n">index</span><span class="p">]</span> <span class="o">&amp;</span> <span class="mh">0xFFFFFF</span>
+                <span class="n">timeStamps</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ts</span><span class="p">)</span>
+                <span class="n">nSamples</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="n">index</span><span class="p">]</span> <span class="o">&gt;&gt;</span> <span class="mi">24</span>
+                <span class="n">index</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="k">if</span> <span class="n">nSamples</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">samples</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                        <span class="n">np</span><span class="o">.</span><span class="n">frombuffer</span><span class="p">(</span>
+                            <span class="n">data</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="n">index</span> <span class="p">:</span> <span class="n">index</span> <span class="o">+</span> <span class="n">nSamples</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span>
+                        <span class="p">)</span>
+                    <span class="p">)</span>
+                    <span class="n">index</span> <span class="o">+=</span> <span class="n">nSamples</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">samples</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="mi">0</span><span class="p">,),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">))</span>
+            <span class="n">allTimestamps</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">timeStamps</span><span class="p">)</span>
+            <span class="n">allSamples</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">samples</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">allTimestamps</span><span class="p">,</span> <span class="n">allSamples</span><span class="p">)</span></div>
+
+
+
+<span class="n">freeeventlistdata</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">h5lib</span><span class="o">.</span><span class="n">TwFreeEventListData</span> <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;posix&quot;</span> <span class="k">else</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">_TwFreeEventListData</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="TwFreeEventListData">
+<a class="viewcode-back" href="../../../../hardware.tofwerk.lib.html#hardware.tofwerk.lib.TwH5.TwFreeEventListData">[docs]</a>
+<span class="k">def</span> <span class="nf">TwFreeEventListData</span><span class="p">():</span>
+    <span class="k">return</span> <span class="n">freeeventlistdata</span><span class="p">()</span></div>
+
+
+
+<span class="n">addlogentry</span> <span class="o">=</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">TwH5AddLogEntry</span> <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;posix&quot;</span> <span class="k">else</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">_TwH5AddLogEntry</span>
+
+
+<div class="viewcode-block" id="TwH5AddLogEntry">
+<a class="viewcode-back" href="../../../../hardware.tofwerk.lib.html#hardware.tofwerk.lib.TwH5.TwH5AddLogEntry">[docs]</a>
+<span class="k">def</span> <span class="nf">TwH5AddLogEntry</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">logEntryText</span><span class="p">,</span> <span class="n">logEntryTime</span><span class="p">):</span>
+    <span class="n">addlogentry</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">[</span><span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span> <span class="n">ct</span><span class="o">.</span><span class="n">c_uint64</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">addlogentry</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">logEntryText</span><span class="p">,</span> <span class="n">logEntryTime</span><span class="p">)</span></div>
+
+
+
+<span class="n">getuserdatafromh5</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">h5lib</span><span class="o">.</span><span class="n">TwGetUserDataFromH5</span> <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;posix&quot;</span> <span class="k">else</span> <span class="n">h5lib</span><span class="o">.</span><span class="n">_TwGetUserDataFromH5</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="TwGetUserDataFromH5">
+<a class="viewcode-back" href="../../../../hardware.tofwerk.lib.html#hardware.tofwerk.lib.TwH5.TwGetUserDataFromH5">[docs]</a>
+<span class="k">def</span> <span class="nf">TwGetUserDataFromH5</span><span class="p">(</span>
+    <span class="n">filename</span><span class="p">,</span> <span class="n">location</span><span class="p">,</span> <span class="n">rowIndex</span><span class="p">,</span> <span class="n">nbrElements</span><span class="p">,</span> <span class="n">buf</span><span class="p">,</span> <span class="n">elementDescription</span><span class="o">=</span><span class="kc">None</span>
+<span class="p">):</span>
+    <span class="k">def</span> <span class="nf">bytesToStrings</span><span class="p">(</span><span class="nb">bytes</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Takes a numpy array with data type uint8 with &quot;TofDaq&quot; format and converts it to a list of python strings</span>
+<span class="sd">        The &quot;TofDaq&quot; format is a byte array where each string is 256 bytes long (or ended by a null)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">strings</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="nb">bytes</span><span class="p">),</span> <span class="mi">256</span><span class="p">):</span>
+            <span class="n">s</span> <span class="o">=</span> <span class="nb">bytes</span><span class="p">[</span><span class="n">i</span> <span class="p">:</span> <span class="n">i</span> <span class="o">+</span> <span class="mi">256</span><span class="p">]</span><span class="o">.</span><span class="n">tostring</span><span class="p">()</span>
+            <span class="n">strings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\0</span><span class="s2">&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="k">return</span> <span class="n">strings</span>
+
+    <span class="k">if</span> <span class="n">buf</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">getuserdatafromh5</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+            <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+            <span class="n">ndpointer</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">ct</span><span class="o">.</span><span class="n">c_int32</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
+            <span class="n">ndpointer</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">ct</span><span class="o">.</span><span class="n">c_int32</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
+            <span class="n">ct</span><span class="o">.</span><span class="n">c_void_p</span><span class="p">,</span>
+            <span class="n">ct</span><span class="o">.</span><span class="n">c_void_p</span><span class="p">,</span>
+        <span class="p">]</span>
+    <span class="k">elif</span> <span class="n">elementDescription</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">getuserdatafromh5</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+            <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+            <span class="n">ndpointer</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">ct</span><span class="o">.</span><span class="n">c_int32</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
+            <span class="n">ndpointer</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">ct</span><span class="o">.</span><span class="n">c_int32</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
+            <span class="n">_double_array</span><span class="p">,</span>
+            <span class="n">ct</span><span class="o">.</span><span class="n">c_void_p</span><span class="p">,</span>
+        <span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">getuserdatafromh5</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+            <span class="n">ct</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+            <span class="n">ndpointer</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">ct</span><span class="o">.</span><span class="n">c_int32</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
+            <span class="n">ndpointer</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">ct</span><span class="o">.</span><span class="n">c_int32</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
+            <span class="n">_double_array</span><span class="p">,</span>
+            <span class="n">ndpointer</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">ct</span><span class="o">.</span><span class="n">c_uint8</span><span class="p">),</span>
+        <span class="p">]</span>
+        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">elementDescription</span><span class="p">)</span> <span class="o">==</span> <span class="nb">list</span><span class="p">:</span>
+            <span class="n">tempdesc</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">256</span> <span class="o">*</span> <span class="n">nbrElements</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+            <span class="n">ret</span> <span class="o">=</span> <span class="n">getuserdatafromh5</span><span class="p">(</span>
+                <span class="n">filename</span><span class="p">,</span> <span class="n">location</span><span class="p">,</span> <span class="n">rowIndex</span><span class="p">,</span> <span class="n">nbrElements</span><span class="p">,</span> <span class="n">buf</span><span class="p">,</span> <span class="n">tempdesc</span>
+            <span class="p">)</span>
+            <span class="n">elementDescription</span><span class="p">[:]</span> <span class="o">=</span> <span class="n">bytesToStrings</span><span class="p">(</span><span class="n">tempdesc</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">ret</span>
+    <span class="k">return</span> <span class="n">getuserdatafromh5</span><span class="p">(</span>
+        <span class="n">filename</span><span class="p">,</span> <span class="n">location</span><span class="p">,</span> <span class="n">rowIndex</span><span class="p">,</span> <span class="n">nbrElements</span><span class="p">,</span> <span class="n">buf</span><span class="p">,</span> <span class="n">elementDescription</span>
+    <span class="p">)</span></div>
+
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../../../index.html">Mascope</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../modules.html">backend</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2024, Karsa Oy.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 7.2.6</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 0.7.16</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

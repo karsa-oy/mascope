@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, BackgroundTasks, Query, Request
 from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
 
 from ..controllers.sample_items_controller import (
     get_sample_items,
@@ -12,9 +13,9 @@ from ..controllers.sample_items_controller import (
 from ..models.pydantic_models.sample_item_pydantic_model import (
     SampleItemCreate,
     SampleItemUpdate,
-    SampleItemCopy,
+    SampleItemCopyBody,
 )
-from ..models.exceptions import CustomException
+from ..exceptions import ApiException
 
 sample_items_router = APIRouter()
 
@@ -71,11 +72,36 @@ async def update_sample_item_route(sample_item_id: str, sample_item: SampleItemU
     return await update_sample_item(sample_item_id, sample_item)
 
 
-@sample_items_router.post("/api/sample_items/copy")
-async def copy_sample_item_route(sample_item_copy: SampleItemCopy):
+@sample_items_router.post("/api/sample_items/{sample_item_id}/copy")
+async def copy_sample_item_route(
+    request: Request,
+    sample_item_id: str,
+    body: SampleItemCopyBody,
+    background_tasks: BackgroundTasks,
+):
     try:
-        return await copy_sample_item(sample_item_copy, True)
-    except CustomException as e:
+        sid = request.headers.get("X-SID")
+        result = await copy_sample_item(
+            sample_item_id,
+            body.sample_batch_id,
+            body.sample_item_name,
+            body.independent_transaction,
+            background_tasks,
+            sid,
+        )
+
+        # Convert the new_sample_item object to a JSON-serializable format
+        result_data = jsonable_encoder(result)
         return JSONResponse(
-            status_code=400, content={"error": e.user_message, "detail": e.tech_message}
+            status_code=200,
+            content={
+                "message": f"Sample '{body.sample_item_name}' was successfully copied.",
+                "data": result_data,
+            },
+        )
+    # TODO_error_handling
+    except ApiException as e:
+        return JSONResponse(
+            status_code=e.status_code,
+            content={"error": e.user_message, "detail": e.tech_message},
         )

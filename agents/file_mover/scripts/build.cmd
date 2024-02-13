@@ -1,0 +1,1 @@
+call poetry run pyinstaller file_mover.py --noconfirm --onefile --icon=assets\icon.ico
