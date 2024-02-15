@@ -101,16 +101,42 @@
                       style="align: left"
                     />
                   </template>
-                  <b-dropdown-item aria-role="listitem" value="BACKGROUND"
-                    >Background</b-dropdown-item
+                  <b-dropdown-item
+                    aria-role="listitem"
+                    value="INSTRUMENT_BACKGROUND"
+                    v-if="!sampleItemFilterId"
+                    >Instrument background</b-dropdown-item
                   >
-                  <b-dropdown-item aria-role="listitem" value="HOT"
-                    >Hot</b-dropdown-item
+                  <b-dropdown-item
+                    aria-role="listitem"
+                    value="FILTER_REGENERATION"
+                    v-if="sampleItemFilterId"
                   >
-                  <b-dropdown-item aria-role="listitem" value="BLANK"
+                    Filter regeneration
+                  </b-dropdown-item>
+                  <b-dropdown-item
+                    aria-role="listitem"
+                    value="FILTER_BACKGROUND"
+                    v-if="sampleItemFilterId"
+                  >
+                    Filter background
+                  </b-dropdown-item>
+                  <b-dropdown-item
+                    aria-role="listitem"
+                    value="SAMPLE"
+                    v-if="sampleItemFilterId"
+                    >Sample</b-dropdown-item
+                  >
+                  <b-dropdown-item
+                    aria-role="listitem"
+                    value="BLANK"
+                    v-if="sampleItemFilterId"
                     >Blank</b-dropdown-item
                   >
-                  <b-dropdown-item aria-role="listitem" value="UNKNOWN"
+                  <b-dropdown-item
+                    aria-role="listitem"
+                    value="UNKNOWN"
+                    v-if="sampleItemFilterId"
                     >Unknown</b-dropdown-item
                   >
                 </b-dropdown>
@@ -340,12 +366,6 @@ export default {
             required: true,
             placeholder: "Sample title",
           },
-          {
-            label: "filename",
-            required: true,
-            placeholder: "",
-            disabled: true,
-          },
         ],
       },
       formFields: [],
@@ -511,7 +531,6 @@ export default {
       };
       await this.calibrationMzApply(requestData);
     },
-
     removeField(event) {
       // Field to remove label is in button element id, find it from the event data
       let fieldToRemove = event.target.id;
@@ -585,13 +604,6 @@ export default {
       });
     },
     async saveAttributes() {
-      // convert [{label, value...}, ...] to object
-      let props = {};
-      let sample_item_attributes = {};
-      this.formFields.forEach((field) => {
-        if (field.required) props[field.label] = field.value;
-        else sample_item_attributes[field.label] = field.value;
-      });
       if (this.action == "create") {
         let newSampleItem = {
           filename: this.sampleFilename,
@@ -606,7 +618,6 @@ export default {
         let newSampleItem = {
           ...this.sampleActive, // To include sample_item_id
           sample_item_name: this.sampleItemName,
-          sample_item_attributes,
           sample_item_type: this.sampleItemType,
           sample_batch_id: this.batchActive.sample_batch_id,
           sample_item_attributes: this.sampleItemAttributes,

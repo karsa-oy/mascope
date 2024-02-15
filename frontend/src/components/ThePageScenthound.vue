@@ -139,24 +139,31 @@
                 </template>
                 <b-dropdown-item
                   aria-role="listitem"
-                  value="BACKGROUND"
+                  value="INSTRUMENT_BACKGROUND"
                   v-if="!sampleItemFilterId"
                 >
                   Instrument background
                 </b-dropdown-item>
                 <b-dropdown-item
                   aria-role="listitem"
-                  value="BACKGROUND"
+                  value="FILTER_REGENERATION"
                   v-if="sampleItemFilterId && filterIsNew"
+                >
+                  Filter regeneration
+                </b-dropdown-item>
+                <b-dropdown-item
+                  aria-role="listitem"
+                  value="FILTER_BACKGROUND"
+                  v-if="sampleItemFilterId"
                 >
                   Filter background
                 </b-dropdown-item>
                 <b-dropdown-item
                   aria-role="listitem"
-                  value="HOT"
+                  value="SAMPLE"
                   v-if="sampleItemFilterId && !filterIsNew"
                 >
-                  Hot
+                  Sample
                 </b-dropdown-item>
                 <b-dropdown-item
                   aria-role="listitem"
