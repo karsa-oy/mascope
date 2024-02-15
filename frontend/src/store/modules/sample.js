@@ -195,8 +195,37 @@ export default {
     },
   },
   getters: {
+    alarmCategory: (state, getters, rootGetters) => {
+      if (!(state.matchCollections && state.matchCompounds)) return null;
+      // Get ids of target collections set to alarm
+      const alarmCollectionIds = getters["matchCollections"]
+        .filter((collection) => collection.target_collection_type === "TARGETS")
+        .map((collection) => collection.target_collection_id);
+      // Get ids of target compounds set to alarm (based on belonging to alarming collection)
+      const targetCompounds = rootGetters["batch"]["targetCompounds"];
+      if (!targetCompounds) return null;
+      const alarmCompoundIds = targetCompounds
+        .filter((compound) =>
+          alarmCollectionIds.includes(compound.target_collection_id)
+        )
+        .map((compound) => compound.target_compound_id);
+      // Get match compound data for alarming compounds
+      const alarmCompoundMatches = state.matchCompounds.filter((match) =>
+        alarmCompoundIds.includes(match.target_compound_id)
+      );
+      // Return highest match category of alarming compounds
+      return getters["maxMatchCategory"](alarmCompoundMatches);
+    },
     matchCollections: (state) => {
       return state.matchCollections ? state.matchCollections : [];
     },
+    maxMatchCategory:
+      (state) =>
+      (compounds = null) => {
+        if (compounds === null) compounds = state.matchCompounds;
+        return compounds && compounds.length > 0
+          ? Math.max(...compounds.map((compound) => compound.match_category))
+          : null;
+      },
   },
 };

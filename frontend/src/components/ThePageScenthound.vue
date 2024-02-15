@@ -534,6 +534,7 @@ export default {
       mzFitError: "calibration/mzFitError",
       mzFitStats: "calibration/mzFitStats",
       sampleActive: "sample/active",
+      sampleAlarmCategory: "sample/alarmCategory",
       sampleItems: "batch/sampleItems",
       sampleMatched: "sample/matched",
       sampleMatchCompounds: "sample/matchCompounds",
@@ -589,19 +590,14 @@ export default {
       )[0].value;
     },
     sampleMatchClass() {
-      if (this.sampleMaxMatchCategory === null) return "is-primary";
-      if (this.sampleMaxMatchCategory === 2) {
+      if (this.sampleAlarmCategory === null) return "is-primary";
+      if (this.sampleAlarmCategory === 2) {
         return "is-danger";
-      } else if (this.sampleMaxMatchCategory === 1) {
+      } else if (this.sampleAlarmCategory === 1) {
         return "is-primary";
       } else {
         return "is-success";
       }
-    },
-    sampleMaxMatchCategory() {
-      return this.sampleMatchCompounds && this.sampleMatchCompounds.length > 0
-        ? this.sampleMatchCompounds[0].match_category
-        : null;
     },
     savedTemplates() {
       return this.allTemplates.filter(
@@ -718,9 +714,6 @@ export default {
         confirmText: "Save",
         inputAttrs: {
           placeholder: "template name",
-            this.loadedTemplate.name === "default"
-              ? "template name"
-              : this.loadedTemplate.name,
           maxlength: 100,
         },
         trapFocus: true,
