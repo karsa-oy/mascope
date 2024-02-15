@@ -59,7 +59,7 @@
             </div>
             <div v-for="item in formFields" :key="item.label">
               <template>
-                <b-field :label="item.label.replaceAll('_', ' ')">
+                <b-field :label="convertLabelToTitle(item.label)">
                   <b-input
                     v-model="item.value"
                     :placeholder="
@@ -463,7 +463,7 @@ import ThePaneSettingsCalibration from "./ThePaneSettingsCalibration.vue";
 import * as _ from "underscore";
 import { mapMutations } from "vuex";
 import { call, get, sync } from "vuex-pathify";
-import { genId } from "../lib/util";
+import { beautifySnakeCase, camelToSnakeCase, genId } from "../lib/util";
 
 export default {
   name: "TheModalScenthoundWorkflow",
@@ -648,6 +648,9 @@ export default {
           },
         });
       }
+    },
+    convertLabelToTitle(label) {
+      return beautifySnakeCase(label);
     },
     addField() {
       this.$buefy.dialog.prompt({

@@ -29,7 +29,7 @@
             </div>
             <div v-for="item in formFields" :key="item.label">
               <template>
-                <b-field :label="item.label.replaceAll('_', ' ')">
+                <b-field :label="convertLabelToTitle(item.label)">
                   <b-input
                     v-model="item.value"
                     :placeholder="
@@ -343,7 +343,7 @@ import ThePaneSettingsCalibration from "./ThePaneSettingsCalibration.vue";
 import * as _ from "underscore";
 import { mapActions, mapMutations } from "vuex";
 import { call, get, sync } from "vuex-pathify";
-import { genId } from "../lib/util";
+import { beautifySnakeCase, genId } from "../lib/util";
 
 export default {
   name: "TheModalSampleItemAttributesSave",
@@ -472,6 +472,9 @@ export default {
     }),
     clone(obj) {
       return JSON.parse(JSON.stringify(obj));
+    },
+    convertLabelToTitle(label) {
+      return beautifySnakeCase(label);
     },
     addField() {
       this.$buefy.dialog.prompt({

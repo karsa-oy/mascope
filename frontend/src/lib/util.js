@@ -1,7 +1,16 @@
 import { customAlphabet } from "nanoid";
 
+export function beautifySnakeCase(str) {
+  // Replace underscores with white space and capitalize first letter
+  return capitalizeFirstLetter(str.replaceAll("_", " "));
+}
+
 export function camelToSnakeCase(str) {
   return str.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
+}
+
+export function capitalizeFirstLetter(str) {
+  return str[0].toUpperCase() + str.slice(1);
 }
 
 export function genId(len, case_sensitive = true) {
