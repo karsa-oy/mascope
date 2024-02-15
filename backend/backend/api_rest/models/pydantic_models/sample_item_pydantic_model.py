@@ -10,6 +10,7 @@ APP_ITEM_TYPES = [
     "BLANK",
     "SAMPLE",
     "UNKNOWN",
+    "ONLINE",
 ]
 
 
