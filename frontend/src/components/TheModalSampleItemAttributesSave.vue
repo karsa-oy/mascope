@@ -115,6 +115,15 @@
                   >
                 </b-dropdown>
               </b-field>
+              <b-field label="Filename">
+                <b-input
+                  v-model="sampleFilename"
+                  required
+                  :disabled="true"
+                  expanded
+                >
+                </b-input>
+              </b-field>
             </div>
             <div v-if="showEditFunctions" style="padding-top: 2em">
               <b-field>
@@ -410,6 +419,16 @@ export default {
     mzCalibrationTableRows() {
       return this.mzFitStats ?? [];
     },
+    sampleItemAttributes() {
+      return this.formFields
+        .filter((field) => field.label != "sample_item_name")
+        .reduce((acc, cur) => ({ ...acc, [cur.label]: cur.value }), {});
+    },
+    sampleItemName() {
+      return this.formFields.filter(
+        (field) => field.label == "sample_item_name"
+      )[0].value;
+    },
     savedTemplates() {
       return this.allTemplates.filter(
         (template) => template.type == this.templateType
@@ -417,7 +436,7 @@ export default {
     },
   },
   created() {
-    this.loadedTemplate = this.clone(this.availableTemplates[0]);
+    this.formFields = this.clone(this.defaultTemplate.template);
   },
   methods: {
     ...call({
@@ -575,20 +594,22 @@ export default {
       });
       if (this.action == "create") {
         let newSampleItem = {
-          ...props,
-          sample_item_attributes,
+          filename: this.sampleFilename,
+          sample_item_name: this.sampleItemName,
           sample_item_type: this.sampleItemType,
           sample_batch_id: this.batchActive.sample_batch_id,
+          sample_item_attributes: this.sampleItemAttributes,
           filter_id: this.sampleItemFilterId,
         };
         await this.sampleItemCreate(newSampleItem);
       } else if (this.action == "update") {
         let newSampleItem = {
-          ...this.sampleActive,
-          ...props,
+          ...this.sampleActive, // To include sample_item_id
+          sample_item_name: this.sampleItemName,
           sample_item_attributes,
           sample_item_type: this.sampleItemType,
           sample_batch_id: this.batchActive.sample_batch_id,
+          sample_item_attributes: this.sampleItemAttributes,
           filter_id: this.sampleItemFilterId,
         };
         await this.sampleItemUpdate(newSampleItem);
@@ -608,17 +629,33 @@ export default {
           break;
       }
     },
+    sampleItemFilterId() {
+      this.sampleItemType = null;
+    },
     loadedTemplate: {
       handler(newValue) {
         if (newValue) {
           // Make a copy to avoid mutating the loaded template directly
-          this.formFields = this.clone(newValue.template);
+          let newFormFields = this.clone(newValue.template);
+          // Fill in new form with values from the old
+          newFormFields.forEach(
+            (field) =>
+              (field.value = this.formFields.find(
+                (old_field) => old_field.label === field.label
+              )?.value)
+          );
+          this.formFields = newFormFields;
         }
       },
       deep: true,
     },
     modalActive() {
-      if (this.modalActive) this.activeStep = 0;
+      if (this.modalActive) {
+        this.activeStep = 0;
+      } else {
+        // Reset template selection when closing modal
+        this.loadedTemplate = null;
+      }
     },
     modalProps: async function (data) {
       this.action = data.action;
@@ -656,7 +693,7 @@ export default {
         }
       }
 
-      this.loadedTemplate = newTemplate;
+      this.formFields = newTemplate.template;
       this.sampleFilename = data.sampleItemRecordToLoad.filename;
       this.sampleInstrument = data.sampleItemRecordToLoad.instrument;
       this.sampleItemFilterId = data.sampleItemRecordToLoad.filter_id;

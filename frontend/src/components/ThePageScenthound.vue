@@ -45,18 +45,49 @@
             :clickable="true"
             :type="{ 'is-success': this.sampleActive ? true : false }"
           >
+            <div style="text-align: right" v-if="true">
+              <b-button
+                icon-right="cog"
+                type="is-primary"
+                size="is-small"
+                @click="showEditFunctions = !showEditFunctions"
+              >
+              </b-button>
+            </div>
             <div style="padding-bottom: 1.5em">
               <h1 class="title has-text-centered">Sample information</h1>
             </div>
-            <b-field label="Sample name">
-              <b-input
-                v-model="sampleItemName"
-                required
-                :disabled="!acquisitionFilename"
-                expanded
-              >
-              </b-input>
-            </b-field>
+            <div v-for="item in formFields" :key="item.label">
+              <template>
+                <b-field :label="item.label.replaceAll('_', ' ')">
+                  <b-input
+                    v-model="item.value"
+                    :placeholder="
+                      showEditFunctions
+                        ? item.placeholder || 'default value'
+                        : ''
+                    "
+                    :required="fillable && item.required"
+                    :disabled="!fillable || item.disabled"
+                    lazy
+                    expanded
+                  >
+                  </b-input>
+                  <div v-if="showEditFunctions">
+                    <b-button
+                      :id="item.label"
+                      :disabled="item.required"
+                      @click="removeField"
+                      type="is-danger"
+                      icon-right="delete"
+                      hover
+                      title="Delete Field"
+                    >
+                    </b-button>
+                  </div>
+                </b-field>
+              </template>
+            </div>
             <b-field label="Filter ID">
               <b-input v-model="sampleItemFilterId" disabled expanded>
               </b-input>
@@ -200,6 +231,71 @@
                   </table>
                 </template>
               </b-tooltip>
+            </b-field>
+            <div v-if="showEditFunctions" style="padding-top: 2em">
+              <b-field>
+                <b-button @click="addField" expanded>
+                  <b>Add new field</b>
+                </b-button>
+              </b-field>
+            </div>
+            <div><br /></div>
+            <b-field label="Reuse template">
+              <div class="container">
+                <div class="row">
+                  <div class="columns">
+                    <div class="column is-half" style="text-align: center">
+                      <b-select
+                        v-model="loadedTemplate"
+                        placeholder="Load template"
+                        expanded
+                      >
+                        <option
+                          v-for="t in availableTemplates"
+                          :value="t"
+                          :key="t.name"
+                        >
+                          {{ t.name }}
+                        </option>
+                      </b-select>
+                    </div>
+                    <div
+                      class="column is-narrow"
+                      style="text-align: left"
+                      v-if="showEditFunctions"
+                    >
+                      <b-button
+                        :disabled="
+                          !loadedTemplate ||
+                          !loadedTemplate.name ||
+                          loadedTemplate.name == 'default'
+                        "
+                        @click="deleteTemplate"
+                        type="is-danger"
+                        icon-right="delete"
+                        hover
+                        title="Delete Template"
+                      >
+                      </b-button>
+                    </div>
+                    <div
+                      class="column is-narrow"
+                      style="text-align: left"
+                      v-if="showEditFunctions"
+                    >
+                      <b-button
+                        @click="saveTemplate"
+                        :disabled="!formFields.length"
+                        type="is-success"
+                        icon-left="content-save"
+                        hover
+                        title="Save Template"
+                      >
+                      </b-button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </b-field>
             <div
               class="container"
@@ -375,6 +471,18 @@ export default {
   data: function () {
     return {
       activeStep: 0,
+      defaultTemplate: {
+        name: "default",
+        template: [
+          {
+            label: "sample_item_name",
+            required: true,
+            placeholder: "Sample title",
+          },
+        ],
+      },
+      formFields: [],
+      loadedTemplate: null,
       mzCalibrationTableCols: [
         { field: "mz", label: "Isotope m/z" },
         { field: "sample_peak_mz", label: "Pre peak m/z" },
@@ -398,14 +506,16 @@ export default {
       ],
       mzCalibrationTableKey: 0,
       sampleItemFilterId: null,
-      sampleItemName: null,
       sampleItemType: null,
+      showEditFunctions: false,
+      templateType: "sample_item",
     };
   },
   computed: {
     ...get({
       acquisitionFilename: "instrument/acquisitionActiveFilename",
       acquisitionProgress: "instrument/acquisitionProgress",
+      allTemplates: "app/attributeTemplates",
       batchActive: "batch/active",
       batches: "workspace/batches",
       calibrationStatus: "calibration/calibrationStatus",
@@ -426,6 +536,15 @@ export default {
       sampleItemPending: "instrument/sampleItemPending",
       scenthoundModeActive: "instrument/scenthoundModeActive",
     }),
+    availableTemplates() {
+      return [this.defaultTemplate, ...this.savedTemplates];
+    },
+    editable() {
+      return true;
+    },
+    fillable() {
+      return this.acquisitionFilename;
+    },
     batchFilterIds() {
       return this.batchActive
         ? [null, ...new Set(this.sampleItems.map((item) => item.filter_id))]
@@ -452,6 +571,16 @@ export default {
             this.sampleItemFilterId === this.sampleActive.filter_id
         : false;
     },
+    sampleItemAttributes() {
+      return this.formFields
+        .filter((field) => field.label != "sample_item_name")
+        .reduce((acc, cur) => ({ ...acc, [cur.label]: cur.value }), {});
+    },
+    sampleItemName() {
+      return this.formFields.filter(
+        (field) => field.label == "sample_item_name"
+      )[0].value;
+    },
     sampleMatchClass() {
       if (this.sampleMaxMatchCategory === null) return "is-primary";
       if (this.sampleMaxMatchCategory === 2) {
@@ -467,10 +596,16 @@ export default {
         ? this.sampleMatchCompounds[0].match_category
         : null;
     },
+    savedTemplates() {
+      return this.allTemplates.filter(
+        (template) => template.type == this.templateType
+      );
+    },
   },
   created() {
     this.sampleUnload();
     this.scenthoundModeActive = true;
+    this.formFields = [...this.defaultTemplate.template];
   },
   beforeRouteLeave(to, from, next) {
     this.scenthoundModeActive = false;
@@ -507,6 +642,111 @@ export default {
         });
       }
     },
+    addField() {
+      this.$buefy.dialog.prompt({
+        message: "Add field to template",
+        confirmText: "Add",
+        inputAttrs: {
+          placeholder: "field label",
+          maxlength: 100,
+        },
+        trapFocus: true,
+        onConfirm: (fieldToAdd) => {
+          this.loadedTemplate = {
+            name: null,
+            template: [...this.formFields, { label: fieldToAdd, value: "" }],
+          };
+        },
+      });
+    },
+    deleteTemplate() {
+      this.$buefy.dialog.confirm({
+        title: "Deleting template",
+        message:
+          "Are you sure you want to delete template <b>" +
+          this.loadedTemplate.name +
+          "</b>?",
+        confirmText: "Delete",
+        onConfirm: () => {
+          this.$api.emit(
+            "attribute_template_delete",
+            this.availableTemplates
+              .filter(
+                (template) =>
+                  template.attribute_template_id ==
+                  this.loadedTemplate.attribute_template_id
+              )
+              .map((template) => template.attribute_template_id)
+          );
+        },
+      });
+    },
+    removeField(event) {
+      // Field to remove label is in button element id, find it from the event data
+      let fieldToRemove = event.target.id;
+      if (!fieldToRemove.length) {
+        // Failed to find the button id
+        console.log("fieldToRemove not found at event.target.id: ", event);
+        return;
+      }
+      for (let i = 0; i < this.loadedTemplate.template.length; ++i) {
+        if (_.isEqual(fieldToRemove, this.loadedTemplate.template[i].label)) {
+          this.loadedTemplate = {
+            name: null,
+            template: [
+              ...this.loadedTemplate.template.slice(0, i),
+              ...this.loadedTemplate.template.slice(i + 1),
+            ],
+          };
+          break;
+        }
+      }
+    },
+    saveTemplate() {
+      this.$buefy.dialog.prompt({
+        title: "Template name",
+        confirmText: "Save",
+        inputAttrs: {
+          placeholder:
+            this.loadedTemplate.name === "default"
+              ? "template name"
+              : this.loadedTemplate.name,
+          maxlength: 100,
+        },
+        trapFocus: true,
+        onConfirm: (templateName) => {
+          if (templateName.toLowerCase() === "default") {
+            this.$buefy.toast.open({
+              message: `Name "${templateName}" is not allowed`,
+              duration: 5000,
+              type: "is-danger",
+            });
+            return;
+          }
+          // copy loadedTempate fields with user input
+          let newTemplate = {
+            name: templateName,
+            type: this.templateType,
+            template: this.clone(this.formFields),
+          };
+          let i = 0;
+          // set loaded template
+          for (i = 0; i < this.availableTemplates.length; ++i) {
+            if (_.isEqual(templateName, this.availableTemplates[i].name)) break;
+          }
+          if (i < this.availableTemplates.length) {
+            // existing template
+            this.availableTemplates[i] = this.clone(newTemplate);
+          } else {
+            // new template
+            this.availableTemplates.push(this.clone(newTemplate));
+          }
+          this.loadedTemplate = this.clone(newTemplate);
+          // push new template
+          this.$api.emit("attribute_template_create", [this.loadedTemplate]);
+        },
+      });
+    },
     generateFilterId() {
       this.sampleItemFilterId = genId(6, false);
     },
@@ -534,8 +774,11 @@ export default {
     resetSampleItem() {
       this.sampleUnload();
       this.sampleItemFilterId = null;
-      this.sampleItemName = null;
       this.sampleItemType = null;
+      // Reset sample item name
+      this.formFields.filter(
+        (field) => field.label == "sample_item_name"
+      )[0].value = null;
     },
     async sampleMatch() {
       await this.matchSampleCompute(this.sampleActive);
@@ -546,7 +789,7 @@ export default {
         sample_item_name: this.sampleItemName,
         sample_item_type: this.sampleItemType,
         sample_batch_id: this.batchActive.sample_batch_id,
-        sample_item_attributes: {},
+        sample_item_attributes: this.sampleItemAttributes,
         filter_id: this.sampleItemFilterId,
       };
       if (this.conversionProgress < 100) {
@@ -598,6 +841,23 @@ export default {
           this.activeStep = 1;
         }
       }
+    },
+    loadedTemplate: {
+      handler(newValue) {
+        if (newValue) {
+          // Make a copy to avoid mutating the loaded template directly
+          let newFormFields = this.clone(newValue.template);
+          // Fill in new form with values from the old
+          newFormFields.forEach(
+            (field) =>
+              (field.value = this.formFields.find(
+                (old_field) => old_field.label === field.label
+              )?.value)
+          );
+          this.formFields = newFormFields;
+        }
+      },
+      deep: true,
     },
     sampleMaxMatchCategory(newValue, oldValue) {
       if (this.sampleMaxMatchCategory > 0) {
