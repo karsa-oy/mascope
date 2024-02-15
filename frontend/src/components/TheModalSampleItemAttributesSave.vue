@@ -566,10 +566,7 @@ export default {
         title: "Template name",
         confirmText: "Save",
         inputAttrs: {
-          placeholder:
-            this.loadedTemplate.name === "default"
-              ? "template name"
-              : this.loadedTemplate.name,
+          placeholder: "template name",
           maxlength: 100,
         },
         trapFocus: true,
@@ -582,11 +579,13 @@ export default {
             });
             return;
           }
-          // copy loadedTempate fields with user input
+          let templateFormFields = this.clone(this.formFields);
+          // Empty values
+          templateFormFields.forEach((field) => (field.value = ""));
           let newTemplate = {
             name: templateName,
             type: this.templateType,
-            template: this.clone(this.formFields),
+            template: templateFormFields,
           };
           let i = 0;
           // set loaded template
