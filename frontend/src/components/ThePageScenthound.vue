@@ -69,7 +69,6 @@
                     "
                     :required="fillable && item.required"
                     :disabled="!fillable || item.disabled"
-                    lazy
                     expanded
                   >
                   </b-input>
