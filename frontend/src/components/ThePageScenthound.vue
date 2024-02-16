@@ -863,8 +863,9 @@ export default {
       },
       deep: true,
     },
-    sampleMaxMatchCategory(newValue, oldValue) {
-      if (this.sampleMaxMatchCategory > 0) {
+    sampleAlarmCategory(newValue) {
+      if (newValue > 0) {
+        // Switch to target search page if sample alarms
         this.activeStep = 2;
       }
     },
