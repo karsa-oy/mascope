@@ -45,17 +45,23 @@
             :clickable="true"
             :type="{ 'is-success': this.sampleActive ? true : false }"
           >
-            <div style="text-align: right" v-if="true">
-              <b-button
-                icon-right="cog"
-                type="is-primary"
-                size="is-small"
-                @click="showEditFunctions = !showEditFunctions"
-              >
-              </b-button>
-            </div>
-            <div style="padding-bottom: 1.5em">
-              <h1 class="title has-text-centered">Sample information</h1>
+            <div style="padding-bottom: 0.75em">
+              <div class="columns">
+                <div class="column is-11">
+                  <h1 class="title has-text-centered">Sample information</h1>
+                </div>
+                <div class="column is-1">
+                  <div style="text-align: right" v-if="true">
+                    <b-button
+                      icon-right="cog"
+                      type="is-primary"
+                      size="is-small"
+                      @click="showEditFunctions = !showEditFunctions"
+                    >
+                    </b-button>
+                  </div>
+                </div>
+              </div>
             </div>
             <div v-for="item in formFields" :key="item.label">
               <template>
@@ -245,7 +251,6 @@
                 </b-button>
               </b-field>
             </div>
-            <div><br /></div>
             <b-field label="Reuse template">
               <div class="container">
                 <div class="row">
@@ -305,7 +310,7 @@
             </b-field>
             <div
               class="container"
-              style="text-align: center; padding: 2em 0em 0em 0em"
+              style="text-align: center; padding: 1em 0em 0em 0em"
             >
               <div class="rows">
                 <div class="row">
@@ -748,6 +753,7 @@ export default {
           this.loadedTemplate = this.clone(newTemplate);
           // push new template
           this.$api.emit("attribute_template_create", [this.loadedTemplate]);
+          this.showEditFunctions = false;
         },
       });
     },
