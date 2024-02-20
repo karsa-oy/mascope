@@ -475,14 +475,16 @@ export default {
             .sort();
           const compoundsChanged =
             JSON.stringify(initialCompoundIds) !==
-            JSON.stringify(currentCompoundIds);
+              JSON.stringify(currentCompoundIds) ||
+            this.targetCompoundsCreate.length > 0; // Check if there are new compounds to create;
 
           let disabled = !basicPropertiesChanged && !compoundsChanged;
-          // Check if there are any compounds to assign ot create
-          const noCompounds =
-            this.targetCompounds.length === 0 &&
-            this.targetCompoundsCreate.length === 0;
-          if (noCompounds) disabled = true;
+
+          // Check if there are any compounds to assign or to create
+          const hasCompounds =
+            this.targetCompounds.length > 0 ||
+            this.targetCompoundsCreate.length > 0;
+          if (!hasCompounds) disabled = true;
           return disabled;
         case "manageCollectionBatches":
           const initialBatchIds = this.initialBatches
@@ -878,8 +880,11 @@ export default {
 
     // spreadsheet loading
     async loadSpreadsheetCompounds(rows) {
-      if (this.addCompoundsSource !== "spreadsheet")
-        this.targetCompoundsCreate = [];
+      if (this.addCompoundsSource !== "spreadsheet") return;
+      // Reset add compounds list to the first page when the list is reloaded
+      this.addCompoundsCurrentPage = 1;
+      this.targetCompoundsCreateCurrentPage = 1;
+      this.targetCompoundsCreate = [];
       this.spreadsheetCompounds = rows;
       const { existingCompounds, notExistingCompounds } =
         await this.processSpreadsheetInput(rows);
