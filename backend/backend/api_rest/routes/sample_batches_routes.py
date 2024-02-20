@@ -1,5 +1,6 @@
 from fastapi import APIRouter, BackgroundTasks, Request
 from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
 
 from ..controllers.sample_batches_controller import (
     get_sample_batches,
@@ -15,7 +16,7 @@ from ..controllers.sample_batches_controller import (
 from ..models.pydantic_models.sample_pydantic_model import AlarmsList
 from ..models.pydantic_models.sample_batch_pydantic_model import (
     SampleBatchCreate,
-    SampleBatchUpdate,
+    SampleBatchUpdateBody,
     autoSamplerImportBatchData,
     SampleBatchCopyBody,
     SampleBatchExportPeaks,
@@ -69,11 +70,28 @@ async def delete_sample_batch_route(
 
 @sample_batches_router.patch("/api/sample_batches/{sample_batch_id}")
 async def update_sample_batch_route(
+    request: Request,
     sample_batch_id: str,
-    sample_batch: SampleBatchUpdate,
+    body: SampleBatchUpdateBody,
     background_tasks: BackgroundTasks,
 ):
-    return await update_sample_batch(sample_batch_id, sample_batch, background_tasks)
+    try:
+        sid = request.headers.get("X-SID")
+        result = await update_sample_batch(sample_batch_id, body, background_tasks)
+        # Convert the updated_sample_batch object to a JSON-serializable format
+        result_data = jsonable_encoder(result)
+        return JSONResponse(
+            status_code=200,
+            content={
+                "message": f"Sample batch '{body.sample_batch_name}' was successfully updated.",
+                "data": result_data,
+            },
+        )
+    except ApiException as e:
+        return JSONResponse(
+            status_code=e.status_code,
+            content={"error": e.user_message, "detail": e.tech_message},
+        )
 
 
 @sample_batches_router.post("/api/sample_batches/import_batch")

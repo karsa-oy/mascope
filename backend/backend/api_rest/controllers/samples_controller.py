@@ -3,7 +3,7 @@
 # -------------------------------------------------------------------
 import pandas as pd
 from datetime import datetime
-from typing import Optional, List
+from typing import List, Optional, Tuple
 from fastapi import HTTPException
 from sqlalchemy import (
     asc,
@@ -115,9 +115,11 @@ async def set_ions_match_category(
         match_ions_df.at[index, "match_category"] = (
             2
             if match_score >= probable_match_threshold
-            else 1
-            if possible_match_threshold <= match_score < probable_match_threshold
-            else 0
+            else (
+                1
+                if possible_match_threshold <= match_score < probable_match_threshold
+                else 0
+            )
         )
 
     match_ions_df["match_category"] = match_ions_df["match_category"].astype(int)
@@ -147,7 +149,7 @@ async def set_alarm_mode(
 
 async def aggregate_match_isotopes(
     match_filter_df: pd.DataFrame,
-) -> (pd.DataFrame, pd.DataFrame):
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Aggregate fields for matchIsotopes from the provided sample/batch match filter dataframe.
 
     This function processes the sample/batch match filter dataframe to aggregate isotope data.
@@ -219,7 +221,7 @@ async def aggregate_match_isotopes(
 
 async def aggregate_match_ions(
     isotopes_df: pd.DataFrame, filter_params: Optional[FilterParams] = None
-) -> (pd.DataFrame, pd.DataFrame):
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Aggregate fields for matchIons from isotopes dataframe.
      Provided filters are passed to set_ions_match_category, if none filter_params are provided, stored ion-specidic or default params will be applied.
 
@@ -305,7 +307,7 @@ async def aggregate_match_ions(
 
 async def aggregate_match_compounds(
     ions_df: pd.DataFrame,
-) -> (pd.DataFrame, pd.DataFrame):
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Aggregate fields for matchCompounds from ions dataframe.
 
     This function sorts the ions dataframe by match_category and match_score in descending order
@@ -681,12 +683,10 @@ async def get_samples(
                 batch_matches_info_dict["matches"]["match_compounds"] = len(
                     match_compounds_df
                 )
-                batch_matches_info_dict[
-                    "match_compounds"
-                ] = match_compounds_df.sort_values(
-                    by=["match_category", "match_score"], ascending=[False, False]
-                ).to_dict(
-                    "records"
+                batch_matches_info_dict["match_compounds"] = (
+                    match_compounds_df.sort_values(
+                        by=["match_category", "match_score"], ascending=[False, False]
+                    ).to_dict("records")
                 )
 
             if match_ions:
@@ -699,12 +699,10 @@ async def get_samples(
                 batch_matches_info_dict["matches"]["match_isotopes"] = len(
                     match_isotopes_df
                 )
-                batch_matches_info_dict[
-                    "match_isotopes"
-                ] = match_isotopes_df.sort_values(
-                    by=["match_category", "match_score"], ascending=[False, False]
-                ).to_dict(
-                    "records"
+                batch_matches_info_dict["match_isotopes"] = (
+                    match_isotopes_df.sort_values(
+                        by=["match_category", "match_score"], ascending=[False, False]
+                    ).to_dict("records")
                 )
 
             result_dict["batch_matches_info"] = batch_matches_info_dict
@@ -1119,9 +1117,13 @@ async def init_batch_match_filter(sample_batch_id: str):
             row["match_category"] = (
                 2  # Probable match
                 if match_score >= probable_match_threshold
-                else 1  # Possible match
-                if possible_match_threshold <= match_score < probable_match_threshold
-                else 0  # No match
+                else (
+                    1  # Possible match
+                    if possible_match_threshold
+                    <= match_score
+                    < probable_match_threshold
+                    else 0
+                )  # No match
             )
 
         message = (
@@ -1310,9 +1312,13 @@ async def init_sample_match_filter(
             row["match_category"] = (
                 2  # Probable match
                 if match_score >= probable_match_threshold
-                else 1  # Possible match
-                if possible_match_threshold <= match_score < probable_match_threshold
-                else 0  # No match
+                else (
+                    1  # Possible match
+                    if possible_match_threshold
+                    <= match_score
+                    < probable_match_threshold
+                    else 0
+                )  # No match
             )
 
         if target_ion_id and filter_params:

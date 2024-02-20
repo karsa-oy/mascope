@@ -40,8 +40,7 @@ async def emit_progress_update(
     #  TODO: - optimize instrument/compute_sample_match notifications emits/listeners.
     if not progress_properties:
         return
-
-    if progress_properties.progress_type == "match_batches":
+    if progress_properties.progress_type in ["rematch_batches", "rematch_batch"]:
         item_weight = progress_properties.item_weight
         item_index = progress_properties.item_index
         batch_index = progress_properties.batch_index
@@ -60,16 +59,41 @@ async def emit_progress_update(
         # Combine both progresses
         progress_percentage_all = batch_progress + proportional_batch_progress
 
-        await sio.emit(
-            "match_batch_compute_progress_percentage",
-            {
-                "progress_percentage": progress_percentage_all,
-                "progress_percentage_batch": proportional_batch_progress
-                * total_batches,
-            },
-            room=workspace_id,
-            namespace="/",
-        )
+        if progress_properties.progress_type == "rematch_batches":
+            # emit event to the user who triggered rematch_batches operation
+            await sio.emit(
+                "rematch_batches_progress_percentage",
+                {
+                    "progress_percentage": progress_percentage_all,
+                    "progress_percentage_batch": proportional_batch_progress
+                    * total_batches,
+                },
+                room=progress_properties.sid,
+                namespace="/",
+            )
+            # emit event to the client of current affected batch
+            # TODO_notifications compute the real progress for the current batch, not progress_percentage_all
+            await sio.emit(
+                "rematch_batch_progress_percentage",
+                {
+                    "progress_percentage": progress_percentage_all,
+                    "progress_percentage_batch": proportional_batch_progress
+                    * total_batches,
+                },
+                room=progress_properties.sample_batch_id,
+                namespace="/",
+            )
+        if progress_properties.progress_type == "rematch_batch":
+            await sio.emit(
+                "rematch_batch_progress_percentage",
+                {
+                    "progress_percentage": progress_percentage_all,
+                    "progress_percentage_batch": proportional_batch_progress
+                    * total_batches,
+                },
+                room=progress_properties.sample_batch_id,
+                namespace="/",
+            )
 
     elif progress_properties.progress_type == "match_item":
         sample_batch_id = progress_properties.sample_batch_id

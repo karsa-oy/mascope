@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from .calibration_pydantic_model import CalibrationMzFitParams
 
@@ -22,11 +22,8 @@ class SampleBatchCreate(SampleBatchBase):
     )
 
 
-class SampleBatchUpdate(SampleBatchBase):
-    sample_batch_name: Optional[str] = Field(
-        None, description="Name of the sample batch"
-    )
-    target_collection_id: List[str] = Field(
+class SampleBatchUpdateBody(SampleBatchBase):
+    target_collection_ids: List[str] = Field(
         ..., description="IDs of target collections associated with the sample batch"
     )
 
