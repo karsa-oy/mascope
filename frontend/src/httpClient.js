@@ -475,11 +475,16 @@ export function createHttpClient(host, api_port) {
     },
 
     // Match
-    matchBatchesRematch: async (body) => {
+    rematchBatch: async ({ batchId, body = {} }) => {
       try {
-        return await httpClient.post(`${matchBaseUrl}/batches/rematch`, body);
+        return await httpClient.post(
+          `${matchBaseUrl}/batch/${batchId}/rematch`,
+          body
+        );
       } catch (error) {
-        console.error("Failed to rematch batches: ", error);
+        const userErrorMessage =
+          error?.response?.data?.error || `Failed to rematch batch: ${error}`;
+        throw new Error(userErrorMessage);
       }
     },
 
@@ -533,46 +538,50 @@ export function createHttpClient(host, api_port) {
       }
     },
 
-    createTargetCollection: async (newTargetCollection) => {
+    createTargetCollection: async (newCollection) => {
       try {
-        return await httpClient.post(
-          targetCollectionsBaseUrl,
-          newTargetCollection
-        );
+        return await httpClient.post(targetCollectionsBaseUrl, newCollection);
       } catch (error) {
-        console.error("Failed to create target collection: ", error);
+        const userErrorMessage =
+          error?.response?.data?.error ||
+          `Failed to create target collection ${newCollection.target_collection_name}: ${error}`;
+        throw new Error(userErrorMessage);
       }
     },
 
-    updateTargetCollection: async (newTargetCollection) => {
+    updateTargetCollection: async ({ collectionId, body }) => {
       try {
         return await httpClient.patch(
-          `${targetCollectionsBaseUrl}/${newTargetCollection.target_collection_id}`,
-          newTargetCollection
+          `${targetCollectionsBaseUrl}/${collectionId}`,
+          body
         );
       } catch (error) {
-        console.error(
-          `Failed to update target collection ${newTargetCollection.target_collection_name} `,
-          error
-        );
+        const userErrorMessage =
+          error?.response?.data?.error ||
+          `Failed to update target collection ${body.target_collection_name}: ${error}`;
+        throw new Error(userErrorMessage);
       }
     },
 
-    deleteTargetCollection: async (collection) => {
+    deleteTargetCollection: async ({
+      collectionId,
+      collectionName,
+      deleteOrphanCompounds,
+    }) => {
       try {
         return await httpClient.delete(
-          `${targetCollectionsBaseUrl}/${collection.target_collection_id}`,
+          `${targetCollectionsBaseUrl}/${collectionId}`,
           {
             params: {
-              delete_orphan_compounds: collection.deleteOrphanCompounds,
+              delete_orphan_compounds: deleteOrphanCompounds,
             },
           }
         );
       } catch (error) {
-        console.error(
-          `Failed to delete target collection ${collection.target_collection_name}: `,
-          error
-        );
+        const userErrorMessage =
+          error?.response?.data?.error ||
+          `Failed to delete target collection ${collectionName}: ${error}`;
+        throw new Error(userErrorMessage);
       }
     },
 
@@ -585,40 +594,6 @@ export function createHttpClient(host, api_port) {
       } catch (error) {
         console.error(
           "Failed to get target collections in sample batch: ",
-          error
-        );
-      }
-    },
-
-    addTargetCollectionToSampleBatch: async (
-      collectionsToSampleBatch,
-      skipRematch = false
-    ) => {
-      try {
-        return await httpClient.post(targetCollectionsInSampleBatchBaseUrl, {
-          target_collections: collectionsToSampleBatch,
-          skipRematch,
-        });
-      } catch (error) {
-        console.error(
-          "Failed to add target collection to sample batch: ",
-          error
-        );
-      }
-    },
-
-    removeTargetCollectionsFromSampleBatch: async (
-      collectionsToRemove,
-      skipRematch = false
-    ) => {
-      try {
-        return await httpClient.delete(
-          `${targetCollectionsInSampleBatchBaseUrl}`,
-          { data: { target_collections: collectionsToRemove, skipRematch } }
-        );
-      } catch (error) {
-        console.error(
-          "Failed to remove target collections from sample batch: ",
           error
         );
       }
@@ -679,36 +654,6 @@ export function createHttpClient(host, api_port) {
       } catch (error) {
         console.error(
           "Failed to get all target compound in target collections: ",
-          error
-        );
-      }
-    },
-    addTargetCompoundToTargetCollection: async (
-      targetCompoundsInTargetCollection
-    ) => {
-      try {
-        return await httpClient.post(
-          targetCompoundsInTargetCollectionBaseUrl,
-          targetCompoundsInTargetCollection
-        );
-      } catch (error) {
-        console.error(
-          "Failed to add target compound to target collection: ",
-          error
-        );
-      }
-    },
-    removeTargetCompoundFromTargetCollection: async (
-      targetCompoundId,
-      targetCollectionId
-    ) => {
-      try {
-        return await httpClient.delete(
-          `${targetCompoundsInTargetCollectionBaseUrl}/${targetCompoundId}/${targetCollectionId}`
-        );
-      } catch (error) {
-        console.error(
-          "Failed to remove target compound from target collection: ",
           error
         );
       }

@@ -8,39 +8,255 @@
       aria-role="dialog"
       aria-modal
       @after-enter="initData"
-      @close="deactivateModal"
+      @close="deactivateModalResetData"
       :type="actionIs('delete') ? 'is-danger' : 'is-primary'"
     >
-      <template v-if="actionIs('editBatchCollections')">
-        <div class="modal-card" style="height: 85vh">
+      <template v-if="actionIs('create', 'update', 'manageCollectionBatches')">
+        <div
+          class="modal-card"
+          style="background-color: inherit; height: 800px"
+        >
           <header class="modal-card-head">
-            <p class="modal-card-title">Add target collection to batch</p>
+            <p class="subtitle">{{ modalTitle }}</p>
           </header>
-          <section class="modal-card-body">
-            <b-field
-              :label="`Select target collections for sample batch    ${selectedBatchInfo.sample_batch_name}`"
+          <section class="modal-card-body" style="min-height: 250px">
+            <b-tabs
+              v-model="activeTab"
+              type="is-boxed"
+              position="is-centered"
+              expanded
             >
-              <b-table
-                :data="targetCollectionsAll"
-                :columns="[
-                  { field: 'target_collection_name', label: 'Name' },
-                  {
-                    field: 'target_collection_description',
-                    label: 'Description',
-                  },
-                ]"
-                checkable
-                :checked-rows.sync="targetCollectionsChecked"
+              <!-- Basic fields -->
+              <b-tab-item value="info" label="Info">
+                <b-field label="Name">
+                  <b-input
+                    v-model="collectionName"
+                    placeholder="Enter a name for the target collection"
+                    :disabled="action == 'manageCollectionBatches'"
+                    required
+                  ></b-input>
+                </b-field>
+                <b-field label="Description">
+                  <b-input
+                    v-model="collectionDesc"
+                    placeholder="Enter a description for the target collection"
+                    :disabled="action == 'manageCollectionBatches'"
+                  ></b-input>
+                </b-field>
+                <b-field label="Collection type">
+                  <b-dropdown
+                    aria-role="list"
+                    v-model="collectionType"
+                    :disabled="action == 'manageCollectionBatches'"
+                    expanded
+                  >
+                    <template #trigger>
+                      <b-button
+                        :label="collectionType || 'Select Type'"
+                        icon-right="menu-down"
+                        expanded
+                        style="align: left"
+                      />
+                    </template>
+                    <b-dropdown-item
+                      aria-role="listitem"
+                      v-for="collectionType in collectionTypes"
+                      :key="collectionType"
+                      :value="collectionType"
+                    >
+                      {{ collectionType }}
+                    </b-dropdown-item>
+                  </b-dropdown>
+                </b-field>
+              </b-tab-item>
+
+              <!-- Target compounds associations -->
+              <b-tab-item
+                value="compounds"
+                label="Target compounds"
+                :disabled="action == 'manageCollectionBatches'"
               >
-              </b-table>
-            </b-field>
+                <b-tabs type="is-toggle" v-model="compoundsTab" expanded>
+                  <!-- Selected compounds tab -->
+                  <b-tab-item
+                    value="selectedCompounds"
+                    label="Selected compounds"
+                  >
+                    <b-field :label="selectedCompoundsLabel"></b-field>
+                    <b-field
+                      v-if="initialCompounds.length > 0"
+                      :label="`Current compounds of '${collectionName}'`"
+                    >
+                      <b-table
+                        :data="paginatedInitialCompounds"
+                        :columns="targetCompoundColumns"
+                        checkable
+                        :checked-rows.sync="targetCompounds"
+                        paginated
+                      >
+                        <!-- Optional: Pagination controls -->
+                        <template v-slot:pagination>
+                          <b-pagination
+                            :total="initialCompounds.length"
+                            :current.sync="initialCompoundsCurrentPage"
+                            :per-page="compoundsPerPage"
+                            size="is-small"
+                          ></b-pagination>
+                        </template>
+                      </b-table>
+                    </b-field>
+                    <b-field
+                      :label="addedCompoundsLabel"
+                      v-if="addedCompounds.length > 0"
+                    >
+                      <b-table
+                        :data="addedCompounds"
+                        :columns="targetCompoundColumns"
+                        checkable
+                        :checked-rows.sync="targetCompounds"
+                      >
+                      </b-table>
+                    </b-field>
+                    <b-field
+                      :label="newCompoundsLabel"
+                      v-if="targetCompoundsCreate.length > 0"
+                    >
+                      <b-table
+                        :data="targetCompoundsCreate"
+                        :columns="targetCompoundColumns"
+                        checkable
+                        :checked-rows.sync="targetCompoundsCreate"
+                      >
+                      </b-table>
+                    </b-field>
+                  </b-tab-item>
+                  <!-- Add compounds tab -->
+                  <b-tab-item value="addCompounds" label="Add compounds">
+                    <!-- Source Selection -->
+                    <b-field label="Add target compounds from">
+                      <b-select
+                        v-model="addCompoundsSource"
+                        @input="loadAddCompoundsList"
+                        placeholder="Select a source for adding compounds"
+                        expanded
+                      >
+                        <optgroup label="Target Collections">
+                          <option
+                            v-for="collection in filteredCollections"
+                            :key="collection.target_collection_id"
+                            :value="collection"
+                          >
+                            {{ collection.target_collection_name }}
+                          </option>
+                        </optgroup>
+                        <option value="all">All compounds</option>
+                        <option value="spreadsheet">Spreadsheet</option>
+                      </b-select>
+                    </b-field>
+
+                    <!-- Spreadsheet compounds input -->
+                    <b-field v-if="addCompoundsSource === 'spreadsheet'">
+                      <base-spreadsheet-input
+                        :label="spreadsheetLabel"
+                        :cols="targetCompoundColumns"
+                        @rowsPasted="loadSpreadsheetCompounds"
+                      ></base-spreadsheet-input>
+                    </b-field>
+
+                    <!-- Add Compounds Selection -->
+                    <b-field
+                      :label="addCompoundsListLabel"
+                      v-if="addCompoundsList.length > 0"
+                    >
+                      <b-table
+                        :data="paginatedAddCompoundsList"
+                        :columns="targetCompoundColumns"
+                        checkable
+                        :checked-rows.sync="targetCompounds"
+                        paginated
+                      >
+                        <!-- Optional: Pagination controls -->
+                        <template v-slot:pagination>
+                          <b-pagination
+                            :total="addCompoundsList.length"
+                            :current.sync="addCompoundsCurrentPage"
+                            :per-page="compoundsPerPage"
+                            size="is-small"
+                          ></b-pagination>
+                        </template>
+                      </b-table>
+                    </b-field>
+                    <b-field
+                      :label="newCompoundsLabel"
+                      v-if="targetCompoundsCreate.length > 0"
+                    >
+                      <b-table
+                        :data="targetCompoundsCreate"
+                        :columns="targetCompoundColumns"
+                        checkable
+                        :checked-rows.sync="targetCompoundsCreate"
+                      >
+                      </b-table>
+                    </b-field>
+                  </b-tab-item>
+                </b-tabs>
+              </b-tab-item>
+
+              <!-- Sample batches associations -->
+              <b-tab-item
+                value="batches"
+                label="Sample batches"
+                :disabled="action == 'update'"
+              >
+                <!-- Source Selection -->
+                <b-field label="Choose a workspace">
+                  <b-select
+                    v-model="workspaceSelected"
+                    @input="loadWorkspaceBatches"
+                    placeholder="Choose a workspace"
+                    expanded
+                  >
+                    <option :value="currentWorkspace" v-if="currentWorkspace">
+                      Current workspace: {{ currentWorkspace.workspace_name }}
+                    </option>
+                    <option
+                      v-for="workspace in filteredWorkspaces"
+                      :key="workspace.workspace_id"
+                      :value="workspace"
+                    >
+                      {{ workspace.workspace_name }}
+                    </option>
+                  </b-select>
+                </b-field>
+                <!-- Workspace Batches Selection -->
+                <b-field :label="workspaceBatchesSelectionLabel">
+                  <b-table
+                    :data="paginatedSelectedWorkspaceBatches"
+                    :columns="[{ field: 'sample_batch_name', label: 'Batch' }]"
+                    checkable
+                    :checked-rows.sync="sampleBatches"
+                    paginated
+                  >
+                    <!-- Optional: Pagination controls -->
+                    <template v-slot:pagination>
+                      <b-pagination
+                        :total="selectedWorkspaceBatches.length"
+                        :current.sync="selectBatchesCurrentPage"
+                        :per-page="batchesPerPage"
+                        size="is-small"
+                      ></b-pagination>
+                    </template>
+                  </b-table>
+                </b-field>
+              </b-tab-item>
+            </b-tabs>
           </section>
           <footer class="modal-card-foot">
             <b-button
               type="is-dark"
               icon-left="close"
               expanded
-              @click="deactivateModal"
+              @click="deactivateModalResetData"
             >
               Cancel
             </b-button>
@@ -48,65 +264,13 @@
               type="is-primary"
               icon-left="content-save"
               expanded
+              :disabled="saveButtonActive"
               @click="
                 () => {
-                  editBatchCollections(targetCollectionsChecked, selectedBatch);
-                  deactivateModal();
-                }
-              "
-            >
-              Set collections
-            </b-button>
-          </footer>
-        </div>
-      </template>
-      <template v-if="actionIs('manageSelectedCollectionBatches')">
-        <div class="modal-card" style="height: 85vh">
-          <header class="modal-card-head">
-            <p class="modal-card-title">Add target collection to batch</p>
-          </header>
-          <section class="modal-card-body">
-            <b-field label="Name">
-              <b-input v-model="newCollectionName" :disabled="true"></b-input>
-            </b-field>
-            <b-field label="Description">
-              <b-input v-model="newCollectionDesc" :disabled="true"> </b-input>
-            </b-field>
-            <b-field label="Type">
-              <b-input v-model="newCollectionType" :disabled="true"> </b-input>
-            </b-field>
-            <b-field
-              :label="`Select batches for target collection ${targetCollectionActiveInfo.target_collection_name}`"
-            >
-              <b-table
-                :data="sampleBatches"
-                :columns="[{ field: 'sample_batch_name', label: 'Batch' }]"
-                checkable
-                :checked-rows.sync="sampleBatchesChecked"
-              >
-              </b-table>
-            </b-field>
-          </section>
-          <footer class="modal-card-foot">
-            <b-button
-              type="is-dark"
-              icon-left="close"
-              expanded
-              @click="modalActive = false"
-            >
-              Cancel
-            </b-button>
-            <b-button
-              type="is-primary"
-              icon-left="content-save"
-              expanded
-              @click="
-                () => {
-                  manageSelectedCollectionBatches(
-                    sampleBatchesChecked,
-                    selectedCollection
-                  );
-                  deactivateModal();
+                  actionIs('create')
+                    ? createCollection(newCollection)
+                    : updateCollection(newCollection);
+                  deactivateModalResetData();
                 }
               "
             >
@@ -115,164 +279,10 @@
           </footer>
         </div>
       </template>
-      <template v-if="actionIs('create')">
-        <div class="modal-card" style="height: 85vh">
-          <header class="modal-card-head">
-            <p class="modal-card-title">Create new target collection</p>
-          </header>
-          <section class="modal-card-body">
-            <b-field label="Name">
-              <b-input
-                v-model="newCollectionName"
-                placeholder="Enter a name for the target collection"
-              ></b-input>
-            </b-field>
-            <b-field
-              label="Description"
-              placeholder="Enter a description for your target collection"
-            >
-              <b-input v-model="newCollectionDesc"></b-input>
-            </b-field>
-            <b-field label="Collection type">
-              <b-dropdown aria-role="list" v-model="newCollectionType" expanded>
-                <template #trigger>
-                  <b-button
-                    :label="newCollectionType || 'Select Type'"
-                    icon-right="menu-down"
-                    expanded
-                    style="align: left"
-                  />
-                </template>
-                <b-dropdown-item
-                  aria-role="listitem"
-                  v-for="collectionType in collectionTypes"
-                  :key="collectionType"
-                  :value="collectionType"
-                >
-                  {{ collectionType }}
-                </b-dropdown-item>
-              </b-dropdown>
-            </b-field>
-
-            <base-spreadsheet-input
-              label="Target compounds"
-              :cols="targetCompoundCols"
-              @rowsPasted="loadTargetCompounds"
-            ></base-spreadsheet-input>
-            <b-field label="Add to sample batch">
-              <base-table
-                :rows="sampleBatches"
-                :cols="[{ field: 'sample_batch_name', label: 'Batch' }]"
-                :checkable="true"
-                @selectRows="selectBatchesToAddTo"
-              >
-              </base-table>
-            </b-field>
-          </section>
-          <footer class="modal-card-foot">
-            <b-button
-              type="is-dark"
-              icon-left="close"
-              expanded
-              @click="modalActive = false"
-            >
-              Cancel
-            </b-button>
-            <b-button
-              type="is-primary"
-              icon-left="content-save"
-              expanded
-              :disabled="
-                !this.newCollectionName ||
-                // !this.newCollectionDesc ||
-                !this.newCollectionType ||
-                this.newTargetCompounds.length === 0
-              "
-              @click="
-                () => {
-                  createCollection(newCollection);
-                  deactivateModal();
-                }
-              "
-            >
-              Create
-            </b-button>
-          </footer>
-        </div>
-      </template>
-      <template v-if="actionIs('update')">
-        <div class="modal-card" style="height: 85vh">
-          <header class="modal-card-head">
-            <p class="modal-card-title">Update target collection</p>
-          </header>
-          <section class="modal-card-body">
-            <b-field label="Name">
-              <b-input
-                v-model="newCollectionName"
-                placeholder="Enter a name for the target collection"
-              ></b-input>
-            </b-field>
-            <b-field
-              label="Description"
-              placeholder="Enter a description for your target collection"
-            >
-              <b-input v-model="newCollectionDesc"></b-input>
-            </b-field>
-
-            <b-field label="Collection type">
-              <b-dropdown aria-role="list" v-model="newCollectionType" expanded>
-                <template #trigger>
-                  <b-button
-                    :label="newCollectionType || 'Select Type'"
-                    icon-right="menu-down"
-                    expanded
-                    style="align: left"
-                  />
-                </template>
-                <b-dropdown-item
-                  aria-role="listitem"
-                  v-for="collectionType in collectionTypes"
-                  :key="collectionType"
-                  :value="collectionType"
-                >
-                  {{ collectionType }}
-                </b-dropdown-item>
-              </b-dropdown>
-            </b-field>
-            <!-- <base-spreadsheet-input
-              label="Target compounds"
-              :cols="targetCompoundCols"
-              @rowsPasted="loadTargetCompounds"
-            ></base-spreadsheet-input> -->
-          </section>
-          <footer class="modal-card-foot">
-            <b-button type="is-warning" expanded @click="modalActive = false">
-              Cancel
-            </b-button>
-            <b-button
-              type="is-primary"
-              expanded
-              :disabled="
-                !this.newCollectionName ||
-                // !this.newCollectionDesc ||
-                !this.newCollectionType
-              "
-              @click="
-                () => {
-                  updateCollection(newCollection);
-                  deactivateModal();
-                }
-              "
-            >
-              Update
-            </b-button>
-          </footer>
-        </div>
-      </template>
       <template v-else-if="actionIs('delete')">
-        <div class="modal-card" style="height: 40vh">
+        <div class="modal-card" style="height: 28vh">
           <header class="modal-card-head">
-            <p class="modal-card-title">Delete terget colletion</p>
+            <p class="subtitle">{{ modalTitle }}</p>
           </header>
           <section
             class="modal-card-body"
@@ -284,14 +294,16 @@
             "
           >
             <b-field
-              :label="`Are you sure you want to delete the collection ${targetCollectionActiveInfo.target_collection_name} ?`"
+              :label="`Would you like to keep or remove compounds from '${collectionName}' that are not part of any other collection?`"
             >
+            </b-field>
+            <b-field>
               <b-radio
                 v-model="deleteOrphanCompounds"
                 :native-value="false"
                 type="is-info"
               >
-                Delete collection
+                Delete the collection and keep the unique compounds
               </b-radio>
             </b-field>
             <b-field>
@@ -300,7 +312,7 @@
                 :native-value="true"
                 type="is-primary"
               >
-                Delete collection and unused compounds
+                Delete the collection and its unique compounds
               </b-radio>
             </b-field>
           </section>
@@ -317,17 +329,9 @@
               type="is-danger"
               icon-left="delete"
               expanded
-              @click="
-                () => {
-                  deleteCollection({
-                    ...selectedCollection,
-                    deleteOrphanCompounds,
-                  });
-                  deactivateModal();
-                }
-              "
+              @click="deleteButtonClick"
             >
-              Remove
+              Delete
             </b-button>
           </footer>
         </div>
@@ -346,24 +350,45 @@ import BaseTable from "./BaseTable.vue";
 export default {
   name: "TheModalTargetCollectionOp",
   components: { BaseSpreadsheetInput, BaseTable },
-  data: function () {
+  data() {
     return {
-      // Edit Batch Collections
-      initialTargetCollectionsChecked: [],
-      targetCollectionsChecked: [],
-      selectedBatchInfo: {},
-      // Copy Selected Collection To Batches
-      batchesToAddTo: [],
-      newCollectionName: null,
-      newCollectionDesc: null,
-      newCollectionType: null,
-      newTargetCompounds: [],
-      // Delete Selected Collection
-      targetCollectionActiveInfo: {},
+      //// Main collection data
+      // Basic fields
+      collectionId: "",
+      collectionName: "",
+      collectionDesc: "",
+      collectionType: null,
+      // Associations data
+      targetCompounds: [],
+      sampleBatches: [],
+      // Create data
+      targetCompoundsCreate: [],
+
+      //// Utility data
+      activeTab: null, // This will hold the value of the active tab
+      compoundsTab: null, // This will hold the value of the Target Compounds active subtab
+      // Select compounds tab
+      initialCompounds: [], // To store initial compounds from the active collection
+      // Pagination properties for initialCompounds
+      initialCompoundsCurrentPage: 1,
+      // Add compounds tab
+      addCompoundsSource: null,
+      spreadsheetCompounds: [], // To store pasted to spreadsheet data
+      addCompoundsList: [], // To store filtered list of available compounds (already existing in db)
+      // Pagination properties for addCompoundsList
+      addCompoundsCurrentPage: 1,
+      compoundsPerPage: 15,
+
+      // Sample Batches tab
+      initialBatches: [], // To store initial batches of the active collection
+      workspaceSelected: null,
+      selectedWorkspaceBatches: [], // Loaded batches of the selected workspace
+      // Pagination properties for selectedWorkspaceBatches
+      selectBatchesCurrentPage: 1,
+      batchesPerPage: 15,
+
+      // Delete Modal
       deleteOrphanCompounds: true,
-      // Manage Selected Collection Batches
-      initialSampleBatchesChecked: [],
-      sampleBatchesChecked: [],
     };
   },
   computed: {
@@ -372,212 +397,488 @@ export default {
       modalProps: "modal/targetCollectionOpProps",
     }),
     ...get({
-      sampleBatches: "workspace/batches",
-      sampleBatchesSelected: "workspace/sampleBatchesSelected",
-      targetCollectionsSelected: "batch/targetCollectionsSelected",
-      batchActive: "batch/active",
       targetCollectionActive: "targets/activeCollection",
-      batchTargetCollections: "batch/targetCollections",
-      targetCollectionsAll: "targets/getAllCollections",
       collectionTypes: "targets/collectionTypes",
+      allCollections: "targets/getAllCollections",
+      allCompounds: "targets/getAllCompounds",
+      allWorkspaces: "app/workspaces",
+      activeWorkspace: "workspace/active",
+      activeWorkspaceBatches: "workspace/batches",
     }),
-    fields() {
-      return this.cols.map((col) => col.field);
-    },
+    //// General data ////
     action() {
       return this.modalProps.action;
     },
-    selectedBatch() {
-      return this.sampleBatchesSelected[0] ?? null;
-    },
-    selectedCollection() {
-      return this.targetCollectionsSelected[0] ?? null;
-    },
-    targetCompoundCols() {
+    targetCompoundColumns() {
+      // TODO_target_compound_management make fields editable
       return [
         { field: "target_compound_name", label: "Name" },
         { field: "target_compound_formula", label: "Formula" },
         { field: "cas_number", label: "CAS Number" },
       ];
     },
+    saveButtonActive() {
+      switch (this.action) {
+        case "create":
+          return (
+            !this.collectionName ||
+            !this.collectionType ||
+            (this.targetCompounds.length === 0 &&
+              this.targetCompoundsCreate.length === 0)
+          );
+
+        case "update":
+          // Check if basic properties have changed
+          const basicPropertiesChanged =
+            this.collectionName !==
+              this.targetCollectionActive.target_collection_name ||
+            this.collectionDesc !==
+              this.targetCollectionActive.target_collection_description ||
+            this.collectionType !==
+              this.targetCollectionActive.target_collection_type;
+
+          // Compare initial and current compounds
+          const initialCompoundIds = this.initialCompounds
+            .map((compound) => compound.target_compound_id)
+            .sort();
+          const currentCompoundIds = this.targetCompounds
+            .map((compound) => compound.target_compound_id)
+            .sort();
+          const compoundsChanged =
+            JSON.stringify(initialCompoundIds) !==
+            JSON.stringify(currentCompoundIds);
+
+          let disabled = !basicPropertiesChanged && !compoundsChanged;
+          // Check if there are any compounds to assign ot create
+          const noCompounds =
+            this.targetCompounds.length === 0 &&
+            this.targetCompoundsCreate.length === 0;
+          if (noCompounds) disabled = true;
+          return disabled;
+        case "manageCollectionBatches":
+          const initialBatchIds = this.initialBatches
+            .map((batch) => batch.sample_batch_id)
+            .sort();
+          const currentBatchIds = this.sampleBatches
+            .map((batch) => batch.sample_batch_id)
+            .sort();
+          return (
+            JSON.stringify(initialBatchIds) === JSON.stringify(currentBatchIds)
+          );
+
+        default:
+          return false;
+      }
+    },
+
+    //// Labels and titles ////
+    //// modal
+    modalTitle() {
+      // Define the modal title based on the action
+      let title = "";
+      switch (this.action) {
+        case "create":
+          title = `Create a new target collection ${
+            this?.collectionName || ""
+          }`;
+          break;
+        case "update":
+          title = `Update target collection "${this.collectionName}"`;
+          break;
+        case "manageCollectionBatches":
+          title = `Manage batches of "${this.collectionName}" target collection`;
+          break;
+        case "delete":
+          title = `Delete target collection "${this.collectionName}"`;
+          break;
+      }
+      return title;
+    },
+    //// Target Compounds
+    // Selected compounds tab
+    selectedCompoundsLabel() {
+      const name =
+        this.collectionName === "" ? "new" : `"${this.collectionName}"`;
+      if (
+        !this.initialCompounds.length &&
+        !this.addedCompounds.length &&
+        !this.targetCompoundsCreate.length
+      ) {
+        return `Please add compounds to the ${name} collection.`;
+      }
+      return `Following checked compounds (uncheck to remove) will be present in the ${name} collection:`;
+    },
+    addedCompoundsLabel() {
+      return `Added compounds:`;
+    },
+
+    // Add compounds tab
+    addCompoundsListLabel() {
+      if (this.addCompoundsSource.target_collection_id)
+        return "Select compounds to add from the chosen collection:";
+      if (this.addCompoundsSource === "all")
+        return "Select compounds to add from all compounds:";
+      if (this.addCompoundsSource === "spreadsheet")
+        return "Select compounds to add from already existing compounds:";
+      else return "Select compounds to add:";
+    },
+    spreadsheetLabel() {
+      if (
+        this.addCompoundsSource === "spreadsheet" &&
+        this.spreadsheetCompounds.length
+      )
+        return "Pasted target compounds:";
+      else return "Paste a list of target compounds:";
+    },
+    // both tabs
+    newCompoundsLabel() {
+      const name =
+        this.collectionName === "" ? "new" : `"${this.collectionName}"`;
+      return `Compounds to be created and added to the ${name} collection, please check the name and formula carefully:`;
+    },
+    //// Sample Batches Tab
+    workspaceBatchesSelectionLabel() {
+      const name =
+        this.collectionName === "" ? "new" : `"${this.collectionName}"`;
+      let title = "";
+      switch (this.action) {
+        case "create":
+        case "manageCollectionBatches":
+          title = `Select batches ${
+            this.workspaceSelected
+              ? `of the "${this?.workspaceSelected?.workspace_name}" workspace`
+              : ""
+          } where to add the ${name} collection`;
+          break;
+      }
+      return title;
+    },
+    ////// tabs data //////
+    //// Target Compounds Tab ////
+    // data for Select compounds tab
+    paginatedInitialCompounds() {
+      const start =
+        (this.initialCompoundsCurrentPage - 1) * this.compoundsPerPage;
+      const end = start + this.compoundsPerPage;
+      return this.initialCompounds.slice(start, end);
+    },
+    // Computes the added compounds by filtering out those that are not in the initial compounds
+    addedCompounds() {
+      return this.targetCompounds.filter(
+        (compound) =>
+          !this.initialCompounds.some(
+            (initialCompound) =>
+              initialCompound.target_compound_id === compound.target_compound_id
+          )
+      );
+    },
+
+    // data for Add compounds tab
+    filteredCollections() {
+      if (this.action !== "create") {
+        return this.allCollections.filter((collection) => {
+          return (
+            collection.target_collection_id !==
+            this.targetCollectionActive.target_collection_id
+          );
+        });
+      }
+      return this.allCollections;
+    },
+
+    paginatedAddCompoundsList() {
+      const start = (this.addCompoundsCurrentPage - 1) * this.compoundsPerPage;
+      const end = start + this.compoundsPerPage;
+      return this.addCompoundsList.slice(start, end);
+    },
+
+    /// Sample Batches Tab ////
+    // Select workspaces
+    currentWorkspace() {
+      return this.activeWorkspace ? this.activeWorkspace : null;
+    },
+    filteredWorkspaces() {
+      if (this.activeWorkspace) {
+        return this.allWorkspaces.filter((workspace) => {
+          return workspace.workspace_id !== this.activeWorkspace.workspace_id;
+        });
+      }
+      return [];
+    },
+    paginatedSelectedWorkspaceBatches() {
+      const start = (this.selectBatchesCurrentPage - 1) * this.batchesPerPage;
+      const end = start + this.batchesPerPage;
+      return this.selectedWorkspaceBatches.slice(start, end);
+    },
+
+    //// data to form http request ////
+    targetCompoundsIds() {
+      return this.targetCompounds.map(
+        (compound) => compound.target_compound_id
+      );
+    },
+    sampleBatchesIds() {
+      return this.sampleBatches.map((batch) => batch.sample_batch_id);
+    },
     newCollection() {
       if (this.actionIs("create")) {
         return {
-          target_collection_name: this.newCollectionName,
-          target_collection_description: this.newCollectionDesc,
-          target_collection_type: this.newCollectionType,
-          target_compounds: this.newTargetCompounds,
-          sample_batches: this.batchesToAddTo ? this.batchesToAddTo : [],
+          target_collection_name: this.collectionName,
+          target_collection_description: this.collectionDesc,
+          target_collection_type: this.collectionType,
+          target_compound_ids: this.targetCompoundsIds,
+          target_compounds_create: this.targetCompoundsCreate,
+          sample_batch_ids: this.sampleBatchesIds,
         };
-      } else if (this.actionIs("update")) {
+      }
+      if (this.actionIs("update")) {
         return {
-          target_collection_id: this.selectedCollection.target_collection_id,
-          target_collection_name: this.newCollectionName,
-          target_collection_description: this.newCollectionDesc,
-          target_collection_type: this.newCollectionType,
+          target_collection_id:
+            this.targetCollectionActive.target_collection_id,
+          target_collection_name: this.collectionName,
+          target_collection_description: this.collectionDesc,
+          target_collection_type: this.collectionType,
+          target_compound_ids: this.targetCompoundsIds,
+          target_compounds_create: this.targetCompoundsCreate,
         };
-      } else {
-        return null;
+      }
+      if (this.actionIs("manageCollectionBatches")) {
+        return {
+          target_collection_id:
+            this.targetCollectionActive.target_collection_id,
+          target_collection_name: this.collectionName,
+          target_collection_description: this.collectionDesc,
+          target_collection_type: this.collectionType,
+          sample_batch_ids: this.sampleBatchesIds,
+        };
       }
     },
   },
   methods: {
     ...call({
+      gethWorkspaceBatches: "workspace/gethWorkspaceBatches",
+      getTargetCollection: "targets/getTargetCollection",
+      getAllTargetCompounds: "targets/getAllTargetCompounds",
       createCollection: "targets/createCollection",
       updateCollection: "targets/updateCollection",
       deleteCollection: "targets/deleteCollection",
-      removeTargetCollectionsFromSampleBatch:
-        "targets/removeTargetCollectionsFromSampleBatch",
-      addTargetCollectionToSampleBatch:
-        "targets/addTargetCollectionToSampleBatch",
+      processSpreadsheetInput: "targets/processSpreadsheetInput",
+      showWarningNotification: "notification/showWarningNotification",
     }),
     ...mapMutations({
       deactivateModal: "modal/deactivate",
     }),
+    //// General methods ////
     actionIs(...actions) {
-      return actions.includes(this.action);
+      return actions.includes(this.modalProps.action);
     },
-    async editBatchCollections(target_collections, sample_batch) {
-      const removedCollections = this.initialTargetCollectionsChecked.filter(
-        (initialCollection) =>
-          !target_collections.some(
-            (collection) =>
-              collection.target_collection_id ===
-              initialCollection.target_collection_id
-          )
-      );
-
-      const addedCollections = target_collections
-        .filter(
-          (collection) =>
-            !this.initialTargetCollectionsChecked.some(
-              (initialCollection) =>
-                initialCollection.target_collection_id ===
-                collection.target_collection_id
-            )
-        )
-        .map((collection) => ({
-          target_collection_id: collection.target_collection_id,
-          sample_batch_id: sample_batch.sample_batch_id,
-        }));
-
-      if (removedCollections.length === 0 && addedCollections.length === 0)
-        return;
-
-      if (removedCollections.length > 0) {
-        const collectionsToRemove = removedCollections.map((collection) => ({
-          target_collection_id: collection.target_collection_id,
-          sample_batch_id: sample_batch.sample_batch_id,
-        }));
-
-        const skipRematch = addedCollections.length > 0;
-        await this.removeTargetCollectionsFromSampleBatch({
-          collectionsToRemove,
-          skipRematch,
-        });
-      }
-
-      if (addedCollections.length > 0) {
-        await this.addTargetCollectionToSampleBatch(addedCollections);
-      }
+    deactivateModalResetData() {
+      this.deactivateModal();
+      this.resetData();
     },
-    async manageSelectedCollectionBatches(batches, target_collection) {
-      const removedBatches = this.initialSampleBatchesChecked.filter(
-        (initialBatch) =>
-          !batches.some(
-            (batch) => batch.sample_batch_id === initialBatch.sample_batch_id
-          )
-      );
-
-      const addedBatches = batches
-        .filter(
-          (batch) =>
-            !this.initialSampleBatchesChecked.some(
-              (initialBatch) =>
-                initialBatch.sample_batch_id === batch.sample_batch_id
-            )
-        )
-        .map((batch) => ({
-          sample_batch_id: batch.sample_batch_id,
-          target_collection_id: target_collection.target_collection_id,
-        }));
-
-      if (removedBatches.length === 0 && addedBatches.length === 0) return;
-
-      if (removedBatches.length > 0) {
-        const collectionsToRemove = removedBatches.map((batch) => ({
-          sample_batch_id: batch.sample_batch_id,
-          target_collection_id: target_collection.target_collection_id,
-        }));
-
-        const skipRematch = addedBatches.length > 0;
-        await this.removeTargetCollectionsFromSampleBatch({
-          collectionsToRemove,
-          skipRematch,
-        });
-      }
-
-      if (addedBatches.length > 0) {
-        await this.addTargetCollectionToSampleBatch(addedBatches);
-      }
+    deleteButtonClick() {
+      this.$buefy.dialog.confirm({
+        message: `Are you sure you want to delete '${this.collectionName}' target collection?`,
+        confirmText: "Delete",
+        type: "is-danger",
+        hasIcon: true,
+        icon: "delete-alert",
+        onConfirm: async () => {
+          const collectionId = this.collectionId;
+          const collectionName = this.collectionName;
+          const deleteOrphanCompounds = this.deleteOrphanCompounds;
+          this.deleteCollection({
+            collectionId,
+            collectionName,
+            deleteOrphanCompounds,
+          });
+          this.deactivateModalResetData();
+        },
+      });
     },
-
+    //// Data loading ////
+    // General data loading methods
+    // Initialization logic when the modal is activated
     initData() {
+      // Initializes data specific to the 'create' action
       if (this.action == "create") {
-        this.newCollectionName = null;
-        this.newCollectionDesc = null;
-        this.newCollectionType = null;
-        this.newTargetCompounds = [];
-        this.batchesToAddTo = [];
+        this.activeTab = "info";
+        this.compoundsTab = "addCompounds";
+        this.collectionId = "";
+        this.collectionName = "";
+        this.collectionDesc = "";
+        this.collectionType = null;
+        this.targetCompounds = [];
+        this.initialCompounds = this.targetCompounds;
+        this.targetCompoundsCreate = [];
+        this.spreadsheetCompounds = [];
+        this.sampleBatches = [];
+        this.initialBatches = this.sampleBatches;
+        this.workspaceSelected = this?.currentWorkspace || null;
+        if (this.activeWorkspaceBatches)
+          this.reconcileBatches(this.activeWorkspaceBatches);
       }
-      if (this.selectedCollection) {
-        this.newCollectionName = this.selectedCollection.target_collection_name;
-        this.newCollectionDesc =
-          this.selectedCollection.target_collection_description;
-        this.newCollectionType = this.selectedCollection.target_collection_type;
-        this.targetCollectionActiveInfo = this.targetCollectionActive;
+      // Initializes data specific to the 'update' action
+      if (this.actionIs("update")) {
+        this.activeTab = "info";
+        this.compoundsTab = "selectedCompounds";
+        // Reset the selected compounds tab to the first page when the list is reloaded
+        this.initialCompoundsCurrentPage = 1;
+        this.collectionId =
+          this?.targetCollectionActive?.target_collection_id || "";
+        this.collectionName =
+          this?.targetCollectionActive?.target_collection_name || "";
+        this.collectionDesc =
+          this?.targetCollectionActive?.target_collection_description || "";
+        this.collectionType =
+          this?.targetCollectionActive?.target_collection_type || null;
+        this.targetCompounds =
+          this?.targetCollectionActive?.target_compounds || [];
+        this.initialCompounds = this.targetCompounds;
+        this.targetCompoundsCreate = [];
+        this.spreadsheetCompounds = [];
       }
-      if (this.selectedBatch) {
-        this.selectedBatchInfo = this.batchActive;
+      // Initializes data specific to the 'manageCollectionBatches' action
+      if (this.action == "manageCollectionBatches") {
+        this.activeTab = "batches";
+        this.collectionId =
+          this?.targetCollectionActive?.target_collection_id || "";
+        this.collectionName =
+          this?.targetCollectionActive?.target_collection_name || "";
+        this.collectionDesc =
+          this?.targetCollectionActive?.target_collection_description || "";
+        this.collectionType =
+          this?.targetCollectionActive?.target_collection_type || null;
+        this.sampleBatches = this?.targetCollectionActive?.sample_batches || [];
+        this.initialBatches = this.sampleBatches;
+        this.workspaceSelected = this?.currentWorkspace || null;
+        if (this.activeWorkspaceBatches)
+          this.reconcileBatches(this.activeWorkspaceBatches);
       }
-      this.initTargetCollectionsChecked();
-      this.initSampleBatchesChecked();
+      // Initializes data specific to the 'delete' action
+      if (this.action == "delete") {
+        this.collectionId =
+          this?.targetCollectionActive?.target_collection_id || "";
+        this.collectionName =
+          this?.targetCollectionActive?.target_collection_name || "";
+        this.deleteOrphanCompounds = true;
+      }
     },
-    initTargetCollectionsChecked() {
-      const ids = this.batchActive
-        ? this.batchTargetCollections.map((row) => row.target_collection_id)
-        : [];
-      this.targetCollectionsChecked = this.targetCollectionsAll.filter((row) =>
-        ids.includes(row.target_collection_id)
-      );
-      this.initialTargetCollectionsChecked = [...this.targetCollectionsChecked];
+    resetData() {
+      this.modalProps = {};
+      this.activeTab = "info";
+      this.compoundsTab = "selectedCompounds";
+      this.collectionId = "";
+      this.collectionName = "";
+      this.collectionDesc = "";
+      this.collectionType = null;
+      this.targetCompounds = [];
+      this.targetCompoundsCreate = [];
+      this.sampleBatches = [];
+      this.addCompoundsSource = null;
+      this.addCompoundsList = [];
+      this.spreadsheetCompounds = [];
+      this.workspaceSelected = null;
+      this.selectedWorkspaceBatches = [];
+      this.deleteOrphanCompounds = true;
     },
-    initSampleBatchesChecked() {
-      const batchIdsForCurrentCollection = this.targetCollectionActive
-        ? this.targetCollectionActive.sample_batches.map(
-            (batch) => batch.sample_batch_id
-          )
-        : [];
-      this.sampleBatchesChecked = this.sampleBatches.filter((batch) =>
-        batchIdsForCurrentCollection.includes(batch.sample_batch_id)
-      );
-      this.initialSampleBatchesChecked = [...this.sampleBatchesChecked];
+    // Data loading methods for Add compounds tab
+    async loadAddCompoundsList() {
+      if (!this.addCompoundsSource) return;
+      if (this.addCompoundsSource === "spreadsheet") {
+        this.addCompoundsList = [];
+        return;
+      }
+      // Reset add compounds list to the first page when the list is reloaded
+      this.addCompoundsCurrentPage = 1;
+
+      let compoundsToProcess = [];
+      if (this.addCompoundsSource === "all") {
+        compoundsToProcess = this.allCompounds;
+      }
+      if (this.addCompoundsSource.target_collection_id) {
+        const collectionId = this.addCompoundsSource.target_collection_id;
+        const collection = await this.getTargetCollection(collectionId);
+        compoundsToProcess = collection?.target_compounds || [];
+      }
+      // check if the loaded collection has any compounds
+      if (!compoundsToProcess.length) return;
+      this.reconcileCompounds(compoundsToProcess);
     },
 
-    loadTargetCompounds(rows) {
-      this.newTargetCompounds = rows;
+    // Reconcile compounds to maintain reference equality with compounds in targetCompounds and initialCompounds list.
+    reconcileCompounds(compounds) {
+      // Combine initialCompounds and targetCompounds to cover all compounds that are already part of the collection or selected
+      const combinedCompounds = [
+        ...this.initialCompounds,
+        ...this.targetCompounds,
+      ];
+
+      // Use a Map to eliminate duplicate compounds based on a unique identifier (target_compound_id or formula)
+      const compoundMap = new Map(
+        combinedCompounds.map((compound) => [
+          compound.target_compound_id || compound.target_compound_formula,
+          compound,
+        ])
+      );
+
+      this.addCompoundsList = compounds.map((compound) => {
+        // First, try finding by target_compound_id, if not found by ID and there's no ID on the new compound, try finding by formula
+        let selectedCompound = compoundMap.get(
+          compound.target_compound_id || compound.target_compound_formula
+        );
+
+        // If found, use the existing compound from combinedCompounds if available; otherwise, use the current compound
+        return selectedCompound || compound;
+      });
     },
-    selectBatchesToAddTo(newRows) {
-      this.batchesToAddTo = newRows.map((row) => ({
-        workspace_id: row.workspace_id,
-        sample_batch_id: row.sample_batch_id,
-      }));
+
+    // spreadsheet loading
+    async loadSpreadsheetCompounds(rows) {
+      if (this.addCompoundsSource !== "spreadsheet")
+        this.targetCompoundsCreate = [];
+      this.spreadsheetCompounds = rows;
+      const { existingCompounds, notExistingCompounds } =
+        await this.processSpreadsheetInput(rows);
+
+      // Reconcile existing compounds
+      this.reconcileCompounds(existingCompounds);
+
+      // Add notExistingCompounds to a list for creation
+      this.targetCompoundsCreate.push(...notExistingCompounds);
     },
-    // TODO_replace sio api
-    // TODO_refactor_store
-    updateTargetCollection(target_collection) {
-      this.$api.emit("target_collection_update", target_collection);
+
+    // Data loading methods for Sample Batches tab
+    reconcileBatches(batches) {
+      this.selectedWorkspaceBatches = batches.map((batch) => {
+        // Try to find an existing batch in sampleBatches
+        const existingBatch = this.sampleBatches.find(
+          (sb) => sb.sample_batch_id === batch.sample_batch_id
+        );
+        // If found, use the existing batch object to maintain reference equality; otherwise, use the current batch
+        return existingBatch || batch;
+      });
+    },
+
+    async loadWorkspaceBatches() {
+      if (!this.workspaceSelected) return;
+
+      // Reset to the first page when the list is reloaded
+      this.selectBatchesCurrentPage = 1;
+
+      const workspaceBatches = await this.gethWorkspaceBatches(
+        this.workspaceSelected.workspace_id
+      );
+      if (!workspaceBatches.length) return;
+      // Reconcile the loaded batches with those already present in sampleBatches
+      this.reconcileBatches(workspaceBatches);
     },
   },
 };
 </script>
+
+<style scoped>
+optgroup {
+  color: #464752 !important;
+}
+</style>

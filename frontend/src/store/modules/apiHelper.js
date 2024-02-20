@@ -43,7 +43,7 @@ export async function handleApiRequest({
 }) {
   try {
     const response = await rootState.api.httpClient[httpMethod](requestData);
-    if (response.status === 200) {
+    if (response.status === 200 || response.status === 201) {
       if (progressNotificationPayload) {
         dispatch(
           "notification/showProgressNotification",

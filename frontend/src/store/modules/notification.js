@@ -32,7 +32,8 @@ const state = {
   // Item compute progress notification
   itemMatchComputing: false,
   // Batch compute progress notification
-  batchMatchComputing: false,
+  rematchBatchesProgress: false,
+  rematchBatchProgress: false,
   totalBatches: null,
   currentBatch: null,
   currentBatchMessage: "",
@@ -112,8 +113,9 @@ export default {
     },
     // backend listeners
     // Batch compute progress notification
-    async onMatchBatchComputeStarted({ commit }, data) {
-      commit("SET_BATCH_MATCH_COMPUTING", true);
+    // TODO_notifications refactor
+    async onRematchBatchesStarted({ commit }, data) {
+      commit("SET_REMATCH_BATCHES_PROGRESS", true);
       commit("SET_TOTAL_BATCHES", data.total_batches);
       commit(
         "SET_PROGRESS_MESSAGE",
@@ -121,7 +123,18 @@ export default {
         Starting computation for ${data.total_batches} batches`
       );
     },
-    async onMatchBatchComputeProgress({ commit, state }, data) {
+    async onRematchBatchStarted({ commit, state }, data) {
+      // if the rematch batches progress already opened - skip
+      if (state.rematchBatchesProgress) return;
+      commit("SET_REMATCH_BATCH_PROGRESS", true);
+      commit("SET_TOTAL_BATCHES", data.total_batches);
+      commit(
+        "SET_PROGRESS_MESSAGE",
+        `Changes in workspace detected.
+        Starting computation for ${data.total_batches} batches`
+      );
+    },
+    async onRematchBatchProgress({ commit, state }, data) {
       if (data.current_batch) {
         commit("SET_CURRENT_BATCH", data.current_batch);
         commit(
@@ -136,12 +149,19 @@ export default {
         commit("SET_CURRENT_BATCH_MESSAGE", "");
       }
     },
-    async onMatchBatchComputeProgressPercentage({ commit }, data) {
+    async onRematchBatchesProgressPercentage({ commit }, data) {
       if (data.progress_percentage) {
         commit("SET_PROGRESS_PERCENTAGE", data.progress_percentage);
       }
     },
-    async onMatchBatchComputeFinished({ commit, state, dispatch }, data) {
+    async onRematchBatchProgressPercentage({ commit }, data) {
+      // if the rematch batches progress already opened - skip
+      if (state.rematchBatchesProgress) return;
+      if (data.progress_percentage) {
+        commit("SET_PROGRESS_PERCENTAGE", data.progress_percentage);
+      }
+    },
+    async onRematchBatchesFinished({ commit, state, dispatch }, data) {
       let progressMessage = `Finished computation for ${
         state.totalBatches
       } batch${state.totalBatches === 1 ? "" : "es"}`;
@@ -169,7 +189,47 @@ export default {
       commit("SET_PROGRESS_PERCENTAGE", 100);
       setTimeout(() => {
         // TODO_configuration move 500 animation delay to config file and 3000 closing notification time
-        commit("SET_BATCH_MATCH_COMPUTING", false);
+        commit("SET_REMATCH_BATCHES_PROGRESS", false);
+        commit("SET_TOTAL_BATCHES", null);
+        commit("SET_CURRENT_BATCH", null);
+        setTimeout(() => {
+          commit("SET_PROGRESS_MESSAGE", "");
+          commit("SET_COMPUTE_ERROR", false);
+          commit("SET_PROGRESS_PERCENTAGE", 0);
+        }, 500);
+      }, 4000);
+    },
+    async onRematchBatchFinished({ commit, state, dispatch }, data) {
+      // if the rematch batches progress already opened - skip
+      if (state.rematchBatchesProgress) return;
+      let progressMessage = `Finished computation for ${
+        state.totalBatches
+      } batch${state.totalBatches === 1 ? "" : "es"}`;
+
+      if (
+        data.samples_compute_failed &&
+        data.samples_compute_failed.length > 0
+      ) {
+        commit("SET_COMPUTE_ERROR", true);
+        progressMessage += ` with ${data.samples_compute_failed.length} sample${
+          data.samples_compute_failed.length === 1 ? "" : "s"
+        } failed to compute matches`;
+
+        // Show warning notification after 3 seconds with info about failed to compute matches samples
+        setTimeout(() => {
+          dispatch("showWarningNotification", {
+            notification: "batchComputeFailedSamples",
+            data: data.samples_compute_failed,
+          });
+        }, 4000);
+      }
+
+      commit("SET_PROGRESS_MESSAGE", progressMessage);
+      commit("SET_CURRENT_BATCH_MESSAGE", "");
+      commit("SET_PROGRESS_PERCENTAGE", 100);
+      setTimeout(() => {
+        // TODO_configuration move 500 animation delay to config file and 3000 closing notification time
+        commit("SET_REMATCH_BATCH_PROGRESS", false);
         commit("SET_TOTAL_BATCHES", null);
         commit("SET_CURRENT_BATCH", null);
         setTimeout(() => {

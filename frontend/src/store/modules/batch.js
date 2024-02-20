@@ -173,7 +173,8 @@ export default {
     },
     async unpackParams({ state, commit }) {
       // unpack parameters from batch object into state variables
-      const buildParams = state.active.build_params;
+      const buildParams = state.active?.build_params || null;
+      if (!buildParams) return;
       for (const param in buildParams) {
         await commit(`SET_PARAM_${param.toUpperCase()}`, buildParams[param]);
       }
@@ -284,15 +285,24 @@ export default {
       });
     },
 
-    async matchBatchesRematch({ rootState }, batches) {
-      const formattedBatches = batches.map((batch) => ({
-        sample_batch_id: batch.sample_batch_id,
-        workspace_id: batch.workspace_id,
-      }));
-      const body = {
-        sample_batches: formattedBatches,
-      };
-      await rootState.api.httpClient.matchBatchesRematch(body);
+    async rematchBatch({ dispatch, rootState, state }, batch = null) {
+      const batchId = batch?.sample_batch_id || state.active.sample_batch_id;
+      const body = {};
+      try {
+        await rootState.api.httpClient.rematchBatch({ batchId, body });
+      } catch (error) {
+        // TODO_error_handling and use handleApiRequest for start notification
+        console.error(`Failed to rematch batch.`, error);
+        const userErrorMessage = `${errorMessage}. ${error}`;
+        dispatch(
+          "notification/showGeneralNotification",
+          {
+            notification: "error",
+            message: userErrorMessage,
+          },
+          { root: true }
+        );
+      }
     },
 
     // backend notifications
@@ -425,6 +435,9 @@ export default {
     },
   },
   getters: {
+    batchActive: (state) => {
+      return state.active ? state.active : null;
+    },
     buildParams: (state) => {
       return {
         calibration_collection: state.paramCalibrationCollection,
