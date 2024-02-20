@@ -1,59 +1,43 @@
+# Frontend
+
 ### Description
 
-This folder contains the Mascope frontend.
+This folder contains the Mascope frontend, developed in [Vue.js](https://vuejs.org/). The dependencies are managed by [yarn](https://yarnpkg.com/).
 
-Front-end/back-end sources can be found here:
-
-1. Karsa Desktop client application - https://gitlab.com/karsa_dev/karsa_msview/frontend/
-2. Karsa Router and backend services - https://gitlab.com/karsa_dev/karsa_msview/backend/
-
-Front-end builds are found here:
-https://github.com/karsa-dev/frontend/releases
+```
+mascope
+├───agents
+├───backend
+├───frontend            # Mascope frontend
+│   ├───scripts             # Build scripts
+│   └───src                 # Frontend source code
+│       ├───assets              # Icons, images, CSS
+│       ├───components          # Vue components
+│       ├───lib                 # Library (JS)
+│       └───store               # Vuex store
+└───scripts
+```
 
 ### Setup Requirements
 
-- Node version 12.13.1
-- yarn (package manager / recommended) or npm
+- [Node.js](https://nodejs.org/en)
+- [yarn](https://yarnpkg.com/)
 
 ### Project setup
 
-Call dev_setup.cmd to set up the project from the current repository.
+Call `yarn install` to install the dependencies.
 
 ### Compilation and hot-reloads for development
 
-1. for Web version (web version will display error, as it's customized for electron)
-
-yarn serve
-
-2. for electron version (use this)
-
-yarn electron:serve
-
-### Compilation and minify for production
-
-yarn build
+To run the frontend in development mode, call `yarn serve`.
 
 ### Lints and fixes files
 
-yarn lint
+`yarn lint`
 
 ### Compile and build distribution package
 
-1. run checklist.cmd to make sure all build pre-requisits are in place
-
-2. build the application
-
-yarn electron:build --legacy
-
-### Compile, build and publish distribution package (to github.com)
-
-1. run checklist.cmd to make sure all build pre-requisits are in place
-
-2. update package.json
-
-3. build and publish the application
-
-yarn electron:publish --legacy
+To build the frontend package, run `/scripts/build/build.cmd`. Refer to the README inside `/scripts/build` for more details.
 
 ### Customize configuration
 

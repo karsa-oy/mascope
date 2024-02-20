@@ -13,10 +13,6 @@ export default ({ mode }) => {
     plugins: [createVuePlugin()],
     server: {
       port: process.env.MASCOPE_PUBLIC_PORT,
-      fs: {
-        strict: false,
-        allow: ["/data/database/"],
-      },
     },
     resolve: {
       alias: [

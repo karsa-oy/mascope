@@ -5,7 +5,8 @@ description = "Agent to connect Tofwerk TOF with Karsa Mascope"
 authors = ["Karsa Oy <support@karsa.fi>"]
 license = "Proprietary"
 packages = [
-    ]
+    {include = "hardware", from = "../../backend/hardware"},
+]
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
@@ -21,8 +22,8 @@ python-socketio = "^5.7.2"
 numpy = "^1.23.5"
 pyaml = "^23.9.7"
 aiohttp = "^3.8.3"
-pyinstaller = "5.6.2"
 
+[tool.poetry.group.dev.dependencies]
+pyinstaller = "5.6.2"
 # Local dependencies
 hardware = { path = "../../backend/hardware", develop = true }
-service = { path = "../../backend/backend/service", develop = true }

@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>hardware.orbitrap.util &#8212; Mascope  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=d1102ebc" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/alabaster.css?v=12dfc556" />
+    <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for hardware.orbitrap.util</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Created on Mon Dec  2 14:34:17 2019</span>
+
+<span class="sd">@author: Oskari Kausiala</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">ctypes</span>
+
+<span class="kn">import</span> <span class="nn">clr</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">System.Runtime.InteropServices</span> <span class="kn">import</span> <span class="n">GCHandle</span><span class="p">,</span> <span class="n">GCHandleType</span>
+
+<span class="n">clr</span><span class="o">.</span><span class="n">AddReference</span><span class="p">(</span><span class="s2">&quot;System.Runtime.InteropServices&quot;</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="net2np_array">
+<a class="viewcode-back" href="../../../hardware.orbitrap.html#hardware.orbitrap.util.net2np_array">[docs]</a>
+<span class="k">def</span> <span class="nf">net2np_array</span><span class="p">(</span><span class="n">netarray</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Given a CLR &#39;System.Array&#39; returns a &#39;numpy.ndarray&#39;. See _MAP_NET_NP for</span>
+<span class="sd">    the mapping of CLR types to Numpy dtypes.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">_MAP_NET_NP</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;Single&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="s2">&quot;float32&quot;</span><span class="p">),</span>
+        <span class="s2">&quot;Double&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="s2">&quot;float64&quot;</span><span class="p">),</span>
+        <span class="s2">&quot;SByte&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="s2">&quot;int8&quot;</span><span class="p">),</span>
+        <span class="s2">&quot;Int16&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="s2">&quot;int16&quot;</span><span class="p">),</span>
+        <span class="s2">&quot;Int32&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="s2">&quot;int32&quot;</span><span class="p">),</span>
+        <span class="s2">&quot;Int64&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="s2">&quot;int64&quot;</span><span class="p">),</span>
+        <span class="s2">&quot;Byte&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="s2">&quot;uint8&quot;</span><span class="p">),</span>
+        <span class="s2">&quot;UInt16&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="s2">&quot;uint16&quot;</span><span class="p">),</span>
+        <span class="s2">&quot;UInt32&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="s2">&quot;uint32&quot;</span><span class="p">),</span>
+        <span class="s2">&quot;UInt64&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="s2">&quot;uint64&quot;</span><span class="p">),</span>
+        <span class="s2">&quot;Boolean&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="s2">&quot;bool&quot;</span><span class="p">),</span>
+    <span class="p">}</span>
+    <span class="n">dims</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">netarray</span><span class="o">.</span><span class="n">Rank</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">I</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">netarray</span><span class="o">.</span><span class="n">Rank</span><span class="p">):</span>
+        <span class="n">dims</span><span class="p">[</span><span class="n">I</span><span class="p">]</span> <span class="o">=</span> <span class="n">netarray</span><span class="o">.</span><span class="n">GetLength</span><span class="p">(</span><span class="n">I</span><span class="p">)</span>
+    <span class="n">nettype</span> <span class="o">=</span> <span class="n">netarray</span><span class="o">.</span><span class="n">GetType</span><span class="p">()</span><span class="o">.</span><span class="n">GetElementType</span><span class="p">()</span><span class="o">.</span><span class="n">Name</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">nparray</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">dims</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">_MAP_NET_NP</span><span class="p">[</span><span class="n">nettype</span><span class="p">])</span>
+    <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
+            <span class="s2">&quot;as_nparray does not yet support System type </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">nettype</span><span class="p">)</span>
+        <span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>  <span class="c1"># Memmove</span>
+        <span class="n">sourceHandle</span> <span class="o">=</span> <span class="n">GCHandle</span><span class="o">.</span><span class="n">Alloc</span><span class="p">(</span><span class="n">netarray</span><span class="p">,</span> <span class="n">GCHandleType</span><span class="o">.</span><span class="n">Pinned</span><span class="p">)</span>
+        <span class="n">sourcePtr</span> <span class="o">=</span> <span class="n">sourceHandle</span><span class="o">.</span><span class="n">AddrOfPinnedObject</span><span class="p">()</span><span class="o">.</span><span class="n">ToInt64</span><span class="p">()</span>
+        <span class="n">destPtr</span> <span class="o">=</span> <span class="n">nparray</span><span class="o">.</span><span class="n">__array_interface__</span><span class="p">[</span><span class="s2">&quot;data&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">ctypes</span><span class="o">.</span><span class="n">memmove</span><span class="p">(</span><span class="n">destPtr</span><span class="p">,</span> <span class="n">sourcePtr</span><span class="p">,</span> <span class="n">nparray</span><span class="o">.</span><span class="n">nbytes</span><span class="p">)</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">sourceHandle</span><span class="o">.</span><span class="n">IsAllocated</span><span class="p">:</span>
+            <span class="n">sourceHandle</span><span class="o">.</span><span class="n">Free</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">nparray</span></div>
+
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../../index.html">Mascope</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">backend</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2024, Karsa Oy.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 7.2.6</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 0.7.16</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>
