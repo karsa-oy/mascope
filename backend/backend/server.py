@@ -2,12 +2,15 @@
 from hardware.tofwerk.lib.TwTool import *
 
 import socketio
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 from .socket_events import sio
-from fastapi.middleware.cors import CORSMiddleware
 from backend.db import run as run_db
 from .db_api_rest import init_db
+
 from .api_rest.routes.sample_items_routes import sample_items_router
 from .api_rest.routes.sample_batches_routes import sample_batches_router
 from .api_rest.routes.workspace_routes import workspace_router
@@ -50,6 +53,32 @@ fastapi_app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Custom exception handler for Pydantic validation errors
+@fastapi_app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    # Combine error messages from exc.errors() into a single string
+    error_messages = []
+    for error in exc.errors():
+        field = " -> ".join(error["loc"])
+        msg = error["msg"]
+        error_messages.append(f"{msg}")
+
+    # Join all error messages with a separator (e.g., ", ")
+    combined_error_message = "; ".join(error_messages)
+
+    # Return a custom JSON response with the combined error message
+    error = f"Validation error. {combined_error_message}"
+    print(str(exc))
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={
+            "error": error,
+            "detail": str(exc),
+        },
+    )
+
 
 routers = [
     sample_items_router,

@@ -1,10 +1,10 @@
 from fastapi import HTTPException
 from sqlalchemy import asc, desc, func, select, or_, and_
+from sqlalchemy.orm import aliased
 from typing import List, Optional
 
 from backend.server import sio
 from backend.db.id import gen_id
-
 from backend.db_api_rest import async_session
 
 from .ionization_mechanisms_controller import get_ionization_mechanisms
@@ -26,59 +26,79 @@ async def get_target_compounds(
     target_compound_name: Optional[str] = None,
     target_compound_formula: Optional[str] = None,
     sample_batch_id: Optional[str] = None,
+    show_duplicates: bool = False,
     sort: str = None,
     order: str = None,
     page: int = 0,
     limit: int = 1000000,
 ):
     async with async_session() as session:
+        # Define the main query for target compounds
         stmt = select(TargetCompound)
 
+        # Apply filters if any
         if target_compound_name:
             stmt = stmt.filter(
                 TargetCompound.target_compound_name == target_compound_name
             )
-
         if target_compound_formula:
             stmt = stmt.filter(
                 TargetCompound.target_compound_formula == target_compound_formula
             )
-        if sample_batch_id:
-            stmt = (
-                stmt.join(
-                    TargetCompoundInTargetCollection,
-                    TargetCompoundInTargetCollection.target_compound_id
-                    == TargetCompound.target_compound_id,
-                )
-                .join(
-                    TargetCollectionInSampleBatch,
-                    TargetCollectionInSampleBatch.target_collection_id
-                    == TargetCompoundInTargetCollection.target_collection_id,
-                )
-                .filter(
-                    TargetCollectionInSampleBatch.sample_batch_id == sample_batch_id
-                )
-                .distinct()
+
+        # Adjust the query based on sample_batch_id filter
+        if sample_batch_id or show_duplicates:
+            # Alias for TargetCompoundInTargetCollection to be able to add to SELECT the target_collection_id
+            tcitc_alias = aliased(TargetCompoundInTargetCollection)
+
+            stmt = stmt.join(
+                tcitc_alias,
+                tcitc_alias.target_compound_id == TargetCompound.target_compound_id,
+            ).join(
+                TargetCollectionInSampleBatch,
+                TargetCollectionInSampleBatch.target_collection_id
+                == tcitc_alias.target_collection_id,
             )
 
+            if sample_batch_id:
+                stmt = stmt.filter(
+                    TargetCollectionInSampleBatch.sample_batch_id == sample_batch_id
+                )
+
+            if show_duplicates:
+                # Select the target_collection_id if duplicates are to be shown
+                stmt = stmt.add_columns(tcitc_alias.target_collection_id).distinct()
+
+            if not show_duplicates:
+                # Apply distinct only if duplicates should not be shown
+                stmt = stmt.distinct()
+
+        # Apply sorting if specified
         if sort:
             if order == "desc":
                 stmt = stmt.order_by(desc(getattr(TargetCompound, sort)))
             else:
                 stmt = stmt.order_by(asc(getattr(TargetCompound, sort)))
 
-        # Get total count
-        count_stmt = select(func.count()).select_from(stmt)
+        # Pagination logic
+        count_stmt = select(func.count()).select_from(stmt.subquery())
         total = await session.scalar(count_stmt)
 
-        # Get paginated results
         stmt = stmt.offset(page * limit).limit(limit)
         result = await session.execute(stmt)
-        target_compounds = result.scalars().all()
+
+        # Construct the response data
+        data = []
+        for row in result.all():
+            # When duplicates are shown, include target_collection_id
+            compound_data = row.TargetCompound.to_dict()
+            if show_duplicates:
+                compound_data["target_collection_id"] = row.target_collection_id
+            data.append(compound_data)
 
         return {
             "results": total,
-            "data": [target_compound.to_dict() for target_compound in target_compounds],
+            "data": data,
         }
 
 
@@ -148,6 +168,7 @@ async def delete_target_compound(target_compound_id: str, session=None):
                 room=sample_batch_id,
                 namespace="/",
             )
+        await sio.emit("targets_all_reload", namespace="/")
     else:
         await session.flush()
 
