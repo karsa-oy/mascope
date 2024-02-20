@@ -12,10 +12,7 @@
       :type="actionIs('delete') ? 'is-danger' : 'is-primary'"
     >
       <template v-if="actionIs('create', 'update', 'manageCollectionBatches')">
-        <div
-          class="modal-card"
-          style="background-color: inherit; height: 800px"
-        >
+        <div class="modal-card" style="background-color: inherit; height: 90vh">
           <header class="modal-card-head">
             <p class="subtitle">{{ modalTitle }}</p>
           </header>
@@ -110,11 +107,21 @@
                       v-if="addedCompounds.length > 0"
                     >
                       <b-table
-                        :data="addedCompounds"
+                        :data="paginatedAddedCompounds"
                         :columns="targetCompoundColumns"
                         checkable
                         :checked-rows.sync="targetCompounds"
+                        paginated
                       >
+                        <!-- Optional: Pagination controls -->
+                        <template v-slot:pagination>
+                          <b-pagination
+                            :total="addedCompounds.length"
+                            :current.sync="addedCompoundsCurrentPage"
+                            :per-page="compoundsPerPage"
+                            size="is-small"
+                          ></b-pagination>
+                        </template>
                       </b-table>
                     </b-field>
                     <b-field
@@ -122,11 +129,21 @@
                       v-if="targetCompoundsCreate.length > 0"
                     >
                       <b-table
-                        :data="targetCompoundsCreate"
+                        :data="paginatedTargetCompoundsCreate"
                         :columns="targetCompoundColumns"
                         checkable
                         :checked-rows.sync="targetCompoundsCreate"
+                        paginated
                       >
+                        <!-- Optional: Pagination controls -->
+                        <template v-slot:pagination>
+                          <b-pagination
+                            :total="targetCompoundsCreate.length"
+                            :current.sync="targetCompoundsCreateCurrentPage"
+                            :per-page="compoundsPerPage"
+                            size="is-small"
+                          ></b-pagination>
+                        </template>
                       </b-table>
                     </b-field>
                   </b-tab-item>
@@ -191,11 +208,21 @@
                       v-if="targetCompoundsCreate.length > 0"
                     >
                       <b-table
-                        :data="targetCompoundsCreate"
+                        :data="paginatedTargetCompoundsCreate"
                         :columns="targetCompoundColumns"
                         checkable
                         :checked-rows.sync="targetCompoundsCreate"
+                        paginated
                       >
+                        <!-- Optional: Pagination controls -->
+                        <template v-slot:pagination>
+                          <b-pagination
+                            :total="targetCompoundsCreate.length"
+                            :current.sync="targetCompoundsCreateCurrentPage"
+                            :per-page="compoundsPerPage"
+                            size="is-small"
+                          ></b-pagination>
+                        </template>
                       </b-table>
                     </b-field>
                   </b-tab-item>
@@ -369,8 +396,10 @@ export default {
       compoundsTab: null, // This will hold the value of the Target Compounds active subtab
       // Select compounds tab
       initialCompounds: [], // To store initial compounds from the active collection
-      // Pagination properties for initialCompounds
+      // Pagination properties
       initialCompoundsCurrentPage: 1,
+      addedCompoundsCurrentPage: 1,
+      targetCompoundsCreateCurrentPage: 1,
       // Add compounds tab
       addCompoundsSource: null,
       spreadsheetCompounds: [], // To store pasted to spreadsheet data
@@ -561,6 +590,18 @@ export default {
         (this.initialCompoundsCurrentPage - 1) * this.compoundsPerPage;
       const end = start + this.compoundsPerPage;
       return this.initialCompounds.slice(start, end);
+    },
+    paginatedAddedCompounds() {
+      const start =
+        (this.addedCompoundsCurrentPage - 1) * this.compoundsPerPage;
+      const end = start + this.compoundsPerPage;
+      return this.addedCompounds.slice(start, end);
+    },
+    paginatedTargetCompoundsCreate() {
+      const start =
+        (this.targetCompoundsCreateCurrentPage - 1) * this.compoundsPerPage;
+      const end = start + this.compoundsPerPage;
+      return this.targetCompoundsCreate.slice(start, end);
     },
     // Computes the added compounds by filtering out those that are not in the initial compounds
     addedCompounds() {
@@ -781,6 +822,8 @@ export default {
       this.workspaceSelected = null;
       this.selectedWorkspaceBatches = [];
       this.deleteOrphanCompounds = true;
+      this.addedCompoundsCurrentPage = 1;
+      this.targetCompoundsCreateCurrentPage = 1;
     },
     // Data loading methods for Add compounds tab
     async loadAddCompoundsList() {

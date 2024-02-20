@@ -294,8 +294,7 @@ export default {
         case "create":
           return (
             !this.batchName ||
-            this.calibrationCollectionSelected.length === 0 ||
-            this.targetCollectionsSelected.length === 0 ||
+            this.calibrationCollectionSelected.length !== 1 ||
             this.ionMechanismsSelected.length === 0
           );
 
@@ -338,8 +337,7 @@ export default {
             !collectionsChanged &&
             !iomMechanismsChanged;
           // Check if there are any ion_mechanism
-          const noIonMechanism = this.ionMechanismsSelected.length === 0;
-          if (noIonMechanism) disabled = true;
+          if (this.ionMechanismsSelected.length === 0) disabled = true;
           if (!this.batchName) disabled = true;
           return disabled;
         case "editBatchCollections":
