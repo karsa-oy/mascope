@@ -15,7 +15,7 @@ from ..controllers.sample_batches_controller import (
 )
 from ..models.pydantic_models.sample_pydantic_model import AlarmsList
 from ..models.pydantic_models.sample_batch_pydantic_model import (
-    SampleBatchCreate,
+    SampleBatchCreateBody,
     SampleBatchUpdateBody,
     autoSamplerImportBatchData,
     SampleBatchCopyBody,
@@ -53,8 +53,27 @@ async def get_batch_targets_route(sample_batch_id: str, body: AlarmsList):
 
 
 @sample_batches_router.post("/api/sample_batches")
-async def create_sample_batch_route(sample_batch: SampleBatchCreate):
-    return await create_sample_batch(sample_batch)
+async def create_sample_batch_route(
+    request: Request,
+    body: SampleBatchCreateBody,
+):
+    try:
+        sid = request.headers.get("X-SID")
+        result = await create_sample_batch(body)
+        # Convert the new_sample_batch object to a JSON-serializable format
+        result_data = jsonable_encoder(result)
+        return JSONResponse(
+            status_code=201,
+            content={
+                "message": f"Sample batch '{body.sample_batch_name}' was successfully created.",
+                "data": result_data,
+            },
+        )
+    except ApiException as e:
+        return JSONResponse(
+            status_code=e.status_code,
+            content={"error": e.user_message, "detail": e.tech_message},
+        )
 
 
 @sample_batches_router.delete("/api/sample_batches/{sample_batch_id}")

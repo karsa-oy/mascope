@@ -1,6 +1,27 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from typing import Optional, List, Dict, Any
 from .calibration_pydantic_model import CalibrationMzFitParams
+
+
+class BuildParams(BaseModel):
+    calibration_collection: str = Field(
+        ..., description="ID of the calibration collection"
+    )
+    ion_mechanisms: List[str] = Field(
+        ..., description="List of ionisation mechanism IDs"
+    )
+
+    @validator("calibration_collection")
+    def check_calibration_collection_length(cls, v):
+        if len(v) != 16:
+            raise ValueError("Only one calibration collection can be applied")
+        return v
+
+    @validator("ion_mechanisms")
+    def check_ion_mechanisms_non_empty(cls, v):
+        if len(v) == 0:
+            raise ValueError("At least one ionization mechanism must be provided")
+        return v
 
 
 class SampleBatchBase(BaseModel):
@@ -9,15 +30,15 @@ class SampleBatchBase(BaseModel):
     )
     sample_batch_name: str = Field(..., description="Name of the sample batch")
     sample_batch_description: Optional[str] = Field(
-        None, description="Description of the sample batch"
+        "", description="Description of the sample batch"
     )
-    build_params: Dict[str, Any] = Field(
+    build_params: BuildParams = Field(
         ..., description="Build parameters of the sample batch"
     )
 
 
-class SampleBatchCreate(SampleBatchBase):
-    target_collection_id: List[str] = Field(
+class SampleBatchCreateBody(SampleBatchBase):
+    target_collection_ids: List[str] = Field(
         ..., description="IDs of target collections associated with the sample batch"
     )
 

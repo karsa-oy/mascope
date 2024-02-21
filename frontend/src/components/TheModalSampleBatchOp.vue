@@ -31,6 +31,7 @@
                   <b-input
                     v-model="batchName"
                     :disabled="action == 'editBatchCollections'"
+                    required
                   ></b-input>
                 </b-field>
                 <b-field label="Description">
@@ -43,7 +44,7 @@
               <b-tab-item
                 value="calibration"
                 label="Calibration"
-                :disabled="action != 'create'"
+                :disabled="calibrationTabDisabled"
               >
                 <b-field>
                   <b-select
@@ -59,8 +60,7 @@
                 <b-table
                   :data="displayedCalibrationCollections"
                   :columns="collectionColumns"
-                  checkable
-                  :checked-rows.sync="calibrationCollectionSelected"
+                  :selected.sync="calibrationCollectionSelected"
                 >
                 </b-table>
               </b-tab-item>
@@ -236,15 +236,19 @@ export default {
       batchName: "",
       batchDesc: "",
       // Selected Associations data
-      calibrationCollectionSelected: [],
+      calibrationCollectionSelected: null,
       targetCollectionsSelected: [],
       ionMechanismsSelected: [],
 
       //// Utility data
       activeTab: null, // This will hold the value of the active tab
       isCopying: false,
+      // Basic fields to track changes
+      initialBatchName: "",
+      initialBatchDesc: "",
       // Calibration tab
       selectedCalibrationCollectionType: "calibrants", // default calibrant selection
+      initialCalibrationCollection: null, // This will be used to check if the user has changed the calibration collection
       // Target Collections tab
       selectedTargetCollectionType: "all", // default target selection
       initialTargetCollections: [], // To store initial target collections
@@ -289,26 +293,55 @@ export default {
         { field: "target_collection_description", label: "Description" },
       ];
     },
+    calibrationTabDisabled() {
+      switch (this.action) {
+        case "create":
+          return false;
+        case "update":
+          // Compare initial and current calibration collection
+          const initialCalibrationCollectionId = this
+            .initialCalibrationCollection
+            ? this.initialCalibrationCollection.target_collection_id
+            : null;
+          const currentCalibrationCollectionId = this
+            .calibrationCollectionSelected
+            ? this.calibrationCollectionSelected.target_collection_id
+            : null;
+          const calibrationCollectionChanged =
+            initialCalibrationCollectionId !== currentCalibrationCollectionId;
+          return !calibrationCollectionChanged;
+        default:
+          return true;
+      }
+    },
+
     saveButtonActive() {
       switch (this.action) {
         case "create":
           return (
             !this.batchName ||
-            this.calibrationCollectionSelected.length === 0 ||
-            this.targetCollectionsSelected.length === 0 ||
+            !this.calibrationCollectionSelected ||
             this.ionMechanismsSelected.length === 0
           );
 
         case "update":
-          let disabled;
-          // Provide default values to avoid errors when batchActive is null
-          const activeBatchName = this.batchActive?.sample_batch_name || "";
-          const activeBatchDesc =
-            this.batchActive?.sample_batch_description || "";
           // Check if basic properties have changed
           const basicPropertiesChanged =
-            this.batchName !== activeBatchName ||
-            this.batchDesc !== activeBatchDesc;
+            (this.batchName !== this.initialBatchName ||
+              this.batchDesc !== this.initialBatchDesc) &&
+            this.batchName; // the name is required
+
+          // Compare initial and current calibration collection
+          const initialCalibrationCollectionId = this
+            .initialCalibrationCollection
+            ? this.initialCalibrationCollection.target_collection_id
+            : null;
+          const currentCalibrationCollectionId = this
+            .calibrationCollectionSelected
+            ? this.calibrationCollectionSelected.target_collection_id
+            : null;
+          const calibrationCollectionChanged =
+            initialCalibrationCollectionId !== currentCalibrationCollectionId;
 
           // Compare initial and current target collections
           const initialCollectionsIds = this.initialTargetCollections
@@ -331,17 +364,16 @@ export default {
             .sort();
           const iomMechanismsChanged =
             JSON.stringify(initialIonizationMechanismsIds) !==
-            JSON.stringify(currentIonizationMechanismsIds);
+              JSON.stringify(currentIonizationMechanismsIds) &&
+            this.ionMechanismsSelected.length > 0; // Check if there are any ion_mechanisms selected
 
-          disabled =
+          return (
             !basicPropertiesChanged &&
+            !calibrationCollectionChanged &&
             !collectionsChanged &&
-            !iomMechanismsChanged;
-          // Check if there are any ion_mechanism
-          const noIonMechanism = this.ionMechanismsSelected.length === 0;
-          if (noIonMechanism) disabled = true;
-          if (!this.batchName) disabled = true;
-          return disabled;
+            !iomMechanismsChanged
+          );
+
         case "editBatchCollections":
           // Compare initial and current target collections
           const initialCollections = this.initialTargetCollections
@@ -444,7 +476,7 @@ export default {
               this.calibrationCollectionSelected.target_collection_id,
             ion_mechanisms: this.ionMechanismIds,
           },
-          target_collection_id: this.targetCollectionIds,
+          target_collection_ids: this.targetCollectionIds,
         };
       }
       if (this.actionIs("update") || this.actionIs("editBatchCollections")) {
@@ -471,6 +503,7 @@ export default {
       updateBatch: "batch/updateBatch",
       deleteBatch: "batch/deleteBatch",
       copyBatch: "batch/copyBatch",
+      showWarningNotification: "notification/showWarningNotification",
     }),
     ...mapMutations({
       deactivateModal: "modal/deactivate",
@@ -506,19 +539,19 @@ export default {
         this.activeTab = "info";
         this.selectedTargetCollectionType = "targets";
         this.selectedCalibrationCollectionType = "calibrants";
-        this.batchName = null;
-        this.batchDesc = null;
+        this.batchName = "";
+        this.batchDesc = "";
+        // TODO_configuration
         // set defaults
-        let calibrantTargets = this.displayedCalibrationCollections.filter(
+        let calibrantTargets = this.displayedCalibrationCollections.find(
           (collection) => collection.target_collection_name === "Br calibrants"
         );
-        this.calibrationCollectionSelected =
-          calibrantTargets.length > 0
-            ? calibrantTargets
-            : this.allCollections.filter(
-                (collection) =>
-                  collection.target_collection_id === "xkSPp3eZrWXYSVDa"
-              );
+        this.calibrationCollectionSelected = calibrantTargets
+          ? calibrantTargets
+          : this.allCollections.find(
+              (collection) =>
+                collection.target_collection_id === "xkSPp3eZrWXYSVDa"
+            );
         let explosivesTargets = this.displayedTargetCollections.filter(
           (collection) =>
             collection.target_collection_name === "Explosives targets"
@@ -533,25 +566,33 @@ export default {
         this.ionMechanismsSelected = this.ionMechanismsAll.filter(
           (mech) => mech.ionization_mechanism === "+Br-"
         );
-      } else if (this.action == "copy") {
+      }
+      if (this.action == "update") {
+        this.activeTab = "info";
+        this.selectedTargetCollectionType = "targets";
+        this.selectedCalibrationCollectionType = "calibrants";
+        this.batchName = this.batchActive.sample_batch_name;
+        this.batchDesc = this.batchActive.sample_batch_description;
+        this.initialBatchName = this.batchName;
+        this.initialBatchDesc = this.batchDesc;
+        this.initCalibrationCollectionSelected();
+        this.initTargetCollectionsSelected();
+        this.initIonMechanismsSelected();
+      }
+      if (this.action == "delete") {
+        this.batchName = this.batchActive.sample_batch_name;
+      }
+      if (this.action == "copy") {
         this.batchName = this.batchActive.sample_batch_name;
         this.newBatchName = this.batchActive
           ? generateCopyName(this.batchActive.sample_batch_name)
           : null;
         this.newBatchDescription = this.batchActive.sample_batch_description;
         this.workspaceSelected = null;
-      } else if (this.action == "editBatchCollections") {
+      }
+      if (this.action == "editBatchCollections") {
         this.activeTab = "collections";
         this.selectedTargetCollectionType = "all";
-        this.selectedCalibrationCollectionType = "calibrants";
-        this.batchName = this.batchActive.sample_batch_name;
-        this.batchDesc = this.batchActive.sample_batch_description;
-        this.initCalibrationCollectionSelected();
-        this.initTargetCollectionsSelected();
-        this.initIonMechanismsSelected();
-      } else {
-        this.activeTab = "info";
-        this.selectedTargetCollectionType = "targets";
         this.selectedCalibrationCollectionType = "calibrants";
         this.batchName = this.batchActive.sample_batch_name;
         this.batchDesc = this.batchActive.sample_batch_description;
@@ -561,11 +602,37 @@ export default {
       }
     },
     initCalibrationCollectionSelected() {
+      // set active batch calibration collection from build_params
       if (this.batchCalibrationCollectionId) {
-        this.calibrationCollectionSelected = this.allCollections.filter(
+        this.calibrationCollectionSelected = this.allCollections.find(
           (collection) =>
             collection.target_collection_id == this.batchCalibrationCollectionId
         );
+      }
+      this.initialCalibrationCollection = this.calibrationCollectionSelected;
+      if (!this.calibrationCollectionSelected) {
+        // set defaults if batch calibration collection is not set (debug)
+        // TODO_configuration
+        let calibrantTargets = this.displayedCalibrationCollections.find(
+          (collection) => collection.target_collection_name === "Br calibrants"
+        );
+        this.calibrationCollectionSelected = calibrantTargets
+          ? calibrantTargets
+          : this.allCollections.find(
+              (collection) =>
+                collection.target_collection_id === "xkSPp3eZrWXYSVDa"
+            );
+        const data = {
+          batchName: this.batchName,
+          collectionName:
+            this.calibrationCollectionSelected.target_collection_name,
+        };
+        // inform client about debug
+        this.showWarningNotification({
+          notification: "noCalibrationCollection",
+          data: data,
+        });
+        this.activeTab = "calibration";
       }
     },
     initTargetCollectionsSelected() {

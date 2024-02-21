@@ -180,7 +180,10 @@ export function createHttpClient(host, api_port) {
       try {
         return await httpClient.post(batchesBaseUrl, newBatch);
       } catch (error) {
-        console.error("Failed to create sample batch: ", error);
+        const userErrorMessage =
+          error?.response?.data?.error ||
+          `Failed to create sample batch "${newBatch.sample_batch_name}": ${error}`;
+        throw new Error(userErrorMessage);
       }
     },
     deleteBatch: async (batch) => {
@@ -195,14 +198,14 @@ export function createHttpClient(host, api_port) {
         );
       }
     },
-    updateBatch: async (newBatch) => {
+    updateBatch: async ({ batchId, body }) => {
       try {
-        return await httpClient.patch(
-          `${batchesBaseUrl}/${newBatch.sample_batch_id}`,
-          newBatch
-        );
+        return await httpClient.patch(`${batchesBaseUrl}/${batchId}`, body);
       } catch (error) {
-        console.error("Failed to update batch", error);
+        const userErrorMessage =
+          error?.response?.data?.error ||
+          `Failed to update sample batch "${body.sample_batch_name}": ${error}`;
+        throw new Error(userErrorMessage);
       }
     },
     autoSamplerImportBatch: async (data) => {
