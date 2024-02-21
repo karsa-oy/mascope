@@ -30,7 +30,7 @@ from ..models.models import (
     TargetIsotope,
 )
 from ..models.pydantic_models.sample_batch_pydantic_model import (
-    SampleBatchCreate,
+    SampleBatchCreateBody,
     SampleBatchUpdateBody,
     SampleBatchCopyBody,
     SampleBatchExportPeaks,
@@ -343,35 +343,44 @@ async def get_batch_targets(
         }
 
 
-async def create_sample_batch(sample_batch: SampleBatchCreate):
-    async with async_session() as session:
-        new_sample_batch = SampleBatch(
-            sample_batch_id=gen_id(16),
-            workspace_id=sample_batch.workspace_id,
-            sample_batch_name=sample_batch.sample_batch_name,
-            sample_batch_description=sample_batch.sample_batch_description,
-            build_params=sample_batch.build_params,
-            sample_batch_utc_created=datetime.utcnow(),
-        )
-        session.add(new_sample_batch)
-        await session.commit()
-        await session.refresh(new_sample_batch)
-
-        # associations to target collections
-        for target_collection_id in sample_batch.target_collection_id:
-            new_target_collection_in_sample_batch = TargetCollectionInSampleBatch(
-                target_collection_id=target_collection_id,
-                sample_batch_id=new_sample_batch.sample_batch_id,
+async def create_sample_batch(sample_batch: SampleBatchCreateBody) -> SampleBatch:
+    try:
+        async with async_session() as session:
+            new_sample_batch = SampleBatch(
+                sample_batch_id=gen_id(16),
+                workspace_id=sample_batch.workspace_id,
+                sample_batch_name=sample_batch.sample_batch_name,
+                sample_batch_description=sample_batch.sample_batch_description,
+                build_params=sample_batch.build_params.dict(),
+                sample_batch_utc_created=datetime.utcnow(),
             )
-            session.add(new_target_collection_in_sample_batch)
-        await session.commit()
+            session.add(new_sample_batch)
+            await session.commit()
+            await session.refresh(new_sample_batch)
 
-        # emit the event to inform the clients about the new workspace
-        await sio.emit(
-            "workspace_reload", room=sample_batch.workspace_id, namespace="/"
+            # associations to target collections
+            for target_collection_id in sample_batch.target_collection_ids:
+                new_target_collection_in_sample_batch = TargetCollectionInSampleBatch(
+                    target_collection_id=target_collection_id,
+                    sample_batch_id=new_sample_batch.sample_batch_id,
+                )
+                session.add(new_target_collection_in_sample_batch)
+            await session.commit()
+
+            # emit the event to inform the clients about the new workspace
+            await sio.emit(
+                "workspace_reload", room=sample_batch.workspace_id, namespace="/"
+            )
+
+            return new_sample_batch
+    except Exception as e:
+        api_exc = process_exception(
+            e,
+            f"Failed to create sample batch '{sample_batch.sample_batch_name}'",
         )
-
-        return new_sample_batch
+        raise ApiException(
+            api_exc.user_message, api_exc.tech_message, api_exc.status_code
+        )
 
 
 async def update_sample_batch(
@@ -435,11 +444,11 @@ async def update_sample_batch(
                 item.target_collection_id
                 for item in existing_sample_batch.target_collection
             }
-            new_ion_mechanisms = set(
-                sample_batch_update_body.build_params["ion_mechanisms"]
-            )
             existing_ion_mechanisms = set(
                 existing_sample_batch.build_params["ion_mechanisms"]
+            )
+            new_ion_mechanisms = set(
+                sample_batch_update_body.build_params.ion_mechanisms
             )
 
             # Check if target_compounds were added/remoced
@@ -479,7 +488,9 @@ async def update_sample_batch(
             existing_sample_batch.sample_batch_utc_modified = datetime.utcnow()
 
             # Update build_params and associations with target collections
-            existing_sample_batch.build_params = sample_batch_update_body.build_params
+            existing_sample_batch.build_params = (
+                sample_batch_update_body.build_params.dict()
+            )
 
             if "target_collection_ids" in update_data:
                 targets_all_reload = True

@@ -20,6 +20,7 @@ const state = {
   paramIonMechanisms: null,
 };
 
+// TODO_configuration
 const paramDefaults = {
   // build parameters
   paramCalibrationCollection: [],
@@ -231,11 +232,27 @@ export default {
     async autoSamplerImportBatch({ rootState }, data) {
       await rootState.api.httpClient.autoSamplerImportBatch(data);
     },
-    async createBatch({ rootState }, newBatch) {
-      await rootState.api.httpClient.createBatch(newBatch);
+    async createBatch({ dispatch, rootState }, newBatch) {
+      return await handleApiRequest({
+        dispatch,
+        rootState,
+        httpMethod: "createBatch",
+        requestData: newBatch,
+        successMessage: `Sample batch "${newBatch.sample_batch_name}" created successfully!`,
+        errorMessage: `Failed to create sample batch "${newBatch.sample_batch_name}". Please try again.`,
+      });
     },
-    async updateBatch({ rootState }, newBatch) {
-      await rootState.api.httpClient.updateBatch(newBatch);
+    async updateBatch({ dispatch, rootState }, newBatch) {
+      const batchId = newBatch.sample_batch_id;
+      const body = newBatch;
+      return await handleApiRequest({
+        dispatch,
+        rootState,
+        httpMethod: "updateBatch",
+        requestData: { batchId, body },
+        successMessage: `Sample batch "${newBatch.sample_batch_name}"  updated successfully!`,
+        errorMessage: `Failed to update sample batch "${newBatch.sample_batch_name}". Please try again.`,
+      });
     },
 
     async deleteBatch({ dispatch, rootState }, batch) {
