@@ -467,7 +467,7 @@ import ThePaneSettingsCalibration from "./ThePaneSettingsCalibration.vue";
 import * as _ from "underscore";
 import { mapMutations } from "vuex";
 import { call, get, sync } from "vuex-pathify";
-import { beautifySnakeCase, camelToSnakeCase, genId } from "../lib/util";
+import { beautifySnakeCase, strToSnakeCase, genId } from "../lib/util";
 
 export default {
   name: "TheModalScenthoundWorkflow",
@@ -586,7 +586,10 @@ export default {
     sampleItemAttributes() {
       return this.formFields
         .filter((field) => field.label != "sample_item_name")
-        .reduce((acc, cur) => ({ ...acc, [cur.label]: cur.value }), {});
+        .reduce(
+          (acc, cur) => ({ ...acc, [strToSnakeCase(cur.label)]: cur.value }),
+          {}
+        );
     },
     sampleItemName() {
       return this.formFields.filter(

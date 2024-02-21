@@ -343,7 +343,7 @@ import ThePaneSettingsCalibration from "./ThePaneSettingsCalibration.vue";
 import * as _ from "underscore";
 import { mapActions, mapMutations } from "vuex";
 import { call, get, sync } from "vuex-pathify";
-import { beautifySnakeCase, genId } from "../lib/util";
+import { beautifySnakeCase, strToSnakeCase, genId } from "../lib/util";
 
 export default {
   name: "TheModalSampleItemAttributesSave",
@@ -442,7 +442,10 @@ export default {
     sampleItemAttributes() {
       return this.formFields
         .filter((field) => field.label != "sample_item_name")
-        .reduce((acc, cur) => ({ ...acc, [cur.label]: cur.value }), {});
+        .reduce(
+          (acc, cur) => ({ ...acc, [strToSnakeCase(cur.label)]: cur.value }),
+          {}
+        );
     },
     sampleItemName() {
       return this.formFields.filter(
@@ -705,7 +708,7 @@ export default {
           });
         }
       }
-
+      this.loadedTemplate = newTemplate;
       this.formFields = newTemplate.template;
       this.sampleFilename = data.sampleItemRecordToLoad.filename;
       this.sampleInstrument = data.sampleItemRecordToLoad.instrument;

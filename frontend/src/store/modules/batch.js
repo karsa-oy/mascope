@@ -1,5 +1,5 @@
 import { make } from "vuex-pathify";
-import { camelToSnakeCase } from "../../lib/util";
+import { strToSnakeCase } from "../../lib/util";
 import { handleApiRequest, getApiData } from "./apiHelper";
 
 const state = {
@@ -167,7 +167,7 @@ export default {
       for (const field in state) {
         if (field.startsWith("param")) {
           const defaultValue = paramDefaults[field];
-          commit(`SET_${camelToSnakeCase(field).toUpperCase()}`, defaultValue);
+          commit(`SET_${strToSnakeCase(field).toUpperCase()}`, defaultValue);
         }
       }
     },
