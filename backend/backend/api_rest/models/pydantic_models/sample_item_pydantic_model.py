@@ -10,7 +10,7 @@ APP_ITEM_TYPES = [
     "BLANK",
     "SAMPLE",
     "UNKNOWN",
-    "ONLINE",
+    "ONLINE",  # At the moment not selectable from the UI
 ]
 
 

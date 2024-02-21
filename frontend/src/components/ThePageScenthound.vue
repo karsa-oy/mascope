@@ -51,7 +51,7 @@
                   <h1 class="title has-text-centered">Sample information</h1>
                 </div>
                 <div class="column is-1">
-                  <div style="text-align: right" v-if="true">
+                  <div style="text-align: right" v-if="editable">
                     <b-button
                       icon-right="cog"
                       type="is-primary"
@@ -99,7 +99,7 @@
               <b-dropdown
                 aria-role="list"
                 v-model="sampleItemFilterId"
-                :disabled="!acquisitionFilename"
+                :disabled="!fillable"
                 expanded
               >
                 <template #trigger>
@@ -122,7 +122,7 @@
               <b-button
                 type="is-primary"
                 icon-left="plus"
-                :disabled="!acquisitionFilename"
+                :disabled="!fillable"
                 @click="generateFilterId()"
               >
               </b-button>
@@ -131,7 +131,7 @@
               <b-dropdown
                 aria-role="list"
                 v-model="sampleItemType"
-                :disabled="!acquisitionFilename"
+                :disabled="!fillable"
                 expanded
               >
                 <template #trigger>
@@ -260,6 +260,7 @@
                         v-model="loadedTemplate"
                         placeholder="Load template"
                         expanded
+                        :disabled="!editable"
                       >
                         <option
                           v-for="t in availableTemplates"
@@ -552,10 +553,10 @@ export default {
       return [this.defaultTemplate, ...this.savedTemplates];
     },
     editable() {
-      return true;
+      return !this.sampleItemPending;
     },
     fillable() {
-      return this.acquisitionFilename;
+      return this.acquisitionFilename && !this.sampleItemPending;
     },
     batchFilterIds() {
       return this.batchActive
@@ -580,7 +581,11 @@ export default {
       return this.sampleActive
         ? this.sampleItemName === this.sampleActive.sample_item_name &&
             this.sampleItemType === this.sampleActive.sample_item_type &&
-            this.sampleItemFilterId === this.sampleActive.filter_id
+            this.sampleItemFilterId === this.sampleActive.filter_id &&
+            _.isEqual(
+              this.sampleItemAttributes,
+              this.sampleActive.sample_item_attributes
+            )
         : false;
     },
     sampleItemAttributes() {
@@ -597,11 +602,11 @@ export default {
       )[0].value;
     },
     sampleMatchClass() {
-      if (this.sampleAlarmCategory === null) return "is-primary";
+      if (this.sampleAlarmCategory === null) return "is-success";
       if (this.sampleAlarmCategory === 2) {
         return "is-danger";
       } else if (this.sampleAlarmCategory === 1) {
-        return "is-primary";
+        return "is-warning";
       } else {
         return "is-success";
       }
@@ -615,6 +620,7 @@ export default {
   created() {
     this.sampleUnload();
     this.scenthoundModeActive = true;
+    this.loadedTemplate = this.clone(this.defaultTemplate);
     this.formFields = [...this.defaultTemplate.template];
   },
   beforeRouteLeave(to, from, next) {
@@ -877,6 +883,11 @@ export default {
         // Switch to target search page if sample alarms
         this.activeStep = 2;
       }
+    },
+    sampleItemFilterId() {
+      // Reset sample item type when filter ID is changed
+      // In order to not allow inconsistency between filter ID and sample type
+      this.sampleItemType = null;
     },
   },
 };
