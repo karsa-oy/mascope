@@ -60,7 +60,7 @@ async def create_sample_batch_route(
     try:
         sid = request.headers.get("X-SID")
         result = await create_sample_batch(body)
-        # Convert the updated_sample_batch object to a JSON-serializable format
+        # Convert the new_sample_batch object to a JSON-serializable format
         result_data = jsonable_encoder(result)
         return JSONResponse(
             status_code=201,

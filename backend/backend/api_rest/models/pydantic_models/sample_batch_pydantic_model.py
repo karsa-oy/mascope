@@ -7,7 +7,9 @@ class BuildParams(BaseModel):
     calibration_collection: str = Field(
         ..., description="ID of the calibration collection"
     )
-    ion_mechanisms: List[str] = Field(..., description="List of ion mechanism IDs")
+    ion_mechanisms: List[str] = Field(
+        ..., description="List of ionisation mechanism IDs"
+    )
 
     @validator("calibration_collection")
     def check_calibration_collection_length(cls, v):
