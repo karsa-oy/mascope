@@ -71,7 +71,7 @@ async def emit_progress_update(progress_properties, increment):
     await sio.emit(
         "calibration_mz_fit_progress",
         {
-            "action": "MZ Fit",
+            "action": "m/z Fit",
             "progress_percentage": progress_percentage,
         },
         room=sample_item_id,
@@ -222,7 +222,7 @@ async def mz_calibrate_sample(
 
     if fit:
         print(
-            f"Calibration MZ Fit finished successfully. Sample - {sample_item['sample_item_name']}, filename - {sample_item['filename']}"
+            f"Calibration m/z Fit finished successfully. Sample - {sample_item['sample_item_name']}, filename - {sample_item['filename']}"
         )
         await sio.emit(
             "calibration_mz_fit_finished",
@@ -237,7 +237,7 @@ async def mz_calibrate_sample(
         await calibration_mz_apply(fit, sample_item["filename"], autosampler_mode)
 
         print(
-            f"Calibration MZ calibrate sample finished successfully. Sample - {sample_item['sample_item_name']}, filename - {sample_item['filename']}"
+            f"Calibration m/z calibrate sample finished successfully. Sample - {sample_item['sample_item_name']}, filename - {sample_item['filename']}"
         )
         await sio.emit(
             "calibration_mz_calibrate_sample_finished",
@@ -251,7 +251,7 @@ async def mz_calibrate_sample(
         result["status"] = "calibrated"
     else:
         print(
-            f"Calibration MZ Fit failed: {error}. Sample - {sample_item['sample_item_name']}, filename - {sample_item['filename']}"
+            f"Calibration m/z Fit failed: {error}. Sample - {sample_item['sample_item_name']}, filename - {sample_item['filename']}"
         )
         await sio.emit(
             "calibration_mz_fit_failed",
@@ -263,7 +263,7 @@ async def mz_calibrate_sample(
             room=sample_item["sample_item_id"],
         )
         print(
-            f"Calibration MZ calibrate sample failed: {error}. Sample - {sample_item['sample_item_name']}, filename - {sample_item['filename']}"
+            f"Calibration m/z calibrate sample failed: {error}. Sample - {sample_item['sample_item_name']}, filename - {sample_item['filename']}"
         )
         await sio.emit(
             "calibration_mz_calibrate_sample_failed",
@@ -363,7 +363,7 @@ async def background_mz_fit(
         await sio.emit(
             "calibration_mz_fit_finished",
             {
-                "action": "MZ Fit",
+                "action": "m/z Fit",
                 "progress_percentage": 100,
                 "fit": fit,
                 "stats": stats,
@@ -375,7 +375,7 @@ async def background_mz_fit(
         await sio.emit(
             "calibration_mz_fit_failed",
             {
-                "action": "MZ Fit",
+                "action": "m/z Fit",
                 "progress_percentage": 100,
                 "fit": fit,
                 "stats": stats,
@@ -449,7 +449,7 @@ async def calibration_mz_fit(
     await sio.emit(
         "calibration_mz_fit_started",
         {
-            "action": "MZ Fit",
+            "action": "m/z Fit",
             "progress_percentage": 0,
         },
         room=sample_item_id,
@@ -509,7 +509,7 @@ async def calibration_mz_fit(
             sample_item_id,
         )
 
-        return {"message": "MZ Fit Calibration started"}
+        return {"message": "m/z Fit Calibration started"}
     else:
         fit, stats, error = await mz_fit(
             filename,
@@ -544,7 +544,7 @@ async def calibration_mz_apply(
         await sio.emit(
             "calibration_mz_apply_started",
             {
-                "action": "MZ Apply",
+                "action": "m/z Apply",
                 "sample_item_id": sample_item_id,
                 "progress": 0,
             },
@@ -585,7 +585,7 @@ async def calibration_mz_apply(
         await sio.emit(
             "calibration_mz_apply_finished",
             {
-                "action": "MZ Apply",
+                "action": "m/z Apply",
                 "sample_item_id": sample_item_id,
                 "progress": 100,
                 "autosampler_mode": autosampler_mode,
@@ -635,7 +635,7 @@ async def calibration_mz_calibrate_sample(
         filename,
     )
 
-    return {"message": "MZ sample calibration started, please wait for completion"}
+    return {"message": "m/z sample calibration started, please wait for completion"}
 
 
 async def calibration_mz_calibrate_batch(

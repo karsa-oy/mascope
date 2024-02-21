@@ -52,17 +52,7 @@ def run():
         # Rename new table to old table
         new_conn.execute("ALTER TABLE sample_batch_new RENAME TO sample_batch;")
 
-        # STEP 4 - Add new row to ionization_mechanism table
-        print("Inserting new row into ionization_mechanism table")
-
-        new_conn.execute(
-            """
-            INSERT INTO ionization_mechanism VALUES
-            ("2r5zId3E4zr", "+", "+(CH3CH2)2NH+", "(CH3CH2)2NH")
-        """
-        )
-
-        # STEP 5 - Add new field target_collection_type to target_collection table
+        # STEP 4 - Add new field target_collection_type to target_collection table
         print("Adding target_collection_type field to target_collection table")
         new_conn.execute(
             """

@@ -1,6 +1,17 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from typing import Optional, Dict
 from datetime import timezone, datetime as dt
+
+# TODO_configuration possible item types
+APP_ITEM_TYPES = [
+    "FILTER_REGENERATION",
+    "FILTER_BACKGROUND",
+    "INSTRUMENT_BACKGROUND",
+    "BLANK",
+    "SAMPLE",
+    "UNKNOWN",
+    "ONLINE",  # At the moment not selectable from the UI
+]
 
 
 class SampleItemBase(BaseModel):
@@ -12,6 +23,15 @@ class SampleItemBase(BaseModel):
         ..., description="Attributes of the sample item"
     )
     filter_id: Optional[str] = Field(None, description="Filter ID of the sample item")
+
+    @validator("sample_item_type")
+    def check_item_type(cls, item):
+        if item not in APP_ITEM_TYPES:
+            allowed_types = ", ".join(APP_ITEM_TYPES)
+            raise ValueError(
+                f"{item} is not a valid sample_item_type. Allowed types are {allowed_types}."
+            )
+        return item
 
 
 class SampleItemCreate(SampleItemBase):

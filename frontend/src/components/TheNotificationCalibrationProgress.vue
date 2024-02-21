@@ -12,9 +12,9 @@
           <p>{{ progressMessage }}</p>
         </section>
         <section class="notification-progress-bar">
-          <!-- For MZ Fit -->
+          <!-- For m/z Fit -->
           <b-progress
-            v-if="calibrationAction === 'MZ Fit'"
+            v-if="calibrationAction === 'm/z Fit'"
             :value="progressPercentage"
             :max="100"
             show-value
@@ -28,9 +28,9 @@
                 : 'is-primary'
             "
           ></b-progress>
-          <!-- For MZ Apply -->
+          <!-- For m/z Apply -->
           <b-progress
-            v-else-if="calibrationAction === 'MZ Apply'"
+            v-else-if="calibrationAction === 'm/z Apply'"
             :value="progressPercentage"
             size="is-medium"
             :type="
