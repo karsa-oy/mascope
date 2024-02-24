@@ -645,8 +645,11 @@ export default {
           break;
       }
     },
-    sampleItemFilterId() {
-      this.sampleItemType = null;
+    sampleItemFilterId(newValue) {
+      if (newValue != this.sampleActive.filter_id) {
+        // Reset sample item type when filter ID was changed
+        this.sampleItemType = null;
+      }
     },
     loadedTemplate: {
       handler(newValue) {
