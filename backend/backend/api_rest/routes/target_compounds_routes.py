@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from ..controllers.target_compounds_controller import (
     get_target_compound_by_id,
     get_target_compounds,
@@ -18,18 +18,32 @@ target_compounds_router = APIRouter()
 
 @target_compounds_router.get("/api/target_compounds")
 async def get_target_compounds_route(
-    target_compound_name: Optional[str] = None,
-    target_compound_formula: Optional[str] = None,
-    sample_batch_id: Optional[str] = None,
-    sort: str = None,
-    order: str = None,
-    page: int = 0,
-    limit: int = 100,
+    target_compound_name: Optional[str] = Query(
+        None, description="The name of the target compound to filter by."
+    ),
+    target_compound_formula: Optional[str] = Query(
+        None, description="The formula of the target compound to filter by."
+    ),
+    sample_batch_id: Optional[str] = Query(
+        None, description="The ID of the sample batch to filter compounds by."
+    ),
+    show_duplicates: bool = Query(
+        False,
+        description="Flag to include duplicate compounds and their collection IDs.",
+    ),
+    sort: str = Query(None, description="The column name to sort the results by."),
+    order: str = Query(
+        None,
+        description="The sort order, either 'asc' for ascending or 'desc' for descending.",
+    ),
+    page: int = Query(0, description="The page number for pagination."),
+    limit: int = Query(10000, description="The number of results per page."),
 ):
     return await get_target_compounds(
         target_compound_name,
         target_compound_formula,
         sample_batch_id,
+        show_duplicates,
         sort,
         order,
         page,

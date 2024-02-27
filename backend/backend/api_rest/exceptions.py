@@ -1,6 +1,9 @@
 # TODO_error_handling
 from fastapi import HTTPException, status
+from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy.exc import SQLAlchemyError
+from pydantic import ValidationError
 
 
 class ApiException(Exception):
@@ -32,6 +35,7 @@ def process_exception(e: Exception, context_message: str) -> ApiException:
         user_message = f"{context_message}: {e.detail}."
         tech_message = error_message
         status_code = e.status_code
+
     elif isinstance(e, ValueError):
         user_message = f"{context_message}: invalid value."
         tech_message = error_message

@@ -49,6 +49,9 @@ export default {
       notificationIsActive: "notification/generalActive",
       generalNotification: "notification/generalNotification",
       generalNotificationMessage: "notification/generalNotificationMessage",
+      batchComputeProgressActive: "notification/batchComputeProgressActive",
+      deleteProgress: "notification/deleteProgress",
+      progressActive: "notification/progressActive",
     }),
   },
   watch: {
@@ -57,7 +60,12 @@ export default {
         this.resetGeneralNotification();
       }
       if (newVal) {
-        setTimeout(this.close, 3500);
+        setTimeout(() => {
+          if (this.batchComputeProgressActive) return;
+          if (this.deleteProgress) return;
+          if (this.progressActive) return;
+          setTimeout(this.close, 3500);
+        }, 1000);
       }
     },
   },

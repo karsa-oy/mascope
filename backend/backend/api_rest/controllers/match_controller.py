@@ -25,7 +25,7 @@ from backend.api_rest.models.models import (
     SampleItem,
 )
 from ..models.pydantic_models.match_pydantic_model import (
-    MatchComputeBatch,
+    RematchBatchesBody,
     MatchComputeSample,
     ProgressProperties,
 )
@@ -810,112 +810,105 @@ async def match_sample_compute(
 
 
 async def rematch_batches(
-    sample_batches: List[MatchComputeBatch],
-    added_target_compound_ids: Optional[List[str]] = None,
-    added_ionization_mechanism_ids: Optional[List[str]] = None,
-    removed_target_compound_ids: Optional[List[str]] = None,
-    removed_ionization_mechanism_ids: Optional[List[str]] = None,
-):
+    rematch_batches_body: RematchBatchesBody,
+    sid,
+) -> dict:
     """
-    Performs a rematch operation on multiple sample batches, handling both the removal of existing matches
-    and the computation of new matches based on changes in target compounds or ionization mechanisms.
+    Performs a rematch operation on multiple sample batches based on the provided for each batch batch-specific
+    removed- or added- parameters in target compounds or ionization mechanisms.
 
-    This function iterates over each sample batch, applying removals and additions of matches as specified.
+    This function iterates over each sample batch, creating separate rematch_batch task with
+    removed- or added- parameters in target compounds or ionization mechanisms for each batch.
     It also aggregates any failures across batches for reporting purposes.
 
     Steps:
     1. Gather initial data for each sample batch, including the number of items per batch and workspace IDs.
-    2. Notify clients that batch processing has started.
-    3. Sequentially process each sample batch, performing removals and additions as specified.
+    2. Notify client who triggered rematch_batches that batches processing has started.
+    3. Sequentially process each sample batch with the specific for each batch added and removed parameters.
     4. Aggregate failed samples from each batch for reporting.
-    5. Notify clients that batch processing has finished, including information about any failures.
+    5. Notify client who triggered rematch_batches that batches processing has finished, including information about any failures.
 
-    :param sample_batches: A list of sample batch identifiers along with optional workspace information.
-    :type sample_batches: List[MatchComputeBatch]
-    :param added_target_compound_ids: IDs of target compounds added, for which new matches should be computed.
-    :type added_target_compound_ids: Optional[List[str]], optional
-    :param added_ionization_mechanism_ids: IDs of ionization mechanisms added, for which new matches should be computed.
-    :type added_ionization_mechanism_ids: Optional[List[str]], optional
-    :param removed_target_compound_ids: IDs of target compounds removed, for which existing matches should be deleted.
-    :type removed_target_compound_ids: Optional[List[str]], optional
-    :param removed_ionization_mechanism_ids: IDs of ionization mechanisms removed, for which existing matches should be deleted.
-    :type removed_ionization_mechanism_ids: Optional[List[str]], optional
+
+    :param rematch_batches_body: A list of sample batch identifiers along with optional removed/added entities
+    :type rematch_batches_body: RematchBatchesBody
+    :param sid: Session ID, used for emitting notifications to specific clients
+    :type sid: str
     :return: A status message indicating the outcome of the batch rematch operation, including any failed match computations for samples.
     :rtype: dict
+
+    TODO_notifications
+        - Refactor notifications
     """
     # Initialize variables for tracking overall progress and failures for correct user notifications
-    total_batches = len(sample_batches)
+    total_batches = len(rematch_batches_body.sample_batches)
     total_number_of_items = 0
     items_per_batch = []
-    workspace_ids = set()
     samples_compute_failed_all = []  # to collect failed samples from all batches
 
-    # Step 1: Gather data for each batch and set workspace_ids
-    for sample_batch in sample_batches:
+    # Step 1: Gather data for each batch and set workspace_id for each batch
+    for sample_batch in rematch_batches_body.sample_batches:
         sample_items_info = await get_samples(
             sample_batch_id=sample_batch.sample_batch_id, batch_matches_info=False
         )
         total_number_of_items += sample_items_info["results"]
         items_per_batch.append(sample_items_info["results"])
 
-        # If workspace_id is not provided, fetch it from the database
-        if not sample_batch.workspace_id:
-            async with async_session() as session:
-                result = await session.execute(
-                    select(SampleBatch.workspace_id).filter(
-                        SampleBatch.sample_batch_id == sample_batch.sample_batch_id
-                    )
+        # Fetch workspace_id from the database
+        async with async_session() as session:
+            result = await session.execute(
+                select(SampleBatch.workspace_id).filter(
+                    SampleBatch.sample_batch_id == sample_batch.sample_batch_id
                 )
-                sample_batch.workspace_id = result.scalar_one_or_none()
-
-        workspace_ids.add(sample_batch.workspace_id)
+            )
+            sample_batch.workspace_id = result.scalar_one_or_none()
 
     # Calculate weight for each batch based on the number of items
     item_weights_per_batch = [1.0 / items if items else 0 for items in items_per_batch]
 
-    # Step 2: Notify workspace clients that batch processing has started
-    for workspace_id in workspace_ids:
-        await sio.emit(
-            "match_batch_compute_started",
-            {"total_batches": total_batches},
-            room=workspace_id,
-            namespace="/",
-        )
+    # Step 2: Notify client who triggered rematch_batches that batches processing has started.
+    await sio.emit(
+        "rematch_batches_started",
+        {"total_batches": total_batches},
+        room=sid,
+        namespace="/",
+    )
 
     # Step 3: Process each batch
-    for batch_index, sample_batch in enumerate(sample_batches, start=1):
-        # Notify workspace clients of the progres
+    for batch_index, sample_batch in enumerate(
+        rematch_batches_body.sample_batches, start=1
+    ):
+        sample_batch_id = sample_batch.sample_batch_id
+        workspace_id = sample_batch.workspace_id
+        added_target_compound_ids = sample_batch.added_target_compound_ids
+        removed_target_compound_ids = sample_batch.removed_target_compound_ids
+
+        # Notify workspace client of the current progres batch
         await sio.emit(
-            "match_batch_compute_progress",
+            "rematch_batch_progress",
             {"current_batch": batch_index},
-            room=sample_batch.workspace_id,
-            namespace="/",
-        )
-        # Notify sample batch clients of the selected batch processing
-        await sio.emit(
-            "match_batch_compute_progress",
-            {"current_batch_message": "Selected batch is processing now"},
-            room=sample_batch.sample_batch_id,
+            room=sid,
             namespace="/",
         )
 
         # Compute progress properties for the current batch
         progress_properties = ProgressProperties(
+            progress_type="rematch_batches",
+            sample_batch_id=sample_batch_id,
             item_weight=item_weights_per_batch[batch_index - 1],
             batch_index=batch_index,
-            workspace_id=sample_batch.workspace_id,
+            workspace_id=workspace_id,
             total_batches=total_batches,
+            sid=sid,
         )
 
         # Create rematching task for the current batch
         task = asyncio.create_task(
             rematch_batch(
-                sample_batch.sample_batch_id,
+                sample_batch_id=sample_batch_id,
+                workspace_id=workspace_id,
                 added_target_compound_ids=added_target_compound_ids,
-                added_ionization_mechanism_ids=added_ionization_mechanism_ids,
                 removed_target_compound_ids=removed_target_compound_ids,
-                removed_ionization_mechanism_ids=removed_ionization_mechanism_ids,
-                independent_transaction=True,
+                independent_transaction=False,
                 progress_properties=progress_properties,
             )
         )
@@ -928,17 +921,16 @@ async def rematch_batches(
         if task_result and "samples_compute_failed" in task_result:
             samples_compute_failed_all.extend(task_result["samples_compute_failed"])
 
-    # Step 5: Notify workspace clients that batch processing has finished, including information about any failures
-    for workspace_id in workspace_ids:
-        await sio.emit(
-            "match_batch_compute_finished",
-            {
-                "total_batches": total_batches,
-                "samples_compute_failed": samples_compute_failed_all,
-            },
-            room=workspace_id,
-            namespace="/",
-        )
+    # Step 5: Notify client who triggered rematching that batches processing has finished, including information about any failures
+    await sio.emit(
+        "rematch_batches_finished",
+        {
+            "total_batches": total_batches,
+            "samples_compute_failed": samples_compute_failed_all,
+        },
+        room=sid,
+        namespace="/",
+    )
 
     if samples_compute_failed_all:
         # If there are any aggregated failed samples from all batches, include this information in the final result
@@ -951,6 +943,7 @@ async def rematch_batches(
 
 async def rematch_batch(
     sample_batch_id: str,
+    workspace_id: Optional[str] = None,
     added_target_compound_ids: Optional[List[str]] = None,
     added_ionization_mechanism_ids: Optional[List[str]] = None,
     removed_target_compound_ids: Optional[List[str]] = None,
@@ -960,17 +953,20 @@ async def rematch_batch(
 ):
     """
     Performs a rematch of sample batch by removing and/or computing matches based on the specified parameters.
+    This operation can be conducted as part of a larger rematch_batches operation or as an independent transaction.
 
     This function handles the rematch process of a sample batch by first removing matches associated with removed
     target compounds or ionization mechanisms and then adding matches for added compounds or mechanisms.
     If no parameters are provided, it performs a complete rematch by removing all existing sample matches and recomputing them.
 
     Steps:
-    1. Remove existing matches associated with removed parameters, if specified.
-    2. Compute new matches for added parameters, if specified.
-    3. In the absence of specified parameters for addition or removal, perform a full rematch by removing all matches and recomputing them for all targets of the batch.
-    4. Emit a reload event for the batch users to update the system with the changes, if the operation is flagged as an independent transaction.
-    5. If there are any failed samples, return them as part of the function's result to be processed in rematch_batches endpoint
+    1. Notify batch clients that batch processing has started.
+    2. Remove existing matches associated with removed parameters, if specified.
+    3. Compute new matches for added parameters, if specified.
+    4. In the absence of specified parameters for addition or removal, perform a full rematch by removing all matches and recomputing them for all targets of the batch.
+    5. Emit a reload event for the batch users to update the system with the changes, if the operation is flagged as an independent transaction.
+    6. Notify batch clients that  batch rematching has finished, including information about any failures
+    7. If there are any failed samples, return them as part of the function's result to be processed in rematch_batches endpoint
 
     :param sample_batch_id: ID of the sample batch for which the rematch is to be performed.
     :type sample_batch_id: str
@@ -987,11 +983,68 @@ async def rematch_batch(
         - If `removed_*` parameters are provided, the function removes matches related to these parameters.
         - If `added_*` parameters are provided, the function computes new matches related to these parameters.
         - If no `added_*` or `removed_*` parameters are provided, the function removes all existing matches and computes new matches for all targets.
+    TODO_notifications
+        - Handle the separate types of notifications when called from rematch_batches or when an independent transaction, potentially using sid
     """
     print(f"...Rematching batch: {sample_batch_id} ...")
     samples_compute_failed = []
     try:
-        # Step 1: Remove existing matches based on provided removed parameters
+        # Step 1: Notify batch clients that batch processing has started.
+        await sio.emit(
+            "rematch_batch_started",
+            {"total_batches": 1},
+            room=sample_batch_id,
+            namespace="/",
+        )
+        if progress_properties.progress_type == "rematch_batch":
+            if independent_transaction:
+                # Compute progress properties for the current batch
+                sample_items_info = await get_samples(
+                    sample_batch_id=sample_batch_id,
+                    batch_matches_info=False,
+                )
+                item_weight = 1.0 / sample_items_info["results"]
+                if progress_properties.workspace_reload is not None:
+                    workspace_reload = progress_properties.workspace_reload
+                else:
+                    workspace_reload = False
+
+                progress_properties = ProgressProperties(
+                    progress_type=progress_properties.progress_type,
+                    item_weight=item_weight,
+                    batch_index=1,
+                    total_batches=1,
+                    workspace_reload=workspace_reload,
+                    sample_batch_id=sample_batch_id,
+                )
+                if not workspace_id:
+                    # Fetch workspace_id from the database
+                    async with async_session() as session:
+                        result = await session.execute(
+                            select(SampleBatch.workspace_id).filter(
+                                SampleBatch.sample_batch_id == sample_batch_id
+                            )
+                        )
+                        workspace_id = result.scalar_one_or_none()
+
+            # Notify batch clients of the progres
+            await sio.emit(
+                "rematch_batch_progress",
+                {"current_batch": progress_properties.batch_index},
+                room=sample_batch_id,
+                namespace="/",
+            )
+        # Notify sample batch clients of the selected batch processing
+        await sio.emit(
+            "rematch_batch_progress",
+            {
+                "current_batch_message": "Selected batch is processing now",
+            },
+            room=sample_batch_id,
+            namespace="/",
+        )
+
+        # Step 2: Remove existing matches based on provided removed parameters
         if removed_target_compound_ids or removed_ionization_mechanism_ids:
             await match_batch_remove(
                 sample_batch_id=sample_batch_id,
@@ -999,7 +1052,7 @@ async def rematch_batch(
                 removed_ionization_mechanism_ids=removed_ionization_mechanism_ids,
             )
 
-        # Step 2: Compute new matches based on provided added parameters
+        # Step 3: Compute new matches based on provided added parameters
         if added_target_compound_ids or added_ionization_mechanism_ids:
             await match_batch_compute(
                 sample_batch_id=sample_batch_id,
@@ -1007,7 +1060,7 @@ async def rematch_batch(
                 added_ionization_mechanism_ids=added_ionization_mechanism_ids,
                 progress_properties=progress_properties,
             )
-        # Step 3: Perform a complete rematch if no specific targets are provided
+        # Step 4: Perform a complete rematch if no specific targets are provided
         elif not removed_target_compound_ids and not removed_ionization_mechanism_ids:
             await match_batch_remove(
                 sample_batch_id=sample_batch_id,
@@ -1026,11 +1079,24 @@ async def rematch_batch(
             # If no specific failed samples information is present, log the general error
             print("Error:", error_info)
 
-    # Step 4: Emit a reload event if this operation is independent
-    if independent_transaction:
+    # Step 5: Emit a reload event if this operation is independent
+    if progress_properties.workspace_reload:
+        await sio.emit("workspace_reload", room=workspace_id, namespace="/")
+    else:
         await sio.emit("sample_batch_reload", room=sample_batch_id, namespace="/")
 
-    # Step 5: If there are any failed samples, return them as part of the function's result to be processed in rematch_batches endpoint
+    # Step 6: Notify batch clients that  batch rematching has finished, including information about any failures
+    await sio.emit(
+        "rematch_batch_finished",
+        {
+            "total_batches": 1,
+            "samples_compute_failed": samples_compute_failed,
+        },
+        room=sample_batch_id,
+        namespace="/",
+    )
+
+    # Step 7: If there are any failed samples, return them as part of the function's result to be processed in rematch_batches endpoint
     if samples_compute_failed:
         return {"samples_compute_failed": samples_compute_failed}
 
@@ -1216,14 +1282,11 @@ async def match_batch_compute(
         )
         # Prepare progress_properties for correct notifications.
         if progress_properties is not None:
-            progress_properties = ProgressProperties(
-                progress_type="match_batches",
-                item_weight=progress_properties.item_weight,
-                item_index=item_index,
-                batch_index=progress_properties.batch_index,
-                workspace_id=progress_properties.workspace_id,
-                total_batches=progress_properties.total_batches,
-            )
+            # Convert to dict and update 'item_index'
+            progress_properties_dict = progress_properties.dict()
+            progress_properties_dict["item_index"] = item_index
+
+            progress_properties = ProgressProperties(**progress_properties_dict)
 
         try:
             # Gather sample information

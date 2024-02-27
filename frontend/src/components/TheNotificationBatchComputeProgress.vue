@@ -52,7 +52,8 @@ export default {
       progressPercentage: "notification/progressPercentage",
     }),
     ...get({
-      batchMatchComputing: "notification/batchMatchComputing",
+      rematchBatchesProgress: "notification/rematchBatchesProgress",
+      rematchBatchProgress: "notification/rematchBatchProgress",
       notificationActive: "notification/active",
       computeError: "notification/computeError",
     }),
@@ -72,7 +73,18 @@ export default {
     },
   },
   watch: {
-    batchMatchComputing(value) {
+    rematchBatchesProgress(value) {
+      if (value) {
+        this.activateNotification({
+          notification: "batchComputeProgress",
+        });
+      } else {
+        if (this.notificationActive === "batchComputeProgress") {
+          this.close();
+        }
+      }
+    },
+    rematchBatchProgress(value) {
       if (value) {
         this.activateNotification({
           notification: "batchComputeProgress",

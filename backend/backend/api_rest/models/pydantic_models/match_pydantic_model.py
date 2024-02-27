@@ -2,13 +2,6 @@ from pydantic import BaseModel, Field
 from typing import Optional, List
 
 
-class MatchComputeBatch(BaseModel):
-    sample_batch_id: str = Field(..., description="ID of the sample batch")
-    workspace_id: Optional[str] = Field(
-        None, description="ID of the workspace associated with the sample batch"
-    )
-
-
 class MatchComputeSample(BaseModel):
     sample_item_id: str = Field(..., description="ID of the sample item")
     sample_item_name: str = Field(..., description="ID of the sample item")
@@ -42,6 +35,9 @@ class ProgressProperties(BaseModel):
         description="Type of progress computation ('match_batches' or 'match_item')",
     )
     sid: Optional[str] = Field(None, description="Session ID for the socket connection")
+    workspace_reload: Optional[bool] = Field(
+        False, description="Flag to trigger workspace reload"
+    )
 
 
 class RematchBody(BaseModel):
@@ -67,9 +63,16 @@ class RematchBody(BaseModel):
     )
 
 
-class RematchBatchesBody(RematchBody):
-    sample_batches: Optional[List[MatchComputeBatch]] = Field(
-        None, description="List of sample batches to rematch"
+class RematchBatchBody(RematchBody):
+    sample_batch_id: Optional[str] = Field(None, description="ID of the sample batch")
+    workspace_id: Optional[str] = Field(
+        None, description="ID of the workspace associated with the sample batch"
+    )
+
+
+class RematchBatchesBody(BaseModel):
+    sample_batches: List[RematchBatchBody] = Field(
+        ..., description="List of sample batches to rematch"
     )
 
 

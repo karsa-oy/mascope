@@ -11,7 +11,7 @@
       @close="deactivateModal"
       :type="actionIs('delete') ? 'is-danger' : 'is-primary'"
     >
-      <template v-if="actionIs('create', 'update')">
+      <template v-if="actionIs('create', 'update', 'editBatchCollections')">
         <div
           class="modal-card"
           style="background-color: inherit; height: 800px"
@@ -20,59 +20,75 @@
             <h2 class="subtitle">{{ modalTitle }}</h2>
           </header>
           <section class="modal-card-body" style="min-height: 250px">
-            <b-tabs type="is-boxed">
-              <b-tab-item label="Info">
+            <b-tabs
+              v-model="activeTab"
+              type="is-boxed"
+              position="is-centered"
+              expanded
+            >
+              <b-tab-item value="info" label="Info">
                 <b-field label="Name">
-                  <b-input v-model="batchName"></b-input>
+                  <b-input
+                    v-model="batchName"
+                    :disabled="action == 'editBatchCollections'"
+                    required
+                  ></b-input>
                 </b-field>
                 <b-field label="Description">
-                  <b-input v-model="batchDesc"></b-input>
+                  <b-input
+                    v-model="batchDesc"
+                    :disabled="action == 'editBatchCollections'"
+                  ></b-input>
                 </b-field>
               </b-tab-item>
-              <b-tab-item label="Calibration" :disabled="action != 'create'">
-                <b-switch v-model="calibrationShowAllCollections"
-                  >Show All Collections</b-switch
-                >
+              <b-tab-item
+                value="calibration"
+                label="Calibration"
+                :disabled="calibrationTabDisabled"
+              >
+                <b-field>
+                  <b-select
+                    v-model="selectedCalibrationCollectionType"
+                    placeholder="Select a type"
+                  >
+                    <option value="targets">Targets collections</option>
+                    <option value="calibrants">Calibrants collections</option>
+                    <option value="diagnostics">Diagnostic collections</option>
+                    <option value="all">All collections</option>
+                  </b-select>
+                </b-field>
                 <b-table
-                  :data="
-                    calibrationShowAllCollections
-                      ? allCollections
-                      : calibrantsCollections
-                  "
-                  :columns="[
-                    { field: 'target_collection_name', label: 'Name' },
-                    {
-                      field: 'target_collection_description',
-                      label: 'Description',
-                    },
-                  ]"
+                  :data="displayedCalibrationCollections"
+                  :columns="collectionColumns"
                   :selected.sync="calibrationCollectionSelected"
                 >
                 </b-table>
               </b-tab-item>
-              <b-tab-item label="Target collections">
-                <b-switch v-model="targetsShowAllCollections"
-                  >Show All Collections</b-switch
-                >
+              <b-tab-item value="collections" label="Target collections">
+                <b-field>
+                  <b-select
+                    v-model="selectedTargetCollectionType"
+                    placeholder="Select a type"
+                  >
+                    <option value="targets">Targets collections</option>
+                    <option value="calibrants">Calibrants collections</option>
+                    <option value="diagnostics">Diagnostic collections</option>
+                    <option value="all">All collections</option>
+                  </b-select>
+                </b-field>
                 <b-table
-                  :data="
-                    targetsShowAllCollections
-                      ? allCollections
-                      : targetsCollections
-                  "
-                  :columns="[
-                    { field: 'target_collection_name', label: 'Name' },
-                    {
-                      field: 'target_collection_description',
-                      label: 'Description',
-                    },
-                  ]"
+                  :data="displayedTargetCollections"
+                  :columns="collectionColumns"
                   checkable
                   :checked-rows.sync="targetCollectionsSelected"
                 >
                 </b-table>
               </b-tab-item>
-              <b-tab-item label="Ionization mechanisms">
+              <b-tab-item
+                value="ionization"
+                label="Ionization mechanisms"
+                :disabled="action == 'editBatchCollections'"
+              >
                 <b-table
                   :data="ionMechanismsAll"
                   :columns="[
@@ -91,7 +107,7 @@
           </section>
           <footer class="modal-card-foot">
             <b-button
-              type="is-warning"
+              type="is-dark"
               icon-left="close"
               expanded
               @click="deactivateModal"
@@ -102,12 +118,7 @@
               type="is-primary"
               icon-left="content-save"
               expanded
-              :disabled="
-                !batchName ||
-                !targetCollectionsSelected ||
-                !calibrationCollectionSelected ||
-                !ionMechanismsSelected
-              "
+              :disabled="saveButtonActive"
               @click="
                 () => {
                   actionIs('create')
@@ -212,6 +223,7 @@
 </template>
 
 <script>
+import * as _ from "underscore";
 import { mapMutations } from "vuex";
 import { call, get, sync } from "vuex-pathify";
 import { generateCopyName } from "../store/modules/apiHelper";
@@ -220,15 +232,30 @@ export default {
   name: "TheModalSampleBatchOp",
   data: function () {
     return {
-      batchName: null,
-      batchDesc: null,
-      // populating collections
-      calibrationShowAllCollections: false,
-      targetsShowAllCollections: false,
-      // selected data
+      //// Main batch data
+      // Basic fields
+      batchName: "",
+      batchDesc: "",
+      // Selected Associations data
       calibrationCollectionSelected: null,
-      ionMechanismsSelected: [],
       targetCollectionsSelected: [],
+      ionMechanismsSelected: [],
+
+      //// Utility data
+      activeTab: null, // This will hold the value of the active tab
+      isCopying: false,
+      // Basic fields to track changes
+      initialBatchName: "",
+      initialBatchDesc: "",
+      // Calibration tab
+      selectedCalibrationCollectionType: "calibrants", // default calibrant selection
+      initialCalibrationCollection: null, // This will be used to check if the user has changed the calibration collection
+      // Target Collections tab
+      selectedTargetCollectionType: "all", // default target selection
+      initialTargetCollections: [], // To store initial target collections
+      // Ionization tab
+      initialIonizationMechanisms: [], // To store initial ion_mechanisms
+
       // copy action
       workspaceSelected: null,
       newBatchName: this.batchActive
@@ -237,30 +264,196 @@ export default {
       newBatchDescription: this.batchActive
         ? this.batchActive.sample_batch_description
         : null,
-      isCopying: false,
     };
   },
-  created() {},
   computed: {
     ...sync({
       modalActive: "modal/sampleBatchOpActive",
       modalProps: "modal/sampleBatchOpProps",
     }),
     ...get({
-      batchActive: "batch/active",
-      batches: "workspace/batches",
+      batchActive: "batch/batchActive",
       batchCalibrationCollectionId: "batch/paramCalibrationCollection",
       batchIonMechanismIds: "batch/paramIonMechanisms",
       batchTargetCollections: "batch/targetCollections",
       ionMechanismsAll: "app/ionMechanisms",
       allCollections: "targets/getAllCollections",
-      calibrantsCollections: "targets/getCalibrantsCollections",
       targetsCollections: "targets/getTargetsCollections",
+      calibrantsCollections: "targets/getCalibrantsCollections",
+      diagnosticsCollections: "targets/getDiagnosticsCollections",
       workspaceActive: "workspace/active",
       allWorkspaces: "app/workspaces",
     }),
+    //// General data ////
     action() {
       return this.modalProps.action;
+    },
+    collectionColumns() {
+      return [
+        { field: "target_collection_name", label: "Name" },
+        { field: "target_collection_description", label: "Description" },
+      ];
+    },
+    calibrationTabDisabled() {
+      switch (this.action) {
+        case "create":
+          return false;
+        case "update":
+          // Compare initial and current calibration collection
+          const initialCalibrationCollectionId = this
+            .initialCalibrationCollection
+            ? this.initialCalibrationCollection.target_collection_id
+            : null;
+          const currentCalibrationCollectionId = this
+            .calibrationCollectionSelected
+            ? this.calibrationCollectionSelected.target_collection_id
+            : null;
+          const calibrationCollectionChanged =
+            initialCalibrationCollectionId !== currentCalibrationCollectionId;
+          return !calibrationCollectionChanged;
+        default:
+          return true;
+      }
+    },
+
+    saveButtonActive() {
+      switch (this.action) {
+        case "create":
+          return (
+            !this.batchName ||
+            !this.calibrationCollectionSelected ||
+            this.ionMechanismsSelected.length === 0
+          );
+
+        case "update":
+          // Check if basic properties have changed
+          const basicPropertiesChanged =
+            (this.batchName !== this.initialBatchName ||
+              this.batchDesc !== this.initialBatchDesc) &&
+            this.batchName; // the name is required
+
+          // Compare initial and current calibration collection
+          const initialCalibrationCollectionId =
+            this?.initialCalibrationCollection?.target_collection_id || null;
+          const currentCalibrationCollectionId =
+            this?.calibrationCollectionSelected?.target_collection_id || null;
+          const calibrationCollectionChanged =
+            initialCalibrationCollectionId !== currentCalibrationCollectionId;
+
+          // Compare initial and current target collections
+          const collectionsChanged = !_.isEqual(
+            this.initialTargetCollections
+              .map((collection) => collection.target_collection_id)
+              .sort(),
+            this.targetCollectionsSelected
+              .map((collection) => collection.target_collection_id)
+              .sort()
+          );
+
+          // Compare initial and current ion mechanisms
+          const iomMechanismsChanged =
+            !_.isEqual(
+              this.initialIonizationMechanisms
+                .map((mechanism) => mechanism)
+                .sort(),
+              this.ionMechanismsSelected.map((mechanism) => mechanism).sort()
+            ) && this.ionMechanismsSelected.length > 0; // Check if there are any ion_mechanisms selected
+
+          return (
+            !basicPropertiesChanged &&
+            !calibrationCollectionChanged &&
+            !collectionsChanged &&
+            !iomMechanismsChanged
+          );
+
+        case "editBatchCollections":
+          // Compare initial and current target collections
+          return !_.isEqual(
+            this.initialTargetCollections
+              .map((collection) => collection.target_collection_id)
+              .sort(),
+            this.targetCollectionsSelected
+              .map((collection) => collection.target_collection_id)
+              .sort()
+          );
+
+        default:
+          return false;
+      }
+    },
+    //// Labels and titles ////
+    modalTitle() {
+      let title;
+      switch (this.action) {
+        case "create":
+          title = `Create a new sample batch`;
+          break;
+        case "update":
+          title = `Update sample batch "${this.batchName}"`;
+          break;
+        case "editBatchCollections":
+          title = `Edit collections of sample batch "${this.batchName}"`;
+          break;
+        case "delete":
+          title = `Delete sample batch "${this.batchName}"`;
+          break;
+        case "copy":
+          title = `Copy sample batch "${this.batchName}"`;
+          break;
+      }
+      return title;
+    },
+    /// Calibration Tab ////
+    displayedCalibrationCollections() {
+      switch (this.selectedCalibrationCollectionType) {
+        case "targets":
+          return this.targetsCollections;
+        case "calibrants":
+          return this.calibrantsCollections;
+        case "diagnostics":
+          return this.diagnosticsCollections;
+        case "all":
+        default:
+          return this.allCollections;
+      }
+    },
+    /// Target Collections Tab ////
+    displayedTargetCollections() {
+      switch (this.selectedTargetCollectionType) {
+        case "targets":
+          return this.targetsCollections;
+        case "calibrants":
+          return this.calibrantsCollections;
+        case "diagnostics":
+          return this.diagnosticsCollections;
+        case "all":
+        default:
+          return this.allCollections;
+      }
+    },
+
+    /// Copy batch action ////
+    sameWorkspace() {
+      return this.workspaceActive ? this.workspaceActive : null;
+    },
+    filteredWorkspaces() {
+      if (this.workspaceActive) {
+        return this.allWorkspaces.filter((workspace) => {
+          return workspace.workspace_id !== this.workspaceActive.workspace_id;
+        });
+      }
+      return [];
+    },
+    //// data to form http request ////
+    ionMechanismIds() {
+      return this.ionMechanismsSelected.map(
+        (row) => row.ionization_mechanism_id
+      );
+    },
+    targetCollectionIds() {
+      return this.targetCollectionsSelected.map(
+        (row) => row.target_collection_id
+      );
     },
     newBatch() {
       if (this.actionIs("create")) {
@@ -273,9 +466,10 @@ export default {
               this.calibrationCollectionSelected.target_collection_id,
             ion_mechanisms: this.ionMechanismIds,
           },
-          target_collection_id: this.targetCollectionIds,
+          target_collection_ids: this.targetCollectionIds,
         };
-      } else if (this.actionIs("update")) {
+      }
+      if (this.actionIs("update") || this.actionIs("editBatchCollections")) {
         return {
           sample_batch_id: this.batchActive.sample_batch_id,
           sample_batch_name: this.batchName,
@@ -286,51 +480,10 @@ export default {
               this.calibrationCollectionSelected.target_collection_id,
             ion_mechanisms: this.ionMechanismIds,
           },
-          target_collection_id: this.targetCollectionIds,
+          target_collection_ids: this.targetCollectionIds,
           sample_batch_utc_created: this.batchActive.sample_batch_utc_created,
         };
-      } else {
-        return null;
       }
-    },
-    modalTitle() {
-      let title;
-      switch (this.action) {
-        case "create":
-          title = `Create a new sample batch`;
-          break;
-        case "update":
-          title = `Update sample batch ${this.batchName}`;
-          break;
-        case "delete":
-          title = `Delete sample batch ${this.batchName}`;
-          break;
-        case "copy":
-          title = `Copy sample batch: ${this.batchName}`;
-          break;
-      }
-      return title;
-    },
-    ionMechanismIds() {
-      return this.ionMechanismsSelected.map(
-        (row) => row.ionization_mechanism_id
-      );
-    },
-    targetCollectionIds() {
-      return this.targetCollectionsSelected.map(
-        (row) => row.target_collection_id
-      );
-    },
-    sameWorkspace() {
-      return this.workspaceActive ? this.workspaceActive : null;
-    },
-    filteredWorkspaces() {
-      if (this.workspaceActive) {
-        return this.allWorkspaces.filter((workspace) => {
-          return workspace.workspace_id !== this.workspaceActive.workspace_id;
-        });
-      }
-      return [];
     },
   },
   methods: {
@@ -340,6 +493,7 @@ export default {
       updateBatch: "batch/updateBatch",
       deleteBatch: "batch/deleteBatch",
       copyBatch: "batch/copyBatch",
+      showWarningNotification: "notification/showWarningNotification",
     }),
     ...mapMutations({
       deactivateModal: "modal/deactivate",
@@ -367,34 +521,28 @@ export default {
       this.deactivateModal();
     },
 
-    initCalibrationCollectionSelected() {
-      if (this.batchCalibrationCollectionId) {
-        [this.calibrationCollectionSelected] = this.allCollections.filter(
-          (collection) =>
-            collection.target_collection_id == this.batchCalibrationCollectionId
-        );
-      } else {
-        this.calibrationCollectionSelected = null;
-      }
-    },
+    //// Data loading ////
+    // General data loading methods
     initData() {
+      // Initialization logic when the modal is activated
       if (this.action == "create") {
-        this.batchName = null;
-        this.batchDesc = null;
+        this.activeTab = "info";
+        this.selectedTargetCollectionType = "targets";
+        this.selectedCalibrationCollectionType = "calibrants";
+        this.batchName = "";
+        this.batchDesc = "";
+        // TODO_configuration
         // set defaults
-        this.calibrationCollectionSelected =
-          this.allCollections.find(
-            (collection) =>
-              collection.target_collection_name === "Br calibrants"
-          ) ||
-          this.allCollections.find(
-            (collection) =>
-              collection.target_collection_id === "xkSPp3eZrWXYSVDa"
-          );
-        this.ionMechanismsSelected = this.ionMechanismsAll.filter(
-          (mech) => mech.ionization_mechanism === "+Br-"
+        let calibrantTargets = this.displayedCalibrationCollections.find(
+          (collection) => collection.target_collection_name === "Br calibrants"
         );
-        let explosivesTargets = this.allCollections.filter(
+        this.calibrationCollectionSelected = calibrantTargets
+          ? calibrantTargets
+          : this.allCollections.find(
+              (collection) =>
+                collection.target_collection_id === "xkSPp3eZrWXYSVDa"
+            );
+        let explosivesTargets = this.displayedTargetCollections.filter(
           (collection) =>
             collection.target_collection_name === "Explosives targets"
         );
@@ -405,27 +553,77 @@ export default {
                 (collection) =>
                   collection.target_collection_id === "kNBOCx32dpehRWUw"
               );
-      } else if (this.action == "copy") {
+        this.ionMechanismsSelected = this.ionMechanismsAll.filter(
+          (mech) => mech.ionization_mechanism === "+Br-"
+        );
+      }
+      if (this.action == "update") {
+        this.activeTab = "info";
+        this.selectedTargetCollectionType = "targets";
+        this.selectedCalibrationCollectionType = "calibrants";
         this.batchName = this.batchActive.sample_batch_name;
-        // this.newBatchName = `${this.batchActive.sample_batch_name} Copy`;
+        this.batchDesc = this.batchActive.sample_batch_description;
+        this.initialBatchName = this.batchName;
+        this.initialBatchDesc = this.batchDesc;
+        this.initCalibrationCollectionSelected();
+        this.initTargetCollectionsSelected();
+        this.initIonMechanismsSelected();
+      }
+      if (this.action == "delete") {
+        this.batchName = this.batchActive.sample_batch_name;
+      }
+      if (this.action == "copy") {
+        this.batchName = this.batchActive.sample_batch_name;
         this.newBatchName = this.batchActive
           ? generateCopyName(this.batchActive.sample_batch_name)
           : null;
         this.newBatchDescription = this.batchActive.sample_batch_description;
         this.workspaceSelected = null;
-      } else {
+      }
+      if (this.action == "editBatchCollections") {
+        this.activeTab = "collections";
+        this.selectedTargetCollectionType = "all";
+        this.selectedCalibrationCollectionType = "calibrants";
         this.batchName = this.batchActive.sample_batch_name;
         this.batchDesc = this.batchActive.sample_batch_description;
         this.initCalibrationCollectionSelected();
-        this.initIonMechanismsSelected();
         this.initTargetCollectionsSelected();
+        this.initIonMechanismsSelected();
       }
     },
-    initIonMechanismsSelected() {
-      const ids = this.batchIonMechanismIds;
-      this.ionMechanismsSelected = this.ionMechanismsAll.filter((row) =>
-        ids.includes(row.ionization_mechanism_id)
-      );
+    initCalibrationCollectionSelected() {
+      // set active batch calibration collection from build_params
+      if (this.batchCalibrationCollectionId) {
+        this.calibrationCollectionSelected = this.allCollections.find(
+          (collection) =>
+            collection.target_collection_id == this.batchCalibrationCollectionId
+        );
+      }
+      this.initialCalibrationCollection = this.calibrationCollectionSelected;
+      if (!this.calibrationCollectionSelected) {
+        // set defaults if batch calibration collection is not set (debug)
+        // TODO_configuration
+        let calibrantTargets = this.displayedCalibrationCollections.find(
+          (collection) => collection.target_collection_name === "Br calibrants"
+        );
+        this.calibrationCollectionSelected = calibrantTargets
+          ? calibrantTargets
+          : this.allCollections.find(
+              (collection) =>
+                collection.target_collection_id === "xkSPp3eZrWXYSVDa"
+            );
+        const data = {
+          batchName: this.batchName,
+          collectionName:
+            this.calibrationCollectionSelected.target_collection_name,
+        };
+        // inform client about debug
+        this.showWarningNotification({
+          notification: "noCalibrationCollection",
+          data: data,
+        });
+        this.activeTab = "calibration";
+      }
     },
     initTargetCollectionsSelected() {
       const ids = this.batchActive
@@ -434,6 +632,14 @@ export default {
       this.targetCollectionsSelected = this.allCollections.filter((row) =>
         ids.includes(row.target_collection_id)
       );
+      this.initialTargetCollections = this.targetCollectionsSelected;
+    },
+    initIonMechanismsSelected() {
+      const ids = this.batchIonMechanismIds;
+      this.ionMechanismsSelected = this.ionMechanismsAll.filter((row) =>
+        ids.includes(row.ionization_mechanism_id)
+      );
+      this.initialIonizationMechanisms = this.ionMechanismsSelected;
     },
   },
 };

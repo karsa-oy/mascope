@@ -33,20 +33,22 @@ export default {
   computed: {
     ...sync({
       modalTargetCollectionOpProps: "modal/targetCollectionOpProps",
+      modalSampleBatchOpProps: "modal/sampleBatchOpProps",
       activeIon: "visualization/activeIon",
     }),
     ...get({
       sampleBatchesSelected: "workspace/sampleBatchesSelected",
+      targetCollections: "batch/targetCollections",
+      activeBatch: "batch/active",
+      targetCollectionsSelected: "batch/targetCollectionsSelected",
+      targetCompounds: "batch/targetCompounds",
+      targetIons: "batch/targetIons",
+      targetIsotopes: "batch/targetIsotopes",
       matchCollections: "sample/matchCollections",
       matchCompounds: "sample/matchCompounds",
       matchIons: "sample/matchIons",
       matchIsotopes: "sample/matchIsotopes",
       sampleItemFocused: "sample/active",
-      targetCollections: "batch/targetCollections",
-      targetCollectionsSelected: "batch/targetCollectionsSelected",
-      targetCompounds: "batch/targetCompounds",
-      targetIons: "batch/targetIons",
-      targetIsotopes: "batch/targetIsotopes",
     }),
     contextMenuIcon() {
       if (this.targetCollectionsSelected.length === 1) return "menu";
@@ -242,34 +244,26 @@ export default {
       };
       let copySelectedCollectionToOtherBatchesButton = {
         label: "Manage selected collection batches",
-        onClick: this.manageSelectedCollectionBatches,
+        onClick: this.manageCollectionBatches,
       };
       let editBatchCollectionsButton = {
         label: "Edit collections of selected batch",
         onClick: this.editBatchCollections,
       };
-      let rematchBatchesButton = {
-        label: "Rematch selected batch (debug)",
-        onClick: this.rematchBatches,
-      };
+
       if (
         this.targetCollectionsSelected.length == 0 &&
         this.sampleBatchesSelected.length == 1
       ) {
-        return [
-          createCollectionButton,
-          editBatchCollectionsButton,
-          rematchBatchesButton,
-        ];
+        return [editBatchCollectionsButton, createCollectionButton];
       }
       if (this.targetCollectionsSelected.length == 0) {
         return [createCollectionButton];
       }
       if (this.targetCollectionsSelected.length == 1) {
         return [
-          createCollectionButton,
           editBatchCollectionsButton,
-          rematchBatchesButton,
+          createCollectionButton,
           updateCollectionButton,
           copySelectedCollectionToOtherBatchesButton,
           deleteCollectionButton,
@@ -288,32 +282,29 @@ export default {
       activateModal: "modal/activate",
     }),
     ...call({
-      matchBatchesRematch: "batch/matchBatchesRematch",
       loadSampleIon: "visualization/load",
       targetCollectionToggle: "batch/targetCollectionToggle",
     }),
-    manageSelectedCollectionBatches() {
+    manageCollectionBatches() {
       this.modalTargetCollectionOpProps = {
-        action: "manageSelectedCollectionBatches",
-        collection: this.targetCollectionsSelected[0],
+        action: "manageCollectionBatches",
       };
       this.activateModal({
         modal: "targetCollectionOp",
       });
     },
-    async editBatchCollections() {
-      this.modalTargetCollectionOpProps = {
+
+    editBatchCollections() {
+      this.modalSampleBatchOpProps = {
         action: "editBatchCollections",
-        collection: this.targetCollectionsSelected[0],
       };
       this.activateModal({
-        modal: "targetCollectionOp",
+        modal: "sampleBatchOp",
       });
     },
     collectionRemoveFromBatch() {
       this.modalTargetCollectionOpProps = {
         action: "removeFromBatch",
-        collection: this.targetCollectionsSelected[0],
       };
       this.activateModal({
         modal: "targetCollectionOp",
@@ -330,7 +321,6 @@ export default {
     collectionDelete() {
       this.modalTargetCollectionOpProps = {
         action: "delete",
-        collection: this.targetCollectionsSelected[0],
       };
       this.activateModal({
         modal: "targetCollectionOp",
@@ -342,7 +332,6 @@ export default {
     collectionUpdate() {
       this.modalTargetCollectionOpProps = {
         action: "update",
-        collection: this.targetCollectionsSelected[0],
       };
       this.activateModal({
         modal: "targetCollectionOp",
@@ -375,9 +364,6 @@ export default {
       if (!ionId) return;
       const collectionId = row?.target_collection_id;
       this.ionShow({ ionId, collectionId });
-    },
-    async rematchBatches() {
-      await this.matchBatchesRematch(this.sampleBatchesSelected);
     },
   },
 };

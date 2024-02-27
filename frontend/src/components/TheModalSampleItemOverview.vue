@@ -194,7 +194,7 @@ export default {
           (batch) => batch.sample_batch_id === this.activeBatch.sample_batch_id
         ) || null;
 
-      // Filter out the sam abtch from batches options
+      // Filter out the same batch from batches options
       if (this.sameBatch) {
         this.batches = this.batches.filter((batch) => {
           return batch.sample_batch_id !== this.sameBatch.sample_batch_id;

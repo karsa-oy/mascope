@@ -113,6 +113,10 @@ export default {
         label: "Copy selected batch",
         onClick: this.batchCopy,
       };
+      let rematchBatchButton = {
+        label: "Rematch selected batch (debug)",
+        onClick: this.rematchBatch,
+      };
       let batchButtons =
         this.batchActiveCount == 0
           ? [createBatchButton]
@@ -122,6 +126,7 @@ export default {
               exportBatchButton,
               exportBatchPeaksButton,
               copyBatchButton,
+              rematchBatchButton,
             ];
       // sample items
       let updateItemButton = {
@@ -174,6 +179,7 @@ export default {
       itemToggle: "batch/sampleItemToggle",
       batchToggle: "batch/batchToggle",
       batchExportPeakData: "batch/batchExportPeakData",
+      rematchBatch: "batch/rematchBatch",
       matchSampleRematch: "sample/matchSampleRematch",
       deleteSampleItem: "sample/deleteSampleItem",
     }),

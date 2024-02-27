@@ -108,6 +108,24 @@
       a new batch in this workspace.
     </b-message>
 
+    <!-- No calibration collection in active batch -->
+    <b-message
+      v-if="warningNotification === 'noCalibrationCollection'"
+      type="is-notification"
+      title="No Calibration Collection Warning"
+      has-icon
+      icon="alert"
+      icon-size="is-medium"
+      :closable="true"
+      @close="close"
+      :class="{ 'is-closing': isClosing, 'empty-workspace': 'empty-workspace' }"
+    >
+      Selected batch "{{ warningData.batchName }}" has no calibration
+      collection. The default calibrant collection "{{
+        warningData.collectionName
+      }}" was applied, please save the changes.
+    </b-message>
+
     <!-- Other types of warning messages here -->
   </div>
 </template>

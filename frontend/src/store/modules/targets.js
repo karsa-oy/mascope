@@ -1,5 +1,5 @@
 import { make } from "vuex-pathify";
-import { getApiData } from "./apiHelper";
+import { handleApiRequest, getApiData } from "./apiHelper";
 
 const state = {
   activeCollection: null,
@@ -31,10 +31,12 @@ export default {
   },
   actions: {
     // data loading
-    async load({ state, dispatch }) {
+    async load({ state, dispatch }, collectionId = null) {
       if (state.activeCollection) await dispatch("unload");
       await dispatch("loadAllCollections");
       await dispatch("loadAllCompounds");
+      if (!collectionId) return;
+      await dispatch("loadActiveCollection", collectionId);
     },
 
     async loadAllCollections({ commit, dispatch }) {
@@ -52,30 +54,22 @@ export default {
       await commit("SET_TARGET_COMPOUNDS_ALL", compounds);
     },
 
-    async reload({ dispatch, rootState }, collection = null) {
-      const collectionToLoad = collection ? collection : state.activeCollection;
-      if (collectionToLoad) {
-        const collectionToLoadId = collectionToLoad.target_collection_id;
-        await dispatch("unload");
-        await dispatch("load");
+    async loadActiveCollection({ commit, dispatch }, collectionId) {
+      const collection = await dispatch("getTargetCollection", collectionId);
+      await commit("SET_ACTIVE_COLLECTION", collection);
+    },
 
-        // Check if the collection is present in the batch's targetCollections before reselecting it
-        const batchTargetCollections = rootState.batch.targetCollections;
-        if (
-          batchTargetCollections &&
-          batchTargetCollections.some(
-            (coll) => coll.target_collection_id === collectionToLoadId
-          )
-        ) {
-          await dispatch("updateCollectionSelection", {
-            collectionId: collectionToLoadId,
-            selectionValue: 2,
-          });
-        }
-      } else {
-        // If no active collection, just refresh the list of collections without selecting any
-        await dispatch("load");
-      }
+    async reload({ dispatch, state, rootState }, collection = null) {
+      const collectionToLoadId =
+        state?.activeCollection?.target_collection_id || null;
+      // const currentActiveCollection = state?.activeCollection || null;
+      await dispatch("unload");
+      await dispatch("load", collectionToLoadId);
+      if (!collectionToLoadId) return;
+      await dispatch("updateCollectionSelection", {
+        collectionId: collectionToLoadId,
+        selectionValue: 2,
+      });
     },
 
     async unload({ commit }) {
@@ -83,6 +77,36 @@ export default {
       await commit("SET_TARGET_COMPOUNDS_ALL", null);
       if (!state.activeCollection) return;
       await commit("SET_ACTIVE_COLLECTION", null);
+    },
+
+    processSpreadsheetInput({ state }, rows) {
+      // process the spreadsheet input to check if compounds already exist
+      let existingCompounds = [];
+      let notExistingCompounds = [];
+      let processedFormulas = new Set(); // Set to track processed compound formulas
+      rows.forEach((row) => {
+        // Skip processing if this formula has already been processed
+        if (processedFormulas.has(row.target_compound_formula)) {
+          return;
+        }
+
+        const existingCompound = state.targetCompoundsAll.find(
+          (compound) =>
+            compound.target_compound_formula === row.target_compound_formula
+        );
+
+        if (existingCompound) {
+          //  If an existing compound is found, add it to existingCompounds
+          existingCompounds.push(existingCompound);
+        } else {
+          // If no existing compound is found, add the row to notExistingCompounds
+          notExistingCompounds.push(row);
+        }
+
+        // Mark this formula as processed
+        processedFormulas.add(row.target_compound_formula);
+      });
+      return { existingCompounds, notExistingCompounds };
     },
 
     // http client endpoints
@@ -104,41 +128,54 @@ export default {
       });
     },
 
-    async getAllTargetCompounds({ dispatch }) {
+    async getAllTargetCompounds({ dispatch }, params = {}) {
       const compounds = await getApiData({
         dispatch,
         httpMethod: "getAllTargetCompounds",
+        requestData: params,
         errorMessage: `Failed to load all target compounds.`,
       });
       return compounds.data;
     },
 
-    async createCollection({ rootState }, newCollection) {
-      await rootState.api.httpClient.createTargetCollection(newCollection);
+    async createCollection({ dispatch, rootState }, collection) {
+      return await handleApiRequest({
+        dispatch,
+        rootState,
+        httpMethod: "createTargetCollection",
+        requestData: collection,
+        successMessage: `Target collection ${collection.target_collection_name} created successfully!`,
+        errorMessage: `Failed to create target collection ${collection.target_collection_name}. Please try again.`,
+      });
     },
 
-    async updateCollection({ rootState }, newCollection) {
-      await rootState.api.httpClient.updateTargetCollection(newCollection);
+    async updateCollection({ dispatch, rootState }, collection) {
+      const collectionId = collection.target_collection_id;
+      const body = collection;
+      return await handleApiRequest({
+        dispatch,
+        rootState,
+        httpMethod: "updateTargetCollection",
+        requestData: { collectionId, body },
+        successMessage: `Target collection ${collection.target_collection_name} updated successfully!`,
+        errorMessage: `Failed to update target collection ${body.target_collection_name}. Please try again.`,
+      });
     },
 
-    async deleteCollection({ rootState }, collection) {
-      await rootState.api.httpClient.deleteTargetCollection(collection);
-    },
-
-    async removeTargetCollectionsFromSampleBatch(
-      { rootState },
-      { collectionsToRemove, skipRematch = false }
+    async deleteCollection(
+      { commit, dispatch, rootState },
+      { collectionId, collectionName, deleteOrphanCompounds }
     ) {
-      await rootState.api.httpClient.removeTargetCollectionsFromSampleBatch(
-        collectionsToRemove,
-        skipRematch
-      );
-    },
-
-    async addTargetCollectionToSampleBatch({ rootState }, addedCollections) {
-      await rootState.api.httpClient.addTargetCollectionToSampleBatch(
-        addedCollections
-      );
+      await commit("SET_ACTIVE_COLLECTION", {});
+      return await handleApiRequest({
+        dispatch,
+        rootState,
+        httpMethod: "deleteTargetCollection",
+        requestData: { collectionId, collectionName, deleteOrphanCompounds },
+        successNotificationType: "deleted",
+        successMessage: `Target collection ${collectionName} was deleted successfully!`,
+        errorMessage: `Failed to delete workspace ${collectionName}. Please try again.`,
+      });
     },
 
     // backend notifications
@@ -148,7 +185,7 @@ export default {
 
     // selection
     async updateCollectionSelection(
-      { commit, dispatch, state, getters, rootState },
+      { commit, dispatch, state, getters },
       { collectionId, selectionValue }
     ) {
       // Only one collection can be selected at a time
@@ -168,8 +205,7 @@ export default {
       // If a collection is selected, fetch its details
       const selectedCollections = getters.targetCollectionsSelected;
       if (selectionValue === 2 && selectedCollections.length === 1) {
-        const collection = await dispatch("getTargetCollection", collectionId);
-        await commit("SET_ACTIVE_COLLECTION", collection);
+        await dispatch("loadActiveCollection", collectionId);
       } else {
         commit("SET_ACTIVE_COLLECTION", null);
       }
@@ -184,6 +220,9 @@ export default {
 
     getAllCollections: (state) => {
       return state?.targetCollectionsAll || [];
+    },
+    getAllCompounds: (state) => {
+      return state?.targetCompoundsAll || [];
     },
     getTargetsCollections: (state) => {
       return (

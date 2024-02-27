@@ -1,4 +1,8 @@
-from fastapi import APIRouter, Query, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, Query, Request
+from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
+
+
 from ..controllers.target_collections_controller import (
     get_target_collections,
     get_target_collection,
@@ -7,10 +11,10 @@ from ..controllers.target_collections_controller import (
     update_target_collection,
 )
 from ..models.pydantic_models.target_collection_pydantic_model import (
-    TargetCollectionCreate,
-    TargetCollectionUpdate,
+    TargetCollectionCreateBody,
+    TargetCollectionUpdateBody,
 )
-
+from ..exceptions import ApiException
 
 target_collections_router = APIRouter()
 
@@ -46,40 +50,62 @@ async def get_target_collection_route(target_collection_id: str):
 
 @target_collections_router.post("/api/target_collections")
 async def create_target_collection_route(
-    target_collection: TargetCollectionCreate, background_tasks: BackgroundTasks
+    request: Request,
+    body: TargetCollectionCreateBody,
+    background_tasks: BackgroundTasks,
 ):
-    result = await create_target_collection(target_collection, background_tasks)
-    response = {
-        "new_target_collection": result["new_target_collection"],
-        "created_compounds_count": result["created_compounds_count"],
-        "created_compounds": result["created_compounds"],
-        "existing_compounds_count": result["existing_compounds_count"],
-        "existing_compounds": result["existing_compounds"],
-        "message_logs": result["message_logs"],
-    }
-    return response
+    try:
+        sid = request.headers.get("X-SID")
+        result = await create_target_collection(body, background_tasks, sid)
+        message_logs = result["message_logs"]
+        result_data = jsonable_encoder(result["new_target_collection"])
+        return JSONResponse(
+            status_code=201,
+            content={
+                "message": f"Target collection {body.target_collection_name} created successfully.",
+                "message_logs": message_logs,
+                "data": result_data,
+            },
+        )
+    except ApiException as e:
+        return JSONResponse(
+            status_code=e.status_code,
+            content={"error": e.user_message, "detail": e.tech_message},
+        )
 
 
 @target_collections_router.patch("/api/target_collections/{target_collection_id}")
 async def update_target_collection_route(
+    request: Request,
     target_collection_id: str,
-    target_collection_update: TargetCollectionUpdate,
+    body: TargetCollectionUpdateBody,
     background_tasks: BackgroundTasks,
 ):
-    result = await update_target_collection(
-        target_collection_id, target_collection_update, background_tasks
-    )
-
-    return {
-        "updated_target_collection": result["updated_target_collection"],
-        "added_compounds": result["added_compounds"],
-        "removed_compounds": result["removed_compounds"],
-        "message_logs": result["message_logs"],
-    }
+    try:
+        sid = request.headers.get("X-SID")
+        result = await update_target_collection(
+            target_collection_id, body, background_tasks, sid
+        )
+        message_logs = result["message_logs"]
+        result_data = jsonable_encoder(result["updated_target_collection"])
+        return JSONResponse(
+            status_code=200,
+            content={
+                "message": f"Target collection {body.target_collection_name} updated successfully.",
+                "message_logs": message_logs,
+                "data": result_data,
+            },
+        )
+    except ApiException as e:
+        return JSONResponse(
+            status_code=e.status_code,
+            content={"error": e.user_message, "detail": e.tech_message},
+        )
 
 
 @target_collections_router.delete("/api/target_collections/{target_collection_id}")
 async def delete_target_collection_route(
+    request: Request,
     target_collection_id: str,
     background_tasks: BackgroundTasks,
     delete_orphan_compounds: bool = Query(
@@ -87,6 +113,20 @@ async def delete_target_collection_route(
         description="Delete orphan compounds associated with the target collection",
     ),
 ):
-    return await delete_target_collection(
-        target_collection_id, background_tasks, delete_orphan_compounds
-    )
+    try:
+        sid = request.headers.get("X-SID")
+        result = await delete_target_collection(
+            target_collection_id, background_tasks, delete_orphan_compounds, sid
+        )
+        message = result["message"]
+        return JSONResponse(
+            status_code=200,
+            content={
+                "message": message,
+            },
+        )
+    except ApiException as e:
+        return JSONResponse(
+            status_code=e.status_code,
+            content={"error": e.user_message, "detail": e.tech_message},
+        )

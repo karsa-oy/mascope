@@ -20,6 +20,7 @@ const state = {
   paramIonMechanisms: null,
 };
 
+// TODO_configuration
 const paramDefaults = {
   // build parameters
   paramCalibrationCollection: [],
@@ -173,7 +174,8 @@ export default {
     },
     async unpackParams({ state, commit }) {
       // unpack parameters from batch object into state variables
-      const buildParams = state.active.build_params;
+      const buildParams = state.active?.build_params || null;
+      if (!buildParams) return;
       for (const param in buildParams) {
         await commit(`SET_PARAM_${param.toUpperCase()}`, buildParams[param]);
       }
@@ -230,11 +232,27 @@ export default {
     async autoSamplerImportBatch({ rootState }, data) {
       await rootState.api.httpClient.autoSamplerImportBatch(data);
     },
-    async createBatch({ rootState }, newBatch) {
-      await rootState.api.httpClient.createBatch(newBatch);
+    async createBatch({ dispatch, rootState }, newBatch) {
+      return await handleApiRequest({
+        dispatch,
+        rootState,
+        httpMethod: "createBatch",
+        requestData: newBatch,
+        successMessage: `Sample batch "${newBatch.sample_batch_name}" created successfully!`,
+        errorMessage: `Failed to create sample batch "${newBatch.sample_batch_name}". Please try again.`,
+      });
     },
-    async updateBatch({ rootState }, newBatch) {
-      await rootState.api.httpClient.updateBatch(newBatch);
+    async updateBatch({ dispatch, rootState }, newBatch) {
+      const batchId = newBatch.sample_batch_id;
+      const body = newBatch;
+      return await handleApiRequest({
+        dispatch,
+        rootState,
+        httpMethod: "updateBatch",
+        requestData: { batchId, body },
+        successMessage: `Sample batch "${newBatch.sample_batch_name}"  updated successfully!`,
+        errorMessage: `Failed to update sample batch "${newBatch.sample_batch_name}". Please try again.`,
+      });
     },
 
     async deleteBatch({ dispatch, rootState }, batch) {
@@ -284,15 +302,24 @@ export default {
       });
     },
 
-    async matchBatchesRematch({ rootState }, batches) {
-      const formattedBatches = batches.map((batch) => ({
-        sample_batch_id: batch.sample_batch_id,
-        workspace_id: batch.workspace_id,
-      }));
-      const body = {
-        sample_batches: formattedBatches,
-      };
-      await rootState.api.httpClient.matchBatchesRematch(body);
+    async rematchBatch({ dispatch, rootState, state }, batch = null) {
+      const batchId = batch?.sample_batch_id || state.active.sample_batch_id;
+      const body = {};
+      try {
+        await rootState.api.httpClient.rematchBatch({ batchId, body });
+      } catch (error) {
+        // TODO_error_handling and use handleApiRequest for start notification
+        console.error(`Failed to rematch batch.`, error);
+        const userErrorMessage = `${errorMessage}. ${error}`;
+        dispatch(
+          "notification/showGeneralNotification",
+          {
+            notification: "error",
+            message: userErrorMessage,
+          },
+          { root: true }
+        );
+      }
     },
 
     // backend notifications
@@ -425,6 +452,9 @@ export default {
     },
   },
   getters: {
+    batchActive: (state) => {
+      return state.active ? state.active : null;
+    },
     buildParams: (state) => {
       return {
         calibration_collection: state.paramCalibrationCollection,
