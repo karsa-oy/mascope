@@ -368,6 +368,7 @@
 </template>
 
 <script>
+import * as _ from "underscore";
 import { mapMutations } from "vuex";
 import { sync, call, get } from "vuex-pathify";
 
@@ -467,16 +468,15 @@ export default {
               this.targetCollectionActive.target_collection_type;
 
           // Compare initial and current compounds
-          const initialCompoundIds = this.initialCompounds
-            .map((compound) => compound.target_compound_id)
-            .sort();
-          const currentCompoundIds = this.targetCompounds
-            .map((compound) => compound.target_compound_id)
-            .sort();
           const compoundsChanged =
-            JSON.stringify(initialCompoundIds) !==
-              JSON.stringify(currentCompoundIds) ||
-            this.targetCompoundsCreate.length > 0; // Check if there are new compounds to create;
+            !_.isEqual(
+              this.initialCompounds
+                .map((compound) => compound.target_compound_id)
+                .sort(),
+              this.targetCompounds
+                .map((compound) => compound.target_compound_id)
+                .sort()
+            ) || this.targetCompoundsCreate.length > 0; // Check if there are new compounds to create;
 
           let disabled = !basicPropertiesChanged && !compoundsChanged;
 
@@ -487,14 +487,9 @@ export default {
           if (!hasCompounds) disabled = true;
           return disabled;
         case "manageCollectionBatches":
-          const initialBatchIds = this.initialBatches
-            .map((batch) => batch.sample_batch_id)
-            .sort();
-          const currentBatchIds = this.sampleBatches
-            .map((batch) => batch.sample_batch_id)
-            .sort();
-          return (
-            JSON.stringify(initialBatchIds) === JSON.stringify(currentBatchIds)
+          return _.isEqual(
+            this.initialBatches.map((batch) => batch.sample_batch_id).sort(),
+            this.sampleBatches.map((batch) => batch.sample_batch_id).sort()
           );
 
         default:

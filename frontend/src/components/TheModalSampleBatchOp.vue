@@ -223,6 +223,7 @@
 </template>
 
 <script>
+import * as _ from "underscore";
 import { mapMutations } from "vuex";
 import { call, get, sync } from "vuex-pathify";
 import { generateCopyName } from "../store/modules/apiHelper";
@@ -332,40 +333,31 @@ export default {
             this.batchName; // the name is required
 
           // Compare initial and current calibration collection
-          const initialCalibrationCollectionId = this
-            .initialCalibrationCollection
-            ? this.initialCalibrationCollection.target_collection_id
-            : null;
-          const currentCalibrationCollectionId = this
-            .calibrationCollectionSelected
-            ? this.calibrationCollectionSelected.target_collection_id
-            : null;
+          const initialCalibrationCollectionId =
+            this?.initialCalibrationCollection?.target_collection_id || null;
+          const currentCalibrationCollectionId =
+            this?.calibrationCollectionSelected?.target_collection_id || null;
           const calibrationCollectionChanged =
             initialCalibrationCollectionId !== currentCalibrationCollectionId;
 
           // Compare initial and current target collections
-          const initialCollectionsIds = this.initialTargetCollections
-            .map((collection) => collection.target_collection_id)
-            .sort();
-          const currentCollectionsIds = this.targetCollectionsSelected
-            .map((collection) => collection.target_collection_id)
-            .sort();
-          const collectionsChanged =
-            JSON.stringify(initialCollectionsIds) !==
-            JSON.stringify(currentCollectionsIds);
+          const collectionsChanged = !_.isEqual(
+            this.initialTargetCollections
+              .map((collection) => collection.target_collection_id)
+              .sort(),
+            this.targetCollectionsSelected
+              .map((collection) => collection.target_collection_id)
+              .sort()
+          );
 
           // Compare initial and current ion mechanisms
-          const initialIonizationMechanismsIds =
-            this.initialIonizationMechanisms
-              .map((mechanism) => mechanism)
-              .sort();
-          const currentIonizationMechanismsIds = this.ionMechanismsSelected
-            .map((mechanism) => mechanism)
-            .sort();
           const iomMechanismsChanged =
-            JSON.stringify(initialIonizationMechanismsIds) !==
-              JSON.stringify(currentIonizationMechanismsIds) &&
-            this.ionMechanismsSelected.length > 0; // Check if there are any ion_mechanisms selected
+            !_.isEqual(
+              this.initialIonizationMechanisms
+                .map((mechanism) => mechanism)
+                .sort(),
+              this.ionMechanismsSelected.map((mechanism) => mechanism).sort()
+            ) && this.ionMechanismsSelected.length > 0; // Check if there are any ion_mechanisms selected
 
           return (
             !basicPropertiesChanged &&
@@ -376,15 +368,13 @@ export default {
 
         case "editBatchCollections":
           // Compare initial and current target collections
-          const initialCollections = this.initialTargetCollections
-            .map((collection) => collection.target_collection_id)
-            .sort();
-          const currentCollections = this.targetCollectionsSelected
-            .map((collection) => collection.target_collection_id)
-            .sort();
-          return (
-            JSON.stringify(initialCollections) ===
-            JSON.stringify(currentCollections)
+          return !_.isEqual(
+            this.initialTargetCollections
+              .map((collection) => collection.target_collection_id)
+              .sort(),
+            this.targetCollectionsSelected
+              .map((collection) => collection.target_collection_id)
+              .sort()
           );
 
         default:
