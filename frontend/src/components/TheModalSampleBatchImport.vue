@@ -29,6 +29,61 @@
                 @rowsPasted="processCsvRows"
               >
               </base-spreadsheet-input>
+              <!-- Filter ID input and dropdown -->
+              <template v-if="showFilterIdInput">
+                <b-field label="Please select the Filter ID">
+                  <div
+                    style="
+                      display: flex;
+                      justify-content: space-between;
+                      align-items: center;
+                    "
+                  >
+                    <div style="display: flex; align-items: center">
+                      <b-button
+                        type="is-primary"
+                        icon-left="plus"
+                        @click="generateFilterId"
+                        style="margin-right: 10px"
+                      >
+                      </b-button>
+                      <b-input
+                        v-model="selectedFilterId"
+                        disabled
+                        expanded
+                      ></b-input>
+                      <b-dropdown
+                        aria-role="list"
+                        v-model="selectedFilterId"
+                        expanded
+                      >
+                        <template #trigger>
+                          <b-button
+                            :label="selectedFilterId || 'Select Filter ID'"
+                            icon-right="menu-down"
+                          />
+                        </template>
+                        <template v-for="filterId in batchFilterIds">
+                          <b-dropdown-item
+                            aria-role="listitem"
+                            :key="filterId"
+                            :value="filterId"
+                          >
+                            {{ filterId }}
+                          </b-dropdown-item>
+                        </template>
+                      </b-dropdown>
+                    </div>
+                    <b-button
+                      type="is-primary"
+                      @click="preprocessSamples"
+                      :disabled="!selectedFilterId"
+                    >
+                      Continue
+                    </b-button>
+                  </div>
+                </b-field>
+              </template>
             </b-tab-item>
 
             <!-- Parsed Sample Items Tab -->
@@ -120,11 +175,14 @@ export default {
         columnsFailures: [],
         info: [],
       },
+      showFilterIdInput: false, // Controls visibility of filter ID input
+      selectedFilterId: "", // Stores the selected filter ID
     };
   },
   computed: {
     ...get({
       batchActive: "batch/active",
+      sampleItems: "batch/sampleItems",
       sampleBatchImportProps: "modal/sampleBatchImportProps",
       sampleTypes: "sample/sampleTypes",
     }),
@@ -144,7 +202,6 @@ export default {
           return `Paste samples data to import to "${batchName}" batch`;
       }
     },
-    // Sample Items Tab
     sampleItemsToCreateLabel() {
       const batchName = this.batchActive?.sample_batch_name || "selected";
       switch (this.importType) {
@@ -154,6 +211,13 @@ export default {
           return `Please check carefully the details of the samples parsed from the spreedsheet input:`;
       }
     },
+    // Data Input Tab
+    batchFilterIds() {
+      return this.batchActive
+        ? [null, ...new Set(this.sampleItems.map((item) => item.filter_id))]
+        : [];
+    },
+    // Sample Items Tab
     tableColumns() {
       if (this.sampleItemsToCreate.length === 0) {
         return [];
@@ -202,6 +266,9 @@ export default {
       this.deactivateModal();
       this.resetData();
     },
+    generateFilterId() {
+      this.selectedFilterId = genId(6, false);
+    },
     processButtonClick() {
       this.$buefy.dialog.confirm({
         message: `Are you sure you want to import ${
@@ -214,23 +281,25 @@ export default {
         hasIcon: true,
         icon: "file-import",
         onConfirm: async () => {
-          this.processBatch();
+          this.processSamples();
           this.deactivateModalResetData();
         },
       });
     },
-    //// Data loading ////
     resetData() {
       this.csvCols = [];
       this.csvRows = [];
       this.parsedRows = [];
       this.sampleItemsToCreate = [];
+      this.selectedFilterId = "";
       this.importType = null;
+      this.showFilterIdInput = false;
       this.activeTab = "input";
       this.sampleItemsValidation = false;
       this.columnsValidation = false;
       this.closeGeneralNotification();
     },
+    //// Data processing ////
     // csv loading columns
     async processCsvCols(cols) {
       this.resetData();
@@ -249,10 +318,98 @@ export default {
       this.csvRows = rows;
       this.parseCsv();
       if (!this.parsedRows) return;
+      if (this.importType === "autosampler") {
+        this.showFilterIdInput = true;
+      } else {
+        this.preprocessSamples();
+      }
+    },
+
+    preprocessSamples() {
       this.prepareSampleItemsToCreate();
       this.activeTab = "samples";
       this.samplesCurrentPage = 1;
       this.validateImportedSampleItems();
+    },
+
+    processSamples() {
+      if (!this.sampleItemsValidation) return;
+      const data = {
+        batch: this.batchActive,
+        sample_items: this.sampleItemsToCreate,
+      };
+      this.importSamplesToBatch(data);
+    },
+
+    determineImportType(cols) {
+      // List of keys that can identify the autosampler report
+      const autosamplerKeys = [
+        "ht3000a_autorun_report",
+        "software",
+        "sample_list",
+        "autosampler",
+      ];
+
+      // Check if the field of any of the first few columns matches the autosampler keys
+      const isAutosamplerReport = cols.some((col) =>
+        autosamplerKeys.includes(col.field.toLowerCase())
+      );
+
+      this.importType = isAutosamplerReport ? "autosampler" : "general";
+    },
+
+    parseCsv() {
+      if (this.importType === "autosampler") {
+        this.parsedRows = parseAutosamplerCsv(this.csvRows);
+      } else if (this.importType === "general") {
+        this.parsedRows = parseGenericCsv(this.csvCols, this.csvRows);
+      }
+    },
+
+    prepareSampleItemsToCreate() {
+      if (this.importType === "autosampler") {
+        let items = [];
+        for (let [i, row] of Object.entries(this.parsedRows)) {
+          let newSampleItem = {
+            filename:
+              this.sampleBatchImportProps.sampleFilesSelected[i]?.filename ||
+              null,
+            sample_batch_id: this.batchActive.sample_batch_id,
+            filter_id: this.selectedFilterId,
+          };
+          let attributes = {};
+          for (const key in row) {
+            const attr = key.toLowerCase().replaceAll(/[\s-]/g, "_");
+            if (attr.startsWith("sample_")) {
+              // sample_name or sample_type
+              const prop = attr.replace("sample", "sample_item");
+              newSampleItem[prop] = row[key];
+            } else {
+              attributes[attr] = row[key];
+            }
+          }
+
+          newSampleItem.sample_item_attributes = attributes;
+          items.push(newSampleItem);
+        }
+        this.sampleItemsToCreate = items;
+        this.showFilterIdInput = false;
+        this.selectedFilterId = "";
+      }
+      // Process items for the general import
+      if (this.importType === "general") {
+        // Transform the parsed rows into sample items with necessary properties
+        this.sampleItemsToCreate = this.parsedRows.map((row, index) => {
+          const newSampleItem = {
+            sample_batch_id: this.batchActive.sample_batch_id,
+            filename:
+              this.sampleBatchImportProps.sampleFilesSelected[index]
+                ?.filename || null,
+            ...row, // spread the already parsed row properties
+          };
+          return newSampleItem;
+        });
+      }
     },
 
     //// Data validation ////
@@ -433,94 +590,6 @@ export default {
       }
 
       return (this.sampleItemsValidation = true);
-    },
-
-    //// Data processing ////
-    determineImportType(cols) {
-      // List of keys that can identify the autosampler report
-      const autosamplerKeys = [
-        "ht3000a_autorun_report",
-        "software",
-        "sample_list",
-        "autosampler",
-      ];
-
-      // Check if the field of any of the first few columns matches the autosampler keys
-      const isAutosamplerReport = cols.some((col) =>
-        autosamplerKeys.includes(col.field.toLowerCase())
-      );
-
-      this.importType = isAutosamplerReport ? "autosampler" : "general";
-    },
-
-    parseCsv() {
-      if (this.importType === "autosampler") {
-        this.parsedRows = parseAutosamplerCsv(this.csvRows);
-      } else if (this.importType === "general") {
-        this.parsedRows = parseGenericCsv(this.csvCols, this.csvRows);
-      }
-    },
-
-    prepareSampleItemsToCreate() {
-      if (this.importType === "autosampler") {
-        let items = [];
-        for (let [i, row] of Object.entries(this.parsedRows)) {
-          let newSampleItem = {
-            filename:
-              this.sampleBatchImportProps.sampleFilesSelected[i]?.filename ||
-              null,
-            sample_batch_id: this.batchActive.sample_batch_id,
-          };
-          let attributes = {};
-          for (const key in row) {
-            const attr = key.toLowerCase().replaceAll(/[\s-]/g, "_");
-            if (attr.startsWith("sample_")) {
-              // sample_name or sample_type
-              const prop = attr.replace("sample", "sample_item");
-              newSampleItem[prop] = row[key];
-            } else {
-              attributes[attr] = row[key];
-            }
-          }
-
-          // Generate filter_id only if sample_item_type is not ONLINE or INSTRUMENT_BACKGROUND
-          if (
-            !["INSTRUMENT_BACKGROUND", "ONLINE"].includes(
-              newSampleItem.sample_item_type
-            ) &&
-            !newSampleItem.filter_id
-          ) {
-            newSampleItem.filter_id = genId(6, false); // Generate a 6-character alphanumeric ID
-          }
-
-          newSampleItem.sample_item_attributes = attributes;
-          items.push(newSampleItem);
-        }
-        this.sampleItemsToCreate = items;
-      }
-      // Process items for the general import
-      if (this.importType === "general") {
-        // Transform the parsed rows into sample items with necessary properties
-        this.sampleItemsToCreate = this.parsedRows.map((row, index) => {
-          const newSampleItem = {
-            sample_batch_id: this.batchActive.sample_batch_id,
-            filename:
-              this.sampleBatchImportProps.sampleFilesSelected[index]
-                ?.filename || null,
-            ...row, // spread the already parsed row properties
-          };
-          return newSampleItem;
-        });
-      }
-    },
-
-    processBatch() {
-      if (!this.sampleItemsValidation) return;
-      const data = {
-        batch: this.batchActive,
-        sample_items: this.sampleItemsToCreate,
-      };
-      this.importSamplesToBatch(data);
     },
   },
 };
