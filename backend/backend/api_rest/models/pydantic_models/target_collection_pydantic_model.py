@@ -40,7 +40,7 @@ class TargetCollectionCreateBody(TargetCollectionBase):
     )
 
     @root_validator
-    def check_at_least_one_compound_type_provided(cls, values):
+    def check_at_least_one_compound_provided(cls, values):
         compounds_create, compound_ids = values.get(
             "target_compounds_create"
         ), values.get("target_compound_ids")

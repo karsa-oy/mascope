@@ -35,9 +35,6 @@ from ..models.pydantic_models.sample_batch_pydantic_model import (
     SampleBatchCopyBody,
     SampleBatchExportPeaks,
 )
-from ..models.pydantic_models.sample_item_pydantic_model import (
-    SampleItemCreate,
-)
 from ..models.pydantic_models.calibration_pydantic_model import CalibrationMzFitParams
 from ..models.pydantic_models.match_pydantic_model import (
     RematchBatchBody,
@@ -686,68 +683,81 @@ async def delete_sample_batch(sample_batch_id: str, sid=None):
                 )
 
 
-async def autosampler_import_batch(
-    sample_batch, sample_items, params: CalibrationMzFitParams, background_tasks
+async def import_sample_items(
+    sample_batch_id: str, sample_items, params: CalibrationMzFitParams
 ):
-    created_sample_items = []
+    """
+    Imports a sample items to specified batch by creating provided sample items, calibrating the batch, computing matches, and handling errors.
 
-    for sample_item in sample_items:
-        sample_item_model = SampleItemCreate(**sample_item)
-        created_item = await create_sample_item(sample_item_model, skipReload=True)
-        created_sample_items.append(created_item.to_dict())
+    Steps:
+    1. Create provided sample items and save them to the database.
+    2. Calibrate the batch using the provided calibration parameters.
+    3. Compute matches for the batch.
+    4. In case of calibration failure, send a notification with information about failed samples.
 
-    background_tasks.add_task(
-        process_batch,
-        sample_batch,
-        created_sample_items,
-        params,
-    )
-
-
-async def process_batch(sample_batch, sample_items, params):
-    sample_batch_id = sample_batch.get("sample_batch_id")
-
-    # Step 1. Calibrate batch
+    :param sample_batch_id: ID of the sample batch where sample items will be imported.
+    :type sample_batch_id: str
+    :param sample_items: List of sample items to be created and imported.
+    :type sample_items: List[SampleItemCreate]
+    :param params: Calibration parameters to be used for the batch.
+    :type params: CalibrationMzFitParams
+    :raises ApiException: Raised for any exceptions that occur during the import process.
+    """
     try:
+        # Step 1. Create provided sample items and save to database
+        for sample_item in sample_items:
+            await create_sample_item(sample_item, skipReload=True)
+
+        # Step 2. Calibrate batch
         calibration_results = await calibration_mz_calibrate_batch(
-            sample_batch, sample_items, params
+            sample_batch_id, params
         )
-    except Exception as e:
-        print("Failed to calibrate batch %s" % sample_batch["sample_batch_name"])
-        print(e)
 
-    # Step 2. Compute matches for the batch
-    try:
+        # Step 3. Compute matches for the batch
         progress_properties = ProgressProperties(
             progress_type="rematch_batch",
-            workspace_reload=True,
         )
 
         await rematch_batch(
             sample_batch_id=sample_batch_id,
-            independent_transaction=True,
+            independent_transaction=False,
             progress_properties=progress_properties,
         )
-    except Exception as e:
-        print(
-            "Failed to compute matched for batch %s" % sample_batch["sample_batch_name"]
-        )
-        print(e)
 
-    # Step 3. Send the warning notification if calibration was failed and information about samples
-    failed_samples = [
-        sample
-        for sample in calibration_results
-        if sample["status"] == "calibration failed"
-    ]
-    if failed_samples:
+    # TODO_error_handling for background tasks we emit the sio with payload, should similar to http response structure
+    except ApiException as e:
+        # Step 4. Send the warning notification if calibration was failed and information about samples
+        context_message = f"Failed to import sample items to batch '{sample_batch_id}'"
+        api_exc = process_exception(e, context_message)
+        user_error_message = api_exc.user_message
+        detail = api_exc.tech_message
+
+        error_payload = {
+            "action": "import",
+            "type": "samples",
+            "status": "error",
+            "message": user_error_message,  # should be "error" as in http responses
+            "error": detail,  # should be "detail" as in http responses
+            "progress_percentage": 100,
+        }
+
+        # TODO_notifications refactor failed_calibration_samples notificationsm
+        # Check the failed calibrations samples
+        failed_samples = [
+            sample
+            for sample in calibration_results
+            if sample["status"] == "calibration failed"
+        ]
+
+        if failed_samples:
+            error_payload["failed_calibration_samples":failed_samples]
+
         await sio.emit(
-            "calibration_mz_calibrate_batch_failed",
-            {"type": "failed_calibration_samples", "samples": failed_samples},
-            room=sample_batch["sample_batch_id"],
+            "import_samples_to_batch_finished",
+            error_payload,
+            room=sample_batch_id,
             namespace="/",
         )
-    return
 
 
 async def copy_sample_batch(

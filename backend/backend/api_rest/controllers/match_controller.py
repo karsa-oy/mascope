@@ -24,6 +24,8 @@ from backend.api_rest.models.models import (
     SampleBatch,
     SampleItem,
 )
+from ..exceptions import process_exception, ApiException, NotFoundException
+
 from ..models.pydantic_models.match_pydantic_model import (
     RematchBatchesBody,
     MatchComputeSample,
@@ -498,8 +500,7 @@ async def rematch_sample(
         if independent_transaction:
             await sio.emit("sample_batch_reload", room=sample_batch_id, namespace="/")
     except Exception as e:
-        error_message = f"Sample rematching failed: {e}"
-        raise RuntimeError(error_message)
+        api_exc = process_exception(e, f"Rematching sample '{sample_item_id}' failed ")
 
 
 async def match_sample_remove(
@@ -997,35 +998,34 @@ async def rematch_batch(
             namespace="/",
         )
         if progress_properties.progress_type == "rematch_batch":
-            if independent_transaction:
-                # Compute progress properties for the current batch
-                sample_items_info = await get_samples(
-                    sample_batch_id=sample_batch_id,
-                    batch_matches_info=False,
-                )
-                item_weight = 1.0 / sample_items_info["results"]
-                if progress_properties.workspace_reload is not None:
-                    workspace_reload = progress_properties.workspace_reload
-                else:
-                    workspace_reload = False
+            # Compute progress properties for the current batch
+            sample_items_info = await get_samples(
+                sample_batch_id=sample_batch_id,
+                batch_matches_info=False,
+            )
+            item_weight = 1.0 / sample_items_info["results"]
+            if progress_properties.workspace_reload is not None:
+                workspace_reload = progress_properties.workspace_reload
+            else:
+                workspace_reload = False
 
-                progress_properties = ProgressProperties(
-                    progress_type=progress_properties.progress_type,
-                    item_weight=item_weight,
-                    batch_index=1,
-                    total_batches=1,
-                    workspace_reload=workspace_reload,
-                    sample_batch_id=sample_batch_id,
-                )
-                if not workspace_id:
-                    # Fetch workspace_id from the database
-                    async with async_session() as session:
-                        result = await session.execute(
-                            select(SampleBatch.workspace_id).filter(
-                                SampleBatch.sample_batch_id == sample_batch_id
-                            )
+            progress_properties = ProgressProperties(
+                progress_type=progress_properties.progress_type,
+                item_weight=item_weight,
+                batch_index=1,
+                total_batches=1,
+                workspace_reload=workspace_reload,
+                sample_batch_id=sample_batch_id,
+            )
+            if not workspace_id:
+                # Fetch workspace_id from the database
+                async with async_session() as session:
+                    result = await session.execute(
+                        select(SampleBatch.workspace_id).filter(
+                            SampleBatch.sample_batch_id == sample_batch_id
                         )
-                        workspace_id = result.scalar_one_or_none()
+                    )
+                    workspace_id = result.scalar_one_or_none()
 
             # Notify batch clients of the progres
             await sio.emit(
@@ -1071,6 +1071,18 @@ async def rematch_batch(
 
     except Exception as e:
         # Extract error information from the exception, specifically looking for "failed_samples"
+        context_message = f"Failed to ramatch sample batch '{sample_batch_id}'"
+        api_exc = process_exception(e, context_message)
+        user_error_message = api_exc.user_message
+        detail = api_exc.tech_message
+
+        # reise the error if called internally, from import_sample_items
+        if independent_transaction:
+            print(user_error_message)
+            print(detail)
+        else:
+            raise ApiException(user_error_message, detail, api_exc.status_code)
+
         error_info = e.args[0]
         # If the exception contains information about failed samples, extend the failed samples list with this information
         if "failed_samples" in error_info:
