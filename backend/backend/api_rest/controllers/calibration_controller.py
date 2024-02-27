@@ -32,6 +32,7 @@ from zarr.errors import PathNotFoundError
 from fastapi import BackgroundTasks, HTTPException
 from sqlalchemy import select, func, and_
 
+from ..exceptions import process_exception, ApiException, NotFoundException
 from .match_controller import match_sample_remove, compute_matches
 from .sample_files_controller import (
     update_sample_file,
@@ -95,7 +96,7 @@ async def mz_fit(
     sample_item_id,
 ):
     """
-    Main function to fit mz. Fits the mass-to-charge ratio (m/z) for a given sample file.
+    Main function to fit m/z. Fits the mass-to-charge ratio (m/z) for a given sample file.
 
     :param ...:  parameters.
     :return: fit, stats, error.
@@ -205,6 +206,7 @@ async def mz_calibrate_sample(
     :param autosampler_mode: Indicates whether the calibration is in autosampler mode or not.
     :return: The calibration result for the given sample.
     """
+    print(f"...m/z calibrating sample: {sample_item['sample_item_name']} ...")
 
     # Initializing the result dictionary.
     result = {
@@ -395,13 +397,13 @@ async def get_mz_calibration(
     sample_item_id: str = None,
 ):
     """
-    Retrieve the mz calibration for a given instrument or sample item ID.
+    Retrieve the m/z calibration for a given instrument or sample item ID.
 
     :param instrument: (Optional) The instrument name.
     :type instrument: str, optional
     :param sample_item_id: (Optional) The sample item ID.
     :type sample_item_id: str, optional
-    :return: The mz calibration for the given parameters.
+    :return: The m/z calibration for the given parameters.
     :rtype: dict
     """
 
@@ -491,7 +493,7 @@ async def calibration_mz_fit(
         )
         sample_batch = result.one()
 
-    # get mz calibration parameters
+    # get m/z calibration parameters
     build_params = sample_batch.build_params
     calibration_collection_id = build_params["calibration_collection"]
     ionization_mechanism_ids = build_params["ion_mechanisms"]
@@ -639,40 +641,71 @@ async def calibration_mz_calibrate_sample(
 
 
 async def calibration_mz_calibrate_batch(
-    sample_batch, sample_items, params: CalibrationMzFitParams
-):
+    sample_batch_id: str,
+    params: CalibrationMzFitParams,
+    independent_transaction: bool = False,
+) -> list:
     """
-    Calibrates the entire batch of samples and notifies about the progress
-    and completion using socket IO. In case of failure, an error message is emitted.
+    Performs m/z calibration on all samples within a given batch using specified calibration parameters.
+    It notifies about the calibration progress and completion via Socket.IO. In case of failure, an error message is emitted.
 
-    :param sample_batch: The batch of samples to be calibrated.
-    :param sample_items: List of sample items within the batch.
-    :param params: Calibration parameters defined by the CalibrationMzFitParams pydantic model.
-    :return: A list containing the calibration results for the batch.
+    Steps:
+    1. Emit an event to notify the start of calibration.
+    2. Retrieve all samples associated with the specified sample batch.
+    3. Iterate over each sample, perform calibration, and accumulate results.
+    4. Emit an event to notify the completion of calibration along with the results.
+    5. Emit a reload event for the sample batch if this is an independent transaction.
+    6. In case of an exception, emit an event indicating calibration failure.
+
+    :param sample_batch_id: The ID of the sample batch to be calibrated.
+    :type sample_batch_id: str
+    :param params: Calibration parameters to be used for the calibration process.
+    :type params: CalibrationMzFitParams
+    :param independent_transaction: Flag indicating if the operation is an independent transaction, default to False.
+    :type independent_transaction: bool
+    :raises NotFoundException: Raised if the sample batch or any samples within it are not found.
+    :raises ApiException: Raised for any exceptions that occur during the calibration process.
+    :return: A list of calibration results for each sample in the batch.
+    :rtype: list
     """
-
-    calibration_results = []
-    sample_batch_id = sample_batch.get("sample_batch_id")
-
-    await sio.emit(
-        "calibration_mz_calibrate_batch_started",
-        {
-            "action": "Auto Sampler",
-            "sample_batch_id": sample_batch_id,
-            "progress": 0,
-        },
-        room=sample_batch_id,
-        namespace="/",
-    )
-
     try:
-        for index, sample_item in enumerate(sample_items):
-            filename = sample_item.get("filename")
-            if not filename:
-                raise ValueError(f"Invalid sample item: {sample_item}")
+        calibration_results = []
 
+        # Step 1: Notify the start of calibration
+
+        print(f"...m/z calibrating batch: {sample_batch_id} ...")
+        await sio.emit(
+            "calibration_mz_calibrate_batch_started",
+            {
+                "action": "m/z Calibrate Batch",
+                "sample_batch_id": sample_batch_id,
+                "progress": 0,
+            },
+            room=sample_batch_id,
+            namespace="/",
+        )
+
+        # Step 2: Fetch all samples in the batch
+        async with async_session() as session:
+            # Fetch samples
+            result = await session.execute(
+                select(Sample).where(Sample.sample_batch_id == sample_batch_id)
+            )
+
+            samples = result.scalars().all()
+
+        if not samples:
+            raise NotFoundException(f"Sample batch has no samples")
+
+        # Step 3: Calibrate each sample and collect results
+        for index, sample in enumerate(samples):
+            filename = sample.filename
+            if not filename:
+                raise ValueError(f"Invalid sample: {sample.sample_item_name}")
+
+            # Calibrate sample using specified parameters
             result = await mz_calibrate_sample(
-                sample_item,
+                sample.to_dict(),
                 params,
                 filename,
                 autosampler_mode=True,
@@ -680,10 +713,11 @@ async def calibration_mz_calibrate_batch(
             result["index"] = index
             calibration_results.append(result)
 
+        # Step 4: Notify the completion of calibration
         await sio.emit(
             "calibration_mz_calibrate_batch_finished",
             {
-                "action": "Auto Sampler",
+                "action": "m/z Calibrate Batch",
                 "sample_batch_id": sample_batch_id,
                 "progress": 100,
                 "calibration_results": calibration_results,
@@ -691,21 +725,36 @@ async def calibration_mz_calibrate_batch(
             room=sample_batch_id,
             namespace="/",
         )
+        # Step 5: Emit a reload event for the sample batch if this is an independent transaction.
+        # Reload affected sample batch if called by http request
+        if independent_transaction:
+            await sio.emit("sample_batch_reload", room=sample_batch_id, namespace="/")
     except Exception as e:
-        print("Failed to calibrate batch %s" % sample_batch["sample_batch_name"])
-        print(e)
+        # Step 5: Handle exceptions and notify calibration failure
+        error_message = f"Failed to m/z calibrate batch '{sample_batch_id}'. {str(e)}"
 
         await sio.emit(
             "calibration_mz_calibrate_batch_failed",
             {
-                "action": "Auto Sampler",
+                "action": "m/z Calibrate Batch",
                 "sample_batch_id": sample_batch_id,
                 "progress": 100,
                 "calibration_results": calibration_results,
-                "error": e,
+                "error": error_message,
             },
-            room=sample_batch["sample_batch_id"],
+            room=sample_batch_id,
             namespace="/",
         )
+
+        # reise the error if called internally, from import_sample_items
+        if independent_transaction:
+            print(error_message)
+        else:
+            api_exc = process_exception(
+                e, f"Failed to m/z calibrate batch '{sample_batch_id}'."
+            )
+            raise ApiException(
+                api_exc.user_message, api_exc.tech_message, api_exc.status_code
+            )
 
     return calibration_results

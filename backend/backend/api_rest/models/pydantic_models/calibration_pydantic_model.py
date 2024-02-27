@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List
+from typing import Optional
 
 
 class CalibrationMzFitParams(BaseModel):
@@ -14,7 +14,9 @@ class CalibrationMzApplyData(BaseModel):
     fit: dict = Field(..., description="Fit parameteres")
 
 
-class CalibrationMzCalibrateBatchData(BaseModel):
-    sample_batch: dict
-    sample_items: List[dict]
+class CalibrationMzCalibrateBatchBody(BaseModel):
     params: CalibrationMzFitParams = CalibrationMzFitParams()
+    independent_transaction: Optional[bool] = Field(
+        default=True,
+        description="Flag indicating whether the calibration is an independent transaction and if the operation should emit a reload event for the sample batch, raise the error if called internally.",
+    )

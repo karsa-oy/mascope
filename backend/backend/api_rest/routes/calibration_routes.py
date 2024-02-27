@@ -1,4 +1,8 @@
-from fastapi import APIRouter, BackgroundTasks, Query, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Query, HTTPException, Request
+from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
+from ..exceptions import ApiException
+
 from ..controllers.calibration_controller import (
     get_mz_calibration,
     calibration_mz_fit,
@@ -9,7 +13,7 @@ from ..controllers.calibration_controller import (
 from ..models.pydantic_models.calibration_pydantic_model import (
     CalibrationMzFitParams,
     CalibrationMzApplyData,
-    CalibrationMzCalibrateBatchData,
+    CalibrationMzCalibrateBatchBody,
 )
 
 calibration_router = APIRouter()
@@ -65,8 +69,23 @@ async def calibration_mz_calibrate_sample_route(
     return await calibration_mz_calibrate_sample(sample_item, params, background_tasks)
 
 
-@calibration_router.post("/api/calibration/mz_calibrate/batch")
-async def calibration_mz_calibrate_batch_route(data: CalibrationMzCalibrateBatchData):
-    return await calibration_mz_calibrate_batch(
-        data.sample_batch, data.sample_items, data.params
+@calibration_router.post("/api/calibration/mz_calibrate/batch/{sample_batch_id}")
+async def calibration_mz_calibrate_batch_route(
+    request: Request,
+    sample_batch_id: str,
+    body: CalibrationMzCalibrateBatchBody,
+    background_tasks: BackgroundTasks,
+):
+    sid = request.headers.get("X-SID")
+    background_tasks.add_task(
+        calibration_mz_calibrate_batch,
+        sample_batch_id,
+        body.params,
+        body.independent_transaction,
+    )
+    return JSONResponse(
+        status_code=200,
+        content={
+            "message": f"Sample batch '{sample_batch_id}' m/z calibration has started.",
+        },
     )
