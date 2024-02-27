@@ -29,7 +29,7 @@
             </div>
             <div v-for="item in formFields" :key="item.label">
               <template>
-                <b-field :label="item.label.replaceAll('_', ' ')">
+                <b-field :label="convertLabelToTitle(item.label)">
                   <b-input
                     v-model="item.value"
                     :placeholder="
@@ -101,19 +101,54 @@
                       style="align: left"
                     />
                   </template>
-                  <b-dropdown-item aria-role="listitem" value="BACKGROUND"
-                    >Background</b-dropdown-item
+                  <b-dropdown-item
+                    aria-role="listitem"
+                    value="INSTRUMENT_BACKGROUND"
+                    v-if="!sampleItemFilterId"
+                    >Instrument background</b-dropdown-item
                   >
-                  <b-dropdown-item aria-role="listitem" value="HOT"
-                    >Hot</b-dropdown-item
+                  <b-dropdown-item
+                    aria-role="listitem"
+                    value="FILTER_REGENERATION"
+                    v-if="sampleItemFilterId"
                   >
-                  <b-dropdown-item aria-role="listitem" value="BLANK"
+                    Filter regeneration
+                  </b-dropdown-item>
+                  <b-dropdown-item
+                    aria-role="listitem"
+                    value="FILTER_BACKGROUND"
+                    v-if="sampleItemFilterId"
+                  >
+                    Filter background
+                  </b-dropdown-item>
+                  <b-dropdown-item
+                    aria-role="listitem"
+                    value="SAMPLE"
+                    v-if="sampleItemFilterId"
+                    >Sample</b-dropdown-item
+                  >
+                  <b-dropdown-item
+                    aria-role="listitem"
+                    value="BLANK"
+                    v-if="sampleItemFilterId"
                     >Blank</b-dropdown-item
                   >
-                  <b-dropdown-item aria-role="listitem" value="UNKNOWN"
+                  <b-dropdown-item
+                    aria-role="listitem"
+                    value="UNKNOWN"
+                    v-if="sampleItemFilterId"
                     >Unknown</b-dropdown-item
                   >
                 </b-dropdown>
+              </b-field>
+              <b-field label="Filename">
+                <b-input
+                  v-model="sampleFilename"
+                  required
+                  :disabled="true"
+                  expanded
+                >
+                </b-input>
               </b-field>
             </div>
             <div v-if="showEditFunctions" style="padding-top: 2em">
@@ -308,7 +343,7 @@ import ThePaneSettingsCalibration from "./ThePaneSettingsCalibration.vue";
 import * as _ from "underscore";
 import { mapActions, mapMutations } from "vuex";
 import { call, get, sync } from "vuex-pathify";
-import { genId } from "../lib/util";
+import { beautifySnakeCase, strToSnakeCase, genId } from "../lib/util";
 
 export default {
   name: "TheModalSampleItemAttributesSave",
@@ -330,12 +365,6 @@ export default {
             label: "sample_item_name",
             required: true,
             placeholder: "Sample title",
-          },
-          {
-            label: "filename",
-            required: true,
-            placeholder: "",
-            disabled: true,
           },
         ],
       },
@@ -410,6 +439,19 @@ export default {
     mzCalibrationTableRows() {
       return this.mzFitStats ?? [];
     },
+    sampleItemAttributes() {
+      return this.formFields
+        .filter((field) => field.label != "sample_item_name")
+        .reduce(
+          (acc, cur) => ({ ...acc, [strToSnakeCase(cur.label)]: cur.value }),
+          {}
+        );
+    },
+    sampleItemName() {
+      return this.formFields.filter(
+        (field) => field.label == "sample_item_name"
+      )[0].value;
+    },
     savedTemplates() {
       return this.allTemplates.filter(
         (template) => template.type == this.templateType
@@ -417,7 +459,7 @@ export default {
     },
   },
   created() {
-    this.loadedTemplate = this.clone(this.availableTemplates[0]);
+    this.formFields = this.clone(this.defaultTemplate.template);
   },
   methods: {
     ...call({
@@ -433,6 +475,9 @@ export default {
     }),
     clone(obj) {
       return JSON.parse(JSON.stringify(obj));
+    },
+    convertLabelToTitle(label) {
+      return beautifySnakeCase(label);
     },
     addField() {
       this.$buefy.dialog.prompt({
@@ -492,7 +537,6 @@ export default {
       };
       await this.calibrationMzApply(requestData);
     },
-
     removeField(event) {
       // Field to remove label is in button element id, find it from the event data
       let fieldToRemove = event.target.id;
@@ -525,10 +569,7 @@ export default {
         title: "Template name",
         confirmText: "Save",
         inputAttrs: {
-          placeholder:
-            this.loadedTemplate.name === "default"
-              ? "template name"
-              : this.loadedTemplate.name,
+          placeholder: "template name",
           maxlength: 100,
         },
         trapFocus: true,
@@ -541,11 +582,13 @@ export default {
             });
             return;
           }
-          // copy loadedTempate fields with user input
+          let templateFormFields = this.clone(this.formFields);
+          // Empty values
+          templateFormFields.forEach((field) => (field.value = ""));
           let newTemplate = {
             name: templateName,
             type: this.templateType,
-            template: this.clone(this.formFields),
+            template: templateFormFields,
           };
           let i = 0;
           // set loaded template
@@ -566,29 +609,23 @@ export default {
       });
     },
     async saveAttributes() {
-      // convert [{label, value...}, ...] to object
-      let props = {};
-      let sample_item_attributes = {};
-      this.formFields.forEach((field) => {
-        if (field.required) props[field.label] = field.value;
-        else sample_item_attributes[field.label] = field.value;
-      });
       if (this.action == "create") {
         let newSampleItem = {
-          ...props,
-          sample_item_attributes,
+          filename: this.sampleFilename,
+          sample_item_name: this.sampleItemName,
           sample_item_type: this.sampleItemType,
           sample_batch_id: this.batchActive.sample_batch_id,
+          sample_item_attributes: this.sampleItemAttributes,
           filter_id: this.sampleItemFilterId,
         };
         await this.sampleItemCreate(newSampleItem);
       } else if (this.action == "update") {
         let newSampleItem = {
-          ...this.sampleActive,
-          ...props,
-          sample_item_attributes,
+          ...this.sampleActive, // To include sample_item_id
+          sample_item_name: this.sampleItemName,
           sample_item_type: this.sampleItemType,
           sample_batch_id: this.batchActive.sample_batch_id,
+          sample_item_attributes: this.sampleItemAttributes,
           filter_id: this.sampleItemFilterId,
         };
         await this.sampleItemUpdate(newSampleItem);
@@ -608,17 +645,36 @@ export default {
           break;
       }
     },
+    sampleItemFilterId(newValue) {
+      if (newValue != this.sampleActive.filter_id) {
+        // Reset sample item type when filter ID was changed
+        this.sampleItemType = null;
+      }
+    },
     loadedTemplate: {
       handler(newValue) {
         if (newValue) {
           // Make a copy to avoid mutating the loaded template directly
-          this.formFields = this.clone(newValue.template);
+          let newFormFields = this.clone(newValue.template);
+          // Fill in new form with values from the old
+          newFormFields.forEach(
+            (field) =>
+              (field.value = this.formFields.find(
+                (old_field) => old_field.label === field.label
+              )?.value)
+          );
+          this.formFields = newFormFields;
         }
       },
       deep: true,
     },
     modalActive() {
-      if (this.modalActive) this.activeStep = 0;
+      if (this.modalActive) {
+        this.activeStep = 0;
+      } else {
+        // Reset template selection when closing modal
+        this.loadedTemplate = null;
+      }
     },
     modalProps: async function (data) {
       this.action = data.action;
@@ -655,8 +711,8 @@ export default {
           });
         }
       }
-
       this.loadedTemplate = newTemplate;
+      this.formFields = newTemplate.template;
       this.sampleFilename = data.sampleItemRecordToLoad.filename;
       this.sampleInstrument = data.sampleItemRecordToLoad.instrument;
       this.sampleItemFilterId = data.sampleItemRecordToLoad.filter_id;
