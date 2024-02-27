@@ -12,7 +12,7 @@ const state = {
   targetIons: null,
   targetIsotopes: null,
   // matches
-  matchSamples: null,
+  matchSamples: null, // TODO_loading not used
   matchCompounds: null,
   matchIons: null,
   // build parameters
@@ -197,8 +197,7 @@ export default {
       const body = {
         sample_batch_id: batchId,
         batch_matches_info: true,
-        sort: "datetime_utc",
-        order: "asc",
+        sort: "sample_item_utc_created",
         alarms_list: alarmsList,
       };
 
@@ -229,8 +228,19 @@ export default {
       return batchTargetsData.data;
     },
 
-    async autoSamplerImportBatch({ rootState }, data) {
-      await rootState.api.httpClient.autoSamplerImportBatch(data);
+    async importSamplesToBatch({ dispatch, rootState }, data) {
+      const body = {
+        sample_items: data.sample_items,
+      };
+      const batch = data.batch;
+      return await handleApiRequest({
+        dispatch,
+        rootState,
+        httpMethod: "importSamplesToBatch",
+        requestData: { batch, body },
+        successMessage: `Sample batch "${batch.sample_batch_name}" import started`,
+        errorMessage: `Failed to import sample batch "${batch.sample_batch_name}". Please try again.`,
+      });
     },
     async createBatch({ dispatch, rootState }, newBatch) {
       return await handleApiRequest({

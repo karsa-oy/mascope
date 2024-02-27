@@ -41,9 +41,9 @@
                 : 'is-primary'
             "
           ></b-progress>
-          <!-- For Auto Sampler -->
+          <!-- For m/z Calibrate Batch -->
           <b-progress
-            v-else-if="calibrationAction === 'Auto Sampler'"
+            v-else-if="calibrationAction === 'm/z Calibrate Batch'"
             :value="progressPercentage"
             size="is-medium"
             :type="

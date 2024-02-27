@@ -26,6 +26,8 @@ const state = {
   copyProgress: false,
   // Export progress notification
   exportProgress: false,
+  // Import progress notification
+  importProgress: false,
   // Delete progress notification
   deleteProgress: false,
   // TODO_refactor_store move other progress notification to the generilised progress
@@ -102,6 +104,9 @@ export default {
       commit("SET_GENERAL_NOTIFICATION", payload.notification);
       commit("SET_GENERAL_NOTIFICATION_MESSAGE", payload.message);
       commit("activate", { notification: "general" });
+    },
+    closeGeneralNotification({ commit }, payload) {
+      commit("deactivate", { notification: "general" });
     },
     // progress notification
     showProgressNotification({ commit }, payload) {
@@ -292,6 +297,7 @@ export default {
       }, 3000);
     },
     // calibration notifications
+    // TODO_notifications	refactor to use unified progress component/onActionFinished
     async onCalibrationStarted({ commit }, data) {
       commit("SET_CALIBRATION_COMPUTING", true);
       commit("SET_CALIBRATION_ACTION", data.action);
@@ -311,13 +317,18 @@ export default {
         "SET_PROGRESS_MESSAGE",
         `Calibration process finished: ${data.action}...`
       );
-      commit("SET_PROGRESS_PERCENTAGE", data.progress_percentage || 100);
       setTimeout(() => {
         if (state.calibrationAction !== data.action) {
           return; // Do not close if this is not the currently active action.
         }
         commit("SET_CALIBRATION_COMPUTING", false);
         setTimeout(() => {
+          if (state.calibrationAction !== data.action) {
+            return; // Do not close if this is not the currently active action.
+          }
+          if (!state.calibrationProgressActive) {
+            return; // Do not reset if calibrationAction is not the currently active action.
+          }
           commit("RESET_CALIBRATION_NOTIFICATION");
         }, 500);
       }, 3000);
@@ -343,6 +354,10 @@ export default {
     },
     // copy notifications
     async onCopyFinished({ dispatch }, data) {
+      dispatch("onActionFinished", data);
+    },
+    // import batch notifications
+    async onImportSamplesToBatchFinished({ dispatch }, data) {
       dispatch("onActionFinished", data);
     },
     // batch peaks export

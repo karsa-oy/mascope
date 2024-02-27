@@ -76,6 +76,8 @@ export default {
           return `Deleting ${actionTypeCapitalized} Progress`;
         case "export":
           return `Export ${actionTypeCapitalized} Progress`;
+        case "import":
+          return `Import ${actionTypeCapitalized} Progress`;
         default:
           return `${
             this.progressAction.charAt(0).toUpperCase() +
