@@ -1071,7 +1071,7 @@ async def rematch_batch(
 
     except Exception as e:
         # Extract error information from the exception, specifically looking for "failed_samples"
-        context_message = f"Failed to ramatch sample batch '{sample_batch_id}'"
+        context_message = f"Failed to rematch sample batch '{sample_batch_id}'"
         api_exc = process_exception(e, context_message)
         user_error_message = api_exc.user_message
         detail = api_exc.tech_message
