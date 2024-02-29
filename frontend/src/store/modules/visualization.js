@@ -141,7 +141,7 @@ export default {
       for (const param in paramDefaults) {
         commit(
           `SET_PARAM_${param.toUpperCase()}`,
-          filterParams[param] || paramDefaults[param]
+          filterParams[param] ?? paramDefaults[param]
         );
       }
     },
