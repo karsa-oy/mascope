@@ -368,7 +368,7 @@ export default {
 
         case "editBatchCollections":
           // Compare initial and current target collections
-          return !_.isEqual(
+          return _.isEqual(
             this.initialTargetCollections
               .map((collection) => collection.target_collection_id)
               .sort(),

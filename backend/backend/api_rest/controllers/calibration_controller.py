@@ -132,7 +132,9 @@ async def mz_fit(
         ionization_mechanism_ids=ionization_mechanism_ids,
     )
     target_isotopes_df = pd.DataFrame(target_isotopes_result["data"])
-    match_isotope_df = await compute_matches(filename, target_isotopes_df)
+    match_isotope_df = await compute_matches(
+        filename, target_isotopes_df, min_isotope_abundance=isotope_abundance_min
+    )
 
     # Filter matches
     good_matches_df = match_isotope_df[

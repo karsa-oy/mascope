@@ -539,8 +539,13 @@ export default {
     },
     removeField(event) {
       // Field to remove label is in button element id, find it from the event data
-      let fieldToRemove = event.target.id;
-      if (!fieldToRemove.length) {
+      let targetElement = event.target;
+      // Check if the clicked element is not the button itself, then find the closest parent button
+      if (targetElement.nodeName !== "BUTTON") {
+        targetElement = targetElement.closest("button");
+      }
+      let fieldToRemove = targetElement?.id || null;
+      if (!fieldToRemove) {
         // Failed to find the button id
         console.log("fieldToRemove not found at event.target.id: ", event);
         return;

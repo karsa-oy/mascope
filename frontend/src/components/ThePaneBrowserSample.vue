@@ -28,10 +28,10 @@ export default {
       batchMatchCompounds: "batch/matchCompounds",
       batchMatchIons: "batch/matchIons",
       batchTargetCollections: "batch/targetCollections",
+      batchTargetCompounds: "batch/targetCompounds",
       sampleActive: "sample/active",
       sampleItems: "batch/sampleItems",
       sampleItemFocused: "batch/sampleItemFocused",
-      targetCollections: "batch/targetCollections",
       workspaceActive: "workspace/active",
     }),
     ...sync({
@@ -276,6 +276,34 @@ export default {
         " ",
         "_"
       )}.xlsx`;
+      // Extend batchMatchCompounds with sample_item_type
+      const extendedMatchCompounds = this.batchMatchCompounds.map(
+        (compound) => {
+          const sampleItem = this.sampleItems.find(
+            (item) => item.sample_item_id === compound.sample_item_id
+          );
+          return {
+            ...compound,
+            sample_item_type: sampleItem?.sample_item_type || null,
+          };
+        }
+      );
+      // Extend batchMatchIons with sample_item_type, target_compound_name, and target_compound_formula
+      const extendedMatchIons = this.batchMatchIons.map((ion) => {
+        const sampleItem = this.sampleItems.find(
+          (item) => item.sample_item_id === ion.sample_item_id
+        );
+        const targetCompound = this.batchTargetCompounds.find(
+          (compound) => compound.target_compound_id === ion.target_compound_id
+        );
+        return {
+          ...ion,
+          sample_item_type: sampleItem?.sample_item_type || null,
+          target_compound_name: targetCompound?.target_compound_name || null,
+          target_compound_formula:
+            targetCompound?.target_compound_formula || null,
+        };
+      });
       table.toSpreadsheet(filename, [
         {
           name: "Batch",
@@ -289,12 +317,12 @@ export default {
         },
         {
           name: "Match compounds",
-          rows: this.batchMatchCompounds,
+          rows: extendedMatchCompounds,
           cols: matchCompoundCols,
         },
         {
           name: "Match ions",
-          rows: this.batchMatchIons,
+          rows: extendedMatchIons,
           cols: matchIonCols,
         },
       ]);

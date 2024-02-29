@@ -359,7 +359,7 @@ export default {
         failedFilters.push({
           filter: "m/z tolerance",
           isotopeValue: `Isotope m/z error is ${isotope.match_mz_error.toFixed(
-            2
+            3
           )}`,
           threshold: this.paramMzTolerance,
         });
@@ -371,7 +371,7 @@ export default {
         failedFilters.push({
           filter: "Isotope ratio tolerance",
           isotopeValue: `Match abundance error is ${isotope.match_abundance_error.toFixed(
-            2
+            3
           )}`,
           threshold: this.paramIsotopeRatioTolerance,
         });
@@ -380,7 +380,7 @@ export default {
         failedFilters.push({
           filter: "Minimum peak intensity",
           isotopeValue: `Sample peak area is ${isotope.sample_peak_area.toFixed(
-            2
+            3
           )}`,
           threshold: this.paramPeakMinIntensity,
         });
@@ -392,7 +392,7 @@ export default {
         failedFilters.push({
           filter: "Minimum isotope correlation",
           isotopeValue: `Match isotope correlation is ${isotope.match_isotope_correlation.toFixed(
-            2
+            3
           )}`,
           threshold: this.paramMinIsotopeCorrelation,
         });
