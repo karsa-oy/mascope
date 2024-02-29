@@ -87,9 +87,6 @@ export default {
         }, 1000);
       }
     },
-    async calibrationMzCalibrateBatch({ rootState }, data) {
-      await rootState.api.httpClient.calibrationMzCalibrateBatch(data);
-    },
 
     // backend notifications
     // mz_fit
@@ -163,6 +160,8 @@ export default {
     ) {
       dispatch("notification/onCalibrationFinished", data, { root: true });
     },
+    // TODO_notifications  move to notification store, use the onActionFinished,
+    // failed_calibration_samples is not used now from import_sample_items
     async onCalibrationMzCalibrateBatchFailed(
       { rootState, commit, dispatch },
       data

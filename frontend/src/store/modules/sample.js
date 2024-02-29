@@ -11,6 +11,17 @@ const state = {
   matchIsotopes: null,
 };
 
+// TODO_configuration possible collection types
+const sampleTypes = [
+  "FILTER_REGENERATION",
+  "FILTER_BACKGROUND",
+  "INSTRUMENT_BACKGROUND",
+  "BLANK",
+  "SAMPLE",
+  "UNKNOWN",
+  "ONLINE", // At the moment not selectable from the UI
+];
+
 export default {
   namespaced: true,
   state,
@@ -195,6 +206,7 @@ export default {
     },
   },
   getters: {
+    sampleTypes: () => sampleTypes,
     alarmCategory: (state, getters, rootGetters) => {
       if (!(state.matchCollections && state.matchCompounds)) return null;
       // Get ids of target collections set to alarm

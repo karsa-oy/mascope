@@ -348,7 +348,7 @@
               type="is-dark"
               icon-left="close"
               expanded
-              @click="deactivateModal"
+              @click="deactivateModalResetData"
             >
               Cancel
             </b-button>

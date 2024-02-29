@@ -208,11 +208,18 @@ export function createHttpClient(host, api_port) {
         throw new Error(userErrorMessage);
       }
     },
-    autoSamplerImportBatch: async (data) => {
+    importSamplesToBatch: async ({ batch, body }) => {
       try {
-        return await httpClient.post(`${batchesBaseUrl}/import_batch`, data);
+        return await httpClient.post(
+          `${batchesBaseUrl}/${batch.sample_batch_id}/import`,
+          body
+        );
       } catch (error) {
-        console.error("Failed to import batch: ", error);
+        // TODO_error_handling
+        const userErrorMessage =
+          error?.response?.data?.error ||
+          `Failed to import sample batch: ${error}`;
+        throw new Error(userErrorMessage);
       }
     },
     copySampleBatch: async ({ batchId, body }) => {
@@ -446,18 +453,21 @@ export function createHttpClient(host, api_port) {
           }
         );
       } catch (error) {
-        console.error("Failed to mz calibrate sample: ", error);
+        console.error("Failed to m/z calibrate sample: ", error);
       }
     },
 
-    calibrationMzCalibrateBatch: async (data) => {
+    calibrationMzCalibrateBatch: async ({ batch, body }) => {
       try {
         return await httpClient.post(
-          `${calibrationBaseUrl}/mz_calibrate/batch`,
-          data
+          `${calibrationBaseUrl}/mz_calibrate/batch/${batch.sample_batch_id}`,
+          body
         );
       } catch (error) {
-        console.error("Failed to mz calibrate batch: ", error);
+        const userErrorMessage =
+          error?.response?.data?.error ||
+          `Failed to m/z calibrate sample batch "${batch.sample_batch_name}": ${error}`;
+        throw new Error(userErrorMessage);
       }
     },
 

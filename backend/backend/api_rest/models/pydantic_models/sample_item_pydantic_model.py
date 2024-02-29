@@ -1,6 +1,7 @@
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, root_validator
 from typing import Optional, Dict
 from datetime import timezone, datetime as dt
+import re
 
 # TODO_configuration possible item types
 APP_ITEM_TYPES = [
@@ -13,6 +14,9 @@ APP_ITEM_TYPES = [
     "ONLINE",  # At the moment not selectable from the UI
 ]
 
+# Regular expression for filter_id validation
+FILTER_ID_REGEX = r"^[0-9A-Z]{6}$"
+
 
 class SampleItemBase(BaseModel):
     sample_batch_id: str = Field(..., description="ID of the associated sample batch")
@@ -24,6 +28,20 @@ class SampleItemBase(BaseModel):
     )
     filter_id: Optional[str] = Field(None, description="Filter ID of the sample item")
 
+    @root_validator
+    def check_filter_id_based_on_item_type(cls, values):
+        item_type = values.get("sample_item_type")
+        filter_id = values.get("filter_id")
+        if item_type in ["INSTRUMENT_BACKGROUND", "ONLINE"] and filter_id is not None:
+            raise ValueError(
+                f"There must be no filter_id for sample type '{item_type}'"
+            )
+        elif item_type not in ["INSTRUMENT_BACKGROUND", "ONLINE"] and filter_id is None:
+            raise ValueError(
+                f"The filter_id must be provided for sample type '{item_type}'"
+            )
+        return values
+
     @validator("sample_item_type")
     def check_item_type(cls, item):
         if item not in APP_ITEM_TYPES:
@@ -32,6 +50,17 @@ class SampleItemBase(BaseModel):
                 f"{item} is not a valid sample_item_type. Allowed types are {allowed_types}."
             )
         return item
+
+    @validator("filter_id", always=True)
+    def validate_filter_id(cls, v, values, **kwargs):
+        item_type = values.get("sample_item_type")
+        # Only validate filter_id if it's required and provided
+        if item_type not in ["INSTRUMENT_BACKGROUND", "ONLINE"] and v:
+            if not re.match(FILTER_ID_REGEX, v):
+                raise ValueError(
+                    "Invalid filter_id format. Must be 6 characters long and contain only uppercase letters and numbers."
+                )
+        return v
 
 
 class SampleItemCreate(SampleItemBase):

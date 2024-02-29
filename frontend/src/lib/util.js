@@ -67,3 +67,40 @@ export function parseAutosamplerCsv(rows) {
   }
   return result;
 }
+
+export function parseGenericCsv(cols, rows) {
+  // Filter out rows where sample name is empty or None
+  const validRows = rows.filter(
+    (row) => row[cols[0].field] && row[cols[0].field].trim() !== ""
+  );
+
+  // Map over the filtered non-empty rows
+  return validRows.map((row) => {
+    // Determine if filter_id should be generated
+    const checkTypesToGenerateFilterId = ![
+      "INSTRUMENT_BACKGROUND",
+      "ONLINE",
+    ].includes(row[cols[1].field]);
+
+    const newSampleItem = {
+      sample_item_name: row[cols[0].field],
+      sample_item_type: row[cols[1].field]
+        ? row[cols[1].field].trim()
+        : "UNKNOWN",
+      // Generate filter_id only if the type is not "INSTRUMENT_BACKGROUND" or "ONLINE", for "INSTRUMENT_BACKGROUND" or "ONLINE" set filter_id to null
+      filter_id: checkTypesToGenerateFilterId
+        ? row[cols[2].field] || genId(6, false)
+        : null,
+      sample_item_attributes: {},
+    };
+
+    // Process the rest of the columns for sample_item_attributes
+    cols.slice(3).forEach((col) => {
+      const attrKey = strToSnakeCase(col.label.trim());
+      // Ensure that if the attribute is empty, we set it to a default or empty string
+      newSampleItem.sample_item_attributes[attrKey] =
+        col.field && row[col.field].trim() ? row[col.field].trim() : "";
+    });
+    return newSampleItem;
+  });
+}

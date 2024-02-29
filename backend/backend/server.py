@@ -61,7 +61,6 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     # Combine error messages from exc.errors() into a single string
     error_messages = []
     for error in exc.errors():
-        field = " -> ".join(error["loc"])
         msg = error["msg"]
         error_messages.append(f"{msg}")
 

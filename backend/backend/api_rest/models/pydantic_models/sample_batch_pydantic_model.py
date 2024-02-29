@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field, validator
 from typing import Optional, List, Dict, Any
 from .calibration_pydantic_model import CalibrationMzFitParams
+from .sample_item_pydantic_model import SampleItemCreate
 
 
 class BuildParams(BaseModel):
@@ -62,9 +63,10 @@ class SampleBatchInDB(SampleBatchBase):
         orm_mode = True
 
 
-class autoSamplerImportBatchData(BaseModel):
-    sample_batch: dict
-    sample_items: List[dict]
+class SampleBatchImportSamplesBody(BaseModel):
+    sample_items: List[SampleItemCreate] = Field(
+        ..., description="Sample items to be created and imported to the sample batch"
+    )
     params: CalibrationMzFitParams = CalibrationMzFitParams()
 
 

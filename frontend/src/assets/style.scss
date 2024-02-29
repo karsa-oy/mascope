@@ -133,6 +133,12 @@ $modal-card-body-background-color: inherit;
 .message.is-notification.in-development {
   width: 500px;
 }
+.message.is-notification.failed-computation {
+  width: 50vw;
+}
+.message.is-notification.failed-validation-import-samples {
+  width: 50vw;
+}
 .message.is-notification.is-submitted {
   background-color: rgba($success, 0.9) !important;
 }
@@ -155,6 +161,36 @@ $table-row-hover-background-color: $cool-grey-4;
 }
 .base-browser-row-partially-selected {
   background: $burgundy-red;
+}
+
+// Custom table with pagination and horizontal scrollbar
+.table-with-pagination {
+  .table-container {
+    overflow-x: auto;
+
+    // Custom table horizontal scrollbar
+    &::-webkit-scrollbar {
+      // width: 10px; // Width of the vertical scrollbar
+      height: 10px; // Height of the horizontal scrollbar
+    }
+
+    // Style the scrollbar thumb
+    &::-webkit-scrollbar-thumb {
+      background-color: $cool-grey-0; // Thumb color
+      border-radius: 6px; // Rounded corners for the thumb
+      border: 1.5px solid $cool-grey-1; // Creates padding around the thumb
+
+      &:hover {
+        background-color: $cool-grey-3; // Darker thumb color on hover
+      }
+    }
+
+    // Style the scrollbar track (the part the thumb moves within)
+    &::-webkit-scrollbar-track {
+      background: darken($cool-grey-0, 4%); // Track color
+      border-radius: 6px; // Rounded corners for the track
+    }
+  }
 }
 
 // Input

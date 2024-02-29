@@ -26,6 +26,7 @@
       type="is-notification"
       has-icon
       icon="alert-circle-outline"
+      icon-size="is-medium"
       :class="{ 'is-closing': isClosing, 'is-error': 'is-error' }"
     >
       {{ generalNotificationMessage }}
@@ -51,6 +52,7 @@ export default {
       generalNotificationMessage: "notification/generalNotificationMessage",
       batchComputeProgressActive: "notification/batchComputeProgressActive",
       deleteProgress: "notification/deleteProgress",
+      calibrationComputing: "notification/calibrationComputing",
       progressActive: "notification/progressActive",
     }),
   },
@@ -63,8 +65,13 @@ export default {
         setTimeout(() => {
           if (this.batchComputeProgressActive) return;
           if (this.deleteProgress) return;
+          if (this.calibrationComputing) return;
           if (this.progressActive) return;
-          setTimeout(this.close, 3500);
+          if (this.generalNotification === "error") {
+            setTimeout(this.close, 10000);
+          } else {
+            setTimeout(this.close, 3500);
+          }
         }, 1000);
       }
     },
