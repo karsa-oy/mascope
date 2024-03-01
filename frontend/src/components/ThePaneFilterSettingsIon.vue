@@ -20,7 +20,7 @@
       label="Isotope ratio tolerance"
       path="visualization/paramIsotopeRatioTolerance"
       @paramChange="loadMatches"
-      :range="{ min: 0, max: 1, step: 0.1 }"
+      :range="{ min: 0, max: 1, step: 0.05 }"
     >
     </base-param-field>
     <base-param-field

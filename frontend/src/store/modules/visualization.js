@@ -21,7 +21,7 @@ const state = {
 const paramDefaults = {
   mz_tolerance: 15,
   min_isotope_abundance: 0.15,
-  isotope_ratio_tolerance: 0.1,
+  isotope_ratio_tolerance: 0.15,
   peak_min_intensity: 0,
   min_isotope_correlation: 0.8,
   probable_match_threshold: 0.8,
