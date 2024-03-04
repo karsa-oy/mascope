@@ -174,7 +174,7 @@ export default {
         requestData: { collectionId, collectionName, deleteOrphanCompounds },
         successNotificationType: "deleted",
         successMessage: `Target collection ${collectionName} was deleted successfully!`,
-        errorMessage: `Failed to delete workspace ${collectionName}. Please try again.`,
+        errorMessage: `Failed to delete target collection ${collectionName}. Please try again.`,
       });
     },
 
