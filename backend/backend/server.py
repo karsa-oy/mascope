@@ -31,6 +31,7 @@ from .api_rest.routes.target_isotopes_routes import target_isotopes_router
 from .api_rest.routes.match_interferences_routes import match_interferences_router
 from .api_rest.routes.instrument_functions_routes import instrument_functions_router
 from .api_rest.routes.attribute_templates_routes import attribute_templates_router
+from .api_rest.routes.visualization_routes import visualization_router
 from .api_rest.routes.match_routes import match_router
 from .api_rest.routes.match_rating_routes import match_rating_router
 from .api_rest.routes.samples_routes import samples_router
@@ -98,6 +99,7 @@ routers = [
     target_isotopes_router,
     instrument_functions_router,
     attribute_templates_router,
+    visualization_router,
     samples_router,
 ]
 
