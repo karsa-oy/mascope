@@ -469,6 +469,8 @@ export default {
       sampleItemCreate: "sample/create",
       sampleItemUpdate: "sample/update",
       matchSampleRematch: "sample/matchSampleRematch",
+      createAttributeTemplate: "sample/createAttributeTemplate",
+      deleteAttributeTemplate: "sample/deleteAttributeTemplate",
     }),
     ...mapMutations({
       deactivateModal: "modal/deactivate",
@@ -505,16 +507,12 @@ export default {
           "</b>?",
         confirmText: "Delete",
         onConfirm: () => {
-          this.$api.emit(
-            "attribute_template_delete",
-            this.availableTemplates
-              .filter(
-                (template) =>
-                  template.attribute_template_id ==
-                  this.loadedTemplate.attribute_template_id
-              )
-              .map((template) => template.attribute_template_id)
+          const templateToDelete = this.availableTemplates.find(
+            (template) =>
+              template.attribute_template_id ==
+              this.loadedTemplate.attribute_template_id
           );
+          this.deleteAttributeTemplate(templateToDelete);
         },
       });
     },
@@ -609,7 +607,7 @@ export default {
           }
           this.loadedTemplate = this.clone(newTemplate);
           // push new template
-          this.$api.emit("attribute_template_create", [this.loadedTemplate]);
+          this.createAttributeTemplate(this.loadedTemplate);
         },
       });
     },

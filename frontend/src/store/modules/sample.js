@@ -163,6 +163,45 @@ export default {
       });
     },
 
+    // Attribute templates
+    async createAttributeTemplate({ dispatch, rootState }, newTemplate) {
+      return await handleApiRequest({
+        dispatch,
+        rootState,
+        httpMethod: "createAttributeTemplate",
+        requestData: newTemplate,
+        successMessage: `Attribute template "${newTemplate.name}" created successfully!`,
+        errorMessage: `Failed to create attribute template "${newTemplate.name}". Please try again.`,
+      });
+    },
+
+    async updateAttributeTemplate({ dispatch, rootState }, template) {
+      const templateId = template.attribute_template_id;
+      const body = template;
+      return await handleApiRequest({
+        dispatch,
+        rootState,
+        httpMethod: "updateAttributeTemplate",
+        requestData: { templateId, body },
+        successMessage: `Attribute template "${updateData.name}" updated successfully!`,
+        errorMessage: `Failed to update attribute template "${updateData.name}". Please try again.`,
+      });
+    },
+
+    async deleteAttributeTemplate({ dispatch, rootState }, template) {
+      const templateId = template.attribute_template_id;
+      const templateName = template.name;
+      return await handleApiRequest({
+        dispatch,
+        rootState,
+        httpMethod: "deleteAttributeTemplate",
+        requestData: { templateId, templateName },
+        successNotificationType: "deleted",
+        successMessage: `Attribute template "${templateName}" was deleted successfully!`,
+        errorMessage: `Failed to delete attribute template ${templateName}. Please try again.`,
+      });
+    },
+
     // backend notifications
     async onSampleBatchExportPeaksFailed({ dispatch }, error) {
       await dispatch(

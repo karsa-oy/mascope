@@ -781,16 +781,59 @@ export function createHttpClient(host, api_port) {
       try {
         return await httpClient.get(`${attributeTemplatesBaseUrl}`, { params });
       } catch (error) {
-        console.error("Failed to get all attribute templates: ", error);
+        const userErrorMessage =
+          error?.response?.data?.error ||
+          `Failed to get all attribute templates: ${error}`;
+        throw new Error(userErrorMessage);
       }
     },
-    getAttributeTemplateById: async (templateId) => {
+    getAttributeTemplate: async (templateId) => {
       try {
         return await httpClient.get(
           `${attributeTemplatesBaseUrl}/${templateId}`
         );
       } catch (error) {
-        console.error("Failed to get attribute template by id: ", error);
+        const userErrorMessage =
+          error?.response?.data?.error ||
+          `Failed to get attribute template with ID "${templateId}": ${error}`;
+        throw new Error(userErrorMessage);
+      }
+    },
+    createAttributeTemplate: async (newTemplate) => {
+      try {
+        return await httpClient.post(attributeTemplatesBaseUrl, newTemplate);
+      } catch (error) {
+        const userErrorMessage =
+          error?.response?.data?.error ||
+          `Failed to create attribute template "${newTemplate.name}": ${error}`;
+        throw new Error(userErrorMessage);
+      }
+    },
+
+    updateAttributeTemplate: async ({ templateId, body }) => {
+      try {
+        return await httpClient.patch(
+          `${attributeTemplatesBaseUrl}/${templateId}`,
+          body
+        );
+      } catch (error) {
+        const userErrorMessage =
+          error?.response?.data?.error ||
+          `Failed to update attribute template "${body.name}": ${error}`;
+        throw new Error(userErrorMessage);
+      }
+    },
+
+    deleteAttributeTemplate: async ({ templateId, templateName }) => {
+      try {
+        return await httpClient.delete(
+          `${attributeTemplatesBaseUrl}/${templateId}`
+        );
+      } catch (error) {
+        const userErrorMessage =
+          error?.response?.data?.error ||
+          `Failed to delete attribute template "${templateName}: ${error}`;
+        throw new Error(userErrorMessage);
       }
     },
   };
