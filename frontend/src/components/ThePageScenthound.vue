@@ -592,7 +592,10 @@ export default {
       return this.formFields
         .filter((field) => field.label != "sample_item_name")
         .reduce(
-          (acc, cur) => ({ ...acc, [strToSnakeCase(cur.label)]: cur.value }),
+          (acc, cur) => ({
+            ...acc,
+            [strToSnakeCase(cur.label)]: cur.value || "",
+          }),
           {}
         );
     },

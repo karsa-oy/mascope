@@ -341,7 +341,7 @@ import ThePaneBrowserTarget from "./ThePaneBrowserTarget.vue";
 import ThePaneSettingsCalibration from "./ThePaneSettingsCalibration.vue";
 
 import * as _ from "underscore";
-import { mapActions, mapMutations } from "vuex";
+import { mapMutations } from "vuex";
 import { call, get, sync } from "vuex-pathify";
 import { beautifySnakeCase, strToSnakeCase, genId } from "../lib/util";
 
@@ -443,7 +443,10 @@ export default {
       return this.formFields
         .filter((field) => field.label != "sample_item_name")
         .reduce(
-          (acc, cur) => ({ ...acc, [strToSnakeCase(cur.label)]: cur.value }),
+          (acc, cur) => ({
+            ...acc,
+            [strToSnakeCase(cur.label)]: cur.value || "",
+          }),
           {}
         );
     },

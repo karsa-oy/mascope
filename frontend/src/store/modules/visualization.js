@@ -47,10 +47,10 @@ export default {
       );
 
       await dispatch("loadMatches", { sampleId, ionId, collectionId });
-      await dispatch("emitVisualization");
+      await dispatch("loadVisualizationIonFocus", { sampleId, ionId });
     },
 
-    async loadMatches({ commit, dispatch, state }, params = null) {
+    async loadMatches({ commit, dispatch, state }, params = {}) {
       const sampleId = params?.sampleId || state.activeIon.sample_item_id;
       const ionId = params?.ionId || state.activeIon.target_ion_id;
       const collectionId =
@@ -93,25 +93,22 @@ export default {
       commit("SET_ACTIVE_ISOTOPES", activeIsotopes);
     },
 
-    async emitVisualization({ rootState, state, dispatch }, params) {
+    async loadVisualizationIonFocus({ state, dispatch }, params = {}) {
       const sampleId = params?.sampleId || state.activeIon.sample_item_id;
       const ionId = params?.ionId || state.activeIon.target_ion_id;
 
       if (state.tracesSignalTimeseries && state.tracesSignalSumSpectrum)
         await dispatch("resetVisualization");
-      rootState.api.emit(
-        "visualization_ion_focus",
+
+      const response = await dispatch("getVisualizationIonFocus", {
         sampleId,
         ionId,
-        state.paramMinIsotopeAbundance,
-        state.paramPeakMinIntensity,
-        state.paramMzTolerance
-      );
+      });
     },
 
-    async reload({ dispatch, state }) {
+    async reload({ dispatch }) {
       await dispatch("loadMatches");
-      await dispatch("emitVisualization");
+      await dispatch("loadVisualizationIonFocus");
     },
 
     async resetVisualization({ commit }) {
@@ -181,6 +178,20 @@ export default {
         errorMessage: `Failed to load sample ion data.`,
       });
       return sampleIonData.data;
+    },
+
+    async getVisualizationIonFocus({ state, dispatch }, { sampleId, ionId }) {
+      return await getApiData({
+        dispatch,
+        httpMethod: "getVisualizationIonFocus",
+        requestData: {
+          sample_item_id: sampleId,
+          target_ion_id: ionId,
+          min_isotope_abundance: state.paramMinIsotopeAbundance,
+          peak_min_intensity: state.paramPeakMinIntensity,
+          mz_tolerance: state.paramMzTolerance,
+        },
+      });
     },
 
     async submitMatchRating({ dispatch, rootState }, newMatchRating) {

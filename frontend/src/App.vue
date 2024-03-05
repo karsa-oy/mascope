@@ -3,9 +3,7 @@
     <div v-if="appReady">
       <router-view></router-view>
     </div>
-    <section v-else>
-      <b-loading :is-full-page="true"> Loading... </b-loading>
-    </section>
+    <b-loading :active="!appReady" :is-full-page="true"> </b-loading>
   </div>
 </template>
 
@@ -15,7 +13,7 @@
 
 <script>
 import { call, get } from "vuex-pathify";
-import { mapMutations, mapActions } from "vuex";
+import { mapMutations } from "vuex";
 
 export default {
   data: function () {
@@ -51,11 +49,11 @@ export default {
     ...call({
       keydown: "key/down",
       keyup: "key/up",
+      showWarningNotification: "notification/showWarningNotification",
     }),
     ...mapMutations({
       activateNotification: "notification/activate",
     }),
-    ...mapActions("notification", ["showWarningNotification"]),
   },
   watch: {
     appPushNotification: {
