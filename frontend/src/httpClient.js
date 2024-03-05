@@ -78,6 +78,7 @@ const targetIsotopesBaseUrl = "/target_isotopes";
 const matchInterferencesBaseUrl = "/match_interferences";
 const instrumentFunctionsBaseUrl = "/instrument_functions";
 const attributeTemplatesBaseUrl = "/attribute_templates";
+const visualizationBaseUrl = "/visualization";
 
 export function createHttpClient(host, api_port) {
   const axiosInstance = axios.create({
@@ -833,6 +834,20 @@ export function createHttpClient(host, api_port) {
         const userErrorMessage =
           error?.response?.data?.error ||
           `Failed to delete attribute template "${templateName}: ${error}`;
+        throw new Error(userErrorMessage);
+      }
+    },
+
+    // Visualization
+    getVisualizationIonFocus: async (params = {}) => {
+      try {
+        return await httpClient.get(`${visualizationBaseUrl}/ion_focus`, {
+          params,
+        });
+      } catch (error) {
+        const userErrorMessage =
+          error?.response?.data?.error ||
+          `Failed to visualize ion '${params.target_ion_id}' focus for sample '${params.sample_item_id}': ${error}`;
         throw new Error(userErrorMessage);
       }
     },

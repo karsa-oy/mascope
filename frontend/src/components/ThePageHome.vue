@@ -174,7 +174,6 @@ export default {
       instruments: "app/instruments",
       recentAcquisitions: "instrument/recentAcquisitions",
       sampleBatches: "workspace/batches",
-      sampleFileSchema: "app/schema@sample_file",
       sampleActive: "sample/active",
       sampleMatched: "sample/matched",
       workspaceActive: "workspace/active",

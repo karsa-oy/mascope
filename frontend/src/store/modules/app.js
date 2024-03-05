@@ -10,7 +10,6 @@ const state = {
   mode: mode,
   pushNotification: null,
   ready: false,
-  schema: {},
   workspaces: [],
 };
 export default {
@@ -42,12 +41,8 @@ export default {
       const workspaces = await dispatch("getAllWorkspaces");
       await commit("SET_WORKSPACES", workspaces);
 
-      // TODO_replace sio api
-      // get schema
-      api.emit("schema_read", (resp) => {
-        commit("SET_SCHEMA", resp);
-        commit("SET_READY", true);
-      });
+      // set application ready to stop loading spinner and show app
+      commit("SET_READY", true);
     },
     async reload({ dispatch }) {
       dispatch("load");

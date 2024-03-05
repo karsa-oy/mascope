@@ -95,7 +95,7 @@ export async function getApiData({
       "notification/showGeneralNotification",
       {
         notification: "error",
-        message: errorMessage,
+        message: error,
       },
       { root: true }
     );
