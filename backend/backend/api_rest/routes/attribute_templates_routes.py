@@ -42,7 +42,7 @@ async def get_attribute_templates_route(
 
 
 @attribute_templates_router.get("/api/attribute_templates/{attribute_template_id}")
-async def get_attribute_template_by_id_route(attribute_template_id: str):
+async def get_attribute_template_route(attribute_template_id: str):
     try:
         result = await get_attribute_template(attribute_template_id)
         result_data = jsonable_encoder(result)
