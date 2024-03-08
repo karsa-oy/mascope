@@ -75,8 +75,6 @@ async def get_attribute_template(attribute_template_id: str):
     :raises ApiException: For handling any other exceptions that occur.
     :return: The attribute template data.
     :rtype: dict
-
-
     """
     try:
         async with async_session() as session:

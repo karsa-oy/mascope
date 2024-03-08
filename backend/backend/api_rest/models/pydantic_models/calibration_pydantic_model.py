@@ -14,7 +14,7 @@ class CalibrationMzApplyData(BaseModel):
     fit: dict = Field(..., description="Fit parameteres")
 
 
-class CalibrationMzCalibrateBatchBody(BaseModel):
+class CalibrationMzCalibrateBody(BaseModel):
     params: CalibrationMzFitParams = CalibrationMzFitParams()
     independent_transaction: Optional[bool] = Field(
         default=True,

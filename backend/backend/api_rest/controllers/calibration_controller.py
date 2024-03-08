@@ -602,44 +602,87 @@ async def calibration_mz_apply(
 
 
 async def calibration_mz_calibrate_sample(
-    sample_item,
+    sample_item_id: str,
     params: CalibrationMzFitParams,
-    background_tasks,
 ):
-    filename = sample_item.get("filename")
-    if not filename:
-        raise ValueError(f"Invalid sample item: {sample_item}")
+    """
+    Performs m/z calibration on a single sample using specified calibration parameters.
+    Emits events to notify the start, progress, and completion of the calibration process.
+    In case of a failure during the process, an error message is emitted.
 
-    async with async_session() as session:
-        result = await session.execute(
-            select(Sample.instrument).where(Sample.filename == filename).distinct()
+    Steps:
+    1. Fetch the sample data using the provided sample item ID.
+    2. Emit an event to notify the start of the calibration process.
+    3. Perform the calibration using the specified parameters.
+    4. In case of any exceptions during the process, emit an error message indicating the failure.
+
+    :param sample_item_id: The ID of the sample to be calibrated.
+    :type sample_item_id: str
+    :param params: The calibration parameters to be used for the calibration process.
+    :type params: CalibrationMzFitParams
+    :raises NotFoundException: If the sample with the given ID is not found in the database.
+    :raises ValueError: If the sample does not have a valid filename associated with it.
+    :raises ApiException: For any exceptions that occur during the calibration process.
+    """
+    try:
+        # Step 1: Fetch sample data
+        async with async_session() as session:
+            # Fetch samples
+            result = await session.execute(
+                select(Sample).filter(Sample.sample_item_id == sample_item_id)
+            )
+
+            sample = result.scalars().first()
+
+        if not sample:
+            raise NotFoundException(f"Sample with ID {sample_item_id} not found")
+
+        filename = sample.filename
+        if not filename:
+            raise ValueError(f"Invalid sample item: {sample.sample_item_name}")
+
+        # Step 2: Notify the start of calibration
+        await sio.emit(
+            "calibration_mz_calibrate_sample_started",
+            {
+                "filename": filename,
+                "progress": 0,
+            },
+            room=sample_item_id,
+            namespace="/",
         )
-        instrument = result.one_or_none()
 
-    await sio.emit(
-        "calibration_mz_calibrate_sample_started",
-        {
-            "filename": filename,
-            "progress": 0,
-        },
-        room=sample_item["sample_item_id"],
-        namespace="/",
-    )
-    await sio.emit(
-        "calibration_mz_calibrate_sample_progress",
-        {},
-        room=sample_item["sample_item_id"],
-        namespace="/",
-    )
+        await sio.emit(
+            "calibration_mz_calibrate_sample_progress",
+            {},
+            room=sample_item_id,
+            namespace="/",
+        )
 
-    background_tasks.add_task(
-        mz_calibrate_sample,
-        sample_item,
-        params,
-        filename,
-    )
-
-    return {"message": "m/z sample calibration started, please wait for completion"}
+        # Step 3: Calibrate sample using specified parameters
+        await mz_calibrate_sample(
+            sample.to_dict(),
+            params,
+            filename,
+        )
+    except Exception as e:
+        # TODO_error_handling construct some common backfround task fail notification
+        # Emit an error message indicating calibration failure
+        await sio.emit(
+            "calibration_mz_calibrate_sample_failed",
+            {
+                "action": "m/z Calibrate Sample",
+                "filename": filename,
+                "error": str(e),
+                "progress": 100,
+                "sample_item_id": sample_item_id,
+            },
+            room=sample_item_id,
+            namespace="/",
+        )
+        raise process_exception(
+            e, f"Failed to m/z calibrate samples '{sample_item_id}'."
+        )
 
 
 async def calibration_mz_calibrate_batch(
@@ -752,11 +795,8 @@ async def calibration_mz_calibrate_batch(
         if independent_transaction:
             print(error_message)
         else:
-            api_exc = process_exception(
+            raise process_exception(
                 e, f"Failed to m/z calibrate batch '{sample_batch_id}'."
-            )
-            raise ApiException(
-                api_exc.user_message, api_exc.tech_message, api_exc.status_code
             )
 
     return calibration_results
