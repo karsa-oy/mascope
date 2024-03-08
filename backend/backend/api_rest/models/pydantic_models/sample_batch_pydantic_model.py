@@ -68,6 +68,10 @@ class SampleBatchImportSamplesBody(BaseModel):
         ..., description="Sample items to be created and imported to the sample batch"
     )
     params: CalibrationMzFitParams = CalibrationMzFitParams()
+    calibrate_batch: bool = Field(
+        default=True,
+        description="Flag to control whether the batch should be calibrated.",
+    )
 
 
 class SampleBatchCopyBody(BaseModel):

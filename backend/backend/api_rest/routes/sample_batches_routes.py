@@ -122,7 +122,11 @@ async def import_sample_items_route(
 ):
     sid = request.headers.get("X-SID")
     background_tasks.add_task(
-        import_sample_items, sample_batch_id, body.sample_items, body.params
+        import_sample_items,
+        sample_batch_id,
+        body.sample_items,
+        body.params,
+        body.calibrate_batch,
     )
     return JSONResponse(
         status_code=200,

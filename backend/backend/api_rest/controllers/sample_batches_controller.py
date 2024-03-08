@@ -41,7 +41,6 @@ from ..models.pydantic_models.match_pydantic_model import (
     ProgressProperties,
 )
 from .match_controller import rematch_batch
-from .samples_controller import get_samples
 from .target_compounds_controller import get_target_compounds
 from .sample_items_controller import create_sample_item, copy_sample_item
 from .calibration_controller import calibration_mz_calibrate_batch
@@ -684,14 +683,17 @@ async def delete_sample_batch(sample_batch_id: str, sid=None):
 
 
 async def import_sample_items(
-    sample_batch_id: str, sample_items, params: CalibrationMzFitParams
+    sample_batch_id: str,
+    sample_items,
+    params: CalibrationMzFitParams,
+    calibrate_batch: bool = True,
 ):
     """
     Imports a sample items to specified batch by creating provided sample items, calibrating the batch, computing matches, and handling errors.
 
     Steps:
     1. Create provided sample items and save them to the database.
-    2. Calibrate the batch using the provided calibration parameters.
+    2. Optionally calibrate the batch using the provided calibration parameters, based on the calibrate_batch flag.
     3. Compute matches for the batch.
     4. In case of calibration failure, send a notification with information about failed samples.
 
@@ -708,10 +710,11 @@ async def import_sample_items(
         for sample_item in sample_items:
             await create_sample_item(sample_item, skipReload=True)
 
-        # Step 2. Calibrate batch
-        calibration_results = await calibration_mz_calibrate_batch(
-            sample_batch_id, params
-        )
+        # Step 2. Optionally calibrate batch if calibrate_batch is True (default behaviour)
+        if calibrate_batch:
+            calibration_results = await calibration_mz_calibrate_batch(
+                sample_batch_id, params
+            )
 
         # Step 3. Compute matches for the batch
         progress_properties = ProgressProperties(
