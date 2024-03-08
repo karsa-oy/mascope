@@ -73,7 +73,7 @@
                 Process file
               </b-button>
               <b-button
-                v-if="browseAcquisitions"
+                v-if="browseAcquisitions || sampleFilesSelected.length > 1"
                 type="is-primary"
                 style="position: fixed; left: 15em; bottom: 2em"
                 :disabled="
