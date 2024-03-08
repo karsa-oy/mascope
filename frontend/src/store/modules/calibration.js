@@ -71,15 +71,15 @@ export default {
     async calibrationMzCalibrateSample({ rootState, rootGetters, dispatch }) {
       const sampleActive = rootState.sample.active;
       if (sampleActive) {
-        await rootState.api.httpClient.calibrationMzCalibrateSample(
-          {
-            filename: sampleActive.filename,
-            sample_item_id: sampleActive.sample_item_id,
-            sample_item_name: sampleActive.sample_item_name,
-            sample_batch_id: sampleActive.sample_batch_id,
-          },
-          rootGetters["calibration/params"]
-        );
+        const sampleId = sampleActive.sample_item_id;
+        const sampleName = sampleActive.sample_item_name;
+        const body = rootGetters["calibration/params"];
+        await getApiData({
+          dispatch,
+          httpMethod: "calibrationMzCalibrateSample",
+          requestData: { sampleId, sampleName, body },
+          errorMessage: `Failed to m/z calibrate sample ${sampleName}.`,
+        });
       } else {
         if (!rootState.instrument.scenthoundModeActive) return;
         setTimeout(() => {
@@ -127,6 +127,7 @@ export default {
     },
 
     // mz_calibrate_sample
+    // TODO_notifications
     async onCalibrationMzCalibrateSampleStarted({ rootState, commit }, data) {
       commit("SET_CALIBRATION_STATUS", data);
     },

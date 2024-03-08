@@ -444,17 +444,17 @@ export function createHttpClient(host, api_port) {
       }
     },
 
-    calibrationMzCalibrateSample: async (sample_item, params) => {
+    calibrationMzCalibrateSample: async ({ sampleId, sampleName, body }) => {
       try {
         return await httpClient.post(
-          `${calibrationBaseUrl}/mz_calibrate/sample`,
-          {
-            sample_item: sample_item,
-            params: params,
-          }
+          `${calibrationBaseUrl}/mz_calibrate/sample/${sampleId}`,
+          body
         );
       } catch (error) {
-        console.error("Failed to m/z calibrate sample: ", error);
+        const userErrorMessage =
+          error?.response?.data?.error ||
+          `Failed to m/z calibrate sample  "${sampleName}": ${error}`;
+        throw new Error(userErrorMessage);
       }
     },
 
