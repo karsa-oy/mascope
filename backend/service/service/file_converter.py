@@ -25,13 +25,19 @@ from hardware.tofwerk.lib.TwTool import *
 
 from lib.file_func import zarr_sdk
 from lib.peak import calculate_tic
-from lib.structs import AttrDict, LRUDict
+from lib.structs import AttrDict
 from lib.util import timestamp_from_filename
 from service.lib.filesystem_watcher import FSWatcher
 from service.lib.util import load_env_yaml
 
 
 def create_sample_file_db_record(data):
+    """Create a sample file database record by a HTTP request
+
+    :param data: Sample file object to create
+    :type data: dict
+    :raises Exception: HTTP request failed
+    """
     filename = data["filename"]
     print(f"Creating sample file record for file: {filename}")
     instrument_name = filename.split("_")[0]
@@ -64,12 +70,24 @@ def create_sample_file_db_record(data):
 
 
 def process_stream(streamer):
+    """Process data stream from the streamer thread
+
+    :param streamer: Data streamer instance
+    :type streamer: H5Streamer or RawStreamer
+    """
     global cache
     global sio
 
     # Handlers
     def handle_spec_data(data):
+        """Process one spectrum from the streamer
+
+        :param data: Data object
+        :type data: dict
+        """
+
         def cleanup():
+            """Clean-up routine on stream canceled"""
             print("Canceling...")
             streamer.cancel_event.set()
             # Clear queues
@@ -142,6 +160,11 @@ def process_stream(streamer):
         return True
 
     def handle_tps_data(data):
+        """Handle one point of TPS data from the streamer
+
+        :param data: TPS data object
+        :type data: dict
+        """
         data.update({"filename": data["filename"].replace(" ", "_")})
         filename = data["filename"]
         spec_i = data["i"]
@@ -164,12 +187,20 @@ def process_stream(streamer):
     # Main loop
     while not streamer.shutdown_event.is_set():
         try:
+            # Check the queue for new data
             spec_data = streamer.spec_queue.get_nowait()
+            spec_i = spec_data["i"]
+            # Handle spectrum data
             success = handle_spec_data(spec_data)
             if success and hasattr(streamer, "tps_queue"):
+                # If "tps_queue" exists (H5Streamer), handle tps data
                 tps_data = streamer.tps_queue.get()
                 handle_tps_data(tps_data)
+            if spec_i is None:
+                # Received poison pill, clear file from cache
+                cache.pop(spec_data["filename"])
         except Empty:
+            # No data available, wait before retry
             sleep(0.1)
 
 
@@ -249,16 +280,21 @@ def parse_cmd_args():
 
 
 def main():
+    """Main loop of the service. Connect socket.io and then do nothing."""
     global sio
     url = f"http://{host}:{port}"
     print(f"Connecting to {url}...")
     while not shutdown_event.is_set():
+        # Keep trying to connect to socket.io server
         try:
             sio.connect(url)
             break
         except:
+            # Connection timed out, wait before retry
             sleep(1)
+    # socket.io connection established
     while not shutdown_event.is_set():
+        # Wait for shutdown event
         sleep(1)
 
 
@@ -273,18 +309,24 @@ sio = socketio.Client(logger=True, ssl_verify=False)
 
 
 def run():
+    """Run the service
+
+    :raises Exception: Parsing command line arguments failed
+    """
     global host
     global port
     global cache
     global file_queue
     global shutdown_event
 
+    # Parse command line arguments
     args = parse_cmd_args()
     print(args)
 
     host = args.get("host", "127.0.0.1")
     port = args.get("port", os.environ.get("MASCOPE_PUBLIC_API_PORT"))
 
+    # Validate streamer type
     streamer_type = args["streamer_type"]
     if streamer_type == "H5":
         streamer_class = H5Streamer
@@ -295,8 +337,9 @@ def run():
     else:
         raise Exception(f"Unknown streamer type: {streamer_type}")
 
+    # Initialize streamer thread(s)
     n_jobs = args.get("n_jobs", 1)
-    cache = LRUDict(n_jobs)
+    cache = dict()
     streamer_lock = Lock()
     streamers = [
         streamer_class(
@@ -306,6 +349,7 @@ def run():
         )
         for _ in range(n_jobs)
     ]
+    # Start streamer thread(s)
     for streamer in streamers:
         streamer.start()
         streamer_processor = Thread(target=process_stream, args=(streamer,))
@@ -317,6 +361,7 @@ def run():
         print(f"Creating missing source directory {source_path}")
         os.makedirs(source_path)
 
+    # Initialize file system watcher
     fs_watcher = FSWatcher(
         path=source_path,
         mask=file_mask,
@@ -325,16 +370,21 @@ def run():
         ping=args["ping"],  # default False
         shutdown_event=shutdown_event,
     )
+    # Start file system watcher
     fs_watcher.run_as_daemon()
 
     try:
+        # Run main loop
         main()
     except KeyboardInterrupt:
+        # Shutdown gracefully on ctrl+C
         shutdown_event.set()
     except:
+        # Shutdown gracefully on exception
         shutdown_event.set()
     streamer_processor.join()
 
 
 if __name__ == "__main__":
+    # Run the service
     run()
