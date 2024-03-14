@@ -2,6 +2,7 @@
 import traceback
 from fastapi import HTTPException, status
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.exc import SQLAlchemyError
 from pydantic import ValidationError
@@ -21,29 +22,64 @@ class NotFoundException(HTTPException):
 
 
 def process_exception(e: Exception, context_message: str) -> ApiException:
-    error_message = f"{context_message}: {str(e)}."
+    error_message = f"{context_message}. {str(e)}."
     traceback_info = traceback.format_exc()
+    print(f"{error_message}\n\n{traceback_info}")
 
-    # Construct the technical message with traceback information
-    tech_message = f"{error_message}\n\n{traceback_info}"
-    print(tech_message)
+    # Construct the technical message with structured JSON
+    tech_message_details = {
+        "error_message": error_message.replace("\n", "; "),
+        "traceback": traceback_info.replace("\n", "; "),
+    }
+    # Encode the technical message details into JSON-compatible format
+    tech_message = jsonable_encoder(tech_message_details)
 
     if isinstance(e, SQLAlchemyError):
-        user_message = f"{context_message}: database operation failed."
+        user_message = f"{context_message}. Database operation failed."
         status_code = 400  # Bad Request
     elif isinstance(e, ApiException):
-        print(e)
         user_message = e.user_message
         status_code = e.status_code
     elif isinstance(e, HTTPException):
-        user_message = f"{context_message}: {e.detail}."
+        user_message = f"{context_message}. {e.detail}."
         status_code = e.status_code
-
     elif isinstance(e, ValueError):
-        user_message = f"{context_message}: invalid value."
+        user_message = error_message.replace("\n", "; ")
         status_code = 400  # Bad Request
+    elif isinstance(e, RequestValidationError):
+        error_messages = [error["msg"] for error in e.errors()]
+        combined_error_message = "; ".join(error_messages)
+        user_message = f"{context_message}. Validation error. {combined_error_message}"
+        status_code = 422  # Unprocessable entity
     else:
-        user_message = f"{context_message}: unexpected error."
+        user_message = f"{context_message}. Unexpected error."
         status_code = 500  # Internal Server Error
 
     return ApiException(user_message, tech_message, status_code)
+
+
+def api_e_response_json(e: ApiException):
+    return JSONResponse(
+        status_code=e.status_code,
+        content={"error": e.user_message, "detail": e.tech_message},
+    )
+
+
+def handle_exception(
+    e, context_message: str, response_type: str = "http"
+) -> JSONResponse:
+    """
+    Handles exceptions by processing them and returning an appropriate response.
+
+    :param e: The exception that was raised.
+    :param context_message: A context message for better error understanding.
+    :param response_type: The type of response to return, defaults to "http".
+    :return: A JSONResponse for HTTP response types.
+    """
+    # Process the exception
+    processed_exception = process_exception(e, context_message)
+
+    # Handle based on the response type
+    if response_type == "http":
+        return api_e_response_json(processed_exception)
+    # other response types like "sio" can be added here
