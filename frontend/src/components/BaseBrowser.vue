@@ -59,7 +59,7 @@
             {{ parseValue(props.row[col.field]) }}
           </template>
         </b-table-column>
-        <template v-if="levels.length > 1" slot="detail" slot-scope="props">
+        <template v-if="levels.length > 1" v-slot:detail="props">
           <tr>
             <td :colspan="cols.length + 1">
               <base-browser
