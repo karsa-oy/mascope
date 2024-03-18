@@ -7,10 +7,12 @@
         <template #trigger>
           <b-button :icon-left="contextMenuIcon" size="is-small" />
         </template>
-        <template v-for="item of menu">
+        <template
+          v-for="item of menu"
+          :key="item.label"  
+        >
           <b-dropdown-item
             aria-role="listitem"
-            :key="item.label"
             @click="item.onClick"
           >
             {{ item.label }}

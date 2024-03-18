@@ -74,10 +74,12 @@
                       style="align: left"
                     />
                   </template>
-                  <template v-for="filterId of batchFilterIds">
+                  <template
+                    v-for="filterId of batchFilterIds"
+                    :key="filterId"
+                  >
                     <b-dropdown-item
                       aria-role="listitem"
-                      :key="filterId"
                       :value="filterId"
                     >
                       {{ filterId }}

@@ -109,10 +109,12 @@
                     style="align: left"
                   />
                 </template>
-                <template v-for="filterId of batchFilterIds">
+                <template
+                  v-for="filterId of batchFilterIds"
+                  :key="filterId"
+                >
                   <b-dropdown-item
                     aria-role="listitem"
-                    :key="filterId"
                     :value="filterId"
                   >
                     {{ filterId }}
@@ -217,10 +219,12 @@
                       style="align: left"
                     />
                   </template>
-                  <template v-for="batch of batches">
+                  <template
+                    v-for="batch of batches"
+                    :key="batch.sample_batch_id"
+                  >
                     <b-dropdown-item
                       aria-role="listitem"
-                      :key="batch.sample_batch_id"
                       :value="batch"
                     >
                       {{ batch.sample_batch_name }}
@@ -234,8 +238,11 @@
                       <th>#</th>
                       <th>Sample name</th>
                     </tr>
-                    <template v-for="item in sampleItems">
-                      <tr v-bind:key="item.sample_item_id">
+                    <template
+                      v-for="item in sampleItems"
+                      v-bind:key="item.sample_item_id"
+                    >
+                      <tr>
                         <td>{{ item.index }}</td>
                         <td>{{ item.sample_item_name }}</td>
                       </tr>

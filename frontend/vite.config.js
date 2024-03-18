@@ -1,5 +1,5 @@
 import { defineConfig, loadEnv } from "vite";
-import { createVuePlugin } from "vite-plugin-vue2";
+import vue from '@vitejs/plugin-vue';
 import path from "path";
 
 export default ({ mode }) => {
@@ -10,21 +10,15 @@ export default ({ mode }) => {
   );
 
   return defineConfig({
-    plugins: [createVuePlugin()],
+    plugins: [vue()],
     server: {
       port: process.env.MASCOPE_PUBLIC_PORT,
     },
     resolve: {
-      alias: [
-        {
-          find: "$lib",
-          replacement: path.resolve(__dirname, "src/lib/"),
-        },
-        {
-          find: "$api",
-          replacement: path.resolve(__dirname, "src/api.js"),
-        },
-      ],
+      alias: {
+        $lib: path.resolve(__dirname, "src/lib/"),
+        $api: path.resolve(__dirname, "src/api.js")
+      }
     },
     build: {
       chunkSizeWarningLimit: 600,

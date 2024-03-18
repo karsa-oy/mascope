@@ -21,9 +21,12 @@
         </span>
       </b-tag>
       <!-- tooltip slot -->
-      <template v-slot:content>
+      <template
+        v-slot:content
+        v-bind:key="field"
+      >
         <template v-for="(value, field) in tooltip">
-          {{ field }}: {{ value }}<br v-bind:key="field" />
+          {{ field }}: {{ value }}<br/>
         </template>
       </template>
     </b-tooltip>

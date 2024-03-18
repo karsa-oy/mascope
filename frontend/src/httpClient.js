@@ -1,5 +1,5 @@
 import axios from "axios";
-import Vue from "vue";
+import { api } from "$api";
 
 // Create the URL
 
@@ -14,23 +14,21 @@ let url =
 
 const getSessionId = () => {
   // get session id for emitting sio finished events
-  const sid = Vue.prototype.$api.socket.id;
+  const sid = api.socket.id;
   return sid;
 };
 
 const logRequest = (request) => {
   console.log(
-    `[httpClient] Starting request to: ${request.method.toUpperCase()} ${
-      request.url
+    `[httpClient] Starting request to: ${request.method.toUpperCase()} ${request.url
     }`
   );
   return request;
 };
 
 const logResponse = (response) => {
-  let logMessage = `[httpClient] Response: ${response.status} ${
-    response.statusText
-  } from ${response.config.method.toUpperCase()} ${response.config.url}`;
+  let logMessage = `[httpClient] Response: ${response.status} ${response.statusText
+    } from ${response.config.method.toUpperCase()} ${response.config.url}`;
   // Append the message if available
   if (response.data && response.data.message) {
     logMessage += ` | Message: ${response.data.message}`;

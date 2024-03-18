@@ -1,25 +1,17 @@
-import Vue from "vue";
-import Vuex from "vuex";
+import { createStore } from 'vuex';
 import pathify from "vuex-pathify";
 
 import logger from "./plugins/logger";
 import api from "./plugins/api";
 
-import app from "./modules/app";
-import batch from "./modules/batch";
-import calibration from "./modules/calibration";
-import instrument from "./modules/instrument";
-import key from "./modules/key";
-import modal from "./modules/modal";
-import notification from "./modules/notification";
-import sample from "./modules/sample";
-import targets from "./modules/targets";
-import visualization from "./modules/visualization";
-import workspace from "./modules/workspace";
+import {
+  app, batch, calibration, instrument, key, modal,
+  notification, sample, targets, visualization, workspace
+} from './modules'
 
-Vue.use(Vuex);
+pathify.options.mapping = 'simple'
 
-export default new Vuex.Store({
+export default createStore({
   modules: {
     app,
     batch,

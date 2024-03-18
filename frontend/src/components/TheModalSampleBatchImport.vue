@@ -63,10 +63,12 @@
                             icon-right="menu-down"
                           />
                         </template>
-                        <template v-for="filterId in batchFilterIds">
+                        <template
+                          v-for="filterId in batchFilterIds"
+                          :key="filterId"  
+                        >
                           <b-dropdown-item
                             aria-role="listitem"
-                            :key="filterId"
                             :value="filterId"
                           >
                             {{ filterId }}
