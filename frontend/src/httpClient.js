@@ -303,7 +303,7 @@ export function createHttpClient(host, api_port) {
     },
     getRecentSampleFiles: async (params = {}) => {
       try {
-        return await httpClient.get(`${filesBaseUrl}-recent`, { params });
+        return await httpClient.get(`${filesBaseUrl}/recent`, { params });
       } catch (error) {
         console.error("Failed to get recent acquisitions: ", error);
       }

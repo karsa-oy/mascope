@@ -2,7 +2,7 @@
 from hardware.tofwerk.lib.TwTool import *
 
 import socketio
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .socket_events import sio
 from backend.db import run as run_db
 from .db_api_rest import init_db
+from .api_rest.exceptions import handle_exception
 
 from .api_rest.routes.sample_items_routes import sample_items_router
 from .api_rest.routes.sample_batches_routes import sample_batches_router
@@ -56,28 +57,58 @@ fastapi_app.add_middleware(
 )
 
 
-# Custom exception handler for Pydantic validation errors
 @fastapi_app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    # Combine error messages from exc.errors() into a single string
-    error_messages = []
-    for error in exc.errors():
-        msg = error["msg"]
-        error_messages.append(f"{msg}")
+async def validation_exception_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    """
+    Custom exception handler for Pydantic validation errors. This handler is invoked when request data validation fails
+    due to schema constraints defined in Pydantic models.
 
-    # Join all error messages with a separator (e.g., ", ")
-    combined_error_message = "; ".join(error_messages)
+    :param request: The request object.
+    :type request: Request
+    :param exc: The RequestValidationError exception instance containing details about the validation errors.
+    :type exc: RequestValidationError
+    :return: A structured HTTP response indicating the validation errors.
+    :rtype: JSONResponse
+    """
+    context_message = "Validation error"
+    return handle_exception(exc, context_message, response_type="http")
 
-    # Return a custom JSON response with the combined error message
-    error = f"Validation error. {combined_error_message}"
-    print(str(exc))
-    return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content={
-            "error": error,
-            "detail": str(exc),
-        },
-    )
+
+@fastapi_app.exception_handler(ValueError)
+async def value_exception_handler(request: Request, exc: ValueError) -> JSONResponse:
+    """
+    Custom exception handler for ValueError exceptions. This handler is invoked when an operation or function receives
+    an argument that has the right type but an inappropriate value.
+
+    :param request: The request object.
+    :type request: Request
+    :param exc: The ValueError exception instance containing details about what caused the error.
+    :type exc: ValueError
+    :return: A structured HTTP response indicating the value errors.
+    :rtype: JSONResponse
+    """
+    context_message = "Invalid value"
+    return handle_exception(exc, context_message, response_type="http")
+
+
+@fastapi_app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """
+    Global exception handler for the FastAPI app. This handler is invoked for any unhandled exceptions
+    that occur during the processing of a request, serving as a catch-all for exceptions that are not
+    explicitly caught by more specific route exception handlers.
+
+    :param request: The request object. It may be used for extracting additional information about the request,
+                    such as the endpoint being accessed, the request method, and any query parameters or headers.
+    :param exc: The exception that was raised. This is the unhandled exception that has propagated up to the global handler.
+    :return: An appropriate HTTP response based on the exception, ensuring that the application responds gracefully to unexpected errors.
+    :rtype: JSONResponse
+    """
+    context_message = "An error occurred"
+    # Handle the exception and get the response
+    return handle_exception(exc, context_message, response_type="http")
 
 
 routers = [

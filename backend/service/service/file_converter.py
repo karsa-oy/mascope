@@ -63,7 +63,7 @@ def create_sample_file_db_record(data):
     url = f"http://{host}:{port}/api/sample_files"
 
     response = requests.post(url, headers=headers, json=sample_file_db_record)
-    if response.status_code != 200:
+    if response.status_code != 201:
         raise Exception(
             f"Failed to create database record! Status code: {response.status_code}"
         )
