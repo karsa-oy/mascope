@@ -242,7 +242,9 @@ class zarr_sdk:
         filename_sum_signal = filename_to_zarr_path(filename_base, "sum_signal")
         sample_file = load_file(filename_base, vars=["signal"])
         sum_signal = sample_file.signal.sum(dim="time").compute()
-        sum_signal_array = ExtendableDataArray(path=filename_sum_signal, array_module=np)
+        sum_signal_array = ExtendableDataArray(
+            path=filename_sum_signal, array_module=np
+        )
         sum_signal_array.init_array(
             dims=("mz",),
             data=sum_signal.values,
@@ -254,6 +256,15 @@ class zarr_sdk:
 
 
 def filename_to_zarr_path(base_filename, variable):
+    """Derive full path to a zarr data array from sample filename and the desired variable
+
+    :param base_filename: Sample file filename
+    :type base_filename: str
+    :param variable: Variable name inside the sample file
+    :type variable: str
+    :return: Full path
+    :rtype: str
+    """
     base_path = get_base_path()
     sample_data_path = parse_path_from_item_filename(base_filename, base_path)
     zarr_filename = variable + os.extsep + "zarr"
@@ -261,11 +272,23 @@ def filename_to_zarr_path(base_filename, variable):
 
 
 def get_base_path():
+    """Get path to "instrument" directory
+
+    :return: str
+    :rtype: Path
+    """
     base_path = os.environ.get("MASCOPE_PRIVATE_INSTRUMENT_DIR", "./instrument")
     return base_path
 
 
 def get_file_data_vars(filepath):
+    """Get list of available variables in a sample file
+
+    :param filepath: Full path to the sample file
+    :type filepath: str
+    :return: List of available variables
+    :rtype: list
+    """
     file_dirs = next(os.walk(filepath))[1]
     zarrs = []
     for var in fnmatch.filter(file_dirs, "*.zarr"):
@@ -274,6 +297,19 @@ def get_file_data_vars(filepath):
 
 
 def get_zarr_var_shape(base_filename, var, concat_dim=1):
+    """Get the shape of a sample file variable
+
+    :param base_filename: Sample file filename
+    :type base_filename: str
+    :param var: Variable name
+    :type var: str
+    :param concat_dim: Concatenation dimension of groups of the variable, defaults to 1
+    :type concat_dim: int, optional
+    :raises FileNotFoundError: No such sample file or variable
+    :raises ArgumentError: Illegal concat_dim
+    :return: Shape of the variable
+    :rtype: tuple
+    """
     path = filename_to_zarr_path(base_filename, var)
     if not os.path.exists(path):
         raise FileNotFoundError(f"Zarr file {path} does not exist")
@@ -300,21 +336,17 @@ def load_array(base_filename, var, prev_array=None):
        load_array calls with non-empty prev_array will update
        previously created dataset from the updated variable.
 
-    Parameters
-    ----------
-    base_filename : str
-        Base filename
-    var : str
-        Variable (zarr array) name
-    prev_array: xarray DataArray, optional
-        Previously loaded array to update with the updated var. By default
-        None.
-
-    Returns
-    -------
-    xarray.Dataset
-        Loaded data
+    :param base_filename: Sample file filename
+    :type base_filename: str
+    :param var: Sample file variable name
+    :type var: str
+    :param prev_array: Previously loaded array to update with the updated var, defaults to None
+    :type prev_array: xarray.DataArray, optional
+    :raises FileNotFoundError: No such sample file or variable in it.
+    :return: Loaded sample file object
+    :rtype: xarray.Dataset
     """
+
     # print("Loading array %s : %s" %(base_filename, var))
     var_path = filename_to_zarr_path(base_filename, var)
     if not os.path.exists(var_path):
@@ -338,6 +370,17 @@ def load_array(base_filename, var, prev_array=None):
 
 
 def load_coord(base_filename, var, coord_name):
+    """Load coordinate array of a sample file
+
+    :param base_filename: Sample file filename
+    :type base_filename: str
+    :param var: Sample file variable name
+    :type var: str
+    :param coord_name: Coordinate axis name
+    :type coord_name: str
+    :return: Requested coordinate array
+    :rtype: np.array
+    """
     path = filename_to_zarr_path(base_filename, var)
     sync = ExtendableDataArray.get_zarr_synchronizer(path)
     z = zarr.open(path, mode="r", synchronizer=sync)
@@ -351,21 +394,17 @@ def load_file(base_filename, vars=None, prev_dataset=None):
        load_file calls with non-empty prev_dataset will update
        previously created dataset from updated variables.
 
-    Parameters
-    ----------
-    base_filename : str
-        Base filename
-    vars : list, optional
-        List of variable (zarr array) names to load. By default None,
-        all variables are loaded.
-    prev_dataset: xarray dataset, optional
-        Previously loaded dataset to update with updated vars. By default None.
-
-    Returns
-    -------
-    xarray.Dataset
-        Loaded data
+    :param base_filename: Sample file filename
+    :type base_filename: str
+    :param vars: List of variable (zarr array) names to load, defaults to None. If None, all variables are loaded.
+    :type vars: list, optional
+    :param prev_dataset: Previously loaded dataset to update with updated vars, defaults to None.
+    :type prev_dataset: xarray.Dataset, optional
+    :raises FileNotFoundError: No such sample file
+    :return: Loaded sample file object
+    :rtype: xarray.Dataset
     """
+
     base_path = get_base_path()
     filepath = parse_path_from_item_filename(base_filename, base_path)
     if not os.path.exists(filepath):
@@ -413,29 +452,20 @@ def load_file(base_filename, vars=None, prev_dataset=None):
 def open_mfzarr(path, sync=None, mode="r", concat_dim="time", prev_array=None):
     """Load data from a multi-file zarr into a xarray.Dataset
 
-    Parameters
-    ----------
-    path : str
-        zarr file path
-    mode : str, optional
-        File mode, by default 'r'
-    concat_dim : str, optional
-        Dimension name along which to concatenate the files,
-        by default 'time'
-    prev_array: xarray DataArray, optional
-        Previously loaded array to update with new mfzarr data chunk,
-        by default None.
-
-    Returns
-    -------
-    xarray.Dataset
-        Concatenated data
-
-    Raises
-    ------
-    ValueError
-        In case requested file does not exist
+    :param path: Full path to the multi-file zarr array
+    :type path: str
+    :param sync: Zarr file synchronizer, defaults to None
+    :type sync: zarr.ProcessSynchronizer, optional
+    :param mode: File mode, defaults to "r"
+    :type mode: str, optional
+    :param concat_dim: Dimension name along which to concatenate the files, defaults to "time"
+    :type concat_dim: str, optional
+    :param prev_array: Previously loaded array to update with new mfzarr data chunk, defaults to None
+    :type prev_array: xarray.DataArray, optional
+    :return: Concatenated data
+    :rtype: xarray.Dataset
     """
+
     z = zarr.open(path, mode=mode, synchronizer=sync)
     groups = list(z.group_keys())
 
@@ -463,6 +493,16 @@ def open_mfzarr(path, sync=None, mode="r", concat_dim="time", prev_array=None):
 
 
 def open_zarr(path, sync=None):
+    """Open zarr array
+
+    :param path: str
+    :type path: Path to the zarr
+    :param sync: Zarr file synchronizer, defaults to None
+    :type sync: zarr.ProcessSynchronizer, optional
+    :raises FileNotFoundError: Such file does not exist
+    :return: The opened zarr file
+    :rtype: xarray.DataArray
+    """
     if not os.path.exists(path):
         raise FileNotFoundError(path)
     ds = xarray.open_zarr(path, consolidated=False, synchronizer=sync)
@@ -470,8 +510,16 @@ def open_zarr(path, sync=None):
 
 
 def read_zarr_attributes(filepath):
+    """Read zarr file attributes
+
+    :param filepath: Path to the zarr file
+    :type filepath: str
+    :raises FileNotFoundError: No such zarr file
+    :return: Attributes dictionary
+    :rtype: dict
+    """
     if not os.path.exists(filepath):
-        raise ValueError(f"Zarr file {filepath} does not exist")
+        raise FileNotFoundError(f"Zarr file {filepath} does not exist")
     sync = ExtendableDataArray.get_zarr_synchronizer(filepath)
     z = zarr.open(filepath, mode="r", synchronizer=sync)
     attributes = z.attrs.asdict()
@@ -479,6 +527,13 @@ def read_zarr_attributes(filepath):
 
 
 def update_props(base_filename, props_to_update):
+    """Update sample file properties and write to file. Properties given are updated, rest (if any) remain as is.
+
+    :param base_filename: Sample file filename
+    :type base_filename: str
+    :param props_to_update: Properties to update,
+    :type props_to_update: dict
+    """
     base_path = get_base_path()
     sample_data_path = parse_path_from_item_filename(base_filename, base_path)
     # Update properties
@@ -491,6 +546,13 @@ def update_props(base_filename, props_to_update):
 
 
 def write_props(base_filename, props):
+    """Write properties into sample file.
+
+    :param base_filename: Sample file filename
+    :type base_filename: str
+    :param props: Properties to write
+    :type props: dict
+    """
     base_path = get_base_path()
     sample_data_path = parse_path_from_item_filename(base_filename, base_path)
     # Write properties
@@ -500,6 +562,17 @@ def write_props(base_filename, props):
 
 
 def update_zarr_array_coord(base_filename, var, dim, coord):
+    """Update coordinates of a zarr array
+
+    :param base_filename: Sample file filename
+    :type base_filename: str
+    :param var: Sample file variable name
+    :type var: str
+    :param dim: Name of the coordinate dimension
+    :type dim: str
+    :param coord: New coordinate array
+    :type coord: np.array
+    """
     array_path = filename_to_zarr_path(base_filename, var)
     sync = ExtendableDataArray.get_zarr_synchronizer(array_path)
     zarr_array = zarr.open(array_path, mode="a", synchronizer=sync)
