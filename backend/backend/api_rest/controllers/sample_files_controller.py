@@ -306,16 +306,19 @@ async def get_sample_file_spectrum(
         # Check the number of data points in the time coordinate
         time_data_points = sample_file_slice.sizes["time"]
 
-        # Compute the sum spectrum over the time range
-        spectrum = sample_file_slice.sum(dim="time")["signal"].compute()
+        # Sum over the time dimension
+        spectrum = sample_file_slice.sum(dim="time")["signal"]
     else:
         # Load the 'sum_signal' for the entire time range
         sample_file = load_file(filename, vars=["sum_signal"])
-        spectrum = sample_file["sum_signal"].compute()
+        spectrum = sample_file["sum_signal"]
 
     # Apply m/z range if provided
     if mz_min is not None and mz_max is not None:
         spectrum = spectrum.sel(mz=slice(mz_min, mz_max))
+
+    # Compute the final, sliced spectrum results
+    spectrum = spectrum.compute()
 
     # Extract m/z values and intensities
     mz_values = spectrum.mz.values.tolist()
