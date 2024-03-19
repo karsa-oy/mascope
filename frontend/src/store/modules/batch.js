@@ -197,7 +197,7 @@ export default {
       const body = {
         sample_batch_id: batchId,
         batch_matches_info: true,
-        sort: "sample_item_utc_created",
+        sort: "datetime_utc",
         alarms_list: alarmsList,
       };
 
