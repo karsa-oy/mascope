@@ -35,60 +35,60 @@
 </template>
 
 <script>
-import { mapMutations } from "vuex";
-import { sync } from "vuex-pathify";
+import { mapMutations } from 'vuex'
+import { sync } from 'vuex-pathify'
 
 export default {
-  name: "TheNotificationGeneral",
+  name: 'TheNotificationGeneral',
   data() {
     return {
       isClosing: false,
-    };
+    }
   },
   computed: {
     ...sync({
-      notificationIsActive: "notification/generalActive",
-      generalNotification: "notification/generalNotification",
-      generalNotificationMessage: "notification/generalNotificationMessage",
-      batchComputeProgressActive: "notification/batchComputeProgressActive",
-      deleteProgress: "notification/deleteProgress",
-      calibrationComputing: "notification/calibrationComputing",
-      progressActive: "notification/progressActive",
+      notificationIsActive: 'notification/generalActive',
+      generalNotification: 'notification/generalNotification',
+      generalNotificationMessage: 'notification/generalNotificationMessage',
+      batchComputeProgressActive: 'notification/batchComputeProgressActive',
+      deleteProgress: 'notification/deleteProgress',
+      calibrationComputing: 'notification/calibrationComputing',
+      progressActive: 'notification/progressActive',
     }),
   },
   watch: {
     notificationIsActive(newVal) {
       if (!newVal) {
-        this.resetGeneralNotification();
+        this.resetGeneralNotification()
       }
       if (newVal) {
         setTimeout(() => {
-          if (this.batchComputeProgressActive) return;
-          if (this.deleteProgress) return;
-          if (this.calibrationComputing) return;
-          if (this.progressActive) return;
-          if (this.generalNotification === "error") {
-            setTimeout(this.close, 10000);
+          if (this.batchComputeProgressActive) return
+          if (this.deleteProgress) return
+          if (this.calibrationComputing) return
+          if (this.progressActive) return
+          if (this.generalNotification === 'error') {
+            setTimeout(this.close, 10000)
           } else {
-            setTimeout(this.close, 3500);
+            setTimeout(this.close, 3500)
           }
-        }, 1000);
+        }, 1000)
       }
     },
   },
   methods: {
     ...mapMutations({
-      deactivateNotification: "notification/deactivate",
-      resetGeneralNotification: "notification/RESET_GENERAL_NOTIFICATION",
+      deactivateNotification: 'notification/deactivate',
+      resetGeneralNotification: 'notification/RESET_GENERAL_NOTIFICATION',
     }),
     close() {
       // TODO_configuration  move animation delay
-      this.isClosing = true;
+      this.isClosing = true
       setTimeout(() => {
-        this.deactivateNotification();
-        this.isClosing = false;
-      }, 480);
+        this.deactivateNotification()
+        this.isClosing = false
+      }, 480)
     },
   },
-};
+}
 </script>

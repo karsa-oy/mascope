@@ -11,38 +11,38 @@ export default {
   mutations: {
     activate(state, key) {
       if (key in state) {
-        state[key] = true;
+        state[key] = true
       }
     },
     deactivate(state, key) {
       if (key in state) {
-        state[key] = false;
+        state[key] = false
       }
     },
   },
   actions: {
     down({ commit }, event) {
-      let key = mapCodeToKey[event.code];
+      let key = mapCodeToKey[event.code]
       if (key) {
-        commit("activate", key);
+        commit('activate', key)
       }
     },
     up({ commit }, event) {
-      let key = mapCodeToKey[event.code];
+      let key = mapCodeToKey[event.code]
       if (key) {
-        commit("deactivate", key);
+        commit('deactivate', key)
       }
     },
   },
-};
+}
 
 let mapCodeToKey = {
-  AltLeft: "alt",
-  AltRight: "alt",
-  ControlLeft: "control",
-  ControlRight: "control",
-  ShiftLeft: "shift",
-  ShiftRight: "shift",
-  KeyC: "c",
-  KeyV: "v",
-};
+  AltLeft: 'alt',
+  AltRight: 'alt',
+  ControlLeft: 'control',
+  ControlRight: 'control',
+  ShiftLeft: 'shift',
+  ShiftRight: 'shift',
+  KeyC: 'c',
+  KeyV: 'v',
+}

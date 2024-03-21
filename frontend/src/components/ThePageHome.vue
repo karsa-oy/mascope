@@ -27,7 +27,7 @@
                     size="is-small"
                     @click="
                       (props) => {
-                        props.open = !props.open;
+                        props.open = !props.open
                       }
                     "
                   >
@@ -36,17 +36,11 @@
               </template>
               <div class="columns">
                 <div class="column is-half">
-                  <b-datetimepicker
-                    placeholder="Starting from..."
-                    v-model="sampleFileMinDatetime"
-                  >
+                  <b-datetimepicker placeholder="Starting from..." v-model="sampleFileMinDatetime">
                   </b-datetimepicker>
                 </div>
                 <div class="column is-half">
-                  <b-datetimepicker
-                    placeholder="Until..."
-                    v-model="sampleFileMaxDatetime"
-                  >
+                  <b-datetimepicker placeholder="Until..." v-model="sampleFileMaxDatetime">
                   </b-datetimepicker>
                 </div>
               </div>
@@ -63,11 +57,7 @@
               <b-button
                 type="is-primary"
                 style="position: fixed; left: 5em; bottom: 2em"
-                :disabled="
-                  !workspaceActive ||
-                  !batchActive ||
-                  sampleFilesSelected.length != 1
-                "
+                :disabled="!workspaceActive || !batchActive || sampleFilesSelected.length != 1"
                 @click="launchProcessSelectedModal"
               >
                 Process file
@@ -85,9 +75,7 @@
                 "
                 @click="launchProcessBatchModal"
               >
-                Process batch ({{
-                  sampleFilesSelected ? sampleFilesSelected.length : 0
-                }})
+                Process batch ({{ sampleFilesSelected ? sampleFilesSelected.length : 0 }})
               </b-button>
             </section>
           </div>
@@ -112,10 +100,10 @@
                   () => {
                     workspaceModalProps = {
                       action: 'create',
-                    };
+                    }
                     activateModal({
                       modal: 'workspaceSave',
-                    });
+                    })
                   }
                 "
               >
@@ -133,16 +121,16 @@
 </template>
 
 <script>
-import BaseTable from "./BaseTable.vue";
-import BaseWorkspaceTile from "./BaseWorkspaceTile.vue";
-import TheLayoutSidebar from "./TheLayoutSidebar.vue";
-import ThePaneBrowser from "./ThePaneBrowser.vue";
+import BaseTable from './BaseTable.vue'
+import BaseWorkspaceTile from './BaseWorkspaceTile.vue'
+import TheLayoutSidebar from './TheLayoutSidebar.vue'
+import ThePaneBrowser from './ThePaneBrowser.vue'
 
-import { mapMutations } from "vuex";
-import { call, get, sync } from "vuex-pathify";
+import { mapMutations } from 'vuex'
+import { call, get, sync } from 'vuex-pathify'
 
 export default {
-  name: "ThePageHome",
+  name: 'ThePageHome',
   components: {
     BaseTable,
     BaseWorkspaceTile,
@@ -153,135 +141,129 @@ export default {
     return {
       browseAcquisitions: false,
       instrumentSelected: [],
-      sampleFileMinDatetime: new Date(
-        new Date().getTime() - 24 * 60 * 60 * 1000
-      ), // now - 24h
+      sampleFileMinDatetime: new Date(new Date().getTime() - 24 * 60 * 60 * 1000), // now - 24h
       sampleFileMaxDatetime: new Date(), // now
       sampleFilesSelected: [],
       sampleFileTableDataKey: 0,
-    };
+    }
   },
   computed: {
     ...sync({
-      sampleBatchImportProps: "modal/sampleBatchImportProps",
-      sampleItemAttributesSaveProps: "modal/sampleItemAttributesSaveProps",
-      workspaceModalProps: "modal/workspaceSaveProps",
+      sampleBatchImportProps: 'modal/sampleBatchImportProps',
+      sampleItemAttributesSaveProps: 'modal/sampleItemAttributesSaveProps',
+      workspaceModalProps: 'modal/workspaceSaveProps',
     }),
     ...get({
-      acquisitionsInRange: "instrument/acquisitions",
-      batchActive: "batch/active",
-      instrumentActive: "instrument/active",
-      instruments: "app/instruments",
-      recentAcquisitions: "instrument/recentAcquisitions",
-      sampleBatches: "workspace/batches",
-      sampleActive: "sample/active",
-      sampleMatched: "sample/matched",
-      workspaceActive: "workspace/active",
-      workspaces: "app/workspaces",
+      acquisitionsInRange: 'instrument/acquisitions',
+      batchActive: 'batch/active',
+      instrumentActive: 'instrument/active',
+      instruments: 'app/instruments',
+      recentAcquisitions: 'instrument/recentAcquisitions',
+      sampleBatches: 'workspace/batches',
+      sampleActive: 'sample/active',
+      sampleMatched: 'sample/matched',
+      workspaceActive: 'workspace/active',
+      workspaces: 'app/workspaces',
     }),
     acquisitions() {
-      return this.browseAcquisitions
-        ? this.acquisitionsInRange
-        : this.recentAcquisitions;
+      return this.browseAcquisitions ? this.acquisitionsInRange : this.recentAcquisitions
     },
     sampleFileCols() {
-      return [{ field: "filename", label: "Filename" }];
+      return [{ field: 'filename', label: 'Filename' }]
     },
     sampleFileTableHeight() {
-      return "calc(50vh)";
+      return 'calc(50vh)'
     },
     workspaceHomeText() {
       if (this.workspaceActive) {
-        return `${this.workspaceActive.workspace_name}`;
+        return `${this.workspaceActive.workspace_name}`
       } else {
-        return `Loading workspace...`;
+        return `Loading workspace...`
       }
     },
   },
   created: function () {
     this.instrumentSelected = this.instruments.filter(
-      (instrument) => instrument.instrument === this.instrumentActive
-    );
+      (instrument) => instrument.instrument === this.instrumentActive,
+    )
   },
   methods: {
     ...call({
-      sampleItemFocus: "batch/sampleItemFocus",
-      getAcquisitions: "instrument/getAcquisitions",
-      loadInstrument: "instrument/load",
-      unloadInstrument: "instrument/unload",
+      sampleItemFocus: 'batch/sampleItemFocus',
+      getAcquisitions: 'instrument/getAcquisitions',
+      loadInstrument: 'instrument/load',
+      unloadInstrument: 'instrument/unload',
     }),
     ...mapMutations({
-      activateModal: "modal/activate",
+      activateModal: 'modal/activate',
     }),
     getAcquisitionsInRange() {
       // Reset selected files when changing range, to avoid ghost selections
-      this.sampleFilesSelected = [];
+      this.sampleFilesSelected = []
       this.getAcquisitions({
         min: this.sampleFileMinDatetime,
         max: this.sampleFileMaxDatetime,
-      });
+      })
     },
     launchProcessBatchModal() {
       this.sampleBatchImportProps = {
         sampleFilesSelected: this.sampleFilesSelected,
-      };
+      }
       this.activateModal({
-        modal: "sampleBatchImport",
-      });
+        modal: 'sampleBatchImport',
+      })
     },
     launchProcessSelectedModal() {
       // defocus currently focused sample
       if (this.sampleActive) {
-        this.sampleItemFocus(this.sampleActive);
+        this.sampleItemFocus(this.sampleActive)
       }
       this.sampleItemAttributesSaveProps = {
-        action: "create",
+        action: 'create',
         sampleItemRecordToLoad: this.sampleFilesSelected[0],
-      };
+      }
       this.activateModal({
-        modal: "sampleItemAttributesSave",
-      });
+        modal: 'sampleItemAttributesSave',
+      })
     },
     selectInstrument(newRows) {
-      const instrument = newRows.length ? newRows[0].instrument : null;
+      const instrument = newRows.length ? newRows[0].instrument : null
       if (instrument) {
-        this.loadInstrument(instrument);
-        this.getAcquisitionsInRange();
+        this.loadInstrument(instrument)
+        this.getAcquisitionsInRange()
       } else {
-        this.unloadInstrument();
+        this.unloadInstrument()
       }
     },
   },
   watch: {
     browseAcquisitions: function () {
       // Reset selected files when switching between recent acquisitions/browse
-      this.sampleFilesSelected = [];
+      this.sampleFilesSelected = []
     },
     instrumentSelected: function (newRows, oldRows) {
       // Reset selected files when switching instrument
-      this.sampleFilesSelected = [];
+      this.sampleFilesSelected = []
       // Allow selecting only one instrument at a time
-      if (newRows === null) return;
+      if (newRows === null) return
       if (newRows.length > 1) {
-        this.instrumentSelected = newRows.filter(
-          (row) => !oldRows.includes(row)
-        );
-        return;
+        this.instrumentSelected = newRows.filter((row) => !oldRows.includes(row))
+        return
       }
-      this.selectInstrument(newRows);
+      this.selectInstrument(newRows)
     },
     sampleFileMinDatetime: function () {
-      this.getAcquisitionsInRange();
+      this.getAcquisitionsInRange()
     },
     sampleFileMaxDatetime: function () {
-      this.getAcquisitionsInRange();
+      this.getAcquisitionsInRange()
     },
     recentAcquisitions: function () {
       // This watcher triggers on database reload
-      if (this.browseAcquisitions) this.getAcquisitionsInRange();
+      if (this.browseAcquisitions) this.getAcquisitionsInRange()
     },
   },
-};
+}
 </script>
 
 <style scoped>

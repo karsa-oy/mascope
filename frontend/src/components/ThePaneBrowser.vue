@@ -12,34 +12,34 @@
 </template>
 
 <script>
-import ThePaneBrowserSample from "./ThePaneBrowserSample.vue";
-import ThePaneBrowserTarget from "./ThePaneBrowserTarget.vue";
+import ThePaneBrowserSample from './ThePaneBrowserSample.vue'
+import ThePaneBrowserTarget from './ThePaneBrowserTarget.vue'
 
-import { get } from "vuex-pathify";
+import { get } from 'vuex-pathify'
 
 export default {
-  name: "ThePaneBrowser",
+  name: 'ThePaneBrowser',
   components: {
     ThePaneBrowserTarget,
     ThePaneBrowserSample,
   },
   data: function () {
-    return {};
+    return {}
   },
   computed: {
     ...get({
-      batchActive: "batch/active",
-      sampleActive: "sample/active",
-      sampleMatched: "sample/matched",
-      workspaceActive: "workspace/active",
+      batchActive: 'batch/active',
+      sampleActive: 'sample/active',
+      sampleMatched: 'sample/matched',
+      workspaceActive: 'workspace/active',
     }),
     workspaceHomeText() {
       if (this.workspaceActive) {
-        return `${this.workspaceActive.workspace_name}`;
+        return `${this.workspaceActive.workspace_name}`
       } else {
-        return `Loading workspace...`;
+        return `Loading workspace...`
       }
     },
   },
-};
+}
 </script>

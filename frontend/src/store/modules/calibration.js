@@ -1,5 +1,5 @@
-import { make } from "vuex-pathify";
-import { getApiData } from "./apiHelper.js";
+import { make } from 'vuex-pathify'
+import { getApiData } from './apiHelper.js'
 
 const state = {
   active: null,
@@ -11,7 +11,7 @@ const state = {
   paramMinIsotopeAbundance: 0.1,
   paramMinPeakIntensity: 1000,
   paramRefineWindow: 100,
-};
+}
 
 export default {
   namespaced: true,
@@ -24,179 +24,164 @@ export default {
     async load({ commit, dispatch }, sample) {
       // reset if previous calibration loaded
       if (state.active) {
-        dispatch("unload");
+        dispatch('unload')
       }
-      const sampleMzCalibration = await dispatch(
-        "getSampleMzCalibration",
-        sample
-      );
-      await commit("SET_MZ_FIT", sampleMzCalibration);
+      const sampleMzCalibration = await dispatch('getSampleMzCalibration', sample)
+      await commit('SET_MZ_FIT', sampleMzCalibration)
     },
 
     async unload({ commit }) {
-      await commit("SET_MZ_FIT", null);
-      await commit("SET_MZ_FIT_ERROR", null);
-      await commit("SET_MZ_FIT_STATS", null);
+      await commit('SET_MZ_FIT', null)
+      await commit('SET_MZ_FIT_ERROR', null)
+      await commit('SET_MZ_FIT_STATS', null)
     },
 
     // http client endpoints
     async getSampleMzCalibration({ dispatch }, { sample_item_id }) {
       return await getApiData({
         dispatch,
-        httpMethod: "getMzCalibration",
+        httpMethod: 'getMzCalibration',
         requestData: {
           sample_item_id,
         },
         errorMessage: `Failed to get sample mz calibration.`,
-      });
+      })
     },
 
     async calibrationMzFit({ dispatch }, requestData) {
       await getApiData({
         dispatch,
-        httpMethod: "calibrationMzFit",
+        httpMethod: 'calibrationMzFit',
         requestData: requestData,
         errorMessage: `Failed to calibrate mz fit of sample ${requestData.sampleName}.`,
-      });
+      })
     },
 
     async calibrationMzApply({ dispatch }, requestData) {
       await getApiData({
         dispatch,
-        httpMethod: "calibrationMzApply",
+        httpMethod: 'calibrationMzApply',
         requestData: requestData,
         errorMessage: `Failed to apply mz calibration for sample file ${requestData.sample_filename}.`,
-      });
+      })
     },
     async calibrationMzCalibrateSample({ rootState, rootGetters, dispatch }) {
-      const sampleActive = rootState.sample.active;
+      const sampleActive = rootState.sample.active
       if (sampleActive) {
-        const sampleId = sampleActive.sample_item_id;
-        const sampleName = sampleActive.sample_item_name;
-        const body = rootGetters["calibration/params"];
+        const sampleId = sampleActive.sample_item_id
+        const sampleName = sampleActive.sample_item_name
+        const body = rootGetters['calibration/params']
         await getApiData({
           dispatch,
-          httpMethod: "calibrationMzCalibrateSample",
+          httpMethod: 'calibrationMzCalibrateSample',
           requestData: { sampleId, sampleName, body },
           errorMessage: `Failed to m/z calibrate sample ${sampleName}.`,
-        });
+        })
       } else {
-        if (!rootState.instrument.scenthoundModeActive) return;
+        if (!rootState.instrument.scenthoundModeActive) return
         setTimeout(() => {
-          dispatch("calibrationMzCalibrateSample");
-        }, 1000);
+          dispatch('calibrationMzCalibrateSample')
+        }, 1000)
       }
     },
 
     // backend notifications
     // mz_fit
     async onCalibrationMzFitStarted({ commit, dispatch }, data) {
-      dispatch("notification/onCalibrationStarted", data, { root: true });
+      dispatch('notification/onCalibrationStarted', data, { root: true })
     },
     async onCalibrationMzFitProgress({ commit, dispatch }, data) {
-      dispatch("notification/onCalibrationProgress", data, { root: true });
+      dispatch('notification/onCalibrationProgress', data, { root: true })
     },
     async onCalibrationMzFitFinished({ commit, dispatch }, data) {
-      let fit = data.fit;
-      let fitError = data.error;
-      let fitStats = data.stats;
-      await commit("SET_MZ_FIT", fit);
-      await commit("SET_MZ_FIT_ERROR", fitError);
-      await commit("SET_MZ_FIT_STATS", fitStats);
-      dispatch("notification/onCalibrationFinished", data, { root: true });
+      let fit = data.fit
+      let fitError = data.error
+      let fitStats = data.stats
+      await commit('SET_MZ_FIT', fit)
+      await commit('SET_MZ_FIT_ERROR', fitError)
+      await commit('SET_MZ_FIT_STATS', fitStats)
+      dispatch('notification/onCalibrationFinished', data, { root: true })
     },
     async onCalibrationMzFitFailed({ commit, dispatch }, data) {
-      dispatch("notification/onCalibrationFailed", data, { root: true });
+      dispatch('notification/onCalibrationFailed', data, { root: true })
     },
 
     // mz_apply
     async onCalibrationMzApplyStarted({ dispatch }, data) {
-      dispatch("notification/onCalibrationStarted", data, { root: true });
+      dispatch('notification/onCalibrationStarted', data, { root: true })
     },
     async onCalibrationMzApplyFinished({ rootState, dispatch }, data) {
       if (data.autosampler_mode === true) {
-        dispatch("notification/onCalibrationFinished", data, { root: true });
+        dispatch('notification/onCalibrationFinished', data, { root: true })
       } else {
-        await dispatch("unload");
-        await dispatch("sample/reload", rootState.sample.active, {
+        await dispatch('unload')
+        await dispatch('sample/reload', rootState.sample.active, {
           root: true,
-        });
-        await dispatch("batch/reload", null, { root: true });
-        dispatch("notification/onCalibrationFinished", data, { root: true });
+        })
+        await dispatch('batch/reload', null, { root: true })
+        dispatch('notification/onCalibrationFinished', data, { root: true })
       }
     },
 
     // mz_calibrate_sample
     // TODO_notifications
     async onCalibrationMzCalibrateSampleStarted({ rootState, commit }, data) {
-      commit("SET_CALIBRATION_STATUS", data);
+      commit('SET_CALIBRATION_STATUS', data)
     },
     async onCalibrationMzCalibrateSampleProgress({ rootState, commit }, data) {
-      commit("SET_CALIBRATION_STATUS", data);
+      commit('SET_CALIBRATION_STATUS', data)
     },
-    async onCalibrationMzCalibrateSampleFinished(
-      { rootState, commit, dispatch },
-      data
-    ) {
-      commit("SET_CALIBRATION_STATUS", data);
+    async onCalibrationMzCalibrateSampleFinished({ rootState, commit, dispatch }, data) {
+      commit('SET_CALIBRATION_STATUS', data)
       // Start matching in Scenthound automatically
       if (rootState.instrument.scenthoundModeActive) {
-        dispatch("instrument/matchSample", null, { root: true });
+        dispatch('instrument/matchSample', null, { root: true })
       }
     },
     async onCalibrationMzCalibrateSampleFailed({ rootState, commit }, data) {
-      commit("SET_CALIBRATION_STATUS", { ...data, failed: true });
+      commit('SET_CALIBRATION_STATUS', { ...data, failed: true })
     },
 
     // mz_calibrate_batch
-    async onCalibrationMzCalibrateBatchStarted(
-      { rootState, commit, dispatch },
-      data
-    ) {
-      dispatch("notification/onCalibrationStarted", data, { root: true });
+    async onCalibrationMzCalibrateBatchStarted({ rootState, commit, dispatch }, data) {
+      dispatch('notification/onCalibrationStarted', data, { root: true })
     },
-    async onCalibrationMzCalibrateBatchFinished(
-      { rootState, commit, dispatch },
-      data
-    ) {
-      dispatch("notification/onCalibrationFinished", data, { root: true });
+    async onCalibrationMzCalibrateBatchFinished({ rootState, commit, dispatch }, data) {
+      dispatch('notification/onCalibrationFinished', data, { root: true })
     },
     // TODO_notifications  move to notification store, use the onActionFinished,
     // failed_calibration_samples is not used now from import_sample_items
-    async onCalibrationMzCalibrateBatchFailed(
-      { rootState, commit, dispatch },
-      data
-    ) {
+    async onCalibrationMzCalibrateBatchFailed({ rootState, commit, dispatch }, data) {
       const showWarningFailedCalibration = (payload) => {
-        dispatch("notification/showWarningNotification", payload, {
+        dispatch('notification/showWarningNotification', payload, {
           root: true,
-        });
-        commit("notification/RESET_CALIBRATION_NOTIFICATION", null, {
+        })
+        commit('notification/RESET_CALIBRATION_NOTIFICATION', null, {
           root: true,
-        });
-      };
+        })
+      }
       const failedCalibrationSamples = () => {
         const payload = {
-          notification: "failedCalibrationSamples",
+          notification: 'failedCalibrationSamples',
           data: data.samples,
-        };
+        }
         if (rootState.notification.active) {
           setTimeout(() => {
-            showWarningFailedCalibration(payload);
-          }, 2000);
+            showWarningFailedCalibration(payload)
+          }, 2000)
         } else {
-          showWarningFailedCalibration(payload);
+          showWarningFailedCalibration(payload)
         }
-      };
+      }
 
       const regularFail = () => {
-        dispatch("notification/onCalibrationFailed", data, { root: true });
-      };
+        dispatch('notification/onCalibrationFailed', data, { root: true })
+      }
 
-      if (data.type === "failed_calibration_samples") {
-        failedCalibrationSamples();
+      if (data.type === 'failed_calibration_samples') {
+        failedCalibrationSamples()
       } else {
-        regularFail();
+        regularFail()
       }
     },
   },
@@ -207,7 +192,7 @@ export default {
         refine_window: state.paramRefineWindow,
         peak_intensity_min: state.paramMinPeakIntensity,
         isotope_abundance_min: state.paramMinIsotopeAbundance,
-      };
+      }
     },
   },
-};
+}

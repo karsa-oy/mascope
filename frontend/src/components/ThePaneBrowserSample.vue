@@ -9,114 +9,112 @@
 </template>
 
 <script>
-import { mapActions, mapMutations } from "vuex";
-import { sync, get, call } from "vuex-pathify";
-import table from "../lib/table";
+import { mapActions, mapMutations } from 'vuex'
+import { sync, get, call } from 'vuex-pathify'
+import table from '../lib/table'
 
-import BaseBrowser from "./BaseBrowser.vue";
+import BaseBrowser from './BaseBrowser.vue'
 
 export default {
-  name: "ThePaneBrowserSample",
+  name: 'ThePaneBrowserSample',
   components: {
     BaseBrowser,
   },
   computed: {
     ...get({
-      batches: "workspace/batches",
-      batchActive: "batch/active",
-      batchBuildParams: "batch/buildParams",
-      batchMatchCompounds: "batch/matchCompounds",
-      batchMatchIons: "batch/matchIons",
-      batchTargetCollections: "batch/targetCollections",
-      batchTargetCompounds: "batch/targetCompounds",
-      sampleActive: "sample/active",
-      sampleItems: "batch/sampleItems",
-      sampleItemFocused: "batch/sampleItemFocused",
-      workspaceActive: "workspace/active",
+      batches: 'workspace/batches',
+      batchActive: 'batch/active',
+      batchBuildParams: 'batch/buildParams',
+      batchMatchCompounds: 'batch/matchCompounds',
+      batchMatchIons: 'batch/matchIons',
+      batchTargetCollections: 'batch/targetCollections',
+      batchTargetCompounds: 'batch/targetCompounds',
+      sampleActive: 'sample/active',
+      sampleItems: 'batch/sampleItems',
+      sampleItemFocused: 'batch/sampleItemFocused',
+      workspaceActive: 'workspace/active',
     }),
     ...sync({
-      modalSampleBatchOpProps: "modal/sampleBatchOpProps",
-      modalSampleItemAttributesSaveProps: "modal/sampleItemAttributesSaveProps",
-      modalSampleItemOverviewProps: "modal/sampleItemOverviewProps",
+      modalSampleBatchOpProps: 'modal/sampleBatchOpProps',
+      modalSampleItemAttributesSaveProps: 'modal/sampleItemAttributesSaveProps',
+      modalSampleItemOverviewProps: 'modal/sampleItemOverviewProps',
     }),
     contextMenuIcon() {
-      return this.batchActiveCount == 0 ? "plus" : "dots-horizontal";
+      return this.batchActiveCount == 0 ? 'plus' : 'dots-horizontal'
     },
     sampleLevels() {
-      let hidden = this.batchActive ? false : true;
+      let hidden = this.batchActive ? false : true
       return [
         {
-          name: "Batch",
-          slug: "sample_batch",
-          cols: [{ field: "sample_batch_name", label: "Batch", width: "90%" }],
-          detailsIcon: "none",
+          name: 'Batch',
+          slug: 'sample_batch',
+          cols: [{ field: 'sample_batch_name', label: 'Batch', width: '90%' }],
+          detailsIcon: 'none',
           rows: this.batches,
           rowClick: this.batchToggle,
           opened: this.openedBatch,
         },
         {
-          name: "Item",
-          slug: "sample_item",
+          name: 'Item',
+          slug: 'sample_item',
           cols: [
-            { field: "index", label: "#", width: "5%" },
-            { field: "sample_item_name", label: "Item", width: "75%" },
-            { field: "datetime", label: "Datetime", width: "0%", hidden: true },
-            { field: "filter_id", label: "Filter ID", width: "10%" },
+            { field: 'index', label: '#', width: '5%' },
+            { field: 'sample_item_name', label: 'Item', width: '75%' },
+            { field: 'datetime', label: 'Datetime', width: '0%', hidden: true },
+            { field: 'filter_id', label: 'Filter ID', width: '10%' },
             {
-              field: "match_score",
-              label: "Score",
-              width: "10%",
+              field: 'match_score',
+              label: 'Score',
+              width: '10%',
               displayMatchScore: true,
               hidden,
               tooltip: (row) => {
                 return {
-                  "Peak intensity": this.formatter.format(
-                    row.sample_peak_area_sum
-                  ),
-                };
+                  'Peak intensity': this.formatter.format(row.sample_peak_area_sum),
+                }
               },
             },
           ],
           rows: this.sampleItems,
-          detailsIcon: "none",
+          detailsIcon: 'none',
           rowClick: this.itemSelect,
           opened: [],
         },
-      ];
+      ]
     },
     batchActiveCount() {
-      return this.batchActive ? 1 : 0;
+      return this.batchActive ? 1 : 0
     },
     menu() {
       // sample batch
       let createBatchButton = {
-        label: "Create sample batch",
+        label: 'Create sample batch',
         onClick: this.batchCreate,
-      };
+      }
       let deleteBatchButton = {
-        label: "Delete sample batch",
+        label: 'Delete sample batch',
         onClick: this.batchDelete,
-      };
+      }
       let exportBatchButton = {
-        label: "Export sample batch",
+        label: 'Export sample batch',
         onClick: this.batchExport,
-      };
+      }
       let exportBatchPeaksButton = {
-        label: "Export peak data",
+        label: 'Export peak data',
         onClick: this.batchPeakExport,
-      };
+      }
       let updateBatchButton = {
-        label: "Update sample batch",
+        label: 'Update sample batch',
         onClick: this.batchUpdate,
-      };
+      }
       let copyBatchButton = {
-        label: "Copy selected batch",
+        label: 'Copy selected batch',
         onClick: this.batchCopy,
-      };
+      }
       let rematchBatchButton = {
-        label: "Rematch selected batch (debug)",
+        label: 'Rematch selected batch (debug)',
         onClick: this.rematchBatch,
-      };
+      }
       let batchButtons =
         this.batchActiveCount == 0
           ? [createBatchButton]
@@ -127,271 +125,256 @@ export default {
               exportBatchPeaksButton,
               copyBatchButton,
               rematchBatchButton,
-            ];
+            ]
       // sample items
       let updateItemButton = {
         label: `Update sample item`,
         onClick: this.itemUpdate,
-      };
+      }
       let deleteItemButton = {
         label: `Delete sample item`,
         onClick: this.itemDelete,
-      };
+      }
       let copyItemButton = {
-        label: "Copy selected sample item",
+        label: 'Copy selected sample item',
         onClick: this.itemCopy,
-      };
+      }
       let rematchItemButton = {
         label: `Rematch selected sample (debug)`,
         onClick: this.itemRematch,
-      };
+      }
       let itemButtons = this.sampleItemFocused
-        ? [
-            updateItemButton,
-            deleteItemButton,
-            copyItemButton,
-            rematchItemButton,
-          ]
-        : [];
+        ? [updateItemButton, deleteItemButton, copyItemButton, rematchItemButton]
+        : []
       // menu
-      return this.sampleItemFocused ? itemButtons : batchButtons;
+      return this.sampleItemFocused ? itemButtons : batchButtons
     },
     openedBatch() {
       return this.batchActive
-        ? this.batches.filter(
-            (batch) => batch.sample_batch_id == this.batchActive.sample_batch_id
-          )
-        : [];
+        ? this.batches.filter((batch) => batch.sample_batch_id == this.batchActive.sample_batch_id)
+        : []
     },
   },
   created: function () {
-    this.formatter = new Intl.NumberFormat("en-US", {
+    this.formatter = new Intl.NumberFormat('en-US', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
-    });
+    })
   },
   methods: {
     ...mapMutations({
-      activateModal: "modal/activate",
+      activateModal: 'modal/activate',
     }),
     ...call({
-      itemFocus: "batch/sampleItemFocus",
-      itemToggle: "batch/sampleItemToggle",
-      batchToggle: "batch/batchToggle",
-      batchExportPeakData: "batch/batchExportPeakData",
-      rematchBatch: "batch/rematchBatch",
-      matchSampleRematch: "sample/matchSampleRematch",
-      deleteSampleItem: "sample/deleteSampleItem",
+      itemFocus: 'batch/sampleItemFocus',
+      itemToggle: 'batch/sampleItemToggle',
+      batchToggle: 'batch/batchToggle',
+      batchExportPeakData: 'batch/batchExportPeakData',
+      rematchBatch: 'batch/rematchBatch',
+      matchSampleRematch: 'sample/matchSampleRematch',
+      deleteSampleItem: 'sample/deleteSampleItem',
     }),
     batchCreate() {
       this.modalSampleBatchOpProps = {
-        action: "create",
-      };
+        action: 'create',
+      }
       this.activateModal({
-        modal: "sampleBatchOp",
-      });
+        modal: 'sampleBatchOp',
+      })
     },
     batchDelete() {
       this.modalSampleBatchOpProps = {
-        action: "delete",
+        action: 'delete',
         batch: this.batchActive,
-      };
+      }
       this.activateModal({
-        modal: "sampleBatchOp",
-      });
+        modal: 'sampleBatchOp',
+      })
     },
     batchExport() {
       const batchCols = [
-        { field: "field", label: "Batch" },
-        { field: "value", label: "" },
-      ];
+        { field: 'field', label: 'Batch' },
+        { field: 'value', label: '' },
+      ]
       let batchRows = [
-        { field: "Name", value: this.batchActive.sample_batch_name },
+        { field: 'Name', value: this.batchActive.sample_batch_name },
         {
-          field: "Description",
+          field: 'Description',
           value: this.batchActive.sample_batch_description,
         },
-        { field: "Workspace", value: this.workspaceActive.workspace_name },
-        { field: "", value: "" },
+        { field: 'Workspace', value: this.workspaceActive.workspace_name },
+        { field: '', value: '' },
         {
-          field: "Target collections",
-          value: this.batchTargetCollections
-            .map((row) => row.target_collection_name)
-            .join(", "),
+          field: 'Target collections',
+          value: this.batchTargetCollections.map((row) => row.target_collection_name).join(', '),
         },
-        { field: "", value: "" },
-        { field: "Parameters", value: "" },
-      ];
+        { field: '', value: '' },
+        { field: 'Parameters', value: '' },
+      ]
       const batchParams = {
         ...this.batchBuildParams,
-      };
+      }
       Object.entries(batchParams).forEach(([key, val]) =>
         batchRows.push({
-          field: key.replaceAll("_", " "),
+          field: key.replaceAll('_', ' '),
           value: JSON.stringify(val),
-        })
-      );
+        }),
+      )
       const sampleItemCols = [
-        { field: "sample_item_name", label: "Sample name" },
-        { field: "filename", label: "Filename" },
-        { field: "datetime", label: "Datetime" },
-        { field: "sample_item_type", label: "Sample type" },
-        { field: "tic", label: "TIC" },
-        { field: "filter_id", label: "Filter ID" },
-        { field: "match_score", label: "Match score" },
-      ];
+        { field: 'sample_item_name', label: 'Sample name' },
+        { field: 'filename', label: 'Filename' },
+        { field: 'datetime', label: 'Datetime' },
+        { field: 'sample_item_type', label: 'Sample type' },
+        { field: 'tic', label: 'TIC' },
+        { field: 'filter_id', label: 'Filter ID' },
+        { field: 'match_score', label: 'Match score' },
+      ]
       const matchCompoundCols = [
-        { field: "sample_item_name", label: "Sample name" },
-        { field: "filename", label: "Filename" },
-        { field: "sample_item_type", label: "Sample type" },
-        { field: "target_compound_name", label: "Compound name" },
-        { field: "target_compound_formula", label: "Compound formula" },
-        { field: "sample_peak_area_sum", label: "Sample peak intensity" },
+        { field: 'sample_item_name', label: 'Sample name' },
+        { field: 'filename', label: 'Filename' },
+        { field: 'sample_item_type', label: 'Sample type' },
+        { field: 'target_compound_name', label: 'Compound name' },
+        { field: 'target_compound_formula', label: 'Compound formula' },
+        { field: 'sample_peak_area_sum', label: 'Sample peak intensity' },
         {
-          field: "sample_peak_interference_max",
-          label: "Sample peak interference",
+          field: 'sample_peak_interference_max',
+          label: 'Sample peak interference',
         },
-        { field: "match_score", label: "Match score" },
-      ];
+        { field: 'match_score', label: 'Match score' },
+      ]
       const matchIonCols = [
-        { field: "sample_item_name", label: "Sample name" },
-        { field: "filename", label: "Filename" },
-        { field: "sample_item_type", label: "Sample type" },
-        { field: "target_compound_name", label: "Compound name" },
-        { field: "target_compound_formula", label: "Compound formula" },
-        { field: "target_ion_mechanism", label: "Ionization mechanism" },
-        { field: "target_ion_formula", label: "Ion formula" },
-        { field: "sample_peak_area_sum", label: "Sample peak intensity" },
+        { field: 'sample_item_name', label: 'Sample name' },
+        { field: 'filename', label: 'Filename' },
+        { field: 'sample_item_type', label: 'Sample type' },
+        { field: 'target_compound_name', label: 'Compound name' },
+        { field: 'target_compound_formula', label: 'Compound formula' },
+        { field: 'target_ion_mechanism', label: 'Ionization mechanism' },
+        { field: 'target_ion_formula', label: 'Ion formula' },
+        { field: 'sample_peak_area_sum', label: 'Sample peak intensity' },
         {
-          field: "sample_peak_interference_sum",
-          label: "Sample peak interference",
+          field: 'sample_peak_interference_sum',
+          label: 'Sample peak interference',
         },
-        { field: "match_score", label: "Match score" },
-      ];
-      const datetimestamp = new Date()
-        .toJSON()
-        .slice(0, -5)
-        .replace(/[-:]/g, "");
+        { field: 'match_score', label: 'Match score' },
+      ]
+      const datetimestamp = new Date().toJSON().slice(0, -5).replace(/[-:]/g, '')
       const filename = `${datetimestamp}_${this.batchActive.sample_batch_name.replaceAll(
-        " ",
-        "_"
-      )}.xlsx`;
+        ' ',
+        '_',
+      )}.xlsx`
       // Extend batchMatchCompounds with sample_item_type
-      const extendedMatchCompounds = this.batchMatchCompounds.map(
-        (compound) => {
-          const sampleItem = this.sampleItems.find(
-            (item) => item.sample_item_id === compound.sample_item_id
-          );
-          return {
-            ...compound,
-            sample_item_type: sampleItem?.sample_item_type || null,
-          };
+      const extendedMatchCompounds = this.batchMatchCompounds.map((compound) => {
+        const sampleItem = this.sampleItems.find(
+          (item) => item.sample_item_id === compound.sample_item_id,
+        )
+        return {
+          ...compound,
+          sample_item_type: sampleItem?.sample_item_type || null,
         }
-      );
+      })
       // Extend batchMatchIons with sample_item_type, target_compound_name, and target_compound_formula
       const extendedMatchIons = this.batchMatchIons.map((ion) => {
         const sampleItem = this.sampleItems.find(
-          (item) => item.sample_item_id === ion.sample_item_id
-        );
+          (item) => item.sample_item_id === ion.sample_item_id,
+        )
         const targetCompound = this.batchTargetCompounds.find(
-          (compound) => compound.target_compound_id === ion.target_compound_id
-        );
+          (compound) => compound.target_compound_id === ion.target_compound_id,
+        )
         return {
           ...ion,
           sample_item_type: sampleItem?.sample_item_type || null,
           target_compound_name: targetCompound?.target_compound_name || null,
-          target_compound_formula:
-            targetCompound?.target_compound_formula || null,
-        };
-      });
+          target_compound_formula: targetCompound?.target_compound_formula || null,
+        }
+      })
       table.toSpreadsheet(filename, [
         {
-          name: "Batch",
+          name: 'Batch',
           rows: batchRows,
           cols: batchCols,
         },
         {
-          name: "Samples",
+          name: 'Samples',
           rows: this.sampleItems,
           cols: sampleItemCols,
         },
         {
-          name: "Match compounds",
+          name: 'Match compounds',
           rows: extendedMatchCompounds,
           cols: matchCompoundCols,
         },
         {
-          name: "Match ions",
+          name: 'Match ions',
           rows: extendedMatchIons,
           cols: matchIonCols,
         },
-      ]);
+      ])
     },
     batchPeakExport() {
       this.$buefy.dialog.confirm({
-        title: "Export batch peak data",
+        title: 'Export batch peak data',
         message: `Export peak data for batch "${this.batchActive.sample_batch_name}"?`,
-        confirmText: "Export",
+        confirmText: 'Export',
         onConfirm: () => {
-          this.batchExportPeakData(this.batchActive);
+          this.batchExportPeakData(this.batchActive)
         },
-      });
+      })
     },
     batchUpdate() {
       this.modalSampleBatchOpProps = {
-        action: "update",
+        action: 'update',
         batch: this.batchActive,
-      };
+      }
       this.activateModal({
-        modal: "sampleBatchOp",
-      });
+        modal: 'sampleBatchOp',
+      })
     },
     batchCopy() {
       this.modalSampleBatchOpProps = {
-        action: "copy",
+        action: 'copy',
         batch: this.batchActive,
-      };
+      }
       this.activateModal({
-        modal: "sampleBatchOp",
-      });
+        modal: 'sampleBatchOp',
+      })
     },
     async itemUpdate() {
       this.modalSampleItemAttributesSaveProps = {
-        action: "update",
+        action: 'update',
         sampleItemRecordToLoad: this.sampleItemFocused,
-      };
-      this.activateModal({ modal: "sampleItemAttributesSave" });
+      }
+      this.activateModal({ modal: 'sampleItemAttributesSave' })
     },
     async itemRematch() {
-      await this.matchSampleRematch(this.sampleActive);
+      await this.matchSampleRematch(this.sampleActive)
     },
     itemDelete() {
       this.$buefy.dialog.confirm({
-        title: "Deleting item",
+        title: 'Deleting item',
         message: `Delete sample "${this.sampleItemFocused.sample_item_name}"
           from batch "${this.batchActive.sample_batch_name}"?`,
-        confirmText: "Delete",
+        confirmText: 'Delete',
         onConfirm: async () => {
-          const itemId = this.sampleItemFocused.sample_item_id;
+          const itemId = this.sampleItemFocused.sample_item_id
           // defocus
-          this.itemFocus(this.sampleItemFocused);
-          await this.deleteSampleItem(itemId);
+          this.itemFocus(this.sampleItemFocused)
+          await this.deleteSampleItem(itemId)
         },
-      });
+      })
     },
     itemSelect(row) {
-      this.itemToggle(row);
-      this.itemFocus(row);
+      this.itemToggle(row)
+      this.itemFocus(row)
     },
     itemCopy() {
       this.modalSampleItemOverviewProps = {
-        action: "copy",
+        action: 'copy',
         sample: this.sampleItemFocused,
-      };
+      }
       this.activateModal({
-        modal: "sampleItemOverview",
-      });
+        modal: 'sampleItemOverview',
+      })
     },
   },
-};
+}
 </script>

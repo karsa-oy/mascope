@@ -1,10 +1,10 @@
-import { createLogger } from 'vuex';
+import { createLogger } from 'vuex'
 
 export default createLogger({
   filter(mutation) {
-    return false;
+    return false
   },
   actionFilter(action) {
-    return !action.type.startsWith("key");
+    return !action.type.startsWith('key')
   },
-});
+})

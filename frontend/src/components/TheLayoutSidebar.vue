@@ -6,15 +6,7 @@
           <the-main-menu></the-main-menu>
         </b-sidebar>
         <div class="page-container">
-          <div
-            style="
-              position: fixed;
-              left: 9em;
-              bottom: 5em;
-              z-index: -1;
-              width: 200px;
-            "
-          >
+          <div style="position: fixed; left: 9em; bottom: 5em; z-index: -1; width: 200px">
             <b-image
               :src="require('../assets/karsa_logo_white_rgb.png')"
               alt="Karsa Logo"
@@ -28,16 +20,16 @@
 </template>
 
 <script>
-import TheLayout from "./TheLayout.vue";
-import TheMainMenu from "./TheMainMenu.vue";
+import TheLayout from './TheLayout.vue'
+import TheMainMenu from './TheMainMenu.vue'
 
 export default {
-  name: "TheLayoutSidebar",
+  name: 'TheLayoutSidebar',
   components: {
     TheLayout,
     TheMainMenu,
   },
-};
+}
 </script>
 
 <style>

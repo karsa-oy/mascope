@@ -1,33 +1,33 @@
-import { api, apiLog } from "$api";
+import { api, apiLog } from '$api'
 
 // Utils
 export const extractDistinctValues = (objects, property) => {
-  const propertyValues = objects.map((object) => object[property]);
-  const distinctPropertyValues = [...new Set(propertyValues)];
-  return distinctPropertyValues.map((value) => ({ [property]: value }));
-};
+  const propertyValues = objects.map((object) => object[property])
+  const distinctPropertyValues = [...new Set(propertyValues)]
+  return distinctPropertyValues.map((value) => ({ [property]: value }))
+}
 
 export function generateCopyName(originalName) {
-  const cleanedName = originalName.replace(/\s+/g, " ").trim();
+  const cleanedName = originalName.replace(/\s+/g, ' ').trim()
 
-  const namePattern = cleanedName.match(/(.*\sCopy)(?:\((\d+)\))?$/);
+  const namePattern = cleanedName.match(/(.*\sCopy)(?:\((\d+)\))?$/)
   if (namePattern) {
-    const baseName = namePattern[1];
-    const copyNum = namePattern[2];
+    const baseName = namePattern[1]
+    const copyNum = namePattern[2]
     if (copyNum) {
-      return `${baseName}(${parseInt(copyNum) + 1})`;
+      return `${baseName}(${parseInt(copyNum) + 1})`
     } else {
-      return `${baseName}(1)`;
+      return `${baseName}(1)`
     }
   } else {
-    return `${cleanedName} Copy`;
+    return `${cleanedName} Copy`
   }
 }
 
 export function snakeToCamel(snakeCaseStr) {
   return snakeCaseStr.replace(/(_\w)/g, (match) => {
-    return match[1].toUpperCase();
-  });
+    return match[1].toUpperCase()
+  })
 }
 
 // API handlers
@@ -36,68 +36,65 @@ export async function handleApiRequest({
   rootState,
   httpMethod,
   requestData,
-  successNotificationType = "submitted",
+  successNotificationType = 'submitted',
   successMessage = null, // empty for progress notification
-  errorMessage = "An error occurred while processing your request.",
+  errorMessage = 'An error occurred while processing your request.',
   progressNotificationPayload = null, // parameter for progress notification
 }) {
   try {
-    const response = await rootState.api.httpClient[httpMethod](requestData);
+    const response = await rootState.api.httpClient[httpMethod](requestData)
     if (response.status === 200 || response.status === 201) {
       if (progressNotificationPayload) {
-        dispatch(
-          "notification/showProgressNotification",
-          progressNotificationPayload,
-          { root: true }
-        );
+        dispatch('notification/showProgressNotification', progressNotificationPayload, {
+          root: true,
+        })
       } else {
         dispatch(
-          "notification/showGeneralNotification",
+          'notification/showGeneralNotification',
           {
             notification: successNotificationType,
             message: successMessage,
           },
-          { root: true }
-        );
+          { root: true },
+        )
       }
     }
-    return response;
+    return response
   } catch (error) {
     // TODO_error_handling
-    console.error(`Failed to process ${httpMethod}.`, error);
-    const userErrorMessage = `${errorMessage}. ${error}`;
+    console.error(`Failed to process ${httpMethod}.`, error)
+    const userErrorMessage = `${errorMessage}. ${error}`
     dispatch(
-      "notification/showGeneralNotification",
+      'notification/showGeneralNotification',
       {
-        notification: "error",
+        notification: 'error',
         message: userErrorMessage,
       },
-      { root: true }
-    );
+      { root: true },
+    )
   }
 }
 
 export async function getApiData({
   dispatch,
   httpMethod,
-  requestData = {},
-  errorMessage = "An error occurred while loading data.",
+  requestData = {}
 }) {
   try {
-    const response = await api.httpClient[httpMethod](requestData);
+    const response = await api.httpClient[httpMethod](requestData)
     if (response.status === 200) {
-      const { data } = response;
-      return data;
+      const { data } = response
+      return data
     }
   } catch (error) {
-    console.error(`Failed to process ${httpMethod}.`, error);
+    console.error(`Failed to process ${httpMethod}.`, error)
     dispatch(
-      "notification/showGeneralNotification",
+      'notification/showGeneralNotification',
       {
-        notification: "error",
+        notification: 'error',
         message: error,
       },
-      { root: true }
-    );
+      { root: true },
+    )
   }
 }

@@ -31,7 +31,7 @@
 
 <script>
 export default {
-  name: "BaseTable",
+  name: 'BaseTable',
   components: {},
   props: {
     checkable: {
@@ -56,7 +56,7 @@ export default {
     height: {
       type: String,
       required: false,
-      default: "100%",
+      default: '100%',
     },
     maxPrecision: {
       type: Number,
@@ -86,31 +86,31 @@ export default {
   data() {
     return {
       selected: [],
-    };
+    }
   },
   created: function () {
-    this.formatter = new Intl.NumberFormat("en-US", {
+    this.formatter = new Intl.NumberFormat('en-US', {
       minimumFractionDigits: this.minPrecision,
       maximumFractionDigits: this.maxPrecision,
-    });
+    })
   },
   methods: {
     parseValue: function (value) {
-      let isNumeric = typeof value == "number";
-      return isNumeric ? this.formatter.format(value) : value;
+      let isNumeric = typeof value == 'number'
+      return isNumeric ? this.formatter.format(value) : value
     },
   },
   watch: {
     rows() {
-      this.selected = [];
+      this.selected = []
     },
     selected(newRows, oldRows) {
       if (this.checkSingle && newRows.length > 1) {
-        this.selected = newRows.filter((row) => !oldRows.includes(row));
-        return;
+        this.selected = newRows.filter((row) => !oldRows.includes(row))
+        return
       }
-      this.$emit("selectRows", newRows, oldRows);
+      this.$emit('selectRows', newRows, oldRows)
     },
   },
-};
+}
 </script>

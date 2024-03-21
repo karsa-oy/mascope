@@ -24,8 +24,8 @@
               calibrationError
                 ? 'is-danger'
                 : progressPercentage == 100
-                ? 'is-success'
-                : 'is-primary'
+                  ? 'is-success'
+                  : 'is-primary'
             "
           ></b-progress>
           <!-- For m/z Apply -->
@@ -61,55 +61,55 @@
 </template>
 
 <script>
-import { mapMutations, mapState } from "vuex";
-import { sync, get, call } from "vuex-pathify";
+import { mapMutations, mapState } from 'vuex'
+import { sync, get, call } from 'vuex-pathify'
 
 export default {
-  name: "TheNotificationCalibrationProgress",
+  name: 'TheNotificationCalibrationProgress',
   data() {
     return {
       isClosing: false,
-    };
+    }
   },
   computed: {
     ...sync({
-      notificationIsActive: "notification/calibrationProgressActive",
-      calibrationAction: "notification/calibrationAction",
-      progressMessage: "notification/progressMessage",
-      progressPercentage: "notification/progressPercentage",
+      notificationIsActive: 'notification/calibrationProgressActive',
+      calibrationAction: 'notification/calibrationAction',
+      progressMessage: 'notification/progressMessage',
+      progressPercentage: 'notification/progressPercentage',
     }),
     ...get({
-      calibrationComputing: "notification/calibrationComputing",
-      notificationActive: "notification/active",
-      calibrationError: "notification/calibrationError",
+      calibrationComputing: 'notification/calibrationComputing',
+      notificationActive: 'notification/active',
+      calibrationError: 'notification/calibrationError',
     }),
   },
   methods: {
     ...mapMutations({
-      activateNotification: "notification/activate",
-      deactivateNotification: "notification/deactivate",
+      activateNotification: 'notification/activate',
+      deactivateNotification: 'notification/deactivate',
     }),
     close() {
       // TODO_configuration  move animation delay to config file
-      this.isClosing = true;
+      this.isClosing = true
       setTimeout(() => {
-        this.deactivateNotification();
-        this.isClosing = false;
-      }, 480);
+        this.deactivateNotification()
+        this.isClosing = false
+      }, 480)
     },
   },
   watch: {
     calibrationComputing(value) {
       if (value) {
         this.activateNotification({
-          notification: "calibrationProgress",
-        });
+          notification: 'calibrationProgress',
+        })
       } else {
-        if (this.notificationActive === "calibrationProgress") {
-          this.close();
+        if (this.notificationActive === 'calibrationProgress') {
+          this.close()
         }
       }
     },
   },
-};
+}
 </script>

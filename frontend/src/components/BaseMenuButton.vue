@@ -1,17 +1,12 @@
 <template>
   <div v-on:click="onClick">
-    <b-menu-item
-      tag="router-link"
-      :to="{ path, query }"
-      :icon="icon"
-      :disabled="disabled"
-    >
+    <b-menu-item tag="router-link" :to="{ path, query }" :icon="icon" :disabled="disabled">
     </b-menu-item>
   </div>
 </template>
 
 <script>
-import { mapState } from "vuex";
+import { mapState } from 'vuex'
 
 export default {
   props: {
@@ -40,7 +35,7 @@ export default {
     tooltipPosition: {
       type: String,
       required: false,
-      default: "is-right",
+      default: 'is-right',
     },
     tooltipDelay: {
       type: Number,
@@ -55,13 +50,13 @@ export default {
   },
   computed: {
     ...mapState({
-      existingQuery: "query",
+      existingQuery: 'query',
     }),
     query() {
-      return this.newQuery ?? this.existingQuery;
+      return this.newQuery ?? this.existingQuery
     },
   },
-};
+}
 </script>
 
 <style>

@@ -1,13 +1,10 @@
-import { defineConfig, loadEnv } from "vite";
-import vue from '@vitejs/plugin-vue';
-import path from "path";
+import { defineConfig, loadEnv } from 'vite'
+import vue from '@vitejs/plugin-vue'
+import path from 'path'
 
 export default ({ mode }) => {
-  const dotEnvPath = path.resolve(process.cwd() + "/..");
-  process.env = Object.assign(
-    process.env,
-    loadEnv(mode, dotEnvPath, "MASCOPE_PUBLIC_")
-  );
+  const dotEnvPath = path.resolve(process.cwd() + '/..')
+  process.env = Object.assign(process.env, loadEnv(mode, dotEnvPath, 'MASCOPE_PUBLIC_'))
 
   return defineConfig({
     plugins: [vue()],
@@ -16,15 +13,16 @@ export default ({ mode }) => {
     },
     resolve: {
       alias: {
-        $lib: path.resolve(__dirname, "src/lib/"),
-        $api: path.resolve(__dirname, "src/api.js")
-      }
+        $app: path.resolve(__dirname, 'src/'),
+        $lib: path.resolve(__dirname, 'src/lib/'),
+        $api: path.resolve(__dirname, 'src/api.js'),
+      },
     },
     build: {
       chunkSizeWarningLimit: 600,
       cssCodeSplit: false,
-      target: "esnext",
+      target: 'esnext',
     },
-    envPrefix: "MASCOPE_PUBLIC_",
-  });
-};
+    envPrefix: 'MASCOPE_PUBLIC_',
+  })
+}

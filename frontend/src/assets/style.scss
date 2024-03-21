@@ -1,7 +1,7 @@
-@use "sass:color";
+@use 'sass:color';
 
 // Import Bulma's core
-@import "../node_modules/bulma/sass/utilities/_all.sass";
+@import '../node_modules/bulma/sass/utilities/_all.sass';
 
 // Karsa colors
 $moss-green: #425634;
@@ -252,17 +252,19 @@ $progress-bar-background-color: $cool-grey-light;
 }
 
 // Isotope rating range input
-input[type="range"] {
+input[type='range'] {
   -webkit-appearance: none;
   width: 20%;
   margin: 5px 20px 5px 20px;
   height: 8px;
   border-radius: 5px;
-  background: linear-gradient(to right,
-      $notification-dark 0%,
-      $notification 25%,
-      $notification-light 50%,
-      $moss-green-light 75%);
+  background: linear-gradient(
+    to right,
+    $notification-dark 0%,
+    $notification 25%,
+    $notification-light 50%,
+    $moss-green-light 75%
+  );
   outline: none;
 
   // Slider thumb
@@ -324,64 +326,78 @@ input[type="range"] {
 
 // Setup $colors to use as bulma classes (e.g. 'is-twitter')
 $colors: (
-  "white": ($white,
+  'white': (
+    $white,
     $black,
   ),
-  "black": ($black,
+  'black': (
+    $black,
     $white,
   ),
-  "light": ($light,
+  'light': (
+    $light,
     $light-invert,
   ),
-  "dark": ($dark,
+  'dark': (
+    $dark,
     $dark-invert,
   ),
-  "primary": ($primary,
+  'primary': (
+    $primary,
     $primary-invert,
     $primary-light,
     $primary-dark,
   ),
-  "link": ($link,
+  'link': (
+    $link,
     $link-invert,
     $link-light,
     $link-dark,
   ),
-  "info": ($info,
+  'info': (
+    $info,
     $info-invert,
     $info-light,
     $info-dark,
   ),
-  "success": ($success,
+  'success': (
+    $success,
     $success-invert,
     $success-light,
     $success-dark,
   ),
-  "success-pale": ($success-pale,
+  'success-pale': (
+    $success-pale,
     $success-invert,
     $success-light,
     $success-dark,
   ),
-  "warning": ($warning,
+  'warning': (
+    $warning,
     $warning-invert,
     $warning-light,
     $warning-dark,
   ),
-  "warning-pale": ($warning-pale,
+  'warning-pale': (
+    $warning-pale,
     $warning-invert,
     $warning-light,
     $warning-dark,
   ),
-  "danger": ($danger,
+  'danger': (
+    $danger,
     $danger-invert,
     $danger-light,
     $danger-dark,
   ),
-  "danger-pale": ($danger-pale,
+  'danger-pale': (
+    $danger-pale,
     $danger-invert,
     $danger-light,
     $danger-dark,
   ),
-  "notification": ($notification-dark,
+  'notification': (
+    $notification-dark,
     $notification-light,
     $notification,
     $notification-invert,
@@ -415,5 +431,5 @@ $link-invert: $primary-invert;
 $link-focus-border: $primary;
 
 // Import Bulma and Buefy styles
-@import "../node_modules/bulma/bulma.sass";
-@import "../node_modules/@ntohq/buefy-next/src/scss/buefy.scss";
+@import '../node_modules/bulma/bulma.sass';
+@import '../node_modules/@ntohq/buefy-next/src/scss/buefy.scss';

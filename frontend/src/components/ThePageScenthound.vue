@@ -32,8 +32,7 @@
             </b-progress>
           </b-field>
           <b-field label="Target search">
-            <b-progress :value="matchingProgress" :type="sampleMatchClass">
-            </b-progress>
+            <b-progress :value="matchingProgress" :type="sampleMatchClass"> </b-progress>
           </b-field>
         </section>
         <br />
@@ -68,11 +67,7 @@
                 <b-field :label="convertLabelToTitle(item.label)">
                   <b-input
                     v-model="item.value"
-                    :placeholder="
-                      showEditFunctions
-                        ? item.placeholder || 'default value'
-                        : ''
-                    "
+                    :placeholder="showEditFunctions ? item.placeholder || 'default value' : ''"
                     :required="fillable && item.required"
                     :disabled="!fillable || item.disabled"
                     expanded
@@ -94,8 +89,7 @@
               </template>
             </div>
             <b-field label="Filter ID">
-              <b-input v-model="sampleItemFilterId" disabled expanded>
-              </b-input>
+              <b-input v-model="sampleItemFilterId" disabled expanded> </b-input>
               <b-dropdown
                 aria-role="list"
                 v-model="sampleItemFilterId"
@@ -109,14 +103,8 @@
                     style="align: left"
                   />
                 </template>
-                <template
-                  v-for="filterId of batchFilterIds"
-                  :key="filterId"
-                >
-                  <b-dropdown-item
-                    aria-role="listitem"
-                    :value="filterId"
-                  >
+                <template v-for="filterId of batchFilterIds" :key="filterId">
+                  <b-dropdown-item aria-role="listitem" :value="filterId">
                     {{ filterId }}
                   </b-dropdown-item>
                 </template>
@@ -130,12 +118,7 @@
               </b-button>
             </b-field>
             <b-field label="Sample type">
-              <b-dropdown
-                aria-role="list"
-                v-model="sampleItemType"
-                :disabled="!fillable"
-                expanded
-              >
+              <b-dropdown aria-role="list" v-model="sampleItemType" :disabled="!fillable" expanded>
                 <template #trigger>
                   <b-button
                     :label="sampleItemType"
@@ -189,28 +172,11 @@
               </b-dropdown>
             </b-field>
             <b-field label="Filename">
-              <b-input
-                v-model="acquisitionFilename"
-                required
-                :disabled="true"
-                expanded
-              >
-              </b-input>
+              <b-input v-model="acquisitionFilename" required :disabled="true" expanded> </b-input>
             </b-field>
             <b-field label="Sample batch">
-              <b-tooltip
-                :delay="200"
-                position="is-top"
-                type="is-dark"
-                size="is-small"
-                multilined
-              >
-                <b-dropdown
-                  aria-role="list"
-                  expanded
-                  @change="selectBatch"
-                  disabled
-                >
+              <b-tooltip :delay="200" position="is-top" type="is-dark" size="is-small" multilined>
+                <b-dropdown aria-role="list" expanded @change="selectBatch" disabled>
                   <template #trigger>
                     <b-button
                       :label="batchActive ? batchActive.sample_batch_name : ''"
@@ -219,14 +185,8 @@
                       style="align: left"
                     />
                   </template>
-                  <template
-                    v-for="batch of batches"
-                    :key="batch.sample_batch_id"
-                  >
-                    <b-dropdown-item
-                      aria-role="listitem"
-                      :value="batch"
-                    >
+                  <template v-for="batch of batches" :key="batch.sample_batch_id">
+                    <b-dropdown-item aria-role="listitem" :value="batch">
                       {{ batch.sample_batch_name }}
                     </b-dropdown-item>
                   </template>
@@ -238,10 +198,7 @@
                       <th>#</th>
                       <th>Sample name</th>
                     </tr>
-                    <template
-                      v-for="item in sampleItems"
-                      v-bind:key="item.sample_item_id"
-                    >
+                    <template v-for="item in sampleItems" v-bind:key="item.sample_item_id">
                       <tr>
                         <td>{{ item.index }}</td>
                         <td>{{ item.sample_item_name }}</td>
@@ -269,20 +226,12 @@
                         expanded
                         :disabled="!editable"
                       >
-                        <option
-                          v-for="t in availableTemplates"
-                          :value="t"
-                          :key="t.name"
-                        >
+                        <option v-for="t in availableTemplates" :value="t" :key="t.name">
                           {{ t.name }}
                         </option>
                       </b-select>
                     </div>
-                    <div
-                      class="column is-narrow"
-                      style="text-align: left"
-                      v-if="showEditFunctions"
-                    >
+                    <div class="column is-narrow" style="text-align: left" v-if="showEditFunctions">
                       <b-button
                         :disabled="
                           !loadedTemplate ||
@@ -297,11 +246,7 @@
                       >
                       </b-button>
                     </div>
-                    <div
-                      class="column is-narrow"
-                      style="text-align: left"
-                      v-if="showEditFunctions"
-                    >
+                    <div class="column is-narrow" style="text-align: left" v-if="showEditFunctions">
                       <b-button
                         @click="saveTemplate"
                         :disabled="!formFields.length"
@@ -316,18 +261,12 @@
                 </div>
               </div>
             </b-field>
-            <div
-              class="container"
-              style="text-align: center; padding: 1em 0em 0em 0em"
-            >
+            <div class="container" style="text-align: center; padding: 1em 0em 0em 0em">
               <div class="rows">
                 <div class="row">
                   <b-button
                     :disabled="
-                      sampleIsSaved ||
-                      !sampleItemName ||
-                      !sampleItemType ||
-                      !acquisitionFilename
+                      sampleIsSaved || !sampleItemName || !sampleItemType || !acquisitionFilename
                     "
                     :type="sampleIsSaved ? 'is-success' : 'is-danger'"
                     :loading="sampleItemPending === null ? false : true"
@@ -344,9 +283,7 @@
                     icon-left="close"
                     @click="closeButtonPressed()"
                     :disabled="
-                      sampleActive
-                        ? calibrationProgress != 100 || matchingProgress == null
-                        : false
+                      sampleActive ? calibrationProgress != 100 || matchingProgress == null : false
                     "
                     v-if="acquisitionFilename && conversionProgress == 100"
                   >
@@ -371,7 +308,7 @@
                     size="is-small"
                     @click="
                       (props) => {
-                        props.open = !props.open;
+                        props.open = !props.open
                       }
                     "
                   >
@@ -426,13 +363,7 @@
           <!-- Target search step -->
           <b-step-item
             label="Target search"
-            :clickable="
-              this.sampleActive
-                ? this.sampleMzCalibrated
-                  ? true
-                  : false
-                : false
-            "
+            :clickable="this.sampleActive ? (this.sampleMzCalibrated ? true : false) : false"
             :type="{ 'is-success': this.sampleMatched }"
           >
             <h1 class="title has-text-centered">Target search</h1>
@@ -466,19 +397,19 @@
 </template>
 
 <script>
-import BaseParamField from "./BaseParamField.vue";
-import BaseTable from "./BaseTable.vue";
-import TheLayoutSidebar from "./TheLayoutSidebar.vue";
-import ThePaneBrowserTarget from "./ThePaneBrowserTarget.vue";
-import ThePaneSettingsCalibration from "./ThePaneSettingsCalibration.vue";
+import BaseParamField from './BaseParamField.vue'
+import BaseTable from './BaseTable.vue'
+import TheLayoutSidebar from './TheLayoutSidebar.vue'
+import ThePaneBrowserTarget from './ThePaneBrowserTarget.vue'
+import ThePaneSettingsCalibration from './ThePaneSettingsCalibration.vue'
 
-import * as _ from "underscore";
-import { mapMutations } from "vuex";
-import { call, get, sync } from "vuex-pathify";
-import { beautifySnakeCase, strToSnakeCase, genId } from "../lib/util";
+import * as _ from 'underscore'
+import { mapMutations } from 'vuex'
+import { call, get, sync } from 'vuex-pathify'
+import { beautifySnakeCase, strToSnakeCase, genId } from '../lib/util'
 
 export default {
-  name: "TheModalScenthoundWorkflow",
+  name: 'TheModalScenthoundWorkflow',
   components: {
     BaseParamField,
     BaseTable,
@@ -491,35 +422,35 @@ export default {
     return {
       activeStep: 0,
       defaultTemplate: {
-        name: "default",
+        name: 'default',
         template: [
           {
-            label: "sample_item_name",
+            label: 'sample_item_name',
             required: true,
-            placeholder: "Sample title",
+            placeholder: 'Sample title',
           },
         ],
       },
       formFields: [],
       loadedTemplate: null,
       mzCalibrationTableCols: [
-        { field: "mz", label: "Isotope m/z" },
-        { field: "sample_peak_mz", label: "Pre peak m/z" },
+        { field: 'mz', label: 'Isotope m/z' },
+        { field: 'sample_peak_mz', label: 'Pre peak m/z' },
         {
-          field: "match_mz_error",
-          label: "Pre m/z error [ppm]",
+          field: 'match_mz_error',
+          label: 'Pre m/z error [ppm]',
           subheading: null,
         },
-        { field: "calibration_mz", label: "Post peak m/z" },
+        { field: 'calibration_mz', label: 'Post peak m/z' },
         {
-          field: "calibration_mz_error",
-          label: "Post m/z error [ppm]",
+          field: 'calibration_mz_error',
+          label: 'Post m/z error [ppm]',
           subheading: null,
         },
-        { field: "mz_error_diff", label: "m/z error diff", subheading: null },
+        { field: 'mz_error_diff', label: 'm/z error diff', subheading: null },
         {
-          field: "calibrant_to_tic",
-          label: "fraction of TIC",
+          field: 'calibrant_to_tic',
+          label: 'fraction of TIC',
           subheading: null,
         },
       ],
@@ -527,194 +458,182 @@ export default {
       sampleItemFilterId: null,
       sampleItemType: null,
       showEditFunctions: false,
-      templateType: "sample_item",
-    };
+      templateType: 'sample_item',
+    }
   },
   computed: {
     ...get({
-      acquisitionFilename: "instrument/acquisitionActiveFilename",
-      acquisitionProgress: "instrument/acquisitionProgress",
-      allTemplates: "app/attributeTemplates",
-      batchActive: "batch/active",
-      batches: "workspace/batches",
-      calibrationStatus: "calibration/calibrationStatus",
-      conversionProgress: "instrument/conversionProgress",
-      instrumentActive: "instrument/active",
-      matchingProgress: "instrument/matchingProgress",
-      mzCalibrationParams: "calibration/params",
-      mzFit: "calibration/mzFit",
-      mzFitError: "calibration/mzFitError",
-      mzFitStats: "calibration/mzFitStats",
-      sampleActive: "sample/active",
-      sampleAlarmCategory: "sample/alarmCategory",
-      sampleItems: "batch/sampleItems",
-      sampleMatched: "sample/matched",
-      sampleMatchCompounds: "sample/matchCompounds",
-      sampleMzCalibrated: "sample/active@mz_calibration.verified",
+      acquisitionFilename: 'instrument/acquisitionActiveFilename',
+      acquisitionProgress: 'instrument/acquisitionProgress',
+      allTemplates: 'app/attributeTemplates',
+      batchActive: 'batch/active',
+      batches: 'workspace/batches',
+      calibrationStatus: 'calibration/calibrationStatus',
+      conversionProgress: 'instrument/conversionProgress',
+      instrumentActive: 'instrument/active',
+      matchingProgress: 'instrument/matchingProgress',
+      mzCalibrationParams: 'calibration/params',
+      mzFit: 'calibration/mzFit',
+      mzFitError: 'calibration/mzFitError',
+      mzFitStats: 'calibration/mzFitStats',
+      sampleActive: 'sample/active',
+      sampleAlarmCategory: 'sample/alarmCategory',
+      sampleItems: 'batch/sampleItems',
+      sampleMatched: 'sample/matched',
+      sampleMatchCompounds: 'sample/matchCompounds',
+      sampleMzCalibrated: 'sample/active@mz_calibration.verified',
     }),
     ...sync({
-      sampleItemPending: "instrument/sampleItemPending",
-      scenthoundModeActive: "instrument/scenthoundModeActive",
+      sampleItemPending: 'instrument/sampleItemPending',
+      scenthoundModeActive: 'instrument/scenthoundModeActive',
     }),
     availableTemplates() {
-      return [this.defaultTemplate, ...this.savedTemplates];
+      return [this.defaultTemplate, ...this.savedTemplates]
     },
     editable() {
-      return !this.sampleItemPending;
+      return !this.sampleItemPending
     },
     fillable() {
-      return this.acquisitionFilename && !this.sampleItemPending;
+      return this.acquisitionFilename && !this.sampleItemPending
     },
     batchFilterIds() {
       return this.batchActive
         ? [null, ...new Set(this.sampleItems.map((item) => item.filter_id))]
-        : [];
+        : []
     },
     calibrationProgress() {
-      return this.calibrationStatus ? this.calibrationStatus.progress : 0;
+      return this.calibrationStatus ? this.calibrationStatus.progress : 0
     },
     filterIsNew() {
-      return !this.batchFilterIds.includes(this.sampleItemFilterId);
+      return !this.batchFilterIds.includes(this.sampleItemFilterId)
     },
     mzCalibrationTableRows() {
-      return this.mzFitStats ?? [];
+      return this.mzFitStats ?? []
     },
     sampleFilename() {
-      return this.sampleActive
-        ? this.sampleActive.filename
-        : this.acquisitionFilename;
+      return this.sampleActive ? this.sampleActive.filename : this.acquisitionFilename
     },
     sampleIsSaved() {
       return this.sampleActive
         ? this.sampleItemName === this.sampleActive.sample_item_name &&
             this.sampleItemType === this.sampleActive.sample_item_type &&
             this.sampleItemFilterId === this.sampleActive.filter_id &&
-            _.isEqual(
-              this.sampleItemAttributes,
-              this.sampleActive.sample_item_attributes
-            )
-        : false;
+            _.isEqual(this.sampleItemAttributes, this.sampleActive.sample_item_attributes)
+        : false
     },
     sampleItemAttributes() {
       return this.formFields
-        .filter((field) => field.label != "sample_item_name")
+        .filter((field) => field.label != 'sample_item_name')
         .reduce(
           (acc, cur) => ({
             ...acc,
-            [strToSnakeCase(cur.label)]: cur.value || "",
+            [strToSnakeCase(cur.label)]: cur.value || '',
           }),
-          {}
-        );
+          {},
+        )
     },
     sampleItemName() {
-      return this.formFields.filter(
-        (field) => field.label == "sample_item_name"
-      )[0].value;
+      return this.formFields.filter((field) => field.label == 'sample_item_name')[0].value
     },
     sampleMatchClass() {
-      if (this.sampleAlarmCategory === null) return "is-success";
+      if (this.sampleAlarmCategory === null) return 'is-success'
       if (this.sampleAlarmCategory === 2) {
-        return "is-danger";
+        return 'is-danger'
       } else if (this.sampleAlarmCategory === 1) {
-        return "is-warning";
+        return 'is-warning'
       } else {
-        return "is-success";
+        return 'is-success'
       }
     },
     savedTemplates() {
-      return this.allTemplates.filter(
-        (template) => template.type == this.templateType
-      );
+      return this.allTemplates.filter((template) => template.type == this.templateType)
     },
   },
   created() {
-    this.sampleUnload();
-    this.scenthoundModeActive = true;
-    this.loadedTemplate = this.clone(this.defaultTemplate);
-    this.formFields = [...this.defaultTemplate.template];
+    this.sampleUnload()
+    this.scenthoundModeActive = true
+    this.loadedTemplate = this.clone(this.defaultTemplate)
+    this.formFields = [...this.defaultTemplate.template]
   },
   beforeRouteLeave(to, from, next) {
-    this.scenthoundModeActive = false;
-    next();
+    this.scenthoundModeActive = false
+    next()
   },
   methods: {
     ...call({
-      batchSelect: "batch/load",
-      mzCalibrationReset: "calibration/unload",
-      calibrationMzFit: "calibration/calibrationMzFit",
-      calibrationMzApply: "calibration/calibrationMzApply",
-      resetAcquisitionStatus: "instrument/resetAcquisitionStatus",
-      sampleItemCreate: "sample/create",
-      sampleItemUpdate: "sample/update",
-      sampleUnload: "sample/unload",
-      matchSampleCompute: "sample/matchSampleCompute",
-      createAttributeTemplate: "sample/createAttributeTemplate",
-      deleteAttributeTemplate: "sample/deleteAttributeTemplate",
+      batchSelect: 'batch/load',
+      mzCalibrationReset: 'calibration/unload',
+      calibrationMzFit: 'calibration/calibrationMzFit',
+      calibrationMzApply: 'calibration/calibrationMzApply',
+      resetAcquisitionStatus: 'instrument/resetAcquisitionStatus',
+      sampleItemCreate: 'sample/create',
+      sampleItemUpdate: 'sample/update',
+      sampleUnload: 'sample/unload',
+      matchSampleCompute: 'sample/matchSampleCompute',
+      createAttributeTemplate: 'sample/createAttributeTemplate',
+      deleteAttributeTemplate: 'sample/deleteAttributeTemplate',
     }),
     ...mapMutations({}),
     clone(obj) {
-      return JSON.parse(JSON.stringify(obj));
+      return JSON.parse(JSON.stringify(obj))
     },
     closeButtonPressed() {
       if (this.sampleActive && this.sampleIsSaved) {
-        this.reset();
+        this.reset()
       } else {
         this.$buefy.dialog.confirm({
-          title: "Close sample without saving?",
+          title: 'Close sample without saving?',
           message: `There is unsaved information in the form.
             Are you sure you want to close the sample without saving?`,
-          confirmText: "Close",
+          confirmText: 'Close',
           onConfirm: () => {
-            this.reset();
+            this.reset()
           },
-        });
+        })
       }
     },
     convertLabelToTitle(label) {
-      return beautifySnakeCase(label);
+      return beautifySnakeCase(label)
     },
     addField() {
       this.$buefy.dialog.prompt({
-        message: "Add field to template",
-        confirmText: "Add",
+        message: 'Add field to template',
+        confirmText: 'Add',
         inputAttrs: {
-          placeholder: "field label",
+          placeholder: 'field label',
           maxlength: 100,
         },
         trapFocus: true,
         onConfirm: (fieldToAdd) => {
           this.loadedTemplate = {
             name: null,
-            template: [...this.formFields, { label: fieldToAdd, value: "" }],
-          };
+            template: [...this.formFields, { label: fieldToAdd, value: '' }],
+          }
         },
-      });
+      })
     },
     deleteTemplate() {
       this.$buefy.dialog.confirm({
-        title: "Deleting template",
+        title: 'Deleting template',
         message:
-          "Are you sure you want to delete template <b>" +
-          this.loadedTemplate.name +
-          "</b>?",
-        confirmText: "Delete",
+          'Are you sure you want to delete template <b>' + this.loadedTemplate.name + '</b>?',
+        confirmText: 'Delete',
         onConfirm: () => {
           const templateToDelete = this.availableTemplates.find(
             (template) =>
-              template.attribute_template_id ==
-              this.loadedTemplate.attribute_template_id
-          );
-          this.deleteAttributeTemplate(templateToDelete);
+              template.attribute_template_id == this.loadedTemplate.attribute_template_id,
+          )
+          this.deleteAttributeTemplate(templateToDelete)
         },
-      });
+      })
     },
     removeField(event) {
       // Field to remove label is in button element id, find it from the event data
-      let fieldToRemove = event.target.id;
+      let fieldToRemove = event.target.id
       if (!fieldToRemove.length) {
         // Failed to find the button id
-        console.log("fieldToRemove not found at event.target.id: ", event);
-        return;
+        console.log('fieldToRemove not found at event.target.id: ', event)
+        return
       }
       for (let i = 0; i < this.loadedTemplate.template.length; ++i) {
         if (_.isEqual(fieldToRemove, this.loadedTemplate.template[i].label)) {
@@ -724,91 +643,89 @@ export default {
               ...this.loadedTemplate.template.slice(0, i),
               ...this.loadedTemplate.template.slice(i + 1),
             ],
-          };
-          break;
+          }
+          break
         }
       }
     },
     saveTemplate() {
       this.$buefy.dialog.prompt({
-        title: "Template name",
-        confirmText: "Save",
+        title: 'Template name',
+        confirmText: 'Save',
         inputAttrs: {
-          placeholder: "template name",
+          placeholder: 'template name',
           maxlength: 100,
         },
         trapFocus: true,
         onConfirm: (templateName) => {
-          if (templateName.toLowerCase() === "default") {
+          if (templateName.toLowerCase() === 'default') {
             this.$buefy.toast.open({
               message: `Name "${templateName}" is not allowed`,
               duration: 5000,
-              type: "is-danger",
-            });
-            return;
+              type: 'is-danger',
+            })
+            return
           }
-          let templateFormFields = this.clone(this.formFields);
+          let templateFormFields = this.clone(this.formFields)
           // Empty values
-          templateFormFields.forEach((field) => (field.value = ""));
+          templateFormFields.forEach((field) => (field.value = ''))
           let newTemplate = {
             name: templateName,
             type: this.templateType,
             template: templateFormFields,
-          };
-          let i = 0;
+          }
+          let i = 0
           // set loaded template
           for (i = 0; i < this.availableTemplates.length; ++i) {
-            if (_.isEqual(templateName, this.availableTemplates[i].name)) break;
+            if (_.isEqual(templateName, this.availableTemplates[i].name)) break
           }
           if (i < this.availableTemplates.length) {
             // existing template
-            this.availableTemplates[i] = this.clone(newTemplate);
+            this.availableTemplates[i] = this.clone(newTemplate)
           } else {
             // new template
-            this.availableTemplates.push(this.clone(newTemplate));
+            this.availableTemplates.push(this.clone(newTemplate))
           }
-          this.loadedTemplate = this.clone(newTemplate);
+          this.loadedTemplate = this.clone(newTemplate)
           // push new template
-          this.createAttributeTemplate(this.loadedTemplate);
-          this.showEditFunctions = false;
+          this.createAttributeTemplate(this.loadedTemplate)
+          this.showEditFunctions = false
         },
-      });
+      })
     },
     generateFilterId() {
-      this.sampleItemFilterId = genId(6, false);
+      this.sampleItemFilterId = genId(6, false)
     },
     async mzCalibrationFit() {
-      this.mzCalibrationReset();
+      this.mzCalibrationReset()
       const requestData = {
         sampleId: this.sampleActive.sample_item_id,
         sampleName: this.sampleActive.sample_item_name,
         body: this.mzCalibrationParams,
-      };
-      await this.calibrationMzFit(requestData);
+      }
+      await this.calibrationMzFit(requestData)
     },
     async mzCalibrationApply() {
       const requestData = {
         fit: this.mzFit,
         sample_filename: this.sampleFilename,
-      };
-      await this.calibrationMzApply(requestData);
+      }
+      await this.calibrationMzApply(requestData)
     },
     reset() {
-      this.resetAcquisitionStatus();
-      this.resetSampleItem();
-      this.activeStep = 0;
+      this.resetAcquisitionStatus()
+      this.resetSampleItem()
+      this.activeStep = 0
     },
     resetSampleItem() {
-      this.sampleUnload();
-      this.sampleItemFilterId = null;
-      this.sampleItemType = null;
+      this.sampleUnload()
+      this.sampleItemFilterId = null
+      this.sampleItemType = null
       // Reset sample item name
-      this.formFields.filter(
-        (field) => field.label == "sample_item_name"
-      )[0].value = null;
+      this.formFields.filter((field) => field.label == 'sample_item_name')[0].value = null
     },
     async sampleMatch() {
-      await this.matchSampleCompute(this.sampleActive);
+      await this.matchSampleCompute(this.sampleActive)
     },
     saveSampleInfoButtonPressed() {
       let sample = {
@@ -818,18 +735,18 @@ export default {
         sample_batch_id: this.batchActive.sample_batch_id,
         sample_item_attributes: this.sampleItemAttributes,
         filter_id: this.sampleItemFilterId,
-      };
+      }
       if (this.conversionProgress < 100) {
-        this.sampleItemPending = sample;
-        return;
+        this.sampleItemPending = sample
+        return
       } else {
-        this.saveSampleInformation(sample);
+        this.saveSampleInformation(sample)
       }
     },
     async saveSampleInformation(sample) {
       if (!this.sampleActive) {
         // Create
-        await this.sampleItemCreate(sample);
+        await this.sampleItemCreate(sample)
       } else {
         // Update
         sample = {
@@ -837,35 +754,35 @@ export default {
           sample_item_id: this.sampleActive.sample_item_id,
           sample_item_attributes: this.sampleActive.sample_item_attributes,
           sample_item_utc_created: this.sampleActive.sample_item_utc_created,
-        };
-        await this.sampleItemUpdate(sample);
+        }
+        await this.sampleItemUpdate(sample)
       }
     },
     selectBatch(val) {
-      this.batchSelect(val.sample_batch_id);
+      this.batchSelect(val.sample_batch_id)
     },
   },
   watch: {
     activeStep() {
       switch (this.activeStep) {
         case 0:
-          break;
+          break
         case 1:
-          break;
+          break
         case 2:
-          break;
+          break
       }
     },
     acquisitionProgress(newValue, oldValue) {
       if (newValue == 0) {
-        this.resetSampleItem();
-        this.activeStep = 0;
+        this.resetSampleItem()
+        this.activeStep = 0
       }
     },
     calibrationProgress(newValue, oldValue) {
       if (oldValue != 100 && newValue == 100) {
         if (this.calibrationStatus.failed) {
-          this.activeStep = 1;
+          this.activeStep = 1
         }
       }
     },
@@ -873,15 +790,15 @@ export default {
       handler(newValue) {
         if (newValue) {
           // Make a copy to avoid mutating the loaded template directly
-          let newFormFields = this.clone(newValue.template);
+          let newFormFields = this.clone(newValue.template)
           // Fill in new form with values from the old
           newFormFields.forEach(
             (field) =>
               (field.value = this.formFields.find(
-                (old_field) => old_field.label === field.label
-              )?.value)
-          );
-          this.formFields = newFormFields;
+                (old_field) => old_field.label === field.label,
+              )?.value),
+          )
+          this.formFields = newFormFields
         }
       },
       deep: true,
@@ -889,14 +806,14 @@ export default {
     sampleAlarmCategory(newValue) {
       if (newValue > 0) {
         // Switch to target search page if sample alarms
-        this.activeStep = 2;
+        this.activeStep = 2
       }
     },
     sampleItemFilterId() {
       // Reset sample item type when filter ID is changed
       // In order to not allow inconsistency between filter ID and sample type
-      this.sampleItemType = null;
+      this.sampleItemType = null
     },
   },
-};
+}
 </script>

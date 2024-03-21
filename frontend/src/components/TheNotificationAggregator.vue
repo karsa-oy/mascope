@@ -10,15 +10,15 @@
 </template>
 
 <script>
-import TheNotificationWarning from "./TheNotificationWarning.vue";
-import TheNotificationGeneral from "./TheNotificationGeneral.vue";
-import TheNotificationProgress from "./TheNotificationProgress.vue";
-import TheNotificationBatchComputeProgress from "./TheNotificationBatchComputeProgress.vue";
-import TheNotificationItemComputeProgress from "./TheNotificationItemComputeProgress.vue";
-import TheNotificationCalibrationProgress from "./TheNotificationCalibrationProgress.vue";
+import TheNotificationWarning from './TheNotificationWarning.vue'
+import TheNotificationGeneral from './TheNotificationGeneral.vue'
+import TheNotificationProgress from './TheNotificationProgress.vue'
+import TheNotificationBatchComputeProgress from './TheNotificationBatchComputeProgress.vue'
+import TheNotificationItemComputeProgress from './TheNotificationItemComputeProgress.vue'
+import TheNotificationCalibrationProgress from './TheNotificationCalibrationProgress.vue'
 
 export default {
-  name: "TheNotificationAggregator",
+  name: 'TheNotificationAggregator',
   components: {
     TheNotificationWarning,
     TheNotificationGeneral,
@@ -27,5 +27,5 @@ export default {
     TheNotificationItemComputeProgress,
     TheNotificationCalibrationProgress,
   },
-};
+}
 </script>

@@ -1,4 +1,4 @@
-import { make } from "vuex-pathify";
+import { make } from 'vuex-pathify'
 
 const state = {
   // active modal indicator
@@ -31,7 +31,7 @@ const state = {
   sampleItemOverviewActive: false,
   sampleItemOverviewProps: {},
   sampleItemTargetIonActive: false,
-};
+}
 
 export default {
   namespaced: true,
@@ -40,17 +40,15 @@ export default {
     ...make.mutations(state),
 
     activate(state, { modal }) {
-      state.active = modal;
-      state[modal + "Active"] = true;
+      state.active = modal
+      state[modal + 'Active'] = true
     },
     deactivate(state) {
-      let activeState = Object.keys(state).filter((prop) =>
-        prop.endsWith("Active")
-      );
+      let activeState = Object.keys(state).filter((prop) => prop.endsWith('Active'))
       for (let prop of activeState) {
-        state[prop] = false;
+        state[prop] = false
       }
-      state.active = null;
+      state.active = null
     },
   },
-};
+}

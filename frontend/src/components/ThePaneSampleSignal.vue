@@ -6,14 +6,14 @@
 </template>
 
 <script>
-import ThePaneChartSampleSignalSumSpectrum from "./ThePaneChartSampleSignalSumSpectrum.vue";
-import ThePaneChartSampleSignalTimeseries from "./ThePaneChartSampleSignalTimeseries.vue";
+import ThePaneChartSampleSignalSumSpectrum from './ThePaneChartSampleSignalSumSpectrum.vue'
+import ThePaneChartSampleSignalTimeseries from './ThePaneChartSampleSignalTimeseries.vue'
 
 export default {
-  name: "ThePaneSampleSignal",
+  name: 'ThePaneSampleSignal',
   components: {
     ThePaneChartSampleSignalSumSpectrum,
     ThePaneChartSampleSignalTimeseries,
   },
-};
+}
 </script>

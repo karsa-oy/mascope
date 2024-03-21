@@ -2,14 +2,11 @@
   <b-field :label="label">
     <template v-if="cols.length > 1 && rows.length > 0">
       <section>
-        <section
-          style="font-style: italic; color: #b7b7b7; padding-bottom: 0.5em"
-        >
+        <section style="font-style: italic; color: #b7b7b7; padding-bottom: 0.5em">
           Paste spreadsheet data again to replace data.
         </section>
         <section>
-          <b-table :columns="cols" :data="rows" style="padding-bottom: 0.5em">
-          </b-table>
+          <b-table :columns="cols" :data="rows" style="padding-bottom: 0.5em"> </b-table>
         </section>
       </section>
     </template>
@@ -18,11 +15,11 @@
 </template>
 
 <script>
-import table from "$lib/table";
-import { get } from "vuex-pathify";
+import table from '$lib/table'
+import { get } from 'vuex-pathify'
 
 export default {
-  name: "BaseSpreadsheetInput",
+  name: 'BaseSpreadsheetInput',
   props: {
     label: {
       type: String,
@@ -40,56 +37,52 @@ export default {
     info: {
       type: String,
       required: false,
-      default: "Paste spreadsheet cells here",
+      default: 'Paste spreadsheet cells here',
     },
   },
   data: function () {
     return {
-      clipboardText: "",
+      clipboardText: '',
       rows: [],
-    };
+    }
   },
   computed: {
     ...get({
-      control: "key/control",
-      v: "key/v",
+      control: 'key/control',
+      v: 'key/v',
     }),
     fields() {
-      return this.cols.map((col) => col.field);
+      return this.cols.map((col) => col.field)
     },
   },
   methods: {
     parseClipboard: async function () {
-      navigator.permissions.query({ name: "clipboard-read" });
-      let clipboardText = await navigator.clipboard.readText();
+      navigator.permissions.query({ name: 'clipboard-read' })
+      let clipboardText = await navigator.clipboard.readText()
       if (this.colsFromHeader) {
-        let fields = table.readHeader(clipboardText);
+        let fields = table.readHeader(clipboardText)
         let cols = fields.map((field) => ({
-          field: field.toLowerCase().replace(/ /g, "_").trim(),
+          field: field.toLowerCase().replace(/ /g, '_').trim(),
           label: field,
-        }));
-        this.$emit("colsPasted", cols);
-        await this.$nextTick();
+        }))
+        this.$emit('colsPasted', cols)
+        await this.$nextTick()
       }
-      this.rows = table.fromSpreadsheet(
-        clipboardText,
-        this.fields,
-        this.colsFromHeader
-      );
-      this.$emit("rowsPasted", this.rows);
+      this.rows = table.fromSpreadsheet(clipboardText, this.fields, this.colsFromHeader)
+      this.$emit('rowsPasted', this.rows)
     },
   },
   watch: {
     control: function () {
       if (this.control && this.v) {
-        this.parseClipboard();
+        this.parseClipboard()
       }
     },
     v: function () {
       if (this.control && this.v) {
-        this.parseClipboard();
+        this.parseClipboard()
       }
     },
   },
-};
+}
 </script>

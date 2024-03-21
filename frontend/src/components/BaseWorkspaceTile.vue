@@ -15,10 +15,10 @@
               modalProps = {
                 action: 'edit',
                 workspace_id: workspace.workspace_id,
-              };
+              }
               activateModal({
                 modal: 'workspaceSave',
-              });
+              })
             }
           "
         >
@@ -31,10 +31,10 @@
               modalProps = {
                 action: 'delete',
                 workspace_id: workspace.workspace_id,
-              };
+              }
               activateModal({
                 modal: 'workspaceSave',
-              });
+              })
             }
           "
         >
@@ -49,11 +49,11 @@
 </template>
 
 <script>
-import { mapMutations } from "vuex";
-import { sync, call } from "vuex-pathify";
+import { mapMutations } from 'vuex'
+import { sync, call } from 'vuex-pathify'
 
 export default {
-  name: "BaseWorkspaceTile",
+  name: 'BaseWorkspaceTile',
   props: {
     workspace: {
       required: true,
@@ -61,21 +61,21 @@ export default {
   },
   computed: {
     ...sync({
-      modalProps: "modal/workspaceSaveProps",
+      modalProps: 'modal/workspaceSaveProps',
     }),
   },
   methods: {
     ...call({
-      workspaceLoad: "workspace/load",
-      targetsLoad: "targets/load",
+      workspaceLoad: 'workspace/load',
+      targetsLoad: 'targets/load',
     }),
     ...mapMutations({
-      activateModal: "modal/activate",
+      activateModal: 'modal/activate',
     }),
     onClick() {
-      this.workspaceLoad(this.workspace.workspace_id);
-      this.targetsLoad();
+      this.workspaceLoad(this.workspace.workspace_id)
+      this.targetsLoad()
     },
   },
-};
+}
 </script>

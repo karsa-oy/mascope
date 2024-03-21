@@ -7,14 +7,8 @@
         <template #trigger>
           <b-button :icon-left="contextMenuIcon" size="is-small" />
         </template>
-        <template
-          v-for="item of menu"
-          :key="item.label"  
-        >
-          <b-dropdown-item
-            aria-role="listitem"
-            @click="item.onClick"
-          >
+        <template v-for="item of menu" :key="item.label">
+          <b-dropdown-item aria-role="listitem" @click="item.onClick">
             {{ item.label }}
           </b-dropdown-item>
         </template>
@@ -84,23 +78,23 @@
 </template>
 
 <script>
-import BaseTagMatch from "./BaseTagMatch.vue";
+import BaseTagMatch from './BaseTagMatch.vue'
 
-import { cloneDeep } from "lodash";
+import { cloneDeep } from 'lodash'
 
-let doNothing = () => ({});
+let doNothing = () => ({})
 
 export default {
-  name: "BaseBrowser",
+  name: 'BaseBrowser',
   components: {
-    BaseBrowser: () => import("./BaseBrowser.vue"),
+    BaseBrowser: () => import('./BaseBrowser.vue'),
     BaseTagMatch,
   },
   props: {
     contextMenuIcon: {
       type: String,
       required: false,
-      default: "dots-horizontal",
+      default: 'dots-horizontal',
     },
     name: {
       type: String,
@@ -128,71 +122,71 @@ export default {
     },
   },
   created: function () {
-    this.formatter = new Intl.NumberFormat("en-US", {
+    this.formatter = new Intl.NumberFormat('en-US', {
       minimumFractionDigits: this.minPrecision,
       maximumFractionDigits: this.maxPrecision,
-    });
+    })
   },
   computed: {
     currentLevel: function () {
-      return this.levels[0];
+      return this.levels[0]
     },
     slug: function () {
-      return this.currentLevel.slug;
+      return this.currentLevel.slug
     },
     levelName: function () {
-      return this.currentLevel[this.currentLevel.slug + "_name"];
+      return this.currentLevel[this.currentLevel.slug + '_name']
     },
     rows: function () {
-      return this.currentLevel.rows;
+      return this.currentLevel.rows
     },
     cols: function () {
-      return this.currentLevel.cols;
+      return this.currentLevel.cols
     },
     showHeader: function () {
-      return this.currentLevel.showHeader ?? true;
+      return this.currentLevel.showHeader ?? true
     },
     defaultSort: function () {
-      return this.currentLevel.defaultSort ?? null;
+      return this.currentLevel.defaultSort ?? null
     },
     detailsIcon: function () {
-      let icon;
+      let icon
       switch (this.currentLevel.detailsIcon) {
-        case "default":
-          icon = "chevron-right";
-          break;
+        case 'default':
+          icon = 'chevron-right'
+          break
         case null:
-          icon = "";
-          break;
+          icon = ''
+          break
         default:
-          icon = this.currentLevel.detailsIcon;
-          break;
+          icon = this.currentLevel.detailsIcon
+          break
       }
-      return icon;
+      return icon
     },
     detailsOpen: function () {
-      if (!this.currentLevel.detailsOpen) return doNothing;
+      if (!this.currentLevel.detailsOpen) return doNothing
       let handleDetailsOpen = (row) => {
-        this.currentLevel.detailsOpen(row);
-        this.refresh();
-      };
-      return handleDetailsOpen;
+        this.currentLevel.detailsOpen(row)
+        this.refresh()
+      }
+      return handleDetailsOpen
     },
     rowClick: function () {
       let handleClick = (row) => {
-        this.currentLevel.rowClick(row);
-        this.refresh();
-      };
-      return handleClick ?? doNothing;
+        this.currentLevel.rowClick(row)
+        this.refresh()
+      }
+      return handleClick ?? doNothing
     },
     opened: function () {
-      return this.currentLevel.opened ?? null;
+      return this.currentLevel.opened ?? null
     },
     minPrecision: function () {
-      return this.currentLevel.minPrecision ?? 1;
+      return this.currentLevel.minPrecision ?? 1
     },
     maxPrecision: function () {
-      return this.currentLevel.maxPrecision ?? 3;
+      return this.currentLevel.maxPrecision ?? 3
     },
   },
   methods: {
@@ -204,76 +198,75 @@ export default {
       // Both parentIdField and parentCollectionId are used for childRow to be correcly assigned to the right collection and to avoid dublicates.
       // If the parentRow do not have the target_collection_id (undefined) then childRow will assigned only by parentIdField.
 
-      let childLevels = [];
+      let childLevels = []
       // init iteration parameters
-      let currentLevel = cloneDeep(this.currentLevel);
-      currentLevel.rows = cloneDeep(parentRows);
-      let nextLevels = cloneDeep(this.levels).splice(1);
+      let currentLevel = cloneDeep(this.currentLevel)
+      currentLevel.rows = cloneDeep(parentRows)
+      let nextLevels = cloneDeep(this.levels).splice(1)
 
       while (nextLevels.length > 0) {
-        const parentIdField = `${currentLevel.slug}_id`;
-        const parentIds = currentLevel.rows.map((row) => row[parentIdField]);
+        const parentIdField = `${currentLevel.slug}_id`
+        const parentIds = currentLevel.rows.map((row) => row[parentIdField])
         // set the parentCollectionId if available
-        const parentCollectionId =
-          parentRows[0]?.target_collection_id ?? undefined;
+        const parentCollectionId = parentRows[0]?.target_collection_id ?? undefined
 
-        let childLevel = nextLevels.shift();
+        let childLevel = nextLevels.shift()
         if (childLevel.rows && childLevel.rows.length > 0) {
           childLevel.rows = childLevel.rows.filter(
             (childRow) =>
               parentIds.includes(childRow[parentIdField]) &&
               // check if the childRow is assigned to the same collection as the parentRow.This condition is ignored if parentCollectionId is undefined
               (parentCollectionId === undefined ||
-                childRow.target_collection_id === parentCollectionId)
-          );
+                childRow.target_collection_id === parentCollectionId),
+          )
           // push results
-          childLevels.push(childLevel);
+          childLevels.push(childLevel)
           // update iteration parameters
-          currentLevel = childLevel;
+          currentLevel = childLevel
         } else {
-          break;
+          break
         }
       }
-      return childLevels;
+      return childLevels
     },
     parseValue: function (value) {
-      let isNumeric = typeof value == "number";
-      return isNumeric ? this.formatter.format(value) : value;
+      let isNumeric = typeof value == 'number'
+      return isNumeric ? this.formatter.format(value) : value
     },
     dynamic: function (className) {
       if (this.isRoot) {
-        return `${className}-root`;
+        return `${className}-root`
       } else {
-        return `${className}-other`;
+        return `${className}-other`
       }
     },
     matchScoreTagClicked: function (row) {
-      this.$emit("tagClicked", row);
+      this.$emit('tagClicked', row)
     },
     rowClass: function (row) {
       switch (row.selection) {
         case 3:
-          return "base-browser-row-focused";
+          return 'base-browser-row-focused'
         case 2:
-          return "base-browser-row-fully-selected";
+          return 'base-browser-row-fully-selected'
         case 1:
-          return "base-browser-row-partially-selected";
+          return 'base-browser-row-partially-selected'
         case 0:
-          return "";
+          return ''
       }
     },
     refresh: function () {
       if (this.isRoot) {
-        this.$forceUpdate();
+        this.$forceUpdate()
       } else {
-        this.rootRefresh();
+        this.rootRefresh()
       }
     },
     open: function (row) {
-      this.$refs.table.openDetailRow(row);
+      this.$refs.table.openDetailRow(row)
     },
     close: function (row) {
-      this.$refs.table.closeDetailRow(row);
+      this.$refs.table.closeDetailRow(row)
     },
   },
   watch: {
@@ -282,16 +275,16 @@ export default {
         this.$nextTick(() => {
           this.rows.forEach((row) => {
             if (openedRows.includes(row)) {
-              this.open(row);
+              this.open(row)
             } else {
-              this.close(row);
+              this.close(row)
             }
-          });
-        });
+          })
+        })
       }
     },
   },
-};
+}
 </script>
 
 <style>

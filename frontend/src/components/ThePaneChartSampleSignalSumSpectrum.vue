@@ -19,107 +19,104 @@
 </template>
 
 <script>
-import BaseChartPlotly from "./BaseChartPlotly.vue";
+import BaseChartPlotly from './BaseChartPlotly.vue'
 
-import { get } from "vuex-pathify";
+import { get } from 'vuex-pathify'
 
 export default {
-  name: "ThePaneChartSampleSignalSumSpectrum",
+  name: 'ThePaneChartSampleSignalSumSpectrum',
   components: { BaseChartPlotly },
   data() {
     return {
       yAxisMax: null,
-    };
+    }
   },
   computed: {
     ...get({
-      sampleFocused: "sample/active",
-      traces: "visualization/tracesSignalSumSpectrum",
-      activeIsotopes: "visualization/activeIsotopes",
+      sampleFocused: 'sample/active',
+      traces: 'visualization/tracesSignalSumSpectrum',
+      activeIsotopes: 'visualization/activeIsotopes',
     }),
     data: function () {
       return {
         traces: this.traces ? this.traces : [],
-      };
+      }
     },
     layout: function () {
-      if (!this.traces) return {};
+      if (!this.traces) return {}
 
       const annotations = this.activeIsotopes
         .map((isotope) => {
-          if (isotope.sample_peak_area === 0) return null;
+          if (isotope.sample_peak_area === 0) return null
 
           // Find the trace that corresponds to the isotope in focus
           const correspondingTrace = this.traces.find(
-            (trace) => trace.target_isotope_id === isotope.target_isotope_id
-          );
-          if (!correspondingTrace) return null;
+            (trace) => trace.target_isotope_id === isotope.target_isotope_id,
+          )
+          if (!correspondingTrace) return null
 
           // Calculate the center position for the x-axis
-          const xValues = correspondingTrace.x;
-          const xCenter =
-            xValues.length > 0
-              ? (Math.max(...xValues) + Math.min(...xValues)) / 2
-              : 0;
+          const xValues = correspondingTrace.x
+          const xCenter = xValues.length > 0 ? (Math.max(...xValues) + Math.min(...xValues)) / 2 : 0
 
           return {
             text: `Target isotope intensity: ${this.formatNumber(
-              isotope.sample_peak_area.toFixed(0)
+              isotope.sample_peak_area.toFixed(0),
             )}`,
             x: xCenter,
-            xref: "x" + (correspondingTrace.xaxis === "x" ? "" : "2"),
-            xanchor: "center",
+            xref: 'x' + (correspondingTrace.xaxis === 'x' ? '' : '2'),
+            xanchor: 'center',
             y: 1.06,
-            yref: "paper",
-            yanchor: "bottom",
+            yref: 'paper',
+            yanchor: 'bottom',
             font: { size: 14 },
             showarrow: false,
-          };
+          }
         })
-        .filter((annotation) => annotation !== null);
+        .filter((annotation) => annotation !== null)
 
       return {
         grid: {
           rows: 1,
           columns: 2,
-          pattern: "independent",
+          pattern: 'independent',
         },
         yaxis: this.yAxisConfiguration,
         xaxis: this.xAxisConfiguration,
         yaxis2: this.yAxisConfiguration,
         xaxis2: this.xAxisConfiguration,
-        dragmode: "zoom",
+        dragmode: 'zoom',
         showlegend: false,
-        height: "400",
-        width: "860",
+        height: '400',
+        width: '860',
         annotations: annotations,
-      };
+      }
     },
     xAxisConfiguration() {
       return {
-        title: "m/z [Th]",
-        gridcolor: "#464752",
+        title: 'm/z [Th]',
+        gridcolor: '#464752',
         gridwidth: 1,
-      };
+      }
     },
     yAxisConfiguration() {
       let yAxisConfig = {
-        title: "Signal intensity [cps]",
-        gridcolor: "#464752",
+        title: 'Signal intensity [cps]',
+        gridcolor: '#464752',
         gridwidth: 1,
-      };
-      if (this.yAxisMax !== null) {
-        yAxisConfig.range = [0, this.yAxisMax];
       }
-      return yAxisConfig;
+      if (this.yAxisMax !== null) {
+        yAxisConfig.range = [0, this.yAxisMax]
+      }
+      return yAxisConfig
     },
   },
   methods: {
     formatNumber(value) {
-      const roundedValue = Math.round(value);
-      const formatter = new Intl.NumberFormat("en-US");
-      return formatter.format(roundedValue);
+      const roundedValue = Math.round(value)
+      const formatter = new Intl.NumberFormat('en-US')
+      return formatter.format(roundedValue)
     },
   },
-};
+}
 </script>

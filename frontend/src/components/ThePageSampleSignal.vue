@@ -7,14 +7,14 @@
 </template>
 
 <script>
-import TheLayoutSidebar from "./TheLayoutSidebar.vue";
-import ThePaneSampleSignal from "./ThePaneSampleSignal.vue";
+import TheLayoutSidebar from './TheLayoutSidebar.vue'
+import ThePaneSampleSignal from './ThePaneSampleSignal.vue'
 
 export default {
-  name: "ThePageSampleSignal",
+  name: 'ThePageSampleSignal',
   components: {
     TheLayoutSidebar,
     ThePaneSampleSignal,
   },
-};
+}
 </script>

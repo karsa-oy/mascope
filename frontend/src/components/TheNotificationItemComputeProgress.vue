@@ -19,11 +19,7 @@
             size="is-medium"
             format="percent"
             :type="
-              computeError
-                ? 'is-danger'
-                : progressPercentage == 100
-                ? 'is-success'
-                : 'is-primary'
+              computeError ? 'is-danger' : progressPercentage == 100 ? 'is-success' : 'is-primary'
             "
           ></b-progress>
         </section>
@@ -33,54 +29,54 @@
 </template>
 
 <script>
-import { mapMutations, mapState } from "vuex";
-import { sync, get, call } from "vuex-pathify";
+import { mapMutations, mapState } from 'vuex'
+import { sync, get, call } from 'vuex-pathify'
 
 export default {
-  name: "TheNotificationItemComputeProgress",
+  name: 'TheNotificationItemComputeProgress',
   data() {
     return {
       isClosing: false,
-    };
+    }
   },
   computed: {
     ...sync({
-      notificationIsActive: "notification/itemComputeProgressActive",
-      progressMessage: "notification/progressMessage",
-      progressPercentage: "notification/progressPercentage",
+      notificationIsActive: 'notification/itemComputeProgressActive',
+      progressMessage: 'notification/progressMessage',
+      progressPercentage: 'notification/progressPercentage',
     }),
     ...get({
-      itemMatchComputing: "notification/itemMatchComputing",
-      notificationActive: "notification/active",
-      computeError: "notification/computeError",
+      itemMatchComputing: 'notification/itemMatchComputing',
+      notificationActive: 'notification/active',
+      computeError: 'notification/computeError',
     }),
   },
   methods: {
     ...mapMutations({
-      activateNotification: "notification/activate",
-      deactivateNotification: "notification/deactivate",
+      activateNotification: 'notification/activate',
+      deactivateNotification: 'notification/deactivate',
     }),
     close() {
       // TODO_configuration  move animation delay to config file
-      this.isClosing = true;
+      this.isClosing = true
       setTimeout(() => {
-        this.deactivateNotification();
-        this.isClosing = false;
-      }, 480);
+        this.deactivateNotification()
+        this.isClosing = false
+      }, 480)
     },
   },
   watch: {
     itemMatchComputing(value) {
       if (value) {
         this.activateNotification({
-          notification: "itemComputeProgress",
-        });
+          notification: 'itemComputeProgress',
+        })
       } else {
-        if (this.notificationActive === "itemComputeProgress") {
-          this.close();
+        if (this.notificationActive === 'itemComputeProgress') {
+          this.close()
         }
       }
     },
   },
-};
+}
 </script>

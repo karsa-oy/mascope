@@ -26,10 +26,10 @@
 </template>
 
 <script>
-import BaseMenuButton from "./BaseMenuButton.vue";
+import BaseMenuButton from './BaseMenuButton.vue'
 
 export default {
-  name: "BaseMainMenu",
+  name: 'BaseMainMenu',
   components: {
     BaseMenuButton,
   },
@@ -45,7 +45,7 @@ export default {
     tooltipPosition: {
       type: String,
       required: false,
-      default: "is-right",
+      default: 'is-right',
     },
     tooltipDelay: {
       type: Number,
@@ -53,7 +53,7 @@ export default {
       default: 200,
     },
   },
-};
+}
 </script>
 
 <style>

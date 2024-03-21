@@ -32,12 +32,12 @@
 </template>
 
 <script>
-import BaseParamField from "./BaseParamField.vue";
+import BaseParamField from './BaseParamField.vue'
 
-import { call, get } from "vuex-pathify";
+import { call, get } from 'vuex-pathify'
 
 export default {
-  name: "ThePaneSettingsMatch",
+  name: 'ThePaneSettingsMatch',
   components: {
     BaseParamField,
   },
@@ -47,5 +47,5 @@ export default {
   methods: {
     ...call({}),
   },
-};
+}
 </script>

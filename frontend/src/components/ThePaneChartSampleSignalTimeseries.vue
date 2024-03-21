@@ -8,45 +8,45 @@
 </template>
 
 <script>
-import BaseChartPlotly from "./BaseChartPlotly.vue";
+import BaseChartPlotly from './BaseChartPlotly.vue'
 
-import { get } from "vuex-pathify";
+import { get } from 'vuex-pathify'
 
 export default {
-  name: "ThePaneChartSampleSignalTimeseries",
+  name: 'ThePaneChartSampleSignalTimeseries',
   components: { BaseChartPlotly },
   computed: {
     ...get({
-      sampleFocused: "sample/active",
-      traces: "visualization/tracesSignalTimeseries",
+      sampleFocused: 'sample/active',
+      traces: 'visualization/tracesSignalTimeseries',
     }),
     data: function () {
-      return this.traces ? this.traces : [];
+      return this.traces ? this.traces : []
     },
     layout: function () {
       return {
         xaxis: {
-          title: "Time [s]",
+          title: 'Time [s]',
           autorange: true,
           showgrid: true,
-          gridcolor: "#464752",
+          gridcolor: '#464752',
           gridwidth: 1,
         },
         yaxis: {
-          title: "Peak height [cps]",
+          title: 'Peak height [cps]',
           showgrid: true,
           autorange: true,
-          rangemode: "tozero",
-          gridcolor: "#464752",
+          rangemode: 'tozero',
+          gridcolor: '#464752',
           gridwidth: 1,
         },
-        dragmode: "zoom",
+        dragmode: 'zoom',
         showlegend: true,
-        height: "400",
-        width: "860",
-      };
+        height: '400',
+        width: '860',
+      }
     },
   },
   methods: {},
-};
+}
 </script>

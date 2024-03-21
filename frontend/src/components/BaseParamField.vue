@@ -25,10 +25,10 @@
 </template>
 
 <script>
-import { sync } from "vuex-pathify";
+import { sync } from 'vuex-pathify'
 
 export default {
-  name: "BaseParamField",
+  name: 'BaseParamField',
   props: {
     disabled: {
       type: Boolean,
@@ -47,13 +47,13 @@ export default {
       type: Object,
       required: false,
       default() {
-        return { min: 0, max: 1, step: 0.01 };
+        return { min: 0, max: 1, step: 0.01 }
       },
     },
     type: {
       type: String,
       required: false,
-      default: "is-info",
+      default: 'is-info',
     },
     tooltip: {
       type: Boolean,
@@ -63,16 +63,16 @@ export default {
   },
   computed: {
     ...sync({
-      param: ":path",
+      param: ':path',
     }),
   },
   watch: {
     param: function (newVal, oldVal) {
-      if (newVal === null) return;
-      this.$emit("paramChange");
+      if (newVal === null) return
+      this.$emit('paramChange')
     },
   },
-};
+}
 </script>
 
 <style>

@@ -21,13 +21,8 @@
         </span>
       </b-tag>
       <!-- tooltip slot -->
-      <template
-        v-slot:content
-        v-bind:key="field"
-      >
-        <template v-for="(value, field) in tooltip">
-          {{ field }}: {{ value }}<br/>
-        </template>
+      <template v-slot:content v-bind:key="field">
+        <template v-for="(value, field) in tooltip"> {{ field }}: {{ value }}<br /> </template>
       </template>
     </b-tooltip>
   </b-field>
@@ -35,7 +30,7 @@
 
 <script>
 export default {
-  name: "BaseTagMatch",
+  name: 'BaseTagMatch',
   props: {
     displayMatchScore: {
       type: Boolean,
@@ -52,12 +47,12 @@ export default {
     },
   },
   created: function () {
-    this.formatter = new Intl.NumberFormat("en-US", {
-      style: "percent",
+    this.formatter = new Intl.NumberFormat('en-US', {
+      style: 'percent',
       minimumIntegerDigits: 2,
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
-    });
+    })
   },
   computed: {
     matchScore: function () {
@@ -65,58 +60,58 @@ export default {
         ? this.row.matched === undefined || this.row.matched
           ? this.row.match_score
           : null
-        : null;
+        : null
     },
     tag: function () {
       if (this.row.alarm_mode) {
         switch (this.row.match_category) {
           case 2:
             return {
-              category: "probable",
-              class: "is-danger",
+              category: 'probable',
+              class: 'is-danger',
               // weight: "font-weight: bold",
-            };
+            }
           case 1:
             return {
-              category: "possible",
-              class: "is-warning",
+              category: 'possible',
+              class: 'is-warning',
               // weight: "font-weight: bold",
-            };
+            }
           default:
             return {
-              category: "improbable",
-              class: "is-success",
+              category: 'improbable',
+              class: 'is-success',
               // weight: "font-weight: bold",
-            };
+            }
         }
       } else {
         switch (this.row.match_category) {
           case 2:
             return {
-              category: "probable",
-              class: "is-danger-pale",
-            };
+              category: 'probable',
+              class: 'is-danger-pale',
+            }
           case 1:
             return {
-              category: "possible",
-              class: "is-warning-pale",
-            };
+              category: 'possible',
+              class: 'is-warning-pale',
+            }
           default:
             return {
-              category: "improbable",
-              class: "is-success-pale",
-            };
+              category: 'improbable',
+              class: 'is-success-pale',
+            }
         }
       }
     },
     tooltipActive: function () {
-      return Object.keys(this.tooltip).length > 0;
+      return Object.keys(this.tooltip).length > 0
     },
   },
   methods: {
     clicked: function () {
-      this.$emit("tagClicked", this.row);
+      this.$emit('tagClicked', this.row)
     },
   },
-};
+}
 </script>

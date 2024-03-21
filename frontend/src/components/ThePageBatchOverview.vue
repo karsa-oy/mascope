@@ -14,16 +14,16 @@
 </template>
 
 <script>
-import TheLayoutSidebar from "./TheLayoutSidebar.vue";
-import ThePaneBrowser from "./ThePaneBrowser.vue";
-import ThePaneChartSampleIntensity from "./ThePaneChartSampleIntensity.vue";
+import TheLayoutSidebar from './TheLayoutSidebar.vue'
+import ThePaneBrowser from './ThePaneBrowser.vue'
+import ThePaneChartSampleIntensity from './ThePaneChartSampleIntensity.vue'
 
 export default {
-  name: "ThePageBatchOverview",
+  name: 'ThePageBatchOverview',
   components: {
     TheLayoutSidebar,
     ThePaneBrowser,
     ThePaneChartSampleIntensity,
   },
-};
+}
 </script>

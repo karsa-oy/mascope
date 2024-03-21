@@ -12,8 +12,7 @@
       @close="close"
       :class="{ 'is-closing': isClosing, 'in-development': 'in-development' }"
     >
-      NOTE: You are running the development version of Mascope. Any changes are
-      not persisted.
+      NOTE: You are running the development version of Mascope. Any changes are not persisted.
     </b-message>
 
     <!-- Failed Calibration Samples Warning -->
@@ -35,8 +34,7 @@
       <ul>
         <li v-for="sample in warningData" :key="sample.index">
           <strong>{{ sample.sample_item_name }}</strong
-          >, <em>{{ sample.filename }}</em> encountered an error:
-          {{ sample.error }}.
+          >, <em>{{ sample.filename }}</em> encountered an error: {{ sample.error }}.
         </li>
       </ul>
       <p>Please check the samples.</p>
@@ -74,17 +72,12 @@
     >
       <p>
         There was an error during match computation for the
-        {{ warningData.length }} following sample{{
-          warningData.length === 1 ? "" : "s"
-        }}:
+        {{ warningData.length }} following sample{{ warningData.length === 1 ? '' : 's' }}:
       </p>
       <ul>
-        <li
-          v-for="sample in warningData"
-          :key="sample.sample_item.sample_item_id"
-        >
-          <strong>{{ sample.sample_item.sample_item_name }}</strong> encountered
-          an error: {{ sample.error_message }}.
+        <li v-for="sample in warningData" :key="sample.sample_item.sample_item_id">
+          <strong>{{ sample.sample_item.sample_item_name }}</strong> encountered an error:
+          {{ sample.error_message }}.
         </li>
       </ul>
     </b-message>
@@ -101,8 +94,8 @@
       @close="close"
       :class="{ 'is-closing': isClosing, 'empty-workspace': 'empty-workspace' }"
     >
-      Selected workspace "{{ warningData }}" has no batches. Please first create
-      a new batch in this workspace.
+      Selected workspace "{{ warningData }}" has no batches. Please first create a new batch in this
+      workspace.
     </b-message>
 
     <!-- No calibration collection in active batch -->
@@ -117,10 +110,8 @@
       @close="close"
       :class="{ 'is-closing': isClosing, 'empty-workspace': 'empty-workspace' }"
     >
-      Selected batch "{{ warningData.batchName }}" has no calibration
-      collection. The default calibrant collection "{{
-        warningData.collectionName
-      }}" was applied, please save the changes.
+      Selected batch "{{ warningData.batchName }}" has no calibration collection. The default
+      calibrant collection "{{ warningData.collectionName }}" was applied, please save the changes.
     </b-message>
 
     <!-- Validation Errors Warning -->
@@ -137,10 +128,7 @@
       }"
     >
       <ul v-if="warningData.messages.length" style="padding-bottom: 0.5em">
-        <li
-          v-for="(message, index) in warningData.messages"
-          :key="'message-' + index"
-        >
+        <li v-for="(message, index) in warningData.messages" :key="'message-' + index">
           {{ message }}
         </li>
       </ul>
@@ -148,27 +136,17 @@
         <strong> Issues with pasted samples: </strong>
       </p>
       <ul v-if="warningData.sampleFailures.length">
-        <li
-          v-for="(item, index) in warningData.sampleFailures"
-          :key="'item-' + index"
-        >
+        <li v-for="(item, index) in warningData.sampleFailures" :key="'item-' + index">
           {{ index + 1 }}) {{ item.sampleName }}:
           <ul>
-            <li
-              v-for="(failure, i) in item.failures"
-              :key="i"
-              style="padding-left: 1em"
-            >
+            <li v-for="(failure, i) in item.failures" :key="i" style="padding-left: 1em">
               - {{ failure }}
             </li>
           </ul>
         </li>
       </ul>
       <ul v-if="warningData.columnsFailures.length">
-        <li
-          v-for="(col, index) in warningData.columnsFailures"
-          :key="'col-' + index"
-        >
+        <li v-for="(col, index) in warningData.columnsFailures" :key="'col-' + index">
           {{ index + 1 }}) {{ col }}
         </li>
       </ul>
@@ -190,55 +168,55 @@
 </template>
 
 <script>
-import { mapMutations } from "vuex";
-import { sync } from "vuex-pathify";
+import { mapMutations } from 'vuex'
+import { sync } from 'vuex-pathify'
 
 export default {
-  name: "TheNotificationWarning",
+  name: 'TheNotificationWarning',
   data() {
     return {
       isClosing: false,
-    };
+    }
   },
   computed: {
     ...sync({
-      notificationIsActive: "notification/warningActive",
-      warningNotification: "notification/warningNotification",
-      warningData: "notification/warningData",
+      notificationIsActive: 'notification/warningActive',
+      warningNotification: 'notification/warningNotification',
+      warningData: 'notification/warningData',
     }),
   },
   watch: {
     notificationIsActive(newVal) {
       if (!newVal) {
-        this.resetWarningNotification();
+        this.resetWarningNotification()
       }
     },
     warningNotification: {
       handler() {
-        this.autoClose();
+        this.autoClose()
       },
       immediate: true,
     },
   },
   methods: {
     ...mapMutations({
-      deactivateNotification: "notification/deactivate",
-      resetWarningNotification: "notification/RESET_WARNING_NOTIFICATION",
+      deactivateNotification: 'notification/deactivate',
+      resetWarningNotification: 'notification/RESET_WARNING_NOTIFICATION',
     }),
     close() {
       // TODO_configuration  move animation delay to config file
-      this.isClosing = true;
+      this.isClosing = true
       setTimeout(() => {
-        this.deactivateNotification();
-        this.resetWarningNotification();
-        this.isClosing = false;
-      }, 500);
+        this.deactivateNotification()
+        this.resetWarningNotification()
+        this.isClosing = false
+      }, 500)
     },
     autoClose() {
-      if (this.warningNotification === "emptyWorkspace") {
-        setTimeout(this.close, 5000);
+      if (this.warningNotification === 'emptyWorkspace') {
+        setTimeout(this.close, 5000)
       }
     },
   },
-};
+}
 </script>
