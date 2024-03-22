@@ -29,12 +29,9 @@ In addition, the SFCs are reorganized to have `<script>` first, then
 `<template>` and finally `<style>`. This is inline with conventions
 in Vue and other frameworks.
 
-## Near-Future Refactoring Suggestions
+## Vue 3 syntax changes of note
 
-I've skipped some quick and easy refactoring ideas in the interest of
-expediency. I suggest we do some cleanup soon:
-
-- Use `reactive` over `ref` when possible to simplify state management
+- `:foo.sync="bar"` is now `v-model:foo="bar"`
 
 # Architecture & Code Style Notes
 

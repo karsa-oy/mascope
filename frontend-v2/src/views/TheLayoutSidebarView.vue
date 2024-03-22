@@ -1,10 +1,10 @@
 <script setup>
-  import TheLayout from './TheLayout.vue'
-  import TheMainMenu from './TheMainMenu.vue'
+  import TheLayoutMainView from './TheLayoutMainView.vue'
+  import TheMainMenu from '@/components/TheMainMenu.vue'
 </script>
 
 <template>
-  <the-layout>
+  <the-layout-main-view>
     <div class="sidebar-page">
       <section class="sidebar-layout">
         <b-sidebar position="fixed" fullheight open reduce>
@@ -18,7 +18,7 @@
         </div>
       </section>
     </div>
-  </the-layout>
+  </the-layout-main-view>
 </template>
 
 <style>

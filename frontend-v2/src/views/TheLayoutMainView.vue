@@ -1,6 +1,6 @@
 <script setup>
-  import TheModalAggregator from './TheModalAggregator.vue'
-  import TheNotificationAggregator from './TheNotificationAggregator.vue'
+import TheModalAggregator from '@/components/TheModalAggregator.vue'
+import TheNotificationAggregator from '@/components/TheNotificationAggregator.vue'
 </script>
 
 <template>
