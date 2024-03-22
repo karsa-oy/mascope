@@ -2,7 +2,7 @@
   import { ref, watch, computed, nextTick } from 'vue';
 
   import table from '@/lib/table'
-  import { useKeyStore } from '@/stores/key'
+  import { useKeyStore } from '@/stores'
 
   const props = defineProps({
     label: {

@@ -1,14 +1,66 @@
+<script setup>
+import { ref, computed } from 'vue'
+
+import table from '@/lib/table'
+
+import { useAppStore, useModalStore, useWorkspaceStore } from '@/stores'
+
+const appStore = useAppStore()
+const modalStore = useModalStore()
+const workspaceStore = useWorkspaceStore()
+
+const workspaceName = ref(null)
+const workspaceDesc = ref(null)
+
+const action = computed(() => {
+  return this.modalProps.action
+})
+const oldWorkspace = computed(() => {
+  if (actionIs('edit', 'delete')) {
+    return table.get(appStore.workspaces, {
+      workspace_id: modalStore.workspaceSaveProps.value.workspace_id
+    })
+  } else {
+    return null
+  }
+})
+const modalTitle = computed(() => {
+  let title
+  const workspaceName = oldWorkspace.value ? oldWorkspace.value.workspace_name : ''
+  switch (action.value) {
+    case 'create':
+      title = `Create a new workspace`
+      break
+    case 'edit':
+      title = `Edit workspace ${workspaceName}`
+      break
+    case 'delete':
+      title = `Delete workspace ${workspaceName}`
+      break
+  }
+  return title
+})
+
+function actionIs(...actions) {
+  return actions.includes(action.value)
+}
+function loadWorkspace() {
+  workspaceName.value = oldWorkspace.value ? oldWorkspace.value.workspace_name : null
+  workspaceDesc.value = oldWorkspace.value ? oldWorkspace.value.workspace_description : null
+}
+</script>
+
 <template>
   <section>
     <b-modal
-      :active.sync="modalActive"
+      v-model:active="modalActive"
       has-modal-card
       trap-focus
       :can-cancel="true"
       aria-role="dialog"
       aria-modal
       @after-enter="loadWorkspace"
-      @close="deactivateModal"
+      @close="modalStore.deactivate"
       :type="actionIs('delete') ? 'is-danger' : 'is-primary'"
     >
       <div class="modal-card" style="width: 500px">
@@ -36,10 +88,10 @@
             expanded
             @click="
               () => {
-                updateWorkspace({
-                  workspace_id: this.oldWorkspace.workspace_id,
-                  workspace_name: this.workspaceName,
-                  workspace_description: this.workspaceDesc,
+                workspaceStore.updateWorkspace({
+                  workspace_id: oldWorkspace.workspace_id,
+                  workspace_name: workspaceName,
+                  workspace_description: workspaceDesc
                 })
                 deactivateModal()
               }
@@ -54,11 +106,11 @@
             expanded
             @click="
               () => {
-                createWorkspace({
-                  workspace_name: this.workspaceName,
-                  workspace_description: this.workspaceDesc,
+                workspaceStore.createWorkspace({
+                  workspace_name: workspaceName,
+                  workspace_description: workspaceDesc
                 })
-                deactivateModal()
+                modalStore.deactivate()
               }
             "
           >
@@ -71,8 +123,8 @@
             expanded
             @click="
               () => {
-                deleteWorkspace(this.oldWorkspace)
-                deactivateModal()
+                workspaceStore.deleteWorkspace(oldWorkspace)
+                modalStore.deactivate()
               }
             "
           >
@@ -83,75 +135,3 @@
     </b-modal>
   </section>
 </template>
-
-<script>
-import { mapMutations } from 'vuex'
-import { sync, call, get } from 'vuex-pathify'
-
-import table from '$lib/table'
-
-export default {
-  name: '',
-  components: {},
-  data: function () {
-    return {
-      workspaceName: null,
-      workspaceDesc: null,
-    }
-  },
-  computed: {
-    ...get({
-      workspaces: 'app/workspaces',
-    }),
-    ...sync({
-      modalActive: 'modal/workspaceSaveActive',
-      modalProps: 'modal/workspaceSaveProps',
-    }),
-    action() {
-      return this.modalProps.action
-    },
-    oldWorkspace() {
-      if (this.actionIs('edit', 'delete')) {
-        return table.get(this.workspaces, {
-          workspace_id: this.modalProps.workspace_id,
-        })
-      } else {
-        return null
-      }
-    },
-    modalTitle() {
-      let title
-      const workspaceName = this.oldWorkspace ? this.oldWorkspace.workspace_name : ''
-      switch (this.action) {
-        case 'create':
-          title = `Create a new workspace`
-          break
-        case 'edit':
-          title = `Edit workspace ${workspaceName}`
-          break
-        case 'delete':
-          title = `Delete workspace ${workspaceName}`
-          break
-      }
-      return title
-    },
-  },
-  methods: {
-    ...call({
-      createWorkspace: 'workspace/createWorkspace',
-      updateWorkspace: 'workspace/updateWorkspace',
-      deleteWorkspace: 'workspace/deleteWorkspace',
-    }),
-    ...mapMutations({
-      deactivateModal: 'modal/deactivate',
-    }),
-    actionIs(...actions) {
-      return actions.includes(this.action)
-    },
-    loadWorkspace() {
-      this.workspaceName = this.oldWorkspace ? this.oldWorkspace.workspace_name : null
-      this.workspaceDesc = this.oldWorkspace ? this.oldWorkspace.workspace_description : null
-    },
-  },
-}
-</script>

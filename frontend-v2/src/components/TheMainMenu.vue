@@ -3,9 +3,7 @@
 
   import BaseMenuBar from './BaseMenuBar.vue'
 
-  import { useInstrumentStore } from '@/stores/instrument'
-  import { useBatchStore } from '@/stores/batch'
-  import { useWorkspaceStore } from '@/stores/workspace'
+  import { useInstrumentStore, useBatchStore, useWorkspaceStore } from '@/stores'
 
   const instrumentStore = useInstrumentStore()
   const batchStore = useBatchStore()
