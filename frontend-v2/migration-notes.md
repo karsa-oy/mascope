@@ -69,3 +69,39 @@ There is a newish javascript standard function `structuredClone`. Our
 code base has some uses of underscore's implementation of deep clones,
 as well has hacky custom implementations. I replace instances of these
 wherever I spot them.
+
+## Returning from short arrow functions
+
+The following are equivalent:
+
+```
+const fooShort = () => "bar"
+const fooLong = () => {
+  return "bar"
+}
+```
+
+In cases where we are returning a simple expression, the former is
+preferable since its easier to read:
+
+```
+const fooShort = () => somethingTrue ? "yay" : "boo"
+const fooLong = () => {
+  return somethingTrue ? "yay" : "boo"
+}
+```
+
+## Testing
+
+Getting started with testing can be daunting. I wonder if a good
+way to begin is with some like https://playwright.dev/.
+
+In particular, it lets you autogenerate tests by clicking around
+in the browser: https://playwright.dev/docs/codegen
+
+This could be a way to take you tacit QA knowledge and encode it
+in tests without considerable effort.
+
+I haven't used it yet myself, but it is suggested by major
+frameworks like Vite and Svelte when creating a new project, so
+it must be quite solid.
