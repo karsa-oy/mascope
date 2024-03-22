@@ -1,9 +1,20 @@
 import { createApp } from 'vue'
-import store from './store'
+import { createPinia } from 'pinia'
+
 import buefy from '@ntohq/buefy-next'
 import '@mdi/font/css/materialdesignicons.min.css'
 
 import App from './App.vue'
-import routes from './router.js'
+import router from './router'
 
-createApp(App).use(store).use(routes).use(buefy).mount('#app')
+import { apiPlugin } from '@/stores/plugins/api.js'
+
+const pinia = createPinia()
+pinia.use(apiPlugin)
+
+const app = createApp(App)
+app.use(pinia)
+app.use(router)
+app.use(buefy)
+
+app.mount('#app')

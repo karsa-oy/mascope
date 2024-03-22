@@ -1,5 +1,36 @@
+<script setup>
+import { ref, watch } from 'vue'
+
+import { useNotificationStore } from '@/stores'
+
+const notificationStore = useNotificationStore()
+
+const isClosing = ref(false)
+
+function close() {
+  // TODO_configuration  move animation delay to config file
+  isClosing.value = true
+  setTimeout(() => {
+    notificationStore.deactivate()
+    isClosing.value = false
+  }, 480)
+}
+
+watch(notificationStore.itemMatchComputing, (value) => {
+  if (value) {
+    notificationStore.activate({
+      notification: 'itemComputeProgress'
+    })
+  } else {
+    if (notificationStore.active === 'itemComputeProgress') {
+      close()
+    }
+  }
+})
+</script>
+
 <template>
-  <div v-if="notificationIsActive">
+  <div v-if="notificationStore.itemComputeProgressActive">
     <b-message
       type="is-notification"
       title="Sample Matches Computation Progress"
@@ -9,17 +40,21 @@
     >
       <div>
         <section>
-          <p>{{ progressMessage }}</p>
+          <p>{{ notificationStore.progressMessage }}</p>
         </section>
         <section class="notification-progress-bar">
           <b-progress
-            :value="progressPercentage"
+            :value="notificationStore.progressPercentage"
             :max="100"
             show-value
             size="is-medium"
             format="percent"
             :type="
-              computeError ? 'is-danger' : progressPercentage == 100 ? 'is-success' : 'is-primary'
+              notificationStore.computeError
+                ? 'is-danger'
+                : notificationStore.progressPercentage == 100
+                  ? 'is-success'
+                  : 'is-primary'
             "
           ></b-progress>
         </section>
@@ -27,56 +62,3 @@
     </b-message>
   </div>
 </template>
-
-<script>
-import { mapMutations, mapState } from 'vuex'
-import { sync, get, call } from 'vuex-pathify'
-
-export default {
-  name: 'TheNotificationItemComputeProgress',
-  data() {
-    return {
-      isClosing: false,
-    }
-  },
-  computed: {
-    ...sync({
-      notificationIsActive: 'notification/itemComputeProgressActive',
-      progressMessage: 'notification/progressMessage',
-      progressPercentage: 'notification/progressPercentage',
-    }),
-    ...get({
-      itemMatchComputing: 'notification/itemMatchComputing',
-      notificationActive: 'notification/active',
-      computeError: 'notification/computeError',
-    }),
-  },
-  methods: {
-    ...mapMutations({
-      activateNotification: 'notification/activate',
-      deactivateNotification: 'notification/deactivate',
-    }),
-    close() {
-      // TODO_configuration  move animation delay to config file
-      this.isClosing = true
-      setTimeout(() => {
-        this.deactivateNotification()
-        this.isClosing = false
-      }, 480)
-    },
-  },
-  watch: {
-    itemMatchComputing(value) {
-      if (value) {
-        this.activateNotification({
-          notification: 'itemComputeProgress',
-        })
-      } else {
-        if (this.notificationActive === 'itemComputeProgress') {
-          this.close()
-        }
-      }
-    },
-  },
-}
-</script>

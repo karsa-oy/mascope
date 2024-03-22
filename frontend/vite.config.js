@@ -1,28 +1,28 @@
+import { fileURLToPath, URL } from 'node:url'
+
 import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
+
 import path from 'path'
 
 export default ({ mode }) => {
+  console.log(process.cwd())
   const dotEnvPath = path.resolve(process.cwd() + '/..')
-  process.env = Object.assign(process.env, loadEnv(mode, dotEnvPath, 'MASCOPE_PUBLIC_'))
+  const env = loadEnv(mode, dotEnvPath, 'MASCOPE_PUBLIC_')
 
   return defineConfig({
     plugins: [vue()],
-    server: {
-      port: process.env.MASCOPE_PUBLIC_PORT,
-    },
     resolve: {
       alias: {
-        $app: path.resolve(__dirname, 'src/'),
-        $lib: path.resolve(__dirname, 'src/lib/'),
-        $api: path.resolve(__dirname, 'src/api.js'),
-      },
+        '@': fileURLToPath(new URL('./src', import.meta.url))
+      }
     },
+    server: { port: env.MASCOPE_PUBLIC_PORT },
     build: {
       chunkSizeWarningLimit: 600,
       cssCodeSplit: false,
-      target: 'esnext',
+      target: 'esnext'
     },
-    envPrefix: 'MASCOPE_PUBLIC_',
+    envPrefix: 'MASCOPE_PUBLIC_'
   })
 }

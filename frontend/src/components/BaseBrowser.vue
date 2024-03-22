@@ -1,3 +1,181 @@
+<script setup>
+import { ref, computed, watch, nextTick } from 'vue'
+import BaseTagMatch from './BaseTagMatch.vue'
+
+const noop = () => ({})
+
+const props = defineProps({
+  contextMenuIcon: {
+    type: String,
+    default: 'dots-horizontal'
+  },
+  name: {
+    type: String,
+    default: null
+  },
+  levels: {
+    type: Array,
+    required: true
+  },
+  menu: {
+    type: Array
+  },
+  // for recursion - don't use externally
+  isRoot: {
+    type: Boolean,
+    default: true
+  },
+  rootRefresh: {
+    type: Function
+  }
+})
+
+const emit = defineEmits(['tagClicked'])
+
+// reactivity
+
+const table = ref(null)
+
+const currentLevel = computed(() => props.levels[0])
+const slug = computed(() => currentLevel.value.slug)
+const rows = computed(() => currentLevel.value.rows)
+const cols = computed(() => currentLevel.value.cols)
+const showHeader = computed(() => currentLevel.value.showHeader ?? true)
+const defaultSort = computed(() => currentLevel.value.defaultSort ?? null)
+const detailsIcon = computed(() => {
+  let icon
+  switch (currentLevel.value.detailsIcon) {
+    case 'default':
+      icon = 'chevron-right'
+      break
+    case null:
+      icon = ''
+      break
+    default:
+      icon = currentLevel.value.detailsIcon
+      break
+  }
+  return icon
+})
+const detailsOpen = computed(() => {
+  if (!currentLevel.value.detailsOpen) return noop
+  let handleDetailsOpen = (row) => {
+    currentLevel.value.detailsOpen(row)
+    refresh()
+  }
+  return handleDetailsOpen
+})
+const rowClick = computed(() => {
+  let handleClick = (row) => {
+    currentLevel.value.rowClick(row)
+    refresh()
+  }
+  return handleClick ?? noop
+})
+const opened = computed(() => currentLevel.value.opened ?? null)
+const minPrecision = computed(() => currentLevel.value.minPrecision ?? 1)
+const maxPrecision = computed(() => currentLevel.value.maxPrecision ?? 3)
+const formatter = computed(
+  () =>
+    new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: minPrecision.value,
+      maximumFractionDigits: maxPrecision.value
+    })
+)
+
+function getChildLevels(...parentRows) {
+  // TODO: Currently only looks one level up for parent id.
+  // Should check all levels (e.g. target_ion_id -> target_compound_id -> target_collection_id)
+
+  // FAQ: parentRow and childRow shoud have the target_collection_id.
+  // Both parentIdField and parentCollectionId are used for childRow to be correcly assigned to the right collection and to avoid dublicates.
+  // If the parentRow do not have the target_collection_id (undefined) then childRow will assigned only by parentIdField.
+
+  let childLevels = []
+  // init iteration parameters
+  let currentLevel = structuredClone(currentLevel.value)
+  currentLevel.rows = structuredClone(parentRows)
+  let nextLevels = structuredClone(props.levels).splice(1)
+
+  while (nextLevels.length > 0) {
+    const parentIdField = `${currentLevel.slug}_id`
+    const parentIds = currentLevel.rows.map((row) => row[parentIdField])
+    // set the parentCollectionId if available
+    const parentCollectionId = parentRows[0]?.target_collection_id ?? undefined
+
+    let childLevel = nextLevels.shift()
+    if (childLevel.rows && childLevel.rows.length > 0) {
+      childLevel.rows = childLevel.rows.filter(
+        (childRow) =>
+          parentIds.includes(childRow[parentIdField]) &&
+          // check if the childRow is assigned to the same collection as the parentRow.This condition is ignored if parentCollectionId is undefined
+          (parentCollectionId === undefined || childRow.target_collection_id === parentCollectionId)
+      )
+      // push results
+      childLevels.push(childLevel)
+      // update iteration parameters
+      currentLevel = childLevel
+    } else {
+      break
+    }
+  }
+  return childLevels
+}
+function parseValue(value) {
+  let isNumeric = typeof value == 'number'
+  return isNumeric ? formatter.value.format(value) : value
+}
+function dynamic(className) {
+  if (props.isRoot) {
+    return `${className}-root`
+  } else {
+    return `${className}-other`
+  }
+}
+function matchScoreTagClicked(row) {
+  emit('tagClicked', row)
+}
+function rowClass(row) {
+  switch (row.selection) {
+    case 3:
+      return 'base-browser-row-focused'
+    case 2:
+      return 'base-browser-row-fully-selected'
+    case 1:
+      return 'base-browser-row-partially-selected'
+    case 0:
+      return ''
+  }
+}
+function refresh() {
+  if (props.isRoot) {
+    //forceUpdate()
+  } else {
+    props.rootRefresh()
+  }
+}
+function open(row) {
+  table.value?.openDetailRow(row)
+}
+function close(row) {
+  table.value?.closeDetailRow(row)
+}
+
+watch(opened, (openedRows) => {
+  if (openedRows) {
+    nextTick(() => {
+      rows.value.forEach((row) => {
+        if (openedRows.includes(row)) {
+          open(row)
+        } else {
+          close(row)
+        }
+      })
+    })
+  }
+})
+</script>
+
 <template>
   <section :class="dynamic('base-browser-container')">
     <section :class="dynamic('base-browser-header')">
@@ -58,14 +236,14 @@
         <template v-if="levels.length > 1" v-slot:detail="props">
           <tr>
             <td :colspan="cols.length + 1">
-              <base-browser
+              <BaseBrowser
                 v-if="getChildLevels(props.row).length > 0"
                 :levels="getChildLevels(props.row)"
                 :isRoot="false"
                 :rootRefresh="refresh"
                 @tagClicked="matchScoreTagClicked"
               >
-              </base-browser>
+              </BaseBrowser>
             </td>
           </tr>
         </template>
@@ -76,216 +254,6 @@
     </section>
   </section>
 </template>
-
-<script>
-import BaseTagMatch from './BaseTagMatch.vue'
-
-import { cloneDeep } from 'lodash'
-
-let doNothing = () => ({})
-
-export default {
-  name: 'BaseBrowser',
-  components: {
-    BaseBrowser: () => import('./BaseBrowser.vue'),
-    BaseTagMatch,
-  },
-  props: {
-    contextMenuIcon: {
-      type: String,
-      required: false,
-      default: 'dots-horizontal',
-    },
-    name: {
-      type: String,
-      required: false,
-      default: null,
-    },
-    levels: {
-      type: Array,
-      required: true,
-    },
-    menu: {
-      type: Array,
-      required: false,
-    },
-    // recursion props
-    // don't use these externally
-    isRoot: {
-      type: Boolean,
-      required: false,
-      default: true,
-    },
-    rootRefresh: {
-      type: Function,
-      required: false,
-    },
-  },
-  created: function () {
-    this.formatter = new Intl.NumberFormat('en-US', {
-      minimumFractionDigits: this.minPrecision,
-      maximumFractionDigits: this.maxPrecision,
-    })
-  },
-  computed: {
-    currentLevel: function () {
-      return this.levels[0]
-    },
-    slug: function () {
-      return this.currentLevel.slug
-    },
-    levelName: function () {
-      return this.currentLevel[this.currentLevel.slug + '_name']
-    },
-    rows: function () {
-      return this.currentLevel.rows
-    },
-    cols: function () {
-      return this.currentLevel.cols
-    },
-    showHeader: function () {
-      return this.currentLevel.showHeader ?? true
-    },
-    defaultSort: function () {
-      return this.currentLevel.defaultSort ?? null
-    },
-    detailsIcon: function () {
-      let icon
-      switch (this.currentLevel.detailsIcon) {
-        case 'default':
-          icon = 'chevron-right'
-          break
-        case null:
-          icon = ''
-          break
-        default:
-          icon = this.currentLevel.detailsIcon
-          break
-      }
-      return icon
-    },
-    detailsOpen: function () {
-      if (!this.currentLevel.detailsOpen) return doNothing
-      let handleDetailsOpen = (row) => {
-        this.currentLevel.detailsOpen(row)
-        this.refresh()
-      }
-      return handleDetailsOpen
-    },
-    rowClick: function () {
-      let handleClick = (row) => {
-        this.currentLevel.rowClick(row)
-        this.refresh()
-      }
-      return handleClick ?? doNothing
-    },
-    opened: function () {
-      return this.currentLevel.opened ?? null
-    },
-    minPrecision: function () {
-      return this.currentLevel.minPrecision ?? 1
-    },
-    maxPrecision: function () {
-      return this.currentLevel.maxPrecision ?? 3
-    },
-  },
-  methods: {
-    getChildLevels: function (...parentRows) {
-      // TODO: Currently only looks one level up for parent id.
-      // Should check all levels (e.g. target_ion_id -> target_compound_id -> target_collection_id)
-
-      // FAQ: parentRow and childRow shoud have the target_collection_id.
-      // Both parentIdField and parentCollectionId are used for childRow to be correcly assigned to the right collection and to avoid dublicates.
-      // If the parentRow do not have the target_collection_id (undefined) then childRow will assigned only by parentIdField.
-
-      let childLevels = []
-      // init iteration parameters
-      let currentLevel = cloneDeep(this.currentLevel)
-      currentLevel.rows = cloneDeep(parentRows)
-      let nextLevels = cloneDeep(this.levels).splice(1)
-
-      while (nextLevels.length > 0) {
-        const parentIdField = `${currentLevel.slug}_id`
-        const parentIds = currentLevel.rows.map((row) => row[parentIdField])
-        // set the parentCollectionId if available
-        const parentCollectionId = parentRows[0]?.target_collection_id ?? undefined
-
-        let childLevel = nextLevels.shift()
-        if (childLevel.rows && childLevel.rows.length > 0) {
-          childLevel.rows = childLevel.rows.filter(
-            (childRow) =>
-              parentIds.includes(childRow[parentIdField]) &&
-              // check if the childRow is assigned to the same collection as the parentRow.This condition is ignored if parentCollectionId is undefined
-              (parentCollectionId === undefined ||
-                childRow.target_collection_id === parentCollectionId),
-          )
-          // push results
-          childLevels.push(childLevel)
-          // update iteration parameters
-          currentLevel = childLevel
-        } else {
-          break
-        }
-      }
-      return childLevels
-    },
-    parseValue: function (value) {
-      let isNumeric = typeof value == 'number'
-      return isNumeric ? this.formatter.format(value) : value
-    },
-    dynamic: function (className) {
-      if (this.isRoot) {
-        return `${className}-root`
-      } else {
-        return `${className}-other`
-      }
-    },
-    matchScoreTagClicked: function (row) {
-      this.$emit('tagClicked', row)
-    },
-    rowClass: function (row) {
-      switch (row.selection) {
-        case 3:
-          return 'base-browser-row-focused'
-        case 2:
-          return 'base-browser-row-fully-selected'
-        case 1:
-          return 'base-browser-row-partially-selected'
-        case 0:
-          return ''
-      }
-    },
-    refresh: function () {
-      if (this.isRoot) {
-        this.$forceUpdate()
-      } else {
-        this.rootRefresh()
-      }
-    },
-    open: function (row) {
-      this.$refs.table.openDetailRow(row)
-    },
-    close: function (row) {
-      this.$refs.table.closeDetailRow(row)
-    },
-  },
-  watch: {
-    opened: function (openedRows) {
-      if (this.opened) {
-        this.$nextTick(() => {
-          this.rows.forEach((row) => {
-            if (openedRows.includes(row)) {
-              this.open(row)
-            } else {
-              this.close(row)
-            }
-          })
-        })
-      }
-    },
-  },
-}
-</script>
 
 <style>
 .base-browser-container-root {

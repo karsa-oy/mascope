@@ -1,13 +1,143 @@
+<script setup>
+import { ref, computed, watch } from 'vue'
+import { generateCopyName } from '@/stores/lib/api'
+
+import {
+  useAppStore,
+  useBatchStore,
+  useModalStore,
+  useSampleStore,
+  useWorkspaceStore,
+  useNotificationStore
+} from '@/stores'
+
+const appStore = useAppStore()
+const batchStore = useBatchStore()
+const sampleStore = useSampleStore()
+const modalStore = useModalStore()
+const workspaceStore = useWorkspaceStore()
+const notificationStore = useNotificationStore()
+
+// state
+const newItemName = ref(null)
+const workspaceSelected = ref(null)
+const batchSelected = ref(null)
+const batches = ref([])
+const sameBatch = ref(null)
+const isCopying = ref(false)
+
+// computed
+const action = computed(() => {
+  return modalStore.state.sampleItemOverviewProps.action
+})
+const sampleItem = computed(() => {
+  return modalStore.state.sampleItemOverviewProps && modalStore.state.sampleItemOverviewProps.sample
+    ? modalStore.state.sampleItemOverviewProps.sample
+    : sampleStore.active
+      ? sampleStore.active
+      : null
+})
+const modalTitle = computed(() => {
+  let title = 'Sample item overview'
+  if (!sampleItem.value) return title
+  if (action.value === 'copy') {
+    title = `Copy "${sampleItem.value.sample_item_name}"`
+  }
+  return title
+})
+const sameWorkspace = computed(() => {
+  return workspaceStore.active ? workspaceStore.active : null
+})
+const filteredWorkspaces = computed(() => {
+  if (workspaceStore.active) {
+    return appStore.workspaces.filter((workspace) => {
+      return workspace.workspace_id !== workspaceStore.active.workspace_id
+    })
+  }
+  return []
+})
+
+// methods
+function actionIs(...actions) {
+  return actions.includes(action.value)
+}
+function initData() {
+  if (modalStore.state.sampleItemOverviewProps.action === 'copy') {
+    newItemName.value = sampleItem.value
+      ? generateCopyName(sampleItem.value.sample_item_name)
+      : null
+    workspaceSelected.value = null
+    batchSelected.value = null
+    batches.value = []
+    sameBatch.value = null
+  }
+}
+async function loadWorkspaceData() {
+  if (!workspaceSelected.value) return
+
+  const workspaceBatches = await workspaceStore.getWorkspaceBatches(
+    workspaceSelected.value.workspace_id
+  )
+
+  batches.value = workspaceBatches || []
+
+  if (!batches.value.length) {
+    notificationStore.showWarningNotification({
+      notification: 'emptyWorkspace',
+      data: `${workspaceSelected.value.workspace_name}`
+    })
+  }
+
+  // Check if the active batch is present in the selected workspace
+  sameBatch.value =
+    batches.value.find((batch) => batch.sample_batch_id === batchStore.active.sample_batch_id) ||
+    null
+
+  // Filter out the same batch from batches options
+  if (sameBatch.value) {
+    batches.value = batches.value.filter((batch) => {
+      return batch.sample_batch_id !== sameBatch.value.sample_batch_id
+    })
+  }
+}
+async function copySampleItem() {
+  isCopying.value = true
+  const sample = {
+    // for http client
+    sample_item_id: sampleItem.value.sample_item_id,
+    sample_batch_id: batchSelected.value.sample_batch_id,
+    sample_item_name: newItemName.value,
+    // for notification
+    sample_batch_name: batchSelected.value.sample_batch_name,
+    workspace_name: workspaceSelected.value.workspace_name
+  }
+  await sampleStore.copySample(sample)
+  isCopying.value = false
+  modalStore.deactivate()
+}
+
+// watchers
+watch(
+  modalStore.state.sampleItemOverviewActive,
+  (newVal) => {
+    if (newVal) {
+      initData()
+    }
+  },
+  { immediate: true }
+)
+</script>
+
 <template>
   <section>
     <b-modal
-      :active.sync="modalActive"
+      v-model:active="modalStore.state.sampleItemOverviewActive"
       trap-focus
       :can-cancel="true"
       aria-role="dialog"
       aria-modal
       @after-enter="initData"
-      @close="deactivateModal"
+      @close="modalStore.deactivate"
     >
       <template v-if="actionIs('copy')">
         <div class="modal-card" style="width: 500px">
@@ -71,140 +201,3 @@
     </b-modal>
   </section>
 </template>
-
-<script>
-import { mapMutations } from 'vuex'
-import { call, get, sync } from 'vuex-pathify'
-import { generateCopyName } from '../store/modules/apiHelper'
-
-export default {
-  name: 'TheModalSampleItemOverview',
-  components: {},
-  data: function () {
-    return {
-      newItemName: null,
-      workspaceSelected: null,
-      batchSelected: null,
-      batches: [],
-      sameBatch: null,
-      isCopying: false,
-    }
-  },
-  computed: {
-    ...get({
-      modalProps: 'modal/sampleItemOverviewProps',
-      sampleItemActive: 'sample/active',
-      activeBatch: 'batch/active',
-      allWorkspaces: 'app/workspaces',
-      activeWorkspace: 'workspace/active',
-    }),
-    ...sync({
-      modalActive: 'modal/sampleItemOverviewActive',
-    }),
-    action() {
-      return this.modalProps.action
-    },
-    sampleItem() {
-      return this.modalProps && this.modalProps.sample
-        ? this.modalProps.sample
-        : this.sampleItemActive
-          ? this.sampleItemActive
-          : null
-    },
-    modalTitle() {
-      let title = 'Sample item overview'
-      if (!this.sampleItem) return title
-      if (this.action === 'copy') {
-        title = `Copy "${this.sampleItem.sample_item_name}"`
-      }
-      return title
-    },
-    sameWorkspace() {
-      return this.activeWorkspace ? this.activeWorkspace : null
-    },
-    filteredWorkspaces() {
-      if (this.activeWorkspace) {
-        return this.allWorkspaces.filter((workspace) => {
-          return workspace.workspace_id !== this.activeWorkspace.workspace_id
-        })
-      }
-      return []
-    },
-  },
-  methods: {
-    ...call({
-      gethWorkspaceBatches: 'workspace/gethWorkspaceBatches',
-      copySample: 'sample/copySample',
-      showWarningNotification: 'notification/showWarningNotification',
-    }),
-    ...mapMutations({
-      deactivateModal: 'modal/deactivate',
-    }),
-    actionIs(...actions) {
-      return actions.includes(this.action)
-    },
-    initData() {
-      if (this.modalProps.action === 'copy') {
-        this.newItemName = this.sampleItem
-          ? generateCopyName(this.sampleItem.sample_item_name)
-          : null
-        this.workspaceSelected = null
-        this.batchSelected = null
-        this.batches = []
-        this.sameBatch = null
-      }
-    },
-    async loadWorkspaceData() {
-      if (!this.workspaceSelected) return
-
-      const workspaceBatches = await this.gethWorkspaceBatches(this.workspaceSelected.workspace_id)
-
-      this.batches = workspaceBatches || []
-
-      if (!this.batches.length) {
-        this.showWarningNotification({
-          notification: 'emptyWorkspace',
-          data: `${this.workspaceSelected.workspace_name}`,
-        })
-      }
-
-      // Check if the active batch is present in the selected workspace
-      this.sameBatch =
-        this.batches.find((batch) => batch.sample_batch_id === this.activeBatch.sample_batch_id) ||
-        null
-
-      // Filter out the same batch from batches options
-      if (this.sameBatch) {
-        this.batches = this.batches.filter((batch) => {
-          return batch.sample_batch_id !== this.sameBatch.sample_batch_id
-        })
-      }
-    },
-    async copySampleItem() {
-      this.isCopying = true
-      const sample = {
-        // for http client
-        sample_item_id: this.sampleItem.sample_item_id,
-        sample_batch_id: this.batchSelected.sample_batch_id,
-        sample_item_name: this.newItemName,
-        // for notification
-        sample_batch_name: this.batchSelected.sample_batch_name,
-        workspace_name: this.workspaceSelected.workspace_name,
-      }
-      await this.copySample(sample)
-      this.isCopying = false
-      this.deactivateModal()
-    },
-  },
-  watch: {
-    modalActive: {
-      immediate: true,
-      handler(newVal) {
-        if (newVal) {
-          this.initData()
-        }
-      },
-    },
-  },
-}
-</script>

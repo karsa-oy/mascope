@@ -1,16 +1,114 @@
+<script setup>
+import { ref, computed, onMounted } from 'vue'
+
+import { DialogProgrammatic as dialog } from '@ntohq/buefy-next'
+
+import BaseParamField from './BaseParamField.vue'
+
+import { useVisualizationStore } from '@/stores'
+
+const visualizationStore = useVisualizationStore()
+
+const initialParams = ref({})
+const isSaving = ref(false)
+
+const paramsChanged = computed(() => {
+  // Check if any parameter has changed
+  return Object.keys(initialParams.value).some((key) => {
+    return initialParams.value[key] !== visualizationStore[key]
+  })
+})
+const isDefaultSettings = computed(() => {
+  return Object.keys(visualizationStore.defaultFilterParams).every((key) => {
+    return visualizationStore[key] === visualizationStore.defaultFilterParams[key]
+  })
+})
+
+function onProbableMatchThresholdChange() {
+  if (
+    visualizationStore.paramProbableMatchThreshold < visualizationStore.paramPossibleMatchThreshold
+  ) {
+    visualizationStore.paramPossibleMatchThreshold = visualizationStore.paramProbableMatchThreshold
+  }
+  visualizationStore.loadMatches()
+}
+function onPossibleMatchThresholdChange() {
+  if (
+    visualizationStore.paramProbableMatchThreshold < visualizationStore.paramPossibleMatchThreshold
+  ) {
+    visualizationStore.paramProbableMatchThreshold = visualizationStore.paramPossibleMatchThreshold
+  }
+  visualizationStore.loadMatches()
+}
+
+async function saveFilterSettings() {
+  dialog.confirm({
+    title: 'Saving filtering parameters',
+    message: `Are you sure you want to save current ${visualizationStore.activeIon.target_ion_formula} filtering parameters for ${visualizationStore.activeIon.instrument} instrument?`,
+    confirmText: 'Save',
+    hasIcon: true,
+    icon: 'content-save',
+    onConfirm: async () => {
+      isSaving.value = true
+      await visualizationStore.saveFilterParams()
+      isSaving.value = false
+      visualizationStore.storeInitialParams()
+      await visualizationStore.loadMatches()
+    }
+  })
+}
+function undoChanges() {
+  // Revert filter parameters to their initial values
+  Object.keys(initialParams.value).forEach((key) => {
+    visualizationStore[key] = initialParams.value[key]
+  })
+}
+function filterParamsDelete() {
+  dialog.confirm({
+    title: 'Deleting filtering parameters',
+    message: `Are you sure you want to delete ${visualizationStore.activeIon.target_ion_formula} filtering parameters for ${visualizationStore.activeIon.instrument} instrument?`,
+    confirmText: 'Delete',
+    type: 'is-danger',
+    hasIcon: true,
+    icon: 'delete-alert',
+    onConfirm: async () => {
+      visualizationStore.setDefaultFilterParams()
+      await visualizationStore.deleteInstrumentFilterParams()
+      await visualizationStore.loadMatches()
+      storeInitialParams()
+    }
+  })
+}
+function storeInitialParams() {
+  initialParams.value = {
+    paramMzTolerance: visualizationStore.paramMzTolerance,
+    paramMinIsotopeAbundance: visualizationStore.paramMinIsotopeAbundance,
+    paramIsotopeRatioTolerance: visualizationStore.paramIsotopeRatioTolerance,
+    paramPeakMinIntensity: visualizationStore.paramPeakMinIntensity,
+    paramMinIsotopeCorrelation: visualizationStore.paramMinIsotopeCorrelation,
+    paramProbableMatchThreshold: visualizationStore.paramProbableMatchThreshold,
+    paramPossibleMatchThreshold: visualizationStore.paramPossibleMatchThreshold
+  }
+}
+
+onMounted(() => {
+  storeInitialParams()
+})
+</script>
+
 <template>
   <section style="padding: 1em">
     <!-- <h2 class="subtitle">Ion-specific filter parameters</h2> -->
     <base-param-field
       label="m/z tolerance [ppm]"
-      path="visualization/paramMzTolerance"
+      v-model:param="visualizationStore.paramMzTolerance"
       @paramChange="reload"
       :range="{ min: 0, max: 100, step: 1 }"
     >
     </base-param-field>
     <base-param-field
       label="Minimum isotope abundance"
-      path="visualization/paramMinIsotopeAbundance"
+      v-model:param="visualizationStore.paramMinIsotopeAbundance"
       @paramChange="reload"
       :range="{ min: 0, max: 1, step: 0.01 }"
       disabled
@@ -18,28 +116,28 @@
     </base-param-field>
     <base-param-field
       label="Isotope ratio tolerance"
-      path="visualization/paramIsotopeRatioTolerance"
+      v-model:param="visualizationStore.paramIsotopeRatioTolerance"
       @paramChange="loadMatches"
       :range="{ min: 0, max: 1, step: 0.05 }"
     >
     </base-param-field>
     <base-param-field
       label="Minimum peak intensity"
-      path="visualization/paramPeakMinIntensity"
+      v-model:param="visualizationStore.paramPeakMinIntensity"
       @paramChange="reload"
       :range="{ min: 0, max: 10000, step: 500 }"
     >
     </base-param-field>
     <base-param-field
       label="Minimum isotope correlation"
-      path="visualization/paramMinIsotopeCorrelation"
+      v-model:param="visualizationStore.paramMinIsotopeCorrelation"
       @paramChange="loadMatches"
       :range="{ min: 0, max: 1, step: 0.1 }"
     >
     </base-param-field>
     <base-param-field
       label="Probable match threshold [%]"
-      path="visualization/paramProbableMatchThreshold"
+      v-model:param="visualizationStore.paramProbableMatchThreshold"
       @paramChange="onProbableMatchThresholdChange"
       :range="{ min: 0, max: 1, step: 0.1 }"
       type="is-danger"
@@ -47,7 +145,7 @@
     </base-param-field>
     <base-param-field
       label="Possible match threshold [%]"
-      path="visualization/paramPossibleMatchThreshold"
+      v-model:param="visualizationStore.paramPossibleMatchThreshold"
       @paramChange="onPossibleMatchThresholdChange"
       :range="{ min: 0, max: 1, step: 0.1 }"
       type="is-warning"
@@ -84,8 +182,8 @@
           size="is-small"
           @click="filterParamsDelete"
           :disabled="
-            this.activeIon?.filter_params &&
-            this.activeIon.instrument in this.activeIon.filter_params
+            visualizationStore.activeIon?.filter_params &&
+            visualizationStore.activeIon.instrument in visualizationStore.activeIon.filter_params
               ? false
               : true
           "
@@ -106,124 +204,3 @@
     </div>
   </section>
 </template>
-
-<script setup>
-import BaseParamField from './BaseParamField.vue'
-
-import { call, get, sync } from 'vuex-pathify'
-
-export default {
-  name: 'ThePaneFilterSettingsIon',
-  components: {
-    BaseParamField,
-  },
-  data() {
-    return {
-      initialParams: {},
-      isSaving: false,
-    }
-  },
-  computed: {
-    ...sync({
-      // filter parameters
-      paramMzTolerance: 'visualization/paramMzTolerance',
-      paramMinIsotopeAbundance: 'visualization/paramMinIsotopeAbundance',
-      paramPeakMinIntensity: 'visualization/paramPeakMinIntensity',
-      paramIsotopeRatioTolerance: 'visualization/paramIsotopeRatioTolerance',
-      paramMinIsotopeCorrelation: 'visualization/paramMinIsotopeCorrelation',
-      paramProbableMatchThreshold: 'visualization/paramProbableMatchThreshold',
-      paramPossibleMatchThreshold: 'visualization/paramPossibleMatchThreshold',
-    }),
-    ...get({
-      batchActive: 'batch/active',
-      activeIon: 'visualization/activeIon',
-      defaultFilterParams: 'visualization/defaultFilterParams',
-    }),
-    paramsChanged() {
-      // Check if any parameter has changed
-      return Object.keys(this.initialParams).some((key) => {
-        return this.initialParams[key] !== this[key]
-      })
-    },
-    isDefaultSettings() {
-      return Object.keys(this.defaultFilterParams).every((key) => {
-        return this[key] === this.defaultFilterParams[key]
-      })
-    },
-  },
-  methods: {
-    ...call({
-      reload: 'visualization/reload',
-      loadMatches: 'visualization/loadMatches',
-      saveFilterParams: 'visualization/saveFilterParams',
-      deleteInstrumentFilterParams: 'visualization/deleteInstrumentFilterParams',
-      setDefaultFilterParams: 'visualization/setDefaultFilterParams',
-    }),
-    onProbableMatchThresholdChange() {
-      if (this.paramProbableMatchThreshold < this.paramPossibleMatchThreshold) {
-        this.paramPossibleMatchThreshold = this.paramProbableMatchThreshold
-      }
-      this.loadMatches()
-    },
-    onPossibleMatchThresholdChange() {
-      if (this.paramProbableMatchThreshold < this.paramPossibleMatchThreshold) {
-        this.paramProbableMatchThreshold = this.paramPossibleMatchThreshold
-      }
-      this.loadMatches()
-    },
-
-    async saveFilterSettings() {
-      this.$buefy.dialog.confirm({
-        title: 'Saving filtering parameters',
-        message: `Are you sure you want to save current ${this.activeIon.target_ion_formula} filtering parameters for ${this.activeIon.instrument} instrument?`,
-        confirmText: 'Save',
-        hasIcon: true,
-        icon: 'content-save',
-        onConfirm: async () => {
-          this.isSaving = true
-          await this.saveFilterParams()
-          this.isSaving = false
-          this.storeInitialParams()
-          await this.loadMatches()
-        },
-      })
-    },
-    undoChanges() {
-      // Revert filter parameters to their initial values
-      Object.keys(this.initialParams).forEach((key) => {
-        this[key] = this.initialParams[key]
-      })
-    },
-    filterParamsDelete() {
-      this.$buefy.dialog.confirm({
-        title: 'Deleting filtering parameters',
-        message: `Are you sure you want to delete ${this.activeIon.target_ion_formula} filtering parameters for ${this.activeIon.instrument} instrument?`,
-        confirmText: 'Delete',
-        type: 'is-danger',
-        hasIcon: true,
-        icon: 'delete-alert',
-        onConfirm: async () => {
-          this.setDefaultFilterParams()
-          await this.deleteInstrumentFilterParams()
-          await this.loadMatches()
-          this.storeInitialParams()
-        },
-      })
-    },
-    storeInitialParams() {
-      this.initialParams = {
-        paramMzTolerance: this.paramMzTolerance,
-        paramMinIsotopeAbundance: this.paramMinIsotopeAbundance,
-        paramIsotopeRatioTolerance: this.paramIsotopeRatioTolerance,
-        paramPeakMinIntensity: this.paramPeakMinIntensity,
-        paramMinIsotopeCorrelation: this.paramMinIsotopeCorrelation,
-        paramProbableMatchThreshold: this.paramProbableMatchThreshold,
-        paramPossibleMatchThreshold: this.paramPossibleMatchThreshold,
-      }
-    },
-  },
-  mounted() {
-    this.storeInitialParams()
-  },
-}
-</script>

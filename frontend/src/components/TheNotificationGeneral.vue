@@ -1,94 +1,73 @@
+<script setup>
+import { ref, watch } from 'vue'
+
+import { useNotificationStore } from '@/stores'
+
+const notificationStore = useNotificationStore()
+
+const isClosing = ref(false)
+
+function close() {
+  // TODO_configuration  move animation delay to config file
+  isClosing.value = true
+  setTimeout(() => {
+    notificationStore.deactivate()
+    isClosing.value = false
+  }, 480)
+}
+
+watch(notificationStore.generalActive, (newVal) => {
+  if (!newVal) {
+    notificationStore.resetGeneralNotification()
+  }
+  if (newVal) {
+    setTimeout(() => {
+      if (notificationStore.batchComputeProgressActive) return
+      if (notificationStore.deleteProgress) return
+      if (notificationStore.calibrationComputing) return
+      if (notificationStore.progressActive) return
+      if (notificationStore.generalNotification === 'error') {
+        setTimeout(close, 10000)
+      } else {
+        setTimeout(close, 3500)
+      }
+    }, 1000)
+  }
+})
+</script>
+
 <template>
-  <div v-if="notificationIsActive">
+  <div v-if="notificationStore.generalActive">
     <!-- Submitted Notification -->
     <b-message
-      v-if="generalNotification === 'submitted'"
+      v-if="notificationStore.generalNotification === 'submitted'"
       type="is-notification"
       has-icon
       icon="check-circle"
       :class="{ 'is-closing': isClosing, 'is-submitted': 'is-submitted' }"
     >
-      {{ generalNotificationMessage }}
+      {{ notificationStore.generalNotificationMessage }}
     </b-message>
     <!-- Deleted Notification -->
     <b-message
-      v-if="generalNotification === 'deleted'"
+      v-if="notificationStore.generalNotification === 'deleted'"
       type="is-notification"
       has-icon
       icon="delete-circle"
       :class="{ 'is-closing': isClosing, 'is-error': 'is-error' }"
     >
-      {{ generalNotificationMessage }}
+      {{ notificationStore.generalNotificationMessage }}
     </b-message>
     <!-- Error Notification -->
     <b-message
-      v-if="generalNotification === 'error'"
+      v-if="notificationStore.generalNotification === 'error'"
       type="is-notification"
       has-icon
       icon="alert-circle-outline"
       icon-size="is-medium"
       :class="{ 'is-closing': isClosing, 'is-error': 'is-error' }"
     >
-      {{ generalNotificationMessage }}
+      {{ notificationStore.generalNotificationMessage }}
     </b-message>
   </div>
 </template>
-
-<script>
-import { mapMutations } from 'vuex'
-import { sync } from 'vuex-pathify'
-
-export default {
-  name: 'TheNotificationGeneral',
-  data() {
-    return {
-      isClosing: false,
-    }
-  },
-  computed: {
-    ...sync({
-      notificationIsActive: 'notification/generalActive',
-      generalNotification: 'notification/generalNotification',
-      generalNotificationMessage: 'notification/generalNotificationMessage',
-      batchComputeProgressActive: 'notification/batchComputeProgressActive',
-      deleteProgress: 'notification/deleteProgress',
-      calibrationComputing: 'notification/calibrationComputing',
-      progressActive: 'notification/progressActive',
-    }),
-  },
-  watch: {
-    notificationIsActive(newVal) {
-      if (!newVal) {
-        this.resetGeneralNotification()
-      }
-      if (newVal) {
-        setTimeout(() => {
-          if (this.batchComputeProgressActive) return
-          if (this.deleteProgress) return
-          if (this.calibrationComputing) return
-          if (this.progressActive) return
-          if (this.generalNotification === 'error') {
-            setTimeout(this.close, 10000)
-          } else {
-            setTimeout(this.close, 3500)
-          }
-        }, 1000)
-      }
-    },
-  },
-  methods: {
-    ...mapMutations({
-      deactivateNotification: 'notification/deactivate',
-      resetGeneralNotification: 'notification/RESET_GENERAL_NOTIFICATION',
-    }),
-    close() {
-      // TODO_configuration  move animation delay
-      this.isClosing = true
-      setTimeout(() => {
-        this.deactivateNotification()
-        this.isClosing = false
-      }, 480)
-    },
-  },
-}
-</script>

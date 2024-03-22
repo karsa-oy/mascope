@@ -1,44 +1,35 @@
-# Frontend
+# vue-project
 
-### Description
+This template should help get you started developing with Vue 3 in Vite.
 
-This folder contains the Mascope frontend, developed in [Vue.js](https://vuejs.org/). The dependencies are managed by [yarn](https://yarnpkg.com/).
+## Recommended IDE Setup
 
-```
-mascope
-├───agents
-├───backend
-├───frontend            # Mascope frontend
-│   ├───scripts             # Build scripts
-│   └───src                 # Frontend source code
-│       ├───assets              # Icons, images, CSS
-│       ├───components          # Vue components
-│       ├───lib                 # Library (JS)
-│       └───store               # Vuex store
-└───scripts
+[VSCode](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+
+## Customize configuration
+
+See [Vite Configuration Reference](https://vitejs.dev/config/).
+
+## Project Setup
+
+```sh
+npm install
 ```
 
-### Setup Requirements
+### Compile and Hot-Reload for Development
 
-- [Node.js](https://nodejs.org/en)
-- [yarn](https://yarnpkg.com/)
+```sh
+npm run dev
+```
 
-### Project setup
+### Compile and Minify for Production
 
-Call `yarn install` to install the dependencies.
+```sh
+npm run build
+```
 
-### Compilation and hot-reloads for development
+### Lint with [ESLint](https://eslint.org/)
 
-To run the frontend in development mode, call `yarn serve`.
-
-### Lints and fixes files
-
-`yarn lint`
-
-### Compile and build distribution package
-
-To build the frontend package, run `/scripts/build/build.cmd`. Refer to the README inside `/scripts/build` for more details.
-
-### Customize configuration
-
-See [Configuration Reference](https://cli.vuejs.org/config/).
+```sh
+npm run lint
+```

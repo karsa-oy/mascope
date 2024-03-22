@@ -1,39 +1,7 @@
-<template>
-  <b-table
-    v-if="rows.length > 0"
-    :data="rows"
-    narrowed
-    hoverable
-    :default-sort="defaultSort"
-    show-header
-    sticky-header
-    :height="height"
-    :header-checkable="checkable && !checkSingle"
-    :checkable="checkable"
-    :checked-rows.sync="selected"
-  >
-    <b-table-column
-      v-for="col in cols"
-      v-slot="props"
-      :key="col.field"
-      :field="col.field"
-      :label="col.label"
-      :width="col.width"
-      :subheading="col.subheading"
-      :searchable="searchable"
-      :sortable="sortable"
-      left
-    >
-      {{ parseValue(props.row[col.field]) }}
-    </b-table-column>
-  </b-table>
-</template>
+<script setup>
+  import { ref, watch } from 'vue';
 
-<script>
-export default {
-  name: 'BaseTable',
-  components: {},
-  props: {
+  const props = defineProps({
     checkable: {
       type: Boolean,
       required: false,
@@ -82,35 +50,40 @@ export default {
       required: false,
       default: true,
     },
-  },
-  data() {
-    return {
-      selected: [],
+  })
+
+  const emit = defineEmits(['selectRows'])
+  const selected = ref([])
+
+  const formatter = new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: props.minPrecision,
+    maximumFractionDigits: props.maxPrecision,
+  })
+
+  function parseValue(value) {
+    let isNumeric = typeof value == 'number'
+    return isNumeric ? formatter.format(value) : value
+  }
+
+  watch(props.rows, () => {
+    selected.value = []
+  })
+  watch(selected, (newRows, oldRows) => {
+    if (props.checkSingle && newRows.length > 1) {
+      selected.value = newRows.filter((row) => !oldRows.includes(row))
+      return
     }
-  },
-  created: function () {
-    this.formatter = new Intl.NumberFormat('en-US', {
-      minimumFractionDigits: this.minPrecision,
-      maximumFractionDigits: this.maxPrecision,
-    })
-  },
-  methods: {
-    parseValue: function (value) {
-      let isNumeric = typeof value == 'number'
-      return isNumeric ? this.formatter.format(value) : value
-    },
-  },
-  watch: {
-    rows() {
-      this.selected = []
-    },
-    selected(newRows, oldRows) {
-      if (this.checkSingle && newRows.length > 1) {
-        this.selected = newRows.filter((row) => !oldRows.includes(row))
-        return
-      }
-      this.$emit('selectRows', newRows, oldRows)
-    },
-  },
-}
+    emit('selectRows', newRows, oldRows)
+  })
 </script>
+
+<template>
+  <b-table v-if="rows.length > 0" :data="rows" narrowed hoverable :default-sort="defaultSort" show-header sticky-header
+    :height="height" :header-checkable="checkable && !checkSingle" :checkable="checkable"
+    v-bind:checked-rows="selected">
+    <b-table-column v-for="col in cols" v-slot="props" :key="col.field" :field="col.field" :label="col.label"
+      :width="col.width" :subheading="col.subheading" :searchable="searchable" :sortable="sortable" left>
+      {{ parseValue(props.row[col.field]) }}
+    </b-table-column>
+  </b-table>
+</template>

@@ -3,5 +3,5 @@ pushd backend
 poetry install --no-interaction --no-root
 popd
 pushd frontend
-yarn install
+npm install
 popd

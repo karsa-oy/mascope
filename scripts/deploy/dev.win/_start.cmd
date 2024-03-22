@@ -4,7 +4,7 @@ pushd backend
 start "mascope-backend" cmd /k poetry run mascope-api
 popd
 pushd frontend
-start "mascope-frontend" cmd /k yarn serve --host
+start "mascope-frontend" cmd /k npm run dev
 popd
 
 @REM pushd backend

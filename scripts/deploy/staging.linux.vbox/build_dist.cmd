@@ -13,7 +13,7 @@ popd
 
 echo Build MASCOPE dist package...
 pushd %frontend_path%
-call yarn build
+call npm build
 popd
 
 echo Find new MASCOPE UI distribution package in frontend/dist

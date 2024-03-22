@@ -1,3 +1,24 @@
+<script setup>
+  import { useModalStore } from '@/stores/modal'
+  import { useTargetsStore } from '@/stores/targets'
+  import { useWorkspaceStore } from '@/stores/workspace'
+
+  const modalStore = useModalStore()
+  const targetsStore = useTargetsStore()
+  const workspaceStore = useWorkspaceStore()
+
+  const props = defineProps({
+    workspace: {
+      required: true,
+    },
+  })
+
+  function onClick() {
+    workspaceStore.load(props.workspace)
+    targetsStore.load()
+  }
+</script>
+
 <template>
   <div class="base-tile">
     <header class="tile-card-header">
@@ -8,36 +29,28 @@
         <template #trigger>
           <b-icon icon="dots-horizontal" size="small" role="button"></b-icon>
         </template>
-        <b-dropdown-item
-          aria-role="listitem"
-          @click="
-            () => {
-              modalProps = {
-                action: 'edit',
-                workspace_id: workspace.workspace_id,
-              }
-              activateModal({
-                modal: 'workspaceSave',
-              })
-            }
-          "
-        >
+        <b-dropdown-item aria-role="listitem" @click="() => {
+        modalProps = {
+          action: 'edit',
+          workspace_id: workspace.workspace_id,
+        }
+        modalStore.activate({
+          modal: 'workspaceSave',
+        })
+      }
+        ">
           Edit
         </b-dropdown-item>
-        <b-dropdown-item
-          aria-role="listitem"
-          @click="
-            () => {
-              modalProps = {
-                action: 'delete',
-                workspace_id: workspace.workspace_id,
-              }
-              activateModal({
-                modal: 'workspaceSave',
-              })
-            }
-          "
-        >
+        <b-dropdown-item aria-role="listitem" @click="() => {
+        modalProps = {
+          action: 'delete',
+          workspace_id: workspace.workspace_id,
+        }
+        modalStore.activate({
+          modal: 'workspaceSave',
+        })
+      }
+        ">
           Delete
         </b-dropdown-item>
       </b-dropdown>
@@ -47,35 +60,3 @@
     </div>
   </div>
 </template>
-
-<script>
-import { mapMutations } from 'vuex'
-import { sync, call } from 'vuex-pathify'
-
-export default {
-  name: 'BaseWorkspaceTile',
-  props: {
-    workspace: {
-      required: true,
-    },
-  },
-  computed: {
-    ...sync({
-      modalProps: 'modal/workspaceSaveProps',
-    }),
-  },
-  methods: {
-    ...call({
-      workspaceLoad: 'workspace/load',
-      targetsLoad: 'targets/load',
-    }),
-    ...mapMutations({
-      activateModal: 'modal/activate',
-    }),
-    onClick() {
-      this.workspaceLoad(this.workspace.workspace_id)
-      this.targetsLoad()
-    },
-  },
-}
-</script>

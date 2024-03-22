@@ -1,3 +1,25 @@
+<script setup>
+import BaseMenuButton from './BaseMenuButton.vue'
+
+defineProps({
+  buttons: {
+    type: Array,
+    required: true
+  },
+  footerButtons: {
+    type: Array
+  },
+  tooltipPosition: {
+    type: String,
+    default: 'is-right'
+  },
+  tooltipDelay: {
+    type: Number,
+    default: 200
+  }
+})
+</script>
+
 <template>
   <b-menu label="menu">
     <b-menu-list label="">
@@ -24,37 +46,6 @@
     </div>
   </b-menu>
 </template>
-
-<script>
-import BaseMenuButton from './BaseMenuButton.vue'
-
-export default {
-  name: 'BaseMainMenu',
-  components: {
-    BaseMenuButton,
-  },
-  props: {
-    buttons: {
-      type: Array,
-      required: true,
-    },
-    footerButtons: {
-      type: Array,
-      required: false,
-    },
-    tooltipPosition: {
-      type: String,
-      required: false,
-      default: 'is-right',
-    },
-    tooltipDelay: {
-      type: Number,
-      required: false,
-      default: 200,
-    },
-  },
-}
-</script>
 
 <style>
 .menu-header {

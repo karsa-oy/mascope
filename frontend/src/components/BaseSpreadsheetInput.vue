@@ -1,26 +1,10 @@
-<template>
-  <b-field :label="label">
-    <template v-if="cols.length > 1 && rows.length > 0">
-      <section>
-        <section style="font-style: italic; color: #b7b7b7; padding-bottom: 0.5em">
-          Paste spreadsheet data again to replace data.
-        </section>
-        <section>
-          <b-table :columns="cols" :data="rows" style="padding-bottom: 0.5em"> </b-table>
-        </section>
-      </section>
-    </template>
-    <b-message v-else type="is-info" has-icon>{{ info }}</b-message>
-  </b-field>
-</template>
+<script setup>
+  import { ref, watch, computed, nextTick } from 'vue';
 
-<script>
-import table from '$lib/table'
-import { get } from 'vuex-pathify'
+  import table from '@/lib/table'
+  import { useKeyStore } from '@/stores'
 
-export default {
-  name: 'BaseSpreadsheetInput',
-  props: {
+  const props = defineProps({
     label: {
       type: String,
       required: true,
@@ -39,50 +23,55 @@ export default {
       required: false,
       default: 'Paste spreadsheet cells here',
     },
-  },
-  data: function () {
-    return {
-      clipboardText: '',
-      rows: [],
+  })
+
+  const emit = defineEmits(['colsPasted', 'rowsPasted'])
+
+  const rows = ref([])
+
+  const fields = computed(() => props.cols.map((col) => col.field))
+
+  const { control, v } = useKeyStore()
+
+
+  // WARN possible regrsssion for cols when using colsFromHeader
+  async function parseClipboard() {
+    if (!(control && v)) return
+    navigator.permissions.query({ name: 'clipboard-read' })
+    let clipboardText = await navigator.clipboard.readText()
+    if (props.colsFromHeader) {
+      let headers = table.readHeader(clipboardText)
+      let cols = headers.map((header) => ({
+        field: header.toLowerCase().replace(/ /g, '_').trim(),
+        label: header,
+      }))
+      emit('colsPasted', cols)
+      await nextTick()
     }
-  },
-  computed: {
-    ...get({
-      control: 'key/control',
-      v: 'key/v',
-    }),
-    fields() {
-      return this.cols.map((col) => col.field)
-    },
-  },
-  methods: {
-    parseClipboard: async function () {
-      navigator.permissions.query({ name: 'clipboard-read' })
-      let clipboardText = await navigator.clipboard.readText()
-      if (this.colsFromHeader) {
-        let fields = table.readHeader(clipboardText)
-        let cols = fields.map((field) => ({
-          field: field.toLowerCase().replace(/ /g, '_').trim(),
-          label: field,
-        }))
-        this.$emit('colsPasted', cols)
-        await this.$nextTick()
-      }
-      this.rows = table.fromSpreadsheet(clipboardText, this.fields, this.colsFromHeader)
-      this.$emit('rowsPasted', this.rows)
-    },
-  },
-  watch: {
-    control: function () {
-      if (this.control && this.v) {
-        this.parseClipboard()
-      }
-    },
-    v: function () {
-      if (this.control && this.v) {
-        this.parseClipboard()
-      }
-    },
-  },
-}
+    rows.value = table.fromSpreadsheet(
+      clipboardText,
+      fields.value,
+      props.colsFromHeader
+    )
+    emit('rowsPasted', rows.value)
+  }
+
+  watch(control, parseClipboard)
+  watch(v, parseClipboard)
 </script>
+
+<template>
+  <b-field :label="label">
+    <template v-if="cols.length > 1 && rows.length > 0">
+      <section>
+        <section style="font-style: italic; color: #b7b7b7; padding-bottom: 0.5em">
+          Paste spreadsheet data again to replace data.
+        </section>
+        <section>
+          <b-table :columns="cols" :data="rows" style="padding-bottom: 0.5em"> </b-table>
+        </section>
+      </section>
+    </template>
+    <b-message v-else type="is-info" has-icon>{{ info }}</b-message>
+  </b-field>
+</template>

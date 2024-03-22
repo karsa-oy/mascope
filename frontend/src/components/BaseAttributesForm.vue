@@ -1,3 +1,213 @@
+<script setup>
+import * as _ from 'underscore'
+import { DialogProgrammatic as dialog, ToastProgrammatic as toast } from '@ntohq/buefy-next'
+import { ref, reactive, computed, watch } from 'vue'
+
+const props = defineProps({
+  initialTemplates: {
+    type: Array,
+    required: true
+  },
+  attributesToLoad: {
+    type: Object,
+    default: () => {}
+  },
+  showEditFunctions: {
+    type: Boolean,
+    default: false
+  },
+  editable: {
+    type: Boolean,
+    default: false
+  },
+  fillable: {
+    type: Boolean,
+    default: true
+  },
+  formTitle: {
+    type: String,
+    required: true
+  },
+  templateType: {
+    type: String,
+    required: true
+  }
+})
+
+const emit = defineEmits([
+  'metaDataUpdated',
+  'loadAttributes',
+  'saveAttributes',
+  'saveTemplate',
+  'deleteTemplate'
+])
+
+// reactivity
+
+let loadedTemplate = reactive(null)
+loadedTemplate = structuredClone(availableTemplates.value[0])
+
+let formFields = reactive([])
+
+const availableTemplates = computed(() => props.initialTemplates)
+const editFunctionsVisible = ref(props.showEditFunctions)
+
+// watchers
+
+watch(formFields, (newValue) => {
+  emit('metaDataUpdated', newValue)
+})
+watch(loadedTemplate, (newValue) => {
+  if (newValue) {
+    formFields = structuredClone(newValue.template)
+  }
+})
+watch(props.attributesToLoad, (data) => {
+  if (_.isEmpty(data) || _.isEmpty(data.row)) {
+    return
+  }
+  let newTemplate = {
+    name: null,
+    type: props.templateType,
+    template: []
+  }
+  for (let { label, key, required, disabled } of data.template) {
+    if (required) {
+      newTemplate.template.push({
+        label,
+        key,
+        required,
+        disabled,
+        value: data.row[label]
+      })
+    }
+  }
+  const attributesField = props.templateType + '_attributes'
+  if (data.row[attributesField]) {
+    Object.keys(data.row[attributesField]).forEach((attr) =>
+      newTemplate.template.push({
+        label: attr,
+        value: data.row[attributesField][attr]
+      })
+    )
+  }
+  loadedTemplate = newTemplate
+})
+watch(props.showEditFunctions, (newValue) => {
+  editFunctionsVisible.value = newValue
+})
+
+// methods
+
+function addField() {
+  dialog.prompt({
+    message: 'Add field to template',
+    confirmText: 'Add',
+    inputAttrs: {
+      placeholder: 'field label',
+      maxlength: 100
+    },
+    trapFocus: true,
+    onConfirm: (fieldToAdd) => {
+      loadedTemplate = {
+        name: null,
+        template: [...formFields, { label: fieldToAdd, value: '' }]
+      }
+    }
+  })
+}
+function removeField(event) {
+  // Field to remove label is in button element id, find it from the event data
+  let fieldToRemove = event.target.id
+  if (!fieldToRemove.length) {
+    // Failed to find the button id
+    console.log('fieldToRemove not found at event.target.id: ', event)
+    return
+  }
+  for (let i = 0; i < loadedTemplate.template.length; ++i) {
+    if (_.isEqual(fieldToRemove, loadedTemplate.template[i].label)) {
+      loadedTemplate = {
+        name: null,
+        template: [...loadedTemplate.template.slice(0, i), ...loadedTemplate.template.slice(i + 1)]
+      }
+      break
+    }
+  }
+}
+function deleteTemplate() {
+  dialog.confirm({
+    title: 'Deleting template',
+    message: 'Are you sure you want to delete template <b>' + loadedTemplate.name + '</b>?',
+    confirmText: 'Delete',
+    onConfirm: () => {
+      emit(
+        'deleteTemplate',
+        availableTemplates.value
+          .filter(
+            (template) => template.attribute_template_id == loadedTemplate.attribute_template_id
+          )
+          .map((template) => template.attribute_template_id)
+      )
+    }
+  })
+}
+function saveTemplate() {
+  dialog.prompt({
+    title: 'Template name',
+    confirmText: 'Save',
+    inputAttrs: {
+      placeholder: loadedTemplate.name === 'default' ? 'template name' : loadedTemplate.name,
+      maxlength: 100
+    },
+    trapFocus: true,
+    onConfirm: (templateName) => {
+      if (templateName.toLowerCase() === 'default') {
+        toast.open({
+          message: `Name "${templateName}" is not allowed`,
+          duration: 5000,
+          type: 'is-danger'
+        })
+        return
+      }
+      // copy loadedTempate fields with user input
+      let newTemplate = {
+        name: templateName,
+        type: props.templateType,
+        template: structuredClone(formFields)
+      }
+      let i = 0
+      // set loaded template
+      for (i = 0; i < availableTemplates.value.length; ++i) {
+        if (_.isEqual(templateName, availableTemplates.value[i].name)) break
+      }
+      if (i < availableTemplates.value.length) {
+        // existing template
+        availableTemplates.value[i] = structuredClone(newTemplate)
+      } else {
+        // new template
+        availableTemplates.value.push(structuredClone(newTemplate))
+      }
+      loadedTemplate = structuredClone(newTemplate)
+      // push new template
+      emit('saveTemplate', loadedTemplate)
+    }
+  })
+}
+function saveAttributes() {
+  dialog.confirm({
+    title: props.formTitle,
+    message: `${props.formTitle} for <b>` + formFields[0].value + '</b>?',
+    confirmText: 'Save',
+    onConfirm: () => {
+      emit('saveAttributes', formFields)
+    }
+  })
+}
+function loadAttributes(requestObject) {
+  emit('loadAttributes', requestObject)
+}
+</script>
+
 <template>
   <div>
     <div class="box" style="background-color: inherit">
@@ -6,7 +216,7 @@
           icon-right="settings"
           type="is-primary"
           size="is-small"
-          @click="showEditFunctions = !showEditFunctions"
+          @click="editFunctionsVisible = !editFunctionsVisible"
         >
         </b-button>
       </div>
@@ -22,7 +232,7 @@
           <b-field :label="item.label" custom-class="dark">
             <b-input
               v-model="item.value"
-              :placeholder="showEditFunctions ? item.placeholder || 'default value' : ''"
+              :placeholder="editFunctionsVisible ? item.placeholder || 'default value' : ''"
               :required="fillable && item.required"
               :disabled="!fillable || item.disabled"
               lazy
@@ -41,7 +251,7 @@
               >
               </b-button>
             </div>
-            <div v-if="showEditFunctions">
+            <div v-if="editFunctionsVisible">
               <b-button
                 :id="item.label"
                 :disabled="item.required"
@@ -56,7 +266,7 @@
           </b-field>
         </template>
       </div>
-      <div v-if="showEditFunctions" style="padding-top: 2em">
+      <div v-if="editFunctionsVisible" style="padding-top: 2em">
         <b-field custom-class="dark">
           <b-button @click="addField" expanded>
             <b>Add new field</b>
@@ -75,7 +285,7 @@
                   </option>
                 </b-select>
               </div>
-              <div class="column is-narrow" style="text-align: left" v-if="showEditFunctions">
+              <div class="column is-narrow" style="text-align: left" v-if="editFunctionsVisible">
                 <b-button
                   :disabled="
                     !loadedTemplate || !loadedTemplate.name || loadedTemplate.name == 'default'
@@ -88,7 +298,7 @@
                 >
                 </b-button>
               </div>
-              <div class="column is-narrow" style="text-align: left" v-if="showEditFunctions">
+              <div class="column is-narrow" style="text-align: left" v-if="editFunctionsVisible">
                 <b-button
                   @click="saveTemplate"
                   :disabled="!formFields.length"
@@ -102,8 +312,8 @@
               <div class="column is-one-half" style="text-align: right">
                 <b-button
                   :disabled="
-                    this.formFields.filter((f) => f.required).length !=
-                    this.formFields.filter((f) => f.required).filter((f) => f.value).length
+                    formFields.filter((f) => f.required).length !=
+                    formFields.filter((f) => f.required).filter((f) => f.value).length
                   "
                   type="is-success"
                   icon-left="content-save"
@@ -122,235 +332,3 @@
     </div>
   </div>
 </template>
-
-<script type="text/javascript">
-import * as _ from 'underscore'
-
-export default {
-  name: 'BaseMetadataForm',
-  props: {
-    initialTemplates: {
-      type: Array,
-      required: true,
-      default: function () {
-        return []
-      },
-    },
-    attributesToLoad: {
-      type: Object,
-      required: false,
-      default: function () {
-        return {}
-      },
-    },
-    showEditFunctions: {
-      type: Boolean,
-      required: false,
-      default: false,
-    },
-    editable: {
-      type: Boolean,
-      required: false,
-      default: false,
-    },
-    fillable: {
-      type: Boolean,
-      required: false,
-      default: true,
-    },
-    formTitle: {
-      type: String,
-      required: true,
-      default: '',
-    },
-    templateType: {
-      type: String,
-      required: true,
-      default: '',
-    },
-  },
-  data() {
-    return {
-      loadedTemplate: null,
-      formFields: [],
-    }
-  },
-  computed: {
-    availableTemplates() {
-      return this.initialTemplates
-    },
-  },
-  created() {
-    this.loadedTemplate = this.clone(this.availableTemplates[0])
-  },
-  methods: {
-    clone(obj) {
-      return JSON.parse(JSON.stringify(obj))
-    },
-    addField() {
-      this.$buefy.dialog.prompt({
-        message: 'Add field to template',
-        confirmText: 'Add',
-        inputAttrs: {
-          placeholder: 'field label',
-          maxlength: 100,
-        },
-        trapFocus: true,
-        onConfirm: (fieldToAdd) => {
-          this.loadedTemplate = {
-            name: null,
-            template: [...this.formFields, { label: fieldToAdd, value: '' }],
-          }
-        },
-      })
-    },
-    removeField(event) {
-      // Field to remove label is in button element id, find it from the event data
-      let fieldToRemove = event.target.id
-      if (!fieldToRemove.length) {
-        // Failed to find the button id
-        console.log('fieldToRemove not found at event.target.id: ', event)
-        return
-      }
-      for (let i = 0; i < this.loadedTemplate.template.length; ++i) {
-        if (_.isEqual(fieldToRemove, this.loadedTemplate.template[i].label)) {
-          this.loadedTemplate = {
-            name: null,
-            template: [
-              ...this.loadedTemplate.template.slice(0, i),
-              ...this.loadedTemplate.template.slice(i + 1),
-            ],
-          }
-          break
-        }
-      }
-    },
-    deleteTemplate() {
-      this.$buefy.dialog.confirm({
-        title: 'Deleting template',
-        message:
-          'Are you sure you want to delete template <b>' + this.loadedTemplate.name + '</b>?',
-        confirmText: 'Delete',
-        onConfirm: () => {
-          this.$emit(
-            'deleteTemplate',
-            this.availableTemplates
-              .filter(
-                (template) =>
-                  template.attribute_template_id == this.loadedTemplate.attribute_template_id,
-              )
-              .map((template) => template.attribute_template_id),
-          )
-        },
-      })
-    },
-    saveTemplate() {
-      this.$buefy.dialog.prompt({
-        title: 'Template name',
-        confirmText: 'Save',
-        inputAttrs: {
-          placeholder:
-            this.loadedTemplate.name === 'default' ? 'template name' : this.loadedTemplate.name,
-          maxlength: 100,
-        },
-        trapFocus: true,
-        onConfirm: (templateName) => {
-          if (templateName.toLowerCase() === 'default') {
-            this.$buefy.toast.open({
-              message: `Name "${templateName}" is not allowed`,
-              duration: 5000,
-              type: 'is-danger',
-            })
-            return
-          }
-          // copy loadedTempate fields with user input
-          let newTemplate = {
-            name: templateName,
-            type: this.templateType,
-            template: this.clone(this.formFields),
-          }
-          let i = 0
-          // set loaded template
-          for (i = 0; i < this.availableTemplates.length; ++i) {
-            if (_.isEqual(templateName, this.availableTemplates[i].name)) break
-          }
-          if (i < this.availableTemplates.length) {
-            // existing template
-            this.availableTemplates[i] = this.clone(newTemplate)
-          } else {
-            // new template
-            this.availableTemplates.push(this.clone(newTemplate))
-          }
-          this.loadedTemplate = this.clone(newTemplate)
-          // push new template
-          this.$emit('saveTemplate', this.loadedTemplate)
-        },
-      })
-    },
-    saveAttributes() {
-      this.$buefy.dialog.confirm({
-        title: this.formTitle,
-        message: `${this.formTitle} for <b>` + this.formFields[0].value + '</b>?',
-        confirmText: 'Save',
-        onConfirm: () => {
-          this.$emit('saveAttributes', this.formFields)
-        },
-      })
-    },
-    loadAttributes(requestObject) {
-      this.$emit('loadAttributes', requestObject)
-    },
-  },
-  watch: {
-    formFields: {
-      handler(newValue) {
-        this.$emit('metaDataUpdated', newValue)
-      },
-      deep: true,
-    },
-    loadedTemplate: {
-      handler(newValue) {
-        if (newValue) {
-          // Make a copy to avoid mutating the loaded template directly
-          this.formFields = this.clone(newValue.template)
-        }
-      },
-      deep: true,
-    },
-    attributesToLoad: {
-      handler(data) {
-        if (_.isEmpty(data) || _.isEmpty(data.row)) {
-          return
-        }
-        let newTemplate = {
-          name: null,
-          type: this.templateType,
-          template: [],
-        }
-        for (let { label, key, required, disabled } of data.template) {
-          if (required) {
-            newTemplate.template.push({
-              label,
-              key,
-              required,
-              disabled,
-              value: data.row[label],
-            })
-          }
-        }
-        const attributesField = this.templateType + '_attributes'
-        if (data.row[attributesField]) {
-          Object.keys(data.row[attributesField]).forEach((attr) =>
-            newTemplate.template.push({
-              label: attr,
-              value: data.row[attributesField][attr],
-            }),
-          )
-        }
-        this.loadedTemplate = newTemplate
-      },
-      deep: true,
-    },
-  },
-}
-</script>
