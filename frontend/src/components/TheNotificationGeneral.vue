@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 
 import { useNotificationStore } from '@/stores'
 
@@ -16,24 +16,27 @@ function close() {
   }, 480)
 }
 
-watch(notificationStore.generalActive, (newVal) => {
-  if (!newVal) {
-    notificationStore.resetGeneralNotification()
+watch(
+  computed(() => notificationStore.generalActive),
+  (newVal) => {
+    if (!newVal) {
+      notificationStore.resetGeneralNotification()
+    }
+    if (newVal) {
+      setTimeout(() => {
+        if (notificationStore.batchComputeProgressActive) return
+        if (notificationStore.deleteProgress) return
+        if (notificationStore.calibrationComputing) return
+        if (notificationStore.progressActive) return
+        if (notificationStore.generalNotification === 'error') {
+          setTimeout(close, 10000)
+        } else {
+          setTimeout(close, 3500)
+        }
+      }, 1000)
+    }
   }
-  if (newVal) {
-    setTimeout(() => {
-      if (notificationStore.batchComputeProgressActive) return
-      if (notificationStore.deleteProgress) return
-      if (notificationStore.calibrationComputing) return
-      if (notificationStore.progressActive) return
-      if (notificationStore.generalNotification === 'error') {
-        setTimeout(close, 10000)
-      } else {
-        setTimeout(close, 3500)
-      }
-    }, 1000)
-  }
-})
+)
 </script>
 
 <template>

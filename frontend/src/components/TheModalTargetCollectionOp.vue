@@ -480,7 +480,7 @@ async function loadWorkspaceBatches() {
 <template>
   <section>
     <b-modal
-      v-model:active="modalStore.state.targetCollectionOpActive"
+      v-model="modalStore.state.targetCollectionOpActive"
       has-modal-card
       trap-focus
       :can-cancel="true"

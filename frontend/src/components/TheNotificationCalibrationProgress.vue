@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 
 import { useNotificationStore } from '@/stores'
 
@@ -16,17 +16,20 @@ function close() {
   }, 480)
 }
 
-watch(notificationStore.calibrationComputing, (value) => {
-  if (value) {
-    this.activateNotification({
-      notification: 'calibrationProgress'
-    })
-  } else {
-    if (notificationStore.active === 'calibrationProgress') {
-      close()
+watch(
+  computed(() => notificationStore.calibrationComputing),
+  (value) => {
+    if (value) {
+      this.activateNotification({
+        notification: 'calibrationProgress'
+      })
+    } else {
+      if (notificationStore.active === 'calibrationProgress') {
+        close()
+      }
     }
   }
-})
+)
 </script>
 
 <template>

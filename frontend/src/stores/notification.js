@@ -68,6 +68,16 @@ export const useNotificationStore = defineStore('notification', () => {
   const computeError = ref(false)
   const calibrationError = ref(false)
 
+  function activate({ notification }) {
+    active.value = notification
+  }
+  function deactivate() {
+    active.value = null
+  }
+  function setProgressState({ action, value }) {
+    progress(action).value = value
+  }
+
   function resetWarningNotification() {
     warningNotification.value = null
     warningData.value = null
@@ -402,6 +412,9 @@ export const useNotificationStore = defineStore('notification', () => {
     calibrationAction,
     computeError,
     calibrationError,
+    activate,
+    deactivate,
+    setProgressState,
     showGeneralNotification,
     showProgressNotification,
     showWarningNotification,

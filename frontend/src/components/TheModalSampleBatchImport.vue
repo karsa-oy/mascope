@@ -407,7 +407,7 @@ function validateImportedSampleItems() {
 <template>
   <section>
     <b-modal
-      v-model:active="modalActive"
+      v-model="modalStore.state.sampleBatchImportActive"
       trap-focus
       :can-cancel="true"
       aria-role="dialog"

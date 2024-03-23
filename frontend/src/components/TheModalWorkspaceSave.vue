@@ -18,7 +18,7 @@ const action = computed(() => {
 const oldWorkspace = computed(() => {
   if (actionIs('edit', 'delete')) {
     return table.get(appStore.workspaces, {
-      workspace_id: modalStore.state.workspaceSaveProps.value.workspace_id
+      workspace_id: modalStore.state.workspaceSaveProps.workspace_id
     })
   } else {
     return null
@@ -53,7 +53,7 @@ function loadWorkspace() {
 <template>
   <section>
     <b-modal
-      v-model:active="modalActive"
+      v-model="modalStore.state.workspaceSaveActive"
       has-modal-card
       trap-focus
       :can-cancel="true"
@@ -77,7 +77,7 @@ function loadWorkspace() {
           <p v-if="actionIs('delete')">Are you sure you want to delete this workspace?</p>
         </section>
         <footer class="modal-card-foot">
-          <b-button type="is-warning" icon-left="close" expanded @click="deactivateModal">
+          <b-button type="is-warning" icon-left="close" expanded @click="modalStore.deactivate">
             Cancel
           </b-button>
 
@@ -93,7 +93,7 @@ function loadWorkspace() {
                   workspace_name: workspaceName,
                   workspace_description: workspaceDesc
                 })
-                deactivateModal()
+                modalStore.deactivate()
               }
             "
           >

@@ -35,10 +35,13 @@ if (isDevelopmentMode.value) {
   })
 }
 
-watch(appStore.pushNotification?.message, () => {
-  console.log(appStore)
-  dialog.alert(appStore.pushNotification?.message)
-})
+watch(
+  computed(() => appStore.pushNotification?.message),
+  () => {
+    console.log(appStore)
+    dialog.alert(appStore.pushNotification?.message)
+  }
+)
 </script>
 
 <template>

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 
 import { useNotificationStore } from '@/stores'
 
@@ -16,17 +16,20 @@ function close() {
   }, 480)
 }
 
-watch(notificationStore.itemMatchComputing, (value) => {
-  if (value) {
-    notificationStore.activate({
-      notification: 'itemComputeProgress'
-    })
-  } else {
-    if (notificationStore.active === 'itemComputeProgress') {
-      close()
+watch(
+  computed(() => notificationStore.itemMatchComputing),
+  (value) => {
+    if (value) {
+      notificationStore.activate({
+        notification: 'itemComputeProgress'
+      })
+    } else {
+      if (notificationStore.active === 'itemComputeProgress') {
+        close()
+      }
     }
   }
-})
+)
 </script>
 
 <template>

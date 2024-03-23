@@ -14,7 +14,8 @@ export async function apiPlugin({ store }) {
   api.socket.onAny((event, ...args) => {
     apiLog(`received event "${event}"`, ...args)
     if (event in handlers) {
-      store.dispatch(handlers[event], ...args)
+      const handler = handlers[event]
+      store[handler](...args)
     }
   })
 

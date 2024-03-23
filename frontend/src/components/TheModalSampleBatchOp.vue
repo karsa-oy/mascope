@@ -395,14 +395,14 @@ function initIonMechanismsSelected() {
 <template>
   <section>
     <b-modal
-      v-model:active="modalActive"
+      v-model="modalStore.state.sampleBatchOp"
       has-modal-card
       trap-focus
       :can-cancel="true"
       aria-role="dialog"
       aria-modal
       @after-enter="initData"
-      @close="deactivateModal"
+      @close="modalStore.deactivate"
       :type="actionIs('delete') ? 'is-danger' : 'is-primary'"
     >
       <template v-if="actionIs('create', 'update', 'editBatchCollections')">
@@ -486,7 +486,7 @@ function initIonMechanismsSelected() {
             </b-tabs>
           </section>
           <footer class="modal-card-foot">
-            <b-button type="is-dark" icon-left="close" expanded @click="deactivateModal">
+            <b-button type="is-dark" icon-left="close" expanded @click="modalStore.deactivate">
               Cancel
             </b-button>
             <b-button
@@ -497,7 +497,7 @@ function initIonMechanismsSelected() {
               @click="
                 () => {
                   actionIs('create') ? createBatch(newBatch) : updateBatch(newBatch)
-                  deactivateModal()
+                  modalStore.deactivate()
                 }
               "
             >
@@ -515,7 +515,7 @@ function initIonMechanismsSelected() {
             <p>Are you sure you want to delete this sample batch?</p>
           </section>
           <footer class="modal-card-foot">
-            <b-button type="is-warning" icon-left="close" expanded @click="deactivateModal">
+            <b-button type="is-warning" icon-left="close" expanded @click="modalStore.deactivate">
               Cancel
             </b-button>
             <b-button
@@ -525,7 +525,7 @@ function initIonMechanismsSelected() {
               @click="
                 () => {
                   deleteSampleBatch(batchActive)
-                  deactivateModal()
+                  modalStore.deactivate()
                 }
               "
             >
@@ -565,7 +565,7 @@ function initIonMechanismsSelected() {
             </b-field>
           </section>
           <footer class="modal-card-foot">
-            <b-button type="is-warning" icon-left="close" expanded @click="deactivateModal">
+            <b-button type="is-warning" icon-left="close" expanded @click="modalStore.deactivate">
               Cancel
             </b-button>
             <b-button

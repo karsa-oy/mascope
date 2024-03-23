@@ -39,10 +39,9 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   async function loadBatches(workspaceId) {
     const workspaceBatches = await getWorkspaceBatches(workspaceId)
 
-    const batches = workspaceBatches.map((batch) => {
+    batches.value = workspaceBatches.map((batch) => {
       return { ...batch, selection: 0 }
     })
-    batches.value = batches
   }
 
   async function reload() {
@@ -90,7 +89,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       },
       errorMessage: `Failed to load the workspace batches.`
     })
-    return batches.value.data
+    return batches.data
   }
 
   async function createWorkspace(newWorkspace) {

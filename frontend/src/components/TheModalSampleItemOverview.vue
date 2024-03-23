@@ -118,7 +118,7 @@ async function copySampleItem() {
 
 // watchers
 watch(
-  modalStore.state.sampleItemOverviewActive,
+  computed(() => modalStore.state.sampleItemOverviewActive),
   (newVal) => {
     if (newVal) {
       initData()
@@ -131,7 +131,7 @@ watch(
 <template>
   <section>
     <b-modal
-      v-model:active="modalStore.state.sampleItemOverviewActive"
+      v-model="modalStore.state.sampleItemOverviewActive"
       trap-focus
       :can-cancel="true"
       aria-role="dialog"

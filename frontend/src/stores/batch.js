@@ -36,27 +36,29 @@ export const useBatchStore = defineStore('batch', () => {
   const getTargetIsotopes = computed(() => targetIsotope.value ?? [])
 
   // get row from id
-  const sampleItem = computed(
-    () => (sampleItemId) =>
-      getSampleItems.value.find((row) => row.sample_item_id == sampleItemId) ?? null
-  )
-  const targetCollection = computed(
-    () => (targetCollectionId) =>
-      getTargetCollections.value.find((row) => row.target_collection_id == targetCollectionId) ??
-      null
-  )
-  const targetCompound = computed(
-    () => (targetCompoundId) =>
-      getTargetCompounds.value.find((row) => row.target_compound_id == targetCompoundId) ?? null
-  )
-  const targetIon = computed(
-    () => (targetIonId) =>
-      getTargetIons.value.find((row) => row.target_ion_id == targetIonId) ?? null
-  )
-  const targetIsotope = computed(
-    () => (targetIsotopeId) =>
-      getTargetIsotopes.value.find((row) => row.target_isotope_id == targetIsotopeId) ?? null
-  )
+  const sampleItem = computed(() => {
+    const sampleItems = getSampleItems.value
+    return (sampleItemId) => sampleItems.find((row) => row.sample_item_id == sampleItemId) ?? null
+  })
+  const targetCollection = computed(() => {
+    const targetCollections = getTargetCollections.value
+    return (targetCollectionId) =>
+      targetCollections.find((row) => row.target_collection_id == targetCollectionId) ?? null
+  })
+  const targetCompound = computed(() => {
+    const targetCompounds = getTargetCompounds.value
+    return (targetCompoundId) =>
+      targetCompounds.find((row) => row.target_compound_id == targetCompoundId) ?? null
+  })
+  const targetIon = computed(() => {
+    const targetIons = getTargetIons.value
+    return (targetIonId) => targetIons.find((row) => row.target_ion_id == targetIonId) ?? null
+  })
+  const targetIsotope = computed(() => {
+    const targetIsotopes = getTargetIsotopes.value
+    return (targetIsotopeId) =>
+      targetIsotopes.find((row) => row.target_isotope_id == targetIsotopeId) ?? null
+  })
   // get selected
   const sampleItemsSelected = computed(() =>
     getSampleItems.value.filter((sampleItem) => sampleItem.selection >= 2)

@@ -181,7 +181,7 @@ async function submitRating() {
 
 // watchers
 watch(
-  visualizationStore.activeIsotopes,
+  computed(() => visualizationStore.activeIsotopes),
   (newVal) => {
     if (newVal) {
       newVal.forEach((isotope) => {
@@ -196,7 +196,7 @@ watch(
 <template>
   <section>
     <b-modal
-      v-model:active="modalStore.state.sampleItemTargetIonActive"
+      v-model="modalStore.state.sampleItemTargetIonActive"
       trap-focus
       :can-cancel="true"
       aria-role="dialog"

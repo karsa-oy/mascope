@@ -99,10 +99,13 @@ watch(sampleFileMinDatetime, () => {
 watch(sampleFileMaxDatetime, () => {
   getAcquisitionsInRange()
 })
-watch(instrumentStore.recentAcquisitions, () => {
-  // This watcher triggers on database reload
-  if (browseAcquisitions.value) getAcquisitionsInRange()
-})
+watch(
+  computed(() => instrumentStore.recentAcquisitions),
+  () => {
+    // This watcher triggers on database reload
+    if (browseAcquisitions.value) getAcquisitionsInRange()
+  }
+)
 </script>
 
 <template>
@@ -115,14 +118,14 @@ watch(instrumentStore.recentAcquisitions, () => {
           </section>
           <h2>Select instrument to monitor</h2>
           <b-table
-            :data="instruments"
+            :data="appStore.instruments"
             :columns="[{ field: 'instrument', label: 'Instrument' }]"
             checkable
             :header-checkable="false"
             v-model:checked-rows="instrumentSelected"
           >
           </b-table>
-          <div v-if="instrumentActive">
+          <div v-if="instrumentStore.active">
             <section style="padding: 2em 2em 2em 2em">
               <h1 class="title is-4">Acquisitions:</h1>
             </section>

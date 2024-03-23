@@ -275,57 +275,63 @@ watch(
   },
   { deep: true }
 )
-watch(modalStore.state.sampleItemAttributesSaveActive, (newValue) => {
-  if (newValue) {
-    activeStep.value = 0
-  } else {
-    // Reset template selection when closing modal
-    loadedTemplate.value = null
-  }
-})
-watch(modalStore.state.sampleItemAttributesSaveProps, (data) => {
-  action.value = data.action
-  let newTemplate = {
-    name: null,
-    type: templateType.value,
-    template: []
-  }
-  for (let { label, key, required, disabled } of defaultTemplate.value.template) {
-    if (required) {
-      newTemplate.template.push({
-        label,
-        key,
-        required,
-        disabled,
-        value: data.sampleItemRecordToLoad[label]
-      })
+watch(
+  computed(() => modalStore.state.sampleItemAttributesSaveActive),
+  (newValue) => {
+    if (newValue) {
+      activeStep.value = 0
+    } else {
+      // Reset template selection when closing modal
+      loadedTemplate.value = null
     }
   }
-  const attributesField = templateType.value + '_attributes'
-  if (data.sampleItemRecordToLoad[attributesField]) {
-    const attributes = data.sampleItemRecordToLoad[attributesField]
-    if (attributes && typeof attributes === 'object' && Object.keys(attributes).length > 0) {
-      Object.keys(attributes).forEach((attr) => {
+)
+watch(
+  computed(() => modalStore.state.sampleItemAttributesSaveProps),
+  (data) => {
+    action.value = data.action
+    let newTemplate = {
+      name: null,
+      type: templateType.value,
+      template: []
+    }
+    for (let { label, key, required, disabled } of defaultTemplate.value.template) {
+      if (required) {
         newTemplate.template.push({
-          label: attr,
-          value: attributes[attr]
+          label,
+          key,
+          required,
+          disabled,
+          value: data.sampleItemRecordToLoad[label]
         })
-      })
+      }
     }
+    const attributesField = templateType.value + '_attributes'
+    if (data.sampleItemRecordToLoad[attributesField]) {
+      const attributes = data.sampleItemRecordToLoad[attributesField]
+      if (attributes && typeof attributes === 'object' && Object.keys(attributes).length > 0) {
+        Object.keys(attributes).forEach((attr) => {
+          newTemplate.template.push({
+            label: attr,
+            value: attributes[attr]
+          })
+        })
+      }
+    }
+    loadedTemplate.value = newTemplate
+    formFields.value = newTemplate.template
+    sampleFilename.value = data.sampleItemRecordToLoad.filename
+    sampleInstrument.value = data.sampleItemRecordToLoad.instrument
+    sampleItemFilterId.value = data.sampleItemRecordToLoad.filter_id
+    sampleItemType.value = data.sampleItemRecordToLoad.sample_item_type
   }
-  loadedTemplate.value = newTemplate
-  formFields.value = newTemplate.template
-  sampleFilename.value = data.sampleItemRecordToLoad.filename
-  sampleInstrument.value = data.sampleItemRecordToLoad.instrument
-  sampleItemFilterId.value = data.sampleItemRecordToLoad.filter_id
-  sampleItemType.value = data.sampleItemRecordToLoad.sample_item_type
-})
+)
 </script>
 
 <template>
   <section>
     <b-modal
-      v-model:active="modalStore.state.sampleItemAttributesSaveActive"
+      v-model="modalStore.state.sampleItemAttributesSaveActive"
       trap-focus
       :can-cancel="true"
       aria-role="dialog"

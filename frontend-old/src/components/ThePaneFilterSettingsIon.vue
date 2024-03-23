@@ -107,7 +107,7 @@
   </section>
 </template>
 
-<script setup>
+<script>
 import BaseParamField from './BaseParamField.vue'
 
 import { call, get, sync } from 'vuex-pathify'

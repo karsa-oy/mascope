@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 
 import { useNotificationStore } from '@/stores'
 
@@ -16,28 +16,34 @@ function close() {
   }, 480)
 }
 
-watch(notificationStore.rematchBatchesProgress, (value) => {
-  if (value) {
-    notificationStore.activate({
-      notification: 'batchComputeProgress'
-    })
-  } else {
-    if (notificationStore.active === 'batchComputeProgress') {
-      close()
+watch(
+  computed(() => notificationStore.rematchBatchesProgress),
+  (value) => {
+    if (value) {
+      notificationStore.activate({
+        notification: 'batchComputeProgress'
+      })
+    } else {
+      if (notificationStore.active === 'batchComputeProgress') {
+        close()
+      }
     }
   }
-})
-watch(notificationStore.rematchBatchProgress, (value) => {
-  if (value) {
-    notificationStore.activate({
-      notification: 'batchComputeProgress'
-    })
-  } else {
-    if (notificationStore.active === 'batchComputeProgress') {
-      close()
+)
+watch(
+  computed(() => notificationStore.rematchBatchProgress),
+  (value) => {
+    if (value) {
+      notificationStore.activate({
+        notification: 'batchComputeProgress'
+      })
+    } else {
+      if (notificationStore.active === 'batchComputeProgress') {
+        close()
+      }
     }
   }
-})
+)
 </script>
 
 <template>

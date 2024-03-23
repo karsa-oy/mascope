@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 
 import { useNotificationStore } from '@/stores'
 
@@ -23,12 +23,19 @@ function autoClose() {
   }
 }
 
-watch(notificationStore.warningActive, (newVal) => {
-  if (!newVal) {
-    notificationStore.resetWarningNotification()
+watch(
+  computed(() => notificationStore.warningActive),
+  (newVal) => {
+    if (!newVal) {
+      notificationStore.resetWarningNotification()
+    }
   }
-})
-watch(notificationStore.warningNotification, () => autoClose(), { immediate: true })
+)
+watch(
+  computed(() => notificationStore.warningNotification),
+  () => autoClose(),
+  { immediate: true }
+)
 </script>
 
 <template>

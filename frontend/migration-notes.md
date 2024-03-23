@@ -1,3 +1,26 @@
+# Overview
+
+In March 2024, a migration was performed to upgrade the frontend
+of Mascope to Vue 3.
+
+tl;dr:
+
+- A fresh project was setup with `npm create vue`
+- The `pinia`, `eslint` and `prettier` options were selected
+- This means `vue@3.4.21` and `pinia@2.1.7` were installed
+- Store modules were moved one by one and converted to Pinia
+  - Vuex pathify was replaced by standard Pinia features
+- Components were moved one by one and converted:
+  - Standard SFC format was used (script first and style last)
+  - The new `<script setup>` form was leveraged
+  - Store imports were updated to work with pinia
+- Dependencies were reinstalled if they were used in the codebase
+- `buefy` was exchanged for `@ntohq/buefy-next`
+
+Note that `yarn` is not used in the new project. In 2024, there
+are no real advantages to using `yarn` over `npm`. We could
+consider `pnpm` for improved dependency management in the future.
+
 # Framework Upgrades
 
 ## Store to Pinia
@@ -18,6 +41,11 @@ This means:
 Migrating from `vuex-pathify` proved easy: Pinia naturally facilitates
 to store paths, and the standard notations of the library make it easy
 to figure out how to migrate naything.
+
+Gotchas:
+
+- You can't `watch` store paths directly. Instead watch a computed
+  like so: `watch(computed(() => someStore.foo.bar), () => { doStuff() })`
 
 ## Components to Vue 3 w/ SFC Script Setup
 
@@ -66,6 +94,10 @@ There is a newish javascript standard function `structuredClone`. Our
 code base has some uses of underscore's implementation of deep clones,
 as well has hacky custom implementations. I replace instances of these
 wherever I spot them.
+
+When performing a clone of a `ref`, use `toRaw` (from Vue):
+
+`const copy = structuredClone(toRaw(original))`
 
 ## Returning from short arrow functions
 
