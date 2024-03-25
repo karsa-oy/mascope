@@ -1,7 +1,7 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 
-import { handleApiRequest, getApiData } from './lib/api'
+import { api } from '@/api'
 
 export const useTargetsStore = defineStore('targets', () => {
   const activeCollection = ref(null)
@@ -140,7 +140,7 @@ export const useTargetsStore = defineStore('targets', () => {
 
   // http client endpoints
   async function getAllTargetCollections() {
-    const collections = await getApiData({
+    const collections = await api.request({
       httpMethod: 'getAllTargetCollections',
       errorMessage: `Failed to load all target collections.`
     })
@@ -148,7 +148,7 @@ export const useTargetsStore = defineStore('targets', () => {
   }
 
   async function getTargetCollection(collectionId) {
-    return await getApiData({
+    return await api.request({
       httpMethod: 'getTargetCollection',
       requestData: collectionId,
       errorMessage: `Failed to get target collection.`
@@ -156,7 +156,7 @@ export const useTargetsStore = defineStore('targets', () => {
   }
 
   async function getAllTargetCompounds(params = {}) {
-    const compounds = await getApiData({
+    const compounds = await api.request({
       httpMethod: 'getAllTargetCompounds',
       requestData: params,
       errorMessage: `Failed to load all target compounds.`
@@ -165,7 +165,7 @@ export const useTargetsStore = defineStore('targets', () => {
   }
 
   async function createCollection(collection) {
-    return await handleApiRequest({
+    return await api.process({
       httpMethod: 'createTargetCollection',
       requestData: collection,
       successMessage: `Target collection ${collection.target_collection_name} created successfully!`,
@@ -176,7 +176,7 @@ export const useTargetsStore = defineStore('targets', () => {
   async function updateCollection(collection) {
     const collectionId = collection.target_collection_id
     const body = collection
-    return await handleApiRequest({
+    return await api.process({
       httpMethod: 'updateTargetCollection',
       requestData: { collectionId, body },
       successMessage: `Target collection ${collection.target_collection_name} updated successfully!`,
@@ -186,7 +186,7 @@ export const useTargetsStore = defineStore('targets', () => {
 
   async function deleteCollection({ collectionId, collectionName, deleteOrphanCompounds }) {
     activeCollection.value = {} // TODO check if this should be null or call unload
-    return await handleApiRequest({
+    return await api.process({
       httpMethod: 'deleteTargetCollection',
       requestData: { collectionId, collectionName, deleteOrphanCompounds },
       successNotificationType: 'deleted',

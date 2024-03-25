@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { generateCopyName } from '@/stores/lib/api'
+import { generateCopyName } from '@/api'
 
 import {
   useAppStore,

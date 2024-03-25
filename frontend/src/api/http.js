@@ -18,12 +18,12 @@ const getSessionId = () => {
 }
 
 const logRequest = (request) => {
-  console.log(`[httpClient] Starting request to: ${request.method.toUpperCase()} ${request.url}`)
+  console.log(`[http] Starting request to: ${request.method.toUpperCase()} ${request.url}`)
   return request
 }
 
 const logResponse = (response) => {
-  let logMessage = `[httpClient] Response: ${response.status} ${
+  let logMessage = `[http] Response: ${response.status} ${
     response.statusText
   } from ${response.config.method.toUpperCase()} ${response.config.url}`
   // Append the message if available
@@ -35,7 +35,7 @@ const logResponse = (response) => {
 
   // Log the message-logs if available
   if (response.data && response.data['message-logs']) {
-    console.log(`[httpClient] Message-Logs:`, response.data['message-logs'])
+    console.log(`[http] Message-Logs:`, response.data['message-logs'])
   }
 
   return response
@@ -44,10 +44,10 @@ const logResponse = (response) => {
 const handleError = (error) => {
   if (error.response) {
     console.log(
-      `[httpClient] Response Error: ${error.response.status} ${error.response.statusText}`
+      `[http] Response Error: ${error.response.status} ${error.response.statusText}`
     )
   } else {
-    console.log(`[httpClient] Request Error: ${error.message}`)
+    console.log(`[http] Request Error: ${error.message}`)
   }
   return Promise.reject(error)
 }

@@ -2,7 +2,7 @@
 import * as _ from 'underscore'
 
 import { computed, ref } from 'vue'
-import { generateCopyName } from '@/stores/lib/api'
+import { generateCopyName } from '@/api'
 
 import {
   useAppStore,

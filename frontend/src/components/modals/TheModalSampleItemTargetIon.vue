@@ -1,9 +1,9 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 
-import ThePaneSampleSignal from './ThePaneSampleSignal.vue'
-import ThePaneFilterSettingsIon from './ThePaneFilterSettingsIon.vue'
-import BaseTagMatch from './BaseTagMatch.vue'
+import ThePaneSampleSignal from '@/components/panes/ThePaneSampleSignal.vue'
+import ThePaneFilterSettingsIon from '@/components/panes/ThePaneFilterSettingsIon.vue'
+import BaseTagMatch from '@/components/base/BaseTagMatch.vue'
 
 import { useModalStore, useSampleStore, useVisualizationStore } from '@/stores'
 

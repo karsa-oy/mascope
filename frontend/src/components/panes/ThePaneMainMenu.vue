@@ -1,55 +1,56 @@
 <script setup>
-  import { computed } from 'vue'
+import { computed } from 'vue'
 
-  import BaseMenuBar from './BaseMenuBar.vue'
+import BaseMenuBar from '@/components/base/BaseMenuBar.vue'
 
-  import { useInstrumentStore, useBatchStore, useWorkspaceStore } from '@/stores'
+import { useInstrumentStore, useBatchStore, useWorkspaceStore } from '@/stores'
 
-  const instrumentStore = useInstrumentStore()
-  const batchStore = useBatchStore()
-  const workspaceStore = useWorkspaceStore()
+const instrumentStore = useInstrumentStore()
+const batchStore = useBatchStore()
+const workspaceStore = useWorkspaceStore()
 
-  const allButtonsDisabled = computed(
-    () => instrumentStore.scenthoundModeActive && instrumentStore.acquisitionActive
-      ? true
-      : false
-  )
+const allButtonsDisabled = computed(() =>
+  instrumentStore.scenthoundModeActive && instrumentStore.acquisitionActive ? true : false
+)
 
-  const buttons = computed(() => [
+const buttons = computed(() =>
+  [
     {
       disabled: allButtonsDisabled.value,
       icon: 'home',
       label: 'Workspace home',
       path: '/',
-      visible: true,
+      visible: true
     },
     {
       disabled: allButtonsDisabled.value || !(batchStore.active && instrumentStore.active),
       icon: 'dog-side',
       label: 'Scenthound',
       path: '/scenthound',
-      visible: true,
+      visible: true
     },
     {
       disabled: allButtonsDisabled.value,
       icon: 'chart-scatter-plot',
       label: 'Batch overview',
       path: '/batch-overview',
-      visible: batchStore.active,
-    },
-  ].filter((b) => b.visible))
+      visible: batchStore.active
+    }
+  ].filter((b) => b.visible)
+)
 
-  const footerButtons = computed(() => [
+const footerButtons = computed(() =>
+  [
     {
       disabled: allButtonsDisabled.value,
       icon: 'logout-variant',
       label: 'Change workspace',
       path: '/',
       onClick: workspaceStore.unload,
-      visible: true,
-    },
+      visible: true
+    }
   ].filter((b) => b.visible)
-  )
+)
 </script>
 
 <template>

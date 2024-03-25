@@ -1,10 +1,9 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 
-import { handleApiRequest, getApiData } from './lib/api'
+import { api } from '@/api'
 
 import { useBatchStore } from './batch'
-import { useApiStore } from './api'
 import { useTargetsStore } from './targets'
 
 export const useWorkspaceStore = defineStore('workspace', () => {
@@ -25,8 +24,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
 
   async function load(workspaceId) {
     if (active.value) await unload(false)
-    const apiStore = useApiStore()
-    apiStore.emit('subscribe', workspaceId)
+    api.emit('subscribe', workspaceId)
     await loadWorkspace(workspaceId)
     await loadBatches(workspaceId)
   }
@@ -62,8 +60,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
 
   async function unload(propagate = true) {
     if (!active.value) return
-    const apiStore = useApiStore()
-    apiStore.emit('unsubscribe', active.value.workspace_id)
+    api.emit('unsubscribe', active.value.workspace_id)
     active.value = null
     batches.value = []
     if (propagate) {
@@ -75,14 +72,14 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   }
   // http client endpoints
   async function getWorkspace(workspaceId) {
-    return await getApiData({
+    return await api.request({
       httpMethod: 'getWorkspace',
       requestData: workspaceId,
       errorMessage: `Failed to load workspace.`
     })
   }
   async function getWorkspaceBatches(workspaceId) {
-    const batches = await getApiData({
+    const batches = await api.request({
       httpMethod: 'getAllBatches',
       requestData: {
         workspace_id: workspaceId
@@ -93,17 +90,15 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   }
 
   async function createWorkspace(newWorkspace) {
-    const apiStore = useApiStore()
-    await apiStore.http.createWorkspace(newWorkspace)
+    await api.http.createWorkspace(newWorkspace)
   }
 
   async function updateWorkspace(newWorkspace) {
-    const apiStore = useApiStore()
-    await apiStore.http.updateWorkspace(newWorkspace)
+    await api.http.updateWorkspace(newWorkspace)
   }
 
   async function deleteWorkspace(workspace) {
-    return await handleApiRequest({
+    return await api.process({
       httpMethod: 'deleteWorkspace',
       requestData: workspace,
       successNotificationType: 'deleted',

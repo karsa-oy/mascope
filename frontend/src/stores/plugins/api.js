@@ -1,4 +1,4 @@
-import { api, apiLog } from '@/api'
+import { api } from '@/api'
 
 const HANDLER_PREFIX = 'on'
 
@@ -12,14 +12,14 @@ export async function apiPlugin({ store }) {
 
   // react to events using handlers if they exist
   api.socket.onAny((event, ...args) => {
-    apiLog(`received event "${event}"`, ...args)
+    api.log(`received event "${event}"`, ...args)
     if (event in handlers) {
       const handler = handlers[event]
       store[handler](...args)
     }
   })
 
-  apiLog('registered event handlers', handlers)
+  api.log('registered event handlers', handlers)
 }
 
 // path parsing

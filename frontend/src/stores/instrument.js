@@ -1,9 +1,8 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 
-import { getApiData } from './lib/api'
+import { api } from '@/api'
 
-import { useApiStore } from './api'
 import { useCalibrationStore } from './calibration'
 import { useSampleStore } from './sample'
 
@@ -22,8 +21,7 @@ export const useInstrumentStore = defineStore('instrument', () => {
   // data loading
   async function load(instrument) {
     if (active.value) await unload()
-    const apiStore = useApiStore()
-    apiStore.emit('subscribe', instrument)
+    api.emit('subscribe', instrument)
     active.value = instrument
     await getMzCalibration()
     await getRecentAcquisitions()
@@ -52,8 +50,7 @@ export const useInstrumentStore = defineStore('instrument', () => {
 
   async function unload() {
     if (!active.value) return
-    const apiStore = useApiStore()
-    apiStore.emit('unsubscribe', active.value)
+    api.emit('unsubscribe', active.value)
     active.value = null
     mzCalibration.value = null
     acquisitions.value = null
@@ -90,7 +87,7 @@ export const useInstrumentStore = defineStore('instrument', () => {
       order: 'asc'
     }
 
-    const sampleFiles = await getApiData({
+    const sampleFiles = await api.request({
       httpMethod: 'getAllSampleFiles',
       requestData: reqData,
       errorMessage: `Failed to get all sample files.`
@@ -106,7 +103,7 @@ export const useInstrumentStore = defineStore('instrument', () => {
       order: 'asc'
     }
 
-    const sampleFiles = await getApiData({
+    const sampleFiles = await api.request({
       httpMethod: 'getRecentSampleFiles',
       requestData: reqData,
       errorMessage: `Failed to get recent acquisitions.`
@@ -120,7 +117,7 @@ export const useInstrumentStore = defineStore('instrument', () => {
       instrument: active.value
     }
 
-    const mzCalibration = await getApiData({
+    const mzCalibration = await api.request({
       httpMethod: 'getMzCalibration',
       requestData: reqData,
       errorMessage: `Failed to get last mz calibration.`

@@ -1,9 +1,7 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 
-import { apiLog } from '@/api'
-
-import { getApiData, extractDistinctValues } from './lib/api.js'
+import { api, extractDistinctValues } from '@/api'
 
 export const useAppStore = defineStore('app', () => {
   const attributeTemplates = ref([])
@@ -25,35 +23,35 @@ export const useAppStore = defineStore('app', () => {
 
     ready.value = true
 
-    apiLog('loaded root data')
+    api.log('loaded root data')
   }
   async function reload() {
     load()
   }
   // http client endpoints
   async function getAllAttributeTemplates() {
-    const attributeTemplatesData = await getApiData({
+    const attributeTemplatesData = await api.request({
       httpMethod: 'getAllAttributeTemplates',
       errorMessage: `Failed to load attribute templates.`
     })
     return attributeTemplatesData.data
   }
   async function getAllInstrumentFunctions() {
-    const instrumentFunctions = await getApiData({
+    const instrumentFunctions = await api.request({
       httpMethod: 'getAllInstrumentFunctions',
       errorMessage: `Failed to load instrument functions.`
     })
     return instrumentFunctions.data
   }
   async function getAllIonizationMechanisms() {
-    const ionizationMechanisms = await getApiData({
+    const ionizationMechanisms = await api.request({
       httpMethod: 'getAllIonizationMechanisms',
       errorMessage: `Failed to load ionization mechanisms.`
     })
     return ionizationMechanisms.data
   }
   async function getAllWorkspaces() {
-    const workspaces = await getApiData({
+    const workspaces = await api.request({
       httpMethod: 'getAllWorkspaces',
       errorMessage: `Failed to load workspaces.`
     })

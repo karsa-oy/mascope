@@ -5,9 +5,9 @@ import { DialogProgrammatic as dialog, ToastProgrammatic as toast } from '@ntohq
 import { ref, computed, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 
-import BaseTable from '@/components/BaseTable.vue'
-import ThePaneBrowserTarget from '@/components/ThePaneBrowserTarget.vue'
-import ThePaneSettingsCalibration from '@/components/ThePaneSettingsCalibration.vue'
+import BaseTable from '@/components/base/BaseTable.vue'
+import ThePaneBrowserTarget from '@/components/panes/ThePaneBrowserTarget.vue'
+import ThePaneSettingsCalibration from '@/components/panes/ThePaneSettingsCalibration.vue'
 
 import TheLayoutSidebarView from '@/views/TheLayoutSidebarView.vue'
 

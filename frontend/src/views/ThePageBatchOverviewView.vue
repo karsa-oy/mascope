@@ -1,8 +1,8 @@
 <script setup>
 import TheLayoutSidebarView from './TheLayoutSidebarView.vue'
 
-import ThePaneBrowser from '@/components/ThePaneBrowser.vue'
-import ThePaneChartSampleIntensity from '@/components/ThePaneChartSampleIntensity.vue'
+import ThePaneBrowser from '@/components/panes/ThePaneBrowser.vue'
+import ThePaneChartSampleIntensity from '@/components/panes/ThePaneChartSampleIntensity.vue'
 </script>
 
 <template>

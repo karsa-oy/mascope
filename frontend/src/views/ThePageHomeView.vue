@@ -3,8 +3,8 @@ import { ref, computed, watch } from 'vue'
 
 import TheLayoutSidebarView from './TheLayoutSidebarView.vue'
 
-import BaseWorkspaceTile from '@/components/BaseWorkspaceTile.vue'
-import ThePaneBrowser from '@/components/ThePaneBrowser.vue'
+import BaseWorkspaceTile from '@/components/base/BaseWorkspaceTile.vue'
+import ThePaneBrowser from '@/components/panes/ThePaneBrowser.vue'
 
 import {
   useAppStore,

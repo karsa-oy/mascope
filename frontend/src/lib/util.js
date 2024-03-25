@@ -24,10 +24,11 @@ export function capitalizeFirstLetter(str) {
 // ==== End string manipulation functions ====
 
 export function genId(len, case_sensitive = true) {
+  let alphabet
   if (case_sensitive) {
-    var alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+    alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
   } else {
-    var alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
   }
   const nanoid = customAlphabet(alphabet, len)
   return nanoid()
@@ -72,7 +73,7 @@ export function parseGenericCsv(cols, rows) {
   return validRows.map((row) => {
     // Determine if filter_id should be generated
     const checkTypesToGenerateFilterId = !['INSTRUMENT_BACKGROUND', 'ONLINE'].includes(
-      row[cols[1].field],
+      row[cols[1].field]
     )
 
     const newSampleItem = {
@@ -80,7 +81,7 @@ export function parseGenericCsv(cols, rows) {
       sample_item_type: row[cols[1].field] ? row[cols[1].field].trim() : 'UNKNOWN',
       // Generate filter_id only if the type is not "INSTRUMENT_BACKGROUND" or "ONLINE", for "INSTRUMENT_BACKGROUND" or "ONLINE" set filter_id to null
       filter_id: checkTypesToGenerateFilterId ? row[cols[2].field] || genId(6, false) : null,
-      sample_item_attributes: {},
+      sample_item_attributes: {}
     }
 
     // Process the rest of the columns for sample_item_attributes

@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 
 import { DialogProgrammatic as dialog } from '@ntohq/buefy-next'
 
-import BaseParamField from './BaseParamField.vue'
+import BaseParamField from '@/components/base/BaseParamField.vue'
 
 import { useVisualizationStore } from '@/stores'
 

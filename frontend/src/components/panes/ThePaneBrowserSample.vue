@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { DialogProgrammatic as dialog } from '@ntohq/buefy-next'
 
-import BaseBrowser from './BaseBrowser.vue'
+import BaseBrowser from '@/components/base/BaseBrowser.vue'
 
 import table from '@/lib/table'
 

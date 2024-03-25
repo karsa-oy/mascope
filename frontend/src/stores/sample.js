@@ -1,10 +1,9 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 
-import { handleApiRequest, getApiData } from './lib/api'
+import { api } from '@/api'
 
 import { useAppStore } from './app'
-import { useApiStore } from './api'
 import { useBatchStore } from './batch'
 import { useCalibrationStore } from './calibration'
 import { useTargetsStore } from './targets'
@@ -64,8 +63,7 @@ export const useSampleStore = defineStore('sample', () => {
     // reset if previous sample loaded
     if (active.value) await unload()
     const sampleItemId = sample.sample_item_id
-    const apiStore = useApiStore()
-    apiStore.emit('subscribe', sampleItemId)
+    api.emit('subscribe', sampleItemId)
     active.value = sample
     await loadSampleData(sampleItemId)
     const calibrationStore = useCalibrationStore()
@@ -98,8 +96,7 @@ export const useSampleStore = defineStore('sample', () => {
 
   async function unload() {
     if (!active.value) return
-    const apiStore = useApiStore()
-    apiStore.emit('unsubscribe', active.value.sample_item_id)
+    api.emit('unsubscribe', active.value.sample_item_id)
 
     active.value = null
 
@@ -130,7 +127,7 @@ export const useSampleStore = defineStore('sample', () => {
       alarms_list: alarmsList
     }
 
-    const sampleData = await getApiData({
+    const sampleData = await api.request({
       httpMethod: 'getSample',
       requestData: {
         sampleId,
@@ -142,7 +139,7 @@ export const useSampleStore = defineStore('sample', () => {
   }
 
   async function getSampleMatches(sampleItemId) {
-    const sampleMatches = await getApiData({
+    const sampleMatches = await api.request({
       httpMethod: 'getAllMatches',
       requestData: {
         sample_item_id: sampleItemId
@@ -153,26 +150,21 @@ export const useSampleStore = defineStore('sample', () => {
   }
 
   async function create(sample) {
-    const apiStore = useApiStore()
-    await apiStore.http.createSampleItem(sample)
+    await api.http.createSampleItem(sample)
   }
   async function update(sample) {
-    const apiStore = useApiStore()
-    await apiStore.http.updateSampleItem(sample.sample_item_id, sample)
+    await api.http.updateSampleItem(sample.sample_item_id, sample)
   }
   async function deleteSampleItem(sampleItemId) {
-    const apiStore = useApiStore()
-    await apiStore.http.deleteSampleItem(sampleItemId)
+    await api.http.deleteSampleItem(sampleItemId)
   }
   async function matchSampleCompute(sample) {
-    const apiStore = useApiStore()
     const sampleId = sample.sample_item_id
-    await apiStore.http.matchSampleCompute({ sampleId })
+    await api.http.matchSampleCompute({ sampleId })
   }
   async function matchSampleRematch(sample) {
-    const apiStore = useApiStore()
     const sampleId = sample.sample_item_id
-    await apiStore.http.matchSampleRematch({ sampleId })
+    await api.http.matchSampleRematch({ sampleId })
   }
 
   async function copySample({ dispatch, rootState }, sample) {
@@ -181,7 +173,7 @@ export const useSampleStore = defineStore('sample', () => {
       sample_batch_id: sample.sample_batch_id,
       sample_item_name: sample.sample_item_name
     }
-    return await handleApiRequest({
+    return await api.process({
       dispatch,
       rootState,
       httpMethod: 'copySampleItem',
@@ -196,7 +188,7 @@ export const useSampleStore = defineStore('sample', () => {
 
   // Attribute templates
   async function createAttributeTemplate(newTemplate) {
-    return await handleApiRequest({
+    return await api.process({
       httpMethod: 'createAttributeTemplate',
       requestData: newTemplate,
       successMessage: `Attribute template "${newTemplate.name}" created successfully!`,
@@ -207,7 +199,7 @@ export const useSampleStore = defineStore('sample', () => {
   async function updateAttributeTemplate(template) {
     const templateId = template.attribute_template_id
     const body = template
-    return await handleApiRequest({
+    return await api.process({
       httpMethod: 'updateAttributeTemplate',
       requestData: { templateId, body },
       successMessage: `Attribute template "${template.name}" updated successfully!`,
@@ -218,7 +210,7 @@ export const useSampleStore = defineStore('sample', () => {
   async function deleteAttributeTemplate(template) {
     const templateId = template.attribute_template_id
     const templateName = template.name
-    return await handleApiRequest({
+    return await api.process({
       httpMethod: 'deleteAttributeTemplate',
       requestData: { templateId, templateName },
       successNotificationType: 'deleted',

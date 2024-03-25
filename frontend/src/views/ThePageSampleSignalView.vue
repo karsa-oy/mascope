@@ -1,7 +1,7 @@
 <script setup>
 import TheLayoutSidebarView from './TheLayoutSidebarView.vue'
 
-import ThePaneSampleSignal from '@/components/ThePaneSampleSignal.vue'
+import ThePaneSampleSignal from '@/components/panes/ThePaneSampleSignal.vue'
 </script>
 
 <template>

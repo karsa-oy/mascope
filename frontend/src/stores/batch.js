@@ -1,9 +1,8 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 
-import { handleApiRequest, getApiData } from './lib/api.js'
+import { api } from '@/api'
 
-import { useApiStore } from './api.js'
 import { useTargetsStore } from './targets.js'
 import { useSampleStore } from './sample.js'
 import { useNotificationStore } from './notification.js'
@@ -90,8 +89,7 @@ export const useBatchStore = defineStore('batch', () => {
   // data loading
   async function load(batchId) {
     if (active.value) await unload()
-    const apiStore = useApiStore()
-    apiStore.emit('subscribe', batchId)
+    api.emit('subscribe', batchId)
     await loadBatch(batchId)
     await loadBatchSamplesData(batchId)
     await unpackParams()
@@ -177,8 +175,7 @@ export const useBatchStore = defineStore('batch', () => {
   }
   async function unload(propagate = true) {
     if (!active.value) return
-    const apiStore = useApiStore()
-    apiStore.emit('unsubscribe', active.value.sample_batch_id)
+    api.emit('unsubscribe', active.value.sample_batch_id)
     active.value = null
     // parameters
     resetParams()
@@ -219,7 +216,7 @@ export const useBatchStore = defineStore('batch', () => {
 
   // http client endpoints
   async function getBatch(batchId) {
-    return await getApiData({
+    return await api.request({
       httpMethod: 'getBatch',
       requestData: batchId,
       errorMessage: `Failed to load batch.`
@@ -237,7 +234,7 @@ export const useBatchStore = defineStore('batch', () => {
       alarms_list: alarmsList
     }
 
-    return await getApiData({
+    return await api.request({
       httpMethod: 'getAllSamples',
       requestData: body,
       errorMessage: `Failed to load batch samples data.`
@@ -254,7 +251,7 @@ export const useBatchStore = defineStore('batch', () => {
         alarms_list: alarmsList
       }
     }
-    const batchTargetsData = await getApiData({
+    const batchTargetsData = await api.request({
       httpMethod: 'getBatchTargets',
       requestData: reqData,
       errorMessage: `Failed to get batch targets.`
@@ -268,7 +265,7 @@ export const useBatchStore = defineStore('batch', () => {
       sample_items: data.sample_items
     }
     const batch = data.batch
-    return await handleApiRequest({
+    return await api.process({
       httpMethod: 'importSamplesToBatch',
       requestData: { batch, body },
       successMessage: `Sample batch "${batch.sample_batch_name}" import started`,
@@ -276,7 +273,7 @@ export const useBatchStore = defineStore('batch', () => {
     })
   }
   async function createBatch(newBatch) {
-    return await handleApiRequest({
+    return await api.process({
       httpMethod: 'createBatch',
       requestData: newBatch,
       successMessage: `Sample batch "${newBatch.sample_batch_name}" created successfully!`,
@@ -286,7 +283,7 @@ export const useBatchStore = defineStore('batch', () => {
   async function updateBatch(newBatch) {
     const batchId = newBatch.sample_batch_id
     const body = newBatch
-    return await handleApiRequest({
+    return await api.process({
       httpMethod: 'updateBatch',
       requestData: { batchId, body },
       successMessage: `Sample batch "${newBatch.sample_batch_name}"  updated successfully!`,
@@ -295,7 +292,7 @@ export const useBatchStore = defineStore('batch', () => {
   }
 
   async function deleteBatch(batch) {
-    return await handleApiRequest({
+    return await api.process({
       httpMethod: 'deleteBatch',
       requestData: batch,
       progressNotificationPayload: {
@@ -312,7 +309,7 @@ export const useBatchStore = defineStore('batch', () => {
       sample_batch_name: batchCopyData.sample_batch_name,
       sample_batch_description: batchCopyData.sample_batch_description
     }
-    return await handleApiRequest({
+    return await api.process({
       httpMethod: 'copySampleBatch',
       requestData: { batchId, body },
       progressNotificationPayload: {
@@ -324,7 +321,7 @@ export const useBatchStore = defineStore('batch', () => {
   }
 
   async function batchExportPeakData(sampleBatch) {
-    return await handleApiRequest({
+    return await api.process({
       httpMethod: 'batchExportPeakData',
       requestData: sampleBatch,
       progressNotificationPayload: {
@@ -339,8 +336,7 @@ export const useBatchStore = defineStore('batch', () => {
     const batchId = batch?.sample_batch_id ?? active.value.sample_batch_id
     const body = {}
     try {
-      const apiStore = useApiStore()
-      await apiStore.http.rematchBatch({ batchId, body })
+      await api.http.rematchBatch({ batchId, body })
     } catch (error) {
       // TODO_error_handling and use handleApiRequest for start notification
       console.error(`Failed to rematch batch.`, error)

@@ -1,7 +1,8 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 
-import { handleApiRequest, getApiData, snakeToCamel } from './lib/api'
+import { api, snakeToCamel } from '@/api'
+
 import { useTargetsStore } from './targets'
 
 export const useVisualizationStore = defineStore('visualization', () => {
@@ -173,7 +174,7 @@ export const useVisualizationStore = defineStore('visualization', () => {
       alarms_list: alarmsList
     }
 
-    const sampleIonData = await getApiData({
+    const sampleIonData = await api.request({
       httpMethod: 'getSampleIonMatches',
       requestData: {
         sampleId,
@@ -185,7 +186,7 @@ export const useVisualizationStore = defineStore('visualization', () => {
   }
 
   async function getVisualizationIonFocus({ sampleId, ionId }) {
-    return await getApiData({
+    return await api.request({
       httpMethod: 'getVisualizationIonFocus',
       requestData: {
         sample_item_id: sampleId,
@@ -198,7 +199,7 @@ export const useVisualizationStore = defineStore('visualization', () => {
   }
 
   async function submitMatchRating(newMatchRating) {
-    return await handleApiRequest({
+    return await api.process({
       httpMethod: 'submitMatchRating',
       requestData: newMatchRating,
       successMessage: 'Rating submitted successfully. Thanks for your feedback!',
@@ -223,7 +224,7 @@ export const useVisualizationStore = defineStore('visualization', () => {
         }
       }
     }
-    return await handleApiRequest({
+    return await api.process({
       httpMethod: 'updateTargetIon',
       requestData: targetIonUpdate,
       successMessage: `Filtering parameters for ${targetIonUpdate.target_ion_formula} saved successfully!`,
@@ -238,7 +239,7 @@ export const useVisualizationStore = defineStore('visualization', () => {
         delete_instrument_filters: activeIon.value.instrument
       }
     }
-    return await handleApiRequest({
+    return await api.process({
       httpMethod: 'updateTargetIon',
       requestData: targetIonUpdate,
       successMessage: `Filtering parameters for ${targetIonUpdate.body.delete_instrument_filters} instrument were deleted successfully!`,

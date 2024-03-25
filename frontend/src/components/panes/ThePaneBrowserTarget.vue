@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 
-import BaseBrowser from './BaseBrowser.vue'
+import BaseBrowser from '@/components/base/BaseBrowser.vue'
 
 import {
   useWorkspaceStore,

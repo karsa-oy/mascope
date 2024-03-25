@@ -5,7 +5,7 @@ import { DialogProgrammatic as dialog } from '@ntohq/buefy-next'
 
 import { ref, computed } from 'vue'
 
-import BaseSpreadsheetInput from './BaseSpreadsheetInput.vue'
+import BaseSpreadsheetInput from '@/components/base/BaseSpreadsheetInput.vue'
 
 import { useAppStore, useModalStore, useTargetsStore, useWorkspaceStore } from '@/stores'
 

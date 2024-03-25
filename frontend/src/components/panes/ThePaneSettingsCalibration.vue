@@ -1,5 +1,5 @@
 <script setup>
-import BaseParamField from './BaseParamField.vue'
+import BaseParamField from '@/components/base/BaseParamField.vue'
 
 import { useCalibrationStore } from '@/stores'
 

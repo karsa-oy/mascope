@@ -1,7 +1,7 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 
-import { getApiData } from './lib/api'
+import { api } from '@/api'
 
 import { useSampleStore } from './sample'
 import { useInstrumentStore } from './instrument'
@@ -47,7 +47,7 @@ export const useCalibrationStore = defineStore('calibration', () => {
 
   // http client endpoints
   async function getSampleMzCalibration({ sample_item_id }) {
-    return await getApiData({
+    return await api.request({
       httpMethod: 'getMzCalibration',
       requestData: {
         sample_item_id
@@ -57,7 +57,7 @@ export const useCalibrationStore = defineStore('calibration', () => {
   }
 
   async function calibrationMzFit(requestData) {
-    await getApiData({
+    await api.request({
       httpMethod: 'calibrationMzFit',
       requestData: requestData,
       errorMessage: `Failed to calibrate mz fit of sample ${requestData.sampleName}.`
@@ -65,7 +65,7 @@ export const useCalibrationStore = defineStore('calibration', () => {
   }
 
   async function calibrationMzApply(requestData) {
-    await getApiData({
+    await api.request({
       httpMethod: 'calibrationMzApply',
       requestData: requestData,
       errorMessage: `Failed to apply mz calibration for sample file ${requestData.sample_filename}.`
@@ -79,7 +79,7 @@ export const useCalibrationStore = defineStore('calibration', () => {
       const sampleId = sampleActive.sample_item_id
       const sampleName = sampleActive.sample_item_name
       const body = params.value
-      await getApiData({
+      await api.request({
         httpMethod: 'calibrationMzCalibrateSample',
         requestData: { sampleId, sampleName, body },
         errorMessage: `Failed to m/z calibrate sample ${sampleName}.`

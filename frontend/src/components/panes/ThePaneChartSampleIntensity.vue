@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 
-import BaseChartPlotly from './BaseChartPlotly.vue'
+import BaseChartPlotly from '@/components/base/BaseChartPlotly.vue'
 
 import { glasbeyLight } from '@/lib/styles'
 

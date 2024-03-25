@@ -3,9 +3,9 @@ import { ref, computed, watch, toRaw } from 'vue'
 
 import { DialogProgrammatic as dialog, ToastProgrammatic as toast } from '@ntohq/buefy-next'
 
-import BaseTable from './BaseTable.vue'
-import ThePaneBrowserTarget from './ThePaneBrowserTarget.vue'
-import ThePaneSettingsCalibration from './ThePaneSettingsCalibration.vue'
+import BaseTable from '@/components/base/BaseTable.vue'
+import ThePaneBrowserTarget from '@/components/panes/ThePaneBrowserTarget.vue'
+import ThePaneSettingsCalibration from '@/components/panes/ThePaneSettingsCalibration.vue'
 
 import { beautifySnakeCase, strToSnakeCase, genId } from '@/lib/util'
 

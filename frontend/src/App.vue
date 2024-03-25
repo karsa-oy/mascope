@@ -4,17 +4,14 @@ import { useRouter } from 'vue-router'
 
 import { DialogProgrammatic as dialog } from '@ntohq/buefy-next'
 
-import { useAppStore, useKeyStore, useNotificationStore } from '@/stores'
+import { useAppStore, useKeyStore } from '@/stores'
 
 const appStore = useAppStore()
 const keyStore = useKeyStore()
-const notificationStore = useNotificationStore()
 
 // load data
 
 appStore.load()
-
-const isDevelopmentMode = computed(() => appStore.mode === 'development')
 
 // add event listeners
 window.addEventListener('keydown', (event) => {
@@ -27,13 +24,6 @@ window.addEventListener('keyup', (event) => {
 // return to home page at reload
 const router = useRouter()
 if (router.currentRoute !== '/') router.push('/')
-
-// warn if in dev mode
-if (isDevelopmentMode.value) {
-  notificationStore.showWarningNotification({
-    notification: 'inDevelopment'
-  })
-}
 
 watch(
   computed(() => appStore.pushNotification?.message),
