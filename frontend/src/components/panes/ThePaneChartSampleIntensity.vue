@@ -149,25 +149,17 @@ function onClick(event) {
 </script>
 
 <template>
-  <div class="columns">
-    <div class="column is-1">
-      <br /><br /><br />
-      <b-field>
-        <template #label
-          ><div style="text-align: center">
-            <b-icon icon="math-log"></b-icon></div
-        ></template>
-        <b-switch v-model="yAxisLog"></b-switch>
-      </b-field>
+  <div>
+    <div class="row" style="max-width: 150px; position: fixed; top: 30px; left: 80px; z-index: 10">
+      <span style="text-align: center"> log scale </span>
+      <b-switch v-model="yAxisLog"></b-switch>
     </div>
-    <div class="column is-11">
-      <base-chart-plotly
-        id="ChartSampleIntensity"
-        :title="batchStore.active?.sample_batch_name ?? ''"
-        :data="data"
-        :layout="layout"
-        @click="onClick"
-      ></base-chart-plotly>
-    </div>
+    <base-chart-plotly
+      id="ChartSampleIntensity"
+      :title="batchStore.active?.sample_batch_name ?? ''"
+      :data="data"
+      :layout="layout"
+      @click="onClick"
+    />
   </div>
 </template>

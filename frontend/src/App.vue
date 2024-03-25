@@ -46,3 +46,11 @@ watch(
 <style lang="scss">
 @import './assets/style.scss';
 </style>
+
+<style>
+.columns {
+  margin: 0 auto;
+  width: 100%;
+  max-width: 1200px;
+}
+</style>

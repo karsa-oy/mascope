@@ -20,9 +20,7 @@ const workspaceHomeText = computed(() => {
 
 <template>
   <section>
-    <section style="padding: 2em 2em 2em 2em">
-      <h1 class="title is-4">{{ workspaceHomeText }}</h1>
-    </section>
+    <h1 class="title is-5">{{ workspaceHomeText }}</h1>
     <the-pane-browser-sample></the-pane-browser-sample>
     <div v-if="!sampleStore.active || sampleStore.matched">
       <!-- hide target browser if selected sample is not matched -->

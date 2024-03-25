@@ -8,7 +8,7 @@ import ThePaneChartSampleIntensity from '@/components/panes/ThePaneChartSampleIn
 <template>
   <the-layout-sidebar-view>
     <section>
-      <div class="columns" style="margin: 0 auto; width: 80vw">
+      <div class="columns">
         <div class="column is-7">
           <the-pane-chart-sample-intensity></the-pane-chart-sample-intensity>
         </div>

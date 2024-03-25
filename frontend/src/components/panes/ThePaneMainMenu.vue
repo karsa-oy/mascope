@@ -54,5 +54,5 @@ const footerButtons = computed(() =>
 </script>
 
 <template>
-  <base-menu-bar :buttons="buttons" :footerButtons="footerButtons"> </base-menu-bar>
+  <base-menu-bar :buttons="buttons" :footerButtons="footerButtons"></base-menu-bar>
 </template>

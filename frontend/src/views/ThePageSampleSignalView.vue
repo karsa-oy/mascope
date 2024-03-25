@@ -7,7 +7,7 @@ import ThePaneSampleSignal from '@/components/panes/ThePaneSampleSignal.vue'
 <template>
   <the-layout-sidebar-view>
     <section>
-      <the-pane-sample-signal></the-pane-sample-signal>
+      <the-pane-sample-signal />
     </section>
   </the-layout-sidebar-view>
 </template>

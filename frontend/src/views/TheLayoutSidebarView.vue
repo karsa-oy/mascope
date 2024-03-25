@@ -9,7 +9,7 @@ import ThePaneMainMenu from '@/components/panes/ThePaneMainMenu.vue'
     <div class="sidebar-page">
       <section class="sidebar-layout">
         <b-sidebar position="fixed" fullheight :modelValue="true" reduce>
-          <the-pane-main-menu></the-pane-main-menu>
+          <the-pane-main-menu />
         </b-sidebar>
         <div class="page-container">
           <div style="position: fixed; left: 9em; bottom: 5em; z-index: -1; width: 200px">
