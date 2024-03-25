@@ -52,7 +52,9 @@ const targetIonRows = computed(() => {
     return batchStore.targetIons
   }
   return batchStore.targetIons.map((targetIon) => {
-    const matchIon = this.matchIons.find((mi) => mi.target_ion_id === targetIon.target_ion_id)
+    const matchIon = sampleStore.matchIons.find(
+      (mi) => mi.target_ion_id === targetIon.target_ion_id
+    )
 
     return matchIon ? { ...targetIon, ...matchIon } : targetIon
   })
@@ -302,6 +304,7 @@ function matchScoreTagClicked(row) {
 <template>
   <section>
     <base-browser
+      v-if="targetCollectionRows"
       name="Targets"
       :levels="targetLevels"
       :menu="menu"

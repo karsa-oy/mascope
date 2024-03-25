@@ -4,7 +4,6 @@ import { defineStore } from 'pinia'
 import { handleApiRequest, getApiData } from './lib/api'
 
 export const useTargetsStore = defineStore('targets', () => {
-
   const activeCollection = ref(null)
   // alarm_mode
   const alarmTargets = ref(true)
@@ -18,37 +17,39 @@ export const useTargetsStore = defineStore('targets', () => {
 
   const getAllCollections = computed(() => targetCollectionsAll.value ?? [])
   const getAllCompounds = computed(() => targetCompoundsAll.value ?? [])
-  const getTargetsCollections = computed(() => targetCollectionsAll.value?.filter(
-        (collection) => collection.target_collection_type === 'TARGETS',
+  const getTargetsCollections = computed(
+    () =>
+      targetCollectionsAll.value?.filter(
+        (collection) => collection.target_collection_type === 'TARGETS'
       ) ?? []
-    )
-  const getCalibrantsCollections = computed(() => targetCollectionsAll.value?.filter(
-        (collection) => collection.target_collection_type === 'CALIBRANTS',
+  )
+  const getCalibrantsCollections = computed(
+    () =>
+      targetCollectionsAll.value?.filter(
+        (collection) => collection.target_collection_type === 'CALIBRANTS'
       ) ?? []
-    )
-  const getDiagnosticsCollections = computed(() => targetCollectionsAll.value?.filter(
-        (collection) => collection.target_collection_type === 'DIAGNOSTICS',
+  )
+  const getDiagnosticsCollections = computed(
+    () =>
+      targetCollectionsAll.value?.filter(
+        (collection) => collection.target_collection_type === 'DIAGNOSTICS'
       ) ?? []
-    )
-  const getCollection = computed(() => (targetCollectionId) =>  getAllCollections
-    .value.find(
-      (row) => row.target_collection_id == targetCollectionId,
-    ) ?? null
+  )
+  const getCollection = computed(
+    () => (targetCollectionId) =>
+      getAllCollections.value.find((row) => row.target_collection_id == targetCollectionId) ?? null
   )
   // TODO_configuration possible collection types
-  const collectionTypes = computed(() => [
-    'TARGETS', 
-    'DIAGNOSTICS', 
-    'CALIBRANTS'
-  ])
+  const collectionTypes = computed(() => ['TARGETS', 'DIAGNOSTICS', 'CALIBRANTS'])
   // get alarm_mode list
-  const alarmsList = computed(() => [
-      alarmTargets,
-      alarmDiagnostics,
-      alarmCalibrants
+  const alarmsList = computed(() =>
+    [
+      [alarmTargets, 'TARGETS'],
+      [alarmDiagnostics, 'DIAGNOSTICS'],
+      [alarmCalibrants, 'CALIBRANTS']
     ]
-    .map((state) => state.value)
-    .filter((val) => val)
+      .filter((val) => val[0])
+      .map((val) => val[1])
   )
   const targetCollectionsSelected = computed(() => {
     return targetCollectionsAll.value?.filter((row) => row.selection >= 2) ?? []
@@ -58,7 +59,7 @@ export const useTargetsStore = defineStore('targets', () => {
 
   function setCollectionAllSelection({ collectionId, selectionValue }) {
     const collection = targetCollectionsAll.value.find(
-      (coll) => coll.target_collection_id === collectionId,
+      (coll) => coll.target_collection_id === collectionId
     )
     if (collection) {
       collection.selection = selectionValue
@@ -97,7 +98,7 @@ export const useTargetsStore = defineStore('targets', () => {
     if (!collectionToLoadId) return
     await updateCollectionSelection({
       collectionId: collectionToLoadId,
-      selectionValue: 2,
+      selectionValue: 2
     })
   }
 
@@ -120,7 +121,7 @@ export const useTargetsStore = defineStore('targets', () => {
       }
 
       const existingCompound = targetCompoundsAll.value.find(
-        (compound) => compound.target_compound_formula === row.target_compound_formula,
+        (compound) => compound.target_compound_formula === row.target_compound_formula
       )
 
       if (existingCompound) {
@@ -141,7 +142,7 @@ export const useTargetsStore = defineStore('targets', () => {
   async function getAllTargetCollections() {
     const collections = await getApiData({
       httpMethod: 'getAllTargetCollections',
-      errorMessage: `Failed to load all target collections.`,
+      errorMessage: `Failed to load all target collections.`
     })
     return collections.data
   }
@@ -150,7 +151,7 @@ export const useTargetsStore = defineStore('targets', () => {
     return await getApiData({
       httpMethod: 'getTargetCollection',
       requestData: collectionId,
-      errorMessage: `Failed to get target collection.`,
+      errorMessage: `Failed to get target collection.`
     })
   }
 
@@ -158,7 +159,7 @@ export const useTargetsStore = defineStore('targets', () => {
     const compounds = await getApiData({
       httpMethod: 'getAllTargetCompounds',
       requestData: params,
-      errorMessage: `Failed to load all target compounds.`,
+      errorMessage: `Failed to load all target compounds.`
     })
     return compounds.data
   }
@@ -168,7 +169,7 @@ export const useTargetsStore = defineStore('targets', () => {
       httpMethod: 'createTargetCollection',
       requestData: collection,
       successMessage: `Target collection ${collection.target_collection_name} created successfully!`,
-      errorMessage: `Failed to create target collection ${collection.target_collection_name}. Please try again.`,
+      errorMessage: `Failed to create target collection ${collection.target_collection_name}. Please try again.`
     })
   }
 
@@ -179,20 +180,18 @@ export const useTargetsStore = defineStore('targets', () => {
       httpMethod: 'updateTargetCollection',
       requestData: { collectionId, body },
       successMessage: `Target collection ${collection.target_collection_name} updated successfully!`,
-      errorMessage: `Failed to update target collection ${body.target_collection_name}. Please try again.`,
+      errorMessage: `Failed to update target collection ${body.target_collection_name}. Please try again.`
     })
   }
 
-  async function deleteCollection(
-    { collectionId, collectionName, deleteOrphanCompounds },
-  ) {
+  async function deleteCollection({ collectionId, collectionName, deleteOrphanCompounds }) {
     activeCollection.value = {} // TODO check if this should be null or call unload
     return await handleApiRequest({
       httpMethod: 'deleteTargetCollection',
       requestData: { collectionId, collectionName, deleteOrphanCompounds },
       successNotificationType: 'deleted',
       successMessage: `Target collection ${collectionName} was deleted successfully!`,
-      errorMessage: `Failed to delete target collection ${collectionName}. Please try again.`,
+      errorMessage: `Failed to delete target collection ${collectionName}. Please try again.`
     })
   }
 
@@ -204,15 +203,14 @@ export const useTargetsStore = defineStore('targets', () => {
   // selection
   async function updateCollectionSelection({ collectionId, selectionValue }) {
     // Only one collection can be selected at a time
-    targetCollectionsAll
-      .value
+    targetCollectionsAll.value
       .filter((coll) => coll.target_collection_id !== collectionId && coll.selection === 2)
       .forEach((coll) => (coll.selection = 0))
 
     // Update the selected collection's selection value
     setCollectionAllSelection({
       collectionId,
-      selectionValue,
+      selectionValue
     })
 
     // If a collection is selected, fetch its details

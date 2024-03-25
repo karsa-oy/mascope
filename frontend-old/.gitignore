@@ -1,7 +1,0 @@
-# node module directory
-node_modules
-dist_electron
-*.log
-.vagrant
-cert
-.prettierignore

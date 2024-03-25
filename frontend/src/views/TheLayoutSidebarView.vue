@@ -7,7 +7,7 @@ import TheMainMenu from '@/components/TheMainMenu.vue'
   <the-layout-main-view>
     <div class="sidebar-page">
       <section class="sidebar-layout">
-        <b-sidebar position="fixed" fullheight open reduce>
+        <b-sidebar position="fixed" fullheight :modelValue="true" reduce>
           <the-main-menu></the-main-menu>
         </b-sidebar>
         <div class="page-container">

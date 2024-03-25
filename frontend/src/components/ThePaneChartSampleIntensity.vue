@@ -22,13 +22,14 @@ const yAxisLog = ref(false)
 
 const data = computed(() => {
   if (!(batchStore.sampleItems && batchStore.matchCompounds)) return []
-  let allCompoundIds = batchStore.targetCompounds.map((compound) => compound.target_compound_id)
+  let allCompoundIds =
+    batchStore.targetCompounds?.map((compound) => compound.target_compound_id) ?? []
   allCompoundIds = [...new Set(allCompoundIds)]
   let compoundColors = Object.fromEntries(
     allCompoundIds.map((compoundId, index) => [[compoundId], glasbeyLight[index]])
   )
   let data = []
-  let x = batchStore.sampleItems.map((item) => item.sample_item_id)
+  let x = batchStore.sampleItems?.map((item) => item.sample_item_id) ?? []
 
   // Loop through target compounds, make traces and push to data
   for (let targetCompoundId of allCompoundIds) {
@@ -58,7 +59,7 @@ const data = computed(() => {
     if (y.every((intensity) => intensity === null)) continue
     let compoundSymbol = compoundMaxMatchCategory === 2 ? 'square' : 'square-open'
     let compoundColor = compoundColors[targetCompoundId]
-    let compound = this.targetCompounds.filter(
+    let compound = batchStore.targetCompounds.filter(
       (target) => target.target_compound_id === targetCompoundId
     )[0]
     data.push({
@@ -81,13 +82,13 @@ const data = computed(() => {
     })
   }
   // Make trace for TIC
-  let y = batchStore.sampleItems.map((item) => item.tic)
+  let y = batchStore.sampleItems?.map((item) => item.tic) ?? []
   data.push({
     name: 'TIC',
     x,
     y,
-    customdata: batchStore.sampleItems.map((item) => item.datetime),
-    text: batchStore.sampleItems.map((item) => item.sample_item_name),
+    customdata: batchStore.sampleItems?.map((item) => item.datetime) ?? [],
+    text: batchStore.sampleItems?.map((item) => item.sample_item_name) ?? [],
     hovertemplate,
     mode: 'markers',
     type: 'scatter',
@@ -106,8 +107,8 @@ const layout = computed(() => ({
     autorange: true,
     showgrid: true,
     tickmode: 'array',
-    tickvals: batchStore.sampleItems.map((item) => item.sample_item_id),
-    ticktext: batchStore.sampleItems.map((_, i) => i + 1),
+    tickvals: batchStore.sampleItems?.map((item) => item.sample_item_id) ?? [],
+    ticktext: batchStore.sampleItems?.map((_, i) => i + 1) ?? [],
     gridcolor: '#464752',
     gridwidth: 1
   },

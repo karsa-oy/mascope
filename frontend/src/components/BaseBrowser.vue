@@ -1,6 +1,8 @@
 <script setup>
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, toRaw, toValue } from 'vue'
 import BaseTagMatch from './BaseTagMatch.vue'
+
+import { cloneDeep } from 'lodash'
 
 const noop = () => ({})
 
@@ -83,23 +85,27 @@ const formatter = computed(
     })
 )
 
+watch(currentLevel, () => {
+  console.dir(currentLevel.value)
+})
+
 function getChildLevels(...parentRows) {
   // TODO: Currently only looks one level up for parent id.
   // Should check all levels (e.g. target_ion_id -> target_compound_id -> target_collection_id)
 
-  // FAQ: parentRow and childRow shoud have the target_collection_id.
+  // FAQ: parentRow and childRow should have the target_collection_id.
   // Both parentIdField and parentCollectionId are used for childRow to be correcly assigned to the right collection and to avoid dublicates.
   // If the parentRow do not have the target_collection_id (undefined) then childRow will assigned only by parentIdField.
 
   let childLevels = []
   // init iteration parameters
-  let currentLevel = structuredClone(currentLevel.value)
-  currentLevel.rows = structuredClone(parentRows)
-  let nextLevels = structuredClone(props.levels).splice(1)
+  let currLevel = cloneDeep(currentLevel.value)
+  currLevel.rows = cloneDeep(parentRows)
+  let nextLevels = cloneDeep(props.levels).splice(1)
 
   while (nextLevels.length > 0) {
-    const parentIdField = `${currentLevel.slug}_id`
-    const parentIds = currentLevel.rows.map((row) => row[parentIdField])
+    const parentIdField = `${currLevel.slug}_id`
+    const parentIds = currLevel.rows.map((row) => row[parentIdField])
     // set the parentCollectionId if available
     const parentCollectionId = parentRows[0]?.target_collection_id ?? undefined
 
@@ -114,7 +120,7 @@ function getChildLevels(...parentRows) {
       // push results
       childLevels.push(childLevel)
       // update iteration parameters
-      currentLevel = childLevel
+      currLevel = childLevel
     } else {
       break
     }

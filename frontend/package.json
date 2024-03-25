@@ -22,6 +22,7 @@
     "alasql": "^4.3.2",
     "axios": "^1.6.8",
     "bulma": "^0.9.4",
+    "lodash": "^4.17.21",
     "pinia": "^2.1.7",
     "plotly.js-dist-min": "^2.30.1",
     "sass": "^1.72.0",

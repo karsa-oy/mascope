@@ -22,6 +22,14 @@ const formatter = new Intl.NumberFormat('en-US', {
 const contextMenuIcon = computed(() => {
   return batchActiveCount.value == 0 ? 'plus' : 'dots-horizontal'
 })
+const openedBatch = computed(() =>
+  batchStore.active
+    ? workspaceStore.batches.filter(
+        (batch) => batch.sample_batch_id == batchStore.active.sample_batch_id
+      )
+    : []
+)
+
 const sampleLevels = computed(() => {
   let hidden = batchStore.active ? false : true
   return [
@@ -32,7 +40,7 @@ const sampleLevels = computed(() => {
       detailsIcon: 'none',
       rows: workspaceStore.batches,
       rowClick: batchStore.batchToggle,
-      opened: openedBatch
+      opened: openedBatch.value
     },
     {
       name: 'Item',
@@ -128,13 +136,6 @@ const menu = computed(() => {
     : []
   // menu
   return batchStore.sampleItemFocused ? itemButtons : batchButtons
-})
-const openedBatch = computed(() => {
-  return batchStore.active
-    ? workspaceStore.batches.filter(
-        (batch) => batch.sample_batch_id == batchStore.active.sample_batch_id
-      )
-    : []
 })
 
 // methods
@@ -321,14 +322,14 @@ function itemDelete() {
     onConfirm: async () => {
       const itemId = batchStore.sampleItemFocused.sample_item_id
       // defocus
-      batchStore.itemFocus(batchStore.sampleItemFocused)
+      batchStore.sampleItemFocus(batchStore.sampleItemFocused)
       await sampleStore.deleteSampleItem(itemId)
     }
   })
 }
 function itemSelect(row) {
-  batchStore.itemToggle(row)
-  batchStore.itemFocus(row)
+  batchStore.sampleItemToggle(row)
+  batchStore.sampleItemFocus(row)
 }
 function itemCopy() {
   modalStore.state.sampleItemOverviewProps = {
@@ -341,7 +342,7 @@ function itemCopy() {
 }
 </script>
 
-<template>
+<template v-if="workspaceStore.batches">
   <base-browser
     name="Samples"
     :levels="sampleLevels"
