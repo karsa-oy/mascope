@@ -80,7 +80,7 @@ export const useBatchStore = defineStore('batch', () => {
   // actions
 
   function setCollectionSelection({ collectionId, selectionValue }) {
-    const collection = targetCollections.value.find(
+    const collection = targetCollections.value?.find(
       (coll) => coll.target_collection_id === collectionId
     )
     if (collection) collection.selection = selectionValue
@@ -115,12 +115,12 @@ export const useBatchStore = defineStore('batch', () => {
   async function loadBatchTargets(batchId) {
     const batchTargetsData = await getBatchTargets(batchId)
 
-    let targetCollections = batchTargetsData.target_collections
+    let newTargetCollections = batchTargetsData.target_collections
 
     const targetStore = useTargetsStore()
     const activeCollection = targetStore.activeCollection
-    if (targetCollections) {
-      targetCollections = targetCollections.map((coll) => {
+    if (newTargetCollections) {
+      newTargetCollections = newTargetCollections.map((coll) => {
         if (
           activeCollection &&
           activeCollection.target_collection_id === coll.target_collection_id
@@ -132,7 +132,7 @@ export const useBatchStore = defineStore('batch', () => {
         return coll
       })
     }
-    targetCollections.value = targetCollection
+    targetCollections.value = newTargetCollections
     targetCompounds.value = batchTargetsData.target_compounds
     targetIons.value = batchTargetsData.target_ions
     targetIsotopes.value = batchTargetsData.target_isotopes
@@ -156,7 +156,7 @@ export const useBatchStore = defineStore('batch', () => {
     const activeCollection = targetStore.activeCollection
     if (activeCollection) {
       const activeCollectionId = activeCollection.target_collection_id
-      const matchingCollection = targetCollections.value.find(
+      const matchingCollection = targetCollections.value?.find(
         (coll) => coll.target_collection_id === activeCollectionId
       )
       if (matchingCollection) {
@@ -415,7 +415,7 @@ export const useBatchStore = defineStore('batch', () => {
   async function targetCollectionToggle(targetCollectionToggled) {
     const targetCollectionToggledId = targetCollectionToggled.target_collection_id
     targetCollections.value
-      .filter((row) => row.target_collection_id != targetCollectionToggledId && row.selection == 2)
+      ?.filter((row) => row.target_collection_id != targetCollectionToggledId && row.selection == 2)
       .forEach((collection) => (collection.selection = 0))
     targetCollectionToggled = targetCollection.value(targetCollectionToggledId)
     switch (targetCollectionToggled.selection) {
@@ -448,7 +448,7 @@ export const useBatchStore = defineStore('batch', () => {
     })
     // Dispatch to sample module if sample is active to update selection there as well
     const sampleStore = useSampleStore()
-    if (sampleStore.matchCollections.length > 0) {
+    if (sampleStore.matchCollections?.length > 0) {
       sampleStore.updateCollectionSelection({
         collectionId: targetCollectionToggledId,
         selectionValue: targetCollectionToggled.selection

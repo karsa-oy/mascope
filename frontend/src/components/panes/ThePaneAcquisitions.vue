@@ -1,8 +1,6 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 
-import TheModalSampleItemAttributesSave from '@/components/modals/TheModalSampleItemAttributesSave.vue'
-
 import {
   useAppStore,
   useBatchStore,
@@ -25,8 +23,6 @@ const sampleFileMinDatetime = ref(new Date(new Date().getTime() - 24 * 60 * 60 *
 const sampleFileMaxDatetime = ref(new Date()) // now
 const sampleFilesSelected = ref([])
 const sampleFileTableDataKey = ref(0)
-
-const modalProcessSelectedVisible = ref(false)
 
 instrumentStore.load(instrumentSelected.value)
 getAcquisitionsInRange()
@@ -59,7 +55,13 @@ function launchProcessSelectedModal() {
   if (sampleStore.active) {
     batchStore.sampleItemFocus(sampleStore.active)
   }
-  modalProcessSelectedVisible.value = true
+  modalStore.state.sampleItemAttributesSaveProps = {
+    action: 'create',
+    sampleItemRecordToLoad: sampleFilesSelected.value[0]
+  }
+  modalStore.activate({
+    modal: 'sampleItemAttributesSave'
+  })
 }
 
 watch(showRecent, () => {
@@ -155,13 +157,6 @@ watch(
       </b-button>
     </section>
   </div>
-
-  <the-modal-sample-item-attributes-save
-    v-if="sampleFilesSelected.length > 0"
-    v-model:visible="modalProcessSelectedVisible"
-    action="create"
-    :sample-item-record-to-load="sampleFilesSelected[0]"
-  />
 </template>
 
 <style scope>

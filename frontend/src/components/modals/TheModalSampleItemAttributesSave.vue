@@ -1,8 +1,9 @@
 <script setup>
+import { cloneDeep } from 'lodash'
+
 import { ref, computed, watch, toRaw } from 'vue'
 
 import { dialog, toast } from '@/main'
-import { cloneDeep } from 'lodash'
 
 import BaseTable from '@/components/base/BaseTable.vue'
 import ThePaneBrowserTarget from '@/components/panes/ThePaneBrowserTarget.vue'
@@ -71,8 +72,8 @@ formFields.value = structuredClone(toRaw(defaultTemplate.value.template))
 
 const availableTemplates = computed(() => [defaultTemplate.value, ...savedTemplates.value])
 const batchFilterIds = computed(() =>
-  batchStore.batchActive
-    ? [null, ...new Set(batchStore.sampleItems.map((item) => item.filter_id))]
+  batchStore.active
+    ? [null, ...new Set(batchStore.getSampleItems.map((item) => item.filter_id))]
     : []
 )
 const editable = computed(() => ['create', 'update'].includes(action.value))
@@ -100,9 +101,6 @@ const savedTemplates = computed(() =>
 )
 const sampleMzCalibrated = computed(() => sampleStore.active.mz_calibration.verified)
 
-function convertLabelToTitle(label) {
-  return beautifySnakeCase(label)
-}
 function addField() {
   dialog.prompt({
     message: 'Add field to template',
@@ -222,7 +220,7 @@ async function saveAttributes() {
       filename: sampleFilename.value,
       sample_item_name: sampleItemName.value,
       sample_item_type: sampleItemType.value,
-      sample_batch_id: batchStore.batchActive.sample_batch_id,
+      sample_batch_id: batchStore.active.sample_batch_id,
       sample_item_attributes: sampleItemAttributes.value,
       filter_id: sampleItemFilterId.value
     }
@@ -232,7 +230,7 @@ async function saveAttributes() {
       ...sampleStore.active, // To include sample_item_id
       sample_item_name: sampleItemName.value,
       sample_item_type: sampleItemType.value,
-      sample_batch_id: batchStore.batchActive.sample_batch_id,
+      sample_batch_id: batchStore.active.sample_batch_id,
       sample_item_attributes: sampleItemAttributes.value,
       filter_id: sampleItemFilterId.value
     }
@@ -243,7 +241,7 @@ async function saveAttributes() {
 }
 
 watch(sampleItemFilterId, (newValue) => {
-  if (newValue != sampleStore.active.filter_id) {
+  if (newValue != sampleStore.active?.filter_id) {
     // Reset sample item type when filter ID was changed
     sampleItemType.value = null
   }
@@ -330,12 +328,8 @@ watch(
       @close="modalStore.deactivate"
     >
       <div class="box" style="background-color: inherit">
-        <b-steps v-model="activeStep" :has-navigation="false">
-          <b-step-item
-            label="Sample information"
-            :clickable="true"
-            :type="{ 'is-success': sampleStore.active ? true : false }"
-          >
+        <b-tabs v-model="activeStep">
+          <b-tab-item label="Sample information" :clickable="true">
             <div style="text-align: right" v-if="editable">
               <b-button
                 icon-right="cog"
@@ -350,7 +344,7 @@ watch(
             </div>
             <div v-for="item in formFields" :key="item.label">
               <template>
-                <b-field :label="convertLabelToTitle(item.label)">
+                <b-field :label="beautifySnakeCase(item.label)">
                   <b-input
                     v-model="item.value"
                     :placeholder="showEditFunctions ? item.placeholder || 'default value' : ''"
@@ -491,7 +485,7 @@ watch(
                           !sampleItemType ||
                           formFields.filter((f) => f.required).length !=
                             formFields.filter((f) => f.required).filter((f) => f.value).length ||
-                          (action == 'create' && sampleActive)
+                          (action == 'create' && sampleStore.active)
                         "
                         type="is-success"
                         icon-left="content-save"
@@ -504,13 +498,12 @@ watch(
                 </div>
               </div>
             </b-field>
-          </b-step-item>
+          </b-tab-item>
 
-          <b-step-item
+          <b-tab-item
             label="Calibration"
             :visible="instrumentIsTof"
             :clickable="sampleStore.active ? true : false"
-            :type="{ 'is-success': sampleMzCalibrated }"
           >
             <h1 class="title has-text-centered">Calibration</h1>
             <b-collapse :open="false" animation="slide">
@@ -562,22 +555,19 @@ watch(
                 Apply calibration
               </b-button>
             </div>
-          </b-step-item>
+          </b-tab-item>
 
-          <b-step-item
+          <b-tab-item
             label="Target search"
-            :clickable="
-              sampleStore.active ? (!instrumentIsTof || sampleMzCalibrated ? true : false) : false
-            "
-            :type="{ 'is-success': sampleStore.matched }"
+            :clickable="sampleStore.active && (!instrumentIsTof || sampleMzCalibrated)"
           >
             <h1 class="title has-text-centered">Target search</h1>
             <div v-if="sampleStore.matched">
-              <the-pane-browser-target></the-pane-browser-target>
+              <the-pane-browser-target />
             </div>
             <div style="text-align: center">
               <b-button
-                :disabled="sampleStore.active ? false : true"
+                :disabled="!sampleStore.active"
                 type="is-success"
                 icon-left=""
                 @click="sampleMatch"
@@ -594,8 +584,8 @@ watch(
                 Close
               </b-button>
             </div>
-          </b-step-item>
-        </b-steps>
+          </b-tab-item>
+        </b-tabs>
       </div>
     </b-modal>
   </section>

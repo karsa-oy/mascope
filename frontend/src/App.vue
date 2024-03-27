@@ -30,7 +30,6 @@ if (router.currentRoute !== '/') router.push('/')
 watch(
   computed(() => appStore.pushNotification?.message),
   () => {
-    console.log(appStore)
     dialog.alert(appStore.pushNotification?.message)
   }
 )
