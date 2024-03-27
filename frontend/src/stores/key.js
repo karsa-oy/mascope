@@ -9,11 +9,10 @@ let mapCodeToKey = {
   ShiftLeft: 'shift',
   ShiftRight: 'shift',
   KeyC: 'c',
-  KeyV: 'v',
+  KeyV: 'v'
 }
 
 export const useKeyStore = defineStore('key', () => {
-
   // state
 
   const state = reactive({
@@ -33,7 +32,7 @@ export const useKeyStore = defineStore('key', () => {
       state[key] = true
     }
   }
-  
+
   function up(event) {
     const key = mapCodeToKey[event.code]
     if (key && key in state) {
@@ -41,5 +40,5 @@ export const useKeyStore = defineStore('key', () => {
     }
   }
 
-  return {state, up, down}
+  return { state, up, down }
 })

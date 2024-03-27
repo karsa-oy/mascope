@@ -1,63 +1,57 @@
 <script setup>
-  import { ref, watch, computed, nextTick } from 'vue';
+import { ref, watch, computed, nextTick } from 'vue'
 
-  import table from '@/lib/table'
-  import { useKeyStore } from '@/stores'
+import table from '@/lib/table'
+import { useKeyStore } from '@/stores'
 
-  const props = defineProps({
-    label: {
-      type: String,
-      required: true,
-    },
-    cols: {
-      type: Array,
-      required: true,
-    },
-    colsFromHeader: {
-      type: Boolean,
-      required: false,
-      default: false,
-    },
-    info: {
-      type: String,
-      required: false,
-      default: 'Paste spreadsheet cells here',
-    },
-  })
+const keyStore = useKeyStore()
 
-  const emit = defineEmits(['colsPasted', 'rowsPasted'])
-
-  const rows = ref([])
-
-  const fields = computed(() => props.cols.map((col) => col.field))
-
-  const { control, v } = useKeyStore()
-
-
-  // WARN possible regrsssion for cols when using colsFromHeader
-  async function parseClipboard() {
-    if (!(control && v)) return
-    navigator.permissions.query({ name: 'clipboard-read' })
-    let clipboardText = await navigator.clipboard.readText()
-    if (props.colsFromHeader) {
-      let headers = table.readHeader(clipboardText)
-      let cols = headers.map((header) => ({
-        field: header.toLowerCase().replace(/ /g, '_').trim(),
-        label: header,
-      }))
-      emit('colsPasted', cols)
-      await nextTick()
-    }
-    rows.value = table.fromSpreadsheet(
-      clipboardText,
-      fields.value,
-      props.colsFromHeader
-    )
-    emit('rowsPasted', rows.value)
+const props = defineProps({
+  label: {
+    type: String,
+    required: true
+  },
+  cols: {
+    type: Array,
+    required: true
+  },
+  colsFromHeader: {
+    type: Boolean,
+    required: false,
+    default: false
+  },
+  info: {
+    type: String,
+    required: false,
+    default: 'Paste spreadsheet cells here'
   }
+})
 
-  watch(control, parseClipboard)
-  watch(v, parseClipboard)
+const emit = defineEmits(['colsPasted', 'rowsPasted'])
+
+const rows = ref([])
+
+const fields = computed(() => props.cols.map((col) => col.field))
+
+// WARN possible regrsssion for cols when using colsFromHeader
+async function parseClipboard() {
+  if (!(keyStore.state.control && keyStore.state.v)) return
+  navigator.permissions.query({ name: 'clipboard-read' })
+  let clipboardText = await navigator.clipboard.readText()
+  if (props.colsFromHeader) {
+    let headers = table.readHeader(clipboardText)
+    let cols = headers.map((header) => ({
+      field: header.toLowerCase().replace(/ /g, '_').trim(),
+      label: header
+    }))
+    emit('colsPasted', cols)
+    await nextTick()
+  }
+  rows.value = table.fromSpreadsheet(clipboardText, fields.value, props.colsFromHeader)
+  emit('rowsPasted', rows.value)
+}
+
+watch(keyStore, parseClipboard)
 </script>
 
 <template>

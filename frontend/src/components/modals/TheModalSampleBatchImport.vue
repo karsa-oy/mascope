@@ -188,9 +188,9 @@ function determineImportType(cols) {
 
 function parseCsv() {
   if (importType.value === 'autosampler') {
-    parsedRows.value = parseAutosamplerCsv(csvRows)
+    parsedRows.value = parseAutosamplerCsv(csvRows.value)
   } else if (importType.value === 'general') {
-    parsedRows.value = parseGenericCsv(csvCols, csvRows)
+    parsedRows.value = parseGenericCsv(csvCols.value, csvRows.value)
   }
 }
 
@@ -429,8 +429,7 @@ function validateImportedSampleItems() {
                 :colsFromHeader="true"
                 @colsPasted="processCsvCols"
                 @rowsPasted="processCsvRows"
-              >
-              </base-spreadsheet-input>
+              />
               <!-- Filter ID input and dropdown -->
               <template v-if="showFilterIdInput">
                 <b-field label="Please select the Filter ID">

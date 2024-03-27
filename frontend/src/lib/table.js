@@ -82,6 +82,7 @@ export default {
     return worksheet
   },
   fromSpreadsheet(clipboardText, fields, skipHeader = false) {
+    console.log(clipboardText)
     // Split full text to rows
     let clipboardLines = clipboardText.split(String.fromCharCode(10))
     // Skip header row

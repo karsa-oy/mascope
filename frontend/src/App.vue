@@ -1,5 +1,5 @@
 <script setup>
-import { computed, watch } from 'vue'
+import { computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { dialog } from '@/main'
@@ -13,12 +13,14 @@ const keyStore = useKeyStore()
 
 appStore.load()
 
-// add event listeners
-window.addEventListener('keydown', (event) => {
-  keyStore.down(event)
-})
-window.addEventListener('keyup', (event) => {
-  keyStore.up(event)
+onMounted(() => {
+  // add event listeners
+  window.addEventListener('keydown', (event) => {
+    keyStore.down(event)
+  })
+  window.addEventListener('keyup', (event) => {
+    keyStore.up(event)
+  })
 })
 
 // return to home page at reload
