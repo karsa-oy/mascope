@@ -59,6 +59,7 @@ async def compute_matches(
     filename,
     target_isotopes_df,
     min_isotope_abundance=0.15,
+    instrument_functions = None
 ):
     """
     Computes matches for specified target isotopes within a sample file.
@@ -95,7 +96,9 @@ async def compute_matches(
         # Step 1: - Load or detect peaks
         # Find peaks and write to file
         u_list = list(np.unique(np.round(target_isotopes_df.mz)))
-        instrument_functions = await read_instrument_functions(filename)
+        # Check if instrument functions were passed
+        if not instrument_functions:
+            instrument_functions = await read_instrument_functions(filename)
         sample_file = await detect_peaks(
             filename, instrument_functions, u_list, if_exists="append"
         )
