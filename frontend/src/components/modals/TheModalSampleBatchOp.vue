@@ -48,11 +48,9 @@ const initialIonizationMechanisms = ref([]) // To store initial ion_mechanisms
 
 // copy action
 const workspaceSelected = ref(null)
-const newBatchName = ref(
-  batchStore.batchActive ? `${batchStore.batchActive.sample_batch_name} Copy` : null
-)
+const newBatchName = ref(batchStore.active ? `${batchStore.active.sample_batch_name} Copy` : null)
 const newBatchDescription = ref(
-  batchStore.batchActive ? batchStore.batchActive.sample_batch_description : null
+  batchStore.active ? batchStore.active.sample_batch_description : null
 )
 
 //// General data ////
@@ -101,7 +99,7 @@ const saveButtonActive = computed(() => {
       const basicPropertiesChanged =
         (batchName.value !== initialBatchName.value ||
           batchDesc.value !== initialBatchDesc.value) &&
-        batchName // the name is required
+        batchName.value // the name is required
 
       // Compare initial and current calibration collection
       const initialCalibrationCollectionId =
@@ -191,16 +189,16 @@ const displayedCalibrationCollections = computed(() => {
 })
 /// Target Collections Tab ////
 const displayedTargetCollections = computed(() => {
-  switch (this.selectedTargetCollectionType) {
+  switch (selectedTargetCollectionType.value) {
     case 'targets':
-      return this.targetsCollections
+      return targetsStore.getTargetsCollections
     case 'calibrants':
-      return this.calibrantsCollections
+      return targetsStore.getCalibrantsCollections
     case 'diagnostics':
-      return this.diagnosticsCollections
+      return targetsStore.getDiagnosticsCollections
     case 'all':
     default:
-      return this.allCollections
+      return targetsStore.getAllCollections
   }
 })
 
@@ -226,35 +224,35 @@ const targetCollectionIds = computed(() => {
 const newBatch = computed(() => {
   if (actionIs('create')) {
     return {
-      sample_batch_name: batchName,
-      sample_batch_description: batchDesc,
+      sample_batch_name: batchName.value,
+      sample_batch_description: batchDesc.value,
       workspace_id: workspaceStore.active.workspace_id,
       build_params: {
         calibration_collection: calibrationCollectionSelected.value.target_collection_id,
-        ion_mechanisms: ionMechanismIds
+        ion_mechanisms: ionMechanismIds.value
       },
-      target_collection_ids: targetCollectionIds
+      target_collection_ids: targetCollectionIds.value
     }
   }
   if (actionIs('update') || actionIs('editBatchCollections')) {
     return {
-      sample_batch_id: batchStore.batchActive.sample_batch_id,
-      sample_batch_name: batchName,
-      sample_batch_description: batchDesc,
+      sample_batch_id: batchStore.active.sample_batch_id,
+      sample_batch_name: batchName.value,
+      sample_batch_description: batchDesc.value,
       workspace_id: workspaceStore.active.workspace_id,
       build_params: {
         calibration_collection: calibrationCollectionSelected.value.target_collection_id,
-        ion_mechanisms: ionMechanismIds
+        ion_mechanisms: ionMechanismIds.value
       },
-      target_collection_ids: targetCollectionIds,
-      sample_batch_utc_created: batchStore.batchActive.sample_batch_utc_created
+      target_collection_ids: targetCollectionIds.value,
+      sample_batch_utc_created: batchStore.active.sample_batch_utc_created
     }
   }
   return null
 })
 
 function actionIs(...actions) {
-  return actions.includes(this.action)
+  return actions.includes(action.value)
 }
 async function deleteSampleBatch(batch) {
   batchStore.unload()
@@ -264,10 +262,10 @@ async function copySampleBatch() {
   isCopying.value = true
   const batchCopyData = {
     // for http client
-    sample_batch_id: batchStore.batchActive.sample_batch_id,
+    sample_batch_id: batchStore.active.sample_batch_id,
     workspace_id: workspaceSelected.value.workspace_id,
-    sample_batch_name: newBatchName,
-    sample_batch_description: newBatchDescription,
+    sample_batch_name: newBatchName.value,
+    sample_batch_description: newBatchDescription.value,
     // for notification
     workspace_name: workspaceSelected.value.workspace_name
   }
@@ -313,31 +311,31 @@ function initData() {
     activeTab.value = 'info'
     selectedTargetCollectionType.value = 'targets'
     selectedCalibrationCollectionType.value = 'calibrants'
-    batchName.value = batchStore.batchActive.sample_batch_name.value
-    batchDesc.value = batchStore.batchActive.sample_batch_description
-    initialBatchName.value = batchName
-    initialBatchDesc.value = batchDesc
+    batchName.value = batchStore.active.sample_batch_name
+    batchDesc.value = batchStore.active.sample_batch_description
+    initialBatchName.value = batchName.value
+    initialBatchDesc.value = batchDesc.value
     initCalibrationCollectionSelected()
     initTargetCollectionsSelected()
     initIonMechanismsSelected()
   }
   if (action.value == 'delete') {
-    batchName.value = batchStore.batchActive.sample_batch_name
+    batchName.value = batchStore.active.sample_batch_name
   }
   if (action.value == 'copy') {
-    batchName.value = batchStore.batchActive.sample_batch_name
-    newBatchName.value = batchStore.batchActive
-      ? generateCopyName(batchStore.batchActive.sample_batch_name)
+    batchName.value = batchStore.active.sample_batch_name
+    newBatchName.value = batchStore.active
+      ? generateCopyName(batchStore.active.sample_batch_name)
       : null
-    newBatchDescription.value = batchStore.batchActive.sample_batch_description
+    newBatchDescription.value = batchStore.active.sample_batch_description
     workspaceSelected.value = null
   }
   if (action.value == 'editBatchCollections') {
     activeTab.value = 'collections'
     selectedTargetCollectionType.value = 'all'
     selectedCalibrationCollectionType.value = 'calibrants'
-    batchName.value = batchStore.batchActive.sample_batch_name
-    batchDesc.value = batchStore.batchActive.sample_batch_description
+    batchName.value = batchStore.active.sample_batch_name
+    batchDesc.value = batchStore.active.sample_batch_description
     initCalibrationCollectionSelected()
     initTargetCollectionsSelected()
     initIonMechanismsSelected()
@@ -363,7 +361,7 @@ function initCalibrationCollectionSelected() {
           (collection) => collection.target_collection_id === 'xkSPp3eZrWXYSVDa'
         )
     const data = {
-      batchName: batchName,
+      batchName: batchName.value,
       collectionName: calibrationCollectionSelected.value.target_collection_name
     }
     // inform client about debug
@@ -375,27 +373,27 @@ function initCalibrationCollectionSelected() {
   }
 }
 function initTargetCollectionsSelected() {
-  const ids = batchStore.batchActive
-    ? batchStore.targetCollections.map((row) => row.target_collection_id)
+  const ids = batchStore.active
+    ? batchStore.targetCollections?.map((row) => row.target_collection_id) ?? []
     : []
   targetCollectionsSelected.value = targetsStore.getAllCollections.filter((row) =>
     ids.includes(row.target_collection_id)
   )
-  initialTargetCollections.value = targetCollectionsSelected
+  initialTargetCollections.value = targetCollectionsSelected.value
 }
 function initIonMechanismsSelected() {
   const ids = batchStore.paramIonMechanisms
   ionMechanismsSelected.value = appStore.ionMechanisms.filter((row) =>
     ids.includes(row.ionization_mechanism_id)
   )
-  initialIonizationMechanisms.value = ionMechanismsSelected
+  initialIonizationMechanisms.value = ionMechanismsSelected.value
 }
 </script>
 
 <template>
   <section>
     <b-modal
-      v-model="modalStore.state.sampleBatchOp"
+      v-model="modalStore.state.sampleBatchOpActive"
       has-modal-card
       trap-focus
       :can-cancel="true"
@@ -470,7 +468,7 @@ function initIonMechanismsSelected() {
                 :disabled="action == 'editBatchCollections'"
               >
                 <b-table
-                  :data="ionMechanismsAll"
+                  :data="appStore.ionMechanisms"
                   :columns="[
                     { field: 'ionization_mechanism', label: 'Mechanism' },
                     {
@@ -496,7 +494,9 @@ function initIonMechanismsSelected() {
               :disabled="saveButtonActive"
               @click="
                 () => {
-                  actionIs('create') ? createBatch(newBatch) : updateBatch(newBatch)
+                  actionIs('create')
+                    ? batchStore.createBatch(newBatch)
+                    : batchStore.updateBatch(newBatch)
                   modalStore.deactivate()
                 }
               "
@@ -524,7 +524,7 @@ function initIonMechanismsSelected() {
               expanded
               @click="
                 () => {
-                  deleteSampleBatch(batchActive)
+                  deleteSampleBatch(batchStore.active)
                   modalStore.deactivate()
                 }
               "

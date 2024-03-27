@@ -85,10 +85,6 @@ const formatter = computed(
     })
 )
 
-watch(currentLevel, () => {
-  console.dir(currentLevel.value)
-})
-
 function getChildLevels(...parentRows) {
   // TODO: Currently only looks one level up for parent id.
   // Should check all levels (e.g. target_ion_id -> target_compound_id -> target_collection_id)

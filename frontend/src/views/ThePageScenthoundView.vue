@@ -1,6 +1,6 @@
 <script setup>
 import * as _ from 'underscore'
-import { DialogProgrammatic as dialog, ToastProgrammatic as toast } from '@ntohq/buefy-next'
+import { dialog, toast } from '@/main'
 
 import { ref, computed, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
@@ -758,7 +758,7 @@ watch(sampleItemFilterId, () => {
             </div>
             <div style="text-align: center">
               <b-button
-                :disabled="this.sampleStore.active ? false : true"
+                :disabled="sampleStore.active ? false : true"
                 type="is-success"
                 icon-left=""
                 @click="sampleMatch"

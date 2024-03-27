@@ -2,7 +2,7 @@
 import { computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
-import { DialogProgrammatic as dialog } from '@ntohq/buefy-next'
+import { dialog } from '@/main'
 
 import { useAppStore, useKeyStore } from '@/stores'
 

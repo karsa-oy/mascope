@@ -2,7 +2,6 @@ import { reactive } from 'vue'
 import { defineStore } from 'pinia'
 
 export const useModalStore = defineStore('modal', () => {
-
   const state = reactive({
     // active modal indicator
     active: null,
@@ -33,10 +32,11 @@ export const useModalStore = defineStore('modal', () => {
     },
     sampleItemOverviewActive: false,
     sampleItemOverviewProps: {},
-    sampleItemTargetIonActive: false,
+    sampleItemTargetIonActive: false
   })
 
   function activate({ modal }) {
+    deactivate()
     state.active = modal
     state[modal + 'Active'] = true
   }
@@ -50,5 +50,5 @@ export const useModalStore = defineStore('modal', () => {
     state.active = null
   }
 
-  return {state, activate, deactivate}
+  return { state, activate, deactivate }
 })

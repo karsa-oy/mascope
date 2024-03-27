@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 
-import { DialogProgrammatic as dialog } from '@ntohq/buefy-next'
+import { dialog } from '@/main'
 
 import BaseParamField from '@/components/base/BaseParamField.vue'
 
@@ -102,14 +102,14 @@ onMounted(() => {
     <base-param-field
       label="m/z tolerance [ppm]"
       v-model:param="visualizationStore.paramMzTolerance"
-      @paramChange="reload"
+      @paramChange="visualizationStore.reload"
       :range="{ min: 0, max: 100, step: 1 }"
     >
     </base-param-field>
     <base-param-field
       label="Minimum isotope abundance"
       v-model:param="visualizationStore.paramMinIsotopeAbundance"
-      @paramChange="reload"
+      @paramChange="visualizationStore.reload"
       :range="{ min: 0, max: 1, step: 0.01 }"
       disabled
     >
@@ -117,21 +117,21 @@ onMounted(() => {
     <base-param-field
       label="Isotope ratio tolerance"
       v-model:param="visualizationStore.paramIsotopeRatioTolerance"
-      @paramChange="loadMatches"
+      @paramChange="visualizationStore.loadMatches"
       :range="{ min: 0, max: 1, step: 0.05 }"
     >
     </base-param-field>
     <base-param-field
       label="Minimum peak intensity"
       v-model:param="visualizationStore.paramPeakMinIntensity"
-      @paramChange="reload"
+      @paramChange="visualizationStore.reload"
       :range="{ min: 0, max: 10000, step: 500 }"
     >
     </base-param-field>
     <base-param-field
       label="Minimum isotope correlation"
       v-model:param="visualizationStore.paramMinIsotopeCorrelation"
-      @paramChange="loadMatches"
+      @paramChange="visualizationStore.loadMatches"
       :range="{ min: 0, max: 1, step: 0.1 }"
     >
     </base-param-field>
@@ -169,7 +169,7 @@ onMounted(() => {
           icon-right="file-restore"
           size="is-small"
           :disabled="isDefaultSettings"
-          @click="setDefaultFilterParams"
+          @click="visualizationStore.setDefaultFilterParams"
           style="margin-right: 5px"
         >
         </b-button>

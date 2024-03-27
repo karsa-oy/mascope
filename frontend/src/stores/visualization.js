@@ -249,6 +249,7 @@ export const useVisualizationStore = defineStore('visualization', () => {
 
   // backend notifications
   async function onVisualizationSignalSumSpectrum(traces) {
+    console.log('XXX')
     for (let trace of traces) {
       trace.x = new Float32Array(trace.x)
       trace.y = new Float32Array(trace.y)

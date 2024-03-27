@@ -20,7 +20,7 @@ watch(
   computed(() => notificationStore.calibrationComputing),
   (value) => {
     if (value) {
-      this.activateNotification({
+      notificationStore.activate({
         notification: 'calibrationProgress'
       })
     } else {

@@ -1,6 +1,8 @@
 <script setup>
 import * as _ from 'underscore'
-import { DialogProgrammatic as dialog, ToastProgrammatic as toast } from '@ntohq/buefy-next'
+
+import { dialog, toast } from '@/main'
+
 import { ref, reactive, computed, watch } from 'vue'
 
 const props = defineProps({

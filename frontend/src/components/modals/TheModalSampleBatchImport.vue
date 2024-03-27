@@ -1,6 +1,7 @@
 <script setup>
 import { ref, reactive, computed } from 'vue'
-import { DialogProgrammatic as dialog } from '@ntohq/buefy-next'
+
+import { dialog } from '@/main'
 
 import BaseSpreadsheetInput from '@/components/base/BaseSpreadsheetInput.vue'
 

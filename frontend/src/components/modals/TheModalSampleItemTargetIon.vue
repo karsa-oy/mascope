@@ -80,7 +80,7 @@ function resetForm() {
     timeseriesExpectedBehavior: null,
     comment: ''
   }
-  visualizationStore.visualizationStore.activeIsotopes.forEach((isotope) => {
+  visualizationStore.activeIsotopes.forEach((isotope) => {
     checklist.value.isotopeRating[isotope.mz] = 3
   })
 }
@@ -208,7 +208,7 @@ watch(
           <h2 class="subtitle" style="width: 100%; display: flex; justify-content: space-between">
             {{ modalTitle }}
             <base-tag-match
-              :row="activeIon"
+              :row="visualizationStore.activeIon"
               :display-match-score="true"
               :tooltip="{}"
             ></base-tag-match>

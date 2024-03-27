@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
-import { DialogProgrammatic as dialog } from '@ntohq/buefy-next'
+
+import { dialog } from '@/main'
 
 import BaseBrowser from '@/components/base/BaseBrowser.vue'
 
@@ -77,27 +78,27 @@ const menu = computed(() => {
   // sample batch
   let createBatchButton = {
     label: 'Create sample batch',
-    onClick: batchCreate
+    onClick: () => batchCreate()
   }
   let deleteBatchButton = {
     label: 'Delete sample batch',
-    onClick: batchDelete
+    onClick: () => batchDelete()
   }
   let exportBatchButton = {
     label: 'Export sample batch',
-    onClick: batchExport
+    onClick: () => batchExport()
   }
   let exportBatchPeaksButton = {
     label: 'Export peak data',
-    onClick: batchPeakExport
+    onClick: () => batchPeakExport()
   }
   let updateBatchButton = {
     label: 'Update sample batch',
-    onClick: batchUpdate
+    onClick: () => batchUpdate()
   }
   let copyBatchButton = {
     label: 'Copy selected batch',
-    onClick: batchCopy
+    onClick: () => batchCopy()
   }
   let rematchBatchButton = {
     label: 'Rematch selected batch (debug)',
@@ -117,19 +118,19 @@ const menu = computed(() => {
   // sample items
   let updateItemButton = {
     label: `Update sample item`,
-    onClick: itemUpdate
+    onClick: () => itemUpdate()
   }
   let deleteItemButton = {
     label: `Delete sample item`,
-    onClick: itemDelete
+    onClick: () => itemDelete()
   }
   let copyItemButton = {
     label: 'Copy selected sample item',
-    onClick: itemCopy
+    onClick: () => itemCopy()
   }
   let rematchItemButton = {
     label: `Rematch selected sample (debug)`,
-    onClick: itemRematch
+    onClick: () => itemRematch()
   }
   let itemButtons = batchStore.sampleItemFocused
     ? [updateItemButton, deleteItemButton, copyItemButton, rematchItemButton]
@@ -171,7 +172,8 @@ function batchExport() {
     { field: '', value: '' },
     {
       field: 'Target collections',
-      value: batchStore.targetCollections.map((row) => row.target_collection_name).join(', ')
+      value:
+        batchStore.targetCollections?.map((row) => row.target_collection_name).join(', ') ?? 'none'
     },
     { field: '', value: '' },
     { field: 'Parameters', value: '' }
@@ -228,30 +230,32 @@ function batchExport() {
     '_'
   )}.xlsx`
   // Extend batchMatchCompounds with sample_item_type
-  const extendedMatchCompounds = batchStore.matchCompounds.map((compound) => {
-    const sampleItem = batchStore.sampleItems.find(
-      (item) => item.sample_item_id === compound.sample_item_id
-    )
-    return {
-      ...compound,
-      sample_item_type: sampleItem?.sample_item_type || null
-    }
-  })
+  const extendedMatchCompounds =
+    batchStore.matchCompounds?.map((compound) => {
+      const sampleItem = batchStore.sampleItems.find(
+        (item) => item.sample_item_id === compound.sample_item_id
+      )
+      return {
+        ...compound,
+        sample_item_type: sampleItem?.sample_item_type
+      }
+    }) ?? []
   // Extend batchMatchIons with sample_item_type, target_compound_name, and target_compound_formula
-  const extendedMatchIons = batchStore.matchIons.map((ion) => {
-    const sampleItem = batchStore.sampleItems.find(
-      (item) => item.sample_item_id === ion.sample_item_id
-    )
-    const targetCompound = batchStore.targetCompounds.find(
-      (compound) => compound.target_compound_id === ion.target_compound_id
-    )
-    return {
-      ...ion,
-      sample_item_type: sampleItem?.sample_item_type || null,
-      target_compound_name: targetCompound?.target_compound_name || null,
-      target_compound_formula: targetCompound?.target_compound_formula || null
-    }
-  })
+  const extendedMatchIons =
+    batchStore.matchIons?.map((ion) => {
+      const sampleItem = batchStore.sampleItems.find(
+        (item) => item.sample_item_id === ion.sample_item_id
+      )
+      const targetCompound = batchStore.targetCompounds?.find(
+        (compound) => compound.target_compound_id === ion.target_compound_id
+      )
+      return {
+        ...ion,
+        sample_item_type: sampleItem?.sample_item_type,
+        target_compound_name: targetCompound?.target_compound_name,
+        target_compound_formula: targetCompound?.target_compound_formula
+      }
+    }) ?? []
   table.toSpreadsheet(filename, [
     {
       name: 'Batch',

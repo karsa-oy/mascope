@@ -56,7 +56,7 @@ const tag = computed(() => {
         }
     }
   } else {
-    switch (this.row.match_category) {
+    switch (props.row.match_category) {
       case 2:
         return {
           category: 'probable',

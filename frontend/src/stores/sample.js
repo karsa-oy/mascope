@@ -167,15 +167,13 @@ export const useSampleStore = defineStore('sample', () => {
     await api.http.matchSampleRematch({ sampleId })
   }
 
-  async function copySample({ dispatch, rootState }, sample) {
+  async function copySample(sample) {
     const sampleId = sample.sample_item_id
     const body = {
       sample_batch_id: sample.sample_batch_id,
       sample_item_name: sample.sample_item_name
     }
     return await api.process({
-      dispatch,
-      rootState,
       httpMethod: 'copySampleItem',
       requestData: { sampleId, body },
       progressNotificationPayload: {
@@ -261,6 +259,7 @@ export const useSampleStore = defineStore('sample', () => {
     active,
     matched,
     matchCollections,
+    matchCompounds,
     matchIons,
     matchIsotopes,
     // getters

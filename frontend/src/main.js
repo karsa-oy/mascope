@@ -18,3 +18,8 @@ app.use(router)
 app.use(buefy)
 
 app.mount('#app')
+
+import { DialogProgrammatic, ToastProgrammatic } from '@ntohq/buefy-next'
+
+export const dialog = new DialogProgrammatic(app)
+export const toast = new ToastProgrammatic(app)

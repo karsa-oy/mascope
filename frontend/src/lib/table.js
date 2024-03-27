@@ -58,12 +58,13 @@ export default {
     } catch (error) {
       console.error(`The following frontend SQL query failed:` + `${sql}`, {
         tables,
-        error,
+        error
       })
     }
   },
-  fitSpredsheetColumnWidths(worksheet) {
+  fitSpreadsheetColumnWidths(worksheet) {
     const data = xlsx.utils.sheet_to_json(worksheet)
+    if (data.length == 0) return
     const colLengths = Object.keys(data[0]).map((k) => (k ? k.toString().length : 0))
     for (const d of data) {
       Object.values(d).forEach((element, index) => {
@@ -75,7 +76,7 @@ export default {
     }
     worksheet['!cols'] = colLengths.map((l) => {
       return {
-        wch: l,
+        wch: l
       }
     })
     return worksheet
@@ -107,7 +108,7 @@ export default {
     return fields
   },
   toSpreadsheet(filename, sheets) {
-    var workbook = xlsx.utils.book_new()
+    let workbook = xlsx.utils.book_new()
     for (let sheet of sheets) {
       let { rows, cols, name } = sheet
       // construct header
@@ -122,9 +123,9 @@ export default {
       let worksheet = xlsx.utils.json_to_sheet(formattedRows, {
         // the default header uses field names
         // so we omit since we add our own header
-        skipHeader: true,
+        skipHeader: true
       })
-      worksheet = this.fitSpredsheetColumnWidths(worksheet)
+      worksheet = this.fitSpreadsheetColumnWidths(worksheet)
       xlsx.utils.book_append_sheet(workbook, worksheet, name)
     }
     try {
@@ -132,5 +133,5 @@ export default {
     } catch (err) {
       console.error(err)
     }
-  },
+  }
 }

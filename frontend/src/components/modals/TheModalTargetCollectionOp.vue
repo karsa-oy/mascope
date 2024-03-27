@@ -1,7 +1,7 @@
 <script setup>
 import * as _ from 'underscore'
 
-import { DialogProgrammatic as dialog } from '@ntohq/buefy-next'
+import { dialog } from '@/main'
 
 import { ref, computed } from 'vue'
 
@@ -331,7 +331,7 @@ function initData() {
     if (workspaceStore.activeBatches) reconcileBatches(workspaceStore.activeBatches)
   }
   // Initializes data specific to the 'update' action
-  if (this.actionIs('update')) {
+  if (actionIs('update')) {
     activeTab.value = 'info'
     compoundsTab.value = 'selectedCompounds'
     // Reset the selected compounds tab to the first page when the list is reloaded
@@ -421,7 +421,7 @@ function reconcileCompounds(compounds) {
     ])
   )
 
-  this.addCompoundsList = compounds.map((compound) => {
+  addCompoundsList.value = compounds.map((compound) => {
     // First, try finding by target_compound_id, if not found by ID and there's no ID on the new compound, try finding by formula
     let selectedCompound = compoundMap.get(
       compound.target_compound_id || compound.target_compound_formula
@@ -454,7 +454,7 @@ async function loadSpreadsheetCompounds(rows) {
 function reconcileBatches(batches) {
   selectedWorkspaceBatches.value = batches.map((batch) => {
     // Try to find an existing batch in sampleBatches
-    const existingBatch = this.sampleBatches.find(
+    const existingBatch = sampleBatches.value.find(
       (sb) => sb.sample_batch_id === batch.sample_batch_id
     )
     // If found, use the existing batch object to maintain reference equality; otherwise, use the current batch

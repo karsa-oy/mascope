@@ -1,8 +1,9 @@
 <script setup>
 import { ref, computed, watch, toRaw } from 'vue'
 
-import { dialog, toast } from '@/main'
 import { cloneDeep } from 'lodash'
+
+import { dialog, toast } from '@/main'
 
 import BaseTable from '@/components/base/BaseTable.vue'
 import ThePaneBrowserTarget from '@/components/panes/ThePaneBrowserTarget.vue'
@@ -10,21 +11,31 @@ import ThePaneSettingsCalibration from '@/components/panes/ThePaneSettingsCalibr
 
 import { beautifySnakeCase, strToSnakeCase, genId } from '@/lib/util'
 
-import {
-  useAppStore,
-  useBatchStore,
-  useModalStore,
-  useCalibrationStore,
-  useSampleStore
-} from '@/stores'
+import { useAppStore, useBatchStore, useCalibrationStore, useSampleStore } from '@/stores'
 
 const appStore = useAppStore()
 const batchStore = useBatchStore()
 const sampleStore = useSampleStore()
-const modalStore = useModalStore()
 const calibrationStore = useCalibrationStore()
 
-const action = ref(null)
+const visible = defineModel('visible', {
+  type: Boolean,
+  required: true
+})
+
+const props = defineProps({
+  action: {
+    type: String, // create, edit, delete
+    required: true
+  },
+  sampleItemId: {
+    type: String // required for edit or delete
+  },
+  sampleItemRecordToLoad: {
+    type: Object
+  }
+})
+
 const activeStep = ref(0)
 const defaultTemplate = ref({
   name: 'default',
@@ -75,8 +86,7 @@ const batchFilterIds = computed(() =>
     ? [null, ...new Set(batchStore.sampleItems.map((item) => item.filter_id))]
     : []
 )
-const editable = computed(() => ['create', 'update'].includes(action.value))
-const fillable = computed(() => ['create', 'update'].includes(action.value))
+const editable = computed(() => ['create', 'update'].includes(props.action))
 const instrumentIsTof = computed(() =>
   sampleInstrument.value ? sampleInstrument.value.indexOf('ORBI') == -1 : false
 )
@@ -98,11 +108,8 @@ const sampleItemName = computed(
 const savedTemplates = computed(() =>
   appStore.attributeTemplates.filter((template) => template.type == templateType.value)
 )
-const sampleMzCalibrated = computed(() => sampleStore.active.mz_calibration.verified)
+const sampleMzCalibrated = computed(() => sampleStore.active?.mz_calibration.verified)
 
-function convertLabelToTitle(label) {
-  return beautifySnakeCase(label)
-}
 function addField() {
   dialog.prompt({
     message: 'Add field to template',
@@ -115,7 +122,7 @@ function addField() {
     onConfirm: (fieldToAdd) => {
       loadedTemplate.value = {
         name: null,
-        template: [...formFields, { label: fieldToAdd, value: '' }]
+        template: [...formFields.value, { label: fieldToAdd, value: '' }]
       }
     }
   })
@@ -137,6 +144,7 @@ function generateFilterId() {
   sampleItemFilterId.value = genId(6, false)
 }
 async function mzCalibrationFit() {
+  if (!sampleStore.active) return
   calibrationStore.unload()
   const requestData = {
     sampleId: sampleStore.active.sample_item_id,
@@ -179,6 +187,7 @@ function removeField(event) {
   }
 }
 async function sampleMatch() {
+  if (!sampleStore.active) return
   await sampleStore.matchSampleRematch(sampleStore.active)
 }
 async function saveSampleItem() {
@@ -202,7 +211,7 @@ function saveTemplate() {
         })
         return
       }
-      let templateFormFields = structuredClone(formFields.value)
+      let templateFormFields = cloneDeep(formFields.value)
       // Empty values
       templateFormFields.forEach((field) => (field.value = ''))
       let newTemplate = {
@@ -217,7 +226,7 @@ function saveTemplate() {
   })
 }
 async function saveAttributes() {
-  if (action.value == 'create') {
+  if (props.action == 'create') {
     let newSampleItem = {
       filename: sampleFilename.value,
       sample_item_name: sampleItemName.value,
@@ -227,7 +236,7 @@ async function saveAttributes() {
       filter_id: sampleItemFilterId.value
     }
     await sampleStore.create(newSampleItem)
-  } else if (action.value == 'update') {
+  } else if (props.action.value == 'update') {
     let newSampleItem = {
       ...sampleStore.active, // To include sample_item_id
       sample_item_name: sampleItemName.value,
@@ -238,12 +247,53 @@ async function saveAttributes() {
     }
     await sampleStore.update(newSampleItem)
 
-    modalStore.deactivate()
+    onClose()
   }
+}
+function loadTemplate() {
+  let newTemplate = {
+    name: null,
+    type: templateType.value,
+    template: []
+  }
+  for (let { label, key, required, disabled } of defaultTemplate.value.template) {
+    if (required) {
+      newTemplate.template.push({
+        label,
+        key,
+        required,
+        disabled,
+        value: props.sampleItemRecordToLoad[label]
+      })
+    }
+  }
+  const attributesField = templateType.value + '_attributes'
+  if (props.sampleItemRecordToLoad[attributesField]) {
+    const attributes = props.sampleItemRecordToLoad[attributesField]
+    if (attributes && typeof attributes === 'object' && Object.keys(attributes).length > 0) {
+      Object.keys(attributes).forEach((attr) => {
+        newTemplate.template.push({
+          label: attr,
+          value: attributes[attr]
+        })
+      })
+    }
+  }
+  loadedTemplate.value = newTemplate
+  formFields.value = newTemplate.template
+  sampleFilename.value = props.sampleItemRecordToLoad.filename
+  sampleInstrument.value = props.sampleItemRecordToLoad.instrument
+  sampleItemFilterId.value = props.sampleItemRecordToLoad.filter_id
+  sampleItemType.value = props.sampleItemRecordToLoad.sample_item_type
+}
+function onClose() {
+  visible.value = false
+  activeStep.value = 0
+  loadedTemplate.value = null
 }
 
 watch(sampleItemFilterId, (newValue) => {
-  if (newValue != sampleStore.active.filter_id) {
+  if (newValue != sampleStore.active?.filter_id) {
     // Reset sample item type when filter ID was changed
     sampleItemType.value = null
   }
@@ -266,76 +316,28 @@ watch(
   },
   { deep: true }
 )
-watch(
-  computed(() => modalStore.state.sampleItemAttributesSaveActive),
-  (newValue) => {
-    if (newValue) {
-      activeStep.value = 0
-    } else {
-      // Reset template selection when closing modal
-      loadedTemplate.value = null
-    }
+watch(props.sampleItemRecordToLoad, (toLoad) => {
+  if (toLoad) {
+    loadTemplate()
   }
-)
-watch(
-  computed(() => modalStore.state.sampleItemAttributesSaveProps),
-  (data) => {
-    action.value = data.action
-    let newTemplate = {
-      name: null,
-      type: templateType.value,
-      template: []
-    }
-    for (let { label, key, required, disabled } of defaultTemplate.value.template) {
-      if (required) {
-        newTemplate.template.push({
-          label,
-          key,
-          required,
-          disabled,
-          value: data.sampleItemRecordToLoad[label]
-        })
-      }
-    }
-    const attributesField = templateType.value + '_attributes'
-    if (data.sampleItemRecordToLoad[attributesField]) {
-      const attributes = data.sampleItemRecordToLoad[attributesField]
-      if (attributes && typeof attributes === 'object' && Object.keys(attributes).length > 0) {
-        Object.keys(attributes).forEach((attr) => {
-          newTemplate.template.push({
-            label: attr,
-            value: attributes[attr]
-          })
-        })
-      }
-    }
-    loadedTemplate.value = newTemplate
-    formFields.value = newTemplate.template
-    sampleFilename.value = data.sampleItemRecordToLoad.filename
-    sampleInstrument.value = data.sampleItemRecordToLoad.instrument
-    sampleItemFilterId.value = data.sampleItemRecordToLoad.filter_id
-    sampleItemType.value = data.sampleItemRecordToLoad.sample_item_type
-  }
-)
+})
 </script>
 
 <template>
   <section>
     <b-modal
-      v-model="modalStore.state.sampleItemAttributesSaveActive"
+      v-model="visible"
+      has-modal-card
       trap-focus
       :can-cancel="true"
       aria-role="dialog"
       aria-modal
-      @close="modalStore.deactivate"
+      @close="onClose"
     >
       <div class="box" style="background-color: inherit">
         <b-steps v-model="activeStep" :has-navigation="false">
-          <b-step-item
-            label="Sample information"
-            :clickable="true"
-            :type="{ 'is-success': sampleStore.active ? true : false }"
-          >
+          <b-step-item label="Sample information" :clickable="true">
+            <!--:type="{ 'is-success': sampleStore.active ? true : false }"-->
             <div style="text-align: right" v-if="editable">
               <b-button
                 icon-right="cog"
@@ -350,16 +352,15 @@ watch(
             </div>
             <div v-for="item in formFields" :key="item.label">
               <template>
-                <b-field :label="convertLabelToTitle(item.label)">
+                <b-field :label="beautifySnakeCase(item.label)">
                   <b-input
                     v-model="item.value"
                     :placeholder="showEditFunctions ? item.placeholder || 'default value' : ''"
-                    :required="fillable && item.required"
-                    :disabled="!fillable || item.disabled"
+                    :required="editable && item.required"
+                    :disabled="!editable || item.disabled"
                     lazy
                     expanded
-                  >
-                  </b-input>
+                  />
                   <div v-if="showEditFunctions">
                     <b-button
                       :id="item.label"
@@ -369,8 +370,7 @@ watch(
                       icon-right="delete"
                       hover
                       title="Delete Field"
-                    >
-                    </b-button>
+                    />
                   </div>
                 </b-field>
               </template>
@@ -392,8 +392,7 @@ watch(
                     </b-dropdown-item>
                   </template>
                 </b-dropdown>
-                <b-button type="is-primary" icon-left="plus" @click="generateFilterId()">
-                </b-button>
+                <b-button type="is-primary" icon-left="plus" @click="generateFilterId" />
               </b-field>
               <b-field label="Sample type">
                 <b-dropdown aria-role="list" v-model="sampleItemType" expanded>
@@ -528,7 +527,7 @@ watch(
                   </b-button>
                 </section>
               </template>
-              <the-pane-settings-calibration></the-pane-settings-calibration>
+              <the-pane-settings-calibration />
             </b-collapse>
             <b-message v-if="calibrationStore.mzFitError" type="is-danger" has-icon>
               {{ calibrationStore.mzFitError }}
@@ -573,7 +572,7 @@ watch(
           >
             <h1 class="title has-text-centered">Target search</h1>
             <div v-if="sampleStore.matched">
-              <the-pane-browser-target></the-pane-browser-target>
+              <the-pane-browser-target />
             </div>
             <div style="text-align: center">
               <b-button
@@ -588,7 +587,7 @@ watch(
               <b-button
                 type="is-primary"
                 icon-left="close"
-                @click="modalStore.deactivate"
+                @click="onClose"
                 v-if="sampleStore.matched"
               >
                 Close
