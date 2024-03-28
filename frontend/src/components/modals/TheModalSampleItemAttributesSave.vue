@@ -343,42 +343,35 @@ watch(
               <h1 class="title has-text-centered">Sample information</h1>
             </div>
             <div v-for="item in formFields" :key="item.label">
-              <template>
-                <b-field :label="beautifySnakeCase(item.label)">
-                  <b-input
-                    v-model="item.value"
-                    :placeholder="showEditFunctions ? item.placeholder || 'default value' : ''"
-                    :required="fillable && item.required"
-                    :disabled="!fillable || item.disabled"
-                    lazy
-                    expanded
+              <b-field :label="beautifySnakeCase(item.label)">
+                <b-input
+                  v-model="item.value"
+                  :placeholder="showEditFunctions ? item.placeholder || 'default value' : ''"
+                  :required="fillable && item.required"
+                  :disabled="!fillable || item.disabled"
+                  expanded
+                >
+                </b-input>
+                <div v-if="showEditFunctions">
+                  <b-button
+                    :id="item.label"
+                    :disabled="item.required"
+                    @click="removeField"
+                    type="is-danger"
+                    icon-right="delete"
+                    hover
+                    title="Delete Field"
                   >
-                  </b-input>
-                  <div v-if="showEditFunctions">
-                    <b-button
-                      :id="item.label"
-                      :disabled="item.required"
-                      @click="removeField"
-                      type="is-danger"
-                      icon-right="delete"
-                      hover
-                      title="Delete Field"
-                    >
-                    </b-button>
-                  </div>
-                </b-field>
-              </template>
+                  </b-button>
+                </div>
+              </b-field>
             </div>
             <div>
               <b-field label="Filter ID">
-                <b-input v-model="sampleItemFilterId" disabled expanded> </b-input>
+                <b-input v-model="sampleItemFilterId" disabled expanded />
                 <b-dropdown aria-role="list" v-model="sampleItemFilterId" expanded>
                   <template #trigger>
-                    <b-button
-                      :label="sampleItemFilterId"
-                      icon-right="menu-down"
-                      style="align: left"
-                    />
+                    <b-button :label="sampleItemFilterId" icon-right="menu-down" />
                   </template>
                   <template v-for="filterId of batchFilterIds" :key="filterId">
                     <b-dropdown-item aria-role="listitem" :value="filterId">
@@ -392,19 +385,15 @@ watch(
               <b-field label="Sample type">
                 <b-dropdown aria-role="list" v-model="sampleItemType" expanded>
                   <template #trigger>
-                    <b-button
-                      :label="sampleItemType"
-                      icon-right="menu-down"
-                      expanded
-                      style="align: left"
-                    />
+                    <b-button :label="sampleItemType" icon-right="menu-down" expanded />
                   </template>
                   <b-dropdown-item
                     aria-role="listitem"
                     value="INSTRUMENT_BACKGROUND"
                     v-if="!sampleItemFilterId"
-                    >Instrument background</b-dropdown-item
                   >
+                    Instrument background
+                  </b-dropdown-item>
                   <b-dropdown-item
                     aria-role="listitem"
                     value="FILTER_REGENERATION"

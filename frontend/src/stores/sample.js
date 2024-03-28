@@ -235,7 +235,7 @@ export const useSampleStore = defineStore('sample', () => {
   async function onSampleItemCreated(sample_item_id) {
     const batchStore = useBatchStore()
     await batchStore.reload(null)
-    const sampleItem = batchStore.sampleItem.value(sample_item_id)
+    const sampleItem = batchStore.sampleItem(sample_item_id)
     await load(sampleItem)
   }
 

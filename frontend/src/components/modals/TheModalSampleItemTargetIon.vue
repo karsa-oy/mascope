@@ -165,7 +165,7 @@ async function submitRating() {
   }
   if (displayChecklist.value) {
     payload.checklist = {
-      isotopes_rating: visualizationStore.visualizationStore.activeIsotopes.map((isotope) => ({
+      isotopes_rating: visualizationStore.activeIsotopes.map((isotope) => ({
         isotope_rating: checklist.value.isotopeRating[isotope.mz],
         target_isotope_id: isotope.target_isotope_id
       })),
