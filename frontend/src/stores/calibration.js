@@ -73,6 +73,7 @@ export const useCalibrationStore = defineStore('calibration', () => {
   }
 
   async function calibrationMzCalibrateSample() {
+    console.log('calibrating')
     const sampleStore = useSampleStore()
     const sampleActive = sampleStore.active
     if (sampleActive) {

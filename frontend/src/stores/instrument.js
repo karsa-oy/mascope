@@ -147,7 +147,7 @@ export const useInstrumentStore = defineStore('instrument', () => {
     // Wait for sample to be saved, then start mass calibration
     if (scenthoundModeActive.value) {
       const calibrationStore = useCalibrationStore()
-      calibrationStore.calibrationMzCalibrateSample(null)
+      calibrationStore.calibrationMzCalibrateSample()
     }
   }
   async function onInstrumentConversionProgress({ progress }) {
@@ -171,9 +171,12 @@ export const useInstrumentStore = defineStore('instrument', () => {
     matchingProgress.value = progress
   }
   async function onSampleFileCreated() {
+    console.log('onSampleFileCreated')
     await getRecentAcquisitions()
     if (scenthoundModeActive.value) {
+      console.log('scenthound active')
       if (sampleItemPending.value) {
+        console.log('sample item pending')
         const sampleStore = useSampleStore()
         await sampleStore.create(sampleItemPending.value)
         sampleItemPending.value = null

@@ -1,8 +1,10 @@
 <script setup>
 import * as _ from 'underscore'
+import { cloneDeep } from 'lodash'
+
 import { dialog, toast } from '@/main'
 
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 
 import BaseTable from '@/components/base/BaseTable.vue'
@@ -18,7 +20,8 @@ import {
   useBatchStore,
   useSampleStore,
   useInstrumentStore,
-  useCalibrationStore
+  useCalibrationStore,
+  useWorkspaceStore
 } from '@/stores'
 
 const appStore = useAppStore()
@@ -26,6 +29,7 @@ const batchStore = useBatchStore()
 const sampleStore = useSampleStore()
 const instrumentStore = useInstrumentStore()
 const calibrationStore = useCalibrationStore()
+const workspaceStore = useWorkspaceStore()
 
 const activeStep = ref(0)
 const defaultTemplate = ref({
@@ -67,10 +71,12 @@ const sampleItemType = ref(null)
 const showEditFunctions = ref(false)
 const templateType = ref('sample_item')
 
-sampleStore.unload()
-instrumentStore.scenthoundModeActive = true
-loadedTemplate.value = structuredClone(defaultTemplate.value)
-formFields.value = [...defaultTemplate.value.template]
+onMounted(() => {
+  sampleStore.unload()
+  instrumentStore.scenthoundModeActive = true
+  loadedTemplate.value = cloneDeep(defaultTemplate.value)
+  formFields.value = [...defaultTemplate.value.template]
+})
 
 onBeforeRouteLeave((to, from, next) => {
   instrumentStore.scenthoundModeActive = false
@@ -78,10 +84,9 @@ onBeforeRouteLeave((to, from, next) => {
 })
 
 const availableTemplates = computed(() => [defaultTemplate.value, ...savedTemplates.value])
-const editable = computed(() => !instrumentStore.instrumentStore.sampleItemPending)
+const editable = computed(() => !instrumentStore.sampleItemPending)
 const fillable = computed(
-  () =>
-    instrumentStore.acquisitionActiveFilename && !instrumentStore.instrumentStore.sampleItemPending
+  () => instrumentStore.acquisitionActiveFilename && !instrumentStore.sampleItemPending
 )
 const batchFilterIds = computed(() =>
   batchStore.active ? [null, ...new Set(batchStore.sampleItems.map((item) => item.filter_id))] : []
@@ -89,7 +94,7 @@ const batchFilterIds = computed(() =>
 const calibrationProgress = computed(() =>
   calibrationStore.calibrationStatus ? calibrationStore.calibrationStatus.progress : 0
 )
-const filterIsNew = computed(() => !batchFilterIds.value.includes(sampleItemFilterId))
+const filterIsNew = computed(() => !batchFilterIds.value.includes(sampleItemFilterId.value))
 const mzCalibrationTableRows = computed(() => calibrationStore.mzFitStats ?? [])
 const sampleFilename = computed(() =>
   sampleStore.active ? sampleStore.active.filename : instrumentStore.acquisitionActiveFilename
@@ -114,7 +119,7 @@ const sampleItemAttributes = computed(() =>
     )
 )
 const sampleItemName = computed(
-  () => formFields.value.filter((field) => field.label == 'sample_item_name')[0].value
+  () => formFields.value?.filter((field) => field.label == 'sample_item_name')[0]?.value
 )
 const sampleMatchClass = computed(() => {
   if (sampleStore.alarmCategory === null) return 'is-success'
@@ -129,9 +134,9 @@ const sampleMatchClass = computed(() => {
 const savedTemplates = computed(() => {
   return appStore.attributeTemplates.filter((template) => template.type == templateType.value)
 })
-const sampleMzCalibrated = computed(() => sampleStore.active.mz_calibration.verified)
+const sampleMzCalibrated = computed(() => sampleStore.active?.mz_calibration.verified)
 
-function closeButtonPressed() {
+function close() {
   if (sampleStore.active && sampleIsSaved.value) {
     reset()
   } else {
@@ -314,23 +319,16 @@ function selectBatch(val) {
   batchStore.load(val.sample_batch_id)
 }
 
-watch(activeStep, () => {
-  switch (activeStep.value) {
-    case 0:
-      break
-    case 1:
-      break
-    case 2:
-      break
-  }
-})
-watch(instrumentStore.acquisitionProgress, (newValue) => {
-  if (newValue == 0) {
-    resetSampleItem()
+watch(
+  computed(() => instrumentStore.acquisitionProgress),
+  (newValue) => {
+    if (newValue == 0) {
+      resetSampleItem()
 
-    activeStep.value = 0
+      activeStep.value = 0
+    }
   }
-})
+)
 watch(calibrationProgress, (newValue, oldValue) => {
   if (oldValue != 100 && newValue == 100) {
     if (calibrationStore.calibrationStatus.failed) {
@@ -343,7 +341,7 @@ watch(
   (newValue) => {
     if (newValue) {
       // Make a copy to avoid mutating the loaded template directly
-      let newFormFields = structuredClone(newValue.template)
+      let newFormFields = cloneDeep(newValue.template)
       // Fill in new form with values from the old
       newFormFields.forEach(
         (field) =>
@@ -356,12 +354,15 @@ watch(
   },
   { deep: true }
 )
-watch(sampleStore.alarmCategory, (newValue) => {
-  if (newValue > 0) {
-    // Switch to target search page if sample alarms
-    activeStep.value = 2
+watch(
+  computed(() => sampleStore.alarmCategory),
+  (newValue) => {
+    if (newValue > 0) {
+      // Switch to target search page if sample alarms
+      activeStep.value = 2
+    }
   }
-})
+)
 watch(sampleItemFilterId, () => {
   // Reset sample item type when filter ID is changed
   // In order to not allow inconsistency between filter ID and sample type
@@ -409,13 +410,9 @@ watch(sampleItemFilterId, () => {
         </section>
         <br />
         <!-- Steps -->
-        <b-steps v-model="activeStep" :has-navigation="false">
+        <b-tabs v-model="activeStep" :has-navigation="false">
           <!-- Sample information step -->
-          <b-step-item
-            label="Sample information"
-            :clickable="true"
-            :type="{ 'is-success': sampleStore.active ? true : false }"
-          >
+          <b-tab-item label="Sample information" :clickable="true">
             <div style="padding-bottom: 0.75em">
               <div class="columns">
                 <div class="column is-11">
@@ -557,13 +554,12 @@ watch(sampleItemFilterId, () => {
                 <b-dropdown aria-role="list" expanded @change="selectBatch" disabled>
                   <template #trigger>
                     <b-button
-                      :label="batchActive ? batchActive.sample_batch_name : ''"
+                      :label="batchStore.active ? batchStore.active.sample_batch_name : ''"
                       icon-right="menu-down"
                       expanded
-                      style="align: left"
                     />
                   </template>
-                  <template v-for="batch of batches" :key="batch.sample_batch_id">
+                  <template v-for="batch of workspaceStore.batches" :key="batch.sample_batch_id">
                     <b-dropdown-item aria-role="listitem" :value="batch">
                       {{ batch.sample_batch_name }}
                     </b-dropdown-item>
@@ -576,7 +572,10 @@ watch(sampleItemFilterId, () => {
                       <th>#</th>
                       <th>Sample name</th>
                     </tr>
-                    <template v-for="item in sampleItems" v-bind:key="item.sample_item_id">
+                    <template
+                      v-for="item in batchStore.sampleItems"
+                      v-bind:key="item.sample_item_id"
+                    >
                       <tr>
                         <td>{{ item.index }}</td>
                         <td>{{ item.sample_item_name }}</td>
@@ -662,7 +661,7 @@ watch(sampleItemFilterId, () => {
                   <b-button
                     type="is-primary"
                     icon-left="close"
-                    @click="closeButtonPressed()"
+                    @click="close()"
                     :disabled="
                       sampleStore.active
                         ? calibrationProgress != 100 || instrumentStore.matchingProgress == null
@@ -678,13 +677,9 @@ watch(sampleItemFilterId, () => {
                 </div>
               </div>
             </div>
-          </b-step-item>
+          </b-tab-item>
           <!-- Calibration step -->
-          <b-step-item
-            label="Calibration"
-            :clickable="sampleStore.active ? true : false"
-            :type="{ 'is-success': sampleMzCalibrated }"
-          >
+          <b-tab-item label="Calibration" :clickable="sampleStore.active ? true : false">
             <h1 class="title has-text-centered">Calibration</h1>
             <b-collapse :open="false" animation="slide">
               <template #trigger>
@@ -719,7 +714,7 @@ watch(sampleItemFilterId, () => {
             </base-table>
             <div style="text-align: right">
               <b-button
-                :disabled="sampleStore.active ? false : true"
+                :disabled="!sampleStore.active"
                 type="is-primary"
                 icon-left=""
                 @click="mzCalibrationFit"
@@ -727,7 +722,7 @@ watch(sampleItemFilterId, () => {
                 Fit
               </b-button>
               <b-button
-                :disabled="calibrationStore.mzFit ? false : true"
+                :disabled="!calibrationStore.mzFit"
                 type="is-success"
                 icon-left="content-save"
                 @click="mzCalibrationApply"
@@ -739,18 +734,17 @@ watch(sampleItemFilterId, () => {
               <b-button
                 type="is-primary"
                 icon-left="close"
-                @click="closeButtonPressed()"
-                v-if="mzFitError"
+                @click="close"
+                v-if="calibrationStore.mzFitError"
               >
                 Close
               </b-button>
             </div>
-          </b-step-item>
+          </b-tab-item>
           <!-- Target search step -->
-          <b-step-item
+          <b-tab-item
             label="Target search"
             :clickable="sampleStore.active ? (sampleMzCalibrated ? true : false) : false"
-            :type="{ 'is-success': sampleStore.matched }"
           >
             <h1 class="title has-text-centered">Target search</h1>
             <div v-if="sampleStore.matched">
@@ -769,14 +763,14 @@ watch(sampleItemFilterId, () => {
               <b-button
                 type="is-primary"
                 icon-left="close"
-                @click="closeButtonPressed()"
+                @click="close()"
                 v-if="sampleStore.matched"
               >
                 Close
               </b-button>
             </div>
-          </b-step-item>
-        </b-steps>
+          </b-tab-item>
+        </b-tabs>
       </div>
     </the-layout-sidebar-view>
   </section>

@@ -9,17 +9,16 @@ export async function apiPlugin({ store }) {
     .filter((path) => getAction(path).startsWith(HANDLER_PREFIX))
     .map((path) => ({ [getEvent(path)]: path }))
     .reduce((prev, curr) => ({ ...prev, ...curr }), {})
-
   // react to events using handlers if they exist
   api.socket.onAny((event, ...args) => {
-    api.log(`received event "${event}"`, ...args)
     if (event in handlers) {
+      api.log(`${store.$id} received event "${event}"`, ...args)
       const handler = handlers[event]
       store[handler](...args)
     }
   })
 
-  api.log('registered event handlers', handlers)
+  api.log(`${store.$id} registered event handlers`, handlers)
 }
 
 // path parsing
