@@ -44,10 +44,16 @@ class GetSampleFilesQueryParams(BaseModel):
     maxDatetime: Optional[dt] = Field(None, description="Maximum datetime filter")
     instrument: Optional[str] = Field(None, description="Filter by instrument")
     filename: Optional[str] = Field(None, description="Filter by filename")
-    sort: Optional[str] = Field(None, description="Column to sort by")
-    order: Optional[str] = Field(None, description="Sort order: asc or desc")
-    page: int = Field(0, description="Page number for pagination")
-    limit: int = Field(10000, description="Results per page")
+    sort: Optional[str] = Field(
+        "datetime_utc",
+        description="The column name by which you want to sort the results.",
+    )
+    order: Optional[str] = Field(
+        "asc",
+        description="Can either be 'asc' for ascending order or 'desc' for descending order.",
+    )
+    page: int = Field(0, description="The page number for pagination, default 0")
+    limit: int = Field(10000, description="The number of results per page.")
 
 
 class GetRecentSampleFilesQueryParams(GetSampleFilesQueryParams):
