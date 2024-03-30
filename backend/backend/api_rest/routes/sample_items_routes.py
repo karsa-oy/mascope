@@ -1,6 +1,5 @@
-from fastapi import APIRouter, BackgroundTasks, Query, Request
-from fastapi.responses import JSONResponse
-from fastapi.encoders import jsonable_encoder
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
+from ..utils.api_features import api_route
 
 from ..controllers.sample_items_controller import (
     get_sample_items,
@@ -13,95 +12,74 @@ from ..controllers.sample_items_controller import (
 from ..models.pydantic_models.sample_item_pydantic_model import (
     SampleItemCreate,
     SampleItemUpdate,
+    GetSampleItemsQueryParams,
     SampleItemCopyBody,
 )
-from ..exceptions import ApiException
 
 sample_items_router = APIRouter()
 
 
 @sample_items_router.get("/api/sample_items")
+@api_route()
 async def get_sample_items_route(
-    sample_batch_id: str = Query(
-        None,
-        description="The sample batch ID for which you want to fetch the sample items.",
-    ),
-    filename: str = Query(
-        None, description="The filename for which you want to fetch the sample items."
-    ),
-    sort: str = Query(
-        None,
-        description="The column name by which you want to sort the results. The column name should be one of the columns in the sample_Item table.",
-    ),
-    order: str = Query(
-        None,
-        description="Can either be asc for ascending order or desc for descending order.",
-    ),
-    page: int = Query(0, description="The page number for pagination, default 0"),
-    limit: int = Query(10000, description="The number of results per page."),
+    query_params: GetSampleItemsQueryParams = Depends(),
 ):
-    return await get_sample_items(
-        sample_batch_id,
-        filename,
-        sort,
-        order,
-        page,
-        limit,
-    )
+    return await get_sample_items(**query_params.dict())
 
 
 @sample_items_router.get("/api/sample_items/{sample_item_id}")
+@api_route()
 async def get_sample_item_route(sample_item_id: str):
     return await get_sample_item(sample_item_id)
 
 
 @sample_items_router.post("/api/sample_items")
-async def create_sample_item_route(
-    sample_item: SampleItemCreate, skipReload: bool = False
-):
-    return await create_sample_item(sample_item, skipReload)
-
-
-@sample_items_router.delete("/api/sample_items/{sample_item_id}")
-async def delete_sample_item_route(sample_item_id: str):
-    return await delete_sample_item(sample_item_id)
+@api_route(
+    status_code_success=201,
+    include_message=True,
+    success_message="Sample item created successfully",
+)
+async def create_sample_item_route(sample_item: SampleItemCreate):
+    return await create_sample_item(
+        sample_item=sample_item, independent_transaction=True
+    )
 
 
 @sample_items_router.patch("/api/sample_items/{sample_item_id}")
+@api_route(include_message=True, success_message="Sample item updated successfully")
 async def update_sample_item_route(sample_item_id: str, sample_item: SampleItemUpdate):
     return await update_sample_item(sample_item_id, sample_item)
 
 
+@sample_items_router.delete("/api/sample_items/{sample_item_id}")
+@api_route(
+    include_data=False,
+    include_message=True,
+    success_message="Sample item deleted successfully",
+)
+async def delete_sample_item_route(sample_item_id: str):
+    return await delete_sample_item(sample_item_id)
+
+
 @sample_items_router.post("/api/sample_items/{sample_item_id}/copy")
+@api_route(
+    include_data=False,
+    include_message=True,
+    success_message="Coping sample item has started",
+)
 async def copy_sample_item_route(
     request: Request,
     sample_item_id: str,
     body: SampleItemCopyBody,
     background_tasks: BackgroundTasks,
 ):
-    try:
-        sid = request.headers.get("X-SID")
-        result = await copy_sample_item(
-            sample_item_id,
-            body.sample_batch_id,
-            body.sample_item_name,
-            body.independent_transaction,
-            background_tasks,
-            sid,
-        )
-
-        # Convert the new_sample_item object to a JSON-serializable format
-        result_data = jsonable_encoder(result)
-        return JSONResponse(
-            status_code=200,
-            content={
-                "message": f"Sample '{body.sample_item_name}' was successfully copied.",
-                "data": result_data,
-            },
-        )
-    # TODO_error_handling
-    except ApiException as e:
-        return JSONResponse(
-            status_code=e.status_code,
-            content={"error": e.user_message, "detail": e.tech_message},
-        )
+    sid = request.headers.get("X-SID")
+    background_tasks.add_task(
+        copy_sample_item,
+        sample_item_id=sample_item_id,
+        sample_batch_id=body.sample_batch_id,
+        sample_item_name=body.sample_item_name,
+        independent_transaction=True,
+        background_tasks=background_tasks,
+        sid=sid,
+    )

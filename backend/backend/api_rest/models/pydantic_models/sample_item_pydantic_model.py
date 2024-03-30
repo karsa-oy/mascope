@@ -88,12 +88,28 @@ class SampleItemInDB(SampleItemBase):
         }
 
 
+class GetSampleItemsQueryParams(BaseModel):
+    sample_batch_id: Optional[str] = Field(
+        None,
+        description="The sample batch ID for which you want to fetch the sample items.",
+    )
+    filename: Optional[str] = Field(
+        None, description="The filename for which you want to fetch the sample items."
+    )
+    sort: Optional[str] = Field(
+        "sample_item_utc_created",
+        description="The column name by which you want to sort the results. The column name should be one of the columns in the sample_Item table.",
+    )
+    order: Optional[str] = Field(
+        "asc",
+        description="Can either be asc for ascending order or desc for descending order.",
+    )
+    page: int = Field(0, description="The page number for pagination, default 0")
+    limit: int = Field(10000, description="The number of results per page.")
+
+
 class SampleItemCopyBody(BaseModel):
     sample_batch_id: str = Field(
         ..., description="ID of the sample batch where to copy sample item"
     )
     sample_item_name: str = Field(..., description="Name of the new sample item")
-    independent_transaction: Optional[bool] = Field(
-        default=True,
-        description="Flag indicating whether the sample item copy is an independent transaction and if the operation should emit a reload event for the sample batch and if the sample should be rematched for new batch targets.",
-    )
