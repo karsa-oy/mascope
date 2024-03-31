@@ -1,20 +1,19 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from ..utils.api_features import api_route
 from ..controllers.target_collection_in_sample_batch_controller import (
     get_target_collections_in_sample_batch,
 )
+from ..models.pydantic_models.target_collection_pydantic_model import (
+    GetTargetCollectionsInSampleBatchQueryParams,
+)
+
 
 target_collection_in_sample_batch_router = APIRouter()
 
 
 @target_collection_in_sample_batch_router.get("/api/target_collections_in_sample_batch")
+@api_route()
 async def get_target_collections_in_sample_batch_route(
-    sample_batch_id: str = None,
-    target_collection_id: str = None,
-    sort: str = None,
-    order: str = None,
-    page: int = 0,
-    limit: int = 100,
+    query_params: GetTargetCollectionsInSampleBatchQueryParams = Depends(),
 ):
-    return await get_target_collections_in_sample_batch(
-        sample_batch_id, target_collection_id, sort, order, page, limit
-    )
+    return await get_target_collections_in_sample_batch(**query_params.dict())

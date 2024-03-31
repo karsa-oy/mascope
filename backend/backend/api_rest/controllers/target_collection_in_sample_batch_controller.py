@@ -1,17 +1,18 @@
 from sqlalchemy import asc, desc, func
 from sqlalchemy.future import select
-
 from backend.db_api_rest import async_session
+from ..utils.api_features import api_controller
 from ..models.models import TargetCollectionInSampleBatch
 
 
+@api_controller()
 async def get_target_collections_in_sample_batch(
-    sample_batch_id: str,
-    target_collection_id: str,
-    sort: str,
-    order: str,
-    page: int,
-    limit: int,
+    sample_batch_id: str = None,
+    target_collection_id: str = None,
+    sort: str = None,
+    order: str = None,
+    page: int = 0,
+    limit: int = 100000,
 ):
     async with async_session() as session:
         stmt = select(TargetCollectionInSampleBatch)
