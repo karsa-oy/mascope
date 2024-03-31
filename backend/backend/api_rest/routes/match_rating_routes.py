@@ -1,45 +1,37 @@
-from fastapi import APIRouter
-from datetime import datetime
+from fastapi import APIRouter, Depends
+from ..utils.api_features import api_route
 from ..controllers.match_rating_controller import (
-    get_match_rating_by_id,
     get_match_ratings,
+    get_match_rating,
     create_match_rating,
 )
-from ..models.pydantic_models.match_rating_pydantic_model import MatchRatingCreate
+from ..models.pydantic_models.match_rating_pydantic_model import (
+    MatchRatingCreate,
+    GetMatchRatingsQueryParams,
+)
 
 match_rating_router = APIRouter()
 
 
-@match_rating_router.post("/api/match_ratings")
-async def create_match_rating_route(match_rating: MatchRatingCreate):
-    return await create_match_rating(match_rating)
-
-
 @match_rating_router.get("/api/match_ratings")
+@api_route()
 async def get_match_ratings_route(
-    sample_item_id: str = None,
-    target_ion_id: str = None,
-    rating: int = None,
-    sort: str = None,
-    order: str = None,
-    page: int = 0,
-    limit: int = 100,
-    minDatetime: datetime = None,
-    maxDatetime: datetime = None,
+    query_params: GetMatchRatingsQueryParams = Depends(),
 ):
-    return await get_match_ratings(
-        sample_item_id,
-        target_ion_id,
-        rating,
-        sort,
-        order,
-        page,
-        limit,
-        minDatetime,
-        maxDatetime,
-    )
+    return await get_match_ratings(**query_params.dict())
 
 
 @match_rating_router.get("/api/match_ratings/{match_rating_id}")
-async def get_match_rating_by_id_route(match_rating_id: str):
-    return await get_match_rating_by_id(match_rating_id)
+@api_route()
+async def get_match_rating_route(match_rating_id: str):
+    return await get_match_rating(match_rating_id=match_rating_id)
+
+
+@match_rating_router.post("/api/match_ratings")
+@api_route(
+    status_code_success=201,
+    include_message=True,
+    success_message="Match rating created successfully",
+)
+async def create_match_rating_route(match_rating: MatchRatingCreate):
+    return await create_match_rating(match_rating=match_rating)
