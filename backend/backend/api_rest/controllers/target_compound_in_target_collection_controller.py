@@ -1,12 +1,13 @@
 from sqlalchemy import asc, desc, func
 from sqlalchemy.future import select
-
 from backend.db_api_rest import async_session
+from ..utils.api_features import api_controller
 from ..models.models import (
     TargetCompoundInTargetCollection,
 )
 
 
+@api_controller()
 async def get_target_compound_in_target_collection(
     target_compound_id: str = None,
     target_collection_id: str = None,

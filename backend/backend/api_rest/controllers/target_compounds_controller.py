@@ -2,11 +2,11 @@ from fastapi import HTTPException
 from sqlalchemy import asc, desc, func, select, or_, and_
 from sqlalchemy.orm import aliased
 from typing import List, Optional
-
 from backend.server import sio
 from backend.db.id import gen_id
 from backend.db_api_rest import async_session
-
+from ..utils.api_features import api_controller
+from ..exceptions import NotFoundException
 from .ionization_mechanisms_controller import get_ionization_mechanisms
 from .target_ions_controller import create_target_ions
 from .helpers_controller import get_affected_batches_and_collections
@@ -21,7 +21,10 @@ from ..models.pydantic_models.target_compound_pydantic_model import (
     TargetCompoundUpdate,
 )
 
+# TODO_target_compound_management refactor to use same strucutre as other controllers
 
+
+@api_controller()
 async def get_target_compounds(
     target_compound_name: Optional[str] = None,
     target_compound_formula: Optional[str] = None,
@@ -30,8 +33,8 @@ async def get_target_compounds(
     sort: str = None,
     order: str = None,
     page: int = 0,
-    limit: int = 1000000,
-):
+    limit: int = 10000,
+) -> dict:
     async with async_session() as session:
         # Define the main query for target compounds
         stmt = select(TargetCompound)
@@ -102,94 +105,54 @@ async def get_target_compounds(
         }
 
 
-async def get_target_compound_by_id(target_compound_id: str):
+@api_controller()
+async def get_target_compound(target_compound_id: str) -> dict:
+    """
+    Retrieves a single target compound by its unique ID.
+
+    Steps:
+    1. Execute a query to fetch the target compound with the specified ID.
+    2. Check if the target compound exists. If not, raise a NotFoundException.
+    3. Return the target compound's details as a dictionary.
+
+    :param sample_batch_id: Unique identifier of the target compound to retrieve.
+    :type sample_batch_id: str
+    :raises NotFoundException: If the target compound with the given ID is not found.
+    :return: The requested target compound's details.
+    :rtype: dict
+    """
     async with async_session() as session:
-        stmt = select(TargetCompound).filter(
-            TargetCompound.target_compound_id == target_compound_id
-        )
-        result = await session.execute(stmt)
-        target_compound = result.scalars().first()
+        # Step 1: Fetch target compound by ID
+        target_compound = await session.get(TargetCompound, target_compound_id)
 
         if not target_compound:
-            raise HTTPException(
-                status_code=404,
-                detail=f"TargetCompound with ID {target_compound_id} not found",
+            # Step 2: If target compound not found, raise exception
+            raise NotFoundException(
+                f"Target compound with ID '{target_compound_id}' not found"
             )
-
-        return target_compound.to_dict()
-
-
-async def delete_target_compound(target_compound_id: str, session=None):
-    independent_transaction = False
-    sample_batches_to_reload = set()
-
-    if session is None:
-        independent_transaction = True
-        session = async_session()
-
-    # Check if target compound exists
-    result = await session.execute(
-        select(TargetCompound).filter(
-            TargetCompound.target_compound_id == target_compound_id
-        )
-    )
-    target_compound = result.scalar_one_or_none()
-    if not target_compound:
-        raise HTTPException(status_code=404, detail="Target compound not found")
-
-    # Fetch the target collections where the deleting compound was present
-    result = await session.execute(
-        select(TargetCompoundInTargetCollection.target_collection_id).filter(
-            TargetCompoundInTargetCollection.target_compound_id == target_compound_id
-        )
-    )
-    target_collections_with_compound = result.scalars().all()
-
-    # Fetch the sample batch ids from TargetCollectionInSampleBatch for these collections
-    result = await session.execute(
-        select(TargetCollectionInSampleBatch.sample_batch_id).filter(
-            TargetCollectionInSampleBatch.target_collection_id.in_(
-                target_collections_with_compound
-            )
-        )
-    )
-    affected_sample_batches = result.scalars().all()
-    sample_batches_to_reload.update(affected_sample_batches)
-
-    # Delete TargetCompound record
-    await session.delete(target_compound)
-
-    if independent_transaction:
-        await session.commit()
-        # Reload affected sample batches
-        for sample_batch_id in sample_batches_to_reload:
-            await sio.emit(
-                "sample_batch_reload",
-                room=sample_batch_id,
-                namespace="/",
-            )
-        await sio.emit("targets_all_reload", namespace="/")
-    else:
-        await session.flush()
+    # Step 3: Return target compound details
+    return target_compound.to_dict()
 
 
+@api_controller()
 async def create_target_compound(
-    target_compounds: List[TargetCompoundBase], session=None
+    target_compounds: List[TargetCompoundBase],
+    independent_transaction=False,
+    session=None,
 ) -> dict:
     """Function to create a target compount record and derived target ions and isotopes
 
     :param target_compounds: List of target compounds to create
     :type target_compounds: List[TargetCompoundBase]
-    :param session: Database session, if not given makes an independent transaction, defaults to None
+    :param independent_transaction: Flag indicating whether the create target compound is an independent transaction, defaults to False
+    :type independent_transaction: bool, optional
+    :param session: Database session, smust be gicen if not an independent transaction, defaults to None
     :type session: SQLAlchemy.AsyncSession, optional
     :raises RuntimeError: Database is malformed
     :return: Return created target compounds, skipped compounds (already existing) and message log
     :rtype: dict
     """
-    independent_transaction = False
-
-    if session is None:
-        independent_transaction = True
+    if independent_transaction:
         session = async_session()
 
     # helper functions
@@ -231,7 +194,6 @@ async def create_target_compound(
             )
         )
         existing_compounds = existing_compounds.scalars().all()
-
         if len(existing_compounds) == 0:
             # save the new compound for creation if it doesn't exist
             target_compound = TargetCompound(
@@ -277,9 +239,10 @@ async def create_target_compound(
 
         # Create target ions for the compound
         await create_target_ions(
-            target_compound,
-            ionization_mechanisms,
-            target_compound_mass,
+            target_compound=target_compound,
+            ionization_mechanisms=ionization_mechanisms,
+            target_compound_mass=target_compound_mass,
+            independent_transaction=False,
             session=session,
         )
         # Add the compound to be committed to the db
@@ -287,6 +250,8 @@ async def create_target_compound(
 
     if independent_transaction:
         await session.commit()
+        # Emit global target reload event to inform all clients.
+        await sio.emit("targets_all_reload", namespace="/")
     else:
         await session.flush()
 
@@ -298,6 +263,7 @@ async def create_target_compound(
     }
 
 
+@api_controller()
 async def update_target_compound(target_compounds: List[TargetCompoundUpdate]):
     async with async_session() as session:
         not_changed_target_compounds = []
@@ -379,12 +345,16 @@ async def update_target_compound(target_compounds: List[TargetCompoundUpdate]):
 
                 # If compound formula has changed, delete the compound and recreate it with new formula
                 await delete_target_compound(
-                    target_compound.target_compound_id, session
+                    target_compound_id=target_compound.target_compound_id,
+                    independent_transaction=False,
+                    session=session,
                 )
 
                 # Create new compound with updated formula
                 new_compound_result = await create_target_compound(
-                    [target_compound], session
+                    target_compounds=[target_compound],
+                    independent_transaction=False,
+                    session=session,
                 )
                 if (
                     "created_compounds" in new_compound_result
@@ -498,3 +468,56 @@ async def update_target_compound(target_compounds: List[TargetCompoundUpdate]):
             "existing_compounds": existing_target_compounds,
             "message_logs": message_log,
         }
+
+
+@api_controller()
+# TODO_error_handling any exceptions would not be returned whdn called from the delete_target_collection, may use the api_controller_background_task
+async def delete_target_compound(
+    target_compound_id: str, independent_transaction=False, session=None
+):
+    sample_batches_to_reload = set()
+
+    if independent_transaction:
+        session = async_session()
+
+    # Step 1: Fetch the target compound
+    target_compound = await session.get(TargetCompound, target_compound_id)
+    if not target_compound:
+        raise NotFoundException(
+            f"Target compound with ID '{target_compound_id}' not found"
+        )
+
+    # Fetch the target collections where the deleting compound was present
+    result = await session.execute(
+        select(TargetCompoundInTargetCollection.target_collection_id).filter(
+            TargetCompoundInTargetCollection.target_compound_id == target_compound_id
+        )
+    )
+    target_collections_with_compound = result.scalars().all()
+
+    # Fetch the sample batch ids from TargetCollectionInSampleBatch for these collections
+    result = await session.execute(
+        select(TargetCollectionInSampleBatch.sample_batch_id).filter(
+            TargetCollectionInSampleBatch.target_collection_id.in_(
+                target_collections_with_compound
+            )
+        )
+    )
+    affected_sample_batches = result.scalars().all()
+    sample_batches_to_reload.update(affected_sample_batches)
+
+    # Delete TargetCompound record
+    await session.delete(target_compound)
+
+    if independent_transaction:
+        await session.commit()
+        # Reload affected sample batches
+        for sample_batch_id in sample_batches_to_reload:
+            await sio.emit(
+                "sample_batch_reload",
+                room=sample_batch_id,
+                namespace="/",
+            )
+        await sio.emit("targets_all_reload", namespace="/")
+    else:
+        await session.flush()
