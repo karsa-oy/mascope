@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field, validator
-from typing import Optional, List, Dict, Any
+from pydantic import BaseModel, Field, validator, root_validator
+from typing import Optional, List
 from .calibration_pydantic_model import CalibrationMzFitParams
 from .sample_item_pydantic_model import SampleItemCreate
 
@@ -63,6 +63,23 @@ class SampleBatchInDB(SampleBatchBase):
         orm_mode = True
 
 
+class GetSampleBatchesQueryParams(BaseModel):
+    workspace_id: Optional[str] = Field(
+        None,
+        description="Filter by the workspace ID for which you want to fetch the sample batches.",
+    )
+    sort: Optional[str] = Field(
+        "sample_batch_utc_created",
+        description="Column name by which you want to sort the results. The column name should be one of the columns in the sample batch table.",
+    )
+    order: Optional[str] = Field(
+        "asc",
+        description="Sorting order which can be asc for ascending or desc for descending.",
+    )
+    page: int = Field(0, description="Page number for pagination.")
+    limit: int = Field(10000, description="Number of results per page.")
+
+
 class SampleBatchImportSamplesBody(BaseModel):
     sample_items: List[SampleItemCreate] = Field(
         ..., description="Sample items to be created and imported to the sample batch"
@@ -72,6 +89,14 @@ class SampleBatchImportSamplesBody(BaseModel):
         default=True,
         description="Flag to control whether the batch should be calibrated.",
     )
+
+    @root_validator
+    def check_sample_items_batch_id(cls, values):
+        sample_items = values.get("sample_items")
+        batch_ids = {item.sample_batch_id for item in sample_items}
+        if len(batch_ids) > 1:
+            raise ValueError("All sample_items must have the same sample_batch_id.")
+        return values
 
 
 class SampleBatchCopyBody(BaseModel):
