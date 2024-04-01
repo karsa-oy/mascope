@@ -384,6 +384,7 @@ async def copy_sample_item(
             added_target_compound_ids=None,
             added_ionization_mechanism_ids=None,
             independent_transaction=independent_transaction,
+            sid=sid,
         )
 
     return new_sample_item.to_dict()

@@ -13,24 +13,20 @@ import pandas as pd
 from fastapi import HTTPException
 from typing import List, Optional
 from sqlalchemy import select
-from backend.db_api_rest import async_session
-from backend.server import sio
-from backend.db.id import gen_id
 from lib.chemistry import match_mz
 from lib.file_func import load_file
 from lib.peak import detect_peaks, get_peaks
+from backend.server import sio
+from backend.db.id import gen_id
+from backend.db_api_rest import async_session
+from ..utils.api_features import api_controller, api_controller_background_task
+from ..exceptions import NotFoundException
 from backend.api_rest.models.models import (
     Sample,
     SampleBatch,
     SampleItem,
 )
 from ..exceptions import process_exception, ApiException, NotFoundException
-
-from ..models.pydantic_models.match_pydantic_model import (
-    RematchBatchesBody,
-    MatchComputeSample,
-    ProgressProperties,
-)
 from .instrument_functions_controller import (
     read_instrument_functions,
 )
@@ -47,6 +43,11 @@ from .match_interferences_controller import (
     get_match_interferences,
     create_match_interferences,
     delete_match_interferences,
+)
+from ..models.pydantic_models.match_pydantic_model import (
+    RematchBatchesBody,
+    MatchComputeSample,
+    ProgressProperties,
 )
 
 
@@ -431,6 +432,20 @@ async def filter_existing_sample_matches_and_interferences(
 # -------------------------------------------------------------------
 # Sample level
 # -------------------------------------------------------------------
+@api_controller_background_task(
+    success_emit_events=[
+        ("rematch_finished", "sample_batch_id"),
+        ("sample_batch_reload", "sample_batch_id"),
+    ],
+    error_emit_events=[
+        ("rematch_finished", "sid"),
+    ],
+    default_payload={
+        "action": "rematch",
+        "type": "sample",
+    },
+    success_message="Sample was successfully rematched",
+)
 async def rematch_sample(
     sample_item_id: str,
     added_target_compound_ids: Optional[List[str]] = None,
@@ -438,7 +453,8 @@ async def rematch_sample(
     removed_target_compound_ids: Optional[List[str]] = None,
     removed_ionization_mechanism_ids: Optional[List[str]] = None,
     independent_transaction: bool = False,
-):
+    sid: str = None,
+) -> dict:
     """
     Performs a rematch of sample by removing and/or computing matches based on the specified parameters.
 
@@ -450,7 +466,10 @@ async def rematch_sample(
     1. Remove existing matches associated with removed parameters, if specified.
     2. Compute new matches for added parameters, if specified.
     3. In the absence of specified parameters for addition or removal, perform a full rematch by removing all matches and recomputing them for all targets of the sample.
-    4. Emit a reload event for the sample's batch to update the system with the changes, if the operation is flagged as an independent transaction.
+    4. Return the rematched sample.
+    5. Emit a finished and reload events to update the system with the changes, if the operation is flagged as an independent transaction.
+        TODO_notifications handle the events + send the data to payload
+        The event emission for 'rematch_finished' and 'sample_batch_reload' is handled by the api_controller_background_task decorator based on operation success or failure
 
     :param sample_item_id: ID of the sample item for which the rematch is to be performed.
     :type sample_item_id: str
@@ -462,45 +481,48 @@ async def rematch_sample(
     :type removed_target_compound_ids: Optional[List[str]], optional
     :param removed_ionization_mechanism_ids: List of ionization mechanism IDs for which matches are to be removed, defaults to None
     :type removed_ionization_mechanism_ids: Optional[List[str]], optional
+    :param independent_transaction: Flag indicating whether the ramtching is an independent transaction, which affects event emission, defaults to False
+    :type independent_transaction: bool, optional
+    :param sid: Session ID, used for targeting specific clients when emitting events, defaults to None
+    :type sid: str, optional
+    :return: The dict with rematched Sample object.
+    rtype: dict
 
     Notes:
         - If `removed_*` parameters are provided, the function removes matches related to these parameters.
         - If `added_*` parameters are provided, the function computes new matches related to these parameters.
         - If no `added_*` or `removed_*` parameters are provided, the function removes all existing matches and computes new matches for all targets.
     """
-    try:
-        print(f"...Rematching sample: {sample_item_id} ...")
-        # Fetch sample data
-        sample_data = await get_sample(sample_item_id)
-        sample_batch_id = sample_data["data"]["sample_batch_id"]
+    print(f"...Rematching sample: {sample_item_id} ...")
+    # Fetch sample data
+    sample = await get_sample(sample_item_id)
 
-        # Step 1: Remove existing matches based on provided removed parameters
-        if removed_target_compound_ids or removed_ionization_mechanism_ids:
-            await match_sample_remove(
-                sample_item_id,
-                removed_target_compound_ids,
-                removed_ionization_mechanism_ids,
-            )
+    # Step 1: Remove existing matches based on provided removed parameters
+    if removed_target_compound_ids or removed_ionization_mechanism_ids:
+        await match_sample_remove(
+            sample_item_id=sample_item_id,
+            removed_target_compound_ids=removed_target_compound_ids,
+            removed_ionization_mechanism_ids=removed_ionization_mechanism_ids,
+        )
 
-        # Step 2: Compute new matches based on provided added parameters
-        if added_target_compound_ids or added_ionization_mechanism_ids:
-            await match_sample_compute(
-                sample_item_id,
-                added_target_compound_ids,
-                added_ionization_mechanism_ids,
-            )
-        # Step 3: Perform a complete rematch if no specific targets are provided
-        elif not removed_target_compound_ids and not removed_ionization_mechanism_ids:
-            await match_sample_remove(sample_item_id)  # Remove all existing matches
-            await match_sample_compute(
-                sample_item_id
-            )  # Compute matches for all targets
+    # Step 2: Compute new matches based on provided added parameters
+    if added_target_compound_ids or added_ionization_mechanism_ids:
+        await match_sample_compute(
+            sample_item_id=sample_item_id,
+            added_target_compound_ids=added_target_compound_ids,
+            added_ionization_mechanism_ids=added_ionization_mechanism_ids,
+        )
+    # Step 3: Perform a complete rematch if no specific targets are provided
+    elif not removed_target_compound_ids and not removed_ionization_mechanism_ids:
+        await match_sample_remove(
+            sample_item_id=sample_item_id
+        )  # Remove all existing matches
+        await match_sample_compute(
+            sample_item_id=sample_item_id
+        )  # Compute matches for all targets
 
-        # Step 4: Emit a reload event if this operation is independent
-        if independent_transaction:
-            await sio.emit("sample_batch_reload", room=sample_batch_id, namespace="/")
-    except Exception as e:
-        api_exc = process_exception(e, f"Rematching sample '{sample_item_id}' failed ")
+    # Step 4: Return rematched sample dict so that api_controller_background_task wrapper would have access to the sio room keys for success_emit_events
+    return sample
 
 
 async def match_sample_remove(
@@ -583,11 +605,28 @@ async def match_sample_remove(
             raise RuntimeError(error_message)
 
 
+@api_controller_background_task(
+    # success_emit_events=[
+    #     ("match_compute_finished", "sample_batch_id"),
+    #     ("sample_batch_reload", "sample_batch_id"),
+    # ],
+    # error_emit_events=[
+    #     ("match_compute_finished", "sid"),
+    # ],
+    # default_payload={
+    #     "action": "match_compute",
+    #     "type": "sample",
+    # },
+    # success_message="Sample matches were successfully computed",
+    # TODO_notifications refactor the events + send the data to payload when success as a result["sio_payload"] (?) if success, in the exception
+    # we should (?) emit the error event to sid, since it is accessible from the wrapper kwargs
+)
 async def match_sample_compute(
     sample_item_id: str,
     added_target_compound_ids: Optional[List[str]] = None,
     added_ionization_mechanism_ids: Optional[List[str]] = None,
     independent_transaction: bool = False,
+    sid: str = None,
 ):
     """
     Computes new matches for a specific sample item, taking into account any added target compounds or ionization mechanisms.
@@ -610,9 +649,13 @@ async def match_sample_compute(
     :type added_target_compound_ids: Optional[List[str]], optional
     :param added_ionization_mechanism_ids: List of added ionization mechanism IDs to be considered for match computation, defaults to None
     :type added_ionization_mechanism_ids: Optional[List[str]], optional
-    :param independent_transaction: Flag to indicate if the operation should be treated as an independent transaction, defaults to False
+    :param independent_transaction: Flag indicating whether the sample match computing is an independent transaction, which affects event emission, defaults to False
     :type independent_transaction: bool, optional
+    :param sid: Session ID, used for targeting specific clients when emitting events, defaults to None
+    :type sid: str, optional
     :raises RuntimeError: Raised when no new target isotopes are available for match computation.
+    :return: The dict with rematched Sample object.
+    rtype: dict
 
     TODO: - optimize instrument/compute_sample_match notifications emits/listeners. item compute for instrument users (Scenthound)
           - sid can be passed to send the notifications for user who triggered computing (for example when copy the sample item)
@@ -621,8 +664,7 @@ async def match_sample_compute(
         # Step 1: Gather sample information
 
         # Fetch sample data
-        sample_data = await get_sample(sample_item_id)
-        sample = sample_data["data"]
+        sample = await get_sample(sample_item_id)
 
         # Extract sample required fields
         sample_item_name = sample["sample_item_name"]
@@ -803,6 +845,8 @@ async def match_sample_compute(
             room=sample_batch_id,
             namespace="/",
         )
+        if independent_transaction:
+            await sio.emit("sample_batch_reload", room=sample_batch_id, namespace="/")
 
 
 # -------------------------------------------------------------------
@@ -810,9 +854,20 @@ async def match_sample_compute(
 # -------------------------------------------------------------------
 
 
+@api_controller_background_task(
+    # TODO_notifications implement the success/error notifications as example below
+    error_emit_events=[
+        ("rematch_finished", "sid"),
+    ],
+    default_payload={
+        "action": "rematch",
+        "type": "batch",
+    },
+)
 async def rematch_batches(
     rematch_batches_body: RematchBatchesBody,
-    sid,
+    independent_transaction: bool,
+    sid: str,
 ) -> dict:
     """
     Performs a rematch operation on multiple sample batches based on the provided for each batch batch-specific
@@ -832,6 +887,8 @@ async def rematch_batches(
 
     :param rematch_batches_body: A list of sample batch identifiers along with optional removed/added entities
     :type rematch_batches_body: RematchBatchesBody
+    :param independent_transaction: Flag to indicate if the operation should be treated as an independent transaction
+    :type independent_transaction: bool
     :param sid: Session ID, used for emitting notifications to specific clients
     :type sid: str
     :return: A status message indicating the outcome of the batch rematch operation, including any failed match computations for samples.
@@ -839,6 +896,7 @@ async def rematch_batches(
 
     TODO_notifications
         - Refactor notifications
+        - return data and add this as "data" to sio notification success payload in the api_controller_background_task
     """
     # Initialize variables for tracking overall progress and failures for correct user notifications
     total_batches = len(rematch_batches_body.sample_batches)
