@@ -335,8 +335,8 @@ async def get_sample_file_peak_timeseries(
             "data": {
                 "mz": None,
                 "intensity": [],
+                "time": [],
             },
-            "time": [],
         }
 
     return {
