@@ -40,7 +40,8 @@ async def detect_peaks(
     u_list=None,
     max_n_peaks=5,
     add_peak_threshold=0.9,
-    if_exists="fail",  # 'fail', 'append', 'replace'
+    if_exists="fail",  # 'fail', 'append', 'replace',
+    dmz = 0.5
 ):
     print(f"Detecting peaks for file {filename}")
     if if_exists not in ["fail", "append", "replace"]:
@@ -50,7 +51,6 @@ async def detect_peaks(
             """
         )
     peakshape, R = instrument_functions
-    dmz = 0.5
     old_peak_mzs = []
     old_peak_areas = []
     old_peak_heights = []
