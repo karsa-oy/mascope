@@ -1,19 +1,9 @@
-import argparse
 import fnmatch
 import os
-import random
 import re
-import string
 from datetime import datetime, timedelta
 
 import datetime_glob
-import yaml
-
-from .structs import AttrDict
-
-
-def copy_dict(d, ignore_keys=[]):
-    return {k: v for k, v in d.items() if k not in ignore_keys}
 
 
 def ct_struct_to_dict(struct):
@@ -64,25 +54,6 @@ def filetime2datetime(timestamp):
 
     _FILETIME_null_date = datetime(1601, 1, 1, 0, 0, 0)
     return _FILETIME_null_date + timedelta(microseconds=timestamp / 10)
-
-
-def generate_unique_key():
-    """Generate a 15 character long random string
-    Returns
-    -------
-    str
-        Random string with 15 characters
-    """
-    CHARACTERS = string.ascii_letters + string.digits + "-._~"
-    return "".join(random.sample(CHARACTERS, 15))
-
-
-def get_client_notification_context(data):
-    """
-    Get shallow copy of client_notificaiton arguments
-    ignoring 'name' and 'value' fields.
-    """
-    return copy_dict(data, ignore_keys=["name", "value"])
 
 
 def timestamp_from_filename(filename):
@@ -141,74 +112,6 @@ def recursive_walk(dir_path, *file_masks):
         fs = recursive_walk(os.path.join(cur_dir, d), *file_masks)
         res.extend(fs)
     return res
-
-
-def parse_cmd_args():
-    """
-    Parse command line arguments for the service application:
-    ------------------------------
-    Return AttrDict.
-    Default argument values: see default_args.
-    """
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-u", "--url", help="backend url", type=str, required=False)
-    parser.add_argument("-p", "--port", help="backend port", type=int, required=False)
-    parser.add_argument(
-        "-n", "--ns", help="instrument namespace to connect", type=str, required=False
-    )
-    parser.add_argument(
-        "-c", "--config", help="path to yaml config file", type=str, required=False
-    )
-    parser.add_argument(
-        "-i", "--instrument", help="instrument name", type=str, required=False
-    )
-    parser.add_argument(
-        "-m", "--data_pool_mask", help="file mask to watch", type=str, required=False
-    )
-    parser.add_argument(
-        "-nj", "--n_jobs", help="number of job processors", type=int, required=False
-    )
-    parser.add_argument(
-        "-s",
-        "--data_pool_path",
-        help="source data pool path for streaming (before date dirs)",
-        type=str,
-        required=False,
-    )
-    parser.add_argument(
-        "-st",
-        "--streamer_type",
-        help="streamer type (H5/Raw)",
-        type=str,
-        required=False,
-    )
-    parser.add_argument(
-        "-t",
-        "--target_data_pool_path",
-        help="target data pool path for streaming (before date dirs)",
-        type=str,
-        required=False,
-    )
-    parser.add_argument(
-        "-tr",
-        "--transit",
-        help="transit mode for streaming",
-        action="store_true",
-        required=False,
-    )
-
-    all_args = parser.parse_args()
-    cmdline_args = {}
-    for arg in vars(all_args):
-        if vars(all_args)[arg] is None:
-            continue
-        cmdline_args[arg] = vars(all_args)[arg]
-    file_args = {}
-    if all_args.config:
-        # service config may be defined in yaml file
-        with open(all_args.config, "r") as f:
-            file_args = yaml.safe_load(f)
-    return AttrDict(**{**file_args, **cmdline_args})
 
 
 def to_snake_case(value):

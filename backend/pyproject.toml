@@ -8,7 +8,7 @@ include = ["backend"]
 packages = [
     {include = "backend"},
     {include = "hardware"},
-    {include = "lib", from ="lib"},
+    {include = "lib"},
     {include = "service", from ="service"},
 ]
 

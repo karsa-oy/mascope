@@ -10,7 +10,6 @@ import numpy as np
 import xarray
 import zarr
 
-from .logger import this_func_name
 from .structs import ExtendableDataArray
 from .util import parse_path_from_item_filename
 
@@ -24,7 +23,7 @@ class zarr_sdk:
         except Exception as e:
             print(
                 f"""
-                [{this_func_name}] Warning: {e.__class__.__name__}({str(e)})
+                [finalize_signal_dataset] Warning: {e.__class__.__name__}({str(e)})
             """
             )
             final_length = item["props"]["length"]
@@ -427,7 +426,7 @@ def load_file(base_filename, vars=None, prev_dataset=None):
         try:
             var_dataset = load_array(base_filename, var, prev_item)
         except FileNotFoundError as e:
-            print(f"[{this_func_name()}] Error {base_filename}/{var}:")
+            print(f"[load_file] Error {base_filename}/{var}:")
             print(f"    {e.__class__.__name__}({str(e)})")
             continue
         datasets.append(var_dataset)
