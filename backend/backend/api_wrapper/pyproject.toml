@@ -1,15 +1,15 @@
 [tool.poetry]
-name = "hardware"
+name = "api-wrapper"
 version = "0.1.0"
 description = ""
 authors = ["Oskari Kausiala <oskari.kausiala@karsa.fi>"]
 readme = "README.md"
 
-
 [tool.poetry.dependencies]
 python = ">=3.9,<3.11"
-numpy = "^1.16.0"
-pythonnet = "^3.0.3"
+ipywidgets = "^8.1.1"
+pandas = "^2.1.1"
+requests = "^2.31.0"
 
 
 [build-system]

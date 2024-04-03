@@ -7,9 +7,9 @@ license = "Proprietary"
 include = ["backend"]
 packages = [
     {include = "backend"},
-    {include = "hardware", from ="hardware"},
-    {include = "lib", from ="lib"},
-    {include = "service", from ="service"},
+    {include = "hardware"},
+    {include = "lib"},
+    {include = "service"},
 ]
 
 [build-system]
@@ -17,7 +17,7 @@ requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
-mascope-api = 'backend:run'
+mascope-api = 'backend.main:run'
 file-converter = 'service.file_converter:run'
 file-downloader = 'service.file_downloader:run'
 log-rotate = 'service.log_rotate:run'
