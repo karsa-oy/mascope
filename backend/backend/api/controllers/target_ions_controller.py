@@ -1,4 +1,3 @@
-from fastapi import HTTPException
 from sqlalchemy import asc, desc, func, select
 from typing import List
 
@@ -7,7 +6,8 @@ from backend.api_sio import sio
 from backend.db.id import gen_id
 
 from lib.molmass import Formula
-
+from ..utils.api_features import api_controller
+from ..exceptions import NotFoundException
 from ..models.models import (
     IonizationMechanism,
     TargetIon,
@@ -23,75 +23,123 @@ from ..models.pydantic_models.target_compound_pydantic_model import TargetCompou
 from ..models.pydantic_models.target_ion_pydantic_model import TargetIonUpdate
 
 
+@api_controller()
 async def get_target_ions(
-    target_compound_id: str,
-    ionization_mechanism_id: str,
-    target_ion_formula: str,
-    sort: str,
-    order: str,
-    page: int,
-    limit: int,
-):
+    target_compound_id: str = None,
+    ionization_mechanism_id: str = None,
+    target_ion_formula: str = None,
+    sort: str = None,
+    order: str = None,
+    page: int = 0,
+    limit: int = 10000,
+) -> dict:
+    """
+    Retrieves a paginated list of target ions, optionally filtered by compound ID, ionization mechanism ID, or ion formula, and sorted by a specified column.
+
+    Steps:
+    1. Construct a SQLAlchemy query to select all target ions.
+    2. Apply filtering based on provided parameters.
+    3. Apply sorting based on the provided sort and order parameters.
+    4. Apply pagination based on the provided page and limit parameters.
+    5. Execute the query and fetch the results.
+    6. Convert the results into a list of dictionaries for JSON serialization.
+
+    :param target_compound_id: Filter by target compound ID, defaults to None.
+    :type target_compound_id: str, optional
+    :param ionization_mechanism_id: Filter by ionization mechanism ID, defaults to None.
+    :type ionization_mechanism_id: str, optional
+    :param target_ion_formula: Filter by target ion formula, defaults to None.
+    :type target_ion_formula: str, optional
+    :param sort: Column to sort by, defaults to "target_ion_id".
+    :type sort: str, optional
+    :param order: Sorting order, "asc" for ascending or "desc" for descending, defaults to "asc".
+    :type order: str, optional
+    :param page: Page number for pagination, defaults to 0.
+    :type page: int, optional
+    :param limit: Number of items per page, defaults to 100.
+    :type limit: int, optional
+    :return: A dictionary with the total count and a list of target ions.
+    :rtype: dict
+    """
     async with async_session() as session:
         stmt = select(TargetIon)
 
+        # Step 2: Apply filters if specified
         if target_compound_id:
             stmt = stmt.filter(TargetIon.target_compound_id == target_compound_id)
-
         if ionization_mechanism_id:
             stmt = stmt.filter(
                 TargetIon.ionization_mechanism_id == ionization_mechanism_id
             )
-
         if target_ion_formula:
             stmt = stmt.filter(TargetIon.target_ion_formula == target_ion_formula)
 
+        # Step 3: Apply sorting
         if sort:
             if order == "desc":
                 stmt = stmt.order_by(desc(getattr(TargetIon, sort)))
             else:
                 stmt = stmt.order_by(asc(getattr(TargetIon, sort)))
 
-        # Get total count
-        count_stmt = select(func.count()).select_from(stmt)
-        total = await session.scalar(count_stmt)
-
-        # Get paginated results
+        # Step 4: Apply pagination and Step 5: Execute the query
+        total = await session.scalar(
+            select(func.count()).select_from(stmt)  # pylint: disable=not-callable
+        )
         stmt = stmt.offset(page * limit).limit(limit)
         result = await session.execute(stmt)
         target_ions = result.scalars().all()
 
+        # Step 6: Return results
         return {
-            "results": total,
+            "total": total,
             "data": [target_ion.to_dict() for target_ion in target_ions],
         }
 
 
-async def get_target_ion(target_ion_id: str):
+@api_controller()
+async def get_target_ion(target_ion_id: str) -> dict:
+    """
+    Retrieves a single target ion by its unique ID.
+
+    Steps:
+    1. Execute a query to fetch the target ion with the specified ID.
+    2. Check if the target ion exists. If not, raise a NotFoundException.
+    3. Return the target ion's details as a dictionary.
+
+    :param target_ion_id: Unique identifier of the target ion to retrieve.
+    :raises NotFoundException: If the target ion with the given ID is not found.
+    :return: The requested target ion's details.
+    """
     async with async_session() as session:
-        stmt = select(TargetIon)
+        # Step 1: Fetch target ion by ID
+        target_ion = await session.get(TargetIon, target_ion_id)
 
-        if target_ion_id:
-            stmt = stmt.filter(TargetIon.target_ion_id == target_ion_id)
-
-        result = await session.execute(stmt)
-        target_ion = result.scalars().first()
-
+        # Step 2: If target ion not found, raise exception
         if not target_ion:
-            raise HTTPException(status_code=404, detail=f"Target ion not found")
+            raise NotFoundException(f"Target ion with ID '{target_ion_id}' not found")
 
+        # Step 3: Return target ion details
         return target_ion.to_dict()
 
 
+@api_controller()
 async def create_target_ions(
     target_compound: TargetCompoundBase,
     ionization_mechanisms: List[IonizationMechanism],
     target_compound_mass: float = None,
+    independent_transaction=False,
     session=None,
 ) -> dict:
     """Function to create target ion and target isotope records
     derived from a given target compound and list of ionization mechanisms to apply.
     If target compound mass is given, it will be used instead of compound formula.
+
+    Steps:
+    1. Verify input parameters and initialize session if operation is an independent transaction.
+    2. Define helper functions for ion and isotope generation.
+    3. Generate target ions and isotopes based on compound formula or mass.
+    4. Persist the generated ions and isotopes in the database.
+    5. Return created ions, isotopes, and any message logs.
 
     :param target_compound: Target compound to derive ions and isotopes from
     :type target_compound: TargetCompoundBase
@@ -100,18 +148,18 @@ async def create_target_ions(
     :param target_compound_mass: Mass of the target compound (if formula is not known),
     defaults to None. If None, formula will be used.
     :type target_compound_mass: float, optional
-    :param session: Database session, if not given makes an independent transaction, defaults to None
+    :param independent_transaction: Flag indicating whether the create target ions is an independent transaction, defaults to False
+    :type independent_transaction: bool, optional
+    :param session: Database session, smust be gicen if not an independent transaction, defaults to None
     :type session: SQLAlchemy.AsyncSession, optional
-    :return: Return created target ions and isotopes, and message log
+    :return: Dictionary with created ions, isotopes, and message logs.
     :rtype: dict
     """
-    independent_transaction = False
-
-    if session is None:
-        independent_transaction = True
+    # Step 1: Initialize session if operation is an independent transaction.
+    if independent_transaction:
         session = async_session()
 
-    # Helper functions
+    # Step 2: Define helper functions for ion and isotope generation.
     def charge_string(raw_ion: Formula) -> str:
         """Get charge string (+/-) based on ion formula
 
@@ -141,7 +189,6 @@ async def create_target_ions(
         :return: 2-tuple of (list of ions (instances of TargetIon), list of isotopes (instances of TargetIsotope))
         :rtype: tuple
         """
-
         target_ions = []
         target_isotopes = []
 
@@ -158,7 +205,7 @@ async def create_target_ions(
                     + mechanism[-1]  # add polarity sign at the end
                 )
             except ValueError as e:
-                print("Failed to parse ion formula: %s" % e)  # TODO: Catch the error
+                raise ValueError("Failed to parse ion formula: %s" % e)
             else:
                 # construct and save ion row
                 ion = TargetIon(
@@ -224,7 +271,9 @@ async def create_target_ions(
             if is_adduct:
                 raw_isotopes = raw_ion.mz_spectrum().values()
             else:
-                raw_isotopes = [(-raw_ion.mz, 1.0)]
+                raw_isotopes = [
+                    (-raw_ion.mz, 1.0)  # pylint: disable=invalid-unary-operand-type
+                ]
 
             target_isotopes.extend(
                 [
@@ -240,9 +289,7 @@ async def create_target_ions(
 
         return target_ions, target_isotopes
 
-    # Initialize message log
-    message_log = {}  # TODO: Populate with information
-
+    # Step 3: Generate target ions and isotopes
     if target_compound_mass is None:
         # Parsing into float failed, target compound is given by composition
         (
@@ -261,6 +308,7 @@ async def create_target_ions(
             target_compound_mass, target_compound, ionization_mechanisms
         )
 
+    # Step 4: Persist generated ions and isotopes
     for target_isotope in target_isotopes:
         # Add the isotopes to be committed to the db
         session.add(target_isotope)
@@ -273,10 +321,11 @@ async def create_target_ions(
     else:
         await session.flush()
 
+    # Step 5: Return created entities and message logs
     return {
-        "created_ions": target_ions,
-        "created_isotopes": target_isotopes,
-        "message_logs": message_log,
+        "created_ions": [ion.to_dict() for ion in target_ions],
+        "created_isotopes": [isotope.to_dict() for isotope in target_isotopes],
+        "message_logs": {},  # TODO_target_compound_management Populate with relevant log messages
     }
 
 
@@ -284,10 +333,7 @@ async def update_target_ion(target_ion_id: str, target_ion_update: TargetIonUpda
     async with async_session() as session:
         target_ion = await session.get(TargetIon, target_ion_id)
         if not target_ion:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Target ion with ID {target_ion_id} not found",
-            )
+            raise NotFoundException(f"Target ion with ID '{target_ion_id}' not found")
 
         existing_filter_params = target_ion.filter_params or {}
 

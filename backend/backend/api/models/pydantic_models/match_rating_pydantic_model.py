@@ -62,3 +62,19 @@ class MatchRatingInDB(MatchRatingBase):
         json_encoders = {
             dt: lambda v: v.replace(tzinfo=timezone.utc).isoformat(timespec="seconds")
         }
+
+
+class GetMatchRatingsQueryParams(BaseModel):
+    sample_item_id: Optional[str] = Field(None, description="ID of the sample item")
+    target_ion_id: Optional[str] = Field(None, description="ID of the target ion")
+    rating: Optional[int] = Field(None, description="Rating value between 0 and 2")
+    sort: Optional[str] = Field(None, description="Field to sort by")
+    order: Optional[str] = Field(None, description="Order of sorting ('asc' or 'desc')")
+    page: int = Field(0, description="Page number for pagination")
+    limit: int = Field(10000, description="Number of items per page")
+    minDatetime: Optional[dt] = Field(
+        None, description="Minimum datetime of creation filter"
+    )
+    maxDatetime: Optional[dt] = Field(
+        None, description="Maximum datetime of creation filter"
+    )

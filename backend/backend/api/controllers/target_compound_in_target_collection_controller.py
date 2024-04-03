@@ -2,11 +2,13 @@ from sqlalchemy import asc, desc, func
 from sqlalchemy.future import select
 
 from backend.db import async_session
+from ..utils.api_features import api_controller
 from ..models.models import (
     TargetCompoundInTargetCollection,
 )
 
 
+@api_controller()
 async def get_target_compound_in_target_collection(
     target_compound_id: str = None,
     target_collection_id: str = None,
@@ -41,7 +43,9 @@ async def get_target_compound_in_target_collection(
                 )
 
         # Get total count
-        count_stmt = select(func.count()).select_from(stmt)
+        count_stmt = select(func.count()).select_from(  # pylint: disable=not-callable
+            stmt
+        )
         total = await session.scalar(count_stmt)
 
         # Get paginated results

@@ -1,16 +1,15 @@
 import numpy as np
 
-from fastapi import HTTPException
 from sqlalchemy import (
     asc,
     desc,
     select,
     func,
-    cast,
-    Float,
 )
 from sqlalchemy.future import select
 from backend.db import async_session
+from ..utils.api_features import api_controller
+from ..exceptions import NotFoundException
 from ..models.models import SampleFile, InstrumentFunction
 
 
@@ -36,32 +35,56 @@ async def read_instrument_functions(filename):
 # -------------------------------------------------------------------
 
 
+@api_controller()
 async def get_instrument_functions(
     instrument: str, sort: str, order: str, page: int, limit: int
-):
+) -> dict:
+    """
+    Retrieves a paginated list of instrument functions, optionally filtered by instrument and sorted by a specified column.
+
+    Steps:
+    1. Construct a query to select all instrument functions.
+    2. Apply filtering if an instrument is specified.
+    3. Apply sorting based on the provided sort and order parameters.
+    4. Apply pagination based on the provided page and limit parameters.
+    5. Execute the query and fetch the results.
+    6. Convert the results into a list of dictionaries for JSON serialization.
+
+    :param instrument: Filter by instrument name.
+    :param sort: Column name to sort by.
+    :param order: Sorting order ('asc' for ascending, 'desc' for descending).
+    :param page: Page number for pagination.
+    :param limit: Number of items per page.
+    :return: A dictionary containing total results count and a list of instrument functions.
+    """
     async with async_session() as session:
         stmt = select(InstrumentFunction)
 
+        # Step 2: Apply instrument filter if specified
         if instrument:
             stmt = stmt.filter(InstrumentFunction.instrument == instrument)
 
+        # Step 3: Apply sorting
         if sort:
-            if order == "desc":
-                stmt = stmt.order_by(desc(getattr(InstrumentFunction, sort)))
-            else:
-                stmt = stmt.order_by(asc(getattr(InstrumentFunction, sort)))
+            stmt = (
+                stmt.order_by(desc(getattr(InstrumentFunction, sort)))
+                if order == "desc"
+                else stmt.order_by(asc(getattr(InstrumentFunction, sort)))
+            )
 
-        # Get total count
-        count_stmt = select(func.count()).select_from(stmt)
-        total = await session.scalar(count_stmt)
-
-        # Get paginated results
+        # Step 4: Apply pagination
+        total = await session.scalar(
+            select(func.count()).select_from(stmt)  # pylint: disable=not-callable
+        )
         stmt = stmt.offset(page * limit).limit(limit)
+
+        # Step 5: Execute the query
         result = await session.execute(stmt)
         instrument_functions = result.scalars().all()
 
+        # Step 6: Convert results to dictionary
         return {
-            "results": total,
+            "total": total,
             "data": [
                 instrument_function.to_dict()
                 for instrument_function in instrument_functions
@@ -69,50 +92,74 @@ async def get_instrument_functions(
         }
 
 
+@api_controller()
 async def get_instrument_function(
     filename: str = None, instrument_function_id: str = None
-):
+) -> dict:
+    """
+    Retrieves a single instrument function either by the filename of a sample file or by its unique instrument function ID.
+
+    Steps:
+    1. Validate input parameters to ensure that either a filename or an instrument_function_id is provided, but not both.
+    2. If a filename is provided, construct a query to fetch the latest instrument function for the instrument associated with the filename, as of the file's creation date and time. If an instrument_function_id is provided, construct a query to fetch the instrument function directly by its ID.
+    3. Execute the query and fetch the result.
+    4. Check if the instrument function exists. If not, raise a NotFoundException with an appropriate message based on the provided parameters.
+    5. Return the instrument function's details as a dictionary, including relevant fields such as resolution, peak shape parameters, etc.
+
+    :param filename: Filename to query for the latest instrument function, based on the file's creation date and time.
+    :type filename: str, optional
+    :param instrument_function_id: Unique ID of the instrument function to retrieve directly.
+    :type instrument_function_id: str, optional
+    :raises ValueError: If both a filename and an instrument_function_id are provided, indicating an ambiguous request.
+    :raises NotFoundException: If no sample file with the provided filename is found in the database.
+    :raises NotFoundException: If no instrument function is found based on the given filename or instrument_function_id.
+    :return: The requested instrument function's details, including parameters like resolution and peak shape.
+    :rtype: dict
+    """
     async with async_session() as session:
+        # Step 1: Validate input parameters
+        if filename and instrument_function_id:
+            raise ValueError(
+                "Provide either filename or instrument_function_id, not both."
+            )
+
+        # Step 2: Construct query based on parameters
         if filename:
+            # Fetch instrument function by filename
             stmt = select(SampleFile.datetime_utc, SampleFile.instrument).filter(
                 SampleFile.filename == filename
             )
             results = await session.execute(stmt)
-            result = results.first()
-            if result:
-                file_timestamp, instrument = result
-                stmt = (
-                    select(InstrumentFunction)
-                    .filter(
-                        InstrumentFunction.instrument == instrument,
-                        InstrumentFunction.datetime_utc <= file_timestamp,
-                    )
-                    .order_by(desc(InstrumentFunction.datetime_utc))
-                    .order_by(desc(InstrumentFunction.datetime_utc))
+            sample_file = results.first()
+            if not sample_file:
+                raise NotFoundException(
+                    f"Sample file with filename {filename} not found"
                 )
-            else:
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"Sample file with filename {filename} not found",
+
+            file_timestamp, instrument = sample_file
+            stmt = (
+                select(InstrumentFunction)
+                .filter(
+                    InstrumentFunction.instrument == instrument,
+                    InstrumentFunction.datetime_utc <= file_timestamp,
                 )
+                .order_by(desc(InstrumentFunction.datetime_utc))
+                .order_by(desc(InstrumentFunction.datetime_utc))
+            )
         elif instrument_function_id:
+            # Fetch instrument function by ID
             stmt = select(InstrumentFunction).filter(
                 InstrumentFunction.instrument_function_id == instrument_function_id
             )
 
+        # Step 3: Execute query
         results = await session.execute(stmt)
         instrument_function = results.scalars().first()
 
+        # Step 4: Check existence
         if not instrument_function:
-            if filename:
-                detail_message = f"InstrumentFunction for filename {filename} not found"
-            else:
-                detail_message = (
-                    f"InstrumentFunction with ID {instrument_function_id} not found"
-                )
-            raise HTTPException(
-                status_code=404,
-                detail=detail_message,
-            )
+            detail_message = f"Instrument function {'for filename ' + filename if filename else 'with ID ' + instrument_function_id} not found"
+            raise NotFoundException(detail_message)
 
+        # Step 5: Return details
         return instrument_function.to_dict()

@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Query, Body
+from fastapi import APIRouter
+from ..utils.api_features import api_route
 from ..controllers.samples_controller import (
     get_sample,
     get_samples,
@@ -9,7 +10,7 @@ from ..controllers.samples_controller import (
 from ..models.pydantic_models.sample_pydantic_model import (
     GetSamplesBody,
     GetSampleBody,
-    MatchFilterBody,
+    GetSampleMatchFilterBody,
     GetSampleIonMatchesBody,
 )
 
@@ -17,100 +18,130 @@ samples_router = APIRouter()
 
 
 @samples_router.post("/api/samples")
+@api_route()
 async def get_samples_route(
     body: GetSamplesBody,
 ):
-    result = await get_samples(
-        sample_item_id=body.sample_item_id,
-        sample_item_id_active=body.sample_item_id_active,
-        sample_file_id=body.sample_file_id,
-        sample_batch_id=body.sample_batch_id,
-        filename=body.filename,
-        instrument=body.instrument,
-        sample_item_type=body.sample_item_type,
-        minDatetime=body.minDatetime,
-        maxDatetime=body.maxDatetime,
-        sort=body.sort,
-        order=body.order,
-        page=body.page,
-        limit=body.limit,
-        batch_matches_info=body.batch_matches_info,
-        match_samples=body.match_samples,
-        match_compounds=body.match_compounds,
-        match_ions=body.match_ions,
-        match_isotopes=body.match_isotopes,
-        alarms_list=body.alarms_list,
-    )
+    result = await get_samples(**body.dict())
+
+    # Default message
+    message = "Samples with no match info"
+    # Check if batch match filter was initialized and there are sample matches
+    if body.sample_batch_id and body.batch_matches_info:
+        matched_samples = any(sample.get("matched", 0) > 0 for sample in result["data"])
+        message = (
+            "Batch match filter successfully initialized"
+            if matched_samples
+            else "No matches found for the batch"
+        )
+
     response = {
         "results": result["results"],
-        "message": result["message"],
+        "message": message,
         "data": result["data"],
     }
 
-    if "batch_matches_info" in result and result["batch_matches_info"]:
+    # Conditionally add batch_matches_info
+    if "batch_matches_info" in result:
         response["batch_matches_info"] = result["batch_matches_info"]
 
     return response
 
 
 @samples_router.post("/api/samples/{sample_item_id}")
+@api_route()
 async def get_sample_route(
     sample_item_id: str,
     body: GetSampleBody,
 ):
-    result = await get_sample(
-        sample_item_id, body.alarms_list, body.sample_matches_info
-    )
+    sample_data = await get_sample(sample_item_id=sample_item_id, **body.dict())
+
+    if sample_data and body.sample_matches_info:
+        if sample_data and sample_data.get("matched", 0) > 0:
+            message = "Sample and match information retrieved successfully"
+        else:
+            message = "Sample retrieved successfully, no matches found for the sample"
+    else:
+        message = "Sample retrieved successfully"
+
     return {
-        "message": result["message"],
-        "data": result["data"],
+        "message": message,
+        "data": sample_data,
     }
 
 
 @samples_router.post("/api/samples/{sample_item_id}/ion_matches")
+@api_route()
 async def get_sample_ion_matches_route(
     sample_item_id: str,
     body: GetSampleIonMatchesBody,
 ):
-    result = await get_sample_ion_matches(
-        sample_item_id,
-        body.target_ion_id,
-        body.target_collection_id,
-        body.filter_params,
-        body.alarms_list,
+    data = await get_sample_ion_matches(
+        sample_item_id=sample_item_id,
+        target_ion_id=body.target_ion_id,
+        target_collection_id=body.target_collection_id,
+        filter_params=body.filter_params,
+        alarms_list=body.alarms_list,
     )
+
+    match_ions_count = len(data["match_ions"]) > 0
+    match_isotopes_count = len(data["match_isotopes"]) > 0
+    if match_ions_count or match_isotopes_count:
+        message = "Match information retrieved successfully"
+    else:
+        message = "No matches found for the specified criteria"
+
     return {
-        "message": result["message"],
-        "data": result["data"],
+        "message": message,
+        "data": data,
     }
 
 
 @samples_router.get("/api/samples/batch_match_filter/{sample_batch_id}")
+@api_route()
 async def batch_match_filter_route(
     sample_batch_id: str,
 ):
-    result = await init_batch_match_filter(sample_batch_id)
-
+    batch_match_filter_data = await init_batch_match_filter(sample_batch_id)
+    message = (
+        "Batch match filter successfully initialized"
+        if len(batch_match_filter_data) > 0
+        else "No matches found for the batch"
+    )
     return {
-        "results": len(result["data"]),
-        "message": result["message"],
-        "data": result["data"],
+        "results": len(batch_match_filter_data),
+        "message": message,
+        "data": batch_match_filter_data,
     }
 
 
 @samples_router.post("/api/samples/{sample_item_id}/sample_match_filter")
+@api_route()
 async def sample_match_filter_route(
     sample_item_id: str,
-    body: MatchFilterBody = Body(..., embed=False),
+    body: GetSampleMatchFilterBody,
 ):
-    result = await init_sample_match_filter(
-        sample_item_id,
-        body.filter_params,
-        body.target_ion_id,
+    data = await init_sample_match_filter(
+        sample_item_id=sample_item_id,
+        filter_params=body.filter_params,
+        target_ion_id=body.target_ion_id,
     )
 
+    if body.target_ion_id and body.filter_params:
+        message = (
+            "Sample match filter for target ion successfully initialized"
+            if len(data) > 0
+            else "No matches found for the specified target ion in the sample"
+        )
+    else:
+        message = (
+            "Sample match filter successfully initialized"
+            if len(data) > 0
+            else "No matches found for the sample"
+        )
+
     return {
-        "results": len(result["data"]),
-        "message": result["message"],
-        "data": result["data"],
+        "results": len(data),
+        "message": message,
+        "data": data,
     }

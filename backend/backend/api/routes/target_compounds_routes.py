@@ -1,9 +1,9 @@
 from typing import List, Optional
-
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request, Depends
+from ..utils.api_features import api_route
 from ..controllers.target_compounds_controller import (
-    get_target_compound_by_id,
     get_target_compounds,
+    get_target_compound,
     create_target_compound,
     delete_target_compound,
     update_target_compound,
@@ -11,59 +11,39 @@ from ..controllers.target_compounds_controller import (
 from ..models.pydantic_models.target_compound_pydantic_model import (
     TargetCompoundBase,
     TargetCompoundUpdate,
+    GetTargetCompoundsQueryParams,
 )
+
+# TODO_target_compound_management refactor to send the same result as as other routes
 
 target_compounds_router = APIRouter()
 
 
 @target_compounds_router.get("/api/target_compounds")
+@api_route()
 async def get_target_compounds_route(
-    target_compound_name: Optional[str] = Query(
-        None, description="The name of the target compound to filter by."
-    ),
-    target_compound_formula: Optional[str] = Query(
-        None, description="The formula of the target compound to filter by."
-    ),
-    sample_batch_id: Optional[str] = Query(
-        None, description="The ID of the sample batch to filter compounds by."
-    ),
-    show_duplicates: bool = Query(
-        False,
-        description="Flag to include duplicate compounds and their collection IDs.",
-    ),
-    sort: str = Query(None, description="The column name to sort the results by."),
-    order: str = Query(
-        None,
-        description="The sort order, either 'asc' for ascending or 'desc' for descending.",
-    ),
-    page: int = Query(0, description="The page number for pagination."),
-    limit: int = Query(10000, description="The number of results per page."),
+    query_params: GetTargetCompoundsQueryParams = Depends(),
 ):
-    return await get_target_compounds(
-        target_compound_name,
-        target_compound_formula,
-        sample_batch_id,
-        show_duplicates,
-        sort,
-        order,
-        page,
-        limit,
-    )
+    return await get_target_compounds(**query_params.dict())
 
 
 @target_compounds_router.get("/api/target_compounds/{target_compound_id}")
-async def get_target_compound_by_id_route(target_compound_id: str):
-    return await get_target_compound_by_id(target_compound_id)
-
-
-@target_compounds_router.delete("/api/target_compounds/{target_compound_id}")
-async def delete_target_compound_route(target_compound_id: str):
-    return await delete_target_compound(target_compound_id)
+@api_route()
+async def get_target_compound_route(target_compound_id: str):
+    return await get_target_compound(target_compound_id)
 
 
 @target_compounds_router.post("/api/target_compounds")
+@api_route(
+    status_code_success=201,
+    include_message=True,
+    success_message="Target compounds created successfully",
+)
 async def create_target_compounds_route(target_compounds: List[TargetCompoundBase]):
-    result = await create_target_compound(target_compounds)
+    result = await create_target_compound(
+        target_compounds=target_compounds,
+        independent_transaction=True,
+    )
     response = {
         "created_compounds_count": len(result["created_compounds"]),
         "created_compounds": result["created_compounds"],
@@ -75,7 +55,13 @@ async def create_target_compounds_route(target_compounds: List[TargetCompoundBas
 
 
 @target_compounds_router.patch("/api/target_compounds")
-async def update_target_compound_route(target_compounds: List[TargetCompoundUpdate]):
+@api_route(
+    include_message=True,
+    success_message="Target compounds updated successfully",
+)
+async def update_target_compound_route(
+    target_compounds: List[TargetCompoundUpdate],
+):
     result = await update_target_compound(target_compounds)
     response = {
         "not_changed_compounds_count": len(result["not_changed_compounds"]),
@@ -89,3 +75,16 @@ async def update_target_compound_route(target_compounds: List[TargetCompoundUpda
         "message-logs": result["message_logs"],
     }
     return response
+
+
+@target_compounds_router.delete("/api/target_compounds/{target_compound_id}")
+@api_route(
+    include_data=False,
+    include_message=True,
+    success_message="Target compound deleted successfully",
+)
+async def delete_target_compound_route(target_compound_id: str):
+    return await delete_target_compound(
+        target_compound_id=target_compound_id,
+        independent_transaction=True,
+    )

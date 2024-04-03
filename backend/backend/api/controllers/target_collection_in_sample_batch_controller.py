@@ -2,16 +2,18 @@ from sqlalchemy import asc, desc, func
 from sqlalchemy.future import select
 
 from backend.db import async_session
+from ..utils.api_features import api_controller
 from ..models.models import TargetCollectionInSampleBatch
 
 
+@api_controller()
 async def get_target_collections_in_sample_batch(
-    sample_batch_id: str,
-    target_collection_id: str,
-    sort: str,
-    order: str,
-    page: int,
-    limit: int,
+    sample_batch_id: str = None,
+    target_collection_id: str = None,
+    sort: str = None,
+    order: str = None,
+    page: int = 0,
+    limit: int = 100000,
 ):
     async with async_session() as session:
         stmt = select(TargetCollectionInSampleBatch)
@@ -34,7 +36,9 @@ async def get_target_collections_in_sample_batch(
                 stmt = stmt.order_by(asc(getattr(TargetCollectionInSampleBatch, sort)))
 
         # Get total count
-        count_stmt = select(func.count()).select_from(stmt)
+        count_stmt = select(func.count()).select_from(  # pylint: disable=not-callable
+            stmt
+        )
         total = await session.scalar(count_stmt)
 
         # Get paginated results

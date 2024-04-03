@@ -1,6 +1,5 @@
-from fastapi import APIRouter, Query
-from fastapi.responses import JSONResponse
-from fastapi.encoders import jsonable_encoder
+from fastapi import APIRouter, Depends
+from ..utils.api_features import api_route
 
 from ..controllers.attribute_templates_controller import (
     get_attribute_templates,
@@ -12,105 +11,51 @@ from ..controllers.attribute_templates_controller import (
 from ..models.pydantic_models.attribute_template_pydantic_model import (
     AttributeTemplateCreateBody,
     AttributeTemplateUpdateBody,
+    GetAttributeTemplatesQueryParams,
 )
-from ..exceptions import ApiException
 
 attribute_templates_router = APIRouter()
 
 
 @attribute_templates_router.get("/api/attribute_templates")
+@api_route()
 async def get_attribute_templates_route(
-    sort: str = Query(
-        None, description="The column name by which you want to sort the results."
-    ),
-    order: str = Query(
-        None,
-        description="Can either be 'asc' for ascending order or 'desc' for descending order.",
-    ),
-    page: int = Query(0, description="The page number for pagination, default 0"),
-    limit: int = Query(100, description="The number of results per page."),
+    query_params: GetAttributeTemplatesQueryParams = Depends(),
 ):
-    try:
-        result = await get_attribute_templates(sort, order, page, limit)
-        result_data = jsonable_encoder(result)
-        return JSONResponse(status_code=200, content=result_data)
-    except ApiException as e:
-        return JSONResponse(
-            status_code=e.status_code,
-            content={"error": e.user_message, "detail": e.tech_message},
-        )
+    return await get_attribute_templates(**query_params.dict())
 
 
 @attribute_templates_router.get("/api/attribute_templates/{attribute_template_id}")
+@api_route()
 async def get_attribute_template_route(attribute_template_id: str):
-    try:
-        result = await get_attribute_template(attribute_template_id)
-        result_data = jsonable_encoder(result)
-        return JSONResponse(status_code=200, content=result_data)
-    except ApiException as e:
-        return JSONResponse(
-            status_code=e.status_code,
-            content={"error": e.user_message, "detail": e.tech_message},
-        )
+    return await get_attribute_template(attribute_template_id)
 
 
 @attribute_templates_router.post("/api/attribute_templates")
-async def create_attribute_template_route(
-    body: AttributeTemplateCreateBody,
-):
-    try:
-        result = await create_attribute_template(body)
-        result_data = jsonable_encoder(result)
-        return JSONResponse(
-            status_code=201,
-            content={
-                "message": "Attribute template created successfully.",
-                "data": result_data,
-            },
-        )
-    except ApiException as e:
-        return JSONResponse(
-            status_code=e.status_code,
-            content={"error": e.user_message, "detail": e.tech_message},
-        )
+@api_route(
+    status_code_success=201,
+    include_message=True,
+    success_message="Attribute template created successfully",
+)
+async def create_attribute_template_route(body: AttributeTemplateCreateBody):
+    return await create_attribute_template(body)
 
 
 @attribute_templates_router.patch("/api/attribute_templates/{attribute_template_id}")
+@api_route(
+    include_message=True, success_message="Attribute template updated successfully"
+)
 async def update_attribute_template_route(
-    attribute_template_id: str,
-    body: AttributeTemplateUpdateBody,
+    attribute_template_id: str, body: AttributeTemplateUpdateBody
 ):
-    try:
-        result = await update_attribute_template(attribute_template_id, body)
-        result_data = jsonable_encoder(result)
-        return JSONResponse(
-            status_code=200,
-            content={
-                "message": "Attribute template updated successfully.",
-                "data": result_data,
-            },
-        )
-    except ApiException as e:
-        return JSONResponse(
-            status_code=e.status_code,
-            content={"error": e.user_message, "detail": e.tech_message},
-        )
+    return await update_attribute_template(attribute_template_id, body)
 
 
 @attribute_templates_router.delete("/api/attribute_templates/{attribute_template_id}")
-async def delete_attribute_template_route(
-    attribute_template_id: str,
-):
-    try:
-        await delete_attribute_template(attribute_template_id)
-        return JSONResponse(
-            status_code=200,
-            content={
-                "message": "Attribute template deleted successfully.",
-            },
-        )
-    except ApiException as e:
-        return JSONResponse(
-            status_code=e.status_code,
-            content={"error": e.user_message, "detail": e.tech_message},
-        )
+@api_route(
+    include_data=False,
+    include_message=True,
+    success_message="Attribute template deleted successfully",
+)
+async def delete_attribute_template_route(attribute_template_id: str):
+    await delete_attribute_template(attribute_template_id)

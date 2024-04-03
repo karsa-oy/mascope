@@ -1,48 +1,37 @@
-from fastapi import APIRouter, Query, Body
-
+from fastapi import APIRouter, Depends
+from ..utils.api_features import api_route
 from ..controllers.target_ions_controller import (
     get_target_ions,
     get_target_ion,
     update_target_ion,
 )
-from ..models.pydantic_models.target_ion_pydantic_model import TargetIonUpdate
+from ..models.pydantic_models.target_ion_pydantic_model import (
+    TargetIonUpdate,
+    GetTargetIonsQueryParams,
+)
 
 target_ions_router = APIRouter()
 
 
 @target_ions_router.get("/api/target_ions")
+@api_route()
 async def get_target_ions_route(
-    target_compound_id: str = None,
-    ionization_mechanism_id: str = None,
-    target_ion_formula: str = None,
-    sort: str = None,
-    order: str = None,
-    page: int = 0,
-    limit: int = 100,
+    query_params: GetTargetIonsQueryParams = Depends(),
 ):
-    return await get_target_ions(
-        target_compound_id,
-        ionization_mechanism_id,
-        target_ion_formula,
-        sort,
-        order,
-        page,
-        limit,
-    )
+    return await get_target_ions(**query_params.dict())
 
 
 @target_ions_router.get("/api/target_ions/{target_ion_id}")
-async def get_target_ion_route(
-    target_ion_id: str,
-):
-    return await get_target_ion(
-        target_ion_id=target_ion_id,
-    )
+@api_route()
+async def get_target_ion_route(target_ion_id: str):
+    return await get_target_ion(target_ion_id=target_ion_id)
 
 
 @target_ions_router.patch("/api/target_ions/{target_ion_id}")
-async def update_target_collection_route(
-    target_ion_id: str,
-    target_ion_update: TargetIonUpdate = Body(...),
+@api_route(include_message=True, success_message="Target ion updated successfully")
+async def update_target_ion_route(
+    target_ion_id: str, target_ion_update: TargetIonUpdate
 ):
-    return await update_target_ion(target_ion_id, target_ion_update)
+    return await update_target_ion(
+        target_ion_id=target_ion_id, target_ion_update=target_ion_update
+    )

@@ -28,3 +28,16 @@ class WorkspaceInDB(WorkspaceBase):
 
     class Config:
         orm_mode = True
+
+
+class GetWorkspacesQueryParams(BaseModel):
+    sort: Optional[str] = Field(
+        "workspace_utc_created",
+        description="Column name by which you want to sort the results. The column name should be one of the columns in the workspace table.",
+    )
+    order: Optional[str] = Field(
+        "asc",
+        description="Sorting order which can be asc for ascending or desc for descending.",
+    )
+    page: int = Field(0, description="Page number for pagination.")
+    limit: int = Field(10000, description="Number of results per page.")

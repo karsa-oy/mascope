@@ -1,7 +1,5 @@
-from fastapi import APIRouter, BackgroundTasks, Request
-from fastapi.responses import JSONResponse
-from fastapi.encoders import jsonable_encoder
-from ..exceptions import ApiException
+from fastapi import APIRouter, BackgroundTasks, Request, Depends
+from ..utils.api_features import api_route
 
 from ..controllers.match_controller import (
     rematch_batches,
@@ -25,25 +23,23 @@ match_router = APIRouter()
 
 
 @match_router.post("/api/match/batches/rematch")
+@api_route(
+    include_data=False,
+    include_message=True,
+    success_message="Rematching process started for sample batches",
+)
 async def rematch_batches_route(
     request: Request,
     body: RematchBatchesBody,
     background_tasks: BackgroundTasks,
 ):
-    try:
-        sid = request.headers.get("X-SID")
-        background_tasks.add_task(rematch_batches, body, sid)
-        return JSONResponse(
-            status_code=200,
-            content={
-                "message": f"Rematching process started for sample batches",
-            },
-        )
-    except ApiException as e:
-        return JSONResponse(
-            status_code=e.status_code,
-            content={"error": e.user_message, "detail": e.tech_message},
-        )
+    sid = request.headers.get("X-SID")
+    background_tasks.add_task(
+        rematch_batches,
+        rematch_batches_body=body,
+        independent_transaction=True,
+        sid=sid,
+    )
 
 
 @match_router.post("/api/match/batch/{sample_batch_id}/rematch")
@@ -60,7 +56,7 @@ async def rematch_batch_route(
         added_ionization_mechanism_ids=body.added_ionization_mechanism_ids,
         removed_target_compound_ids=body.removed_target_compound_ids,
         removed_ionization_mechanism_ids=body.removed_ionization_mechanism_ids,
-        independent_transaction=body.independent_transaction,
+        independent_transaction=True,
         progress_properties=ProgressProperties(
             progress_type="rematch_batch",
         ),
@@ -88,10 +84,10 @@ async def match_batch_compute_route(
 ):
     background_tasks.add_task(
         match_batch_compute,
-        sample_batch_id,
-        body.added_target_compound_ids,
-        body.added_ionization_mechanism_ids,
-        body.independent_transaction,
+        sample_batch_id=sample_batch_id,
+        added_target_compound_ids=body.added_target_compound_ids,
+        added_ionization_mechanism_ids=body.added_ionization_mechanism_ids,
+        independent_transaction=True,
     )
     return {"status": f"Match computation started for batch {sample_batch_id}"}
 
@@ -115,21 +111,28 @@ async def match_batch_remove_route(
 
 
 @match_router.post("/api/match/sample/{sample_item_id}/rematch")
+@api_route(
+    include_data=False,
+    include_message=True,
+    success_message="Sample rematching started",
+)
 async def rematch_sample_route(
+    request: Request,
     sample_item_id: str,
     body: RematchBody,
     background_tasks: BackgroundTasks,
 ):
+    sid = request.headers.get("X-SID")
     background_tasks.add_task(
         rematch_sample,
-        sample_item_id,
-        body.added_target_compound_ids,
-        body.added_ionization_mechanism_ids,
-        body.removed_target_compound_ids,
-        body.removed_ionization_mechanism_ids,
-        body.independent_transaction,
+        sample_item_id=sample_item_id,
+        added_target_compound_ids=body.added_target_compound_ids,
+        added_ionization_mechanism_ids=body.added_ionization_mechanism_ids,
+        removed_target_compound_ids=body.removed_target_compound_ids,
+        removed_ionization_mechanism_ids=body.removed_ionization_mechanism_ids,
+        independent_transaction=True,
+        sid=sid,
     )
-    return {"status": f"Rematching process started for sample item {sample_item_id}"}
 
 
 @match_router.delete("/api/match/sample/{sample_item_id}/remove")
@@ -151,16 +154,23 @@ async def match_sample_remove_route(
 
 
 @match_router.post("/api/match/sample/{sample_item_id}/compute")
+@api_route(
+    include_data=False,
+    include_message=True,
+    success_message="Sample match computation started",
+)
 async def match_sample_compute_route(
+    request: Request,
     sample_item_id: str,
     body: MatchComputeBody,
     background_tasks: BackgroundTasks,
 ):
+    sid = request.headers.get("X-SID")
     background_tasks.add_task(
         match_sample_compute,
-        sample_item_id,
-        body.added_target_compound_ids,
-        body.added_ionization_mechanism_ids,
-        body.independent_transaction,
+        sample_item_id=sample_item_id,
+        added_target_compound_ids=body.added_target_compound_ids,
+        added_ionization_mechanism_ids=body.added_ionization_mechanism_ids,
+        independent_transaction=True,
+        sid=sid,
     )
-    return {"status": "Match computation started for sample {sample_item_id}"}

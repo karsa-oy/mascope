@@ -3,20 +3,18 @@ from sqlalchemy import select, asc, desc, func
 from sqlalchemy.orm import joinedload
 from typing import List, Optional, Tuple
 from backend.db import async_session
+from ..utils.api_features import api_controller
+from ..exceptions import NotFoundException
 from ..models.models import (
-    Workspace,
     SampleBatch,
-    SampleItem,
-    TargetCollectionInSampleBatch,
     TargetCollection,
     TargetCompoundInTargetCollection,
-    TargetCompound,
     TargetIon,
-    IonizationMechanism,
     TargetIsotope,
 )
 
 
+@api_controller()
 async def get_target_isotopes(
     target_ion_id: Optional[str] = None,
     min_mz: Optional[float] = None,
@@ -131,7 +129,9 @@ async def get_target_isotopes(
         target_isotopes = result.scalars().all()
 
         # Get total count
-        count_stmt = select(func.count()).select_from(stmt)
+        count_stmt = select(func.count()).select_from(  # pylint: disable=not-callable
+            stmt
+        )
         total = await session.scalar(count_stmt)
 
         return {
@@ -140,21 +140,33 @@ async def get_target_isotopes(
         }
 
 
-async def get_target_isotope(target_isotope_id: str):
+@api_controller()
+async def get_target_isotope(target_isotope_id: str) -> dict:
+    """
+    Retrieves a single target isotope by its unique ID.
+
+    Steps:
+    1. Execute a query to fetch the target isotope with the specified ID.
+    2. Check if the target isotope exists. If not, raise a NotFoundException.
+    3. Return the target isotope's details as a dictionary.
+
+    :param sample_batch_id: Unique identifier of the target isotope to retrieve.
+    :type sample_batch_id: str
+    :raises NotFoundException: If the target isotope with the given ID is not found.
+    :return: The requested target isotope's details.
+    :rtype: dict
+    """
     async with async_session() as session:
-        stmt = select(TargetIsotope).filter(
-            TargetIsotope.target_isotope_id == target_isotope_id
-        )
-        result = await session.execute(stmt)
-        target_isotope = result.scalars().first()
+        # Step 1: Fetch target isotope by ID
+        target_isotope = await session.get(TargetIsotope, target_isotope_id)
 
         if not target_isotope:
-            raise HTTPException(
-                status_code=404,
-                detail=f"TargetIsotope with ID {target_isotope_id} not found",
+            # Step 2: If target isotope not found, raise exception
+            raise NotFoundException(
+                f"Target isotope with ID '{target_isotope_id}' not found"
             )
-
-        return target_isotope.to_dict()
+    # Step 3: Return target isotope details
+    return target_isotope.to_dict()
 
 
 async def get_target_isotopes_for_match_compute(
