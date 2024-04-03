@@ -4,15 +4,22 @@ from sqlalchemy.future import select
 from backend.db_api_rest import async_session
 from backend.server import sio
 from backend.db.id import gen_id
+from ..utils.api_features import api_controller
+from ..exceptions import NotFoundException
 from ..models.models import AttributeTemplate
 from ..models.pydantic_models.attribute_template_pydantic_model import (
     AttributeTemplateCreateBody,
     AttributeTemplateUpdateBody,
 )
-from ..exceptions import process_exception, NotFoundException
 
 
-async def get_attribute_templates(sort: str, order: str, page: int, limit: int):
+@api_controller()
+async def get_attribute_templates(
+    sort: str = "name",
+    order: str = "asc",
+    page: int = 0,
+    limit: int = 10000,
+):
     """
     Retrieves a paginated list of attribute templates, optionally sorted.
 
@@ -34,40 +41,39 @@ async def get_attribute_templates(sort: str, order: str, page: int, limit: int):
     :return: Dictionary containing total count and paginated attribute templates.
     :rtype: dict
     """
-    try:
-        async with async_session() as session:
-            # Step 1: Construct query
-            stmt = select(AttributeTemplate)
-            if sort:
-                stmt = (
-                    stmt.order_by(desc(getattr(AttributeTemplate, sort)))
-                    if order == "desc"
-                    else stmt.order_by(asc(getattr(AttributeTemplate, sort)))
-                )
-            # Step 2: Count total results
-            total = await session.scalar(select(func.count()).select_from(stmt))
+    async with async_session() as session:
+        # Step 1: Construct query
+        stmt = select(AttributeTemplate)
+        if sort:
+            stmt = (
+                stmt.order_by(desc(getattr(AttributeTemplate, sort)))
+                if order == "desc"
+                else stmt.order_by(asc(getattr(AttributeTemplate, sort)))
+            )
+        # Step 2: Count total results
+        total = await session.scalar(select(func.count()).select_from(stmt))
 
-            # Step 3: Fetch paginated results
-            stmt = stmt.offset(page * limit).limit(limit)
-            result = await session.execute(stmt)
-            attribute_templates = result.scalars().all()
+        # Step 3: Fetch paginated results
+        stmt = stmt.offset(page * limit).limit(limit)
+        result = await session.execute(stmt)
+        attribute_templates = result.scalars().all()
 
-            # Step 4: Return results
-            return {
-                "results": total,
-                "data": [template.to_dict() for template in attribute_templates],
-            }
-    except Exception as e:
-        raise process_exception(e, "Failed to retrieve attribute templates")
+    # Step 4: Return results
+    return {
+        "results": total,
+        "data": [template.to_dict() for template in attribute_templates],
+    }
 
 
+@api_controller()
 async def get_attribute_template(attribute_template_id: str):
     """
     Retrieves a single attribute template by its ID.
 
     Steps:
-    1. Fetch the attribute template by ID.
-    2. Return the attribute template data.
+    1. Execute a query to fetch the attribute template with the specified ID.
+    2. Check if the attribute template exists. If not, raise a NotFoundException.
+    3. Return the attribute template's details as a dictionary.
 
     :param attribute_template_id: ID of the attribute template to retrieve.
     :type attribute_template_id: str
@@ -76,24 +82,19 @@ async def get_attribute_template(attribute_template_id: str):
     :return: The attribute template data.
     :rtype: dict
     """
-    try:
-        async with async_session() as session:
-            template = await session.scalar(
-                select(AttributeTemplate).filter(
-                    AttributeTemplate.attribute_template_id == attribute_template_id
-                )
+    async with async_session() as session:
+        # Step 1: Fetch attribute template by ID
+        template = await session.get(AttributeTemplate, attribute_template_id)
+        # Step 2: If attribute template not found, raise exception
+        if not template:
+            raise NotFoundException(
+                f"AttributeTemplate with ID '{attribute_template_id}' not found"
             )
-            if not template:
-                raise NotFoundException(
-                    f"AttributeTemplate with ID {attribute_template_id} not found"
-                )
-            return template.to_dict()
-    except Exception as e:
-        raise process_exception(
-            e, f"Failed to retrieve attribute template '{attribute_template_id}'"
-        )
+    # Step 3: Return attribute template details
+    return template.to_dict()
 
 
+@api_controller()
 async def create_attribute_template(template_data: AttributeTemplateCreateBody):
     """
     Creates a new attribute template with the given data.
@@ -111,33 +112,31 @@ async def create_attribute_template(template_data: AttributeTemplateCreateBody):
     :return: The created attribute template data.
     :rtype: dict
     """
-    try:
-        async with async_session() as session:
-            # Step 1: Convert each TemplateField object in the template list to a dictionary
-            template_dicts = [field.dict() for field in template_data.template]
+    async with async_session() as session:
+        # Step 1: Convert each TemplateField object in the template list to a dictionary
+        template_dicts = [field.dict() for field in template_data.template]
 
-            # Step 2: Construct new template
-            new_template = AttributeTemplate(
-                attribute_template_id=gen_id(16),
-                name=template_data.name,
-                type=template_data.type,
-                template=template_dicts,
-            )
-            session.add(new_template)
+        # Step 2: Construct new template
+        new_template = AttributeTemplate(
+            attribute_template_id=gen_id(16),
+            name=template_data.name,
+            type=template_data.type,
+            template=template_dicts,
+        )
+        session.add(new_template)
 
-            # Step 3: Commit and refresh
-            await session.commit()
-            await session.refresh(new_template)
+        # Step 3: Commit and refresh
+        await session.commit()
+        await session.refresh(new_template)
 
-            # Step 4: Emit the event to inform the clients about the new template
-            await sio.emit("org_reload", namespace="/")
+    # Step 4: Emit the event to inform the clients about the new template
+    await sio.emit("org_reload", namespace="/")
 
-            # Step 5: Return created template
-            return new_template.to_dict()
-    except Exception as e:
-        raise process_exception(e, "Failed to create attribute template")
+    # Step 5: Return created template
+    return new_template.to_dict()
 
 
+@api_controller()
 async def update_attribute_template(
     attribute_template_id: str, template_data: AttributeTemplateUpdateBody
 ):
@@ -160,33 +159,29 @@ async def update_attribute_template(
     :return: The updated attribute template as a dictionary.
     :rtype: dict
     """
-    try:
-        async with async_session() as session:
-            # Step 1: Fetch the existing attribute template from the database using the provided ID.
-            template = await session.get(AttributeTemplate, attribute_template_id)
-            if not template:
-                raise NotFoundException(
-                    f"AttributeTemplate with ID {attribute_template_id} not found"
-                )
+    async with async_session() as session:
+        # Step 1: Fetch the existing attribute template from the database using the provided ID.
+        template = await session.get(AttributeTemplate, attribute_template_id)
+        if not template:
+            raise NotFoundException(
+                f"AttributeTemplate with ID '{attribute_template_id}' not found"
+            )
 
-            # Step 2: Update the template's properties with the new data.
-            for key, value in template_data.dict(exclude_unset=True).items():
-                setattr(template, key, value)
+        # Step 2: Update the template's properties with the new data.
+        for key, value in template_data.dict(exclude_unset=True).items():
+            setattr(template, key, value)
 
-            # Step 3: Commit the changes to the database.
-            await session.commit()
+        # Step 3: Commit the changes to the database.
+        await session.commit()
 
-            # Step 4: Emit an "org_reload" event to notify clients about the updated template.
-            await sio.emit("org_reload", namespace="/")
+    # Step 4: Emit an "org_reload" event to notify clients about the updated template.
+    await sio.emit("org_reload", namespace="/")
 
-            # Step 5: Return the updated template as a dictionary.
-            return template.to_dict()
-    except Exception as e:
-        raise process_exception(
-            e, f"Failed to update attribute template '{attribute_template_id}'"
-        )
+    # Step 5: Return the updated template as a dictionary.
+    return template.to_dict()
 
 
+@api_controller()
 async def delete_attribute_template(attribute_template_id: str):
     """
     Deletes an attribute template by its ID.
@@ -201,22 +196,17 @@ async def delete_attribute_template(attribute_template_id: str):
     :raises NotFoundException: Raised if the attribute template with the given ID is not found.
     :raises process_exception: Handles any exceptions that occur during the deletion process.
     """
-    try:
-        async with async_session() as session:
-            # Step 1: Fetch the attribute template from the database using the provided ID.
-            template = await session.get(AttributeTemplate, attribute_template_id)
-            if not template:
-                raise NotFoundException(
-                    f"AttributeTemplate with ID {attribute_template_id} not found"
-                )
+    async with async_session() as session:
+        # Step 1: Fetch the attribute template from the database using the provided ID.
+        template = await session.get(AttributeTemplate, attribute_template_id)
+        if not template:
+            raise NotFoundException(
+                f"AttributeTemplate with ID '{attribute_template_id}' not found"
+            )
 
-            # Step 2: Delete the fetched template from the session and commit the changes to the database.
-            await session.delete(template)
-            await session.commit()
+        # Step 2: Delete the fetched template from the session and commit the changes to the database.
+        await session.delete(template)
+        await session.commit()
 
-            # Step 3: Emit an "org_reload" event to notify clients about the deletion.
-            await sio.emit("org_reload", namespace="/")
-    except Exception as e:
-        raise process_exception(
-            e, f"Failed to delete attribute template '{attribute_template_id}'"
-        )
+    # Step 3: Emit an "org_reload" event to notify clients about the deletion.
+    await sio.emit("org_reload", namespace="/")

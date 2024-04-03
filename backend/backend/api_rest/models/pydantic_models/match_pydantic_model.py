@@ -53,10 +53,6 @@ class RematchBody(BaseModel):
     removed_ionization_mechanism_ids: Optional[List[str]] = Field(
         None, description="List of ionization mechanism IDs to remove matches for"
     )
-    independent_transaction: Optional[bool] = Field(
-        default=True,
-        description="Flag indicating whether the ramtching is an independent transaction and if the operation should emit a reload event for the sample batch.",
-    )
     progress_properties: Optional[ProgressProperties] = Field(
         None,
         description="Object with properties for match progress computation notification",
@@ -82,10 +78,6 @@ class MatchComputeBody(BaseModel):
     )
     added_ionization_mechanism_ids: Optional[List[str]] = Field(
         None, description="List of ionization mechanism IDs to compute matches for"
-    )
-    independent_transaction: Optional[bool] = Field(
-        default=True,
-        description="Flag indicating whether the match removal is an independent transaction and if the operation should emit a reload event for the sample batch.",
     )
 
 

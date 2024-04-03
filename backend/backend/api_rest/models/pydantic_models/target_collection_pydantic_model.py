@@ -89,3 +89,45 @@ class TargetCollectionInDB(TargetCollectionBase):
 
     class Config:
         orm_mode = True
+
+
+class GetTargetCollectionsQueryParams(BaseModel):
+    target_collection_type: Optional[str] = Field(
+        None,
+        description="The target collection type for which you want to fetch the target collections.",
+    )
+    target_collection_name: Optional[str] = Field(
+        None,
+        description="The name of the target collection for which you want to fetch the target collections.",
+    )
+    sort: Optional[str] = Field(
+        None,
+        description="The column name by which you want to sort the results. The column name should be one of the fields of target_collection.",
+    )
+    order: Optional[str] = Field(
+        None,
+        description="Can either be asc for ascending order or desc for descending order.",
+    )
+    page: int = Field(0, description="The page number for pagination, default 0")
+    limit: int = Field(10000, description="The number of results per page.")
+
+
+class GetTargetCollectionsInSampleBatchQueryParams(BaseModel):
+    sample_batch_id: Optional[str] = Field(
+        None,
+        description="The sample batch ID filter for which you want to fetch the assosiated target collections ids.",
+    )
+    target_collection_id: Optional[str] = Field(
+        None,
+        description="The target collection ID filter for which you want to fetch the assosiated sample batches ids.",
+    )
+    sort: Optional[str] = Field(
+        None,
+        description="The column name by which you want to sort the results. The column name should be either sample_batch_id or target_collection_id.",
+    )
+    order: Optional[str] = Field(
+        None,
+        description="Can either be asc for ascending order or desc for descending order.",
+    )
+    page: int = Field(0, description="The page number for pagination, default 0")
+    limit: int = Field(10000, description="The number of results per page.")

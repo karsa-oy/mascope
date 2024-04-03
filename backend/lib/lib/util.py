@@ -231,6 +231,28 @@ def to_camel_case(value):
         return value
 
 
+def beautify_func_name(func_name: str, max_words: int = None):
+    """
+    Beautify a function name by replacing underscores with spaces.
+    Optionally, limit the number of words used in the beautified name.
+
+    :param func_name: The function name to beautify.
+    :type func_name: str
+    :param max_words: Maximum number of words to include in the beautified name.
+    :type max_words: int, optional
+    :return: The beautified function name.
+    :rtype: str
+    """
+    if not isinstance(func_name, str):
+        raise ValueError("Function name must be a string.")
+
+    # Replace underscores with spaces and capitalize the first letter
+    words = func_name.replace("_", " ").split()
+    beautified_name = " ".join(words[:max_words]) if max_words else " ".join(words)
+
+    return beautified_name
+
+
 def map_keys(obj, func):
     if isinstance(obj, list):
         result = []

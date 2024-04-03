@@ -24,8 +24,7 @@ class NotFoundException(HTTPException):
 def process_exception(e: Exception, context_message: str) -> ApiException:
     error_message = f"{context_message}. {str(e)}."
     traceback_info = traceback.format_exc()
-    print(f"{error_message}\n\n{traceback_info}")
-
+    print(f"{type(e).__name__}. {error_message}\n\n{traceback_info}")
     # Construct the technical message with structured JSON
     tech_message_details = {
         "error_message": error_message.replace("\n", "; "),
@@ -51,8 +50,14 @@ def process_exception(e: Exception, context_message: str) -> ApiException:
         combined_error_message = "; ".join(error_messages)
         user_message = f"{context_message}. Validation error. {combined_error_message}"
         status_code = 422  # Unprocessable entity
+    elif isinstance(e, AttributeError):
+        user_message = error_message
+        status_code = 400  # Bad Request
+    elif isinstance(e, RuntimeError):
+        user_message = error_message
+        status_code = 500  # Internal Server Error
     else:
-        user_message = f"{context_message}. Unexpected error."
+        user_message = f"{context_message}. Unexpected error. {str(e)}."
         status_code = 500  # Internal Server Error
 
     return ApiException(user_message, tech_message, status_code)

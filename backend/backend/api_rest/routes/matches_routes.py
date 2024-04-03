@@ -1,28 +1,20 @@
-from fastapi import APIRouter
-
-from ..controllers.matches_controller import (
-    get_match_by_id,
-    get_matches,
-    delete_matches,
-)
+from fastapi import APIRouter, Depends
+from ..utils.api_features import api_route
+from ..controllers.matches_controller import get_match, get_matches
+from ..models.pydantic_models.matches_pydantic_model import GetMatchesQueryParams
 
 matches_router = APIRouter()
 
 
 @matches_router.get("/api/matches")
+@api_route()
 async def get_matches_route(
-    sample_item_id: str = None,
-    target_isotope_id: str = None,
-    sort: str = None,
-    order: str = None,
-    page: int = 0,
-    limit: int = 100,
+    query_params: GetMatchesQueryParams = Depends(),
 ):
-    return await get_matches(
-        sample_item_id, target_isotope_id, sort, order, page, limit
-    )
+    return await get_matches(**query_params.dict())
 
 
 @matches_router.get("/api/matches/{match_id}")
-async def get_match_by_id_route(match_id: str):
-    return await get_match_by_id(match_id)
+@api_route()
+async def get_match_route(match_id: str):
+    return await get_match(match_id)

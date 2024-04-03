@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field
+from typing import Optional
 
 
 class IonizationMechanismCreate(BaseModel):
@@ -13,3 +14,22 @@ class IonizationMechanismCreate(BaseModel):
         ...,
         description="Reagent used in the ionization process, if applicable.",
     )
+
+
+class GetIonizationMechanismsQueryParams(BaseModel):
+    ionization_mechanism_polarity: Optional[str] = Field(
+        None, description="Filter by the polarity of the ionization mechanism."
+    )
+    ionization_mechanism: Optional[str] = Field(
+        None, description="Filter by the description of the ionization mechanism."
+    )
+    reagent: Optional[str] = Field(
+        None, description="Filter by the reagent used in the ionization process."
+    )
+    sort: Optional[str] = Field(None, description="Field to sort by.")
+    order: Optional[str] = Field(
+        None,
+        description="Order of sorting, can be either 'asc' for ascending or 'desc' for descending.",
+    )
+    page: int = Field(0, description="Pagination page number.")
+    limit: int = Field(10000, description="Number of items per page.")

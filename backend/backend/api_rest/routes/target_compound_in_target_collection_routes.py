@@ -1,6 +1,10 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from ..utils.api_features import api_route
 from ..controllers.target_compound_in_target_collection_controller import (
     get_target_compound_in_target_collection,
+)
+from ..models.pydantic_models.target_compound_pydantic_model import (
+    GetTargetCompoundInTargetCollectionQueryParams,
 )
 
 target_compound_in_target_collection_router = APIRouter()
@@ -9,14 +13,8 @@ target_compound_in_target_collection_router = APIRouter()
 @target_compound_in_target_collection_router.get(
     "/api/target_compound_in_target_collections"
 )
+@api_route()
 async def get_target_compound_in_target_collections_route(
-    target_compound_id: str = None,
-    target_collection_id: str = None,
-    sort: str = None,
-    order: str = None,
-    page: int = 0,
-    limit: int = 100,
+    query_params: GetTargetCompoundInTargetCollectionQueryParams = Depends(),
 ):
-    return await get_target_compound_in_target_collection(
-        target_compound_id, target_collection_id, sort, order, page, limit
-    )
+    return await get_target_compound_in_target_collection(**query_params.dict())

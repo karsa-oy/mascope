@@ -4,7 +4,6 @@
 import pandas as pd
 from datetime import datetime
 from typing import List, Optional, Tuple
-from fastapi import HTTPException
 from sqlalchemy import (
     asc,
     desc,
@@ -15,11 +14,12 @@ from sqlalchemy import (
     Float,
     literal,
 )
-
 from backend.db_api_rest import async_session
-
+from ..utils.api_features import api_controller
+from ..exceptions import NotFoundException
 from ..models.models import (
     Sample,
+    SampleBatch,
     Match,
     TargetCompound,
     TargetIon,
@@ -30,7 +30,6 @@ from ..models.models import (
     TargetCollection,
     TargetCollectionInSampleBatch,
 )
-
 from ..models.pydantic_models.sample_pydantic_model import FilterParams
 
 # TODO_configuration
@@ -516,6 +515,7 @@ async def compile_samples_df(
 # -------------------------------------------------------------------
 
 
+@api_controller()
 async def get_samples(
     sample_item_id: str = None,
     sample_item_id_active: str = None,
@@ -527,7 +527,7 @@ async def get_samples(
     minDatetime: datetime = None,
     maxDatetime: datetime = None,
     sort: str = "datetime_utc",
-    order: str = None,
+    order: str = "asc",
     page: int = 0,
     limit: int = 10000,
     batch_matches_info: bool = False,
@@ -536,11 +536,59 @@ async def get_samples(
     match_ions: bool = False,
     match_isotopes: bool = False,
     alarms_list: List[str] = None,
-):
-    message = "Samples with no match info"
-    async with async_session() as session:
-        stmt = select(Sample)
+) -> dict:
+    """
+    Retrieves samples (compinded sample item and sample file info) based on various filter criteria and pagination settings.
+    Additionally, it can compute match information for the samples and return it as requested.
 
+    Steps:
+    1. Construct the base query with filters based on provided parameters.
+    2. Apply sorting and pagination to the query.
+    3. Execute the query and fetch results.
+    4. Format the fetched samples into a dataframe for easier manipulation.
+    5. If batch match info is requested, compute and merge match data with sample data.
+    6. Optionally add detailed match information based on match_samples, match_compounds, match_ions, and match_isotopes flags.
+
+    :param sample_item_id: Filter by sample item ID.
+    :type sample_item_id: str, optional
+    :param sample_item_id_active: Used to mark the active sample item in the response.
+    :type sample_item_id_active: str, optional
+    :param sample_file_id: Filter by sample file ID.
+    :type sample_file_id: str, optional
+    :param sample_batch_id: Filter by sample batch ID; required for batch match info.
+    :type sample_batch_id: str, optional, required for batch match data
+    :param filename: Filter by filename.
+    :type filename: str, optional
+    :param instrument: Filter by instrument name.
+    :type instrument: str, optional
+    :param sample_item_type: Filter by sample item type.
+    :type sample_item_type: str, optional
+    :param minDatetime: Filter samples after this datetime of the sample file.
+    :type minDatetime: datetime, optional
+    :param maxDatetime: Filter samples before this datetime of the sample file.
+    :type maxDatetime: datetime, optional
+    :param sort: Column to sort the results by.
+    :type sort: str, optional
+    :param order: Sort order ('asc' or 'desc').
+    :type order: str, optional
+    :param page: Pagination page number.
+    :type page: int, optional
+    :param limit: Number of results per page.
+    :type limit: int, optional
+    :param batch_matches_info: Flag indicating if batch match info should be computed.
+    :type batch_matches_info: bool, optional
+    :param match_samples, match_compounds, match_ions, match_isotopes: Flags for including detailed match info.
+    :type match_samples: bool, optional
+    :type match_ions: bool, optional
+    :type match_isotopes: bool, optional
+    :param alarms_list: List of collection types to set alarm mode to true.
+    :type alarms_list: List[str], optional
+    :return: A dictionary containing the total number of results, the formatted sample data, and optionally match information.
+    :rtype: dict
+    """
+    async with async_session() as session:
+        # Step 1: Construct base query with filters
+        stmt = select(Sample)
         # Query filters
         if sample_item_id:
             stmt = stmt.filter(Sample.sample_item_id == sample_item_id)
@@ -570,6 +618,7 @@ async def get_samples(
                 )
             )
 
+        # Step 2: Apply sorting and pagination
         if sort:
             if order == "desc":
                 stmt = stmt.order_by(desc(getattr(Sample, sort)))
@@ -583,10 +632,11 @@ async def get_samples(
         # Get paginated results
         stmt = stmt.offset(page * limit).limit(limit)
 
+        # Step 3: Execute query and fetch results
         result = await session.execute(stmt)
         samples = result.scalars().all()
 
-        # Convert samples into dataframe
+        # Step 4: Format samples into dataframe
         samples_df = pd.DataFrame([sample.to_dict() for sample in samples])
 
         #  Add 'selection' field
@@ -597,13 +647,12 @@ async def get_samples(
         else:
             samples_df["selection"] = 0
 
+        # Step 5: Compute and merge batch match info if requested
         if sample_batch_id and batch_matches_info:
             # Calculate and add fields match_score, sample_peak_area_sum, sample_peak_interference_sum, matched
-            batch_match_filter_result = await init_batch_match_filter(sample_batch_id)
+            batch_match_filter_dict = await init_batch_match_filter(sample_batch_id)
 
             # Convert the result to a dataframe
-            batch_match_filter_dict = batch_match_filter_result["data"]
-            message = batch_match_filter_result["message"]
             batch_match_filter_df = pd.DataFrame(batch_match_filter_dict)
 
             # Calculate matchIsotopes, matchIons, matchCompounds, matchCollections
@@ -628,7 +677,6 @@ async def get_samples(
                 result_dict = {
                     "results": total,
                     "data": samples_df.to_dict("records"),
-                    "message": message,
                 }
                 return result_dict
 
@@ -663,7 +711,6 @@ async def get_samples(
         result_dict = {
             "results": total,
             "data": samples_df.to_dict("records"),
-            "message": message,
         }
 
         # Conditionally add match data to the result if batch_matches_info is True
@@ -710,63 +757,54 @@ async def get_samples(
         return result_dict
 
 
+@api_controller()
 async def get_sample(
     sample_item_id: str,
     alarms_list: List[str] = None,
     sample_matches_info: bool = False,
 ) -> dict:
     """
-    Retrieves detailed information for a specific sample, including match data if requested.
+    Retrieves detailed information for a specific sample, optionally  including aggregated  match data.
 
-    This function fetches details for a given sample identified by its sample_item_id. It can optionally calculate and include match data
-    as matchIsotopes, matchIons, matchCompounds, and matchCollections, based on the sample's association with target entities.
+    This function fetches the sample based on its unique identifier and conditionally computes matching data for  isotopes, ions,
+    compounds, and collections, dependent on the association of the sample with target entities.
 
-    If the `sample_matches_info` parameter is set to False, the function will return basic sample information without performing match calculations.
+    Match calculations can be omitted based on the `sample_matches_info` parameter.
     Default is True for http requests, False when called from other controllers.
+
+    Steps:
+    1. Fetch the sample using the provided sample item ID to ensure it exists.
+    2. If no match information is required, return the basic sample data immediately.
+    3. Initialize match filtering for the sample and convert results to a DataFrame for further processing.
+    4. Process the DataFrame to include additional match data as specified, applying alarm mode settings and aggregating data across different match categories.
+    5. Compile the comprehensive sample data including all requested match information and return it in a structured dictionary format.
 
     :param sample_item_id: Unique identifier for the sample.
     :type sample_item_id: str
-    :param alarms_list: List of alarming collections when fetching sample information, defaults to None
+    :param alarms_list: :param alarms_list: List of collection types that set alarm_mode to true. By default, targets are alarming, diagnostics and calibrants are not, defaults to None
     :type alarms_list: List[str], optional
     :param sample_matches_info: Flag to determine if match information should be included, defaults to False.
     :type sample_matches_info: bool, optional
-    :raises HTTPException: If the sample with the specified item ID is not found.
+    :raises NotFoundException: If the sample with the specified item ID is not found.
     :return: A dictionary containing the sample information. If `sample_matches_info` is True, additional match data is included.
     :rtype: dict
-
-    The returned dictionary includes the following keys:
-    - 'data': Contains the sample information and, if requested, aggregated match data.
-    - 'message': A message indicating the status of the operation.
-
     """
     async with async_session() as session:
-        stmt = select(Sample).filter(Sample.sample_item_id == sample_item_id)
-        result = await session.execute(stmt)
-        sample = result.scalars().first()
-
+        # Step 1: Fetch sample to verify its existence
+        sample = await session.get(Sample, sample_item_id)
         if not sample:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Sample with ID {sample_item_id} not found",
-            )
+            raise NotFoundException(f"Sample with ID '{sample_item_id}' not found")
 
         sample_dict = sample.to_dict()
 
-        # If no match information is required, return only the sample data
+        # Step 2: Return only basic sample data if match information is not requested.
         if not sample_matches_info:
-            return {
-                "data": sample_dict,
-                "message": "Sample retrieved successfully without match information.",
-            }
+            return sample_dict
 
-        # Calculate matchIsotopes, matchIons, matchCompounds, matchCollections
-        sample_match_filter_result = await init_sample_match_filter(
-            sample.sample_item_id
-        )
+        # Step 3: Initialize sample match filter and fetch match data.
+        sample_match_filter_dict = await init_sample_match_filter(sample.sample_item_id)
 
         # Convert the result to a dataframe
-        sample_match_filter_dict = sample_match_filter_result["data"]
-        message = sample_match_filter_result["message"]
         sample_match_filter_df = pd.DataFrame(sample_match_filter_dict)
 
         # If sample_match_filter_df is empty, return the sample dictionary with empty fields
@@ -785,44 +823,45 @@ async def get_sample(
                     "match_isotopes": [],
                 }
             )
-            return {
-                "data": sample_dict,
-                "message": message,
-            }
+            return sample_dict
 
-        # 1) Set the alarm_mode based on alarms_list
+        # Step 4: Process the DataFrame to include additional match data as specified,
+        # applying alarm mode settings and aggregating data across different match categories.
+
+        # Set the alarm_mode based on alarms_list
         sample_match_filter_df = await set_alarm_mode(
             sample_match_filter_df, alarms_list
         )
 
-        # 2) Aggregate fields for matchIsotopes
+        # Aggregate fields for matchIsotopes
         match_isotopes_data_df, match_isotopes_df = await aggregate_match_isotopes(
             sample_match_filter_df
         )
 
-        # 3) Aggregate fields for matchIons
+        # Aggregate fields for matchIons
         match_ions_data_df, match_ions_df = await aggregate_match_ions(
             match_isotopes_data_df
         )
 
-        # 4) Aggregate fields for matchCompounds
+        # Aggregate fields for matchCompounds
         match_compounds_data_df, match_compounds_df = await aggregate_match_compounds(
             match_ions_data_df
         )
 
-        # 5) Aggregate fields for matchCollections
+        # Aggregate fields for matchCollections
         match_collections_df = await aggregate_match_collections(
             match_compounds_data_df
         )
 
-        # 6) Aggregate fields for sample_df
+        # Step 5: Compile the final sample data dictionary.
+        # Aggregate fields for sample_df
         # Convert sample into dataframe
         sample_df = pd.DataFrame([sample_dict])
 
         # Calculate and add fields match_score, sample_peak_area_sum, sample_peak_interference_sum, matched, selection
         match_samples_df = await aggregate_match_samples(match_compounds_data_df)
 
-        # 7)  Merge fields for samples data
+        #  Merge fields for samples data
         sample_df = await compile_samples_df(sample_df, match_samples_df)
 
         # Add the selection field
@@ -856,61 +895,81 @@ async def get_sample(
             by="mz", ascending=True
         ).to_dict("records")
 
-        return {
-            "data": sample_dict,
-            "message": message,
-        }
+        return sample_dict
 
 
+@api_controller()
 async def get_sample_ion_matches(
     sample_item_id: str,
     target_ion_id: str,
     target_collection_id: str,
     filter_params: FilterParams,
     alarms_list: List[str] = None,
-):
+) -> dict:
+    """
+    Retrieves ion-specific match information for a given sample item. This involves fetching match data at the isotopic level,
+    filtering based on the provided parameters, and returning aggregated match data for ions and isotopes.
+
+    Required ion-specific filter_params, the stored ion-specific or DEFAULT filters are NOT used for match_score/sample_peak_area filtering and setting match_category.
+
+    Steps:
+    1. Verify the existence of the specified sample item and target ion.
+    2. Initialize the sample match filter with target ion and ion-specific filter parameters.
+    3. Convert the filter results into a DataFrame for processing.
+    4. If the DataFrame is empty, return a response indicating no matches were found.
+    5. Set the alarm_mode based on the provided alarms_list.
+    6. Aggregate fields for matchIsotopes and filter duplicates based on target_collection_id.
+    7. Aggregate fields for matchIons and filter duplicates based on target_collection_id.
+    8. Prepare the final output including the counts and details of matched ions and isotopes.
+
+    :param sample_item_id: ID of the sample item for which to retrieve ion matches.
+    :type sample_item_id: str
+    :param target_ion_id: ID of the target ion for which matches are filtered.
+    :type target_ion_id: str
+    :param target_collection_id: ID of the target collection to filter out duplicates.
+    :type target_collection_id: str
+    :param filter_params: Ion-specific filter parameters for match score and sample peak area filtering.
+    :type filter_params: FilterParams
+    :param alarms_list: List of collection types that set alarm_mode to true. By default, targets are alarming, diagnostics and calibrants are not.
+    :type alarms_list: List[str], optional
+    :return: Dictionary containing aggregated match information for ions and isotopes.
+    :rtype: dict
+    """
     async with async_session() as session:
-        # Retrieve the sample details
-        stmt = select(Sample).filter(Sample.sample_item_id == sample_item_id)
-        result = await session.execute(stmt)
-        sample = result.scalars().first()
-
+        # Step 1: Fetch sample and target ion to verify its existence
+        sample = await session.get(Sample, sample_item_id)
         if not sample:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Sample with ID {sample_item_id} not found",
-            )
+            raise NotFoundException(f"Sample with ID '{sample_item_id}' not found")
+        ion = await session.get(TargetIon, target_ion_id)
+        if not ion:
+            raise NotFoundException(f"Target ion with ID '{target_ion_id}' not found")
 
-        # Initialize the sample match filter with target ion and ion-specific filter parameters
-        sample_match_filter_result = await init_sample_match_filter(
+        # Step 2: Initialize the sample match filter with target ion and ion-specific filter parameters
+        sample_match_filter_dict = await init_sample_match_filter(
             sample.sample_item_id, filter_params, target_ion_id
         )
 
-        # Convert the result to a DataFrame
-        sample_match_filter_dict = sample_match_filter_result["data"]
-        message = sample_match_filter_result["message"]
+        # Step 3: Convert the result to a DataFrame
         sample_match_filter_df = pd.DataFrame(sample_match_filter_dict)
 
-        # Check if the DataFrame is empty
+        # Step 4: Check if the DataFrame is empty
         if sample_match_filter_df.empty:
             return {
-                "data": {
-                    "matches": {
-                        "match_ions": 0,
-                        "match_isotopes": 0,
-                    },
-                    "match_ions": [],
-                    "match_isotopes": [],
+                "matches": {
+                    "match_ions": 0,
+                    "match_isotopes": 0,
                 },
-                "message": message,
+                "match_ions": [],
+                "match_isotopes": [],
             }
 
-        # 1) Set the alarm_mode based on alarms_list
+        # Step 5: Set the alarm_mode based on alarms_list
         sample_match_filter_df = await set_alarm_mode(
             sample_match_filter_df, alarms_list
         )
 
-        # 2) Aggregate fields for matchIsotopes
+        # Steps 6 & 7: Aggregate fields for matchIsotopes and matchIons, filtering duplicates
+        # Aggregate fields for matchIsotopes
         match_isotopes_data_df, _ = await aggregate_match_isotopes(
             sample_match_filter_df
         )
@@ -932,7 +991,7 @@ async def get_sample_ion_matches(
             ]
         )
 
-        # 3) Aggregate fields for matchIons
+        #  Aggregate fields for matchIons
         match_ions_data_df, _ = await aggregate_match_ions(
             match_isotopes_data_df, filter_params
         )
@@ -951,26 +1010,53 @@ async def get_sample_ion_matches(
             ]
         )
 
-        # Prepare the final output.
+        # Step 8: Prepare the final output
         return {
-            "data": {
-                "matches": {
-                    "match_ions": len(match_ions_df),
-                    "match_isotopes": len(match_isotopes_df),
-                },
-                "match_ions": match_ions_df.sort_values(
-                    by=["match_category", "match_score"], ascending=[False, False]
-                ).to_dict("records"),
-                "match_isotopes": match_isotopes_df.sort_values(
-                    by="mz", ascending=True
-                ).to_dict("records"),
+            "matches": {
+                "match_ions": len(match_ions_df),
+                "match_isotopes": len(match_isotopes_df),
             },
-            "message": message,
+            "match_ions": match_ions_df.sort_values(
+                by=["match_category", "match_score"], ascending=[False, False]
+            ).to_dict("records"),
+            "match_isotopes": match_isotopes_df.sort_values(
+                by="mz", ascending=True
+            ).to_dict("records"),
         }
 
 
-async def init_batch_match_filter(sample_batch_id: str):
+@api_controller()
+async def init_batch_match_filter(sample_batch_id: str) -> list:
+    """
+    Initializes and applies a batch-level match filter across all samples within a specified batch.
+    This function aggregates isotopic level match data for all samples in the batch, applying ion-specific
+    or default filtering parameters to each isotopic match. The result includes filtered match data.
+
+    This function is used for aggregating batch-level match data. It is utilized in the get_samples endpoint to
+    include aggregated match data (`batch_matches_info`) within the response.
+
+    Steps:
+    1. Verify the existence of the specified sample batch.
+    2. Construct and execute a database query to fetch relevant isotopic match data across the batch.
+    3. Convert query results into a dictionary format for easier manipulation.
+    4. Apply filtering criteria based on provided ion-specific parameters or default values to each isotopic match.
+    5. Categorize each match based on computed match scores into probable, possible, or no matches.
+
+    :param sample_batch_id: ID of the sample batch for which to initialize and apply the match filter.
+    :type sample_batch_id: str
+    :return: A list of dictionaries containing the filtered isotopic match data for the entire batch.
+    :rtype: List[Dict]
+    :raises NotFoundException: If the specified sample batch does not exist.
+    """
     async with async_session() as session:
+        # Step 1: Fetch sample batch to verify sample batch existence
+        sample_batch = await session.get(SampleBatch, sample_batch_id)
+        if not sample_batch:
+            raise NotFoundException(
+                f"Sample batch with ID '{sample_batch_id}' not found"
+            )
+
+        # Step 2: Construct and execute the query to fetch match data across the batch
         stmt = (
             select(
                 Sample.filename,
@@ -1053,97 +1139,112 @@ async def init_batch_match_filter(sample_batch_id: str):
         result = await session.execute(stmt)
         batch_match_filter = result.fetchall()
 
-        # Convert each Row object in the result into a dictionary
-        batch_match_filter_dict = [row._asdict() for row in batch_match_filter]
+    # Step 3: Convert each Row object in the result into a dictionary
+    batch_match_filter_dicts = [row._asdict() for row in batch_match_filter]
 
-        # Filtering match_score, sample_peak_area, and setting match_category
-        for row in batch_match_filter_dict:
-            # Extract the instrument and filter_params from the row
-            instrument = row["instrument"]
-            filter_params = row.get("filter_params")
-            # Determine which filter parameters to use, fall back to batch-specific filters
-            if filter_params and instrument in filter_params:
-                # Use ion-specific filters (unique for different instruments)
-                ion_filters = filter_params[instrument]
-                mz_tolerance = ion_filters["mz_tolerance"]
-                min_isotope_abundance = ion_filters["min_isotope_abundance"]
-                isotope_ratio_tolerance = ion_filters["isotope_ratio_tolerance"]
-                peak_min_intensity = ion_filters["peak_min_intensity"]
-                min_isotope_correlation = ion_filters["min_isotope_correlation"]
-                probable_match_threshold = ion_filters["probable_match_threshold"]
-                possible_match_threshold = ion_filters["possible_match_threshold"]
-            else:
-                # Use default filter parameters if target ion-specific filter_params are not provided
-                mz_tolerance = DEFAULT_MZ_TOLERANCE
-                min_isotope_abundance = DEFAULT_MIN_ISOTOPE_ABUNDANCE
-                isotope_ratio_tolerance = DEFAULT_ISOTOPE_RATIO_TOLERANCE
-                peak_min_intensity = DEFAULT_PEAK_MIN_INTENSITY
-                min_isotope_correlation = DEFAULT_MIN_ISOTOPE_CORRELATION
-                probable_match_threshold = DEFAULT_PROBABLE_MATCH_THRESHOLD
-                possible_match_threshold = DEFAULT_POSSIBLE_MATCH_THRESHOLD
+    # Step 4: Apply filtering match_score, sample_peak_area
+    for row in batch_match_filter_dicts:
+        # Extract the instrument and filter_params from the row
+        instrument = row["instrument"]
+        filter_params = row.get("filter_params")
+        # Determine which filter parameters to use, fall back to default filters
+        if filter_params and instrument in filter_params:
+            # Use ion-specific filters (unique for different instruments)
+            ion_filters = filter_params[instrument]
+            mz_tolerance = ion_filters["mz_tolerance"]
+            min_isotope_abundance = ion_filters["min_isotope_abundance"]
+            isotope_ratio_tolerance = ion_filters["isotope_ratio_tolerance"]
+            peak_min_intensity = ion_filters["peak_min_intensity"]
+            min_isotope_correlation = ion_filters["min_isotope_correlation"]
+            probable_match_threshold = ion_filters["probable_match_threshold"]
+            possible_match_threshold = ion_filters["possible_match_threshold"]
+        else:
+            # Use default filter parameters if target ion-specific filter_params are not provided
+            mz_tolerance = DEFAULT_MZ_TOLERANCE
+            min_isotope_abundance = DEFAULT_MIN_ISOTOPE_ABUNDANCE
+            isotope_ratio_tolerance = DEFAULT_ISOTOPE_RATIO_TOLERANCE
+            peak_min_intensity = DEFAULT_PEAK_MIN_INTENSITY
+            min_isotope_correlation = DEFAULT_MIN_ISOTOPE_CORRELATION
+            probable_match_threshold = DEFAULT_PROBABLE_MATCH_THRESHOLD
+            possible_match_threshold = DEFAULT_POSSIBLE_MATCH_THRESHOLD
 
-            # Apply the filters to each row
-            row["match_score"] = (
-                row["match_score"]
-                if all(
-                    [
-                        abs(row["match_mz_error"]) <= mz_tolerance,
-                        abs(row["match_abundance_error"]) <= isotope_ratio_tolerance,
-                        max(row["match_isotope_correlation"], 0)
-                        >= min_isotope_correlation,
-                        row["sample_peak_area"] >= peak_min_intensity,
-                        row["relative_abundance"] >= min_isotope_abundance,
-                    ]
-                )
-                else 0
+        # Apply the filters to each row
+        row["match_score"] = (
+            row["match_score"]
+            if all(
+                [
+                    abs(row["match_mz_error"]) <= mz_tolerance,
+                    abs(row["match_abundance_error"]) <= isotope_ratio_tolerance,
+                    max(row["match_isotope_correlation"], 0) >= min_isotope_correlation,
+                    row["sample_peak_area"] >= peak_min_intensity,
+                    row["relative_abundance"] >= min_isotope_abundance,
+                ]
             )
-
-            row["sample_peak_area"] = (
-                row["sample_peak_area"]
-                if all(
-                    [
-                        abs(row["match_mz_error"]) <= mz_tolerance,
-                        abs(row["match_abundance_error"]) <= isotope_ratio_tolerance,
-                        max(row["match_isotope_correlation"], 0)
-                        >= min_isotope_correlation,
-                        row["relative_abundance"] >= min_isotope_abundance,
-                    ]
-                )
-                else 0
-            )
-
-            # Assign match category based on thresholds
-            match_score = row["match_score"]
-            row["match_category"] = (
-                2  # Probable match
-                if match_score >= probable_match_threshold
-                else (
-                    1  # Possible match
-                    if possible_match_threshold
-                    <= match_score
-                    < probable_match_threshold
-                    else 0
-                )  # No match
-            )
-
-        message = (
-            "Batch match filter successfully initialized"
-            if len(batch_match_filter_dict) > 0
-            else "No matches found for the batch"
+            else 0
         )
-        return {
-            "message": message,
-            "data": batch_match_filter_dict,
-        }
+
+        row["sample_peak_area"] = (
+            row["sample_peak_area"]
+            if all(
+                [
+                    abs(row["match_mz_error"]) <= mz_tolerance,
+                    abs(row["match_abundance_error"]) <= isotope_ratio_tolerance,
+                    max(row["match_isotope_correlation"], 0) >= min_isotope_correlation,
+                    row["relative_abundance"] >= min_isotope_abundance,
+                ]
+            )
+            else 0
+        )
+
+        # Step 5: Assign match category based on thresholds
+        match_score = row["match_score"]
+        row["match_category"] = (
+            2  # Probable match
+            if match_score >= probable_match_threshold
+            else (
+                1  # Possible match
+                if possible_match_threshold <= match_score < probable_match_threshold
+                else 0
+            )  # No match
+        )
+
+    return batch_match_filter_dicts
 
 
+@api_controller()
 async def init_sample_match_filter(
     sample_item_id: str,
     filter_params: FilterParams = None,
     target_ion_id: str = None,
-):
-    # Provided filter params are ion-specific, apply only when the target_ion_id is provided, in other cases the stored ion-specific or DEFAULT filters are used for match_score and sample_peak_area filtering
+) -> list:
+    """
+    Initializes and applies the sample match filter for a specific sample item, representing isotope-level data.
+    This function fetches isotope match data for a given sample item, applies filtering based on provided
+    ion-specific parameters or default values, and returns the filtered match data.
 
+    This function may be utilized to filter matches by target ion, for example in the get_sample_ion_matches endpoint.
+
+    Filter params are ion-specific. If filter_params are not provided the stored ion-specific or DEFAULT filters are used
+    for match_score/sample_peak_area filtering and setting match_category
+
+    Steps:
+    1. Verify the existence of the specified sample item.
+    2. If a target ion ID is provided, verify its existence and use the provided filter parameters.
+    3. Construct and execute a database query to fetch relevant isotopic match data.
+    4. Convert query results into a dictionary format.
+    5. Apply filtering based on provided filter parameters or using the stored ion-specific or DEFAULT filter parameters.
+    6. Determine the match category for each row based on the computed match score.
+
+    :param sample_item_id: ID of the sample item for which to initialize the match filter.
+    :type sample_item_id: str
+    :param filter_params: Optional ion-specific filter parameters for match score and sample peak area filtering.
+    :type filter_params: FilterParams, optional
+    :param target_ion_id: Optional target ion ID to filter the matches at an isotopic level.
+    :type target_ion_id: str, optional
+    :return: A list of dictionaries containing the filtered isotopic match data.
+    :rtype: List[Dict]
+    :raises NotFoundException: If the specified sample item or target ion does not exist.
+    """
     # Set min_isotope_abundance filter parameter to the provided one or to the DEFAULT value for query
     min_isotope_abundance = (
         filter_params.min_isotope_abundance
@@ -1152,6 +1253,20 @@ async def init_sample_match_filter(
     )
 
     async with async_session() as session:
+        # Step 1: Fetch sample item to verify its existence
+        sample = await session.get(Sample, sample_item_id)
+        if not sample:
+            raise NotFoundException(f"Sample with ID '{sample_item_id}' not found")
+
+        # Step 2: Fetch target ion to verify its existence (if target_ion_id is provided)
+        if target_ion_id is not None:
+            ion = await session.get(TargetIon, target_ion_id)
+            if not ion:
+                raise NotFoundException(
+                    f"Target ion with ID '{target_ion_id}' not found"
+                )
+
+        # Step 3: Construct and execute query to fetch match data
         stmt = (
             select(
                 TargetIsotope.mz,
@@ -1236,25 +1351,24 @@ async def init_sample_match_filter(
             .order_by(TargetIsotope.mz)
         )
 
-        # Apply target_ion_id filter if provided
         if target_ion_id is not None:
+            # Apply target_ion_id filter if provided
             stmt = stmt.where(TargetIon.target_ion_id == target_ion_id)
 
         result = await session.execute(stmt)
         sample_match_filter = result.fetchall()
 
-        # Convert each Row object in the result into a dictionary
+        # Step 4: Convert each Row object in the result into a dictionary
         sample_match_filter_dict = [row._asdict() for row in sample_match_filter]
 
-        # Filtering match_score, sample_peak_area, and setting match_category
+        # Step 5: Apply filtering criteria, filtering match_score, sample_peak_area, and setting match_category
         for row in sample_match_filter_dict:
             # Extract the instrument and filter_params from the database record
             instrument = row["instrument"]
             filter_params_ion = row.get("filter_params")
             # Apply appropriate filter parameters
-            # if target_ion_id and filter_params:
             if filter_params:
-                # Use provided ion-specific filter parameters for specified target_ion
+                # Use provided ion-specific filter parameters
                 mz_tolerance = filter_params.mz_tolerance
                 isotope_ratio_tolerance = filter_params.isotope_ratio_tolerance
                 peak_min_intensity = filter_params.peak_min_intensity
@@ -1262,7 +1376,7 @@ async def init_sample_match_filter(
                 probable_match_threshold = filter_params.probable_match_threshold
                 possible_match_threshold = filter_params.possible_match_threshold
             elif filter_params_ion and instrument in filter_params_ion:
-                # Use ion-specific filters (unique for different instruments), fall back to DEFAULT filters
+                # Use stored ion-specific filters (unique for different instruments)
                 ion_filters = filter_params_ion[instrument]
                 mz_tolerance = ion_filters["mz_tolerance"]
                 isotope_ratio_tolerance = ion_filters["isotope_ratio_tolerance"]
@@ -1271,7 +1385,7 @@ async def init_sample_match_filter(
                 probable_match_threshold = ion_filters["probable_match_threshold"]
                 possible_match_threshold = ion_filters["possible_match_threshold"]
             else:
-                # Use default filters
+                # Fall back to DEFAULT filters
                 mz_tolerance = DEFAULT_MZ_TOLERANCE
                 isotope_ratio_tolerance = DEFAULT_ISOTOPE_RATIO_TOLERANCE
                 peak_min_intensity = DEFAULT_PEAK_MIN_INTENSITY
@@ -1321,20 +1435,4 @@ async def init_sample_match_filter(
                 )  # No match
             )
 
-        if target_ion_id and filter_params:
-            message = (
-                "Sample match filter for target ion successfully initialized"
-                if len(sample_match_filter_dict) > 0
-                else "No matches found for the specified target ion in the sample"
-            )
-        else:
-            message = (
-                "Sample match filter successfully initialized"
-                if len(sample_match_filter_dict) > 0
-                else "No matches found for the sample"
-            )
-
-        return {
-            "message": message,
-            "data": sample_match_filter_dict,
-        }
+        return sample_match_filter_dict

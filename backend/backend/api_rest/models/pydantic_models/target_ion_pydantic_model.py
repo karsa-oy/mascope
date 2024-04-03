@@ -13,3 +13,21 @@ class TargetIonUpdate(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class GetTargetIonsQueryParams(BaseModel):
+    target_compound_id: Optional[str] = Field(
+        None, description="Filter by target compound ID."
+    )
+    ionization_mechanism_id: Optional[str] = Field(
+        None, description="Filter by ionization mechanism ID."
+    )
+    target_ion_formula: Optional[str] = Field(
+        None, description="Filter by target ion formula."
+    )
+    sort: Optional[str] = Field(None, description="Field to sort by.")
+    order: Optional[str] = Field(
+        None, description="Order of sorting ('asc' or 'desc')."
+    )
+    page: int = Field(0, description="Pagination page.")
+    limit: int = Field(10000, description="Number of items per page.")
