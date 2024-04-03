@@ -1,4 +1,4 @@
-from backend.server import sio
+from .. import sio
 
 
 @sio.event(namespace="/")

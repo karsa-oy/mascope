@@ -1,7 +1,7 @@
 from sqlalchemy import asc, desc, func
 from sqlalchemy.future import select
 
-from backend.db_api_rest import async_session
+from backend.db import async_session
 from ..models.models import TargetCollectionInSampleBatch
 
 

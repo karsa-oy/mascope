@@ -1,50 +1,58 @@
 # Import this here to avoid "free(): invalid pointer" error on Linux
 from hardware.tofwerk.lib.TwTool import *
 
+import os
 import socketio
+import uvicorn
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from .socket_events import sio
-from backend.db import run as run_db
-from .db_api_rest import init_db
-from .api_rest.exceptions import handle_exception
+from dotenv import load_dotenv
+from backend.api_sio import sio
+from backend.db import init_db
+from backend.api.exceptions import handle_exception
 
-from .api_rest.routes.sample_items_routes import sample_items_router
-from .api_rest.routes.sample_batches_routes import sample_batches_router
-from .api_rest.routes.workspace_routes import workspace_router
-from .api_rest.routes.sample_files_routes import sample_files_router
-from .api_rest.routes.calibration_routes import calibration_router
-from .api_rest.routes.matches_routes import matches_router
-from .api_rest.routes.target_collections_routes import target_collections_router
-from .api_rest.routes.target_collection_in_sample_batch_routes import (
+from backend.api.routes.sample_items_routes import sample_items_router
+from backend.api.routes.sample_batches_routes import sample_batches_router
+from backend.api.routes.workspace_routes import workspace_router
+from backend.api.routes.sample_files_routes import sample_files_router
+from backend.api.routes.calibration_routes import calibration_router
+from backend.api.routes.matches_routes import matches_router
+from backend.api.routes.target_collections_routes import target_collections_router
+from backend.api.routes.target_collection_in_sample_batch_routes import (
     target_collection_in_sample_batch_router,
 )
-from .api_rest.routes.target_compounds_routes import target_compounds_router
-from .api_rest.routes.target_compound_in_target_collection_routes import (
+from backend.api.routes.target_compounds_routes import target_compounds_router
+from backend.api.routes.target_compound_in_target_collection_routes import (
     target_compound_in_target_collection_router,
 )
-from .api_rest.routes.target_ions_routes import target_ions_router
-from .api_rest.routes.ionization_mechanisms_routes import ionization_mechanisms_router
-from .api_rest.routes.target_isotopes_routes import target_isotopes_router
-from .api_rest.routes.match_interferences_routes import match_interferences_router
-from .api_rest.routes.instrument_functions_routes import instrument_functions_router
-from .api_rest.routes.attribute_templates_routes import attribute_templates_router
-from .api_rest.routes.visualization_routes import visualization_router
-from .api_rest.routes.match_routes import match_router
-from .api_rest.routes.match_rating_routes import match_rating_router
-from .api_rest.routes.samples_routes import samples_router
+from backend.api.routes.target_ions_routes import target_ions_router
+from backend.api.routes.ionization_mechanisms_routes import ionization_mechanisms_router
+from backend.api.routes.target_isotopes_routes import target_isotopes_router
+from backend.api.routes.match_interferences_routes import match_interferences_router
+from backend.api.routes.instrument_functions_routes import instrument_functions_router
+from backend.api.routes.attribute_templates_routes import attribute_templates_router
+from backend.api.routes.visualization_routes import visualization_router
+from backend.api.routes.match_routes import match_router
+from backend.api.routes.match_rating_routes import match_rating_router
+from backend.api.routes.samples_routes import samples_router
 
+
+load_dotenv()
+
+api_port = int(os.environ.get("MASCOPE_PUBLIC_API_PORT"))
+mode = os.environ.get("MASCOPE_PUBLIC_MODE")
 
 fastapi_app = FastAPI()
 
 
 @fastapi_app.on_event("startup")
 async def startup_event():
+    """Run at application startup"""
     await init_db()
-    run_db()
 
 
 # CORS middleware
@@ -139,3 +147,17 @@ for router in routers:
 
 # Initialize ASGI app with socket.io and FastAPI app
 app = socketio.ASGIApp(sio, other_asgi_app=fastapi_app)
+
+
+def run():
+    """Entry point to run Mascope backend"""
+    uvicorn.run(
+        "backend.main:app",
+        host="0.0.0.0" if mode == "development" else "127.0.0.1",
+        port=api_port,
+        reload=(mode == "development"),
+    )
+
+
+if __name__ == "__main__":
+    run()

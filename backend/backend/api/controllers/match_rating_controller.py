@@ -3,8 +3,8 @@ from fastapi import HTTPException, status
 from sqlalchemy import asc, desc, func, and_
 from sqlalchemy.future import select
 from datetime import datetime
-from backend.server import sio
-from backend.db_api_rest import async_session
+from backend.api_sio import sio
+from backend.db import async_session
 from backend.db.id import gen_id
 from ..models.models import MatchRating
 from ..models.pydantic_models.match_rating_pydantic_model import (

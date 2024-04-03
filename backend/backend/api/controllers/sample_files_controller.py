@@ -2,8 +2,8 @@ from fastapi import HTTPException
 from sqlalchemy import asc, desc, func, and_, cast, Float
 from sqlalchemy.future import select
 from datetime import datetime
-from backend.db_api_rest import async_session
-from backend.socket_events import sio
+from backend.db import async_session
+from backend.api_sio import sio
 from backend.db.id import gen_id
 from ..utils.api_features import api_controller
 from ..exceptions import NotFoundException

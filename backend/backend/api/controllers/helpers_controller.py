@@ -1,6 +1,6 @@
 from sqlalchemy import select
-from backend.db_api_rest import async_session
-from backend.server import sio
+from backend.db import async_session
+from backend.api_sio import sio
 from ..models.models import (
     TargetCompoundInTargetCollection,
     TargetCollectionInSampleBatch,

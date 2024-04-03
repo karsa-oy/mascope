@@ -2,7 +2,7 @@ from fastapi import HTTPException
 from sqlalchemy import asc, desc, func, select, delete, and_
 from typing import List, Optional
 
-from backend.db_api_rest import async_session
+from backend.db import async_session
 from ..models.models import MatchInterference
 
 

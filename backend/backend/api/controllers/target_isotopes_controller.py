@@ -2,7 +2,7 @@ from fastapi import HTTPException
 from sqlalchemy import select, asc, desc, func
 from sqlalchemy.orm import joinedload
 from typing import List, Optional, Tuple
-from backend.db_api_rest import async_session
+from backend.db import async_session
 from ..models.models import (
     Workspace,
     SampleBatch,

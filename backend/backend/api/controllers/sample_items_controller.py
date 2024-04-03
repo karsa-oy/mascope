@@ -4,8 +4,8 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
 from datetime import datetime
 
-from backend.server import sio
-from backend.db_api_rest import async_session
+from backend.api_sio import sio
+from backend.db import async_session
 from backend.db.id import gen_id
 
 from ..models.models import (

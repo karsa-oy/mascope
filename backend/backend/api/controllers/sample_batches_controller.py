@@ -12,8 +12,8 @@ from sqlalchemy import (
 from sqlalchemy.orm import joinedload
 from typing import List
 from datetime import datetime
-from backend.db_api_rest import async_session
-from backend.server import sio
+from backend.db import async_session
+from backend.api_sio import sio
 from lib.peak import detect_peaks, get_peaks
 from backend.db.id import gen_id
 

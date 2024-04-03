@@ -6,9 +6,9 @@ from sqlalchemy import asc, desc, func, select
 from sqlalchemy.orm import joinedload
 from typing import List, Optional, Dict
 
-from backend.server import sio
+from backend.api_sio import sio
 from backend.db.id import gen_id
-from backend.db_api_rest import async_session
+from backend.db import async_session
 
 from .target_compounds_controller import (
     get_target_compounds,

@@ -16,8 +16,8 @@ import pandas as pd
 from hardware.tofwerk.calibration import mz_calibrate
 from hardware.tofwerk.lib.TwTool import TwTof2Mass
 
-from backend.db_api_rest import async_session
-from backend.socket_events import sio
+from backend.db import async_session
+from backend.api_sio import sio
 
 from lib.file_func import (
     get_zarr_var_shape,
