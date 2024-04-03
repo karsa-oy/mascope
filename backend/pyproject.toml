@@ -7,7 +7,7 @@ license = "Proprietary"
 include = ["backend"]
 packages = [
     {include = "backend"},
-    {include = "hardware", from ="hardware"},
+    {include = "hardware"},
     {include = "lib", from ="lib"},
     {include = "service", from ="service"},
 ]

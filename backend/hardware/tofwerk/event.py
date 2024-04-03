@@ -10,7 +10,6 @@ Created on Tue Apr  2 13:36:46 2019
 from copy import deepcopy
 
 import h5py
-import h5sparse
 import numpy as np
 import pandas as pd
 import xarray
@@ -401,107 +400,6 @@ class KEvent(KSpectra):
             avg_data.append(data_t.mean(axis=1))
             tnow += avg_s
         return np.asarray(avg_data).T, info
-
-    def get_code(self, m0=None, m1=None, si0=None, si1=None, t0=None, t1=None, dt=None):
-        """Get a single code vector from file
-
-        Get averaged KEncoder result code for a given mass/sample and/or
-        time range. Use either m0 & m1 or si0 & si1 to specify the ranges.
-
-        Parameters
-        ----------
-        m0 : int, optional
-            Beginning of mass range. The default is None.
-        m1 : int, optional
-            End of mass range. The default is None.
-        si0 : int, optional
-            Beginning of sample number range. The default is None.
-        si1 : int, optional
-            End of sample number range. The default is None.
-        t0 : float, optional
-            Start time of the desired time range. The default is None.
-            If None, start time of the acquisition is used.
-        t1 : float, optional
-            End time of the desired range. The default is None.
-            If None, end time of the acquisition is used.
-        dt : float, optional
-            Length of the desired range. The default is None.
-            If not None, 't0' and 'dt' are used to define the range
-            instead of 't0' and 't1'.
-
-        Returns
-        -------
-        code : array
-            Average code for the requested ranges.
-        """
-
-        ind = self._t2flatind(t0, t1, dt)
-        if ind is not None:
-            i0, i1 = ind
-        else:
-            i0 = 0
-            i1 = len(self.t)
-        if m0 is not None:
-            si0 = self.mz2sno(m0, True)
-        if m1 is not None:
-            si1 = self.mz2sno(m1, True)
-        with h5sparse.File(self.filename, "r") as h5f:
-            code = h5f["Karsa/code"].value[si0:si1, i0:i1].sum(axis=1)
-            code = np.squeeze(np.asarray(code))
-            avg_step = h5f["Karsa/code"].attrs["avg_step"]
-            code /= (i1 - i0) / float(avg_step)
-        return code
-
-    def get_codes(
-        self, m0=None, m1=None, si0=None, si1=None, t0=None, t1=None, dt=None
-    ):
-        """Get code sparse matrix from file
-
-        Get KEncoder result codes for a given mass/sample and/or
-        time range. Use either m0 & m1 or si0 & si1 to specify the ranges.
-
-        Parameters
-        ----------
-        m0 : int, optional
-            Beginning of mass range. The default is None.
-        m1 : int, optional
-            End of mass range. The default is None.
-        si0 : int, optional
-            Beginning of sample number range. The default is None.
-        si1 : int, optional
-            End of sample number range. The default is None.
-        t0 : float, optional
-            Start time of the desired time range. The default is None.
-            If None, start time of the acquisition is used.
-        t1 : float, optional
-            End time of the desired range. The default is None.
-            If None, end time of the acquisition is used.
-        dt : float, optional
-            Length of the desired range. The default is None.
-            If not None, 't0' and 'dt' are used to define the range
-            instead of 't0' and 't1'.
-
-        Returns
-        -------
-        codes : csc_matrix
-            Code for the requested ranges as a sparse matrix
-        """
-
-        ind = self._t2flatind(t0, t1, dt)
-        if ind is not None:
-            i0, i1 = ind
-        else:
-            i0 = 0
-            i1 = len(self.t)
-        if m0 is not None:
-            si0 = self.mz2sno(m0, True)
-        if m1 is not None:
-            si1 = self.mz2sno(m1, True)
-        with h5sparse.File(self.filename) as h5f:
-            codes = h5f["Karsa/code"].value[si0:si1, i0:i1]
-            avg_step = h5f["Karsa/code"].attrs["avg_step"]
-            codes /= (i1 - i0) / float(avg_step)
-        return codes  # .toarray()
 
     def write_peaks(self, peaks):
         """Write peaks to file
