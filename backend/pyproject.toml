@@ -9,7 +9,7 @@ packages = [
     {include = "backend"},
     {include = "hardware"},
     {include = "lib"},
-    {include = "service", from ="service"},
+    {include = "service"},
 ]
 
 [build-system]
