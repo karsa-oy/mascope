@@ -406,7 +406,7 @@ def get_sample_items(mascope_url: str, sample_batch_id: str) -> list:
     body = dict(
         sample_batch_id=sample_batch_id,
     )
-    resp = api_post(mascope_url, f"samples", data=body)
+    resp = api_post(mascope_url, "samples", data=body)
     content = None if not resp or resp.status_code != 200 else json.loads(resp.content)
     sample_items = content and content["data"] or []
     return [
@@ -511,3 +511,59 @@ def get_sample_file_spectrum(
     )
     content = None if not resp or resp.status_code != 200 else json.loads(resp.content)
     return content["data"] if content is not None else None
+
+
+def create_instrument_function(
+    mascope_url: str,
+    instrument: str,
+    datetime_utc: str,
+    peakshape: dict,
+    resolution_function: list,
+) -> dict:
+    """
+    Create a new instrument function record in the database.
+
+    :param mascope_url: Base URL of the Mascope API
+    :param instrument: Name of the instrument
+    :param datetime_utc: UTC timestamp of the instrument function
+    :param peakshape: Peak shape data containing 'x' and 'y' lists
+    :param resolution_function: List containing resolution function parameters
+    :return: The created instrument function details as received from the API response
+
+    Example instrument function input data:
+        instrument_function_data = {
+            "instrument": "KLTOF1",
+            "datetime_utc": "2024-04-04T07:51:00.717774",
+            "peakshape": {
+                "x": [-30.0, -29.9, -29.8, 29.8, 29.9, 30.0,],
+                "y": [0.0, 3.0326e-06, 4.8616e-06, 7.4314e-03, 1.2687e-02, 2.2572e-02,]
+            },
+            "resolution_function": [0.0001098, 0.0003524]
+        }
+    """
+    # Construct the request body based on the function parameters
+    data = {
+        "instrument": instrument,
+        "datetime_utc": datetime_utc,
+        "peakshape": peakshape,
+        "resolution_function": resolution_function,
+    }
+
+    # Make the POST request to the instrument_functions endpoint
+    resp = api_post(mascope_url, "instrument_functions", data)
+
+    # Handle the response
+    if resp and resp.status_code == 201:
+        # Successfully created the instrument function, extract 'data' from the response JSON
+        response_json = resp.json()  # parse JSON response content
+        # Return the 'data' part containing the instrument function details
+        return response_json.get("data")
+
+    # Handle errors or unsuccessful attempts
+    error_message = (
+        f"Failed to create instrument function. Status code: {resp.status_code}"
+        if resp
+        else "No response from server"
+    )
+    print(error_message)
+    return {"error": error_message}
