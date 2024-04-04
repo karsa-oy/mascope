@@ -52,7 +52,7 @@ class InstrumentFunctionCreateBody(BaseModel):
     instrument: str = Field(..., description="Instrument name")
     datetime_utc: datetime = Field(
         ...,
-        description="An experimentally determined representation of a typical peak shape observed in the instrument's mass spectrum, providing a median shape derived from multiple peak analyses.. It includes normalized width and height for accurate peak fitting.",
+        description="UTC timestamp from which onwards the specified instrument functions are applied, until new instrument functions are generated.",
     )
     peakshape: PeakShape = Field(..., description="Peak shape data")
     resolution_function: List[float] = Field(
