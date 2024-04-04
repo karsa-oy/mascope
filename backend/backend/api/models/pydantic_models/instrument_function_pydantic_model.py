@@ -1,5 +1,6 @@
-from pydantic import BaseModel, Field, validator, root_validator, ValidationError
-from typing import Optional
+from pydantic import BaseModel, Field, root_validator
+from typing import Optional, List
+from datetime import datetime
 
 
 class GetInstrumentFunctionsQueryParams(BaseModel):
@@ -34,3 +35,27 @@ class GetInstrumentFunctionQueryParams(BaseModel):
                 "Must provide either 'filename' or 'instrument_function_id', not both."
             )
         return values
+
+
+class PeakShape(BaseModel):
+    x: List[float] = Field(
+        ...,
+        description="X-axis values representing the mass-to-charge ratio (m/z) for the peak shape.",
+    )
+    y: List[float] = Field(
+        ...,
+        description="Y-axis values representing intensity for each corresponding m/z value in the peak shape.",
+    )
+
+
+class InstrumentFunctionCreateBody(BaseModel):
+    instrument: str = Field(..., description="Instrument name")
+    datetime_utc: datetime = Field(
+        ...,
+        description="An experimentally determined representation of a typical peak shape observed in the instrument's mass spectrum, providing a median shape derived from multiple peak analyses.. It includes normalized width and height for accurate peak fitting.",
+    )
+    peakshape: PeakShape = Field(..., description="Peak shape data")
+    resolution_function: List[float] = Field(
+        ...,
+        description="Parameters defining the resolution function, which is used to scale the width of peaks accurately during peak fitting.",
+    )
