@@ -2,34 +2,31 @@ import os
 import re
 import traceback
 from importlib import import_module
-
 from dotenv import load_dotenv
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy import text
 
-from backend.db.id import *  # noqa
+
+def get_available_db_version():
+    migrations_dir = os.path.join(os.path.dirname(__file__), "migration")
+    files = os.listdir(migrations_dir)
+    migrations = [f for f in files if re.search("v[0-9]+.py", f)]
+    versions = [int(re.search("[0-9]+", migration).group()) for migration in migrations]
+    return max(versions)
 
 
-def run():
-    try:
-        print("Initializing mascope database")
-        target_version = int(os.environ.get("MASCOPE_PUBLIC_DB_VERSION"))
-        current_version = get_current_db_version()
-        available_version = get_available_db_version()
-        print(f"Detected mascope database version: v{current_version}")
-        if target_version > available_version:
-            raise ValueError(
-                f"""
-                Latest available version is: {available_version}.
-            """
-            )
-        if current_version == target_version:
-            print("No database migration needed.")
-        else:
-            print(f"This version of mascope requires: v{target_version}")
-            current_version = migrate(current_version, target_version)
-        # load api
-        import_module("backend.api")
-    except Exception as error:  # noqa
-        traceback.print_exc()
+def get_current_db_version():
+    v = 0
+    if os.path.exists(db_dir):
+        files = os.listdir(db_dir)
+        databases = [f for f in files if re.search("mascope.v[0-9]+.db", f)]
+        versions = [
+            int(re.search("[0-9]+", database).group()) for database in databases
+        ]
+        if len(versions) > 0:
+            v = max(versions)
+    return v
 
 
 def migrate(current_version, target_version):
@@ -66,25 +63,37 @@ def migrate(current_version, target_version):
     return current_version
 
 
-def get_available_db_version():
-    migrations_dir = os.path.join(os.path.dirname(__file__), "migration")
-    files = os.listdir(migrations_dir)
-    migrations = [f for f in files if re.search("v[0-9]+.py", f)]
-    versions = [int(re.search("[0-9]+", migration).group()) for migration in migrations]
-    return max(versions)
+async def test_database_connection():
+    try:
+        # create a new session and close it
+        async with async_session() as session:
+            await session.execute(text("SELECT 1"))
+        print("Database connection established successfully.")
+    except Exception as e:
+        print("Error while establishing the database connection: ", e)
 
 
-def get_current_db_version():
-    v = 0
-    if os.path.exists(db_dir):
-        files = os.listdir(db_dir)
-        databases = [f for f in files if re.search("mascope.v[0-9]+.db", f)]
-        versions = [
-            int(re.search("[0-9]+", database).group()) for database in databases
-        ]
-        if len(versions) > 0:
-            v = max(versions)
-    return v
+async def init_db():
+    try:
+        print("Initializing mascope database")
+        target_version = int(os.environ.get("MASCOPE_PUBLIC_DB_VERSION"))
+        current_version = get_current_db_version()
+        available_version = get_available_db_version()
+        print(f"Detected mascope database version: v{current_version}")
+        if target_version > available_version:
+            raise ValueError(
+                f"""
+                Latest available version is: {available_version}.
+            """
+            )
+        if current_version == target_version:
+            print("No database migration needed.")
+        else:
+            print(f"This version of mascope requires: v{target_version}")
+            current_version = migrate(current_version, target_version)
+    except Exception as error:  # noqa
+        traceback.print_exc()
+    await test_database_connection()
 
 
 # env vars
@@ -92,3 +101,15 @@ load_dotenv()
 db_dir = os.environ.get("MASCOPE_PRIVATE_DATABASE_DIR")
 current_version = get_current_db_version()
 db_path = os.path.join(db_dir, f"mascope.v{current_version}.db")
+
+# Database configuration
+DATABASE_URL = f"sqlite+aiosqlite:///{db_path}"
+engine = create_async_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,  # Check connection liveness before using a connection from the pool
+    connect_args={
+        "timeout": 15
+    },  # Set a timeout of 15 seconds for establishing connections and waiting for table locks
+)
+
+async_session = sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)

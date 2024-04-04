@@ -4,9 +4,7 @@ version = "0.1.0"
 description = ""
 authors = ["Oskari Kausiala <oskari.kausiala@karsa.fi>"]
 readme = "README.md"
-packages = [
-    { include = "lib", from = "." }
-]
+
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.11"

@@ -8,7 +8,7 @@ const state = {
   mzFitError: null,
   mzFitStats: null,
   paramMatchScoreMin: 0,
-  paramMinIsotopeAbundance: 0.1,
+  paramMinIsotopeAbundance: 0.15,
   paramMinPeakIntensity: 1000,
   paramRefineWindow: 100,
 };
