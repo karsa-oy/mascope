@@ -7,11 +7,14 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.future import select
+from backend.db.id import gen_id
 from backend.db import async_session
 from ..utils.api_features import api_controller
 from ..exceptions import NotFoundException
 from ..models.models import SampleFile, InstrumentFunction
-
+from ..models.pydantic_models.instrument_function_pydantic_model import (
+    InstrumentFunctionCreateBody,
+)
 
 # -------------------------------------------------------------------
 # Main Logic Functions
@@ -163,3 +166,64 @@ async def get_instrument_function(
 
         # Step 5: Return details
         return instrument_function.to_dict()
+
+
+@api_controller()
+async def create_instrument_function(
+    instrument_function_data: InstrumentFunctionCreateBody,
+) -> dict:
+    """
+    Creates a new instrument function with the provided details.
+
+    Steps:
+    1. Construct a new InstrumentFunction object with the provided details and a generated unique ID.
+    2. Add the new instrument function to the session and commit the changes to the database.
+    3. Refresh the instance and return the details of the created instrument function as a dictionary.
+
+    :param instrument_function_data: Data for creating the instrument function.
+    :type instrument_function_data: InstrumentFunctionCreateBody
+    :return: A dictionary containing the created instrument function data.
+    :rtype: dict
+    """
+    async with async_session() as session:
+        # Step 1: Construct new instrument function
+        new_instrument_function = InstrumentFunction(
+            instrument_function_id=gen_id(32),
+            **instrument_function_data.dict(),  # Unpack the Pydantic model's data
+        )
+
+        # Step 2: Add to session and commit the changes to the database
+        session.add(new_instrument_function)
+        await session.commit()
+
+        # Step 3: Refresh the instance and return created instrument function
+        await session.refresh(new_instrument_function)
+        return {"data": new_instrument_function.to_dict()}
+
+
+@api_controller()
+async def delete_instrument_function(instrument_function_id: str):
+    """
+    Deletes a instrument function by its unique identifier.
+
+    Steps:
+    1. Fetch the instrument function by its ID from the database.
+    2. If the instrument function is found, delete it from the session and commit the changes to the database.
+
+    :param instrument_function_id: The unique identifier of the instrument function to delete.
+    :type instrument_function_id: str
+    :raises NotFoundException: If no instrument function is found with the provided ID.
+    """
+    # Step 1: Fetch the instrument function
+    async with async_session() as session:
+        instrument_function = await session.get(
+            InstrumentFunction, instrument_function_id
+        )
+        if not instrument_function:
+            raise NotFoundException(
+                f"Instrument function with ID '{instrument_function_id}' not found"
+            )
+
+        # Step 2: Delete the instrument function and commit changes
+        await session.delete(instrument_function)
+        await session.commit()
