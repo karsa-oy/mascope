@@ -6,8 +6,8 @@ import vue from '@vitejs/plugin-vue'
 import path from 'path'
 
 export default ({ mode }) => {
-  const dotEnvPath = path.resolve(process.cwd() + '/..')
-  const env = loadEnv(mode, dotEnvPath, 'MASCOPE_PUBLIC_')
+  const envDir = path.resolve(process.cwd() + '/..')
+  const env = loadEnv(mode, envDir, 'MASCOPE_PUBLIC_')
 
   return defineConfig({
     plugins: [vue()],
@@ -22,6 +22,7 @@ export default ({ mode }) => {
       cssCodeSplit: false,
       target: 'esnext'
     },
-    envPrefix: 'MASCOPE_PUBLIC_'
+    envPrefix: 'MASCOPE_PUBLIC_',
+    envDir
   })
 }
