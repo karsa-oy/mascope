@@ -1,12 +1,9 @@
 <script setup>
-import * as _ from 'underscore'
-
-import { dialog } from '@/main'
-
 import { ref, computed } from 'vue'
 
 import BaseSpreadsheetInput from '@/components/base/BaseSpreadsheetInput.vue'
 
+import { dialog } from '@/main'
 import { useAppStore, useModalStore, useTargetsStore, useWorkspaceStore } from '@/stores'
 
 const appStore = useAppStore()
@@ -82,9 +79,15 @@ const saveButtonActive = computed(() => {
 
       // Compare initial and current compounds
       const compoundsChanged =
-        !_.isEqual(
-          initialCompounds.value.map((compound) => compound.target_compound_id).sort(),
-          targetCompounds.value.map((compound) => compound.target_compound_id).sort()
+        !(
+          initialCompounds.value
+            .map((compound) => compound.target_compound_id)
+            .sort()
+            .join() ==
+          targetCompounds.value
+            .map((compound) => compound.target_compound_id)
+            .sort()
+            .join()
         ) || targetCompoundsCreate.value.length > 0 // Check if there are new compounds to create;
 
       let disabled = !basicPropertiesChanged && !compoundsChanged
@@ -96,9 +99,15 @@ const saveButtonActive = computed(() => {
       return disabled
     }
     case 'manageCollectionBatches':
-      return _.isEqual(
-        initialBatches.value.map((batch) => batch.sample_batch_id).sort(),
-        sampleBatches.value.map((batch) => batch.sample_batch_id).sort()
+      return (
+        initialBatches.value
+          .map((batch) => batch.sample_batch_id)
+          .sort()
+          .join() ==
+        sampleBatches.value
+          .map((batch) => batch.sample_batch_id)
+          .sort()
+          .join()
       )
 
     default:
@@ -331,11 +340,11 @@ function initData() {
     compoundsTab.value = 'selectedCompounds'
     // Reset the selected compounds tab to the first page when the list is reloaded
     initialCompoundsCurrentPage.value = 1
-    collectionId.value = targetsStore.activeCollection.value?.target_collection_id ?? ''
-    collectionName.value = targetsStore.activeCollection.value?.target_collection_name ?? ''
-    collectionDesc.value = targetsStore.activeCollection.value?.target_collection_description ?? ''
-    collectionType.value = targetsStore.activeCollection.value?.target_collection_type ?? null
-    targetCompounds.value = targetsStore.activeCollection.value?.target_compounds ?? []
+    collectionId.value = targetsStore.activeCollection?.target_collection_id ?? ''
+    collectionName.value = targetsStore.activeCollection?.target_collection_name ?? ''
+    collectionDesc.value = targetsStore.activeCollection?.target_collection_description ?? ''
+    collectionType.value = targetsStore.activeCollection?.target_collection_type ?? null
+    targetCompounds.value = targetsStore.activeCollection?.target_compounds ?? []
     initialCompounds.value = targetCompounds.value
     targetCompoundsCreate.value = []
     spreadsheetCompounds.value = []
@@ -343,11 +352,11 @@ function initData() {
   // Initializes data specific to the 'manageCollectionBatches' action
   if (action.value == 'manageCollectionBatches') {
     activeTab.value = 'batches'
-    collectionId.value = targetsStore.activeCollection.value?.target_collection_id ?? ''
-    collectionName.value = targetsStore.activeCollection.value?.target_collection_name ?? ''
-    collectionDesc.value = targetsStore.activeCollection.value?.target_collection_description ?? ''
-    collectionType.value = targetsStore.activeCollection.value?.target_collection_type ?? null
-    sampleBatches.value = targetsStore.activeCollection.value?.sample_batches ?? []
+    collectionId.value = targetsStore.activeCollection?.target_collection_id ?? ''
+    collectionName.value = targetsStore.activeCollection?.target_collection_name ?? ''
+    collectionDesc.value = targetsStore.activeCollection?.target_collection_description ?? ''
+    collectionType.value = targetsStore.activeCollection?.target_collection_type ?? null
+    sampleBatches.value = targetsStore.activeCollection?.sample_batches ?? []
     initialBatches.value = sampleBatches.value
     workspaceSelected.value = currentWorkspace.value ?? null
     if (workspaceStore.activeBatches) reconcileBatches.value(workspaceStore.activeBatches)
@@ -358,6 +367,7 @@ function initData() {
     collectionName.value = targetsStore.activeCollection?.target_collection_name ?? ''
     deleteOrphanCompounds.value = true
   }
+  loadWorkspaceBatches()
 }
 function resetData() {
   modalStore.state.targetCollectionOpProps = {}

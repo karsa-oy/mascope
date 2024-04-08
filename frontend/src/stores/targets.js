@@ -57,15 +57,6 @@ export const useTargetsStore = defineStore('targets', () => {
 
   // actions
 
-  function setCollectionAllSelection({ collectionId, selectionValue }) {
-    const collection = targetCollectionsAll.value.find(
-      (coll) => coll.target_collection_id === collectionId
-    )
-    if (collection) {
-      collection.selection = selectionValue
-    }
-  }
-
   // data loading
   async function load(collectionId = null) {
     if (activeCollection.value) await unload()
@@ -208,10 +199,11 @@ export const useTargetsStore = defineStore('targets', () => {
       .forEach((coll) => (coll.selection = 0))
 
     // Update the selected collection's selection value
-    setCollectionAllSelection({
-      collectionId,
-      selectionValue
-    })
+    targetCollectionsAll.value = targetCollectionsAll.value.map(
+      (coll) => coll.target_collection_id === collectionId
+        ? {...coll, selection: selectionValue}
+        : coll
+    )
 
     // If a collection is selected, fetch its details
     const selectedCollections = targetCollectionsSelected.value
