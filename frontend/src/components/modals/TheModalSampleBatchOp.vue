@@ -55,9 +55,8 @@ const newBatchDescription = ref(
 
 //// General data ////
 
-const action = computed(() => {
-  return modalStore.state.sampleBatchOpProps.action
-})
+const action = computed(() => modalStore.state.sampleBatchOpProps.action)
+
 const collectionColumns = computed(() => {
   return [
     { field: 'target_collection_name', label: 'Name' },
@@ -68,24 +67,12 @@ const calibrationTabDisabled = computed(() => {
   switch (action.value) {
     case 'create':
       return false
-    case 'update': {
-      // Compare initial and current calibration collection
-      const initialCalibrationCollectionId = initialCalibrationCollection.value
-        ? initialCalibrationCollection.value.target_collection_id
-        : null
-      const currentCalibrationCollectionId = calibrationCollectionSelected.value
-        ? calibrationCollectionSelected.value.target_collection_id
-        : null
-      const calibrationCollectionChanged =
-        initialCalibrationCollectionId !== currentCalibrationCollectionId
-      return !calibrationCollectionChanged
-    }
     default:
       return true
   }
 })
 
-const saveButtonActive = computed(() => {
+const saveButtonDisabled = computed(() => {
   switch (action.value) {
     case 'create':
       return (
@@ -102,19 +89,17 @@ const saveButtonActive = computed(() => {
         batchName.value // the name is required
 
       // Compare initial and current calibration collection
-      const initialCalibrationCollectionId =
-        initialCalibrationCollection.value?.target_collection_id || null
-      const currentCalibrationCollectionId =
-        calibrationCollectionSelected.value?.target_collection_id || null
+
       const calibrationCollectionChanged =
-        initialCalibrationCollectionId !== currentCalibrationCollectionId
+        initialCalibrationCollection.value?.target_collection_id !==
+        calibrationCollectionSelected.value?.target_collection_id
 
       // Compare initial and current target collections
       const collectionsChanged =
         initialTargetCollections.value
           .map((collection) => collection.target_collection_id)
           .sort()
-          .join() ==
+          .join() !==
         targetCollectionsSelected.value
           .map((collection) => collection.target_collection_id)
           .sort()
@@ -153,25 +138,20 @@ const saveButtonActive = computed(() => {
 })
 //// Labels and titles ////
 const modalTitle = computed(() => {
-  let title
   switch (action.value) {
     case 'create':
-      title = `Create a new sample batch`
-      break
+      return `Create a new sample batch`
     case 'update':
-      title = `Update sample batch "${batchName.value}"`
-      break
+      return `Update sample batch "${batchName.value}"`
     case 'editBatchCollections':
-      title = `Edit collections of sample batch "${batchName.value}"`
-      break
+      return `Edit collections of sample batch "${batchName.value}"`
     case 'delete':
-      title = `Delete sample batch "${batchName.value}"`
-      break
+      return `Delete sample batch "${batchName.value}"`
     case 'copy':
-      title = `Copy sample batch "${batchName.value}"`
-      break
+      return `Copy sample batch "${batchName.value}"`
+    default:
+      return 'Unknown sample batch operation'
   }
-  return title
 })
 /// Calibration Tab ////
 const displayedCalibrationCollections = computed(() => {
@@ -222,7 +202,7 @@ const targetCollectionIds = computed(() => {
   return targetCollectionsSelected.value.map((row) => row.target_collection_id)
 })
 const newBatch = computed(() => {
-  if (actionIs('create')) {
+  if (action.value == 'create') {
     return {
       sample_batch_name: batchName.value,
       sample_batch_description: batchDesc.value,
@@ -234,7 +214,7 @@ const newBatch = computed(() => {
       target_collection_ids: targetCollectionIds.value
     }
   }
-  if (actionIs('update') || actionIs('editBatchCollections')) {
+  if (action.value == 'update' || action.value == 'editBatchCollections') {
     return {
       sample_batch_id: batchStore.active.sample_batch_id,
       sample_batch_name: batchName.value,
@@ -251,9 +231,6 @@ const newBatch = computed(() => {
   return null
 })
 
-function actionIs(...actions) {
-  return actions.includes(action.value)
-}
 async function deleteSampleBatch(batch) {
   batchStore.unload()
   await batchStore.deleteBatch(batch)
@@ -348,7 +325,7 @@ function initCalibrationCollectionSelected() {
       (collection) => collection.target_collection_id == batchStore.paramCalibrationCollection
     )
   }
-  initialCalibrationCollection.value = calibrationCollectionSelected
+  initialCalibrationCollection.value = calibrationCollectionSelected.value
   if (!calibrationCollectionSelected.value) {
     // set defaults if batch calibration collection is not set (debug)
     // TODO_configuration
@@ -373,18 +350,16 @@ function initCalibrationCollectionSelected() {
   }
 }
 function initTargetCollectionsSelected() {
-  const ids = batchStore.active
-    ? batchStore.targetCollections?.map((row) => row.target_collection_id) ?? []
-    : []
   targetCollectionsSelected.value = targetsStore.getAllCollections.filter((row) =>
-    ids.includes(row.target_collection_id)
+    batchStore.targetCollections
+      .map((row) => row.target_collection_id)
+      .includes(row.target_collection_id)
   )
   initialTargetCollections.value = targetCollectionsSelected.value
 }
 function initIonMechanismsSelected() {
-  const ids = batchStore.paramIonMechanisms
   ionMechanismsSelected.value = appStore.ionMechanisms.filter((row) =>
-    ids.includes(row.ionization_mechanism_id)
+    batchStore.paramIonMechanisms.includes(row.ionization_mechanism_id)
   )
   initialIonizationMechanisms.value = ionMechanismsSelected.value
 }
@@ -401,9 +376,9 @@ function initIonMechanismsSelected() {
       aria-modal
       @after-enter="initData"
       @close="modalStore.deactivate"
-      :type="actionIs('delete') ? 'is-danger' : 'is-primary'"
+      :type="action == 'delete' ? 'is-danger' : 'is-primary'"
     >
-      <template v-if="actionIs('create', 'update', 'editBatchCollections')">
+      <template v-if="['create', 'update', 'editBatchCollections'].includes(action)">
         <div class="modal-card" style="background-color: inherit; height: 800px">
           <header class="modal-card-head">
             <h2 class="subtitle">{{ modalTitle }}</h2>
@@ -491,10 +466,10 @@ function initIonMechanismsSelected() {
               type="is-primary"
               icon-left="content-save"
               expanded
-              :disabled="saveButtonActive"
+              :disabled="saveButtonDisabled"
               @click="
                 () => {
-                  actionIs('create')
+                  action == 'create'
                     ? batchStore.createBatch(newBatch)
                     : batchStore.updateBatch(newBatch)
                   modalStore.deactivate()
@@ -506,7 +481,7 @@ function initIonMechanismsSelected() {
           </footer>
         </div>
       </template>
-      <template v-if="actionIs('delete')">
+      <template v-if="action == 'delete'">
         <div class="modal-card" style="width: 500px">
           <header class="modal-card-head">
             <h2 class="subtitle">{{ modalTitle }}</h2>
@@ -534,7 +509,7 @@ function initIonMechanismsSelected() {
           </footer>
         </div>
       </template>
-      <template v-if="actionIs('copy')">
+      <template v-if="action == 'copy'">
         <div class="modal-card">
           <!-- style="background-color: inherit; height: 500px" -->
           <header class="modal-card-head">
