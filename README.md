@@ -25,7 +25,6 @@ The backend and frontend have their own setup documentation for Windows and Linu
    - [Python 3.10](https://www.python.org/downloads/release/python-31011/) - Python interpreter
    - [poetry](https://python-poetry.org/) - Python dependency manager
    - [Node](https://nodejs.org/en) - JavaScript runtime environment
-   - [yarn](https://yarnpkg.com/) - JavaScript dependency manager
 
 2. Set up deployment environment by creating file `/scripts/deploy/dev.win/.debug_env`, with the following contents (example, note that the specified directories must exist):
 

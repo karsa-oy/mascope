@@ -28,7 +28,7 @@ FOR /F "eol=# tokens=*" %%i IN (%env_file%) DO SET %%i
 
 echo Build MASCOPE frontend package...
 pushd %frontend_path%
-call yarn build
+call npm build
 
 rm -r -f mascope_ui
 mkdir mascope_ui

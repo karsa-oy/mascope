@@ -6,7 +6,6 @@ import vue from '@vitejs/plugin-vue'
 import path from 'path'
 
 export default ({ mode }) => {
-  console.log(process.cwd())
   const dotEnvPath = path.resolve(process.cwd() + '/..')
   const env = loadEnv(mode, dotEnvPath, 'MASCOPE_PUBLIC_')
 
