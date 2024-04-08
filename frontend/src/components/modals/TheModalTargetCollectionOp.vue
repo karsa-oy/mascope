@@ -55,9 +55,7 @@ const batchesPerPage = ref(15)
 const deleteOrphanCompounds = ref(true)
 
 //// General data ////
-const action = computed(() => {
-  return modalStore.state.targetCollectionOpProps.action
-})
+const action = computed(() => modalStore.state.targetCollectionOpProps.action)
 const targetCompoundColumns = computed(() => {
   // TODO_target_compound_management make fields editable
   return [
@@ -252,7 +250,7 @@ const sampleBatchesIds = computed(() => {
   return sampleBatches.value.map((batch) => batch.sample_batch_id)
 })
 const newCollection = computed(() => {
-  if (actionIs.value('create')) {
+  if (action.value == 'create') {
     return {
       target_collection_name: collectionName.value,
       target_collection_description: collectionDesc.value,
@@ -262,7 +260,7 @@ const newCollection = computed(() => {
       sample_batch_ids: sampleBatchesIds.value
     }
   }
-  if (actionIs.value('update')) {
+  if (action.value == 'update') {
     return {
       target_collection_id: targetsStore.activeCollection.target_collection_id,
       target_collection_name: collectionName.value,
@@ -272,7 +270,7 @@ const newCollection = computed(() => {
       target_compounds_create: targetCompoundsCreate.value
     }
   }
-  if (actionIs.value('manageCollectionBatches')) {
+  if (action.value == 'manageCollectionBatches') {
     return {
       target_collection_id: targetsStore.activeCollection.target_collection_id,
       target_collection_name: collectionName.value,
@@ -285,9 +283,6 @@ const newCollection = computed(() => {
 })
 
 //// General methods ////
-function actionIs(...actions) {
-  return actions.includes(modalStore.state.targetCollectionOpProps.action)
-}
 function deactivateModalResetData() {
   modalStore.deactivate()
   resetData()
@@ -331,7 +326,7 @@ function initData() {
     if (workspaceStore.activeBatches) reconcileBatches(workspaceStore.activeBatches)
   }
   // Initializes data specific to the 'update' action
-  if (actionIs('update')) {
+  if (action.value == 'update') {
     activeTab.value = 'info'
     compoundsTab.value = 'selectedCompounds'
     // Reset the selected compounds tab to the first page when the list is reloaded
@@ -488,9 +483,9 @@ async function loadWorkspaceBatches() {
       aria-modal
       @after-enter="initData"
       @close="deactivateModalResetData"
-      :type="actionIs('delete') ? 'is-danger' : 'is-primary'"
+      :type="action == 'delete' ? 'is-danger' : 'is-primary'"
     >
-      <template v-if="actionIs('create', 'update', 'manageCollectionBatches')">
+      <template v-if="['create', 'update', 'manageCollectionBatches'].includes(action)">
         <div class="modal-card" style="background-color: inherit; height: 90vh">
           <header class="modal-card-head">
             <p class="subtitle">{{ modalTitle }}</p>
@@ -531,7 +526,7 @@ async function loadWorkspaceBatches() {
                     </template>
                     <b-dropdown-item
                       aria-role="listitem"
-                      v-for="collectionType in collectionTypes"
+                      v-for="collectionType in targetsStore.collectionTypes"
                       :key="collectionType"
                       :value="collectionType"
                     >
@@ -744,7 +739,7 @@ async function loadWorkspaceBatches() {
               :disabled="saveButtonActive"
               @click="
                 () => {
-                  actionIs('create')
+                  action == 'create'
                     ? targetsStore.createCollection(newCollection)
                     : targetsStore.updateCollection(newCollection)
                   deactivateModalResetData()
@@ -756,7 +751,7 @@ async function loadWorkspaceBatches() {
           </footer>
         </div>
       </template>
-      <template v-else-if="actionIs('delete')">
+      <template v-else-if="action == 'delete'">
         <div class="modal-card" style="height: 28vh">
           <header class="modal-card-head">
             <p class="subtitle">{{ modalTitle }}</p>
