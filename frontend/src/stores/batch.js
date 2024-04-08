@@ -11,70 +11,59 @@ import { useWorkspaceStore } from './workspace.js'
 export const useBatchStore = defineStore('batch', () => {
   const active = ref(null)
   // samples
-  const sampleItems = ref(null)
+  const sampleItems = ref([])
   // targets
-  const targetCollections = ref(null)
-  const targetCompounds = ref(null)
-  const targetIons = ref(null)
-  const targetIsotopes = ref(null)
+  const targetCollections = ref([])
+  const targetCompounds = ref([])
+  const targetIons = ref([])
+  const targetIsotopes = ref([])
 
   // matches
-  const matchSamples = ref(null) // TODO_loading not used
-  const matchCompounds = ref(null)
-  const matchIons = ref(null)
+  const matchSamples = ref([]) // TODO_loading not used
+  const matchCompounds = ref([])
+  const matchIons = ref([])
   // build parameters
   const paramCalibrationCollection = ref([])
   const paramIonMechanisms = ref([])
 
   // getters
 
-  // get all rows as proxy array
-  const getSampleItems = computed(() => sampleItems.value ?? [])
-  const getTargetCollections = computed(() => targetCollections.value ?? [])
-  const getTargetCompounds = computed(() => targetCompounds.value ?? [])
-  const getTargetIons = computed(() => targetIons.value ?? [])
-  const getTargetIsotopes = computed(() => targetIsotope.value ?? [])
-
   // get row from id
-  const sampleItem = computed(() => {
-    const sampleItems = getSampleItems.value
-    return (sampleItemId) => sampleItems.find((row) => row.sample_item_id == sampleItemId) ?? null
-  })
-  const targetCollection = computed(() => {
-    const targetCollections = getTargetCollections.value
-    return (targetCollectionId) =>
-      targetCollections.find((row) => row.target_collection_id == targetCollectionId) ?? null
-  })
-  const targetCompound = computed(() => {
-    const targetCompounds = getTargetCompounds.value
-    return (targetCompoundId) =>
-      targetCompounds.find((row) => row.target_compound_id == targetCompoundId) ?? null
-  })
-  const targetIon = computed(() => {
-    const targetIons = getTargetIons.value
-    return (targetIonId) => targetIons.find((row) => row.target_ion_id == targetIonId) ?? null
-  })
-  const targetIsotope = computed(() => {
-    const targetIsotopes = getTargetIsotopes.value
-    return (targetIsotopeId) =>
-      targetIsotopes.find((row) => row.target_isotope_id == targetIsotopeId) ?? null
-  })
+  const sampleItem = computed(
+    () => (sampleItemId) =>
+      sampleItems.value.find((row) => row.sample_item_id == sampleItemId) ?? null
+  )
+  const targetCollection = computed(
+    () => (targetCollectionId) =>
+      targetCollections.value.find((row) => row.target_collection_id == targetCollectionId) ?? null
+  )
+  const targetCompound = computed(
+    () => (targetCompoundId) =>
+      targetCompounds.value.find((row) => row.target_compound_id == targetCompoundId) ?? null
+  )
+  const targetIon = computed(
+    () => (targetIonId) => targetIons.value.find((row) => row.target_ion_id == targetIonId) ?? null
+  )
+  const targetIsotope = computed(
+    () => (targetIsotopeId) =>
+      targetIsotopes.value.find((row) => row.target_isotope_id == targetIsotopeId) ?? null
+  )
   // get selected
   const sampleItemsSelected = computed(() =>
-    getSampleItems.value.filter((sampleItem) => sampleItem.selection >= 2)
+    sampleItems.value.filter((sampleItem) => sampleItem.selection >= 2)
   )
   const sampleItemFocused = computed(
-    () => getSampleItems.value.find((sampleItem) => sampleItem.selection == 3) ?? null
+    () => sampleItems.value.find((sampleItem) => sampleItem.selection == 3) ?? null
   )
   const targetCollectionsSelected = computed(() =>
-    getTargetCollections.value.filter((row) => row.selection >= 2)
+    targetCollections.value.filter((row) => row.selection >= 2)
   )
   const targetCompoundsSelected = computed(() =>
-    getTargetCompounds.value.filter((row) => row.selection >= 2)
+    targetCompounds.value.filter((row) => row.selection >= 2)
   )
-  const targetIonsSelected = computed(() => getTargetIons.value.filter((row) => row.selection >= 2))
+  const targetIonsSelected = computed(() => targetIons.value.filter((row) => row.selection >= 2))
   const targetIsotopesSelected = computed(() =>
-    getTargetIsotopes.value.filter((row) => row.selection >= 2)
+    targetIsotopes.value.filter((row) => row.selection >= 2)
   )
 
   // actions
@@ -470,11 +459,6 @@ export const useBatchStore = defineStore('batch', () => {
     paramCalibrationCollection,
     paramIonMechanisms,
     // getters
-    getSampleItems,
-    getTargetCollections,
-    getTargetCompounds,
-    getTargetIons,
-    getTargetIsotopes,
     sampleItem,
     targetCollection,
     targetCompound,
