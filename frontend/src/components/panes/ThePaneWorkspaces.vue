@@ -42,3 +42,14 @@ const workspaceStore = useWorkspaceStore()
     <the-pane-browser />
   </template>
 </template>
+
+<style scoped>
+.base-tile-container {
+  flex: 1;
+  display: flex;
+  flex-flow: row wrap;
+  justify-content: flex-start;
+  align-content: flex-start;
+  gap: 10px 10px;
+}
+</style>
