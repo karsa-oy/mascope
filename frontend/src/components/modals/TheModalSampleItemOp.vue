@@ -54,7 +54,6 @@ function actionIs(...actions) {
 watch(workspaceSelected, loadWorkspaceData, { deep: true })
 
 async function loadWorkspaceData() {
-  console.log('bar', workspaceSelected.value)
   if (!workspaceSelected.value) return
 
   batches.value =

@@ -94,3 +94,7 @@ export function parseGenericCsv(cols, rows) {
     return newSampleItem
   })
 }
+
+export function clone(object) {
+  return JSON.parse(JSON.stringify(object))
+}

@@ -169,16 +169,16 @@ export const useBatchStore = defineStore('batch', () => {
     // parameters
     resetParams()
     // samples
-    sampleItems.value = null
+    sampleItems.value = []
     // targets
-    targetCollections.value = null
-    targetCompounds.value = null
-    targetIons.value = null
-    targetIsotopes.value = null
+    targetCollections.value = []
+    targetCompounds.value = []
+    targetIons.value = []
+    targetIsotopes.value = []
     // matches
-    matchSamples.value = null
-    matchCompounds.value = null
-    matchIons.value = null
+    matchSamples.value = []
+    matchCompounds.value = []
+    matchIons.value = []
     const sampleStore = useSampleStore()
     if (propagate) sampleStore.unload(null)
   }

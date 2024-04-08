@@ -1,7 +1,7 @@
 <script setup>
 import { cloneDeep } from 'lodash'
 
-import { ref, computed, watch, toRaw } from 'vue'
+import { ref, computed, watch } from 'vue'
 
 import { dialog, toast } from '@/main'
 
@@ -9,7 +9,7 @@ import BaseTable from '@/components/base/BaseTable.vue'
 import ThePaneBrowserTarget from '@/components/panes/ThePaneBrowserTarget.vue'
 import ThePaneSettingsCalibration from '@/components/panes/ThePaneSettingsCalibration.vue'
 
-import { beautifySnakeCase, strToSnakeCase, genId } from '@/lib/util'
+import { beautifySnakeCase, strToSnakeCase, genId, clone } from '@/lib/util'
 
 import {
   useAppStore,
@@ -68,13 +68,11 @@ const sampleItemType = ref(null)
 const showEditFunctions = ref(false)
 const templateType = ref('sample_item')
 
-formFields.value = structuredClone(toRaw(defaultTemplate.value.template))
+formFields.value = clone(defaultTemplate.value.template)
 
 const availableTemplates = computed(() => [defaultTemplate.value, ...savedTemplates.value])
 const batchFilterIds = computed(() =>
-  batchStore.active
-    ? [null, ...new Set(batchStore.getSampleItems.map((item) => item.filter_id))]
-    : []
+  batchStore.active ? [null, ...new Set(batchStore.sampleItems.map((item) => item.filter_id))] : []
 )
 const editable = computed(() => ['create', 'update'].includes(action.value))
 const fillable = computed(() => ['create', 'update'].includes(action.value))
@@ -113,7 +111,7 @@ function addField() {
     onConfirm: (fieldToAdd) => {
       loadedTemplate.value = {
         name: null,
-        template: [...formFields, { label: fieldToAdd, value: '' }]
+        template: [...formFields.value, { label: fieldToAdd, value: '' }]
       }
     }
   })
@@ -200,7 +198,7 @@ function saveTemplate() {
         })
         return
       }
-      let templateFormFields = structuredClone(formFields.value)
+      let templateFormFields = clone(formFields.value)
       // Empty values
       templateFormFields.forEach((field) => (field.value = ''))
       let newTemplate = {
@@ -208,7 +206,7 @@ function saveTemplate() {
         type: templateType.value,
         template: templateFormFields
       }
-      loadedTemplate.value = structuredClone(newTemplate)
+      loadedTemplate.value = clone(newTemplate)
       // push new template
       sampleStore.createAttributeTemplate(loadedTemplate.value)
     }
