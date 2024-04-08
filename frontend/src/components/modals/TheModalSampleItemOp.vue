@@ -22,7 +22,7 @@ const notificationStore = useNotificationStore()
 const sampleItem = computed(
   () => modalStore.state.sampleItemOverviewProps?.sample ?? sampleStore.active
 )
-const newItemName = ref(
+const newItemName = computed(() =>
   sampleItem.value && modalStore.state.sampleItemOverviewProps.action === 'copy'
     ? generateCopyName(sampleItem.value.sample_item_name)
     : null
@@ -81,6 +81,11 @@ async function copySampleItem() {
   isCopying.value = false
   modalStore.deactivate()
 }
+
+function initSelection() {
+  workspaceSelected.value = workspaceStore.active
+  batchSelected.value = batchStore.active
+}
 </script>
 
 <template>
@@ -91,6 +96,7 @@ async function copySampleItem() {
       :can-cancel="true"
       aria-role="dialog"
       aria-modal
+      @after-enter="initSelection"
       @close="modalStore.deactivate"
     >
       <div class="box" style="background-color: inherit; display: grid; place-items: center">
