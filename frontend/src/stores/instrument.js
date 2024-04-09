@@ -61,10 +61,9 @@ export const useInstrumentStore = defineStore('instrument', () => {
 
   async function matchSample() {
     const sampleStore = useSampleStore()
-    const sampleActive = sampleStore.active
-    const calibrationVerified = sampleActive.mz_calibration.verified
-    if (sampleActive && calibrationVerified) {
-      await sampleStore.matchSampleCompute(sampleActive)
+    const calibrationVerified = sampleStore.active?.mz_calibration.verified
+    if (calibrationVerified) {
+      await sampleStore.matchSampleCompute(sampleStore.active)
     } else {
       // Try again in 1 second if scenthound is still opened
       if (!scenthoundModeActive.value) return
@@ -137,7 +136,7 @@ export const useInstrumentStore = defineStore('instrument', () => {
   }
   async function onInstrumentAcquisitionStarted({ filename, progress }) {
     const sampleStore = useSampleStore()
-    await sampleStore.unload(null)
+    await sampleStore.unload()
     await resetAcquisitionStatus()
     acquisitionActiveFilename.value = filename
     acquisitionProgress.value = progress

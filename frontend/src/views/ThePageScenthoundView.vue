@@ -122,10 +122,10 @@ const sampleItemName = computed(
   () => formFields.value?.filter((field) => field.label == 'sample_item_name')[0]?.value
 )
 const sampleMatchClass = computed(() => {
-  if (sampleStore.alarmCategory === null) return 'is-success'
-  if (sampleStore.alarmCategory === 2) {
+  if (sampleStore.active?.match_category === null) return 'is-success'
+  if (sampleStore.active?.match_category === 2) {
     return 'is-danger'
-  } else if (sampleStore.alarmCategory === 1) {
+  } else if (sampleStore.active?.match_category === 1) {
     return 'is-warning'
   } else {
     return 'is-success'
@@ -355,7 +355,7 @@ watch(
   { deep: true }
 )
 watch(
-  computed(() => sampleStore.alarmCategory),
+  computed(() => sampleStore.active?.match_category),
   (newValue) => {
     if (newValue > 0) {
       // Switch to target search page if sample alarms
@@ -432,30 +432,28 @@ watch(sampleItemFilterId, () => {
               </div>
             </div>
             <div v-for="item in formFields" :key="item.label">
-              <template>
-                <b-field :label="convertLabelToTitle(item.label)">
-                  <b-input
-                    v-model="item.value"
-                    :placeholder="showEditFunctions ? item.placeholder || 'default value' : ''"
-                    :required="fillable && item.required"
-                    :disabled="!fillable || item.disabled"
-                    expanded
+              <b-field :label="convertLabelToTitle(item.label)">
+                <b-input
+                  v-model="item.value"
+                  :placeholder="showEditFunctions ? item.placeholder || 'default value' : ''"
+                  :required="fillable && item.required"
+                  :disabled="!fillable || item.disabled"
+                  expanded
+                >
+                </b-input>
+                <div v-if="showEditFunctions">
+                  <b-button
+                    :id="item.label"
+                    :disabled="item.required"
+                    @click="removeField"
+                    type="is-danger"
+                    icon-right="delete"
+                    hover
+                    title="Delete Field"
                   >
-                  </b-input>
-                  <div v-if="showEditFunctions">
-                    <b-button
-                      :id="item.label"
-                      :disabled="item.required"
-                      @click="removeField"
-                      type="is-danger"
-                      icon-right="delete"
-                      hover
-                      title="Delete Field"
-                    >
-                    </b-button>
-                  </div>
-                </b-field>
-              </template>
+                  </b-button>
+                </div>
+              </b-field>
             </div>
             <b-field label="Filter ID">
               <b-input v-model="sampleItemFilterId" disabled expanded> </b-input>

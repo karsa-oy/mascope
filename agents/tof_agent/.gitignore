@@ -1,4 +1,5 @@
-build
-dist
+build/
+dist/
 bin.spec
 tof_agent.zip
+tof_agent_config.yaml

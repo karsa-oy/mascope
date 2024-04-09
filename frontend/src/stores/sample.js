@@ -28,26 +28,6 @@ export const useSampleStore = defineStore('sample', () => {
     'UNKNOWN',
     'ONLINE' // At the moment not selectable from the UI
   ])
-  const alarmCategory = computed(() => {
-    if (!(matchCollections.value && matchCompounds.value)) return null
-    // Get ids of target collections set to alarm
-    const alarmCollectionIds = matchCollections.value
-      .filter((collection) => collection.target_collection_type === 'TARGETS')
-      .map((collection) => collection.target_collection_id)
-    // Get ids of target compounds set to alarm (based on belonging to alarming collection)
-    const batchStore = useBatchStore()
-    const targetCompounds = batchStore.targetCompounds
-    if (!targetCompounds) return null
-    const alarmCompoundIds = targetCompounds
-      .filter((compound) => alarmCollectionIds.includes(compound.target_collection_id))
-      .map((compound) => compound.target_compound_id)
-    // Get match compound data for alarming compounds
-    const alarmCompoundMatches = matchCompounds.value.filter((match) =>
-      alarmCompoundIds.includes(match.target_compound_id)
-    )
-    // Return highest match category of alarming compounds
-    return maxMatchCategory.value(alarmCompoundMatches)
-  })
   const getMatchCollections = computed(() => matchCollections.value ?? [])
   const maxMatchCategory = computed(() => (compounds = null) => {
     if (compounds === null) compounds = matchCompounds.value
@@ -264,7 +244,6 @@ export const useSampleStore = defineStore('sample', () => {
     matchIsotopes,
     // getters
     sampleTypes,
-    alarmCategory,
     getMatchCollections,
     maxMatchCategory,
     // actions,

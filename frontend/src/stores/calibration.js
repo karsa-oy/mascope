@@ -146,7 +146,7 @@ export const useCalibrationStore = defineStore('calibration', () => {
     // Start matching in Scenthound automatically
     const instrumentStore = useInstrumentStore()
     if (instrumentStore.scenthoundModeActive) {
-      instrumentStore.matchSimple(null)
+      instrumentStore.matchSample()
     }
   }
   async function onCalibrationMzCalibrateSampleFailed(data) {
