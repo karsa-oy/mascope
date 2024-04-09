@@ -40,8 +40,8 @@ async def detect_peaks(
     u_list=None,
     max_n_peaks=5,
     add_peak_threshold=0.9,
-    if_exists="fail",  # 'fail', 'append', 'replace',
-    dmz = 0.5
+    if_exists="fail",  # 'fail', 'append', 'replace'
+    dmz=0.5,
 ):
     print(f"Detecting peaks for file {filename}")
     if if_exists not in ["fail", "append", "replace"]:
@@ -339,9 +339,11 @@ def fit_n_peaks(
             init_pos = [x[max_ind]]
             init_hei = [y[max_ind]]
             init_res = [
-                resolution_function(x[max_ind])
-                if callable(resolution_function)
-                else resolution_function
+                (
+                    resolution_function(x[max_ind])
+                    if callable(resolution_function)
+                    else resolution_function
+                )
             ]
 
         fit, peaks = fit_peaks(
