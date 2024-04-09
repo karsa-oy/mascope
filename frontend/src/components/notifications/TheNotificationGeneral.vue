@@ -21,16 +21,15 @@ watch(
   (newVal) => {
     if (!newVal) {
       notificationStore.resetGeneralNotification()
-    }
-    if (newVal) {
+    } else {
       setTimeout(() => {
-        if (notificationStore.batchComputeProgressActive) return
-        if (notificationStore.deleteProgress) return
-        if (notificationStore.calibrationComputing) return
-        if (notificationStore.progressActive) return
         if (notificationStore.generalNotification === 'error') {
           setTimeout(close, 10000)
         } else {
+          if (notificationStore.batchComputeProgressActive) return
+          if (notificationStore.deleteProgress) return
+          if (notificationStore.calibrationComputing) return
+          if (notificationStore.progressActive) return
           setTimeout(close, 3500)
         }
       }, 1000)
