@@ -441,6 +441,7 @@ function reconcileCompounds(compounds) {
 
 // spreadsheet loading
 async function loadSpreadsheetCompounds(rows) {
+  console.log(rows)
   if (addCompoundsSource.value !== 'spreadsheet') return
   // Reset add compounds list to the first page when the list is reloaded
   addCompoundsCurrentPage.value = 1
@@ -451,7 +452,7 @@ async function loadSpreadsheetCompounds(rows) {
     await targetsStore.processSpreadsheetInput(rows)
 
   // Reconcile existing compounds
-  reconcileCompounds.value(existingCompounds)
+  reconcileCompounds(existingCompounds)
 
   // Add notExistingCompounds to a list for creation
   targetCompoundsCreate.value.push(...notExistingCompounds)
