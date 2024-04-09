@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 
 import BaseSpreadsheetInput from '@/components/base/BaseSpreadsheetInput.vue'
 
@@ -181,7 +181,7 @@ const workspaceBatchesSelectionLabel = computed(() => {
     case 'manageCollectionBatches':
       title = `Select batches ${
         workspaceSelected.value
-          ? `of the "${this?.workspaceSelected?.workspace_name}" workspace`
+          ? `of the "${workspaceSelected.value?.workspace_name}" workspace`
           : ''
       } where to add the ${name} collection`
       break
@@ -413,6 +413,8 @@ async function loadAddCompoundsList() {
   reconcileCompounds(compoundsToProcess)
 }
 
+watch(addCompoundsSource, loadAddCompoundsList)
+
 // Reconcile compounds to maintain reference equality with compounds in targetCompounds and initialCompounds list.
 function reconcileCompounds(compounds) {
   // Combine initialCompounds and targetCompounds to cover all compounds that are already part of the collection or selected
@@ -433,7 +435,7 @@ function reconcileCompounds(compounds) {
     )
 
     // If found, use the existing compound from combinedCompounds if available; otherwise, use the current compound
-    return selectedCompound || compound
+    return selectedCompound ?? compound
   })
 }
 
@@ -463,7 +465,7 @@ function reconcileBatches(batches) {
       (sb) => sb.sample_batch_id === batch.sample_batch_id
     )
     // If found, use the existing batch object to maintain reference equality; otherwise, use the current batch
-    return existingBatch || batch
+    return existingBatch ?? batch
   })
 }
 
@@ -476,10 +478,11 @@ async function loadWorkspaceBatches() {
   const workspaceBatches = await workspaceStore.getWorkspaceBatches(
     workspaceSelected.value.workspace_id
   )
-  if (!workspaceBatches.length) return
   // Reconcile the loaded batches with those already present in sampleBatches
   reconcileBatches(workspaceBatches)
 }
+
+watch(workspaceSelected, loadWorkspaceBatches)
 </script>
 
 <template>
@@ -623,7 +626,6 @@ async function loadWorkspaceBatches() {
                     <b-field label="Add target compounds from">
                       <b-select
                         v-model="addCompoundsSource"
-                        @input="loadAddCompoundsList"
                         placeholder="Select a source for adding compounds"
                         expanded
                       >
@@ -697,12 +699,7 @@ async function loadWorkspaceBatches() {
               <b-tab-item value="batches" label="Sample batches" :disabled="action == 'update'">
                 <!-- Source Selection -->
                 <b-field label="Choose a workspace">
-                  <b-select
-                    v-model="workspaceSelected"
-                    @input="loadWorkspaceBatches"
-                    placeholder="Choose a workspace"
-                    expanded
-                  >
+                  <b-select v-model="workspaceSelected" placeholder="Choose a workspace" expanded>
                     <option :value="currentWorkspace" v-if="currentWorkspace">
                       Current workspace: {{ currentWorkspace.workspace_name }}
                     </option>
@@ -731,7 +728,7 @@ async function loadWorkspaceBatches() {
                         v-model:current="selectBatchesCurrentPage"
                         :per-page="batchesPerPage"
                         size="is-small"
-                      ></b-pagination>
+                      />
                     </template>
                   </b-table>
                 </b-field>
