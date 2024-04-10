@@ -99,14 +99,6 @@ const mzCalibrationTableRows = computed(() => calibrationStore.mzFitStats ?? [])
 const sampleFilename = computed(() =>
   sampleStore.active ? sampleStore.active.filename : instrumentStore.acquisitionActiveFilename
 )
-const sampleIsSaved = computed(() =>
-  sampleStore.active
-    ? sampleItemName.value === sampleStore.active.sample_item_name &&
-      sampleItemType.value === sampleStore.active.sample_item_type &&
-      sampleItemFilterId.value === sampleStore.active.filter_id &&
-      _.isEqual(sampleItemAttributes, sampleStore.active.sample_item_attributes)
-    : false
-)
 const sampleItemAttributes = computed(() =>
   formFields.value
     .filter((field) => field.label != 'sample_item_name')
@@ -117,6 +109,14 @@ const sampleItemAttributes = computed(() =>
       }),
       {}
     )
+)
+const sampleIsSaved = computed(() =>
+  sampleStore.active
+    ? sampleItemName.value === sampleStore.active.sample_item_name &&
+      sampleItemType.value === sampleStore.active.sample_item_type &&
+      sampleItemFilterId.value === sampleStore.active.filter_id &&
+      _.isEqual(sampleItemAttributes.value, sampleStore.active.sample_item_attributes)
+    : false
 )
 const sampleItemName = computed(
   () => formFields.value?.filter((field) => field.label == 'sample_item_name')[0]?.value
