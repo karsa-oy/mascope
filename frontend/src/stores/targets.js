@@ -44,9 +44,9 @@ export const useTargetsStore = defineStore('targets', () => {
   // get alarm_mode list
   const alarmsList = computed(() =>
     [
-      [alarmTargets, 'TARGETS'],
-      [alarmDiagnostics, 'DIAGNOSTICS'],
-      [alarmCalibrants, 'CALIBRANTS']
+      [alarmTargets.value, 'TARGETS'],
+      [alarmDiagnostics.value, 'DIAGNOSTICS'],
+      [alarmCalibrants.value, 'CALIBRANTS']
     ]
       .filter((val) => val[0])
       .map((val) => val[1])
@@ -199,10 +199,8 @@ export const useTargetsStore = defineStore('targets', () => {
       .forEach((coll) => (coll.selection = 0))
 
     // Update the selected collection's selection value
-    targetCollectionsAll.value = targetCollectionsAll.value.map(
-      (coll) => coll.target_collection_id === collectionId
-        ? {...coll, selection: selectionValue}
-        : coll
+    targetCollectionsAll.value = targetCollectionsAll.value.map((coll) =>
+      coll.target_collection_id === collectionId ? { ...coll, selection: selectionValue } : coll
     )
 
     // If a collection is selected, fetch its details
