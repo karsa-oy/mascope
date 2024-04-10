@@ -18,13 +18,12 @@ const workspaceStore = useWorkspaceStore()
 const instrumentStore = useInstrumentStore()
 
 const mode = ref('recent')
-const instrumentSelected = ref(instrumentStore.active ?? appStore.instruments[0].instrument)
+const instrumentSelected = ref(instrumentStore.active)
 const sampleFileMinDatetime = ref(new Date(new Date().getTime() - 24 * 60 * 60 * 1000)) // now - 24h
 const sampleFileMaxDatetime = ref(new Date()) // now
 const sampleFilesSelected = ref([])
 const sampleFileTableDataKey = ref(0)
 
-instrumentStore.load(instrumentSelected.value)
 getAcquisitionsInRange()
 
 const sampleFileCols = [{ field: 'filename', label: 'Filename' }]
@@ -101,6 +100,9 @@ watch(
           {{ instrumentSelected ?? 'none' }}
         </b-button>
       </template>
+      <b-dropdown-item :value="null" aria-role="listitem">
+        <span>none</span>
+      </b-dropdown-item>
       <template
         v-for="instrument in appStore.instruments.map(({ instrument }) => instrument)"
         v-bind:key="instrument"
