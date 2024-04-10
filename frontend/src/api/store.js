@@ -1,4 +1,4 @@
-import { api } from '@/api'
+import { api } from './client.js'
 
 const HANDLER_PREFIX = 'on'
 
