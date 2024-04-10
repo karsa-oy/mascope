@@ -4,7 +4,6 @@ import pandas as pd
 import sqlite3
 import shutil
 
-from backend.db.conn import conn
 from lib.file_func import filename_to_zarr_path
 
 # patch asyncio to supported run_until_complete

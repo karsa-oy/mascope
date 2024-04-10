@@ -5,11 +5,11 @@ description = ""
 authors = ["Oskari Kausiala <oskari.kausiala@karsa.fi>"]
 readme = "README.md"
 
+
 [tool.poetry.dependencies]
-python = ">=3.10,<3.11"
-numpy = "^1.26.1"
+python = ">=3.9,<3.11"
+numpy = "^1.16.0"
 pythonnet = "^3.0.3"
-h5sparse = "^0.1.0"
 
 
 [build-system]

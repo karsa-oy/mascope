@@ -17,7 +17,7 @@ export const useCalibrationStore = defineStore('calibration', () => {
   const mzFitError = ref(null)
   const mzFitStats = ref(null)
   const paramMatchScoreMin = ref(0)
-  const paramMinIsotopeAbundance = ref(0.1)
+  const paramMinIsotopeAbundance = ref(0.15)
   const paramMinPeakIntensity = ref(1000)
   const paramRefineWindow = ref(100)
 

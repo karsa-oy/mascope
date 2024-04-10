@@ -259,7 +259,7 @@ export function createHttpClient() {
     },
     getRecentSampleFiles: async (params = {}) => {
       try {
-        return await client.get(`${filesBaseUrl}-recent`, { params })
+        return await client.get(`${filesBaseUrl}/recent`, { params })
       } catch (error) {
         console.error('Failed to get recent acquisitions: ', error)
       }

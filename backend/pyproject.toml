@@ -7,9 +7,9 @@ license = "Proprietary"
 include = ["backend"]
 packages = [
     {include = "backend"},
-    {include = "hardware", from ="hardware"},
-    {include = "lib", from ="lib"},
-    {include = "service", from ="service"},
+    {include = "hardware"},
+    {include = "lib"},
+    {include = "service"},
 ]
 
 [build-system]
@@ -17,7 +17,7 @@ requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
-mascope-api = 'backend:run'
+mascope-api = 'backend.main:run'
 file-converter = 'service.file_converter:run'
 file-downloader = 'service.file_downloader:run'
 log-rotate = 'service.log_rotate:run'
@@ -69,3 +69,7 @@ hardware = { path = "./hardware", develop = true }
 lib = { path = "./lib", develop = true }
 service = { path = "./service", develop = true }
 sphinx = "^7.2.6"
+notebook = "^7.1.1"
+plotly = "^5.19.0"
+matplotlib = "^3.8.3"
+ipywidgets = "^8.1.2"
