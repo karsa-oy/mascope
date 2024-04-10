@@ -647,18 +647,13 @@ watch(workspaceSelected, loadWorkspaceBatches)
         </div>
       </template>
       <template v-else-if="action == 'delete'">
-        <div class="modal-card" style="height: 28vh">
+        <div class="modal-card" style="height: 60vh">
           <header class="modal-card-head">
             <p class="subtitle">{{ modalTitle }}</p>
           </header>
           <section
             class="modal-card-body"
-            style="
-              min-height: 150px;
-              display: flex;
-              flex-direction: column;
-              justify-content: center;
-            "
+            style="display: flex; flex-direction: column; justify-content: center"
           >
             <b-field
               :label="`Would you like to keep or remove compounds from '${collectionName}' that are not part of any other collection?`"
