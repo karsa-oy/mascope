@@ -18,9 +18,6 @@ const csvCols = ref([])
 const csvRows = ref([])
 const parsedRows = ref([])
 const sampleItemsToCreate = ref([]) // Array of objects containing sample_item data
-// Pagination properties for sampleItemsToCreate
-const samplesCurrentPage = ref(1)
-const samplesPerPage = ref(12)
 const activeTab = ref('input') // This will hold the value of the active tab
 const importType = ref(null) // property for import type
 const columnsValidation = ref(false) // the check theat pasted columns are valid
@@ -86,12 +83,6 @@ const tableColumns = computed(() => {
   }))
 
   return [...mainColumns, ...attributeColumns]
-})
-
-const paginatedSampleItemsToCreate = computed(() => {
-  const start = (samplesCurrentPage.value - 1) * samplesPerPage.value
-  const end = start + samplesPerPage.value
-  return sampleItemsToCreate.value.slice(start, end)
 })
 
 function deactivateModalResetData() {
@@ -163,7 +154,6 @@ async function processCsvRows(rows) {
 function preprocessSamples() {
   prepareSampleItemsToCreate()
   activeTab.value = 'samples'
-  samplesCurrentPage.value = 1
   validateImportedSampleItems()
 }
 
@@ -476,22 +466,12 @@ function validateImportedSampleItems() {
               :disabled="sampleItemsToCreate.length == 0"
             >
               <b-field :label="sampleItemsToCreateLabel" v-if="sampleItemsToCreate.length > 0">
-                <div class="table-with-pagination">
-                  <div class="table-container">
-                    <b-table
-                      v-if="sampleItemsToCreate.length > 0"
-                      :data="paginatedSampleItemsToCreate"
-                      :columns="tableColumns"
-                    ></b-table>
-                  </div>
-                  <div class="pagination-container">
-                    <b-pagination
-                      :total="sampleItemsToCreate.length"
-                      v-model:current="samplesCurrentPage"
-                      :per-page="samplesPerPage"
-                      size="is-small"
-                    ></b-pagination>
-                  </div>
+                <div class="table-container">
+                  <b-table
+                    v-if="sampleItemsToCreate.length > 0"
+                    :data="sampleItemsToCreate"
+                    :columns="tableColumns"
+                  />
                 </div>
               </b-field>
             </b-tab-item>

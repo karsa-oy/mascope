@@ -28,25 +28,15 @@ const activeTab = ref(null) // This will hold the value of the active tab
 const compoundsTab = ref(null) // This will hold the value of the Target Compounds active subtab
 // Select compounds tab
 const initialCompounds = ref([]) // To store initial compounds from the active collection
-// Pagination properties
-const initialCompoundsCurrentPage = ref(1)
-const addedCompoundsCurrentPage = ref(1)
-const targetCompoundsCreateCurrentPage = ref(1)
 // Add compounds tab
 const addCompoundsSource = ref(null)
 const spreadsheetCompounds = ref([]) // To store pasted to spreadsheet data
 const addCompoundsList = ref([]) // To store filtered list of available compounds (already existing in db)
-// Pagination properties for addCompoundsList
-const addCompoundsCurrentPage = ref(1)
-const compoundsPerPage = ref(15)
 
 // Sample Batches tab
 const initialBatches = ref([]) // To store initial batches of the active collection
 const workspaceSelected = ref(null)
 const selectedWorkspaceBatches = ref([]) // Loaded batches of the selected workspace
-// Pagination properties for selectedWorkspaceBatches
-const selectBatchesCurrentPage = ref(1)
-const batchesPerPage = ref(15)
 
 // Delete Modal
 const deleteOrphanCompounds = ref(true)
@@ -190,22 +180,6 @@ const workspaceBatchesSelectionLabel = computed(() => {
 })
 ////// tabs data //////
 //// Target Compounds Tab ////
-// data for Select compounds tab
-const paginatedInitialCompounds = computed(() => {
-  const start = (initialCompoundsCurrentPage.value - 1) * compoundsPerPage.value
-  const end = start + compoundsPerPage.value
-  return initialCompounds.value.slice(start, end)
-})
-const paginatedAddedCompounds = computed(() => {
-  const start = (addedCompoundsCurrentPage.value - 1) * compoundsPerPage.value
-  const end = start + compoundsPerPage.value
-  return addedCompounds.value.slice(start, end)
-})
-const paginatedTargetCompoundsCreate = computed(() => {
-  const start = (targetCompoundsCreateCurrentPage.value - 1) * compoundsPerPage.value
-  const end = start + compoundsPerPage.value
-  return targetCompoundsCreate.value.slice(start, end)
-})
 // Computes the added compounds by filtering out those that are not in the initial compounds
 const addedCompounds = computed(() => {
   return targetCompounds.value.filter(
@@ -226,12 +200,6 @@ const filteredCollections = computed(() => {
   return targetsStore.getAllCollections
 })
 
-const paginatedAddCompoundsList = computed(() => {
-  const start = (addCompoundsCurrentPage.value - 1) * compoundsPerPage.value
-  const end = start + compoundsPerPage.value
-  return addCompoundsList.value.slice(start, end)
-})
-
 /// Sample Batches Tab ////
 // Select workspaces
 const currentWorkspace = computed(() => {
@@ -244,11 +212,6 @@ const filteredWorkspaces = computed(() => {
     })
   }
   return []
-})
-const paginatedSelectedWorkspaceBatches = computed(() => {
-  const start = (selectBatchesCurrentPage.value - 1) * batchesPerPage.value
-  const end = start + batchesPerPage.value
-  return selectedWorkspaceBatches.value.slice(start, end)
 })
 
 //// data to form http request ////
@@ -339,7 +302,6 @@ function initData() {
     activeTab.value = 'info'
     compoundsTab.value = 'selectedCompounds'
     // Reset the selected compounds tab to the first page when the list is reloaded
-    initialCompoundsCurrentPage.value = 1
     collectionId.value = targetsStore.activeCollection?.target_collection_id ?? ''
     collectionName.value = targetsStore.activeCollection?.target_collection_name ?? ''
     collectionDesc.value = targetsStore.activeCollection?.target_collection_description ?? ''
@@ -386,8 +348,6 @@ function resetData() {
   workspaceSelected.value = null
   selectedWorkspaceBatches.value = []
   deleteOrphanCompounds.value = true
-  addedCompoundsCurrentPage.value = 1
-  targetCompoundsCreateCurrentPage.value = 1
 }
 // Data loading methods for Add compounds tab
 async function loadAddCompoundsList() {
@@ -396,8 +356,6 @@ async function loadAddCompoundsList() {
     addCompoundsList.value = []
     return
   }
-  // Reset add compounds list to the first page when the list is reloaded
-  addCompoundsCurrentPage.value = 1
 
   let compoundsToProcess = []
   if (addCompoundsSource.value === 'all') {
@@ -444,8 +402,6 @@ async function loadSpreadsheetCompounds(rows) {
   console.log(rows)
   if (addCompoundsSource.value !== 'spreadsheet') return
   // Reset add compounds list to the first page when the list is reloaded
-  addCompoundsCurrentPage.value = 1
-  targetCompoundsCreateCurrentPage.value = 1
   targetCompoundsCreate.value = []
   spreadsheetCompounds.value = rows
   const { existingCompounds, notExistingCompounds } =
@@ -472,9 +428,6 @@ function reconcileBatches(batches) {
 
 async function loadWorkspaceBatches() {
   if (!workspaceSelected.value) return
-
-  // Reset to the first page when the list is reloaded
-  selectBatchesCurrentPage.value = 1
 
   const workspaceBatches = await workspaceStore.getWorkspaceBatches(
     workspaceSelected.value.workspace_id
@@ -565,60 +518,27 @@ watch(workspaceSelected, loadWorkspaceBatches)
                       :label="`Current compounds of '${collectionName}'`"
                     >
                       <b-table
-                        :data="paginatedInitialCompounds"
+                        :data="initialCompounds"
                         :columns="targetCompoundColumns"
                         checkable
                         v-model:checked-rows="targetCompounds"
-                        paginated
-                      >
-                        <!-- Optional: Pagination controls -->
-                        <template v-slot:pagination>
-                          <b-pagination
-                            :total="initialCompounds.length"
-                            v-model:current="initialCompoundsCurrentPage"
-                            :per-page="compoundsPerPage"
-                            size="is-small"
-                          ></b-pagination>
-                        </template>
-                      </b-table>
+                      />
                     </b-field>
                     <b-field :label="addedCompoundsLabel" v-if="addedCompounds.length > 0">
                       <b-table
-                        :data="paginatedAddedCompounds"
+                        :data="addedCompounds"
                         :columns="targetCompoundColumns"
                         checkable
                         v-model:checked-rows="targetCompounds"
-                        paginated
-                      >
-                        <!-- Optional: Pagination controls -->
-                        <template v-slot:pagination>
-                          <b-pagination
-                            :total="addedCompounds.length"
-                            v-model:current="addedCompoundsCurrentPage"
-                            :per-page="compoundsPerPage"
-                            size="is-small"
-                          ></b-pagination>
-                        </template>
-                      </b-table>
+                      />
                     </b-field>
                     <b-field :label="newCompoundsLabel" v-if="targetCompoundsCreate.length > 0">
                       <b-table
-                        :data="paginatedTargetCompoundsCreate"
+                        :data="targetCompoundsCreate"
                         :columns="targetCompoundColumns"
                         checkable
                         v-model:checked-rows="targetCompoundsCreate"
-                        paginated
-                      >
-                        <!-- Optional: Pagination controls -->
-                        <template v-slot:pagination>
-                          <b-pagination
-                            :total="targetCompoundsCreate.length"
-                            v-model:current="targetCompoundsCreateCurrentPage"
-                            :per-page="compoundsPerPage"
-                            size="is-small"
-                          ></b-pagination>
-                        </template>
-                      </b-table>
+                      />
                     </b-field>
                   </b-tab-item>
                   <!-- Add compounds tab -->
@@ -656,41 +576,19 @@ watch(workspaceSelected, loadWorkspaceBatches)
                     <!-- Add Compounds Selection -->
                     <b-field :label="addCompoundsListLabel" v-if="addCompoundsList.length > 0">
                       <b-table
-                        :data="paginatedAddCompoundsList"
+                        :data="addCompoundsList"
                         :columns="targetCompoundColumns"
                         checkable
                         v-model:checked-rows="targetCompounds"
-                        paginated
-                      >
-                        <!-- Optional: Pagination controls -->
-                        <template v-slot:pagination>
-                          <b-pagination
-                            :total="addCompoundsList.length"
-                            v-model:current="addCompoundsCurrentPage"
-                            :per-page="compoundsPerPage"
-                            size="is-small"
-                          ></b-pagination>
-                        </template>
-                      </b-table>
+                      />
                     </b-field>
                     <b-field :label="newCompoundsLabel" v-if="targetCompoundsCreate.length > 0">
                       <b-table
-                        :data="paginatedTargetCompoundsCreate"
+                        :data="targetCompoundsCreate"
                         :columns="targetCompoundColumns"
                         checkable
                         v-model:checked-rows="targetCompoundsCreate"
-                        paginated
-                      >
-                        <!-- Optional: Pagination controls -->
-                        <template v-slot:pagination>
-                          <b-pagination
-                            :total="targetCompoundsCreate.length"
-                            v-model:current="targetCompoundsCreateCurrentPage"
-                            :per-page="compoundsPerPage"
-                            size="is-small"
-                          ></b-pagination>
-                        </template>
-                      </b-table>
+                      />
                     </b-field>
                   </b-tab-item>
                 </b-tabs>
@@ -716,22 +614,11 @@ watch(workspaceSelected, loadWorkspaceBatches)
                 <!-- Workspace Batches Selection -->
                 <b-field :label="workspaceBatchesSelectionLabel">
                   <b-table
-                    :data="paginatedSelectedWorkspaceBatches"
+                    :data="selectedWorkspaceBatches"
                     :columns="[{ field: 'sample_batch_name', label: 'Batch' }]"
                     checkable
                     v-model:checked-rows="sampleBatches"
-                    paginated
-                  >
-                    <!-- Optional: Pagination controls -->
-                    <template v-slot:pagination>
-                      <b-pagination
-                        :total="selectedWorkspaceBatches.length"
-                        v-model:current="selectBatchesCurrentPage"
-                        :per-page="batchesPerPage"
-                        size="is-small"
-                      />
-                    </template>
-                  </b-table>
+                  />
                 </b-field>
               </b-tab-item>
             </b-tabs>

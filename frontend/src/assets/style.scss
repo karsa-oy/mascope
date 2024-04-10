@@ -178,36 +178,6 @@ $table-row-hover-background-color: $cool-grey-4;
   background: $burgundy-red;
 }
 
-// Custom table with pagination and horizontal scrollbar
-.table-with-pagination {
-  .table-container {
-    overflow-x: auto;
-
-    // Custom table horizontal scrollbar
-    &::-webkit-scrollbar {
-      // width: 10px; // Width of the vertical scrollbar
-      height: 10px; // Height of the horizontal scrollbar
-    }
-
-    // Style the scrollbar thumb
-    &::-webkit-scrollbar-thumb {
-      background-color: $cool-grey-0; // Thumb color
-      border-radius: 6px; // Rounded corners for the thumb
-      border: 1.5px solid $cool-grey-1; // Creates padding around the thumb
-
-      &:hover {
-        background-color: $cool-grey-3; // Darker thumb color on hover
-      }
-    }
-
-    // Style the scrollbar track (the part the thumb moves within)
-    &::-webkit-scrollbar-track {
-      background: darken($cool-grey-0, 4%); // Track color
-      border-radius: 6px; // Rounded corners for the track
-    }
-  }
-}
-
 // Input
 $input-color: black;
 $input-border-color: transparent;
@@ -328,80 +298,80 @@ input[type='range'] {
 $colors: (
   'white': (
     $white,
-    $black,
+    $black
   ),
   'black': (
     $black,
-    $white,
+    $white
   ),
   'light': (
     $light,
-    $light-invert,
+    $light-invert
   ),
   'dark': (
     $dark,
-    $dark-invert,
+    $dark-invert
   ),
   'primary': (
     $primary,
     $primary-invert,
     $primary-light,
-    $primary-dark,
+    $primary-dark
   ),
   'link': (
     $link,
     $link-invert,
     $link-light,
-    $link-dark,
+    $link-dark
   ),
   'info': (
     $info,
     $info-invert,
     $info-light,
-    $info-dark,
+    $info-dark
   ),
   'success': (
     $success,
     $success-invert,
     $success-light,
-    $success-dark,
+    $success-dark
   ),
   'success-pale': (
     $success-pale,
     $success-invert,
     $success-light,
-    $success-dark,
+    $success-dark
   ),
   'warning': (
     $warning,
     $warning-invert,
     $warning-light,
-    $warning-dark,
+    $warning-dark
   ),
   'warning-pale': (
     $warning-pale,
     $warning-invert,
     $warning-light,
-    $warning-dark,
+    $warning-dark
   ),
   'danger': (
     $danger,
     $danger-invert,
     $danger-light,
-    $danger-dark,
+    $danger-dark
   ),
   'danger-pale': (
     $danger-pale,
     $danger-invert,
     $danger-light,
-    $danger-dark,
+    $danger-dark
   ),
   'notification': (
     $notification-dark,
     $notification-light,
     $notification,
-    $notification-invert,
-  ),
+    $notification-invert
+  )
 );
 
 // Define animations
