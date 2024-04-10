@@ -187,7 +187,7 @@ function parseCsv() {
 function prepareSampleItemsToCreate() {
   if (importType.value === 'autosampler') {
     let items = []
-    for (let [i, row] of Object.entries(parsedRows)) {
+    for (let [i, row] of Object.entries(parsedRows.value)) {
       let newSampleItem = {
         filename: modalStore.state.sampleBatchImportProps.sampleFilesSelected[i]?.filename ?? null,
         sample_batch_id: batchStore.active.sample_batch_id,
