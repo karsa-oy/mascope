@@ -1,10 +1,6 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import Plotly from './external/Plotly.vue'
-
-defineOptions({
-  inheritAttrs: false
-})
+import { ref, computed, onMounted, watchEffect } from 'vue'
+import * as Plotly from 'plotly.js-basic-dist'
 
 const props = defineProps({
   id: {
@@ -14,18 +10,21 @@ const props = defineProps({
   title: {
     type: String
   },
-  config: {
-    type: Object
-  },
   data: {
     type: Array
+  },
+  config: {
+    type: Object
   },
   layout: {
     type: Object
   }
 })
 
-const plotlyChart = ref(null)
+const emit = defineEmits('click')
+
+const plot = ref(null)
+const ready = ref(false)
 
 const baseConfig = ref({
   displaylogo: false,
@@ -58,22 +57,28 @@ const baseLayout = computed(() => ({
   }
 }))
 
+function setGraph() {
+  if (!ready.value || !plot.value || !props.data || !props.layout) return
+  Plotly.newPlot(
+    plot.value,
+    props.data,
+    { ...baseLayout.value, ...props.layout },
+    { ...baseConfig.value, ...props.config }
+  )
+  // event listener
+  plot.value.on('plotly_click', (e) => emit('click', e))
+}
+
 onMounted(() => {
-  plotlyChart.value?.addEventListener('contextmenu', (event) => {
-    event.preventDefault()
-  })
+  ready.value = true
+  setGraph()
+})
+
+watchEffect(() => {
+  setGraph()
 })
 </script>
 
 <template>
-  <section ref="plotlyChart">
-    <plotly
-      :id="id"
-      :data="data"
-      :layout="{ ...baseLayout, ...layout }"
-      style="width: 100%; height: 100%"
-      v-bind="{ ...baseConfig, ...config }"
-      v-on="$attrs"
-    ></plotly>
-  </section>
+  <div ref="plot" @click.prevent style="width: 100%; height: 100%" />
 </template>

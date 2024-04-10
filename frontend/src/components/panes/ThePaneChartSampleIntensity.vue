@@ -125,25 +125,16 @@ const layout = computed(() => ({
 }))
 
 function itemSelect(row) {
-  batchStore.itemToggle(row)
-  batchStore.itemFocus(row)
+  batchStore.sampleItemToggle(row)
+  batchStore.sampleItemFocus(row)
 }
-function onClick(event) {
+function onClick({ points }) {
+  if (!points) return
   // Select sample item corresponding to clicked data point
-  let sampleItemIndex = event.points[0].pointIndex
+  let sampleItemIndex = points[0].pointIndex
   let sampleItem = batchStore.sampleItems[sampleItemIndex]
-  itemSelect(sampleItem)
-  // Mouse button dependent action
-  switch (event.event.button) {
-    case 0:
-      // Left click
-      break
-    case 1:
-      // Middle click
-      break
-    case 2:
-      // Right click
-      break
+  if (sampleItem) {
+    itemSelect(sampleItem)
   }
 }
 </script>
