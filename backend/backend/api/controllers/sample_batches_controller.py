@@ -432,7 +432,10 @@ async def create_sample_batch(
         # Step 1: Construct new sample batch
         new_sample_batch = SampleBatch(
             sample_batch_id=gen_id(16),
-            **sample_batch.dict(),  # Unpack the Pydantic model's data
+            workspace_id=sample_batch.workspace_id,
+            sample_batch_name=sample_batch.sample_batch_name,
+            sample_batch_description=sample_batch.sample_batch_description,
+            build_params=sample_batch.build_params.dict(),
             sample_batch_utc_created=datetime.now(timezone.utc),
         )
         # Step 2: Add to session
@@ -552,7 +555,7 @@ async def update_sample_batch(
                     sample_batch_reload = True
             setattr(existing_sample_batch, key, value)
 
-        existing_sample_batch.sample_batch_utc_modified = (datetime.now(timezone.utc),)
+        existing_sample_batch.sample_batch_utc_modified = datetime.now(timezone.utc)
 
         # Update build_params and associations with target collections
         existing_sample_batch.build_params = (
@@ -641,14 +644,14 @@ async def update_sample_batch(
         # create backfround task for batch rematching
         background_tasks.add_task(
             rematch_batch,
-            rematch_body.sample_batch_id,
-            rematch_body.workspace_id,
-            rematch_body.added_target_compound_ids,
-            rematch_body.added_ionization_mechanism_ids,
-            rematch_body.removed_target_compound_ids,
-            rematch_body.removed_ionization_mechanism_ids,
-            rematch_body.independent_transaction,
-            rematch_body.progress_properties,
+            sample_batch_id=rematch_body.sample_batch_id,
+            workspace_id=rematch_body.workspace_id,
+            added_target_compound_ids=rematch_body.added_target_compound_ids,
+            added_ionization_mechanism_ids=rematch_body.added_ionization_mechanism_ids,
+            removed_target_compound_ids=rematch_body.removed_target_compound_ids,
+            removed_ionization_mechanism_ids=rematch_body.removed_ionization_mechanism_ids,
+            independent_transaction=True,
+            progress_properties=rematch_body.progress_properties,
         )
 
     # Step 5: Based on the updates, emit workspace reload or a sample batch reload.

@@ -49,7 +49,8 @@ async def rematch_batch_route(
     background_tasks: BackgroundTasks,
 ):
     # prepare data for rematching
-    rematch_body = RematchBatchBody(
+    background_tasks.add_task(
+        rematch_batch,
         sample_batch_id=sample_batch_id,
         workspace_id=body.workspace_id,
         added_target_compound_ids=body.added_target_compound_ids,
@@ -60,18 +61,6 @@ async def rematch_batch_route(
         progress_properties=ProgressProperties(
             progress_type="rematch_batch",
         ),
-    )
-
-    background_tasks.add_task(
-        rematch_batch,
-        rematch_body.sample_batch_id,
-        rematch_body.workspace_id,
-        rematch_body.added_target_compound_ids,
-        rematch_body.added_ionization_mechanism_ids,
-        rematch_body.removed_target_compound_ids,
-        rematch_body.removed_ionization_mechanism_ids,
-        rematch_body.independent_transaction,
-        rematch_body.progress_properties,
     )
     return {"status": f"Rematching process started for sample batch {sample_batch_id}"}
 
