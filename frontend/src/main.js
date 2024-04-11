@@ -1,54 +1,35 @@
-import Vue from "vue";
-import store from "./store";
-import { api, apiLog } from "$api";
+import { createApp } from 'vue'
+import { createPinia } from 'pinia'
 
-// API
+import 'primevue/resources/themes/aura-dark-green/theme.css'
+import Tooltip from 'primevue/tooltip'
 
-Vue.prototype.$api = api;
-apiLog("registered API with Vue prototype");
+import buefy from '@ntohq/buefy-next'
+import '@mdi/font/css/materialdesignicons.min.css'
 
-// Buefy framework
+import { apiPlugin } from '@/api'
 
-import Buefy from "buefy"; // components
-import "@mdi/font/css/materialdesignicons.min.css"; // material design icons
+import App from './App.vue'
+import router from './router'
 
-Vue.use(Buefy);
-Vue.config.productionTip = false;
+const pinia = createPinia()
+pinia.use(apiPlugin)
 
-// Routes
+const app = createApp(App)
 
-import VueRouter from "vue-router";
+// boilerplate
+app.use(pinia)
+app.use(router)
 
-import ThePageHome from "./components/ThePageHome.vue";
-import ThePageBatchOverview from "./components/ThePageBatchOverview.vue";
-import ThePageScenthound from "./components/ThePageScenthound.vue";
+// prime
+app.directive('tooltip', Tooltip)
 
-Vue.use(VueRouter);
+// buefy
+app.use(buefy)
 
-const router = new VueRouter({
-  mode: process.env.NODE_ENV == "production" ? "hash" : "history",
-  routes: [
-    {
-      path: "/",
-      component: ThePageHome,
-    },
-    {
-      path: "/batch-overview",
-      component: ThePageBatchOverview,
-    },
-    {
-      path: "/scenthound",
-      component: ThePageScenthound,
-    },
-  ],
-});
+app.mount('#app')
 
-// App
+import { DialogProgrammatic, ToastProgrammatic } from '@ntohq/buefy-next'
 
-import App from "./App.vue";
-
-new Vue({
-  router,
-  store,
-  render: (h) => h(App),
-}).$mount("#app");
+export const dialog = new DialogProgrammatic(app)
+export const toast = new ToastProgrammatic(app)

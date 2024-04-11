@@ -1,7 +1,7 @@
-@use "sass:color";
+@use 'sass:color';
 
 // Import Bulma's core
-@import "../node_modules/bulma/sass/utilities/_all.sass";
+@import '../node_modules/bulma/sass/utilities/_all.sass';
 
 // Karsa colors
 $moss-green: #425634;
@@ -77,16 +77,19 @@ $notification-invert: $cool-grey-lighter;
   margin: 10px;
   background-color: $cool-grey;
 }
+
 .tile-card-header {
   @extend .card-header;
   background-color: $cool-grey-2 !important;
   border-top-left-radius: 0 !important;
   border-top-right-radius: 0 !important;
 }
+
 .tile-card-header-title {
   @extend .card-header-title;
   color: $cool-grey-light !important;
 }
+
 .tile-card-content {
   @extend .card-content;
   color: $cool-grey-light;
@@ -134,18 +137,23 @@ $loading-background: $cool-grey-0;
 .message.is-notification.is-closing {
   animation: fadeOut 0.5s;
 }
+
 .message.is-notification.in-development {
   width: 500px;
 }
+
 .message.is-notification.failed-computation {
   width: 50vw;
 }
+
 .message.is-notification.failed-validation-import-samples {
   width: 50vw;
 }
+
 .message.is-notification.is-submitted {
   background-color: rgba($success, 0.9) !important;
 }
+
 .message.is-notification.is-error {
   background-color: rgba($danger, 0.9) !important;
 }
@@ -157,44 +165,17 @@ $table-cell-border: 1px solid $cool-grey;
 $table-head-cell-color: $cool-grey-light;
 $table-head-background-color: $cool-grey-3;
 $table-row-hover-background-color: $cool-grey-4;
+
 .base-browser-row-focused {
   background: $burgundy-red-light;
 }
+
 .base-browser-row-fully-selected {
   background: $burgundy-red;
 }
+
 .base-browser-row-partially-selected {
   background: $burgundy-red;
-}
-
-// Custom table with pagination and horizontal scrollbar
-.table-with-pagination {
-  .table-container {
-    overflow-x: auto;
-
-    // Custom table horizontal scrollbar
-    &::-webkit-scrollbar {
-      // width: 10px; // Width of the vertical scrollbar
-      height: 10px; // Height of the horizontal scrollbar
-    }
-
-    // Style the scrollbar thumb
-    &::-webkit-scrollbar-thumb {
-      background-color: $cool-grey-0; // Thumb color
-      border-radius: 6px; // Rounded corners for the thumb
-      border: 1.5px solid $cool-grey-1; // Creates padding around the thumb
-
-      &:hover {
-        background-color: $cool-grey-3; // Darker thumb color on hover
-      }
-    }
-
-    // Style the scrollbar track (the part the thumb moves within)
-    &::-webkit-scrollbar-track {
-      background: darken($cool-grey-0, 4%); // Track color
-      border-radius: 6px; // Rounded corners for the track
-    }
-  }
 }
 
 // Input
@@ -241,7 +222,7 @@ $progress-bar-background-color: $cool-grey-light;
 }
 
 // Isotope rating range input
-input[type="range"] {
+input[type='range'] {
   -webkit-appearance: none;
   width: 20%;
   margin: 5px 20px 5px 20px;
@@ -295,6 +276,7 @@ input[type="range"] {
 
   thead {
     background-color: $cool-grey-2;
+
     th {
       color: white;
     }
@@ -314,82 +296,82 @@ input[type="range"] {
 
 // Setup $colors to use as bulma classes (e.g. 'is-twitter')
 $colors: (
-  "white": (
+  'white': (
     $white,
-    $black,
+    $black
   ),
-  "black": (
+  'black': (
     $black,
-    $white,
+    $white
   ),
-  "light": (
+  'light': (
     $light,
-    $light-invert,
+    $light-invert
   ),
-  "dark": (
+  'dark': (
     $dark,
-    $dark-invert,
+    $dark-invert
   ),
-  "primary": (
+  'primary': (
     $primary,
     $primary-invert,
     $primary-light,
-    $primary-dark,
+    $primary-dark
   ),
-  "link": (
+  'link': (
     $link,
     $link-invert,
     $link-light,
-    $link-dark,
+    $link-dark
   ),
-  "info": (
+  'info': (
     $info,
     $info-invert,
     $info-light,
-    $info-dark,
+    $info-dark
   ),
-  "success": (
+  'success': (
     $success,
     $success-invert,
     $success-light,
-    $success-dark,
+    $success-dark
   ),
-  "success-pale": (
+  'success-pale': (
     $success-pale,
     $success-invert,
     $success-light,
-    $success-dark,
+    $success-dark
   ),
-  "warning": (
+  'warning': (
     $warning,
     $warning-invert,
     $warning-light,
-    $warning-dark,
+    $warning-dark
   ),
-  "warning-pale": (
+  'warning-pale': (
     $warning-pale,
     $warning-invert,
     $warning-light,
-    $warning-dark,
+    $warning-dark
   ),
-  "danger": (
+  'danger': (
     $danger,
     $danger-invert,
     $danger-light,
-    $danger-dark,
+    $danger-dark
   ),
-  "danger-pale": (
+  'danger-pale': (
     $danger-pale,
     $danger-invert,
     $danger-light,
-    $danger-dark,
+    $danger-dark
   ),
-  "notification": (
+  'notification': (
     $notification-dark,
     $notification-light,
     $notification,
-    $notification-invert,
-  ),
+    $notification-invert
+  )
 );
 
 // Define animations
@@ -397,6 +379,7 @@ $colors: (
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -406,6 +389,7 @@ $colors: (
   from {
     opacity: 1;
   }
+
   to {
     opacity: 0;
   }
@@ -417,5 +401,5 @@ $link-invert: $primary-invert;
 $link-focus-border: $primary;
 
 // Import Bulma and Buefy styles
-@import "../node_modules/bulma/bulma.sass";
-@import "../node_modules/buefy/src/scss/buefy.scss";
+@import '../node_modules/bulma/bulma.sass';
+@import '../node_modules/@ntohq/buefy-next/src/scss/buefy.scss';

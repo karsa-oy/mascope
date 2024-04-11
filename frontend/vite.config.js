@@ -1,36 +1,28 @@
-import { defineConfig, loadEnv } from "vite";
-import { createVuePlugin } from "vite-plugin-vue2";
-import path from "path";
+import { fileURLToPath, URL } from 'node:url'
+
+import { defineConfig, loadEnv } from 'vite'
+import vue from '@vitejs/plugin-vue'
+
+import path from 'path'
 
 export default ({ mode }) => {
-  const dotEnvPath = path.resolve(process.cwd() + "/..");
-  process.env = Object.assign(
-    process.env,
-    loadEnv(mode, dotEnvPath, "MASCOPE_PUBLIC_")
-  );
+  const envDir = path.resolve(process.cwd() + '/..')
+  const env = loadEnv(mode, envDir, 'MASCOPE_PUBLIC_')
 
   return defineConfig({
-    plugins: [createVuePlugin()],
-    server: {
-      port: process.env.MASCOPE_PUBLIC_PORT,
-    },
+    plugins: [vue()],
     resolve: {
-      alias: [
-        {
-          find: "$lib",
-          replacement: path.resolve(__dirname, "src/lib/"),
-        },
-        {
-          find: "$api",
-          replacement: path.resolve(__dirname, "src/api.js"),
-        },
-      ],
+      alias: {
+        '@': fileURLToPath(new URL('./src', import.meta.url))
+      }
     },
+    server: { port: env.MASCOPE_PUBLIC_PORT },
     build: {
       chunkSizeWarningLimit: 600,
       cssCodeSplit: false,
-      target: "esnext",
+      target: 'esnext'
     },
-    envPrefix: "MASCOPE_PUBLIC_",
-  });
-};
+    envPrefix: 'MASCOPE_PUBLIC_',
+    envDir
+  })
+}
