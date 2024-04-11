@@ -14,11 +14,13 @@ from sqlalchemy import (
     Float,
     literal,
 )
-
+from lib.util import norm
+from backend.db.id import gen_id
 from backend.db import async_session
-
 from ..utils.api_features import api_controller
 from ..exceptions import NotFoundException
+from .target_ions_controller import create_target_ions
+from .matches_controller import compute_matches
 from ..models.models import (
     Sample,
     SampleBatch,
@@ -76,6 +78,108 @@ def aggregate_params(df: pd.DataFrame) -> pd.Series:
 # -------------------------------------------------------------------
 # Main Logic Functions
 # -------------------------------------------------------------------
+
+
+def apply_filter_params(matches_df, filter_params: FilterParams = None):
+    """
+    Apply filtering logic to a isotope-lvl matches DataFrame.
+
+    :param matches_df: DataFrame containing match data.
+    :type matches_df: pd.DataFrame
+    :param filter_params: Optional; Pydantic model of filtering parameters.
+    :type filter_params: FilterParams
+    :return: DataFrame with applied filters.
+    :rtype: pd.DataFrame
+    """
+    # Define default filter parameters as a fallbasck option
+    default_params = {
+        "mz_tolerance": DEFAULT_MZ_TOLERANCE,
+        "min_isotope_abundance": DEFAULT_MIN_ISOTOPE_ABUNDANCE,
+        "isotope_ratio_tolerance": DEFAULT_ISOTOPE_RATIO_TOLERANCE,
+        "peak_min_intensity": DEFAULT_PEAK_MIN_INTENSITY,
+        "min_isotope_correlation": DEFAULT_MIN_ISOTOPE_CORRELATION,
+        "probable_match_threshold": DEFAULT_PROBABLE_MATCH_THRESHOLD,
+        "possible_match_threshold": DEFAULT_POSSIBLE_MATCH_THRESHOLD,
+    }
+
+    # Convert filter_params Pydantic model to dictionary if provided
+    provided_params = filter_params.dict() if filter_params else None
+
+    def get_params(row):
+        """
+        Determine the filter parameters to use based on the priority:
+        1. Provided filter parameters
+        2. Ion-specific filter parameters for the sample instrument
+        3. Default filter parameters
+        """
+        # If provided_params are available, use them for all rows
+        if provided_params:
+            return provided_params
+
+        # If row-specific filter_params are available for the instrument, use them
+        if "filter_params" in row and row["instrument"] in row["filter_params"]:
+            return row["filter_params"][row["instrument"]]
+
+        # Fallback to default parameters
+        return default_params
+
+    def filter_row(row):
+        """
+        Apply filtering logic to the given row based on the determined parameters.
+        """
+        # Determine which filter parameters to use for the current row
+        params = get_params(row)
+
+        # Apply filtering logic
+        row["match_score"] = (
+            row["match_score"]
+            if all(
+                [
+                    abs(row["match_mz_error"]) <= params["mz_tolerance"],
+                    abs(row["match_abundance_error"])
+                    <= params["isotope_ratio_tolerance"],
+                    max(row.get("match_isotope_correlation", 0), 0)
+                    >= params["min_isotope_correlation"],
+                    row["sample_peak_area"] >= params["peak_min_intensity"],
+                    row["relative_abundance"] >= params["min_isotope_abundance"],
+                ]
+            )
+            else 0
+        )
+
+        row["sample_peak_area"] = (
+            row["sample_peak_area"]
+            if all(
+                [
+                    abs(row["match_mz_error"]) <= params["mz_tolerance"],
+                    abs(row["match_abundance_error"])
+                    <= params["isotope_ratio_tolerance"],
+                    max(row.get("match_isotope_correlation", 0), 0)
+                    >= params["min_isotope_correlation"],
+                    row["relative_abundance"] >= params["min_isotope_abundance"],
+                ]
+            )
+            else 0
+        )
+
+        # Determine match category based on match_score
+        match_score = row["match_score"]
+        row["match_category"] = (
+            2  # Probable match
+            if match_score >= params["probable_match_threshold"]
+            else (
+                1  # Possible match
+                if match_score >= params["possible_match_threshold"]
+                else 0
+            )  # No match
+        )
+
+        return row
+
+    # Apply the filtering logic to each row
+    filtered_df = matches_df.apply(filter_row, axis=1)
+
+    return filtered_df
 
 
 async def set_ions_match_category(
@@ -283,7 +387,8 @@ async def aggregate_match_ions(
     )
 
     # Prepare a simplified DataFrame for frontend
-    # Drop duplicates for matchIons based on target_ion_id for each sample, so each sample would have the unique matchIons (even of there is some compound in the different collections of the batch)
+    # Drop duplicates for matchIons based on target_ion_id for each sample, so each sample would have the unique matchIons
+    # (even of there is some compound in the different collections of the batch)
     match_ions_df = match_ions_data_df.drop(
         columns=[
             "target_collection_id",
@@ -304,6 +409,38 @@ async def aggregate_match_ions(
     match_ions_df = await set_ions_match_category(match_ions_df, filter_params)
 
     return match_ions_data_df, match_ions_df
+
+
+def aggregate_match_ions_simple(
+    filtered_match_isotope_df: pd.DataFrame,
+) -> pd.DataFrame:
+    """
+    Aggregate fields for match ions from the filtered match isotope DataFrame.
+    Used in the get_sample_compound_matches to aggregate simpler match_isotope_df from compute_matches.
+
+    This function groups the filtered match isotope DataFrame by 'target_ion_id' and aggregates relevant data,
+    such as summing up 'sample_peak_area' and computing a weighted 'match_score'.
+
+    :param filtered_match_isotope_df: DataFrame containing filtered match isotope data.
+    :type filtered_match_isotope_df: pd.DataFrame
+    :return: DataFrame with aggregated match ions data.
+    :rtype: pd.DataFrame
+    """
+    match_ions_df = (
+        filtered_match_isotope_df.groupby("target_ion_id")
+        .agg(
+            match_score=(
+                "match_score",
+                lambda x: (
+                    x * filtered_match_isotope_df.loc[x.index, "relative_abundance"]
+                ).sum(),
+            ),
+            sample_peak_area_sum=("sample_peak_area", "sum"),
+        )
+        .reset_index()
+    )
+
+    return match_ions_df
 
 
 async def aggregate_match_compounds(
@@ -367,6 +504,31 @@ async def aggregate_match_compounds(
     ).drop_duplicates(subset=["target_compound_id", "sample_item_id"])
 
     return match_compounds_data_df, match_compounds_df
+
+
+def aggregate_match_compounds_simple(match_ions_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Aggregate fields for match compounds from the match ions DataFrame.
+    Used in the get_sample_compound_matches to aggregate simpler match_ions_df from aggregate_match_ions_simple.
+
+    This function groups the match ions DataFrame by 'target_compound_id' and aggregates relevant data,
+    such as computing a weighted 'match_score' and summing up 'sample_peak_area'.
+
+    :param match_ions_df: DataFrame containing match ions data.
+    :type match_ions_df: pd.DataFrame
+    :return: DataFrame with aggregated match compounds data.
+    :rtype: pd.DataFrame
+    """
+    match_compounds_df = (
+        match_ions_df.groupby("target_compound_id")
+        .agg(
+            match_score=("match_score", "max"),
+            sample_peak_area_sum=("sample_peak_area_sum", "sum"),
+        )
+        .reset_index()
+    )
+
+    return match_compounds_df
 
 
 async def aggregate_match_collections(compounds_df: pd.DataFrame) -> pd.DataFrame:
@@ -1028,6 +1190,147 @@ async def get_sample_ion_matches(
 
 
 @api_controller()
+async def get_sample_compound_matches(
+    sample_item_id: str,
+    target_compound_formula: str,
+    target_compound_name: str,
+    filter_params: FilterParams,
+) -> dict:
+    """
+    Retrieves matches for compounds within a sample based on a target compound formula,
+    applying specified filter parameters to filter the matches.
+
+    Steps:
+    1. Verify the existence of the sample and its batch, extract ion mechanisms.
+    2. Prepare the target compound by normalizing its formula and creating a target compound instance.
+    3. Generate and create target ions and isotopes for the compound.
+    4. Compute matches for the created isotopes within the sample file.
+    5. Apply filters to the computed isotope matches based on the provided parameters.
+    6. Aggregate ion-level data from the filtered isotopes.
+    7. Aggregate compound-level data from the ions and merge with target compound information.
+
+    :param sample_item_id: Unique identifier of the sample item to analyze.
+    :type sample_item_id: str
+    :param target_compound_formula: Chemical formula of the target compound.
+    :type target_compound_formula: str
+    :param target_compound_name: The name of the target compound.
+    :type target_compound_name: str
+    :param filter_params: Parameters to filter the match results, affecting which matches are considered significant.
+    :type filter_params: FilterParams
+    :raises NotFoundException: Raised if the sample item or sample batch cannot be found.
+    :raises ValueError: Raised if no ion mechanisms are defined for the sample batch.
+    :return: A dictionary containing aggregated match compounds, ions, and isotopes, each as a list of dictionaries.
+    :rtype: dict
+    """
+    async with async_session() as session:
+        # Step 1: Fetch sample related data and verify its existence
+        sample = await get_sample(sample_item_id)
+        filename = sample["filename"]
+
+        # Fetch sample batch data and verify its existence
+        sample_batch_id = sample["sample_batch_id"]
+        sample_batch = await session.get(SampleBatch, sample_batch_id)
+        if not sample_batch:
+            raise NotFoundException(
+                f"Sample batch with ID '{sample_batch_id}' not found"
+            )
+
+        # Extract ion_mechanisms IDs from build_params
+        ion_mechanisms_ids = sample_batch.build_params.get("ion_mechanisms", [])
+        if not ion_mechanisms_ids:
+            raise ValueError(
+                f"There are no ion mechanisms for sample batch '{sample_batch.sample_batch_name}'."
+            )
+
+        # Fetch the ionization mechanisms from the database using the extracted IDs
+        restult = await session.execute(
+            select(IonizationMechanism).filter(
+                IonizationMechanism.ionization_mechanism_id.in_(ion_mechanisms_ids)
+            )
+        )
+        ionization_mechanisms = restult.scalars().all()
+        if not ionization_mechanisms:
+            raise NotFoundException(
+                f"Ionization mechanisms with IDs {ion_mechanisms_ids} not found"
+            )
+
+        # Step 2: Prepare target compound
+        # Normalize the compound formula for consistency
+        normalized_formula = norm(target_compound_formula)
+
+        # Attempt to parse the target compound formula as a mass if applicable
+        try:
+            target_compound_mass = float(normalized_formula)
+        except ValueError:
+            target_compound_mass = None  # If parsing fails, proceed without a mass
+
+        # Initialize the target compound with the normalized formula
+        target_compound = TargetCompound(
+            target_compound_id=gen_id(),
+            target_compound_name=target_compound_name,
+            target_compound_formula=normalized_formula,
+        )
+
+        # Step 3: Generate and create target ions and isotopes.
+        # Create target ions for the compound
+        ion_creation_result = await create_target_ions(
+            target_compound=target_compound,
+            ionization_mechanisms=ionization_mechanisms,
+            target_compound_mass=target_compound_mass,
+            independent_transaction=False,
+            session=session,
+        )
+
+        # Convert 'created_ions' list into a DataFrame
+        created_ions_df = pd.DataFrame(ion_creation_result["created_ions"])
+        # Convert created isotopes to pandas DataFrame
+        target_isotopes_df = pd.DataFrame(ion_creation_result["created_isotopes"])
+
+        # Step 4: Compute matches for the isotopes in the sample file.
+        match_isotope_df = await compute_matches(
+            filename=filename,
+            target_isotopes_df=target_isotopes_df,
+            min_isotope_abundance=(
+                filter_params.min_isotope_abundance
+                if filter_params is not None
+                else DEFAULT_MIN_ISOTOPE_ABUNDANCE
+            ),
+        )
+
+        # Drop the 'index' column from the match_isotope_df DataFrame
+        match_isotope_df = match_isotope_df.drop(columns=["index"])
+
+        # Step 5: Apply filters to the computed isotope matches based on the provided parameters.
+        filtered_match_isotope_df = apply_filter_params(match_isotope_df, filter_params)
+
+        # Step 6: Aggregate ion-level data from the filtered isotopes.
+        match_ions_data_df = aggregate_match_ions_simple(filtered_match_isotope_df)
+        match_ions_df = pd.merge(
+            match_ions_data_df, created_ions_df, on="target_ion_id", how="left"
+        )
+
+        # Step 7: Aggregate compound-level data from the ions and merge with target compound information.
+        match_compounds_data_df = aggregate_match_compounds_simple(match_ions_df)
+
+        # Convert the dictionary into a DataFrame
+        target_compound_df = pd.DataFrame([target_compound.to_dict()])
+
+        # Merge match_compounds_data_df with target_compound_df
+        merged_match_compounds_df = pd.merge(
+            match_compounds_data_df,
+            target_compound_df,
+            on="target_compound_id",
+            how="left",
+        )
+
+        return {
+            "match_compounds": merged_match_compounds_df.to_dict("records"),
+            "match_ions": match_ions_df.to_dict("records"),
+            "match_isotopes": filtered_match_isotope_df.to_dict("records"),
+        }
+
+
+@api_controller()
 async def init_batch_match_filter(sample_batch_id: str) -> list:
     """
     Initializes and applies a batch-level match filter across all samples within a specified batch.
@@ -1040,9 +1343,9 @@ async def init_batch_match_filter(sample_batch_id: str) -> list:
     Steps:
     1. Verify the existence of the specified sample batch.
     2. Construct and execute a database query to fetch relevant isotopic match data across the batch.
-    3. Convert query results into a dictionary format for easier manipulation.
-    4. Apply filtering criteria based on provided ion-specific parameters or default values to each isotopic match.
-    5. Categorize each match based on computed match scores into probable, possible, or no matches.
+    3. Convert query result to DataFrame for easier manipulation.
+    4. Apply filtering criteria based on ion-specific parameters or default values to each isotopic match.
+    5. Convert the filtered DataFrame to a list of dictionaries.
 
     :param sample_batch_id: ID of the sample batch for which to initialize and apply the match filter.
     :type sample_batch_id: str
@@ -1141,76 +1444,18 @@ async def init_batch_match_filter(sample_batch_id: str) -> list:
         result = await session.execute(stmt)
         batch_match_filter = result.fetchall()
 
-    # Step 3: Convert each Row object in the result into a dictionary
-    batch_match_filter_dicts = [row._asdict() for row in batch_match_filter]
+    # Step 3: Convert query result to DataFrame
+    batch_match_filter_df = pd.DataFrame([row._asdict() for row in batch_match_filter])
 
     # Step 4: Apply filtering match_score, sample_peak_area
-    for row in batch_match_filter_dicts:
-        # Extract the instrument and filter_params from the row
-        instrument = row["instrument"]
-        filter_params = row.get("filter_params")
-        # Determine which filter parameters to use, fall back to default filters
-        if filter_params and instrument in filter_params:
-            # Use ion-specific filters (unique for different instruments)
-            ion_filters = filter_params[instrument]
-            mz_tolerance = ion_filters["mz_tolerance"]
-            min_isotope_abundance = ion_filters["min_isotope_abundance"]
-            isotope_ratio_tolerance = ion_filters["isotope_ratio_tolerance"]
-            peak_min_intensity = ion_filters["peak_min_intensity"]
-            min_isotope_correlation = ion_filters["min_isotope_correlation"]
-            probable_match_threshold = ion_filters["probable_match_threshold"]
-            possible_match_threshold = ion_filters["possible_match_threshold"]
-        else:
-            # Use default filter parameters if target ion-specific filter_params are not provided
-            mz_tolerance = DEFAULT_MZ_TOLERANCE
-            min_isotope_abundance = DEFAULT_MIN_ISOTOPE_ABUNDANCE
-            isotope_ratio_tolerance = DEFAULT_ISOTOPE_RATIO_TOLERANCE
-            peak_min_intensity = DEFAULT_PEAK_MIN_INTENSITY
-            min_isotope_correlation = DEFAULT_MIN_ISOTOPE_CORRELATION
-            probable_match_threshold = DEFAULT_PROBABLE_MATCH_THRESHOLD
-            possible_match_threshold = DEFAULT_POSSIBLE_MATCH_THRESHOLD
+    filtered_batch_match_filter_df = apply_filter_params(batch_match_filter_df)
 
-        # Apply the filters to each row
-        row["match_score"] = (
-            row["match_score"]
-            if all(
-                [
-                    abs(row["match_mz_error"]) <= mz_tolerance,
-                    abs(row["match_abundance_error"]) <= isotope_ratio_tolerance,
-                    max(row["match_isotope_correlation"], 0) >= min_isotope_correlation,
-                    row["sample_peak_area"] >= peak_min_intensity,
-                    row["relative_abundance"] >= min_isotope_abundance,
-                ]
-            )
-            else 0
-        )
+    # Step 5: Convert the filtered DataFrame to a list of dictionaries
+    filtered_batch_match_filter_dicts = filtered_batch_match_filter_df.to_dict(
+        "records"
+    )
 
-        row["sample_peak_area"] = (
-            row["sample_peak_area"]
-            if all(
-                [
-                    abs(row["match_mz_error"]) <= mz_tolerance,
-                    abs(row["match_abundance_error"]) <= isotope_ratio_tolerance,
-                    max(row["match_isotope_correlation"], 0) >= min_isotope_correlation,
-                    row["relative_abundance"] >= min_isotope_abundance,
-                ]
-            )
-            else 0
-        )
-
-        # Step 5: Assign match category based on thresholds
-        match_score = row["match_score"]
-        row["match_category"] = (
-            2  # Probable match
-            if match_score >= probable_match_threshold
-            else (
-                1  # Possible match
-                if possible_match_threshold <= match_score < probable_match_threshold
-                else 0
-            )  # No match
-        )
-
-    return batch_match_filter_dicts
+    return filtered_batch_match_filter_dicts
 
 
 @api_controller()
@@ -1233,9 +1478,9 @@ async def init_sample_match_filter(
     1. Verify the existence of the specified sample item.
     2. If a target ion ID is provided, verify its existence and use the provided filter parameters.
     3. Construct and execute a database query to fetch relevant isotopic match data.
-    4. Convert query results into a dictionary format.
+    4. Convert query result to DataFrame.
     5. Apply filtering based on provided filter parameters or using the stored ion-specific or DEFAULT filter parameters.
-    6. Determine the match category for each row based on the computed match score.
+    6. Convert the filtered DataFrame to a list of dictionaries.
 
     :param sample_item_id: ID of the sample item for which to initialize the match filter.
     :type sample_item_id: str
@@ -1360,81 +1605,19 @@ async def init_sample_match_filter(
         result = await session.execute(stmt)
         sample_match_filter = result.fetchall()
 
-        # Step 4: Convert each Row object in the result into a dictionary
-        sample_match_filter_dict = [row._asdict() for row in sample_match_filter]
+        # Step 4: Convert query result to DataFrame
+        sample_match_filter_df = pd.DataFrame(
+            [row._asdict() for row in sample_match_filter]
+        )
 
         # Step 5: Apply filtering criteria, filtering match_score, sample_peak_area, and setting match_category
-        for row in sample_match_filter_dict:
-            # Extract the instrument and filter_params from the database record
-            instrument = row["instrument"]
-            filter_params_ion = row.get("filter_params")
-            # Apply appropriate filter parameters
-            if filter_params:
-                # Use provided ion-specific filter parameters
-                mz_tolerance = filter_params.mz_tolerance
-                isotope_ratio_tolerance = filter_params.isotope_ratio_tolerance
-                peak_min_intensity = filter_params.peak_min_intensity
-                min_isotope_correlation = filter_params.min_isotope_correlation
-                probable_match_threshold = filter_params.probable_match_threshold
-                possible_match_threshold = filter_params.possible_match_threshold
-            elif filter_params_ion and instrument in filter_params_ion:
-                # Use stored ion-specific filters (unique for different instruments)
-                ion_filters = filter_params_ion[instrument]
-                mz_tolerance = ion_filters["mz_tolerance"]
-                isotope_ratio_tolerance = ion_filters["isotope_ratio_tolerance"]
-                peak_min_intensity = ion_filters["peak_min_intensity"]
-                min_isotope_correlation = ion_filters["min_isotope_correlation"]
-                probable_match_threshold = ion_filters["probable_match_threshold"]
-                possible_match_threshold = ion_filters["possible_match_threshold"]
-            else:
-                # Fall back to DEFAULT filters
-                mz_tolerance = DEFAULT_MZ_TOLERANCE
-                isotope_ratio_tolerance = DEFAULT_ISOTOPE_RATIO_TOLERANCE
-                peak_min_intensity = DEFAULT_PEAK_MIN_INTENSITY
-                min_isotope_correlation = DEFAULT_MIN_ISOTOPE_CORRELATION
-                probable_match_threshold = DEFAULT_PROBABLE_MATCH_THRESHOLD
-                possible_match_threshold = DEFAULT_POSSIBLE_MATCH_THRESHOLD
+        filtered_sample_match_filter_df = apply_filter_params(
+            sample_match_filter_df, filter_params
+        )
 
-            # Apply the filters to each row
-            row["match_score"] = (
-                row["match_score"]
-                if all(
-                    [
-                        abs(row["match_mz_error"]) <= mz_tolerance,
-                        abs(row["match_abundance_error"]) <= isotope_ratio_tolerance,
-                        max(row["match_isotope_correlation"], 0)
-                        >= min_isotope_correlation,
-                        row["sample_peak_area"] >= peak_min_intensity,
-                    ]
-                )
-                else 0
-            )
+        # Step 6: Convert the filtered DataFrame to a list of dictionaries
+        filtered_sample_match_filter_dicts = filtered_sample_match_filter_df.to_dict(
+            "records"
+        )
 
-            row["sample_peak_area"] = (
-                row["sample_peak_area"]
-                if all(
-                    [
-                        abs(row["match_mz_error"]) <= mz_tolerance,
-                        abs(row["match_abundance_error"]) <= isotope_ratio_tolerance,
-                        max(row["match_isotope_correlation"], 0)
-                        >= min_isotope_correlation,
-                    ]
-                )
-                else 0
-            )
-
-            # Assign match category based on thresholds
-            match_score = row["match_score"]
-            row["match_category"] = (
-                2  # Probable match
-                if match_score >= probable_match_threshold
-                else (
-                    1  # Possible match
-                    if possible_match_threshold
-                    <= match_score
-                    < probable_match_threshold
-                    else 0
-                )  # No match
-            )
-
-        return sample_match_filter_dict
+        return filtered_sample_match_filter_dicts

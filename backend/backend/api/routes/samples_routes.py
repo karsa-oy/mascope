@@ -6,12 +6,14 @@ from ..controllers.samples_controller import (
     init_batch_match_filter,
     init_sample_match_filter,
     get_sample_ion_matches,
+    get_sample_compound_matches,
 )
 from ..models.pydantic_models.sample_pydantic_model import (
     GetSamplesBody,
     GetSampleBody,
     GetSampleMatchFilterBody,
     GetSampleIonMatchesBody,
+    GetSampleCompoundMatchesBody,
 )
 
 samples_router = APIRouter()
@@ -90,6 +92,34 @@ async def get_sample_ion_matches_route(
         message = "Match information retrieved successfully"
     else:
         message = "No matches found for the specified criteria"
+
+    return {
+        "message": message,
+        "data": data,
+    }
+
+
+@samples_router.post("/api/samples/{sample_item_id}/compound_matches")
+@api_route()
+async def get_sample_compound_matches_route(
+    sample_item_id: str,
+    body: GetSampleCompoundMatchesBody,
+):
+    data = await get_sample_compound_matches(
+        sample_item_id=sample_item_id,
+        target_compound_formula=body.target_compound.target_compound_formula,
+        target_compound_name=body.target_compound.target_compound_name,
+        filter_params=body.filter_params,
+    )
+
+    match_compounds_count = len(data["match_compounds"]) > 0
+
+    if match_compounds_count:
+        compound = data["match_compounds"][0].get("target_compound_formula")
+        message = f"Match information for compound '{compound}' retrieved successfully"
+    else:
+        compound = body.target_compound.target_compound_formula
+        message = f"No matches found for the specified compound '{compound}'"
 
     return {
         "message": message,

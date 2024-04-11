@@ -1,11 +1,81 @@
 import pandas as pd
+import numpy as np
 from sqlalchemy import asc, desc, func, select, delete, and_
 from typing import List, Optional
-
+from lib.file_func import load_file
+from backend.db.id import gen_id
 from backend.db import async_session
 from ..utils.api_features import api_controller
+from .instrument_functions_controller import (
+    read_instrument_functions,
+)
 from ..exceptions import NotFoundException
 from ..models.models import MatchInterference
+
+# -------------------------------------------------------------------
+# Main Logic Functions
+# -------------------------------------------------------------------
+
+
+async def compute_match_interferences(
+    filename,
+    target_isotopes_df,
+) -> pd.DataFrame:
+    """
+    Computes match interferences for a given sample file based on specified target isotopes.
+
+    This function calculates the raw intensities for each target isotope within the specified mass-to-charge (m/z) range,
+    which are used to identify potential interferences in the sample's spectrum. It involves loading the sample file data,
+    summing up the spectrum, and then computing the raw intensities for the target isotopes.
+
+    Steps:
+    1. Load the sample file and compute the summed spectrum across all time points.
+    2. For each target isotope, calculate the raw intensity within a defined m/z range around the target m/z value.
+
+    :param filename: Path to the sample file from which to compute interferences.
+    :type filename: str
+    :param target_isotopes_df: DataFrame containing the target isotopes and their m/z values.
+    :type target_isotopes_df: pd.DataFrame
+    :return: DataFrame with computed interferences for each target isotope.
+    :rtype: pd.DataFrame
+    :raises RuntimeError: If an error occurs during the computation process.
+    """
+    try:
+        # Step 1: Load the sample file and compute the summed spectrum
+        sample_file_data = load_file(filename, vars=["signal"])
+        sum_spectrum = sample_file_data.signal.sum(dim="time").compute()
+
+        # Read instrument resolution function
+        _, R = await read_instrument_functions(filename)
+
+        # Step 2: Initialize DataFrame for interferences and compute raw intensities for each target mz
+        isotope_interference_df = target_isotopes_df.copy().assign(
+            sample_peak_interference=np.nan,
+        )
+
+        def calc_raw_intensity(row):
+            target_mz = row.mz
+            dmz = (target_mz / R(target_mz)) / 2  # hwhm
+            target_raw_intensity = sum_spectrum.sel(
+                mz=slice(target_mz - dmz, target_mz + dmz)
+            ).sum(dim="mz")
+            row["match_interference_id"] = gen_id(length=32)
+            row["sample_peak_interference"] = target_raw_intensity.compute().item()
+            return row
+
+        isotope_interference_df = isotope_interference_df.apply(
+            calc_raw_intensity, axis=1
+        )
+
+        return isotope_interference_df
+    except Exception as e:
+        error_message = f"Computing match interferences failed: {e}"
+        raise RuntimeError(error_message)
+
+
+# -------------------------------------------------------------------
+# Controller or Route Handlers
+# -------------------------------------------------------------------
 
 
 @api_controller()

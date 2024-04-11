@@ -33,7 +33,8 @@ from fastapi import BackgroundTasks, HTTPException
 from sqlalchemy import select, func, and_
 
 from ..exceptions import process_exception, ApiException, NotFoundException
-from .match_controller import match_sample_remove, compute_matches
+from .match_controller import match_sample_remove
+from .matches_controller import compute_matches
 from .sample_files_controller import (
     update_sample_file,
     get_sample_files,
@@ -133,7 +134,9 @@ async def mz_fit(
     )
     target_isotopes_df = pd.DataFrame(target_isotopes_result["data"])
     match_isotope_df = await compute_matches(
-        filename, target_isotopes_df, min_isotope_abundance=isotope_abundance_min
+        filename=filename,
+        target_isotopes_df=target_isotopes_df,
+        min_isotope_abundance=isotope_abundance_min,
     )
 
     # Filter matches

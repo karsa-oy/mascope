@@ -15,6 +15,12 @@ class TargetCompoundBase(BaseModel):
     )
 
 
+class TargetCompoundMatches(TargetCompoundBase):
+    target_compound_name: Optional[str] = Field(
+        "Unknown Compound", description="Name of the target compound"
+    )
+
+
 class TargetCompoundUpdate(BaseModel):
     target_compound_id: str = Field(..., description="ID of the target compound")
     target_collection_id: Optional[str] = Field(

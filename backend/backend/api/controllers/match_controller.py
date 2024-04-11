@@ -8,32 +8,15 @@ This module contains all the functionalities and endpoints related to the matchi
 # Imports
 # -------------------------------------------------------------------
 import asyncio
-import numpy as np
 import pandas as pd
 from fastapi import HTTPException
 from typing import List, Optional
 from sqlalchemy import select
 from backend.db import async_session
 from backend.api_sio import sio
-from backend.db.id import gen_id
-from lib.chemistry import match_mz
-from lib.file_func import load_file
-from lib.peak import detect_peaks, get_peaks
-from lib.chemistry import match_mz
-from lib.file_func import load_file
-from lib.peak import detect_peaks, get_peaks
 from ..utils.api_features import api_controller_background_task
-from backend.api.models.models import (
-    Sample,
-    SampleBatch,
-    SampleItem,
-)
 from ..exceptions import process_exception, ApiException
-from .instrument_functions_controller import (
-    read_instrument_functions,
-)
 from .samples_controller import get_sample, get_samples
-from .matches_controller import get_matches, create_matches, delete_matches
 from .helpers_controller import emit_progress_update
 from .target_compounds_controller import get_target_compounds
 from .target_isotopes_controller import (
@@ -41,10 +24,22 @@ from .target_isotopes_controller import (
     get_target_isotopes_for_match_compute,
     get_target_isotopes_for_match_remove,
 )
+from .matches_controller import (
+    compute_matches,
+    get_matches,
+    create_matches,
+    delete_matches,
+)
 from .match_interferences_controller import (
+    compute_match_interferences,
     get_match_interferences,
     create_match_interferences,
     delete_match_interferences,
+)
+from ..models.models import (
+    Sample,
+    SampleBatch,
+    SampleItem,
 )
 from ..models.pydantic_models.match_pydantic_model import (
     RematchBatchesBody,
@@ -52,241 +47,13 @@ from ..models.pydantic_models.match_pydantic_model import (
     ProgressProperties,
 )
 
+# TODO_configuration
+# Default Filter Parameters
+DEFAULT_MIN_ISOTOPE_ABUNDANCE = 0.15
 
 # -------------------------------------------------------------------
 # Main Logic Functions
 # -------------------------------------------------------------------
-
-
-async def compute_matches(
-    filename, target_isotopes_df, min_isotope_abundance=0.15, instrument_functions=None
-):
-    """
-    Computes matches for specified target isotopes within a sample file.
-
-    This function identifies the best matching peaks within the sample spectrum for each target isotope based on
-    their m/z values. It computes match statistics such as match score, m/z error, and isotope correlation.
-
-    Steps:
-    1. Load peaks from the sample file and prepare the data for matching.
-    2. Match each target isotope to the closest peak within a predefined m/z tolerance window.
-    3. Compute match statistics such as isotope correlations, m/z errors, and match score.
-    4. Return a DataFrame containing the match details for each target isotope.
-
-    :param filename: Path to the sample file to be analyzed for matches.
-    :type filename: str
-    :param target_isotopes_df: DataFrame containing target isotopes with their m/z values and other properties.
-    :type target_isotopes_df: pd.DataFrame
-    :param min_isotope_abundance: Minimum relative abundance threshold for isotopes to be considered in matching.
-    :type min_isotope_abundance: float, optional
-    :return: DataFrame with details of the matches found for each target isotope.
-    :rtype: pd.DataFrame
-    :raises RuntimeError: If an error occurs during the matching process.
-
-    Notes:
-        - Matching is done on isotope-level. Ion, compound and collection level matches are aggregated from
-        isotope-level matches on read sample operation; see the samples_controller.py for this aggregation.
-    """
-    try:
-        # TODO min_isotope_abundance will be passed from the filter_params
-        target_isotopes_df = target_isotopes_df[
-            target_isotopes_df["relative_abundance"] >= min_isotope_abundance
-        ].reset_index(drop=True)
-
-        # Step 1: - Load or detect peaks
-        # Find peaks and write to file
-        u_list = list(np.unique(np.round(target_isotopes_df.mz)))
-        # Check if instrument functions were passed
-        if instrument_functions is None:
-            instrument_functions = await read_instrument_functions(filename)
-        sample_file = await detect_peaks(
-            filename, instrument_functions, u_list, if_exists="append"
-        )
-        peaks = get_peaks(sample_file, "area")
-
-        # Step 2: - Prepare data
-        # init match df from target isotopes
-        match_isotope_df = target_isotopes_df.copy().assign(
-            match_id=np.nan,
-            sample_peak_id=np.nan,
-            sample_peak_mz=np.nan,
-            sample_peak_area=np.nan,
-            sample_peak_area_relative=np.nan,
-            match_abundance_error=np.nan,
-            match_isotope_correlation=np.nan,
-            match_mz_error=np.nan,
-            match_score=np.nan,
-        )
-
-        # parse peak data
-        peak_mzs = peaks.mz.values
-        peak_areas = peaks.sum(dim="time").values
-        peak_tofs = peaks.tof.values
-        peak_sorting = np.argsort(peak_mzs)
-
-        # Step 3: - Perform matching
-
-        def match(row):
-            # Get all peaks within unit mass window
-            mz_tolerance = 0.5
-            target_mz = row.mz
-            match_indeces, match_mzs = match_mz(
-                target_mz, peak_mzs[peak_sorting], tolerance=mz_tolerance
-            )
-            # Find closest match
-            for match_index in match_indeces:
-                # get match peak
-                peak_index = peak_sorting[match_index]
-                peak_mz = peak_mzs[peak_index]
-                peak_area = peak_areas[peak_index]
-                # check current best match
-                best_match = row.sample_peak_id
-                if not np.isnan(best_match):
-                    prev_mz_err = np.abs(row.sample_peak_mz - target_mz)
-                    new_mz_err = np.abs(peak_mz - target_mz)
-                    if new_mz_err > prev_mz_err:
-                        continue
-                # save match
-                row["match_id"] = gen_id(length=32)
-                row["sample_peak_id"] = peak_index
-                row["sample_peak_mz"] = peak_mz
-                row["sample_peak_tof"] = peak_tofs[int(peak_index)]
-                row["sample_peak_area"] = peak_area
-            return row
-
-        match_isotope_df = (
-            match_isotope_df.apply(match, axis=1)
-            .dropna(subset=["sample_peak_mz"])
-            .reset_index()
-        )
-
-        # Step 4: - Calculate match stats
-
-        # calculate isotope ratios
-        # sum matched sample peak heights for each ion
-        ion_level_peak_sums = match_isotope_df.groupby(
-            ["target_ion_id"], as_index=False
-        )["sample_peak_area"].sum()
-        # join sums back to the isotope level
-        isotope_level_peak_sums = pd.merge(
-            match_isotope_df,
-            ion_level_peak_sums.rename(
-                columns={"sample_peak_area": "sample_peak_area_sum"}
-            ),
-            on=["target_ion_id"],
-            how="left",
-        )
-
-        # compute relative peak heights
-        match_isotope_df.loc[:, "sample_peak_area_relative"] = (
-            match_isotope_df["sample_peak_area"]
-            / isotope_level_peak_sums["sample_peak_area_sum"]
-        )
-        # calculate isotope ratio errors
-        match_isotope_df.loc[:, "match_abundance_error"] = match_isotope_df[
-            "relative_abundance"
-        ] * (
-            match_isotope_df["sample_peak_area_relative"]
-            - match_isotope_df["relative_abundance"]
-        )
-        # calculate isotope correlations
-        match_isotope_df = match_isotope_df.groupby(
-            ["target_ion_id"], group_keys=False
-        ).apply(
-            lambda ion_group: (
-                ion_group.assign(
-                    match_isotope_correlation=(
-                        np.corrcoef(
-                            np.array(
-                                [
-                                    peaks.sel(mz=peak_mz, method="nearest")
-                                    for peak_mz in ion_group["sample_peak_mz"]
-                                ]
-                            )
-                        )[0, 1]
-                        if len(ion_group) > 1
-                        else 1
-                    )
-                )
-            )
-        )
-        match_isotope_df["match_isotope_correlation"].fillna(value=0, inplace=True)
-        # calculate mz errors
-        match_isotope_df.loc[:, "match_mz_error"] = (
-            1e6
-            * (match_isotope_df["sample_peak_mz"] - match_isotope_df["mz"])
-            / match_isotope_df["mz"]
-        )
-
-        def score(row):
-            row["match_score"] = (1 - abs(row.match_abundance_error)) * max(
-                0, (1 - 1e-2 * abs(row.match_mz_error))
-            )
-            return row
-
-        match_isotope_df = match_isotope_df.apply(
-            score, axis=1, result_type="broadcast"
-        )
-        return match_isotope_df
-    except Exception as e:
-        error_message = f"Computing matches failed: {e}"
-        raise RuntimeError(error_message)
-
-
-async def compute_match_interferences(
-    filename,
-    target_isotopes_df,
-) -> pd.DataFrame:
-    """
-    Computes match interferences for a given sample file based on specified target isotopes.
-
-    This function calculates the raw intensities for each target isotope within the specified mass-to-charge (m/z) range,
-    which are used to identify potential interferences in the sample's spectrum. It involves loading the sample file data,
-    summing up the spectrum, and then computing the raw intensities for the target isotopes.
-
-    Steps:
-    1. Load the sample file and compute the summed spectrum across all time points.
-    2. For each target isotope, calculate the raw intensity within a defined m/z range around the target m/z value.
-
-    :param filename: Path to the sample file from which to compute interferences.
-    :type filename: str
-    :param target_isotopes_df: DataFrame containing the target isotopes and their m/z values.
-    :type target_isotopes_df: pd.DataFrame
-    :return: DataFrame with computed interferences for each target isotope.
-    :rtype: pd.DataFrame
-    :raises RuntimeError: If an error occurs during the computation process.
-    """
-    try:
-        # Step 1: Load the sample file and compute the summed spectrum
-        sample_file_data = load_file(filename, vars=["signal"])
-        sum_spectrum = sample_file_data.signal.sum(dim="time").compute()
-
-        # Read instrument resolution function
-        _, R = await read_instrument_functions(filename)
-
-        # Step 2: Initialize DataFrame for interferences and compute raw intensities for each target mz
-        isotope_interference_df = target_isotopes_df.copy().assign(
-            sample_peak_interference=np.nan,
-        )
-
-        def calc_raw_intensity(row):
-            target_mz = row.mz
-            dmz = (target_mz / R(target_mz)) / 2  # hwhm
-            target_raw_intensity = sum_spectrum.sel(
-                mz=slice(target_mz - dmz, target_mz + dmz)
-            ).sum(dim="mz")
-            row["match_interference_id"] = gen_id(length=32)
-            row["sample_peak_interference"] = target_raw_intensity.compute().item()
-            return row
-
-        isotope_interference_df = isotope_interference_df.apply(
-            calc_raw_intensity, axis=1
-        )
-
-        return isotope_interference_df
-    except Exception as e:
-        error_message = f"Computing match interferences failed: {e}"
-        raise RuntimeError(error_message)
 
 
 async def compute_sample_match(
@@ -339,7 +106,11 @@ async def compute_sample_match(
 
         # Step 3: Compute matches for the given sample and target isotopes.
         print("Computing matches for file: %s" % filename)
-        match_isotope_df = await compute_matches(filename, target_isotopes_df)
+        match_isotope_df = await compute_matches(
+            filename=filename,
+            target_isotopes_df=target_isotopes_df,
+            min_isotope_abundance=DEFAULT_MIN_ISOTOPE_ABUNDANCE,
+        )
         # Emit a progress update after computing matches
         if progress_properties:
             await emit_progress_update(

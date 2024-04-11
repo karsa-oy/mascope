@@ -2,11 +2,10 @@ from fastapi import HTTPException
 from sqlalchemy import asc, desc, func, select, or_, and_
 from sqlalchemy.orm import aliased
 from typing import List, Optional
-
 from backend.api_sio import sio
 from backend.db.id import gen_id
 from backend.db import async_session
-
+from lib.util import norm
 from ..utils.api_features import api_controller
 from ..exceptions import NotFoundException
 from .ionization_mechanisms_controller import get_ionization_mechanisms
@@ -159,12 +158,6 @@ async def create_target_compound(
     if independent_transaction:
         session = async_session()
 
-    # helper functions
-    def norm(name, lower=False):
-        if lower:
-            name = name.lower()
-        return " ".join(name.strip().split())
-
     # Fetch ionization mechanisms
     ionization_mechanisms_data = await get_ionization_mechanisms()
     ionization_mechanisms = [
@@ -212,9 +205,7 @@ async def create_target_compound(
 
             message_log[i + 1]["status_code"] = 201
             message_log[i + 1]["messages"].append(
-                "New target compound with target_compound_id: {} created".format(
-                    target_compound.target_compound_id
-                )
+                f"New target compound with target_compound_id: {target_compound.target_compound_id} created"
             )
         elif len(existing_compounds) == 1:
             # use the existing compound record if it does exist
@@ -224,10 +215,7 @@ async def create_target_compound(
 
             message_log[i + 1]["status_code"] = 200
             message_log[i + 1]["messages"].append(
-                "Existing target compound {} with target_compound_id: {} used".format(
-                    target_compound.target_compound_name,
-                    target_compound.target_compound_id,
-                )
+                f"Existing target compound {target_compound.target_compound_name} with target_compound_id: {target_compound.target_compound_name} used"
             )
             continue  # as ions & isotopes are already there in this case
         else:

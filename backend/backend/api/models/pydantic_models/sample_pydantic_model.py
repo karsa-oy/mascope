@@ -1,6 +1,7 @@
 from typing import List, Optional
 from pydantic import BaseModel, Field, validator
 from datetime import datetime
+from .target_compound_pydantic_model import TargetCompoundMatches
 
 
 # TODO_configuration possible collection types
@@ -139,6 +140,16 @@ class GetSampleIonMatchesBody(AlarmsList):
     )
     filter_params: FilterParams = Field(
         ...,
+        description="Ion-specific filter parameters, used for match_score and sample_peak_area filtering",
+    )
+
+
+class GetSampleCompoundMatchesBody(BaseModel):
+    target_compound: TargetCompoundMatches = Field(
+        ..., description="Target compound with required formula and optional name"
+    )
+    filter_params: FilterParams = Field(
+        None,
         description="Ion-specific filter parameters, used for match_score and sample_peak_area filtering",
     )
 

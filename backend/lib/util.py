@@ -134,7 +134,7 @@ def to_camel_case(value):
         return value
 
 
-def beautify_func_name(func_name: str, max_words: int = None):
+def beautify_func_name(func_name: str, max_words: int = None) -> str:
     """
     Beautify a function name by replacing underscores with spaces.
     Optionally, limit the number of words used in the beautified name.
@@ -154,6 +154,20 @@ def beautify_func_name(func_name: str, max_words: int = None):
     beautified_name = " ".join(words[:max_words]) if max_words else " ".join(words)
 
     return beautified_name
+
+
+def norm(name: str, lower: bool = False) -> str:
+    """
+    Normalize a string by stripping leading and trailing spaces and converting to lowercase if specified.
+
+    :param name: The string to normalize.
+    :param lower: Whether to convert the string to lowercase. Defaults to False.
+    :return: The normalized string.
+    :rtype: str
+    """
+    if lower:
+        name = name.lower()
+    return " ".join(name.strip().split())
 
 
 def map_keys(obj, func):

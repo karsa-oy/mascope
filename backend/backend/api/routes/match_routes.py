@@ -48,7 +48,6 @@ async def rematch_batch_route(
     body: RematchBatchBody,
     background_tasks: BackgroundTasks,
 ):
-    # prepare data for rematching
     background_tasks.add_task(
         rematch_batch,
         sample_batch_id=sample_batch_id,
@@ -56,7 +55,6 @@ async def rematch_batch_route(
         added_target_compound_ids=body.added_target_compound_ids,
         added_ionization_mechanism_ids=body.added_ionization_mechanism_ids,
         removed_target_compound_ids=body.removed_target_compound_ids,
-        removed_ionization_mechanism_ids=body.removed_ionization_mechanism_ids,
         independent_transaction=True,
         progress_properties=ProgressProperties(
             progress_type="rematch_batch",

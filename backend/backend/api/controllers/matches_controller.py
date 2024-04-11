@@ -1,11 +1,207 @@
 import pandas as pd
+import numpy as np
 from sqlalchemy import asc, desc, func, select, delete, and_
 from typing import List, Optional
 
+from lib.peak import detect_peaks, get_peaks
+from lib.chemistry import match_mz
+from backend.db.id import gen_id
 from backend.db import async_session
 from ..utils.api_features import api_controller
+from .instrument_functions_controller import (
+    read_instrument_functions,
+)
 from ..exceptions import NotFoundException
 from ..models.models import Match
+
+# -------------------------------------------------------------------
+# Main Logic Functions
+# -------------------------------------------------------------------
+
+
+async def compute_matches(
+    filename, target_isotopes_df, min_isotope_abundance, instrument_functions=None
+):
+    """
+    Computes matches for specified target isotopes within a sample file.
+
+    This function identifies the best matching peaks within the sample spectrum for each target isotope based on
+    their m/z values. It computes match statistics such as match score, m/z error, and isotope correlation.
+
+    Steps:
+    1. Load peaks from the sample file and prepare the data for matching.
+    2. Match each target isotope to the closest peak within a predefined m/z tolerance window.
+    3. Compute match statistics such as isotope correlations, m/z errors, and match score.
+    4. Return a DataFrame containing the match details for each target isotope.
+
+    :param filename: Path to the sample file to be analyzed for matches.
+    :type filename: str
+    :param target_isotopes_df: DataFrame containing target isotopes with their m/z values and other properties.
+    :type target_isotopes_df: pd.DataFrame
+    :param min_isotope_abundance: Minimum relative abundance threshold for isotopes to be considered in matching.
+    :type min_isotope_abundance: float
+    :param instrument_functions: Optional tuple containing peak shape details and a resolution function R.
+    :type instrument_functions: tuple(dict, function), optional
+    :return: DataFrame with details of the matches found for each target isotope.
+    :rtype: pd.DataFrame
+    :raises RuntimeError: If an error occurs during the matching process.
+
+    Notes:
+        - Matching is done on isotope-level. Ion, compound and collection level matches are aggregated from
+        isotope-level matches on read sample operation; see the samples_controller.py for this aggregation.
+    """
+    try:
+        # TODO min_isotope_abundance will be passed from the filter_params
+        target_isotopes_df = target_isotopes_df[
+            target_isotopes_df["relative_abundance"] >= min_isotope_abundance
+        ].reset_index(drop=True)
+
+        # Step 1: - Load or detect peaks
+        # Find peaks and write to file
+        u_list = list(np.unique(np.round(target_isotopes_df.mz)))
+        # Check if instrument functions were passed
+        if instrument_functions is None:
+            instrument_functions = await read_instrument_functions(filename)
+        sample_file = await detect_peaks(
+            filename, instrument_functions, u_list, if_exists="append"
+        )
+        peaks = get_peaks(sample_file, "area")
+
+        # Step 2: - Prepare data
+        # init match df from target isotopes
+        match_isotope_df = target_isotopes_df.copy().assign(
+            match_id=np.nan,
+            sample_peak_id=np.nan,
+            sample_peak_mz=np.nan,
+            sample_peak_area=np.nan,
+            sample_peak_area_relative=np.nan,
+            match_abundance_error=np.nan,
+            match_isotope_correlation=np.nan,
+            match_mz_error=np.nan,
+            match_score=np.nan,
+        )
+
+        # parse peak data
+        peak_mzs = peaks.mz.values
+        peak_areas = peaks.sum(dim="time").values
+        peak_tofs = peaks.tof.values
+        peak_sorting = np.argsort(peak_mzs)
+
+        # Step 3: - Perform matching
+
+        def match(row):
+            # Get all peaks within unit mass window
+            mz_tolerance = 0.5
+            target_mz = row.mz
+            match_indeces, _ = match_mz(
+                target_mz, peak_mzs[peak_sorting], tolerance=mz_tolerance
+            )
+            # Find closest match
+            for match_index in match_indeces:
+                # get match peak
+                peak_index = peak_sorting[match_index]
+                peak_mz = peak_mzs[peak_index]
+                peak_area = peak_areas[peak_index]
+                # check current best match
+                best_match = row.sample_peak_id
+                if not np.isnan(best_match):
+                    prev_mz_err = np.abs(row.sample_peak_mz - target_mz)
+                    new_mz_err = np.abs(peak_mz - target_mz)
+                    if new_mz_err > prev_mz_err:
+                        continue
+                # save match
+                row["match_id"] = gen_id(length=32)
+                row["sample_peak_id"] = peak_index
+                row["sample_peak_mz"] = peak_mz
+                row["sample_peak_tof"] = peak_tofs[int(peak_index)]
+                row["sample_peak_area"] = peak_area
+            return row
+
+        match_isotope_df = (
+            match_isotope_df.apply(match, axis=1)
+            .dropna(subset=["sample_peak_mz"])
+            .reset_index()
+        )
+
+        # Step 4: - Calculate match stats
+
+        # calculate isotope ratios
+        # sum matched sample peak heights for each ion
+        ion_level_peak_sums = match_isotope_df.groupby(
+            ["target_ion_id"], as_index=False
+        )["sample_peak_area"].sum()
+        # join sums back to the isotope level
+        isotope_level_peak_sums = pd.merge(
+            match_isotope_df,
+            ion_level_peak_sums.rename(
+                columns={"sample_peak_area": "sample_peak_area_sum"}
+            ),
+            on=["target_ion_id"],
+            how="left",
+        )
+
+        # compute relative peak heights
+        match_isotope_df.loc[:, "sample_peak_area_relative"] = (
+            match_isotope_df["sample_peak_area"]
+            / isotope_level_peak_sums["sample_peak_area_sum"]
+        )
+        # calculate isotope ratio errors
+        match_isotope_df.loc[:, "match_abundance_error"] = match_isotope_df[
+            "relative_abundance"
+        ] * (
+            match_isotope_df["sample_peak_area_relative"]
+            - match_isotope_df["relative_abundance"]
+        )
+        # calculate isotope correlations
+        match_isotope_df = match_isotope_df.groupby(
+            ["target_ion_id"], group_keys=False
+        ).apply(
+            lambda ion_group: (
+                ion_group.assign(
+                    match_isotope_correlation=(
+                        np.corrcoef(
+                            np.array(
+                                [
+                                    peaks.sel(mz=peak_mz, method="nearest")
+                                    for peak_mz in ion_group["sample_peak_mz"]
+                                ]
+                            )
+                        )[0, 1]
+                        if len(ion_group) > 1
+                        else 1
+                    )
+                )
+            )
+        )
+        match_isotope_df["match_isotope_correlation"] = match_isotope_df[
+            "match_isotope_correlation"
+        ].fillna(value=0)
+
+        # calculate mz errors
+        match_isotope_df.loc[:, "match_mz_error"] = (
+            1e6
+            * (match_isotope_df["sample_peak_mz"] - match_isotope_df["mz"])
+            / match_isotope_df["mz"]
+        )
+
+        def score(row):
+            row["match_score"] = (1 - abs(row.match_abundance_error)) * max(
+                0, (1 - 1e-2 * abs(row.match_mz_error))
+            )
+            return row
+
+        match_isotope_df = match_isotope_df.apply(
+            score, axis=1, result_type="broadcast"
+        )
+        return match_isotope_df
+    except Exception as e:
+        error_message = f"Computing matches failed: {e}"
+        raise RuntimeError(error_message)
+
+
+# -------------------------------------------------------------------
+# Controller or Route Handlers
+# -------------------------------------------------------------------
 
 
 @api_controller()
