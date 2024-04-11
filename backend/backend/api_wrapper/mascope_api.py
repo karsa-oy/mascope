@@ -567,3 +567,73 @@ def create_instrument_function(
     )
     print(error_message)
     return {"error": error_message}
+
+
+def get_sample_compound_matches(
+    mascope_url: str,
+    sample_item_id: str,
+    target_compound_formula: str,
+    target_compound_name: str = "Unknown Compound",
+    filter_params: dict = None,
+) -> dict:
+    """
+    Retrieves matches for compounds within a sample based on a target compound formula,
+    applying specified filter parameters to filter the matches.
+
+    :param mascope_url: Base URL of the Mascope API.
+    :type mascope_url: str
+    :param sample_item_id: Unique identifier of the sample item to analyze.
+    :type sample_item_id: str
+    :param target_compound_formula: Chemical formula of the target compound.
+    :type target_compound_formula: str
+    :param target_compound_name: The name of the target compound, defaults to "Unknown Compound"
+    :type target_compound_name: str, optional
+    :param filter_params: Parameters to filter the match results, affecting which matches are considered significant.
+                          Should be a dictionary representing the FilterParams Pydantic model.
+    :type filter_params: dict, optional
+    TODO rename outer scope function def filter_params(ctx):
+    :return: A dictionary containing the match data (compound->ions->isotopes)
+    :rtype: dict
+
+    Example of target compound and filter parameters data:
+        "target_compound_formula": "C6H12N2O6",
+        "target_compound_name": "Formic acid", # compound name is optional
+        filter_params = {
+            "mz_tolerance": 72,
+            "isotope_ratio_tolerance": 0.2,
+            "peak_min_intensity": 0.0,
+            "min_isotope_abundance": 0.15,
+            "min_isotope_correlation": 0.7,
+            "probable_match_threshold": 0.8,
+            "possible_match_threshold": 0.4,
+        }
+    """
+    # Construct the request body
+    body = {
+        "target_compound": {
+            "target_compound_formula": target_compound_formula,
+            "target_compound_name": target_compound_name,
+        }
+    }
+    if filter_params is not None:
+        body["filter_params"] = filter_params
+
+    # Make the POST request to the samples/compound_matches endpoint for the specified sample
+    resp = api_post(mascope_url, f"samples/{sample_item_id}/compound_matches", body)
+
+    # Handle the successfull response
+    if resp is not None and resp.status_code == 200:
+        response_json = resp.json()
+        return response_json.get("data")
+
+    # Handle errors or unsuccessful attempts
+    error_message = "No response from server"
+    if resp is not None:
+        error_content = resp.json()
+        error_message = error_content.get(
+            "error",
+            f"Failed to retrieve compound matches. Status code: {resp.status_code}",
+        )
+
+    print(error_message)
+    return {"error": error_message}
