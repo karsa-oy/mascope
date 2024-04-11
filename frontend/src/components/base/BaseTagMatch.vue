@@ -75,9 +75,14 @@ const tag = computed(() => {
     }
   }
 })
-const tooltipActive = computed(() => {
-  return Object.keys(props.tooltip).length > 0
-})
+
+const tooltip = computed(() =>
+  props.tooltip
+    ? Object.entries(props.tooltip)
+        .map(([field, value]) => `${field}: ${value}`)
+        .join('\n')
+    : 'no peaks'
+)
 
 function clicked() {
   emit('tagClicked', props.row)
@@ -86,32 +91,23 @@ function clicked() {
 
 <template>
   <b-field>
-    <b-tooltip
-      :active="tooltipActive"
-      :delay="200"
-      position="is-left"
-      type="is-white"
-      append-to-body
-      size="is-small"
-      multilined
+    <b-tag
+      v-if="!(matchScore === null || isNaN(matchScore))"
+      :icon="tag.icon"
+      :class="tag.class"
+      style="font-size: small"
+      @click="clicked"
+      v-tooltip.left="tooltip"
     >
-      <b-tag
-        v-if="!(matchScore === null || isNaN(matchScore))"
-        :icon="tag.icon"
-        :class="tag.class"
-        style="font-size: small"
-        @click="clicked"
-      >
-        <span v-if="displayMatchScore" :style="tag.weight">
-          {{ formatter.format(matchScore) }}
-        </span>
-      </b-tag>
-      <!-- tooltip slot -->
-      <template v-slot:content>
-        <template v-for="(value, field) in tooltip" :key="field">
-          {{ field }}: {{ value }}<br />
-        </template>
-      </template>
-    </b-tooltip>
+      <span v-if="displayMatchScore" :style="tag.weight">
+        {{ formatter.format(matchScore) }}
+      </span>
+    </b-tag>
   </b-field>
 </template>
+
+<style>
+.p-tooltip {
+  font-size: smaller;
+}
+</style>

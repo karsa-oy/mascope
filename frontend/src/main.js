@@ -1,6 +1,9 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 
+import 'primevue/resources/themes/aura-dark-green/theme.css'
+import Tooltip from 'primevue/tooltip'
+
 import buefy from '@ntohq/buefy-next'
 import '@mdi/font/css/materialdesignicons.min.css'
 
@@ -13,8 +16,15 @@ const pinia = createPinia()
 pinia.use(apiPlugin)
 
 const app = createApp(App)
+
+// boilerplate
 app.use(pinia)
 app.use(router)
+
+// prime
+app.directive('tooltip', Tooltip)
+
+// buefy
 app.use(buefy)
 
 app.mount('#app')
