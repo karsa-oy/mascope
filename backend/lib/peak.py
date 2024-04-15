@@ -42,6 +42,7 @@ async def detect_peaks(
     add_peak_threshold=0.9,
     if_exists="fail",  # 'fail', 'append', 'replace'
     dmz=0.5,
+    return_peak_mzs=False,
 ):
     print(f"Detecting peaks for file {filename}")
     if if_exists not in ["fail", "append", "replace"]:
@@ -84,7 +85,7 @@ async def detect_peaks(
 
     sample_file_data = load_file(filename, vars=["signal"])
 
-    print("Fitting unit masses: %s" % u_list)
+    print(f"Fitting unit masses: {u_list}")
     mz = sample_file_data.mz
     sum_spec = sample_file_data.signal.sum(dim="time").compute()
     cpu_cores = os.cpu_count()
@@ -160,7 +161,10 @@ async def detect_peaks(
     sample_file_data = load_file(
         filename, vars=["peak_areas"], prev_dataset=sample_file_data
     )
-    return sample_file_data
+    if return_peak_mzs:
+        return (sample_file_data, all_peak_mzs)
+    else:
+        return sample_file_data
 
 
 def filter_peaks(
@@ -440,7 +444,7 @@ def gen_peak(x, ppos, phei, pres, ps, trim_borders=False):
         input parameter 'x'. Otherwise returns tuple with new x and the peak.
     """
 
-    sigma = fwhm_to_sigma(ppos / pres)
+    sigma = ppos / pres / (2 * np.sqrt(2 * np.log(2)))
     xi = (np.array(ps["x"]) * sigma) + ppos
     yi = ps["y"] / np.max(ps["y"]) * phei
     spline = CubicSpline(xi, yi, extrapolate=False)

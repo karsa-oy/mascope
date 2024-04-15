@@ -36,13 +36,11 @@ def strip_filepath(filepath):
 
 
 class RawStreamer(Thread):
-    def __init__(
-        self, file_queue=Queue(), shutdown_event=Event(), lock=Lock(), mz_precision=4
-    ):
+    def __init__(self, file_queue=Queue(), shutdown_event=Event(), lock=Lock()):
         print("RawStreamer initializing")
         Thread.__init__(self)
         # Parameters
-        self._mz_precision = mz_precision
+        self._mz_grid = None
         # Thermo Fischer RawFileReaderFactory
         self.raw = None
         # Synchronization primitives
@@ -87,7 +85,7 @@ class RawStreamer(Thread):
         # Map .NET arrays into numpy arrays
         mz = net2np_array(scan.Positions).astype(np.float32)
         spec = net2np_array(scan.Intensities).astype(np.float32)
-        # Round mz values based on the mz precision
+        # Round mz values based on the precomputed mz values
         mz, spec = self._set_mz_precision(mz, spec)
         # Combine data for output
         spec_data = {
@@ -129,35 +127,54 @@ class RawStreamer(Thread):
         self.filename = None
         self.speci = -1
 
+    def _precompute_grid(self, points_per_fwhm=4):
+        """Precompute mz grid based on the resolution function.
+
+        :param points_per_fwhm: number of data points per FWHM of the peak, defaults to 4
+        :type points_per_fwhm: float, optional
+        :return: computed mz grid
+        :rtype: numpy.ndarray
+        """
+        # Set mz range with a stock
+        mz_min = self.raw.RunHeaderEx.LowMass - 10
+        mz_max = self.raw.RunHeaderEx.HighMass + 10
+        # Set starting mz value
+        mz = mz_min
+        # Initialize list with mz grid
+        mz_grid = [
+            mz_min,
+        ]
+        while mz < mz_max:
+            resolution = 1715041.72775 / np.sqrt(mz)
+            fwhm = mz / resolution
+            # Step to the next point of the grid
+            step = fwhm / points_per_fwhm
+            # Add a new point to the mz grid
+            mz += step
+            mz_grid.append(mz)
+
+        return np.array(mz_grid, dtype=np.float32)
+
     def _set_mz_precision(self, mz, spec):
-        # Round the mz values based on the mz precision
-        mz = np.asarray(np.round(mz, self._mz_precision), dtype=np.float32)
+        """Rounds mz values to the nearest values of the precomputed mz grid
 
-        # Contiguous mz values might now be equivalent. Combine their intensity values by taking the sum.
-        unique_mz = np.unique(mz)
-        unique_mz_intensities = np.zeros(unique_mz.shape, dtype=np.float32)
+        :param mz: mz scale
+        :type mz: array-like
+        :param spec: measured counts
+        :type spec: array-like
+        :return: a tuple of updated mz scale and counts
+        :rtype: tuple
+        """
+        # Find the indices of the closest values from self._mz_grid
+        closest_indices = np.searchsorted(self._mz_grid, mz.astype(np.float32))
+        # Get the closest mz values from self._mz_grid
+        mz_closest = self._mz_grid[closest_indices]
+        # Get unique mz values and their corresponding indices
+        unique_mz, inverse_indices = np.unique(mz_closest, return_inverse=True)
+        # Accumulate the intensities for each unique mz value
+        unique_mz_intensities = np.bincount(inverse_indices, weights=spec)
 
-        # Note: This assumes that mz and unique_mz are sorted
-        if len(mz) != len(unique_mz):
-            acc = 0
-            current_unique_mz_idx = 0
-            current_unique_mz = unique_mz[0]
-            for i, mz in enumerate(mz):
-                if mz != current_unique_mz:
-                    unique_mz_intensities[
-                        current_unique_mz_idx
-                    ] = acc  # Flush the accumulator
-                    acc = 0  # Reset the accumulator
-                    current_unique_mz_idx += 1  # Go to the next unique mz value
-                    current_unique_mz = unique_mz[
-                        current_unique_mz_idx
-                    ]  # Get the unique mz value
-                acc += spec[i]  # Increment the accumulator
-            unique_mz_intensities[current_unique_mz_idx] = acc  # Flush the accumulator
-        else:
-            unique_mz_intensities = spec
-
-        return unique_mz, unique_mz_intensities
+        return unique_mz.astype(np.float32), unique_mz_intensities.astype(np.float32)
 
     def _update(self, scan=None):
         """Update per acquisition attributes. If new data is available, feed into queues."""
@@ -170,7 +187,7 @@ class RawStreamer(Thread):
             self.interval = self.length / self.raw.RunHeaderEx.LastSpectrum  # [s]
             # Feed coordinates
             self._feed_coordinates()
-            print("Acquisition started: %s" % self.filename)
+            print(f"Acquisition started: {self.filename}")
         else:
             # New data
             self.speci = scan - 1
@@ -213,11 +230,13 @@ class RawStreamer(Thread):
                     i_data = self.raw.GetInstrumentData()
                     print(f"Instrument: {i_data.Name} #{i_data.SerialNumber}")
                 except Exception as e:
-                    print("Error reading file %s: %s" % (file_to_stream, e))
+                    print(f"Error reading file {file_to_stream}: {e}")
                     continue
             except Empty:
                 continue
 
+            # Precompute mz grid
+            self._mz_grid = self._precompute_grid()
             # Start streaming
             # Update self and feed data into queue
             self._update()
