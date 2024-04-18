@@ -43,6 +43,7 @@ async def detect_peaks(
     if_exists="fail",  # 'fail', 'append', 'replace'
     dmz=0.5,
     return_peak_mzs=False,
+    instrument_type="tof",
 ):
     print(f"Detecting peaks for file {filename}")
     if if_exists not in ["fail", "append", "replace"]:
@@ -85,26 +86,66 @@ async def detect_peaks(
 
     sample_file_data = load_file(filename, vars=["signal"])
 
-    print(f"Fitting unit masses: {u_list}")
     mz = sample_file_data.mz
     sum_spec = sample_file_data.signal.sum(dim="time").compute()
     cpu_cores = os.cpu_count()
     max_workers = max(1, cpu_cores // 2)
     executor = ProcessPoolExecutor(max_workers=max_workers)
     loop = asyncio.get_event_loop()
-    futures = [
-        loop.run_in_executor(
-            executor,
-            fit_n_peaks,
-            mz.sel(mz=slice(u - dmz, u + dmz)).compute().values,
-            sum_spec.sel(mz=slice(u - dmz, u + dmz)).compute().values,
-            peakshape,
-            R(u),
-            max_n_peaks,
-            add_peak_threshold,
+
+    if instrument_type == "orbi":
+        # Get non-zero indices
+        non_zero_indices = np.flatnonzero(sum_spec)
+        # Split in chunks taking into account repeating zeros
+        non_zero_indices = np.split(
+            non_zero_indices, np.where(np.diff(non_zero_indices) > 1)[0] + 1
         )
-        for u in u_list
-    ]
+        # Add zeros on chunk borders
+        non_zero_indices = [
+            np.concatenate(([chunk[0] - 1], chunk, [chunk[-1] + 1]))
+            for chunk in non_zero_indices
+        ]
+        # Check wrong indices on the spectrum ends
+        if non_zero_indices[0][0] < 0:
+            # Remove negative index in the first chunk
+            non_zero_indices[0] = non_zero_indices[0][1:]
+        if non_zero_indices[-1][-1] == len(sum_spec):
+            # Remove out-of-range index from the last chunk
+            non_zero_indices[-1][-1] = non_zero_indices[-1][:-1]
+        # Remove short chunks
+        non_zero_indices = [chunk for chunk in non_zero_indices if len(chunk) > 4]
+        # Fill in asynchronous operations
+        futures = [
+            loop.run_in_executor(
+                executor,
+                fit_n_peaks,
+                mz[chunk].values,
+                sum_spec[chunk].values,
+                peakshape,
+                R(mz[chunk].values.mean()),
+                max_n_peaks,
+                add_peak_threshold,
+            )
+            for chunk in non_zero_indices
+        ]
+    else:
+        # TOF is default since more or less works for both
+        print(f"Fitting unit masses: {u_list}")
+
+        futures = [
+            loop.run_in_executor(
+                executor,
+                fit_n_peaks,
+                mz.sel(mz=slice(u - dmz, u + dmz)).compute().values,
+                sum_spec.sel(mz=slice(u - dmz, u + dmz)).compute().values,
+                peakshape,
+                R(u),
+                max_n_peaks,
+                add_peak_threshold,
+            )
+            for u in u_list
+        ]
+
     new_peaks = []
     for i, future in enumerate(asyncio.as_completed(futures)):
         fit, peaks = await future
@@ -115,7 +156,7 @@ async def detect_peaks(
     sample_file_data = sample_file_data.assign_coords(
         tof=("mz", np.arange(len(sample_file_data.mz)).astype(np.float32))
     )
-    if len(new_peaks):
+    if len(new_peaks) > 0:
         new_peak_mzs = list(zip(*new_peaks))[0]
         new_peak_heights = list(zip(*new_peaks))[1]
         new_peak_areas = list(zip(*new_peaks))[3]
@@ -150,7 +191,7 @@ async def detect_peaks(
     peak_profiles_area = peak_profiles_norm * peak_areas.reshape(-1, 1)
     peak_profiles_height = peak_profiles_norm * peak_heights.reshape(-1, 1)
     print(f"Writing peaks to file {filename}")
-    overwrite_peak_dataset = if_exists == "append" or if_exists == "replace"
+    overwrite_peak_dataset = if_exists in {"append", "replace"}
     zarr_sdk.write_peaks(
         peak_profiles_area,
         peak_profiles_height,
@@ -163,8 +204,7 @@ async def detect_peaks(
     )
     if return_peak_mzs:
         return (sample_file_data, all_peak_mzs)
-    else:
-        return sample_file_data
+    return sample_file_data
 
 
 def filter_peaks(

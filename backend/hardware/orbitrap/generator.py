@@ -145,7 +145,7 @@ class RawStreamer(Thread):
             mz_min,
         ]
         while mz < mz_max:
-            resolution = 1715041.72775 / np.sqrt(mz)
+            resolution = 1.715e6 / np.sqrt(mz)
             fwhm = mz / resolution
             # Step to the next point of the grid
             step = fwhm / points_per_fwhm
@@ -279,7 +279,7 @@ class RawStreamer(Thread):
         if os.path.isfile(filename):
             self.file_queue.put(filename)
         else:
-            raise ValueError("File does not exist: %s" % filename)
+            raise ValueError(f"File does not exist: {filename}")
 
     def stop_stream(self):
         """Stop stream before complete
