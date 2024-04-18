@@ -167,6 +167,10 @@ class RawStreamer(Thread):
         """
         # Find the indices of the closest values from self._mz_grid
         closest_indices = np.searchsorted(self._mz_grid, mz.astype(np.float32))
+        # Filter out of bounds indices
+        closest_indices[np.where(closest_indices == len(self._mz_grid))] = (
+            len(self._mz_grid) - 1
+        )
         # Get the closest mz values from self._mz_grid
         mz_closest = self._mz_grid[closest_indices]
         # Get unique mz values and their corresponding indices
