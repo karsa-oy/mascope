@@ -3,6 +3,7 @@ import numpy as np
 from sqlalchemy import asc, desc, func, select, delete, and_
 from typing import List, Optional
 
+from lib.file_func import get_instrument_type
 from lib.peak import detect_peaks, get_peaks
 from lib.chemistry import match_mz
 from backend.db.id import gen_id
@@ -62,8 +63,13 @@ async def compute_matches(
         # Check if instrument functions were passed
         if instrument_functions is None:
             instrument_functions = await read_instrument_functions(filename)
+        instrument_type = get_instrument_type(filename)
         sample_file = await detect_peaks(
-            filename, instrument_functions, u_list, if_exists="append"
+            filename,
+            instrument_functions,
+            u_list,
+            if_exists="append",
+            instrument_type=instrument_type,
         )
         peaks = get_peaks(sample_file, "area")
 

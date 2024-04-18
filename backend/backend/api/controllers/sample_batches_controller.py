@@ -1,9 +1,9 @@
-import pandas as pd
 import os
-
-from fastapi import BackgroundTasks
 from datetime import datetime, timezone
 from typing import List
+from fastapi import BackgroundTasks
+import pandas as pd
+
 from sqlalchemy import (
     asc,
     desc,
@@ -12,12 +12,14 @@ from sqlalchemy import (
     literal,
 )
 from sqlalchemy.orm import joinedload
-from typing import List
-from datetime import datetime
-from backend.db import async_session
-from backend.api_sio import sio
+
+from lib.file_func import get_instrument_type
 from lib.peak import detect_peaks, get_peaks
+from backend.db import async_session
 from backend.db.id import gen_id
+from backend.api_sio import sio
+
+
 from ..utils.api_features import api_controller, api_controller_background_task
 from ..exceptions import NotFoundException
 from .match_controller import rematch_batch
@@ -957,13 +959,18 @@ async def sample_batch_export_peaks(
         try:
             filename = row["filename"]
             instrument_functions = await read_instrument_functions(filename)
+            instrument_type = get_instrument_type(filename)
 
             await emit_progress_update(
                 progress_properties=progress_properties, increment=0.1
             )
 
             sample_file = await detect_peaks(
-                filename, instrument_functions, u_list=None, if_exists="append"
+                filename,
+                instrument_functions,
+                u_list=None,
+                if_exists="append",
+                instrument_type=instrument_type,
             )
 
             await emit_progress_update(

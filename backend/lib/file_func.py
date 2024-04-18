@@ -295,6 +295,40 @@ def get_file_data_vars(filepath):
     return zarrs
 
 
+def get_instrument_name(filename: str) -> str:
+    """Get instrument name from sample file
+
+    Currently, the sample file name is assumed to begin with the instrument name,
+    followed by an underscore.
+
+    :param filename: Sample file name
+    :type filename: str
+    :return: Instrument name
+    :rtype: str
+    """
+    instrument_name = filename.split("_")[0]
+    return instrument_name
+
+
+def get_instrument_type(filename: str) -> str:
+    """Get instrument type (one of {"orbi", "tof"}) from sample file
+
+    :param filename: Sample file name
+    :type filename: str
+    :raises ValueError: Failed to detect instrument type
+    :return: Instrument type, one of {"orbi", "tof"}
+    :rtype: str
+    """
+    instrument_name = get_instrument_name(filename)
+    if "orbi" in instrument_name.lower():
+        instrument_type = "orbi"
+    elif "tof" in instrument_name.lower():
+        instrument_type = "tof"
+    else:
+        raise ValueError(f"Failed to get instrument type for file {filename}")
+    return instrument_type
+
+
 def get_zarr_var_shape(base_filename, var, concat_dim=1):
     """Get the shape of a sample file variable
 
