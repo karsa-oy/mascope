@@ -1,5 +1,6 @@
-from pydantic import BaseModel, Field, validator, root_validator
 from typing import Optional, List
+from lib.file_func import get_instrument_type
+from pydantic import BaseModel, Field, validator, root_validator
 from .calibration_pydantic_model import CalibrationMzFitParams
 from .sample_item_pydantic_model import SampleItemCreate
 
@@ -91,11 +92,18 @@ class SampleBatchImportSamplesBody(BaseModel):
     )
 
     @root_validator
-    def check_sample_items_batch_id(cls, values):
+    def check_sample_items(cls, values):
         sample_items = values.get("sample_items")
         batch_ids = {item.sample_batch_id for item in sample_items}
+        instruments = set(get_instrument_type(item.filename) for item in sample_items)
         if len(batch_ids) > 1:
-            raise ValueError("All sample_items must have the same sample_batch_id.")
+            raise ValueError(
+                "All samples should be imported to the same batch, please check if the sample batch ID is the same for all importing samples."
+            )
+        if len(instruments) > 1:
+            raise ValueError(
+                "Importing samples from different instruments is not supported, please import samples for each instrument separately."
+            )
         return values
 
 

@@ -34,7 +34,7 @@ from ..models.models import (
     TargetCollection,
     TargetCollectionInSampleBatch,
 )
-from ..models.pydantic_models.sample_pydantic_model import FilterParams
+from ..models.pydantic_models.sample_pydantic_model import FilterParams, AlarmsList
 
 # TODO_configuration
 # Default Filter Parameters
@@ -91,17 +91,6 @@ def apply_filter_params(matches_df, filter_params: FilterParams = None):
     :return: DataFrame with applied filters.
     :rtype: pd.DataFrame
     """
-    # Define default filter parameters as a fallbasck option
-    default_params = {
-        "mz_tolerance": DEFAULT_MZ_TOLERANCE,
-        "min_isotope_abundance": DEFAULT_MIN_ISOTOPE_ABUNDANCE,
-        "isotope_ratio_tolerance": DEFAULT_ISOTOPE_RATIO_TOLERANCE,
-        "peak_min_intensity": DEFAULT_PEAK_MIN_INTENSITY,
-        "min_isotope_correlation": DEFAULT_MIN_ISOTOPE_CORRELATION,
-        "probable_match_threshold": DEFAULT_PROBABLE_MATCH_THRESHOLD,
-        "possible_match_threshold": DEFAULT_POSSIBLE_MATCH_THRESHOLD,
-    }
-
     # Convert filter_params Pydantic model to dictionary if provided
     provided_params = filter_params.dict() if filter_params else None
 
@@ -120,6 +109,8 @@ def apply_filter_params(matches_df, filter_params: FilterParams = None):
         if "filter_params" in row and row["instrument"] in row["filter_params"]:
             return row["filter_params"][row["instrument"]]
 
+        # Define default filter parameters from the FilterParams Pydantic model
+        default_params = FilterParams().dict()
         # Fallback to default parameters
         return default_params
 
@@ -189,7 +180,6 @@ async def set_ions_match_category(
 
     This function determines the match_category for each ion based on match score and predefined thresholds.
     It uses provided filters, if no filters are provided then set the ion-specific filters are used, otherwise defaults used as a fall back thresholds.
-
 
     :param match_ions_df: DataFrame containing ion data with match scores.
     :type match_ions_df: pd.DataFrame
@@ -699,7 +689,7 @@ async def get_samples(
     match_compounds: bool = False,
     match_ions: bool = False,
     match_isotopes: bool = False,
-    alarms_list: List[str] = None,
+    alarms_list: AlarmsList = AlarmsList(),
 ) -> dict:
     """
     Retrieves samples (compinded sample item and sample file info) based on various filter criteria and pagination settings.
@@ -924,7 +914,7 @@ async def get_samples(
 @api_controller()
 async def get_sample(
     sample_item_id: str,
-    alarms_list: List[str] = None,
+    alarms_list: AlarmsList = AlarmsList(),
     sample_matches_info: bool = False,
 ) -> dict:
     """
@@ -1068,7 +1058,7 @@ async def get_sample_ion_matches(
     target_ion_id: str,
     target_collection_id: str,
     filter_params: FilterParams,
-    alarms_list: List[str] = None,
+    alarms_list: AlarmsList = AlarmsList(),
 ) -> dict:
     """
     Retrieves ion-specific match information for a given sample item. This involves fetching match data at the isotopic level,
@@ -1193,8 +1183,8 @@ async def get_sample_ion_matches(
 async def get_sample_compound_matches(
     sample_item_id: str,
     target_compound_formula: str,
-    target_compound_name: str,
-    filter_params: FilterParams,
+    target_compound_name: str = "Unknown Compound",
+    filter_params: FilterParams = FilterParams(),
 ) -> dict:
     """
     Retrieves matches for compounds within a sample based on a target compound formula,
@@ -1213,9 +1203,9 @@ async def get_sample_compound_matches(
     :type sample_item_id: str
     :param target_compound_formula: Chemical formula of the target compound.
     :type target_compound_formula: str
-    :param target_compound_name: The name of the target compound.
+    :param target_compound_name: The name of the target compound, defaults to FilterParams()
     :type target_compound_name: str
-    :param filter_params: Parameters to filter the match results, affecting which matches are considered significant.
+    :param filter_params: Parameters to filter the match results, affecting which matches are considered significant, defaults to FilterParams()
     :type filter_params: FilterParams
     :raises NotFoundException: Raised if the sample item or sample batch cannot be found.
     :raises ValueError: Raised if no ion mechanisms are defined for the sample batch.
@@ -1290,11 +1280,7 @@ async def get_sample_compound_matches(
         match_isotope_df = await compute_matches(
             filename=filename,
             target_isotopes_df=target_isotopes_df,
-            min_isotope_abundance=(
-                filter_params.min_isotope_abundance
-                if filter_params is not None
-                else DEFAULT_MIN_ISOTOPE_ABUNDANCE
-            ),
+            min_isotope_abundance=filter_params.min_isotope_abundance,
         )
 
         # Drop the 'index' column from the match_isotope_df DataFrame

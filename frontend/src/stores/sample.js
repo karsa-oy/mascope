@@ -218,6 +218,10 @@ export const useSampleStore = defineStore('sample', () => {
     const sampleItem = batchStore.sampleItem(sample_item_id)
     await load(sampleItem)
   }
+  async function onSampleProcessingFinished() {
+    console.log(`sample item processing was finished`)
+    // TODO can be used for the Scenthound Page and for 'Process File' buttnon on the Home page for processing 1 selected sample_file
+  }
 
   // selection
   async function updateCollectionSelection({ collectionId, selectionValue }) {
@@ -265,6 +269,7 @@ export const useSampleStore = defineStore('sample', () => {
     onSampleBatchExportPeaksFailed,
     onSampleBatchExportPeaksReady,
     onSampleItemCreated,
+    onSampleProcessingFinished,
     updateCollectionSelection
   }
 })

@@ -45,6 +45,7 @@ from ..models.pydantic_models.sample_batch_pydantic_model import (
     SampleBatchUpdateBody,
     SampleBatchExportPeaks,
 )
+from ..models.pydantic_models.sample_pydantic_model import AlarmsList
 from ..models.pydantic_models.sample_item_pydantic_model import SampleItemCreate
 from ..models.pydantic_models.calibration_pydantic_model import CalibrationMzFitParams
 from ..models.pydantic_models.match_pydantic_model import (
@@ -150,7 +151,7 @@ async def get_sample_batch(sample_batch_id: str) -> dict:
 @api_controller()
 async def get_batch_targets(
     sample_batch_id: str,
-    alarms_list: List[str] = ["TARGETS"],
+    alarms_list: AlarmsList = AlarmsList(),
 ) -> dict:
     """
     Retrieves targets associated with a specific sample batch, including collections, compounds, ions, and isotopes.
@@ -750,13 +751,16 @@ async def import_sample_items(
     sid: str = None,
 ):
     """
-    Imports a sample items to specified batch by creating provided sample items, calibrating the batch, computing matches, and handling errors.
+    Imports sample items to a specified batch by creating provided sample items,
+    optionally calibrating the batch, and computing matches.
 
     Steps:
-    1. Create provided sample items and save them to the database.
-    2. Optionally calibrate the batch using the provided calibration parameters, based on the calibrate_batch flag.
-    3. Compute matches for the batch.
-    4. In case of calibration failure, send a notification with information about failed samples.
+    1. Verify that all sample items are from the same instrument.
+    2. Create provided sample items and save them to the database.
+    3. Optionally calibrate the batch using the provided calibration parameters,
+        based on the calibrate_batch flag and if the instrument is TOF.
+    4. Compute matches for the batch.
+    5. In case of calibration failure, send a notification with information about failed samples.
 
     :param sample_batch_id: ID of the sample batch where sample items will be imported.
     :type sample_batch_id: str
@@ -771,19 +775,27 @@ async def import_sample_items(
     :param sid: Session ID, used for emitting notifications to specific clients, defaults to None.
     :type sid: str, optional
     """
-    # Step 1. Create provided sample items and save to database
+    # Step 1: Verify all sample items are for the same instrument
+    instrument_types = {get_instrument_type(item.filename) for item in sample_items}
+    if len(instrument_types) > 1:
+        raise ValueError(
+            "Importing samples from different instruments is not supported, please import samples for each instrument separately"
+        )
+    instrument_type = instrument_types.pop()  # Extract the single instrument type
+
+    # Step 2: Create provided sample items and save to database
     for sample_item in sample_items:
         await create_sample_item(sample_item=sample_item)
 
-    # Step 2. Optionally calibrate batch if calibrate_batch is True (default behaviour)
-    if calibrate_batch:
+    # Step 3: Optionally calibrate batch if calibrate_batch flag is True and instrument is TOF
+    if calibrate_batch and instrument_type == "tof":
         calibration_results = await calibration_mz_calibrate_batch(
             sample_batch_id, params
         )
         # TODO_error_handling Check the failed calibrations samples
         # TODO_notifications refactor failed_calibration_samples notificationsm
 
-    # Step 3. Compute matches for the batch
+    # Step 4: Compute matches for the batch
     progress_properties = ProgressProperties(
         progress_type="rematch_batch",
     )

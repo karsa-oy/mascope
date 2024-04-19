@@ -39,7 +39,7 @@ from .sample_files_controller import (
     update_sample_file,
     get_sample_files,
 )
-from .sample_items_controller import get_sample_items
+
 from .target_isotopes_controller import get_target_isotopes
 from .target_compound_in_target_collection_controller import (
     get_target_compound_in_target_collection,
@@ -50,7 +50,7 @@ from ..models.pydantic_models.sample_file_pydantic_model import (
     SampleFileUpdate,
 )
 from ..models.pydantic_models.calibration_pydantic_model import CalibrationMzFitParams
-from ..models.models import Sample, SampleBatch
+from ..models.models import Sample, SampleBatch, SampleItem
 
 
 # -------------------------------------------------------------------
@@ -544,8 +544,13 @@ async def calibration_mz_apply(
     """
 
     # Read affected sample items
-    sample_items = await get_sample_items(filename=sample_filename)
-    sample_item_ids = [item["sample_item_id"] for item in sample_items["data"]]
+    async with async_session() as session:
+        result = await session.execute(
+            select(SampleItem).filter(SampleItem.filename == sample_filename)
+        )
+    sample_item_ids = [
+        item.to_dict()["sample_item_id"] for item in result.scalars().all()
+    ]
 
     for sample_item_id in sample_item_ids:
         await sio.emit(
@@ -663,11 +668,12 @@ async def calibration_mz_calibrate_sample(
         )
 
         # Step 3: Calibrate sample using specified parameters
-        await mz_calibrate_sample(
+        result = await mz_calibrate_sample(
             sample.to_dict(),
             params,
             filename,
         )
+
     except Exception as e:
         # TODO_error_handling construct some common backfround task fail notification
         # Emit an error message indicating calibration failure
@@ -686,6 +692,8 @@ async def calibration_mz_calibrate_sample(
         raise process_exception(
             e, f"Failed to m/z calibrate samples '{sample_item_id}'."
         )
+
+    return result
 
 
 async def calibration_mz_calibrate_batch(

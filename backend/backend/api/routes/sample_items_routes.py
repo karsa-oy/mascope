@@ -8,12 +8,14 @@ from ..controllers.sample_items_controller import (
     delete_sample_item,
     update_sample_item,
     copy_sample_item,
+    process_sample_item,
 )
 from ..models.pydantic_models.sample_item_pydantic_model import (
     SampleItemCreate,
     SampleItemUpdate,
     GetSampleItemsQueryParams,
     SampleItemCopyBody,
+    SampleItemProcessBody,
 )
 
 sample_items_router = APIRouter()
@@ -81,5 +83,26 @@ async def copy_sample_item_route(
         sample_item_name=body.sample_item_name,
         independent_transaction=True,
         background_tasks=background_tasks,
+        sid=sid,
+    )
+
+
+@sample_items_router.post("/api/sample_items/process")
+@api_route(
+    status_code_success=202,
+    include_data=False,
+    include_message=True,
+    success_message="Sample item processing has started",
+)
+async def process_sample_item_route(
+    request: Request, body: SampleItemProcessBody, background_tasks: BackgroundTasks
+):
+    sid = request.headers.get("X-SID")
+    background_tasks.add_task(
+        process_sample_item,
+        sample_item=body.sample_item,
+        mz_calibration_params=body.mz_calibration_params,
+        alarms_list=body.alarms_list,
+        independent_transaction=True,
         sid=sid,
     )

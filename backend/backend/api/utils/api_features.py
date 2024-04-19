@@ -219,6 +219,7 @@ def api_controller_background_task(
                     # Emit success events
                     for event_name, room_key in success_emit_events:
                         room_id = (
+                            # TODO_data wrapper
                             kwargs.get(room_key) or result.get(room_key)
                             if room_key
                             else None

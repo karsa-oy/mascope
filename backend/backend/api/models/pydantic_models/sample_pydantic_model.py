@@ -6,30 +6,43 @@ from .target_compound_pydantic_model import TargetCompoundMatches
 
 # TODO_configuration possible collection types
 APP_COLLECTION_TYPES = ["TARGETS", "DIAGNOSTICS", "CALIBRANTS"]
+# TODO_configuration Default Filter Parameters
+DEFAULT_MZ_TOLERANCE = 15
+DEFAULT_MIN_ISOTOPE_ABUNDANCE = 0.15
+DEFAULT_ISOTOPE_RATIO_TOLERANCE = 0.15
+DEFAULT_PEAK_MIN_INTENSITY = 0.0
+DEFAULT_MIN_ISOTOPE_CORRELATION = 0.8
+DEFAULT_PROBABLE_MATCH_THRESHOLD = 0.8
+DEFAULT_POSSIBLE_MATCH_THRESHOLD = 0.7
 
 
 class FilterParams(BaseModel):
     mz_tolerance: int = Field(
-        ..., description="Tolerance for mass-to-charge ratio (m/z) error."
+        DEFAULT_MZ_TOLERANCE,
+        description="Tolerance for mass-to-charge ratio (m/z) error.",
     )
     isotope_ratio_tolerance: float = Field(
-        ..., description="Tolerance for the ratio of isotopic abundances."
+        DEFAULT_ISOTOPE_RATIO_TOLERANCE,
+        description="Tolerance for the ratio of isotopic abundances.",
     )
     peak_min_intensity: float = Field(
-        ..., description="Minimum peak intensity threshold for considering a match."
+        DEFAULT_PEAK_MIN_INTENSITY,
+        description="Minimum peak intensity threshold for considering a match.",
     )
     min_isotope_abundance: float = Field(
-        ...,
+        DEFAULT_MIN_ISOTOPE_ABUNDANCE,
         description="Minimum relative abundance of isotopes to consider in the match.",
     )
     min_isotope_correlation: float = Field(
-        ..., description="Minimum correlation of isotopic pattern required for a match."
+        DEFAULT_MIN_ISOTOPE_CORRELATION,
+        description="Minimum correlation of isotopic pattern required for a match.",
     )
     probable_match_threshold: float = Field(
-        ..., description="Threshold score above which a match is considered probable."
+        DEFAULT_PROBABLE_MATCH_THRESHOLD,
+        description="Threshold score above which a match is considered probable.",
     )
     possible_match_threshold: float = Field(
-        ...,
+        DEFAULT_POSSIBLE_MATCH_THRESHOLD,
         description="Threshold score above which a match is considered possible, but below the probable match threshold.",
     )
 
@@ -38,7 +51,7 @@ class FilterParams(BaseModel):
         if "probable_match_threshold" in values:
             if possible_match_threshold > values["probable_match_threshold"]:
                 raise ValueError(
-                    "possible_match_threshold must be less than or equal to probable_match_threshold"
+                    "Possible match threshold must be less than or equal to probable match threshold"
                 )
         return possible_match_threshold
 
@@ -148,10 +161,7 @@ class GetSampleCompoundMatchesBody(BaseModel):
     target_compound: TargetCompoundMatches = Field(
         ..., description="Target compound with required formula and optional name"
     )
-    filter_params: FilterParams = Field(
-        None,
-        description="Ion-specific filter parameters, used for match_score and sample_peak_area filtering",
-    )
+    filter_params: FilterParams = FilterParams()
 
 
 class GetSampleMatchFilterBody(BaseModel):

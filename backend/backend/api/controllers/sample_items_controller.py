@@ -1,24 +1,33 @@
+from datetime import datetime, timezone
 from fastapi import BackgroundTasks
 from sqlalchemy import asc, desc, func
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
-from datetime import datetime, timezone
-
+from lib.file_func import get_instrument_type
 from backend.api_sio import sio
 from backend.db import async_session
 from backend.db.id import gen_id
 from ..utils.api_features import api_controller, api_controller_background_task
 from ..exceptions import NotFoundException
 from ..controllers.match_controller import match_sample_compute
+from .calibration_controller import calibration_mz_calibrate_sample
+from .samples_controller import get_sample
 from ..models.models import (
-    SampleItem,
     SampleBatch,
+    SampleItem,
+    SampleFile,
     Match,
     MatchInterference,
 )
 from ..models.pydantic_models.sample_item_pydantic_model import (
     SampleItemCreate,
     SampleItemUpdate,
+)
+from ..models.pydantic_models.calibration_pydantic_model import (
+    CalibrationMzFitParams,
+)
+from ..models.pydantic_models.sample_pydantic_model import (
+    AlarmsList,
 )
 
 
@@ -124,13 +133,15 @@ async def create_sample_item(
     sample_item: SampleItemCreate, independent_transaction: bool = False
 ) -> dict:
     """
-    Creates a new sample item with the specified details.
+    Creates a new sample item with the specified details after verifying that an associated
+    sample file exists in the database.
 
     Steps:
-    1. Create a new sample item object with the provided details and the generated ID.
-    2. Add the new sample item to the session and commit the changes to the database.
-    3. Emit a signal to inform clients about the creation of the new sample item.
-    4. Return the details of the created sample item.
+    1. Verify that the sample file with the given filename exists in the database.
+    2. Create a new sample item object with the provided details and a generated ID.
+    3. Add the new sample item to the session and commit the changes to the database.
+    4. Emit a signal to inform clients about the creation of the new sample item.
+    5. Return the details of the created sample item.
 
     :param sample_item: Sample item creation details from the request body.
     :type sample_item: SampleItemCreate
@@ -138,21 +149,32 @@ async def create_sample_item(
     :type independent_transaction: bool, optional
     :return: The created sample item's details.
     :rtype: dict
+    :raises NotFoundException: Raised if the associated sample file does not exist.
     """
     async with async_session() as session:
-        # Step 1: Generate unique ID and create new sample item
+        # Step 1: Verify the existence of the sample file
+        result = await session.execute(
+            select(SampleFile).where(SampleFile.filename == sample_item.filename)
+        )
+        sample_file = result.scalars().one_or_none()
+
+        if not sample_file:
+            raise NotFoundException(
+                f"Sample file with filename '{sample_item.filename}' not found"
+            )
+        # Step 2: Generate unique ID and create new sample item
         new_sample_item = SampleItem(
             sample_item_id=gen_id(),
             **sample_item.dict(),  # Pydantic model's data
             sample_item_utc_created=datetime.now(timezone.utc),
             sample_item_utc_modified=datetime.now(timezone.utc),
         )
-        # Step 2: Add to session and commit
+        # Step 3: Add to session and commit
         session.add(new_sample_item)
         await session.commit()
         await session.refresh(new_sample_item)
 
-    # Step 3: Emit event
+    # Step 4: Emit event if independent transaction
     # TODO_notifications refactor onSampleItemCreated
     if independent_transaction:
         await sio.emit(
@@ -161,7 +183,7 @@ async def create_sample_item(
             room=new_sample_item.sample_batch_id,
             namespace="/",
         )
-    # Step 4: Return the new sample item details
+    # Step 5: Return the new sample item details
     return new_sample_item.to_dict()
 
 
@@ -390,3 +412,87 @@ async def copy_sample_item(
         )
 
     return new_sample_item.to_dict()
+
+
+@api_controller_background_task(
+    success_emit_events=[
+        # ("sample_processing_finished", "sid"), #TODO_notifications should we use sid for success_emit_events notifications?
+        ("sample_processing_finished", "sample_batch_id"),
+        ("sample_batch_reload", "sample_batch_id"),
+    ],
+    error_emit_events=[
+        # ("sample_processing_finished", "sid"),  #TODO_notifications must use sid for error_emit_events notifications?
+        ("sample_processing_finished", "sample_batch_id"),
+    ],
+    default_payload={
+        "action": "process",
+        "type": "sample",
+    },
+    success_message="Sample processing was successfully finished",
+)
+async def process_sample_item(
+    sample_item: SampleItemCreate,
+    mz_calibration_params: CalibrationMzFitParams = CalibrationMzFitParams(),
+    alarms_list: AlarmsList = AlarmsList(),
+    independent_transaction: bool = False,
+    sid=None,
+) -> dict:
+    """
+    Automates the process of sample item creation, calibration, and match computation
+    as a single workflow. This process ensures that once a sample item is created, it is
+    then calibrated and matches are computed without requiring manual intervention.
+    NOTE that the sample_file record with the same filename should already exist in the database.
+
+    Steps:
+    1. Create a new sample item using the provided details.
+    2. Perform m/z calibration on the newly created sample item if instrument is TOF
+        using provided calibration parameters.
+    3. Compute matches for the sample item, integrating any newly identified matches.
+    4. Fetch the final sample details including match data for verification and further processing.
+
+    :param sample_item: Details of the sample item to be created.
+    :type sample_item: SampleItemCreate
+    :param mz_calibration_params: Calibration parameters to use, defaults to a preconfigured set.
+    :type mz_calibration_params: CalibrationMzFitParams, optional
+    :param alarms_list: List of alarms to apply, defaults to standard settings.
+    :type alarms_list: AlarmsList, optional
+    :param independent_transaction: Indicates whether this operation should be treated as a standalone transaction.
+    :type independent_transaction: bool, optional
+    :param sid: Session ID for client-specific communications, defaults to None.
+    :type sid: str, optional
+    :raises RuntimeError: Raised if calibration or match computation fails.
+    :return: Details of the processed sample including matches.
+    :rtype: dict
+    """
+    # Step 1: Create the sample item
+    # (not enitting sample_item_created since by default independent_transaction is False)
+    created_sample_item = await create_sample_item(sample_item)
+    sample_item_id = created_sample_item["sample_item_id"]
+
+    # Step 2: Calibrate the sample item if instrument is TOF
+    if get_instrument_type(created_sample_item["filename"]) == "tof":
+        calibration_result = await calibration_mz_calibrate_sample(
+            sample_item_id=sample_item_id, params=mz_calibration_params
+        )
+        # TODO_calibration_refact refactor error handling and independent_transaction logic
+        if calibration_result["status"] != "calibrated":
+            raise RuntimeError(
+                f"Failed to calibrate sample '{created_sample_item['sample_item_name']}'"
+            )
+
+    # Step 3: Compute matches if calibration is successful
+    await match_sample_compute(
+        sample_item_id=sample_item_id,
+    )
+
+    # Step 4: Fetch updated sample details including match data
+    sample = await get_sample(
+        sample_item_id=sample_item_id,
+        alarms_list=alarms_list,
+        sample_matches_info=True,
+    )
+
+    # TODO_data wrapper
+    # Sample is returned so that api_controller_background_task wrapper would have access
+    # to the required emit_events rooms
+    return sample
