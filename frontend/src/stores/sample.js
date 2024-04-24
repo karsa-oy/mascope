@@ -57,7 +57,7 @@ export const useSampleStore = defineStore('sample', () => {
 
     // Get detailed sample data
     const sampleData = await getSampleData(sampleItemId)
-
+    if (!sampleData) return
     // Set the selection of the active collection
     const targetStore = useTargetsStore()
     const activeCollection = targetStore.activeCollection
@@ -112,10 +112,9 @@ export const useSampleStore = defineStore('sample', () => {
       requestData: {
         sampleId,
         body
-      },
-      errorMessage: `Failed to load the sample data.`
+      }
     })
-    return sampleData.data
+    return sampleData?.data || null
   }
 
   async function getSampleMatches(sampleItemId) {
@@ -198,20 +197,6 @@ export const useSampleStore = defineStore('sample', () => {
   }
 
   // backend notifications
-  async function onSampleBatchExportPeaksFailed(error) {
-    const appStore = useAppStore()
-    await appStore.pushNotify({
-      message: error,
-      key: Math.random()
-    })
-  }
-  async function onSampleBatchExportPeaksReady() {
-    const appStore = useAppStore()
-    await appStore.pushNotify({
-      message: 'Sample batch peak export finished',
-      key: Math.random()
-    })
-  }
   async function onSampleItemCreated(sample_item_id) {
     const batchStore = useBatchStore()
     await batchStore.reload(null)
@@ -266,8 +251,6 @@ export const useSampleStore = defineStore('sample', () => {
     createAttributeTemplate,
     updateAttributeTemplate,
     deleteAttributeTemplate,
-    onSampleBatchExportPeaksFailed,
-    onSampleBatchExportPeaksReady,
     onSampleItemCreated,
     onSampleProcessingFinished,
     updateCollectionSelection

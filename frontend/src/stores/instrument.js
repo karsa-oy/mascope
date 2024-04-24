@@ -23,20 +23,26 @@ export const useInstrumentStore = defineStore('instrument', () => {
     if (active.value) await unload()
     api.emit('subscribe', instrument)
     active.value = instrument
-    await getMzCalibration()
-    await getRecentAcquisitions()
+    await loadMzCalibration()
+    await loadRecentAcquisitions()
   }
 
-  async function getMzCalibration() {
-    mzCalibration.value = await getLastMzCalibration()
+  async function loadMzCalibration() {
+    const lastMzCalibration = await getLastMzCalibration()
+    if (!lastMzCalibration) return
+    mzCalibration.value = lastMzCalibration
   }
 
-  async function getAcquisitions(datetimeRange) {
-    acquisitions.value = await getSampleFiles(datetimeRange)
+  async function loadAcquisitions(datetimeRange) {
+    const acquisitions = await getSampleFiles(datetimeRange)
+    if (!acquisitions) return
+    acquisitions.value = acquisitions
   }
 
-  async function getRecentAcquisitions() {
-    recentAcquisitions.value = await getRecentSampleFiles()
+  async function loadRecentAcquisitions() {
+    const recentAcquisitions = await getRecentSampleFiles()
+    if (!recentAcquisitions) return
+    recentAcquisitions.value = recentAcquisitions
   }
 
   async function resetAcquisitionStatus() {
@@ -75,12 +81,9 @@ export const useInstrumentStore = defineStore('instrument', () => {
 
   // http client endpoints
   async function getSampleFiles(datetimeRange) {
-    const minDatetime = datetimeRange.min.toISOString()
-    const maxDatetime = datetimeRange.max.toISOString()
-
     const reqData = {
-      minDatetime,
-      maxDatetime,
+      datetime_min: datetimeRange.min.toISOString(),
+      datetime_max: datetimeRange.max.toISOString(),
       instrument: active.value,
       sort: 'datetime_utc',
       order: 'asc'
@@ -88,11 +91,9 @@ export const useInstrumentStore = defineStore('instrument', () => {
 
     const sampleFiles = await api.request({
       httpMethod: 'getAllSampleFiles',
-      requestData: reqData,
-      errorMessage: `Failed to get all sample files.`
+      requestData: reqData
     })
-
-    return sampleFiles.data
+    return sampleFiles?.data ?? null
   }
 
   async function getRecentSampleFiles() {
@@ -104,11 +105,9 @@ export const useInstrumentStore = defineStore('instrument', () => {
 
     const sampleFiles = await api.request({
       httpMethod: 'getRecentSampleFiles',
-      requestData: reqData,
-      errorMessage: `Failed to get recent acquisitions.`
+      requestData: reqData
     })
-
-    return sampleFiles.data
+    return sampleFiles?.data ?? null
   }
 
   async function getLastMzCalibration() {
@@ -118,8 +117,7 @@ export const useInstrumentStore = defineStore('instrument', () => {
 
     const mzCalibration = await api.request({
       httpMethod: 'getMzCalibration',
-      requestData: reqData,
-      errorMessage: `Failed to get last mz calibration.`
+      requestData: reqData
     })
 
     return mzCalibration
@@ -155,7 +153,10 @@ export const useInstrumentStore = defineStore('instrument', () => {
   async function onInstrumentConversionStarted({ progress }) {
     conversionProgress.value = progress
   }
-  async function onMatchItemComputeFailed({ progress }) {
+  async function onMatchItemComputeStarted({ progress }) {
+    matchingProgress.value = progress
+  }
+  async function onMatchItemComputeProgress({ progress }) {
     matchingProgress.value = progress
   }
   async function onMatchItemComputeFinished({ progress }) {
@@ -163,15 +164,12 @@ export const useInstrumentStore = defineStore('instrument', () => {
     // TODO: case: background, verify interferences
     // TODO: case: else, display matches
   }
-  async function onMatchItemComputeProgress({ progress }) {
-    matchingProgress.value = progress
-  }
-  async function onMatchItemComputeStarted({ progress }) {
+  async function onMatchItemComputeFailed({ progress }) {
     matchingProgress.value = progress
   }
   async function onSampleFileCreated() {
     console.log('onSampleFileCreated')
-    await getRecentAcquisitions()
+    await loadRecentAcquisitions()
     if (scenthoundModeActive.value) {
       console.log('scenthound active')
       if (sampleItemPending.value) {
@@ -197,9 +195,9 @@ export const useInstrumentStore = defineStore('instrument', () => {
     scenthoundModeActive,
     // actions
     load,
-    getMzCalibration,
-    getAcquisitions,
-    getRecentAcquisitions,
+    loadMzCalibration,
+    loadAcquisitions,
+    loadRecentAcquisitions,
     resetAcquisitionStatus,
     unload,
     matchSample,

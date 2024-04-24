@@ -531,14 +531,12 @@ async def calibration_mz_fit(
         return fit, stats, error
 
 
-async def calibration_mz_apply(
-    fit: dict, sample_filename: str, autosampler_mode: bool = None
-):
+async def calibration_mz_apply(fit: dict, filename: str, autosampler_mode: bool = None):
     """
     Apply m/z calibration to a sample file.
 
     :param fit: Fit dictionary.
-    :param sample_filename: Name of the sample file.
+    :param filename: Name of the sample file.
     :param autosampler_mode: Optional flag for autosampler mode. In the calibration.js store affects if the batch will be reloaded onCalibrationMzApplyFinished
     :return: List of calibrated sample item IDs.
     """
@@ -546,7 +544,7 @@ async def calibration_mz_apply(
     # Read affected sample items
     async with async_session() as session:
         result = await session.execute(
-            select(SampleItem).filter(SampleItem.filename == sample_filename)
+            select(SampleItem).filter(SampleItem.filename == filename)
         )
     sample_item_ids = [
         item.to_dict()["sample_item_id"] for item in result.scalars().all()
@@ -565,12 +563,12 @@ async def calibration_mz_apply(
         )
 
     # Retrieve the sample file directly using filename
-    sample_file_data = await get_sample_files(filename=sample_filename)
+    sample_file_data = await get_sample_files(filename=filename)
 
     if not sample_file_data["data"]:
         raise HTTPException(
             status_code=404,
-            detail=f"Sample file with filename {sample_filename} not found",
+            detail=f"Sample file with filename {filename} not found",
         )
 
     sample_file = sample_file_data["data"][0]

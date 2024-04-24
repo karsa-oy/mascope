@@ -53,11 +53,9 @@ async def calibration_mz_fit_route(
 @calibration_router.post("/api/calibration/mz_apply")
 async def calibration_mz_apply_route(
     data: CalibrationMzApplyData,
-    sample_filename: str = Query(
-        ..., description="The sample filename to query for sample mz_apply"
-    ),
+    filename: str = Query(..., description="The filename to query for sample mz_apply"),
 ):
-    return await calibration_mz_apply(data.fit, sample_filename)
+    return await calibration_mz_apply(data.fit, filename)
 
 
 @calibration_router.post("/api/calibration/mz_calibrate/sample/{sample_item_id}")

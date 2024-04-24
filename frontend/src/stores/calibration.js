@@ -36,7 +36,9 @@ export const useCalibrationStore = defineStore('calibration', () => {
     if (active.value) {
       await unload()
     }
-    mzFit.value = await getSampleMzCalibration(sample)
+    const sampleMzCalibration = await getSampleMzCalibration(sample)
+    if (!sampleMzCalibration) return
+    mzFit.value = sampleMzCalibration
   }
 
   async function unload() {
@@ -46,29 +48,32 @@ export const useCalibrationStore = defineStore('calibration', () => {
   }
 
   // http client endpoints
-  async function getSampleMzCalibration({ sample_item_id }) {
+  async function getSampleMzCalibration(sample) {
     return await api.request({
       httpMethod: 'getMzCalibration',
       requestData: {
-        sample_item_id
-      },
-      errorMessage: `Failed to get sample mz calibration.`
+        sample_item_id: sample.sample_item_id
+      }
     })
   }
 
-  async function calibrationMzFit(requestData) {
+  async function calibrationMzFit(sample) {
+    const requestData = {
+      sampleId: sample.sample_item_id,
+      sampleName: sample.sample_item_name,
+      body: params.value
+    }
     await api.request({
       httpMethod: 'calibrationMzFit',
-      requestData: requestData,
-      errorMessage: `Failed to calibrate mz fit of sample ${requestData.sampleName}.`
+      requestData: requestData
     })
   }
 
-  async function calibrationMzApply(requestData) {
+  async function calibrationMzApply(filename) {
+    const requestData = { fit: mzFit.value, filename }
     await api.request({
       httpMethod: 'calibrationMzApply',
-      requestData: requestData,
-      errorMessage: `Failed to apply mz calibration for sample file ${requestData.sample_filename}.`
+      requestData: requestData
     })
   }
 
@@ -82,8 +87,7 @@ export const useCalibrationStore = defineStore('calibration', () => {
       const body = params.value
       await api.request({
         httpMethod: 'calibrationMzCalibrateSample',
-        requestData: { sampleId, sampleName, body },
-        errorMessage: `Failed to m/z calibrate sample ${sampleName}.`
+        requestData: { sampleId, sampleName, body }
       })
     } else {
       const instrumentStore = useInstrumentStore()

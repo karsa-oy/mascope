@@ -22,8 +22,8 @@ async def get_match_ratings(
     order: str = None,
     page: int = 0,
     limit: int = 10000,
-    minDatetime: datetime = None,
-    maxDatetime: datetime = None,
+    datetime_min: datetime = None,
+    datetime_max: datetime = None,
 ) -> dict:
     """
     Retrieves a paginated list of match ratings, optionally filtered by various parameters, and sorted by a specified column.
@@ -51,10 +51,10 @@ async def get_match_ratings(
     :type page: int, optional
     :param limit: Number of items per page, defaults to 100.
     :type limit: int, optional
-    :param minDatetime: Filter by minimum datetime, defaults to None.
-    :type minDatetime: datetime, optional
-    :param maxDatetime: Filter by maximum datetime, defaults to None.
-    :type maxDatetime: datetime, optional
+    :param datetime_min: Filter by minimum datetime, defaults to None.
+    :type datetime_min: datetime, optional
+    :param datetime_max: Filter by maximum datetime, defaults to None.
+    :type datetime_max: datetime, optional
     :return: Dictionary containing total count and list of match ratings.
     :rtype: dict
     """
@@ -69,13 +69,10 @@ async def get_match_ratings(
             stmt = stmt.filter(MatchRating.target_ion_id == target_ion_id)
         if rating is not None:
             stmt = stmt.filter(MatchRating.rating == rating)
-        if minDatetime and maxDatetime:
-            stmt = stmt.where(
-                and_(
-                    MatchRating.match_rating_utc_created >= minDatetime,
-                    MatchRating.match_rating_utc_created <= maxDatetime,
-                )
-            )
+        if datetime_min:
+            stmt = stmt.where(MatchRating.match_rating_utc_created >= datetime_min)
+        if datetime_max:
+            stmt = stmt.where(MatchRating.match_rating_utc_created <= datetime_max)
 
         # Step 3: Apply sorting
         if sort:

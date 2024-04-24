@@ -25,8 +25,8 @@ from ..models.pydantic_models.sample_file_pydantic_model import (
 
 @api_controller()
 async def get_sample_files(
-    minDatetime: datetime = None,
-    maxDatetime: datetime = None,
+    datetime_min: datetime = None,
+    datetime_max: datetime = None,
     instrument: str = None,
     filename: str = None,
     sort: str = "datetime_utc",
@@ -45,10 +45,10 @@ async def get_sample_files(
     5. Execute the query and fetch the results.
     6. Convert the results into a list of dictionaries for JSON serialization.
 
-    :param minDatetime: Minimum date and time for filtering sample files, optional.
-    :type minDatetime: datetime, optional
-    :param maxDatetime: Maximum date and time for filtering sample files, optional.
-    :type maxDatetime: datetime, optional
+    :param datetime_min: Minimum date and time for filtering sample files, optional.
+    :type datetime_min: datetime, optional
+    :param datetime_max: Maximum date and time for filtering sample files, optional.
+    :type datetime_max: datetime, optional
     :param instrument: Instrument name for filtering sample files, optional.
     :type instrument: str, optional
     :param filename: Filename for filtering sample files, optional.
@@ -69,10 +69,10 @@ async def get_sample_files(
         stmt = select(SampleFile)
 
         # Step 2: Apply filters
-        if minDatetime:
-            stmt = stmt.where(SampleFile.datetime_utc >= minDatetime)
-        if maxDatetime:
-            stmt = stmt.where(SampleFile.datetime_utc <= maxDatetime)
+        if datetime_min:
+            stmt = stmt.where(SampleFile.datetime_utc >= datetime_min)
+        if datetime_max:
+            stmt = stmt.where(SampleFile.datetime_utc <= datetime_max)
         if instrument:
             stmt = stmt.where(SampleFile.instrument == instrument)
         if filename:

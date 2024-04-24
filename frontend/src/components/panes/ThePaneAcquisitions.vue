@@ -36,7 +36,7 @@ const acquisitions = computed(() =>
 function getAcquisitionsInRange() {
   // Reset selected files when changing range, to avoid ghost selections
   sampleFilesSelected.value = []
-  instrumentStore.getAcquisitions({
+  instrumentStore.loadAcquisitions({
     min: sampleFileMinDatetime.value,
     max: sampleFileMaxDatetime.value
   })

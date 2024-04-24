@@ -124,6 +124,8 @@ export const useNotificationStore = defineStore('notification', () => {
     progressMessage.value = message
     progressPercentage.value = percentage ?? 0
   }
+
+  // backend notifications
   async function onRematchBatchesStarted({ total_batches }) {
     rematchBatchesProgress.value = true
     totalBatches.value = total_batches

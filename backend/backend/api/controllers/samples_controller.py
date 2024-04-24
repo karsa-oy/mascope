@@ -678,8 +678,8 @@ async def get_samples(
     filename: str = None,
     instrument: str = None,
     sample_item_type: str = None,
-    minDatetime: datetime = None,
-    maxDatetime: datetime = None,
+    datetime_min: datetime = None,
+    datetime_max: datetime = None,
     sort: str = "datetime_utc",
     order: str = "asc",
     page: int = 0,
@@ -717,10 +717,10 @@ async def get_samples(
     :type instrument: str, optional
     :param sample_item_type: Filter by sample item type.
     :type sample_item_type: str, optional
-    :param minDatetime: Filter samples after this datetime of the sample file.
-    :type minDatetime: datetime, optional
-    :param maxDatetime: Filter samples before this datetime of the sample file.
-    :type maxDatetime: datetime, optional
+    :param datetime_min: Filter samples after this datetime of the sample file.
+    :type datetime_min: datetime, optional
+    :param datetime_max: Filter samples before this datetime of the sample file.
+    :type datetime_max: datetime, optional
     :param sort: Column to sort the results by.
     :type sort: str, optional
     :param order: Sort order ('asc' or 'desc').
@@ -762,13 +762,13 @@ async def get_samples(
         if sample_item_type:
             stmt = stmt.filter(Sample.sample_item_type == sample_item_type)
 
-        if minDatetime and maxDatetime:
+        if datetime_min and datetime_max:
             stmt = stmt.where(
                 and_(
                     cast(func.julianday(Sample.datetime_utc), Float)
-                    >= func.julianday(minDatetime),
+                    >= func.julianday(datetime_min),
                     cast(func.julianday(Sample.datetime_utc), Float)
-                    <= func.julianday(maxDatetime),
+                    <= func.julianday(datetime_max),
                 )
             )
 

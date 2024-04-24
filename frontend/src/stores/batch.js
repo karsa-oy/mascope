@@ -87,12 +87,13 @@ export const useBatchStore = defineStore('batch', () => {
 
   async function loadBatch(batchId) {
     const batch = await getBatch(batchId)
+    if (!batch) return
     active.value = batch
   }
 
   async function loadBatchSamplesData(batchId) {
     const batchData = await getBatchSamplesData(batchId)
-
+    if (!batchData) return
     batchData.data.forEach((row, i) => (row.index = (i + 1).toString()))
     sampleItems.value = batchData.data
     if (!batchData.batch_matches_info) return
@@ -103,7 +104,7 @@ export const useBatchStore = defineStore('batch', () => {
 
   async function loadBatchTargets(batchId) {
     const batchTargetsData = await getBatchTargets(batchId)
-
+    if (!batchTargetsData) return
     let newTargetCollections = batchTargetsData.target_collections
 
     const targetStore = useTargetsStore()
@@ -207,8 +208,7 @@ export const useBatchStore = defineStore('batch', () => {
   async function getBatch(batchId) {
     return await api.request({
       httpMethod: 'getBatch',
-      requestData: batchId,
-      errorMessage: `Failed to load batch.`
+      requestData: { batchId }
     })
   }
 
@@ -225,8 +225,7 @@ export const useBatchStore = defineStore('batch', () => {
 
     return await api.request({
       httpMethod: 'getAllSamples',
-      requestData: body,
-      errorMessage: `Failed to load batch samples data.`
+      requestData: body
     })
   }
 
@@ -242,10 +241,9 @@ export const useBatchStore = defineStore('batch', () => {
     }
     const batchTargetsData = await api.request({
       httpMethod: 'getBatchTargets',
-      requestData: reqData,
-      errorMessage: `Failed to get batch targets.`
+      requestData: reqData
     })
-
+    if (!batchTargetsData) return
     return batchTargetsData.data
   }
 

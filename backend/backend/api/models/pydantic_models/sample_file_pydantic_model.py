@@ -40,8 +40,8 @@ class SampleFileInDB(SampleFileBase):
 
 
 class GetSampleFilesQueryParams(BaseModel):
-    minDatetime: Optional[dt] = Field(None, description="Minimum datetime filter")
-    maxDatetime: Optional[dt] = Field(None, description="Maximum datetime filter")
+    datetime_min: Optional[dt] = Field(None, description="Minimum datetime filter")
+    datetime_max: Optional[dt] = Field(None, description="Maximum datetime filter")
     instrument: Optional[str] = Field(None, description="Filter by instrument")
     filename: Optional[str] = Field(None, description="Filter by filename")
     sort: Optional[str] = Field(

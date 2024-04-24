@@ -101,7 +101,9 @@ export function createHttpClient() {
       try {
         return await client.get(workspacesBaseUrl, { params })
       } catch (error) {
-        console.error('Failed to get all workspaces: ', error)
+        const userErrorMessage =
+          error?.response?.data?.error || `Failed to load all workspaces: ${error}`
+        throw new Error(userErrorMessage)
       }
     },
     getWorkspace: async (workspaceId) => {
@@ -140,18 +142,22 @@ export function createHttpClient() {
         console.error('Failed to get all sample batches: ', error)
       }
     },
-    getBatch: async (batchId) => {
+    getBatch: async ({ batchId }) => {
       try {
         return await client.get(`${batchesBaseUrl}/${batchId}`)
       } catch (error) {
-        console.error('Failed to get batch: ', error)
+        const userErrorMessage =
+          error?.response?.data?.error || `Failed to load sample batch: ${error}`
+        throw new Error(userErrorMessage)
       }
     },
     getBatchTargets: async ({ batchId, body }) => {
       try {
         return await client.post(`${batchesBaseUrl}/${batchId}/targets`, body)
       } catch (error) {
-        console.error('Failed to fetch batch targets: ', error)
+        const userErrorMessage =
+          error?.response?.data?.error || `Failed to load batch targets data: ${error}`
+        throw new Error(userErrorMessage)
       }
     },
     createBatch: async (newBatch) => {
@@ -195,7 +201,6 @@ export function createHttpClient() {
       try {
         return await client.post(`${batchesBaseUrl}/${batchId}/copy`, body)
       } catch (error) {
-        // TODO_error_handling
         const userErrorMessage =
           error?.response?.data?.error || `Failed to copy sample batch: ${error}`
         throw new Error(userErrorMessage)
@@ -213,7 +218,9 @@ export function createHttpClient() {
       try {
         return await client.post(samplesBaseUrl, body)
       } catch (error) {
-        console.error('Failed to get all samples: ', error)
+        const userErrorMessage =
+          error?.response?.data?.error || `Failed to load batch samples data: ${error}`
+        throw new Error(userErrorMessage)
       }
     },
 
@@ -221,7 +228,9 @@ export function createHttpClient() {
       try {
         return await client.post(`${samplesBaseUrl}/${sampleId}`, body)
       } catch (error) {
-        console.error('Failed to get sample: ', error)
+        const userErrorMessage =
+          error?.response?.data?.error || `Failed to load the sample data: ${error}`
+        throw new Error(userErrorMessage)
       }
     },
 
@@ -254,14 +263,18 @@ export function createHttpClient() {
       try {
         return await client.get(filesBaseUrl, { params })
       } catch (error) {
-        console.error('Failed to get all sample files: ', error)
+        const userErrorMessage =
+          error?.response?.data?.error || `Failed to load all sample files: ${error}`
+        throw new Error(userErrorMessage)
       }
     },
     getRecentSampleFiles: async (params = {}) => {
       try {
         return await client.get(`${filesBaseUrl}/recent`, { params })
       } catch (error) {
-        console.error('Failed to get recent acquisitions: ', error)
+        const userErrorMessage =
+          error?.response?.data?.error || `Failed to load recent acquisitions: ${error}`
+        throw new Error(userErrorMessage)
       }
     },
     getSampleFileById: async (sample_file_id) => {
@@ -348,7 +361,9 @@ export function createHttpClient() {
           params
         })
       } catch (error) {
-        console.error('Failed to get mz calibration: ', error)
+        const userErrorMessage =
+          error?.response?.data?.error || `Failed to get sample mz calibration: ${error}`
+        throw new Error(userErrorMessage)
       }
     },
     calibrationMzFit: async ({ sampleId, sampleName, body }) => {
@@ -360,22 +375,27 @@ export function createHttpClient() {
         }
         return await client.post(`${calibrationBaseUrl}/mz_fit`, body, config)
       } catch (error) {
-        console.error(`Failed to calibrate mz fit of sample ${sampleName}: `, error)
+        const userErrorMessage =
+          error?.response?.data?.error || `Failed to mz fit sample '${sampleName}': ${error}`
+        throw new Error(userErrorMessage)
       }
     },
 
-    calibrationMzApply: async ({ fit, sample_filename }) => {
+    calibrationMzApply: async ({ fit, filename }) => {
       try {
         const config = {
           params: {
-            sample_filename
+            filename
           }
         }
         const body = { fit }
 
         return await client.post(`${calibrationBaseUrl}/mz_apply`, body, config)
       } catch (error) {
-        console.error(`Failed to apply mz calibration for ${sample_filename}: `, error)
+        const userErrorMessage =
+          error?.response?.data?.error ||
+          `Failed to apply mz calibration for '${filename}': ${error}`
+        throw new Error(userErrorMessage)
       }
     },
 
@@ -384,8 +404,7 @@ export function createHttpClient() {
         return await client.post(`${calibrationBaseUrl}/mz_calibrate/sample/${sampleId}`, body)
       } catch (error) {
         const userErrorMessage =
-          error?.response?.data?.error ||
-          `Failed to m/z calibrate sample  "${sampleName}": ${error}`
+          error?.response?.data?.error || `Failed to m/z calibrate sample '${sampleName}': ${error}`
         throw new Error(userErrorMessage)
       }
     },
@@ -399,7 +418,7 @@ export function createHttpClient() {
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error ||
-          `Failed to m/z calibrate sample batch "${batch.sample_batch_name}": ${error}`
+          `Failed to m/z calibrate sample batch '${batch.sample_batch_name}': ${error}`
         throw new Error(userErrorMessage)
       }
     },
@@ -409,7 +428,8 @@ export function createHttpClient() {
       try {
         return await client.get(`${matchesBaseUrl}`, { params })
       } catch (error) {
-        console.error('Failed to get all matches: ', error)
+        const userErrorMessage = error?.response?.data?.error || `Failed to load matches: ${error}`
+        throw new Error(userErrorMessage)
       }
     },
     getMatchById: async (matchId) => {
@@ -601,7 +621,9 @@ export function createHttpClient() {
           params
         })
       } catch (error) {
-        console.error('Failed to get all ionization mechanisms: ', error)
+        const userErrorMessage =
+          error?.response?.data?.error || `Failed to load all ionization mechanisms: ${error}`
+        throw new Error(userErrorMessage)
       }
     },
 
@@ -651,7 +673,9 @@ export function createHttpClient() {
           params
         })
       } catch (error) {
-        console.error('Failed to get all instrument functions: ', error)
+        const userErrorMessage =
+          error?.response?.data?.error || `Failed to load all instrument functions: ${error}`
+        throw new Error(userErrorMessage)
       }
     },
     getInstrumentFunction: async (params = {}) => {
@@ -670,7 +694,7 @@ export function createHttpClient() {
         return await client.get(`${attributeTemplatesBaseUrl}`, { params })
       } catch (error) {
         const userErrorMessage =
-          error?.response?.data?.error || `Failed to get all attribute templates: ${error}`
+          error?.response?.data?.error || `Failed to load attribute templates: ${error}`
         throw new Error(userErrorMessage)
       }
     },

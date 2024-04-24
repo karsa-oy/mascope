@@ -255,19 +255,10 @@ function generateFilterId() {
 }
 async function mzCalibrationFit() {
   calibrationStore.unload()
-  const requestData = {
-    sampleId: sampleStore.active.sample_item_id,
-    sampleName: sampleStore.active.sample_item_name,
-    body: calibrationStore.params
-  }
-  await calibrationStore.calibrationMzFit(requestData)
+  await calibrationStore.calibrationMzFit(sampleStore.active)
 }
 async function mzCalibrationApply() {
-  const requestData = {
-    fit: calibrationStore.mzFit,
-    sample_filename: sampleFilename.value
-  }
-  await calibrationStore.calibrationMzApply(requestData)
+  await calibrationStore.calibrationMzApply(sampleFilename.value)
 }
 function reset() {
   instrumentStore.resetAcquisitionStatus()

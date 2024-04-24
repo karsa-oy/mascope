@@ -36,15 +36,15 @@ async def get_recent_sample_files_route(
     query_params: GetRecentSampleFilesQueryParams = Depends(),
 ):
     # Used datetime.now() with timezone.utc to get a timezone-aware UTC datetime
-    minDatetime = datetime.now(timezone.utc) - timedelta(days=query_params.days)
-    maxDatetime = datetime.now(timezone.utc)
+    datetime_min = datetime.now(timezone.utc) - timedelta(days=query_params.days)
+    datetime_max = datetime.now(timezone.utc)
 
     query_params_dict = query_params.dict(exclude={"days"})
-    # Update the dictionary with calculated minDatetime and maxDatetime
+    # Update the dictionary with calculated datetime_min and datetime_max
     query_params_dict.update(
         {
-            "minDatetime": minDatetime,
-            "maxDatetime": maxDatetime,
+            "datetime_min": datetime_min,
+            "datetime_max": datetime_max,
         }
     )
 

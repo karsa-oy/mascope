@@ -97,10 +97,10 @@ class GetSamplesBody(AlarmsList):
     sample_item_type: Optional[str] = Field(
         None, description="Type of the sample item to filter results by."
     )
-    minDatetime: Optional[datetime] = Field(
+    datetime_min: Optional[datetime] = Field(
         None, description="Minimum datetime of the sample file to filter results by."
     )
-    maxDatetime: Optional[datetime] = Field(
+    datetime_max: Optional[datetime] = Field(
         None, description="Maximum datetime of the sample file to filter results by."
     )
     sort: Optional[str] = Field(

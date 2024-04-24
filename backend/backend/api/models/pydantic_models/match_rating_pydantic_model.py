@@ -72,9 +72,9 @@ class GetMatchRatingsQueryParams(BaseModel):
     order: Optional[str] = Field(None, description="Order of sorting ('asc' or 'desc')")
     page: int = Field(0, description="Page number for pagination")
     limit: int = Field(10000, description="Number of items per page")
-    minDatetime: Optional[dt] = Field(
+    datetime_min: Optional[dt] = Field(
         None, description="Minimum datetime of creation filter"
     )
-    maxDatetime: Optional[dt] = Field(
+    datetime_max: Optional[dt] = Field(
         None, description="Maximum datetime of creation filter"
     )

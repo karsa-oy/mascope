@@ -31,29 +31,25 @@ export const useAppStore = defineStore('app', () => {
   // http client endpoints
   async function getAllAttributeTemplates() {
     const attributeTemplatesData = await api.request({
-      httpMethod: 'getAllAttributeTemplates',
-      errorMessage: `Failed to load attribute templates.`
+      httpMethod: 'getAllAttributeTemplates'
     })
     return attributeTemplatesData.data
   }
   async function getAllInstrumentFunctions() {
     const instrumentFunctions = await api.request({
-      httpMethod: 'getAllInstrumentFunctions',
-      errorMessage: `Failed to load instrument functions.`
+      httpMethod: 'getAllInstrumentFunctions'
     })
     return instrumentFunctions.data
   }
   async function getAllIonizationMechanisms() {
     const ionizationMechanisms = await api.request({
-      httpMethod: 'getAllIonizationMechanisms',
-      errorMessage: `Failed to load ionization mechanisms.`
+      httpMethod: 'getAllIonizationMechanisms'
     })
     return ionizationMechanisms.data
   }
   async function getAllWorkspaces() {
     const workspaces = await api.request({
-      httpMethod: 'getAllWorkspaces',
-      errorMessage: `Failed to load workspaces.`
+      httpMethod: 'getAllWorkspaces'
     })
     return workspaces.data
   }
