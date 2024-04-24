@@ -976,10 +976,16 @@ async def sample_batch_export_peaks(
             await emit_progress_update(
                 progress_properties=progress_properties, increment=0.1
             )
-
+            # Assign peak fitting threshold depending on the instrument type
+            # Correct intrument type unsured by get_instrument_type
+            if instrument_type == "orbi":
+                threshold = 0.8
+            if instrument_type == "tof":
+                threshold = 0.9
             sample_file = await detect_peaks(
                 filename,
                 instrument_functions,
+                threshold,
                 u_list=None,
                 if_exists="append",
                 instrument_type=instrument_type,

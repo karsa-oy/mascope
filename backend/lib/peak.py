@@ -8,6 +8,7 @@ Created on Wed Apr 17 13:45:17 2019
 import asyncio
 import os
 from concurrent.futures import ProcessPoolExecutor
+from itertools import compress
 
 import lmfit
 import numpy as np
@@ -34,12 +35,43 @@ def calculate_tic(filename):
     return tic
 
 
+def segment_spec(sum_spec):
+    """Perform segmentation of Orbitrap spectrum
+
+    :param sum_spec: sum of spectra along time dimension
+    :type sum_spec: array-like
+    :return: list of segment indices
+    :rtype: list
+    """
+    # Get non-zero indices
+    non_zero_indices = np.flatnonzero(sum_spec)
+    # Split in chunks taking into account repeating zeros
+    non_zero_indices = np.split(
+        non_zero_indices, np.where(np.diff(non_zero_indices) > 2)[0] + 1
+    )
+    # Add zeros on chunk borders
+    non_zero_indices = [
+        np.concatenate(([chunk[0] - 1], chunk, [chunk[-1] + 1]))
+        for chunk in non_zero_indices
+    ]
+    # Check wrong indices on the spectrum ends
+    if non_zero_indices[0][0] < 0:
+        # Remove negative index in the first chunk
+        non_zero_indices[0] = non_zero_indices[0][1:]
+    if non_zero_indices[-1][-1] == len(sum_spec):
+        # Remove out-of-range index from the last chunk
+        non_zero_indices[-1][-1] = non_zero_indices[-1][:-1]
+    # Remove short chunks
+    non_zero_indices = [chunk for chunk in non_zero_indices if len(chunk) > 4]
+    return non_zero_indices
+
+
 async def detect_peaks(
     filename,
     instrument_functions,
+    add_peak_threshold,
     u_list=None,
     max_n_peaks=5,
-    add_peak_threshold=0.9,
     if_exists="fail",  # 'fail', 'append', 'replace'
     dmz=0.5,
     return_peak_mzs=False,
@@ -84,6 +116,8 @@ async def detect_peaks(
         # Nothing to fit
         return sample_file_data
 
+    print(f"Fitting unit masses: {u_list}")
+
     sample_file_data = load_file(filename, vars=["signal"])
 
     mz = sample_file_data.mz
@@ -94,57 +128,44 @@ async def detect_peaks(
     loop = asyncio.get_event_loop()
 
     if instrument_type == "orbi":
-        # Get non-zero indices
-        non_zero_indices = np.flatnonzero(sum_spec)
-        # Split in chunks taking into account repeating zeros
-        non_zero_indices = np.split(
-            non_zero_indices, np.where(np.diff(non_zero_indices) > 1)[0] + 1
-        )
-        # Add zeros on chunk borders
-        non_zero_indices = [
-            np.concatenate(([chunk[0] - 1], chunk, [chunk[-1] + 1]))
-            for chunk in non_zero_indices
+        # Segment sum spectrum
+        non_zero_indices = segment_spec(sum_spec)
+        # Get mz/spectrum pairs to fit
+        specs_to_fit = [
+            (mz[chunk].values, sum_spec[chunk].values) for chunk in non_zero_indices
         ]
-        # Check wrong indices on the spectrum ends
-        if non_zero_indices[0][0] < 0:
-            # Remove negative index in the first chunk
-            non_zero_indices[0] = non_zero_indices[0][1:]
-        if non_zero_indices[-1][-1] == len(sum_spec):
-            # Remove out-of-range index from the last chunk
-            non_zero_indices[-1][-1] = non_zero_indices[-1][:-1]
-        # Remove short chunks
-        non_zero_indices = [chunk for chunk in non_zero_indices if len(chunk) > 4]
-        # Fill in asynchronous operations
-        futures = [
-            loop.run_in_executor(
-                executor,
-                fit_n_peaks,
-                mz[chunk].values,
-                sum_spec[chunk].values,
-                peakshape,
-                R(mz[chunk].values.mean()),
-                max_n_peaks,
-                add_peak_threshold,
+        u_list_np = np.array(u_list)
+        mask_u_list = []
+        for mz_to_fit, spec_to_fit in specs_to_fit:
+            # Mask for chunks crossing u_list ranges (u+-0.5)
+            mask_u_list.append(
+                np.any(np.abs(mz_to_fit - u_list_np.reshape(-1, 1)) <= 0.5)
             )
-            for chunk in non_zero_indices
-        ]
-    else:
-        # TOF is default since more or less works for both
-        print(f"Fitting unit masses: {u_list}")
-
-        futures = [
-            loop.run_in_executor(
-                executor,
-                fit_n_peaks,
+        # Filter list of chunks to fit based on mask_u_list boolean values
+        specs_to_fit = compress(specs_to_fit, mask_u_list)
+    if instrument_type == "tof":
+        specs_to_fit = [
+            (
                 mz.sel(mz=slice(u - dmz, u + dmz)).compute().values,
                 sum_spec.sel(mz=slice(u - dmz, u + dmz)).compute().values,
-                peakshape,
-                R(u),
-                max_n_peaks,
-                add_peak_threshold,
             )
             for u in u_list
         ]
+
+    # Fill in asynchronous operations
+    futures = [
+        loop.run_in_executor(
+            executor,
+            fit_n_peaks,
+            mz_to_fit,
+            spec_to_fit,
+            peakshape,
+            R(mz_to_fit.mean()),
+            add_peak_threshold,
+            max_n_peaks,
+        )
+        for mz_to_fit, spec_to_fit in specs_to_fit
+    ]
 
     new_peaks = []
     for i, future in enumerate(asyncio.as_completed(futures)):
@@ -184,9 +205,21 @@ async def detect_peaks(
         method="nearest",
     )
     peak_mzs, unique_peak_index = np.unique(peak_mz_coord, return_index=True)
+    all_peak_mzs = all_peak_mzs[unique_peak_index]
+
+    # Difference between fitted peak positions and binded to the mz grid
+    peak_mz_diff = np.abs(all_peak_mzs - peak_mzs)
+    # Recalculate peak position difference to ppm
+    peak_mz_diff_ppm = 1e6 * peak_mz_diff / all_peak_mzs
+    # Find where ppm difference is > 1 ppm
+    peak_mz_mask = np.where(peak_mz_diff_ppm > 1)
+    # Replace mz values where ppm > 1 with exact fitted peak positions
+    peak_mzs[peak_mz_mask] = all_peak_mzs[peak_mz_mask]
+
     peak_areas = all_peak_areas[unique_peak_index]
     peak_heights = all_peak_heights[unique_peak_index]
     peak_profiles = sample_file_data.signal.sel(mz=peak_mzs, method="nearest")
+    peak_profiles["mz"] = peak_mzs
     peak_profiles_norm = peak_profiles / peak_profiles.sum(dim="time")
     peak_profiles_area = peak_profiles_norm * peak_areas.reshape(-1, 1)
     peak_profiles_height = peak_profiles_norm * peak_heights.reshape(-1, 1)
@@ -312,9 +345,13 @@ def fit_peaks(
         else:
             posmin = 0
             posmax = np.inf
-        params.add("peak%spos" % p, value=ppos[p], min=posmin, max=posmax, vary=fit_pos)
-        params.add("peak%shei" % p, value=phei[p] / ymax, min=0, vary=fit_hei)
-        params.add("peak%sres" % p, value=pres[p], min=0, vary=fit_res)
+        params.add(f"peak{p}pos", value=ppos[p], min=posmin, max=posmax, vary=fit_pos)
+        params.add(f"peak{p}hei", value=phei[p] / ymax, min=0, vary=fit_hei)
+        params.add(f"peak{p}res", value=pres[p], min=0, vary=fit_res)
+    # Check if number of varying parameters hit the limit
+    num_of_params = npeaks * sum([fit_pos, fit_hei, fit_res])
+    if num_of_params > len(x):
+        return None, None
     # Fit
     minner = lmfit.Minimizer(peak_kernel_residual, params, fcn_args=(x, yn, ps))
     fit = minner.leastsq(max_nfev=max_iter)
@@ -335,8 +372,8 @@ def fit_n_peaks(
     y,
     peak_shape,
     resolution_function,
+    threshold,
     max_n_peaks=5,
-    threshold=0.9,
     fit_pos=True,
     fit_hei=True,
     fit_res=False,

@@ -64,9 +64,16 @@ async def compute_matches(
         if instrument_functions is None:
             instrument_functions = await read_instrument_functions(filename)
         instrument_type = get_instrument_type(filename)
+        # Assign peak fitting threshold depending on the instrument type
+        # Correct intrument type unsured by get_instrument_type
+        if instrument_type == "orbi":
+            threshold = 0.8
+        if instrument_type == "tof":
+            threshold = 0.9
         sample_file = await detect_peaks(
             filename,
             instrument_functions,
+            threshold,
             u_list,
             if_exists="append",
             instrument_type=instrument_type,
