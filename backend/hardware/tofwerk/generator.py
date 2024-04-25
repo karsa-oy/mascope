@@ -61,6 +61,15 @@ class BaseGenerator(Thread):
         )
 
     @property
+    def polarity(self) -> str:
+        """Ion polarity
+
+        :return: Return either "+" or "-"
+        :rtype: str
+        """
+        return "-" if self.desc.negativeIonMode else "+"
+
+    @property
     def progress(self):
         # TofDaqStreamer progress
         if not self.active.is_set():
@@ -100,6 +109,7 @@ class BaseGenerator(Thread):
             "mz_calibration": self.mz_calibration,
             "t_range": [0, self.length],
             "single_ion_signal": self.single_ion_signal,
+            "polarity": self.polarity,
         }
         self.spec_queue.put(coordinates)
         # tps_info = {
@@ -119,6 +129,7 @@ class BaseGenerator(Thread):
                     "filename": self.filename,
                     "i": None,
                     "source_filepath": self.desc.currentDataFileName.decode(),
+                    "polarity": self.polarity,
                 }
             )
             # self.tps_queue.put({

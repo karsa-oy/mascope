@@ -8,16 +8,21 @@ class SampleFileBase(BaseModel):
     instrument: Optional[str] = Field(
         ..., description="Instrument associated with the file"
     )
-    datetime: Optional[dt] = Field(..., description="Datetime associated with the file")
+    datetime: Optional[dt] = Field(
+        ..., description="Datetime (local) of creation of the sample file"
+    )
     datetime_utc: Optional[dt] = Field(
-        ..., description="UTC datetime associated with the file"
+        ..., description="Datetime (UTC) of creation of the sample file"
     )
     length: Optional[float] = Field(..., description="Length of the sample file")
-    range: Optional[List[float]] = Field(..., description="Range of the sample file")
-    mz_calibration: Optional[Dict] = Field(
-        ..., description="mz_calibration of the sample file"
+    range: Optional[List[float]] = Field(
+        ..., description="m/z range of the sample file"
     )
-    tic: Optional[float] = Field(..., description="tic of the sample file")
+    mz_calibration: Optional[Dict] = Field(
+        ..., description="m/z calibration function parameters of the sample file"
+    )
+    tic: Optional[float] = Field(..., description="TIC of the sample file")
+    polarity: Optional[str] = Field(..., description="Polarity of the sample file")
 
 
 class SampleFileCreate(SampleFileBase):

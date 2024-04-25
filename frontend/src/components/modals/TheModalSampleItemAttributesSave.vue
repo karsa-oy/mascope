@@ -77,7 +77,7 @@ const batchFilterIds = computed(() =>
 const editable = computed(() => ['create', 'update'].includes(action.value))
 const fillable = computed(() => ['create', 'update'].includes(action.value))
 const instrumentIsTof = computed(() =>
-  sampleInstrument.value ? sampleInstrument.value.indexOf('ORBI') == -1 : false
+  sampleInstrument.value ? sampleInstrument.value.toLowerCase().indexOf('orbi') == -1 : false
 )
 const mzCalibrationTableRows = computed(() => calibrationStore.mzFitStats ?? [])
 const sampleItemAttributes = computed(() =>

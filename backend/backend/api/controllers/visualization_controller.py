@@ -85,9 +85,7 @@ async def visualize_ion_focus(
 
     # Step 2: Load the sample file and prepare data slice
     print("Loading file: %s" % filename)
-    sample_file = load_file(filename, vars=["signal", "peak_heights"])
-    t_range = [0, sample_file.props["length"]]  # Full time range
-    sample_file_slice = sample_file.sel(time=slice(*t_range))
+    sample_file = load_file(filename, vars=["sum_signal", "signal", "peak_heights"])
 
     # Step 3: Convert target ion data to DataFrame and prepare data
     target_ion_list = [ion.to_dict() for ion in target_ion_data]
@@ -110,12 +108,12 @@ async def visualize_ion_focus(
         rel_abu = rel_abus[i]
         current_target_isotope_id = target_isotope_ids[i]
 
-        isotope_slice = sample_file_slice.sel(mz=slice(*mz_range)).compute()
-        isotope_sum_spectrum = isotope_slice.sum(dim="time").compute()
-        isotope_height = isotope_sum_spectrum.signal.sel(mz=mz, method="nearest")
+        isotope_slice = sample_file.sel(mz=slice(*mz_range)).compute()
+        isotope_sum_spectrum = isotope_slice.sum_signal
+        isotope_height = isotope_sum_spectrum.sel(mz=mz, method="nearest")
         # Sum spectrum traces
         sum_spectrum_mz = isotope_sum_spectrum.mz.values.astype(np.float32)
-        sum_spectrum_y = isotope_sum_spectrum.signal.values.astype(np.float32)
+        sum_spectrum_y = isotope_sum_spectrum.values.astype(np.float32)
         if i == 0:
             # Set signal normalization constant
             main_isotope_height = float(isotope_height)
@@ -139,7 +137,7 @@ async def visualize_ion_focus(
             }
         )
         # Peak traces (vertical lines)
-        peaks = get_peaks(isotope_sum_spectrum, "height")
+        peaks = get_peaks(isotope_slice, "height").sum(dim="time").compute()
         peaks = filter_peaks(peaks, intensity=peak_min_intensity)
         for peak in peaks:
             peak_mz = peak.mz.item()

@@ -46,6 +46,7 @@ def create_sample_file_db_record(data):
     utc_offset = timedelta(seconds=int(data["utc_offset"]))
     mz_calibration = data.get("mz_calibration")
     tic = calculate_tic(filename)
+    polarity = data.get("polarity")
 
     sample_file_db_record = {
         "filename": filename,
@@ -56,6 +57,7 @@ def create_sample_file_db_record(data):
         "range": data["range"],
         "mz_calibration": mz_calibration,
         "tic": tic,
+        "polarity": polarity,
     }
 
     headers = {"Content-Type": "application/json"}
@@ -96,7 +98,6 @@ def process_stream(streamer):
                 streamer.tps_queue.get()  # coordinates
                 streamer.tps_queue.get()  # data
 
-        data.update({"filename": data["filename"].replace(" ", "_")})
         filename = data["filename"]
         instrument_name = filename.split("_")[0]
         spec_i = data["i"]
@@ -117,11 +118,17 @@ def process_stream(streamer):
                     "range": sample_file.props["range"],
                     "mz_calibration": sample_file.props["mz_calibration"],
                     "utc_offset": sample_file.props["utc_offset"],
+                    "polarity": sample_file.props["polarity"],
                 }
             )
             filepath = data.pop("source_filepath")
             print("Deleting file from mailbox")
-            os.remove(filepath)
+            try:
+                os.remove(filepath)
+            except FileNotFoundError as e:
+                print(f"Failed to delete file {filepath} from the mailbox: {e}")
+
+            # Send request to Mascope backend to create sample file record in the db
             try:
                 create_sample_file_db_record(data)
             except Exception as e:
@@ -184,17 +191,36 @@ def process_stream(streamer):
             # New data to existing file
             zarr_sdk.update_tps_dataset({"value": data}, sample_file)
 
+    def format_filename(generator_data: dict) -> str:
+        """Format raw filename (from data acquisition software) into Mascope sample file name
+
+        - Replace white space with underscore
+        - Append filename with polarity character (+/-)
+
+        :param generator_data: Data object from the generator thread, must contain "filename" key
+        :type generator_data: dict
+        :return: Formatted filename
+        :rtype: str
+        """
+        formatted_filename = generator_data["filename"].replace(" ", "_")
+        formatted_filename = "_".join([formatted_filename, generator_data["polarity"]])
+        return formatted_filename
+
     # Main loop
     while not streamer.shutdown_event.is_set():
         try:
             # Check the queue for new data
             spec_data = streamer.spec_queue.get_nowait()
+            # Format filename
+            spec_data.update({"filename": format_filename(spec_data)})
             spec_i = spec_data["i"]
             # Handle spectrum data
             success = handle_spec_data(spec_data)
             if success and hasattr(streamer, "tps_queue"):
                 # If "tps_queue" exists (H5Streamer), handle tps data
                 tps_data = streamer.tps_queue.get()
+                # Format filename
+                tps_data.update({"filename": format_filename(tps_data)})
                 handle_tps_data(tps_data)
             if spec_i is None:
                 # Received poison pill, clear file from cache

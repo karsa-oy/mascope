@@ -8,6 +8,7 @@ Created on Tue Apr 09 13:08:29 2019
 """
 
 import os
+import h5py
 from ctypes import create_string_buffer
 from multiprocessing import Event, Lock, Queue
 from queue import Empty
@@ -108,6 +109,7 @@ class H5Streamer(BaseGenerator, KInstrument):
                 "t": float(ti),  # Timestamp [s]
                 "period": self.interval,  # Collection period [s]
                 "spec": spec.tobytes(),  # Serialized spectrum [float32]
+                "polarity": self.polarity,  # Ion polarity
             }
             # Feed
             self.spec_queue.put(spec_data)
@@ -219,22 +221,23 @@ class H5Streamer(BaseGenerator, KInstrument):
         while not self.shutdown_event.is_set():
             try:
                 file_to_stream = self.file_queue.get(timeout=0.1)
+                file_to_stream = file_to_stream.encode()
                 # Update TW h5 descriptor
                 with self.lock:
-                    ret = TwGetH5Descriptor(file_to_stream.encode(), self.desc)
+                    ret = TwGetH5Descriptor(file_to_stream, self.desc)
                     if ret != 4:
                         print("Error reading file: %s" % ret)
-                        TwCloseH5(file_to_stream.encode())
+                        TwCloseH5(file_to_stream)
                         continue
                     if not (self.desc.nbrBufs and self.desc.nbrWrites):
                         # Empty file, skip
                         print("Skipping empty file: %s" % file_to_stream)
-                        TwCloseH5(file_to_stream.encode())
+                        TwCloseH5(file_to_stream)
                         continue
                 # Test read to check for corrupt file
                 with self.lock:
                     ret = TwGetTofSpectrumFromH5(
-                        file_to_stream.encode(),
+                        file_to_stream,
                         np.zeros((self.desc.nbrSamples,), dtype=np.float32),
                         0,
                         0,
@@ -247,12 +250,17 @@ class H5Streamer(BaseGenerator, KInstrument):
                     )
                     if ret != 4:
                         print("Error reading file: %s" % ret)
-                        TwCloseH5(file_to_stream.encode())
+                        TwCloseH5(file_to_stream)
                         continue
                 # Add fields to comply with TW shared memory descriptor
-                self.desc.currentDataFileName = file_to_stream.encode()
+                self.desc.currentDataFileName = file_to_stream
                 self.desc.iBuf = 0
                 self.desc.iWrite = 0
+                with h5py.File(file_to_stream, "r") as f:
+                    polarity_str = f.attrs["IonMode"].decode()
+                    self.desc.negativeIonMode = (
+                        True if polarity_str == "negative" else False
+                    )
             except Empty:
                 continue
             # Start streaming
@@ -283,7 +291,7 @@ class H5Streamer(BaseGenerator, KInstrument):
                     break
             # Out of write loop
             with self.lock:
-                TwCloseH5(file_to_stream.encode())
+                TwCloseH5(file_to_stream)
             self.active.clear()
             self._finalize()
             self.cancel_event.clear()

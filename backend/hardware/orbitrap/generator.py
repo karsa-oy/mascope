@@ -51,41 +51,75 @@ class RawStreamer(Thread):
         self.active = Event()  # Acquisition active event
         self.spec_queue = Queue()  # Signal output queue
         # Per acquisition attributes
-        self.filename = None  # Filename base from TW h5 file
-        self.interval = None  # Acquisition interval [s]
-        self.length = None  # Acquisition length [s]
         self.speci = -1  # Index of last received spectrum,
         # -1 when there is no active acquisition
 
     @property
-    def mz(self):
-        if self.raw:
-            return np.array(
-                [self.raw.RunHeaderEx.LowMass, self.raw.RunHeaderEx.HighMass],
-                dtype=np.float32,
-            )
+    def filename(self) -> str:
+        """Base filename of the raw file currently being streamed
+
+        :return: Base filename
+        :rtype: str
+        """
+        return strip_filepath(self.raw.FileName) if self.raw else None
 
     @property
-    def progress(self):
+    def interval(self) -> float:
+        """Mean measurement interval in seconds, i.e. length of one spectrum in the sample
+
+        :return: Measurement interval [s]
+        :rtype: float
+        """
+        return (
+            self.length / self.raw.RunHeaderEx.LastSpectrum if self.raw else None
+        )  # [s]
+
+    @property
+    def length(self) -> float:
+        """Length of the sample file in seconds
+
+        :return: Sample length [s]
+        :rtype: float
+        """
+        return self.raw.RunHeaderEx.EndTime * 60.0 if self.raw else None  # [s]
+
+    @property
+    def mz(self) -> np.array:
+        """Precomputed m/z grid of the sample file
+
+        :return: m/z coordinate grid
+        :rtype: np.array
+        """
+        if self.raw:
+            return self._mz_grid.astype(np.float32)
+
+    @property
+    def progress(self) -> float:
+        """Streaming progress in percent
+
+        :return: Prgress [%]
+        :rtype: float
+        """
         if not self.active.is_set():
             return 100
         return ((self.speci + 1) / self.raw.RunHeaderEx.LastSpectrum) * 100.0  # [%]
 
-    def _get_and_feed_data(self):
+    def _get_and_feed_data(self, scan_no: int):
         """Read data from the RAW file and put to queues"""
         # == Get and feed mass spectrum data ==
-        scan_no = self.speci + 1
         # Get the scan statistics from the RAW file for this scan number
         with self.lock:
             scan_stats = self.raw.GetScanStatsForScanNumber(scan_no)
         # Get timestamp from scan stats
         ti = scan_stats.StartTime * 60.0  # [s]
+        # Get polarity from scan stats
+        polarity = scan_stats.ScanType.split(" ")[1]
         with self.lock:
             scan = self.raw.GetSegmentedScanFromScanNumber(scan_no, scan_stats)
         # Map .NET arrays into numpy arrays
         mz = net2np_array(scan.Positions).astype(np.float32)
         spec = net2np_array(scan.Intensities).astype(np.float32)
-        # Round mz values based on the precomputed mz values
+        # Round mz values based on the mz precision
         mz, spec = self._set_mz_precision(mz, spec)
         # Combine data for output
         spec_data = {
@@ -95,43 +129,92 @@ class RawStreamer(Thread):
             "period": self.interval,  # Collection period [s]
             "mz": mz.tobytes(),  # Serialized mass axis [float32]
             "spec": spec.tobytes(),  # Serialized spectrum [float32]
+            "polarity": polarity,  # Polarity, '-' or '+'
         }
         # Feed
         self.spec_queue.put(spec_data)
 
     def _feed_coordinates(self):
-        coordinates = {
-            "filename": self.filename,
-            "i": -1,
-            "mz": self.mz.tobytes(),
-            "t_range": [0, self.length],
-        }
-        self.spec_queue.put(coordinates)
+        if self._has_negative_scans():
+            coordinates = {
+                "filename": self.filename,
+                "i": -1,
+                "mz": self.mz.tobytes(),
+                "t_range": [0, self.length],
+                "polarity": "-",
+            }
+            self.spec_queue.put(coordinates)
+        if self._has_positive_scans():
+            coordinates = {
+                "filename": self.filename,
+                "i": -1,
+                "mz": self.mz.tobytes(),
+                "t_range": [0, self.length],
+                "polarity": "+",
+            }
+            self.spec_queue.put(coordinates)
 
     def _finalize(self):
         """Finalize acquisition"""
         if not self.cancel_event.is_set():
             # Feed poison pill
-            self.spec_queue.put(
-                {
-                    "filename": self.filename,
-                    "i": None,
-                    "source_filepath": self.raw.FileName,
-                }
-            )
+            if self._has_negative_scans():
+                self.spec_queue.put(
+                    {
+                        "filename": self.filename,
+                        "i": None,
+                        "source_filepath": self.raw.FileName,
+                        "polarity": "-",
+                    }
+                )
+            if self._has_positive_scans():
+                self.spec_queue.put(
+                    {
+                        "filename": self.filename,
+                        "i": None,
+                        "source_filepath": self.raw.FileName,
+                        "polarity": "+",
+                    }
+                )
         # Reset self
-        self._reset()
-
-    def _reset(self):
-        """Reset per acquisition attributes"""
-        self.filename = None
         self.speci = -1
+        self._mz_grid = None
+        with self.lock:
+            self.raw.Dispose()
+        self.active.clear()
+        self.cancel_event.clear()
 
-    def _precompute_grid(self, points_per_fwhm=4):
-        """Precompute mz grid based on the resolution function.
+    def _has_negative_scans(self) -> bool:
+        """Does the current raw file contain scans in negative polarity
+
+        :return: Has negative sans
+        :rtype: bool
+        """
+        polarity_filter = self.raw.GetFilterFromString("-")
+        scan_enumerator = self.raw.GetFilteredScanEnumerator(
+            polarity_filter
+        ).GetEnumerator()
+        return scan_enumerator.MoveNext()
+
+    def _has_positive_scans(self) -> bool:
+        """Does the current raw file contain scans in negative polarity
+
+        :return: Has positive sans
+        :rtype: bool
+        """
+        polarity_filter = self.raw.GetFilterFromString("+")
+        scan_enumerator = self.raw.GetFilteredScanEnumerator(
+            polarity_filter
+        ).GetEnumerator()
+        return scan_enumerator.MoveNext()
+
+    def _precompute_grid(self, points_per_fwhm=4, resolution_coeff=1.715e6):
+        """Precompute mz grid based on the resolution function: `resolution_coeff / sqrt(mz)`
 
         :param points_per_fwhm: number of data points per FWHM of the peak, defaults to 4
         :type points_per_fwhm: float, optional
+        :param resolution_coeff: Resolution function coefficient, defaults to 1.715e6
+        :type resolution_coeff: float, optional
         :return: computed mz grid
         :rtype: numpy.ndarray
         """
@@ -145,7 +228,7 @@ class RawStreamer(Thread):
             mz_min,
         ]
         while mz < mz_max:
-            resolution = 1.715e6 / np.sqrt(mz)
+            resolution = resolution_coeff / np.sqrt(mz)
             fwhm = mz / resolution
             # Step to the next point of the grid
             step = fwhm / points_per_fwhm
@@ -180,24 +263,6 @@ class RawStreamer(Thread):
 
         return unique_mz.astype(np.float32), unique_mz_intensities.astype(np.float32)
 
-    def _update(self, scan=None):
-        """Update per acquisition attributes. If new data is available, feed into queues."""
-        # Update
-        if scan is None:
-            # New file, update attributes
-            raw_filepath = self.raw.FileName  # TF RAW file full path
-            self.filename = strip_filepath(raw_filepath)
-            self.length = self.raw.RunHeaderEx.EndTime * 60.0  # [s]
-            self.interval = self.length / self.raw.RunHeaderEx.LastSpectrum  # [s]
-            # Feed coordinates
-            self._feed_coordinates()
-            print(f"Acquisition started: {self.filename}")
-        else:
-            # New data
-            self.speci = scan - 1
-            print(self.speci)
-            self._get_and_feed_data()
-
     def _wait_for_queues(self):
         """Wait for tick event to be set before continuing streaming
 
@@ -228,32 +293,33 @@ class RawStreamer(Thread):
                         self.raw = ThermoBusiness.RawFileReaderFactory.ReadFile(
                             file_to_stream
                         )
-                    # TODO: DEVICE.MS is supposed to be at 0; is it always the case?
-                    i_type = self.raw.GetInstrumentType(0)
-                    self.raw.SelectInstrument(i_type, 1)
-                    i_data = self.raw.GetInstrumentData()
-                    print(f"Instrument: {i_data.Name} #{i_data.SerialNumber}")
+                        i_type = self.raw.GetInstrumentType(0)
+                        self.raw.SelectInstrument(i_type, 1)
                 except Exception as e:
                     print(f"Error reading file {file_to_stream}: {e}")
                     continue
             except Empty:
+                # No file to stream, keep waiting
                 continue
 
             # Precompute mz grid
             self._mz_grid = self._precompute_grid()
             # Start streaming
-            # Update self and feed data into queue
-            self._update()
+            # Feed coordinates
+            self._feed_coordinates()
+            print(f"Acquisition started: {self.filename}")
             # Set active flag
             self.active.set()
             # Loop through the file and feed to queues
-            scans = range(
+            all_scans = range(
                 self.raw.RunHeaderEx.FirstSpectrum,
                 self.raw.RunHeaderEx.LastSpectrum + 1,
             )
-            for scan in scans:
+            for scan_no in all_scans:
+                print(scan_no)
+                self.speci = scan_no - 1
                 # Update self and feed data into queue
-                self._update(scan)
+                self._get_and_feed_data(scan_no)
                 # Wait for queues to be empty
                 if self._wait_for_queues():
                     # Empty
@@ -263,10 +329,6 @@ class RawStreamer(Thread):
                     break
             # Out of stream loop
             self._finalize()
-            with self.lock:
-                self.raw.Dispose()
-            self.active.clear()
-            self.cancel_event.clear()
             print("RawStream finished")
         # Out of main loop
         print("RawStreamer exiting")
@@ -279,7 +341,15 @@ class RawStreamer(Thread):
         self.spec_queue.close()
         self.spec_queue.join_thread()
 
-    def start_stream(self, filename):
+    def start_stream(self, filename: str):
+        """Method to call externally, to start streaming a file
+
+        Alternative to directly putting a file into `self.file_queue`
+
+        :param filename: Full path to the file to be streamed
+        :type filename: str
+        :raises ValueError: If file is not found
+        """
         if os.path.isfile(filename):
             self.file_queue.put(filename)
         else:

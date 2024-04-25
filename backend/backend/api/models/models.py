@@ -119,6 +119,7 @@ class SampleFile(Base):
     range = Column(JSON)
     mz_calibration = Column(JSON)
     tic = Column(Float)
+    polarity = Column(String(1))
 
     # Define relationships
     sample_item = relationship("SampleItem", back_populates="sample_file")
