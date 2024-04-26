@@ -12,16 +12,36 @@ from itertools import compress
 
 import lmfit
 import numpy as np
-from scipy.interpolate import CubicSpline
+from scipy.interpolate import interp1d
 from scipy.signal._peak_finding_utils import _select_by_peak_distance
 from scipy.stats import norm
+from scipy.integrate import simpson
 
 from .file_func import load_file, zarr_sdk
 
 
-def calculate_peak_area(x, peakshape, peak):
+# Precompute sigma multiplier for peak generation
+SIGMA_MULTIPLIER = 2 * np.sqrt(2 * np.log(2))
+
+
+def calculate_peak_area(x: np.ndarray, peakshape: dict, peak: tuple) -> float:
+    """Calculate the area of a peak.
+
+    This function calculates the area under a peak shape using Simpson's rule.
+
+    :param x: The array of x values corresponding to the peak.
+    :type x: numpy.ndarray
+    :param peakshape: The median peak shape.
+    :type peakshape: dict
+    :param peak: A tuple containing the position, height, and resolution of the peak.
+    :type peak: tuple
+    :return: The area under the peak shape.
+    :rtype: float
+    """
     pos, hei, res = peak
-    return sum(gen_peak(x, pos, hei, res, peakshape))
+    peak_y = gen_peak(x, pos, hei, res, peakshape)
+    peak_area = simpson(y=peak_y, x=x)
+    return peak_area
 
 
 def calculate_tic(filename):
@@ -93,7 +113,7 @@ async def detect_peaks(
 
     if u_list is None:
         # Fit all peaks
-        u_list = range(10, int(np.floor(mz_top)) + 1)
+        u_list = np.arange(10, np.floor(mz_top) + 1)
 
     # Fit peaks to given unit masses
     if "peak_areas" in sample_file_data:
@@ -102,15 +122,15 @@ async def detect_peaks(
         old_peak_mzs = list(sample_file_data.peak_areas.mz.values)
         old_peak_areas = list(sample_file_data.peak_areas.sum(dim="time").values)
         old_peak_heights = list(sample_file_data.peak_heights.sum(dim="time").values)
-        u_list_fitted = list(np.unique(np.round(old_peak_mzs)))
+        u_list_fitted = np.unique(np.round(old_peak_mzs))
     else:
-        u_list_fitted = []
+        u_list_fitted = np.array([])
 
     if if_exists == "append":
         # Only fit unit masses not already fitted
-        u_list = [u for u in u_list if u not in u_list_fitted]
+        u_list = np.setdiff1d(u_list, u_list_fitted)
     # Filter out too large values
-    u_list = [u for u in u_list if u <= mz_top]
+    u_list = u_list[u_list <= mz_top]
 
     if len(u_list) == 0:
         # Nothing to fit
@@ -331,7 +351,7 @@ def fit_peaks(
     """
 
     # Normalize y
-    ymax = max(y)
+    ymax = y.max()
     if ymax == 0:
         return None, None
     yn = y / ymax
@@ -353,8 +373,10 @@ def fit_peaks(
     if num_of_params > len(x):
         return None, None
     # Fit
-    minner = lmfit.Minimizer(peak_kernel_residual, params, fcn_args=(x, yn, ps))
-    fit = minner.leastsq(max_nfev=max_iter)
+    minner = lmfit.Minimizer(
+        peak_kernel_residual, params, fcn_args=(x, yn, ps), ftol=1e-6, xtol=1e-6
+    )
+    fit = minner.minimize(method="least_squares", max_nfev=max_iter)
     # Rescale fit results
     fit.residual *= ymax
     for par in fit.params:
@@ -427,6 +449,8 @@ def fit_n_peaks(
                 )
             ]
 
+        dpos = x[-1] - x[0]
+
         fit, peaks = fit_peaks(
             x,
             y,
@@ -438,8 +462,8 @@ def fit_n_peaks(
             fit_pos,
             fit_hei,
             fit_res,
-            dpos=0.1,
-            max_iter=1000,
+            dpos=dpos,
+            max_iter=100,
         )
         if not fit:
             return None, []
@@ -520,25 +544,23 @@ def gen_peak(x, ppos, phei, pres, ps, trim_borders=False):
         If trim_borders=False returns an array of values corresponding to
         input parameter 'x'. Otherwise returns tuple with new x and the peak.
     """
+    ps_x = np.array(ps["x"])
+    ps_y = np.array(ps["y"])
 
-    sigma = ppos / pres / (2 * np.sqrt(2 * np.log(2)))
-    xi = (np.array(ps["x"]) * sigma) + ppos
-    yi = ps["y"] / np.max(ps["y"]) * phei
-    spline = CubicSpline(xi, yi, extrapolate=False)
+    sigma = ppos / pres / SIGMA_MULTIPLIER
+    xi = ps_x * sigma + ppos
+    yi = ps_y / np.max(ps["y"]) * phei
+    spline = interp1d(xi, yi, fill_value="extrapolate")
     peak = spline(x)
     peak[np.isnan(peak)] = 0
     peak[peak < 0] = 0
+
     if trim_borders:
         thr = 1e-5
-        i = 0
-        while peak[i] < thr:
-            i += 1
-        j = -1
-        while peak[j] < thr:
-            j -= 1
-        if j == -1:
-            j = -2
-        return x[i : j + 1], peak[i : j + 1]
+        i = np.argmax(peak >= thr)
+        j = np.argmax(peak[::-1] >= thr)
+        j = len(x) - j if j > 0 else -1
+        return x[i:j], peak[i:j]
     else:
         return peak
 
@@ -565,9 +587,9 @@ def gen_peak_kernel(params, x, ps):
     kernel = np.zeros((len(x),))
     npeaks = params["npeaks"]
     for p in range(int(npeaks)):
-        ppos = params["peak%spos" % p]
-        phei = params["peak%shei" % p]
-        pres = params["peak%sres" % p]
+        ppos = params[f"peak{p}pos"]
+        phei = params[f"peak{p}hei"]
+        pres = params[f"peak{p}res"]
         peak = gen_peak(x, ppos, phei, pres, ps)
         kernel += peak
     return kernel

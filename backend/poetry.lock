@@ -377,6 +377,26 @@ tests-mypy = ["mypy (>=1.6)", "pytest-mypy-plugins"]
 tests-no-zope = ["attrs[tests-mypy]", "cloudpickle", "hypothesis", "pympler", "pytest (>=4.3.0)", "pytest-xdist[psutil]"]
 
 [[package]]
+name = "austin-dist"
+version = "3.6.0"
+description = "Austin - Frame Stack Sampler for CPython"
+optional = false
+python-versions = "*"
+files = [
+    {file = "austin_dist-3.6.0-py2.py3-none-macosx_11_0_arm64.whl", hash = "sha256:dce1080b02fb9c68357cb5b71cadbdefafeb8c42343f62279f527c48b83debe0"},
+    {file = "austin_dist-3.6.0-py2.py3-none-macosx_11_0_x86_64.whl", hash = "sha256:39d6337043abe848780c0288ed216e7a736290085eb8c6993d5ed09eca14f590"},
+    {file = "austin_dist-3.6.0-py2.py3-none-manylinux_2_12_x86_64.manylinux2010_x86_64.whl", hash = "sha256:4be02b0da272b5c881300b334faaf54a222b8fce78a802cf68461f0a73286829"},
+    {file = "austin_dist-3.6.0-py2.py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:ca55b53aedc954e69f71bae255e66a315ed0f2a8c1c2f0bbb938c637c1c0d94e"},
+    {file = "austin_dist-3.6.0-py2.py3-none-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:f066d7ae91c34e1d5e6316787a8c20cc8ca3eabb6c52bee5c2251da9ff72d6ab"},
+    {file = "austin_dist-3.6.0-py2.py3-none-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:29a56031b460d4a903796fcb5b03b1c038c33267efe1873a333c7bd6ceda9e58"},
+    {file = "austin_dist-3.6.0-py2.py3-none-musllinux_1_1_aarch64.whl", hash = "sha256:045f8b81ec1d34e78d0fec83f297c0fd944efea4e0d701a4e6e79dfbf3f40f4b"},
+    {file = "austin_dist-3.6.0-py2.py3-none-musllinux_1_1_armv7l.whl", hash = "sha256:ba6c5e1bd91fc0214e381cad0831a0b6e5416873963115fca6772ba96ed25102"},
+    {file = "austin_dist-3.6.0-py2.py3-none-musllinux_1_1_ppc64le.whl", hash = "sha256:6ad143d35b5ccd190917376700f32f9a35f2ac306a79fd0a34b0acbfff84c7a7"},
+    {file = "austin_dist-3.6.0-py2.py3-none-musllinux_1_1_x86_64.whl", hash = "sha256:9f1dceb21259d39f08473d2f4ef29a561ffba042f8f2da2a980d13051e893947"},
+    {file = "austin_dist-3.6.0-py2.py3-none-win_amd64.whl", hash = "sha256:084c98544240bca3acfdc45e316adc8213fa694a8171ca6883810328fae31903"},
+]
+
+[[package]]
 name = "babel"
 version = "2.14.0"
 description = "Internationalization utilities"
@@ -4759,4 +4779,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.11"
-content-hash = "dc7bf11f44992478450ac7ab67c4834c5fc47e970a530ec32fe3e80b996f2ba0"
+content-hash = "c9cda34476d1303b90e66368500237250b5b456d26e4fae80e89f3f8ce8eaa9e"
