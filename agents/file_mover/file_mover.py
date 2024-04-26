@@ -1,24 +1,27 @@
 import argparse
 import inspect
 import os
-import re
 import time
 from multiprocessing import Event, Queue
 from ntpath import basename
 from queue import Empty
 from shutil import SameFileError, copy2
 
-# from karsalib.struct import FSWatcher
-# from karsalib.logging import parent_func_name
 from threading import Thread
 
+import watchdog
 from watchdog.events import PatternMatchingEventHandler
 from watchdog.observers import Observer
 
 MOVE_TIMEOUT = 10  # seconds without access before moving sample to target dir
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
+    """Parse command line arguments
+
+    :return: Parsed arguments
+    :rtype: argparse.Namespace
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "-s", "--source", help="source data pool path to watch", type=str, required=True
@@ -38,17 +41,32 @@ def parse_args():
         "--move_timeout",
         help="seconds without access before moving sample to target dir",
         type=int,
-        default=10,
+        default=MOVE_TIMEOUT,
     )
     return parser.parse_args()
 
 
-def parent_func_name():
+def parent_func_name() -> str:
+    """Return the name of a parent function calling a class method
+
+    :return: Parent function name
+    :rtype: str
+    """
     return inspect.stack()[2][3]
 
 
 class FSWatcher:
+    """Watch for file system events in a specified directory"""
+
     class FSEventHandler(PatternMatchingEventHandler):
+        """File system event handler
+
+        Implement callbacks for file system events.
+
+        :param PatternMatchingEventHandler: Event handler from the watchdog package
+        :type PatternMatchingEventHandler: watchdig.events.PatternMatchingEventHandler
+        """
+
         def __init__(self, client, mask):
             self.client = client
             if not isinstance(mask, list):
@@ -57,53 +75,70 @@ class FSWatcher:
                 ]
             super().__init__(patterns=mask)
 
-        def log(self, *arg):
+        def log(self, *arg) -> None:
+            """Print log message"""
             print(f"[{self.__class__.__name__}.{inspect.stack()[1].function}]", *arg)
 
-        def on_created(self, event):
+        def on_created(self, event: watchdog.events.FileSystemEvent) -> None:
+            """New file created
+
+            :param event: Filesystem event
+            :type event: watchdog.events.FileSystemEvent
+            """
             try:
                 self.client.on_filesystem_object_created(event.src_path)
             except AttributeError:
                 pass
             except Exception as e:
                 self.log(f"Exception {e.__class__.__name__}({str(e)})")
-                pass
 
-        def on_modified(self, event):
+        def on_modified(self, event: watchdog.events.FileSystemEvent) -> None:
+            """File modified
+
+            :param event: Filesystem event
+            :type event: watchdog.events.FileSystemEvent
+            """
             try:
                 self.client.on_filesystem_object_modified(event.src_path)
             except AttributeError:
                 pass
             except Exception as e:
                 self.log(f"Exception {e.__class__.__name__}({str(e)})")
-                pass
 
-        def on_deleted(self, event):
+        def on_deleted(self, event: watchdog.events.FileSystemEvent) -> None:
+            """File deleted
+
+            :param event: Filesystem event
+            :type event: watchdog.events.FileSystemEvent
+            """
             try:
                 self.client.on_filesystem_object_deleted(event.src_path)
             except AttributeError:
                 pass
             except Exception as e:
                 self.log(f"Exception {e.__class__.__name__}({str(e)})")
-                pass
 
-        def on_moved(self, event):
+        def on_moved(self, event: watchdog.events.FileSystemEvent) -> None:
+            """File moved
+
+            :param event: Filesystem event
+            :type event: watchdog.events.FileSystemEvent
+            """
             try:
                 self.client.on_filesystem_object_created(event.dest_path)
             except AttributeError:
                 pass
             except Exception as e:
                 self.log(f"Exception {e.__class__.__name__}({str(e)})")
-                pass
             try:
                 self.client.on_filesystem_object_deleted(event.src_path)
             except AttributeError:
                 pass
             except Exception as e:
                 self.log(f"Exception {e.__class__.__name__}({str(e)})")
-                pass
 
-    def log(self, *arg):
+    def log(self, *arg) -> None:
+        """Print a log message"""
         print(f"[{self.__class__.__name__}.{inspect.stack()[1].function}]", *arg)
 
     def __init__(self, client, target_attrs, recursive=False):
@@ -113,19 +148,31 @@ class FSWatcher:
         self.observer = Observer()
         self.handler = self.FSEventHandler(self.client, self.target_attrs["mask"])
 
-    def start(self):
+    def start(self) -> None:
+        """Start watching.
+
+        Start `FSEventHandler`
+        """
         self.observer.schedule(
             self.handler, self.target_attrs["path"], recursive=self.recursive
         )
         self.observer.start()
         self.log("started watching", self.target_attrs)
 
-    def stop(self):
+    def stop(self) -> None:
+        """Stop watching.
+
+        Stop `FSEventHandler`
+        """
         self.observer.stop()
         self.observer.join()
         self.log("stopped")
 
-    def run(self):
+    def run(self) -> None:
+        """Main loop
+
+        Start `FSEventHandler` and do nothing.
+        """
         self.start()
         while not self.client.shutdown_event.is_set():
             try:
@@ -143,7 +190,12 @@ class FSWatcher:
 
 
 class SampleMover:
-    def log(self, *arg):
+    """Watch for new files matching a specified `mask` in `source` directory, copy into
+    `target` directory after file has not been accessed for specified timeout period.
+    """
+
+    def log(self, *arg) -> None:
+        """Print log message"""
         print(f"[{self.__class__.__name__}.{parent_func_name()}]", *arg)
 
     def __init__(self, src, target, mask):
@@ -154,7 +206,15 @@ class SampleMover:
             client=self, target_attrs={"path": src, "mask": mask}, recursive=True
         )
 
-    def on_filesystem_object_created(self, fname):
+    def on_filesystem_object_created(self, fname: str) -> None:
+        """Callback on file created.
+
+        First wait while filesize is changing. Then check file access
+        by dummy rename operation. Finally, put file into `self.jobs` queue.
+
+        :param fname: File path
+        :type fname: str
+        """
         self.log(fname)
         # Wait until the file is ready
         filesize = -1
@@ -170,52 +230,44 @@ class SampleMover:
                 time.sleep(1)
         self.jobs.put(fname)
 
-    def on_filesystem_object_deleted(self, path):
-        self.log(path)
+    def seconds_since_last_access(self, fname: str) -> float:
+        """Count the seconds since the file was last accessed
 
-    def seconds_since_last_access(self, fname):
+        :param fname: Path of the file
+        :type fname: str
+        :return: Seconds since last access
+        :rtype: float
+        """
         return time.time() - os.stat(fname).st_atime
 
-    def get_date_from_name(self, fname):
-        patterns = [
-            r".*(\d{4}).(\d{2}).(\d{2}).(\d{2}).(\d{2}).(\d{2}).*",
-            r".*(\d{4})(\d{2})(\d{2})[- _](\d{2})(\d{2})[- _].*",
-        ]
-        for p in patterns:
-            try:
-                dt = re.findall(p, basename(fname))[0]
-                dt_len = len(dt)
-                if dt_len == 5 or dt_len == 6:
-                    return ".".join(dt[0:3])
-            except IndexError:
-                pass
-        return None
+    def copy(self, fname: str) -> None:
+        """Copy file into target directory
 
-    def copy(self, fname, fdate):
-        dst_dir = os.path.join(self.target_dir, fdate)
-        if not os.path.isdir(dst_dir):
-            os.mkdir(dst_dir)
-        dst_fname = os.path.join(dst_dir, basename(fname))
+        :param fname: Path of the file to copy
+        :type fname: str
+        """
+        dst_fname = os.path.join(self.target_dir, basename(fname))
         copy2(fname, dst_fname)
         self.log(dst_fname)
 
     def run_until_complete(self, args):
+        """Main loop
+
+        :param args: Arguments
+        :type args: argparse.Namespace
+        """
         try:
             while not self.shutdown_event.is_set():
                 time.sleep(2)
                 fname = None
                 try:
                     fname = self.jobs.get_nowait()
-                    fdate = self.get_date_from_name(fname)
-                    if not fdate:
-                        self.log(f"{fname} skipped: invalid sample name")
-                        continue
                     # self.log(fname)
                     if self.seconds_since_last_access(fname) < args.move_timeout:
                         self.jobs.put(fname)
                         # self.log(fname, 'back')
                         continue
-                    self.copy(fname, fdate)
+                    self.copy(fname)
                 except Empty:
                     continue
                 except FileNotFoundError:
@@ -230,7 +282,11 @@ class SampleMover:
             self.shutdown_event.set()
 
 
-def run():
+def run() -> None:
+    """Main function of the application
+
+    Start `SampleMover` thread and wait until it finishes
+    """
     args = parse_args()
     assert all(
         map(lambda d: os.path.isdir(d), [args.source, args.target])
