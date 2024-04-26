@@ -353,6 +353,7 @@ class Sample(Base):
     filter_id = Column(String)
     length = Column(Float)
     tic = Column(Float)
+    polarity = Column(String(1))
     range = Column(JSON)
     mz_calibration = Column(JSON)
     datetime = Column(TIMESTAMP)

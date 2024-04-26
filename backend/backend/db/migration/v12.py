@@ -61,3 +61,40 @@ def run():
                 )
                 """
             )
+
+        # Step 4 - Drop old sample_view
+        new_conn.cursor().execute(
+            """--sql
+            DROP VIEW IF EXISTS sample_view;
+            """
+        )
+
+        # Step 5 - Create new sample_view including polarity
+        new_conn.cursor().execute(
+            """--sql
+            CREATE VIEW sample_view AS
+            SELECT
+                sample_item.sample_item_id,
+                sample_file.sample_file_id,
+                sample_item.sample_batch_id,
+                sample_item.sample_item_name,
+                sample_file.instrument,
+                sample_item.filename,
+                sample_item.sample_item_type,
+                sample_item.sample_item_attributes,
+                sample_item.filter_id,
+                sample_file.length,
+                sample_file.tic,
+                sample_file.range,
+                sample_file.mz_calibration,
+                sample_file.datetime,
+                sample_file.datetime_utc,
+                sample_item.sample_item_utc_created,
+                sample_item.sample_item_utc_modified,
+                sample_file.polarity
+            FROM
+                sample_item
+            JOIN
+                sample_file ON sample_item.filename = sample_file.filename
+            """
+        )
