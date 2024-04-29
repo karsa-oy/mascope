@@ -1,28 +1,30 @@
-from pydantic import BaseModel, Field, validator, ValidationError
+from pydantic import BaseModel, Field, validator
 from typing import Optional, Dict, List
 from datetime import timezone, datetime as dt
 
 
 class SampleFileBase(BaseModel):
     filename: str = Field(..., description="Name of the sample file")
-    instrument: Optional[str] = Field(
-        ..., description="Instrument associated with the file"
-    )
-    datetime: Optional[dt] = Field(
+    instrument: str = Field(..., description="Instrument associated with the file")
+    datetime: dt = Field(
         ..., description="Datetime (local) of creation of the sample file"
     )
-    datetime_utc: Optional[dt] = Field(
+    datetime_utc: dt = Field(
         ..., description="Datetime (UTC) of creation of the sample file"
     )
-    length: Optional[float] = Field(..., description="Length of the sample file")
-    range: Optional[List[float]] = Field(
-        ..., description="m/z range of the sample file"
-    )
-    mz_calibration: Optional[Dict] = Field(
+    length: float = Field(..., description="Length of the sample file")
+    range: List[float] = Field(..., description="m/z range of the sample file")
+    mz_calibration: Dict = Field(
         ..., description="m/z calibration function parameters of the sample file"
     )
-    tic: Optional[float] = Field(..., description="TIC of the sample file")
-    polarity: Optional[str] = Field(..., description="Polarity of the sample file")
+    tic: float = Field(..., description="TIC of the sample file")
+    polarity: str = Field(..., description="Polarity of the sample file")
+
+    @validator("polarity")
+    def validate_polarity(cls, v):
+        if v not in ["+", "-"]:
+            raise ValueError("Polarity must be '+' or '-'")
+        return v
 
 
 class SampleFileCreate(SampleFileBase):

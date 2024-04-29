@@ -34,15 +34,15 @@ export const useInstrumentStore = defineStore('instrument', () => {
   }
 
   async function loadAcquisitions(datetimeRange) {
-    const acquisitions = await getSampleFiles(datetimeRange)
-    if (!acquisitions) return
-    acquisitions.value = acquisitions
+    const sampleFiles = await getSampleFiles(datetimeRange)
+    if (!sampleFiles) return
+    acquisitions.value = sampleFiles
   }
 
   async function loadRecentAcquisitions() {
-    const recentAcquisitions = await getRecentSampleFiles()
-    if (!recentAcquisitions) return
-    recentAcquisitions.value = recentAcquisitions
+    const recentAcquisitionsData = await getRecentSampleFiles()
+    if (!recentAcquisitionsData) return
+    recentAcquisitions.value = recentAcquisitionsData
   }
 
   async function resetAcquisitionStatus() {
