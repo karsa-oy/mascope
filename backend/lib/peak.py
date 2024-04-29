@@ -8,7 +8,6 @@ Created on Wed Apr 17 13:45:17 2019
 import asyncio
 import os
 from concurrent.futures import ProcessPoolExecutor
-from itertools import compress
 
 import lmfit
 import numpy as np
@@ -148,21 +147,25 @@ async def detect_peaks(
     loop = asyncio.get_event_loop()
 
     if instrument_type == "orbi":
-        # Segment sum spectrum
-        non_zero_indices = segment_spec(sum_spec)
-        # Get mz/spectrum pairs to fit
-        specs_to_fit = [
-            (mz[chunk].values, sum_spec[chunk].values) for chunk in non_zero_indices
-        ]
-        u_list_np = np.array(u_list)
-        mask_u_list = []
-        for mz_to_fit, spec_to_fit in specs_to_fit:
-            # Mask for chunks crossing u_list ranges (u+-0.5)
-            mask_u_list.append(
-                np.any(np.abs(mz_to_fit - u_list_np.reshape(-1, 1)) <= 0.5)
-            )
-        # Filter list of chunks to fit based on mask_u_list boolean values
-        specs_to_fit = compress(specs_to_fit, mask_u_list)
+        # Stack mass ranges
+        u_range = np.vstack([u_list - 0.5, u_list + 0.5])
+        # Broadcast the u_range array to have the same shape as mz
+        u_range = u_range[:, :, np.newaxis]
+        # Create boolean masks indicating which elements of spec fall within each range
+        mask_u_list = (mz.values >= u_range[0]) & (mz.values <= u_range[1])
+        mask_u_list = mask_u_list.any(axis=0)
+        # Update mz and spec
+        mz = mz.values[mask_u_list]
+        sum_spec = sum_spec.values[mask_u_list]
+
+        if sum_spec.size == 0:
+            # Nothing to fit
+            specs_to_fit = []
+        else:
+            # Get mz/spectrum pairs to fit from segmented spectrum
+            specs_to_fit = [
+                (mz[chunk], sum_spec[chunk]) for chunk in segment_spec(sum_spec)
+            ]
     if instrument_type == "tof":
         specs_to_fit = [
             (
