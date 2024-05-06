@@ -71,6 +71,17 @@ class H5Streamer(BaseGenerator, KInstrument):
         }
 
     @property
+    def polarity(self) -> str:
+        """Ion polarity
+
+        :return: Return either "+" or "-"
+        :rtype: str
+        """
+        with h5py.File(self.desc.currentDataFileName, "r") as f:
+            polarity_str = f.attrs["IonMode"].decode()
+        return "-" if polarity_str == "negative" else "+"
+
+    @property
     def tps_info(self):
         """List of TPS  names"""
         return self._get_tps_info()
@@ -256,11 +267,6 @@ class H5Streamer(BaseGenerator, KInstrument):
                 self.desc.currentDataFileName = file_to_stream
                 self.desc.iBuf = 0
                 self.desc.iWrite = 0
-                with h5py.File(file_to_stream, "r") as f:
-                    polarity_str = f.attrs["IonMode"].decode()
-                    self.desc.negativeIonMode = (
-                        True if polarity_str == "negative" else False
-                    )
             except Empty:
                 continue
             # Start streaming

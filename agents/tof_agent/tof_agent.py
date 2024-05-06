@@ -122,12 +122,33 @@ async def streamer_processor(streamer):
 
         # Main loop
 
+    def format_filename(generator_data: dict) -> str:
+        """Format raw filename (from data acquisition software) into Mascope sample file name
+
+        - Replace white space with underscore
+        - Append filename with polarity character (+/-)
+
+        :param generator_data: Data object from the generator thread, must contain "filename" key
+        :type generator_data: dict
+        :return: Formatted filename
+        :rtype: str
+        """
+        formatted_filename = generator_data["filename"].replace(" ", "_")
+        formatted_filename = "_".join([formatted_filename, generator_data["polarity"]])
+        return formatted_filename
+
     while not streamer.shutdown_event.is_set():
         try:
+            # Check the queue for new data
             spec_data = streamer.spec_queue.get_nowait()
+            # Format filename
+            spec_data.update({"filename": format_filename(spec_data)})
+            # Handle spectrum data
             success = await handle_spec_data(spec_data)
             if success and hasattr(streamer, "tps_queue"):
                 tps_data = streamer.tps_queue.get()
+                # Format filename
+                tps_data.update({"filename": format_filename(tps_data)})
                 await handle_tps_data(tps_data)
         except Empty:
             await asyncio.sleep(0.1)

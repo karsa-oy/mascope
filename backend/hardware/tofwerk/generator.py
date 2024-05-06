@@ -61,15 +61,6 @@ class BaseGenerator(Thread):
         )
 
     @property
-    def polarity(self) -> str:
-        """Ion polarity
-
-        :return: Return either "+" or "-"
-        :rtype: str
-        """
-        return "-" if self.desc.negativeIonMode else "+"
-
-    @property
     def progress(self):
         # TofDaqStreamer progress
         if not self.active.is_set():

@@ -22,6 +22,7 @@ from .lib.TofDaq import (
     TwCleanupDll,
     TwDaqActive,
     TwGetBufTimeFromShMem,
+    TwGetDaqParameter,
     TwGetDescriptor,
     TwGetRegUserDataDesc,
     TwGetSpecXaxisFromShMem,
@@ -103,6 +104,16 @@ class TofDaqStreamer(BaseGenerator):
             "par": self.desc.p[: self.desc.nbrMassCalibParams],
         }
 
+    @property
+    def polarity(self) -> str:
+        """Ion polarity
+
+        :return: Return either "+" or "-"
+        :rtype: str
+        """
+        neg_ion_mode = TwGetDaqParameter("NegativeIonMode".encode()).decode()
+        return "-" if neg_ion_mode == "true" else "+"
+
     def _get_and_feed_data(self):
         """Read data from the shared memory and put to queues"""
         # Get timestamp from TW shared memory
@@ -123,6 +134,7 @@ class TofDaqStreamer(BaseGenerator):
                 "t": float(ti),  # Timestamp [s]
                 "period": self.interval,  # Collection period [s]
                 "spec": spec.tobytes(),  # Serialized spectrum [float32]
+                "polarity": self.polarity,  # Ion polarity
             }
             # Feed
             self.spec_queue.put(spec_data)
