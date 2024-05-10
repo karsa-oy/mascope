@@ -16,7 +16,7 @@ from scipy.signal._peak_finding_utils import _select_by_peak_distance
 from scipy.stats import norm
 from scipy.integrate import simpson
 
-from .file_func import load_file, zarr_sdk
+from .file_func import load_file, zarr_sdk, get_sum_signal
 
 
 # Precompute sigma multiplier for peak generation
@@ -44,13 +44,8 @@ def calculate_peak_area(x: np.ndarray, peakshape: dict, peak: tuple) -> float:
 
 
 def calculate_tic(filename):
-    try:
-        sample_file_data = load_file(filename, vars=["sum_signal"])
-        sum_spectrum = sample_file_data.sum_signal
-    except FileNotFoundError:
-        sample_file_data = load_file(filename, vars=["signal"])
-        sum_spectrum = sample_file_data.signal.sum(dim="time")
-    tic = sum_spectrum.sum(dim="mz").compute().item()
+    sum_spec = get_sum_signal(filename)
+    tic = sum_spec.sum(dim="mz").compute().item()
     return tic
 
 
@@ -107,7 +102,9 @@ async def detect_peaks(
     old_peak_mzs = []
     old_peak_areas = []
     old_peak_heights = []
-    sample_file_data = load_file(filename, vars=["peak_areas", "peak_heights"])
+    sample_file_data = load_file(
+        filename, vars=["signal", "peak_areas", "peak_heights"]
+    )
     mz_top = sample_file_data.props["range"][1]
 
     if u_list is None:
@@ -137,10 +134,9 @@ async def detect_peaks(
 
     print(f"Fitting unit masses: {u_list}")
 
-    sample_file_data = load_file(filename, vars=["signal"])
+    sum_spec = get_sum_signal(filename)
+    mz = sum_spec.mz
 
-    mz = sample_file_data.mz
-    sum_spec = sample_file_data.signal.sum(dim="time").compute()
     cpu_cores = os.cpu_count()
     max_workers = max(1, cpu_cores // 2)
     executor = ProcessPoolExecutor(max_workers=max_workers)
@@ -241,7 +237,9 @@ async def detect_peaks(
 
     peak_areas = all_peak_areas[unique_peak_index]
     peak_heights = all_peak_heights[unique_peak_index]
-    peak_profiles = sample_file_data.signal.sel(mz=peak_mzs, method="nearest")
+    peak_profiles = sample_file_data.signal.interpolate_na(
+        dim="mz", method="linear"
+    ).sel(mz=peak_mzs, method="nearest")
     peak_profiles["mz"] = peak_mzs
     peak_profiles_norm = peak_profiles / peak_profiles.sum(dim="time")
     peak_profiles_area = peak_profiles_norm * peak_areas.reshape(-1, 1)
@@ -547,14 +545,16 @@ def gen_peak(x, ppos, phei, pres, ps, trim_borders=False):
         If trim_borders=False returns an array of values corresponding to
         input parameter 'x'. Otherwise returns tuple with new x and the peak.
     """
-    ps_x = np.array(ps["x"])
-    ps_y = np.array(ps["y"])
-
     sigma = ppos / pres / SIGMA_MULTIPLIER
-    xi = ps_x * sigma + ppos
-    yi = ps_y / np.max(ps["y"]) * phei
+
+    # Rescale peak shape
+    xi = np.array(ps["x"]) * sigma + ppos
+    yi = np.array(ps["y"]) / np.max(ps["y"]) * phei
+
+    # Interpolate to a new x scale
     spline = interp1d(xi, yi, fill_value="extrapolate")
     peak = spline(x)
+
     peak[np.isnan(peak)] = 0
     peak[peak < 0] = 0
 
@@ -564,8 +564,8 @@ def gen_peak(x, ppos, phei, pres, ps, trim_borders=False):
         j = np.argmax(peak[::-1] >= thr)
         j = len(x) - j if j > 0 else -1
         return x[i:j], peak[i:j]
-    else:
-        return peak
+
+    return peak
 
 
 def gen_peak_kernel(params, x, ps):

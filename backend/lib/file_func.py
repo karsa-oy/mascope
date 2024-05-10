@@ -241,8 +241,12 @@ class zarr_sdk:
     def write_sum_signal_dataset(item):
         filename_base = item.props["filename"]
         filename_sum_signal = filename_to_zarr_path(filename_base, "sum_signal")
-        sample_file = load_file(filename_base, vars=["signal"])
-        sum_signal = sample_file.signal.sum(dim="time").compute()
+        # Interpolate missing values in mz dimension using linear method.
+        sum_signal = (
+            item.signal.interpolate_na(dim="mz", method="linear")
+            .sum(dim="time")
+            .compute()
+        )
         sum_signal_array = ExtendableDataArray(
             path=filename_sum_signal, array_module=np
         )
@@ -254,6 +258,26 @@ class zarr_sdk:
             },
             name="sum_signal",
         )
+
+
+def get_sum_signal(filename: str) -> xarray.core.dataarray.DataArray:
+    """Calculates the sum spectrum of a given filename
+
+    :param filename: Name of the target file
+    :type filename: str
+    :return: Sum signal/sum spectrum
+    :rtype: xarray.core.dataarray.DataArray
+    """
+    try:
+        # Load precomputed sum spectrum from zarr file
+        sum_signal = load_file(filename, vars=["sum_signal"]).sum_signal
+    except AttributeError:
+        # Load file data from a given filename and extract the signal data.
+        sample_file_data = load_file(filename, vars=["signal"])
+        # Write missing sum spectrum to file
+        zarr_sdk.write_sum_signal_dataset(sample_file_data)
+        sum_signal = load_file(filename, vars=["sum_signal"]).sum_signal
+    return sum_signal
 
 
 def filename_to_zarr_path(base_filename, variable):

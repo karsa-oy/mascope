@@ -9,3 +9,7 @@ __pycache__
 .debug_env
 
 backend/backend/service/file_converter_config/test.yaml
+.vscode/extensions.json
+.vscode/tasks.json
+backend/notebooks/profile_fitting.py
+backend/profile_master.austin

@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from sqlalchemy import asc, desc, func, select, delete, and_
 from typing import List, Optional
-from lib.file_func import load_file
+from lib.file_func import load_file, get_sum_spectrum
 from backend.db.id import gen_id
 from backend.db import async_session
 from ..utils.api_features import api_controller
@@ -42,8 +42,7 @@ async def compute_match_interferences(
     """
     try:
         # Step 1: Load the sample file and compute the summed spectrum
-        sample_file_data = load_file(filename, vars=["signal"])
-        sum_spectrum = sample_file_data.signal.sum(dim="time").compute()
+        sum_spectrum = get_sum_spectrum(filename)
 
         # Read instrument resolution function
         _, R = await read_instrument_functions(filename)
