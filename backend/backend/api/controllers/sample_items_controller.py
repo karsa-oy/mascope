@@ -7,7 +7,12 @@ from lib.file_func import get_instrument_type
 from backend.api_sio import sio
 from backend.db import async_session
 from backend.db.id import gen_id
-from ..utils.api_features import api_controller, api_controller_background_task
+from ..utils.api_features import (
+    api_controller,
+    api_controller_background_task,
+    emit_user_notification,
+    send_progress_user_notification,
+)
 from ..exceptions import NotFoundException
 from ..controllers.match_controller import match_sample_compute
 from .calibration_controller import calibration_mz_calibrate_sample
@@ -28,6 +33,9 @@ from ..models.pydantic_models.calibration_pydantic_model import (
 )
 from ..models.pydantic_models.sample_pydantic_model import (
     AlarmsList,
+)
+from ..models.pydantic_models.user_notification_pydantic_model import (
+    UserNotification,
 )
 
 
@@ -174,17 +182,24 @@ async def create_sample_item(
         await session.commit()
         await session.refresh(new_sample_item)
 
-    # Step 4: Emit event if independent transaction
-    # TODO_notifications refactor onSampleItemCreated
-    if independent_transaction:
-        await sio.emit(
-            "sample_item_created",
-            new_sample_item.sample_item_id,
-            room=new_sample_item.sample_batch_id,
-            namespace="/",
+        # Step 4: Emit create_sample_item event if independent transaction
+        # TODO_notifications refactor onSampleItemCreated
+        notification = UserNotification(
+            process_id=gen_id(8),
+            type="create_sample_item",
+            status="success",
+            message=f"Sample item record '{new_sample_item.sample_item_name}' created.",
+            data={
+                "sample_item_id": new_sample_item.sample_item_id,
+            },
         )
+        await emit_user_notification(notification, new_sample_item.sample_batch_id)
+
     # Step 5: Return the new sample item details
-    return new_sample_item.to_dict()
+    return {
+        "data": new_sample_item.to_dict(),
+        "message": f"Sample item '{new_sample_item.sample_item_name}' was created.",
+    }
 
 
 @api_controller()
@@ -228,13 +243,17 @@ async def update_sample_item(
         await session.commit()
         await session.refresh(existing_sample_item)
 
-        # Step 5: Emit socket.io events
-        await sio.emit(
-            "sample_batch_reload",
-            room=existing_sample_item.sample_batch_id,
-            namespace="/",
-        )
-        return existing_sample_item.to_dict()
+    # Step 5: Emit socket.io events
+    # TODO_reload do we need to reload the entire batch?
+    await sio.emit(
+        "sample_batch_reload",
+        room=existing_sample_item.sample_batch_id,
+        namespace="/",
+    )
+    return {
+        "data": existing_sample_item.to_dict(),
+        "message": f"Sample '{existing_sample_item.sample_item_name}' was updated.",
+    }
 
 
 @api_controller()
@@ -256,7 +275,6 @@ async def delete_sample_item(sample_item_id: str):
         sample_item = await session.get(SampleItem, sample_item_id)
         if not sample_item:
             raise NotFoundException(f"Sample item with ID '{sample_item_id}' not found")
-
         # Step 2: Delete the sample item and commit changes
         await session.delete(sample_item)
         await session.commit()
@@ -267,19 +285,15 @@ async def delete_sample_item(sample_item_id: str):
         namespace="/",
     )
 
+    return {
+        "message": f"Sample item '{sample_item.sample_item_name}' was deleted.",
+    }
+
 
 @api_controller_background_task(
-    success_emit_events=[
-        ("copy_finished", "sid"),
-    ],
-    error_emit_events=[
-        ("copy_finished", "sid"),
-    ],
-    default_payload={
-        "action": "copy",
-        "type": "sample",
-    },
-    success_message="Sample item was successfully copied",
+    success_notification_rooms=["sid"],
+    success_reload=[("sample_batch_reload", "sample_batch_id")],
+    error_notification_rooms=["sid"],
 )
 async def copy_sample_item(
     sample_item_id: str,
@@ -288,21 +302,25 @@ async def copy_sample_item(
     independent_transaction: bool = False,
     background_tasks: BackgroundTasks = None,
     sid=None,
+    process_id=None,
+    parent_id=None,
 ) -> dict:
     """
-    Copies a sample item to a new sample batch with a new name. May me independent operation or a part of the copy sample batch operation.
-    The function duplicates the specified sample item and associates the new copy with a specified sample batch.
-    Copies matches, match interferences of the original sample if part of a larger copy batch operation, since targets and ionization mechanisms are the same for original batch and new batch.
-    Computes matches if it's an independent operation, since the targets and ionization mechanisms may differ between original batch and new batch.
+    The function copies the specified sample item and associates the new copy with a specified sample batch.
+    May be a part of the copy sample batch operation or independent.
+    Copies matches, match interferences of the original sample if part of a larger copy batch operation
+    or if it is copied to the same batch, since targets and ionization mechanisms are the same for original batch and new batch.
+    Computes matches if it's an independent operation and target and original batch differ,
+    since the targets and ionization mechanisms may differ between original batch and new batch.
 
 
     Steps:
     1. Validate the batch into which the sample is being copied.
     2. Fetch and validate the original sample item from the database.
     3. Create and add to session a new sample item with updated information.
-    4. Copy match and match interference records when called as part of copy_sample_batch.
+    4. Copy matches and match interferences if copying to the same batch or as part of a larger copy batch operation.
     5. Commit the transaction to the database.
-    6. Create task to compute the sample match data when called independently.
+    6. If an independent operation, compute matches due to target changes.
 
     :param sample_item_id: ID of the original sample item to be copied.
     :type sample_item_id: str
@@ -363,8 +381,11 @@ async def copy_sample_item(
         new_sample_item = SampleItem(**new_sample_item_data)
         session.add(new_sample_item)
 
-        # Steps 4: Copy Match and MatchInterference records when called as part of copy_sample_batch
-        if not independent_transaction and not background_tasks:
+        # Steps 4: Copy match records when called as part of copy_sample_batch or if sample is copied within the same batch
+        if (
+            not independent_transaction
+            or original_sample_item.sample_batch_id == sample_batch_id
+        ):
             # Copy related Match records
             for match in original_sample_item.match:
                 new_match_data = {
@@ -400,8 +421,11 @@ async def copy_sample_item(
         await session.commit()
         await session.refresh(new_sample_item)
 
-    # Step 6: Create task to compute the sample match data when called independently.
-    if independent_transaction and background_tasks:
+    # Step 6: Create task to compute the sample match data when called independently and not withing the same batch.
+    if (
+        independent_transaction
+        and original_sample_item.sample_batch_id != sample_batch_id
+    ):
         background_tasks.add_task(
             match_sample_compute,
             sample_item_id=new_sample_item_id,
@@ -409,26 +433,26 @@ async def copy_sample_item(
             added_ionization_mechanism_ids=None,
             independent_transaction=independent_transaction,
             sid=sid,
+            process_id=process_id,
         )
 
-    return new_sample_item.to_dict()
+    # Step 7: Return the copied samle and message
+    return {
+        "data": new_sample_item.to_dict(),
+        "message": f"Sample '{new_sample_item.sample_item_name}' was successfully copied to sample batch '{batch.sample_batch_name}'.",
+        "_notification_data": {
+            "sample_item_id": new_sample_item_id,
+            "sample_batch_id": sample_batch_id,
+        },
+    }
 
 
 @api_controller_background_task(
-    success_emit_events=[
-        # ("sample_processing_finished", "sid"), #TODO_notifications should we use sid for success_emit_events notifications?
-        ("sample_processing_finished", "sample_batch_id"),
-        ("sample_batch_reload", "sample_batch_id"),
-    ],
-    error_emit_events=[
-        # ("sample_processing_finished", "sid"),  #TODO_notifications must use sid for error_emit_events notifications?
-        ("sample_processing_finished", "sample_batch_id"),
-    ],
-    default_payload={
-        "action": "process",
-        "type": "sample",
-    },
-    success_message="Sample processing was successfully finished",
+    # success_notification_rooms=["sample_batch_id"],  # TEMP for postman testing
+    success_notification_rooms=["sid"],
+    success_reload=[("sample_batch_reload", "sample_batch_id")],
+    error_notification_rooms=["sid"],
+    # error_notification_rooms=["sample_batch_id"],  # TEMP for postman testing
 )
 async def process_sample_item(
     sample_item: SampleItemCreate,
@@ -436,6 +460,7 @@ async def process_sample_item(
     alarms_list: AlarmsList = AlarmsList(),
     independent_transaction: bool = False,
     sid=None,
+    process_id=None,
 ) -> dict:
     """
     Automates the process of sample item creation, calibration, and match computation
@@ -464,26 +489,69 @@ async def process_sample_item(
     :return: Details of the processed sample including matches.
     :rtype: dict
     """
+    notification = UserNotification(
+        process_id=process_id,
+        type="process_sample_item",
+        status="pending",
+        message=f"Processing sample item '{sample_item.sample_item_name}', filename '{sample_item.filename}'.",
+        # NOTE: Set the internal metadata for the pending user_notifications like
+        # room_ids and sid of the user.
+        # Internal metadata will be cleaned up the from data in send_progress_user_notification.
+        data={
+            "filename": sample_item.filename,
+            "sample_batch_id": sample_item.sample_batch_id,
+            "_room_ids": [sid],
+            # "_room_ids": [sample_item.sample_batch_id],  # TEMP for postman testing
+            "_sid": sid,
+        },
+    )
+    await send_progress_user_notification(notification, 0.1)
+
     # Step 1: Create the sample item
     # (not enitting sample_item_created since by default independent_transaction is False)
-    created_sample_item = await create_sample_item(sample_item)
+    create_sample_result = await create_sample_item(sample_item)
+    created_sample_item = create_sample_result.get("data")
     sample_item_id = created_sample_item["sample_item_id"]
+
+    notification.message = f"Sample '{sample_item.sample_item_name}' record created with ID: {sample_item_id}."
+    notification.data = {
+        "sample_item_id": sample_item_id,
+        "filename": sample_item.filename,
+        "sample_batch_id": sample_item.sample_batch_id,
+        "_room_ids": [sid],
+        # "_room_ids": [sample_item.sample_batch_id],  # TEMP for postman testing
+        "_sid": sid,
+    }
+    await send_progress_user_notification(notification, 0.2)
 
     # Step 2: Calibrate the sample item if instrument is TOF
     if get_instrument_type(created_sample_item["filename"]) == "tof":
-        calibration_result = await calibration_mz_calibrate_sample(
-            sample_item_id=sample_item_id, params=mz_calibration_params
+        await calibration_mz_calibrate_sample(
+            sample_item_id=sample_item_id,
+            params=mz_calibration_params,
+            sid=sid,
+            process_id=gen_id(8),
+            parent_id=process_id,
         )
-        # TODO_calibration_refact refactor error handling and independent_transaction logic
-        if calibration_result["status"] != "calibrated":
-            raise RuntimeError(
-                f"Failed to calibrate sample '{created_sample_item['sample_item_name']}'"
-            )
+
+        notification.message = (
+            f"Sample '{sample_item.sample_item_name}' m/z calibrated."
+        )
+        await send_progress_user_notification(notification, 0.6)
 
     # Step 3: Compute matches if calibration is successful
     await match_sample_compute(
         sample_item_id=sample_item_id,
+        independent_transaction=False,
+        sid=sid,
+        process_id=gen_id(8),
+        parent_id=process_id,
     )
+
+    notification.message = (
+        f"Matches computed for sample '{sample_item.sample_item_name}'."
+    )
+    await send_progress_user_notification(notification, 0.9)
 
     # Step 4: Fetch updated sample details including match data
     sample = await get_sample(
@@ -492,7 +560,13 @@ async def process_sample_item(
         sample_matches_info=True,
     )
 
-    # TODO_data wrapper
-    # Sample is returned so that api_controller_background_task wrapper would have access
-    # to the required emit_events rooms
-    return sample
+    # Step 5: Return rematched sample and message
+    return {
+        "data": sample,
+        "message": f"Sample '{sample['sample_item_name']}' was successfully processed.",
+        "_notification_data": {
+            "sample_item_id": sample_item_id,
+            "filename": sample["filename"],
+            "sample_batch_id": sample["sample_batch_id"],
+        },
+    }

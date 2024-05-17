@@ -1,38 +1,134 @@
+from copy import deepcopy
 from functools import wraps
+from typing import Callable, Any, Dict, List, Tuple
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
-from typing import Callable, Any, Dict, List, Tuple
-from backend.api_sio import sio
 from lib.util import beautify_func_name
+from backend.api_sio import sio
+from backend.db.id import gen_id
 from ..exceptions import (
     process_exception,
     ApiException,
     handle_exception,
     api_e_response_json,
 )
+from ..models.pydantic_models.user_notification_pydantic_model import UserNotification
 
 
+# TODO_notification delete after refactoring
 async def emit_sio_event(
-    event_name: str, payload: dict = None, room: str = None, sid: str = None
+    event_name: str,
+    notification: dict = None,
+    room: str = None,
+    sid: str = None,
 ):
     """
     Utility function to emit a Socket.IO event to a specified room.
 
     :param event_name: The name of the Socket.IO event to emit.
-    :param payload: The data payload to send with the event.
+    :param notification: The notification to send with the event.
     :param room: The room to which the event should be emitted.
     :param sid: Optional. The session ID of the client. Used to send direct messages if needed.
     """
-    # Emit without payload if event_name ends with '_reload'
+    # Emit without notification if event_name ends with '_reload'
     if event_name.endswith("_reload"):
         await sio.emit(event_name, room=room, namespace="/")
     else:
         # Emit the event to the specified room
-        await sio.emit(event_name, payload, room=room, namespace="/")
+        await sio.emit(event_name, notification, room=room, namespace="/")
 
         # Check if the user has moved from the room; if so, send them a direct message
         if sid and room != sid and room not in sio.rooms(sid, namespace="/"):
-            await sio.emit(event_name, payload, room=sid, namespace="/")
+            await sio.emit(event_name, notification, room=sid, namespace="/")
+
+
+async def send_progress_user_notification(
+    notification: UserNotification, increment: float = None
+):
+    # Create a deep copy of the notification to ensure the original is not modified
+    notification_copy = deepcopy(notification)
+
+    # Extract internal metadata and clean up the data dictionary
+    room_ids = notification_copy.data.pop("_room_ids", [])
+    instrument_room = notification_copy.data.pop("_instrument_room", None)
+    sid = notification_copy.data.pop("_sid", None)
+
+    total_samples = notification_copy.data.pop("_total_samples", None)
+    item_index = notification_copy.data.pop("_item_index", None)
+
+    # total_batches = notification_copy.data.pop("_total_batches", None)
+    batch_weight = notification_copy.data.pop("_batch_weight", None)
+    batch_index = notification_copy.data.pop("_batch_index", None)
+
+    # Clear any keys that start with an underscore as they are meant for internal use only
+    keys_to_remove = [
+        key for key in notification_copy.data.keys() if key.startswith("_")
+    ]
+    for key in keys_to_remove:
+        notification_copy.data.pop(key, None)
+
+    # If no other data remains, set data to None
+    if not notification_copy.data:
+        notification_copy.data = None
+
+    # Calculate progress based on the notification type and provided increment
+    if (
+        notification_copy.type
+        in [
+            "match_sample_compute",
+            "calibration_mz_fit",
+            "calibration_mz_apply",
+            "calibration_mz_calibrate_sample",
+            "import_sample_items",
+            "process_sample_item",
+        ]
+        and increment
+    ):
+        notification_copy.progress = increment * 100
+    if notification_copy.type == "match_batch_compute":
+        if total_samples is not None and item_index is not None:
+            notification_copy.progress = (
+                (item_index + increment) / total_samples
+            ) * 100
+            notification_copy.message = f"Computing sample batch matches, processing sample {item_index + 1}/{total_samples}"
+    if notification_copy.type == "rematch_batches":
+        notification_copy.progress = (batch_index - 1 + increment) * batch_weight * 100
+    if notification_copy.type == "sample_batch_export_peaks":
+        if total_samples is not None and item_index is not None:
+            notification_copy.progress = (
+                (item_index + increment) / total_samples
+            ) * 100
+            notification_copy.message = f"Exporting peak data, processing sample {item_index + 1}/{total_samples}"
+
+    # Emit the notification to all specified rooms
+    for room_id in room_ids:
+        await emit_user_notification(notification_copy, room_id, sid)
+    # for istrument room don't check if the user has moved from the room -> no sid is provided
+    if instrument_room:
+        await emit_user_notification(notification_copy, instrument_room)
+
+
+async def emit_user_notification(
+    notification: UserNotification = None,
+    room_id: str = None,
+    sid: str = None,
+):
+    """
+    Utility function to emit a Socket.IO event to a specified room_id.
+
+    :param notification: The notification to send with the event.
+    :param room_id: The room to which the event should be emitted.
+    :param sid: Optional. The session ID of the client. Used to send direct messages if needed.
+    """
+    notification_dict = notification.dict(exclude_none=True)
+    if room_id:
+        await sio.emit(
+            "user_notification", notification_dict, room=room_id, namespace="/"
+        )
+
+    # Check if the user has moved from the room; if so, send them a direct message
+    if sid and room_id != sid and room_id not in sio.rooms(sid, namespace="/"):
+        await sio.emit("user_notification", notification_dict, room=sid, namespace="/")
 
 
 def api_controller(emit_reload_events: List[Tuple[str, str]] = [], error_message=None):
@@ -65,7 +161,9 @@ def api_controller(emit_reload_events: List[Tuple[str, str]] = [], error_message
                     # Emit reload events
                     for event_name, room_key in emit_reload_events:
                         room_id = (
-                            kwargs.get(room_key) or result.get(room_key)
+                            kwargs.get(room_key)
+                            or result.get(room_key)
+                            or result.get("data").get(room_key)
                             if room_key
                             else None
                         )
@@ -92,10 +190,11 @@ def api_controller(emit_reload_events: List[Tuple[str, str]] = [], error_message
 
 
 def api_route(
-    status_code_success: int = 200,
+    status_code: int = 200,
     include_data: bool = True,
     include_message: bool = False,
     success_message: str = None,
+    error_message: str = None,
 ):
     """
     A decorator for route handler functions to standardize the response structure and handle exceptions.
@@ -108,12 +207,12 @@ def api_route(
     a data payload, and addition of custom success messages.
 
     Usage:
-    @api_route(status_code_success=201, include_message=True, success_message="Entity created successfully")
+    @api_route(status_code=201, include_message=True, success_message="Entity created successfully")
     async def your_route_handler(...):
         # Your handler implementation
 
-    :param status_code_success: HTTP status code to be used for successful responses, defaults to 200.
-    :type status_code_success: int, optional
+    :param status_code: HTTP status code to be used for successful responses, defaults to 200.
+    :type status_code: int, optional
     :param include_data: Flag to include the result of the route handler as encoded json object in the response, defaults to True.
     :type include_data: bool, optional
     :param include_message: Flag to include a success message in the response, defaults to False.
@@ -121,6 +220,8 @@ def api_route(
     :param success_message: Custom success message to include in the response if include_message is True.
                             Defaults to a generic "Operation successful" message if not provided.
     :type success_message: str, optional
+    :param error_message: Custom error message to include in the response if include_message is True.
+    :type error_message: str, optional
     :return: The wrapped route handler function with standardized response formatting and exception handling.
     :rtype: Callable
     """
@@ -130,20 +231,41 @@ def api_route(
         async def wrapper(*args, **kwargs):
             try:
                 result = await func(*args, **kwargs)
+                headers = {}
+                if result is not None and "process_id" in result:
+                    headers["Process-ID"] = result.pop(
+                        "process_id"
+                    )  # Move process_id to headers
+
                 content: Dict[str, Any] = {}
+                if include_data:
+                    content.update(jsonable_encoder(result))
                 if include_message:
-                    content["message"] = success_message or "Operation successful"
-                    # Add resultmessage_logs if available
+                    message = result.get("message") if result else None
+                    content["message"] = (
+                        message or success_message or "Operation successful"
+                    )
                     message_logs = result.get("message_logs") if result else None
                     if message_logs is not None:
                         content["message_logs"] = message_logs
-                if include_data:
-                    content.update(jsonable_encoder(result))
-                return JSONResponse(status_code=status_code_success, content=content)
+                return JSONResponse(
+                    status_code=status_code,
+                    content=content,
+                    headers=headers,
+                )
+
+                # TODO_notifications move message forming to controllers, example delete_sample_item
+                # return JSONResponse(
+                #     status_code=status_code,
+                #     content=jsonable_encoder(result),
+                #     headers=headers,
+                # )
             except ApiException as e:
                 return api_e_response_json(e)
             except Exception as e:
-                context_message = f"Failed to {beautify_func_name(func.__name__, 3)}"
+                context_message = (
+                    error_message or f"Failed to {beautify_func_name(func.__name__, 3)}"
+                )
                 return handle_exception(e, context_message)
 
         return wrapper
@@ -151,12 +273,35 @@ def api_route(
     return decorator
 
 
+async def handle_reloads(reload_events, kwargs, result):
+    """Emit reload events based on the given configurations."""
+    for event_name, room in reload_events:
+        room_id = kwargs.get(room)
+        if not room_id and result:
+            room_id = result.get(room) or result.get("data").get(room)
+        if room_id is not None:
+            await sio.emit(event_name, room=room_id, namespace="/")
+
+
+async def handle_notifications(rooms, notification, kwargs, result, sid):
+    """Emit notifications to specified rooms."""
+    for room in rooms:
+        room_id = kwargs.get(room)
+        if not room_id and result:
+            # TODO_data wrapper
+            room_id = result.get(room) or result.get("data").get(room)
+        # for istrument room don't check if the user has moved from the room -> no sid is provided
+        if room_id and room == "instrument":
+            await emit_user_notification(notification, room_id)
+        if room_id is not None and room != "instrument":
+            await emit_user_notification(notification, room_id, sid)
+
+
 def api_controller_background_task(
-    success_emit_events: List[Tuple[str, str]] = [],
-    error_emit_events: List[Tuple[str, str]] = [],
-    default_payload: dict = None,
-    success_message: str = None,
-    error_message: str = None,
+    success_notification_rooms: List[str] = [],
+    success_reload: List[Tuple[str, str]] = [],
+    error_notification_rooms: List[str] = [],
+    error_reload: List[Tuple[str, str]] = [],
 ):
     """
     A decorator for background task controller functions to standardize response structure, handle exceptions, and emit Socket.IO events.
@@ -173,7 +318,7 @@ def api_controller_background_task(
         @api_controller_background_task(
             success_emit_events=[("event_name_success", "room_key_success")],
             error_emit_events=[("event_name_failure", "room_key_failure")],
-            default_payload={"initial": "data"},  TODO_notifications the pydantic model can be used
+            default_payload={"initial": "data"},  TODO the pydantic model can be used
             success_message="Task completed successfully",
             error_message="Task failed"
         )
@@ -198,88 +343,97 @@ def api_controller_background_task(
         async def wrapper(*args, **kwargs):
             sid = kwargs.get("sid")
             independent_transaction = kwargs.get("independent_transaction", False)
-            payload = default_payload or {}
+            process_id = kwargs.get("process_id", gen_id(8))  # Generate if not provided
+            parent_id = kwargs.get("parent_id", None)
 
+            notification = UserNotification(
+                process_id=process_id,
+                parent_id=parent_id,
+                progress=100,
+                type=func.__name__,
+                status="pending",
+                message=f"{func.__name__.replace('_', ' ').title()} is processing.",
+            )
             try:
-                # Execute the wrapped function
                 result = await func(*args, **kwargs)
-                # Update the payload and emit success events if this is an independent transaction
-                # TODO_notifications handle adding "payload data" to payload, imlement in match resource
-                if independent_transaction:
-                    # Update the payload with success details
-                    payload.update(
-                        {
-                            "status": "success",
-                            "progress_percentage": 100,
-                            "message": success_message
-                            or f"{beautify_func_name(func.__name__)} completed successfully.",
-                        }
-                    )
+                # Update notification on success
+                notification.status = "success"
+                notification.message = result.get("message") if result else None
+                notification.data = result.get("_notification_data", None) if result else None
 
-                    # Emit success events
-                    for event_name, room_key in success_emit_events:
-                        room_id = (
-                            # TODO_data wrapper
-                            kwargs.get(room_key) or result.get(room_key)
-                            if room_key
-                            else None
-                        )
-                        if room_id:
-                            await emit_sio_event(event_name, payload, room_id, sid)
+                # Handle success user notifications
+                await handle_notifications(
+                    success_notification_rooms, notification, kwargs, result, sid
+                )
+                # Handle success reload notifications
+                # Emit reload events for remat_batch even if called as a part of remath_batches
+                if independent_transaction or (
+                    func.__name__ == "rematch_batch" and parent_id
+                ):
+                    await handle_reloads(success_reload, kwargs, result)
 
                 return result
-
             except ApiException as e:
-                # Update the payload if this is an independent transaction
-                if independent_transaction:
-                    # Directly emit the error payload for already processed exceptions
-                    payload.update(
-                        {
-                            "status": "error",
-                            "progress_percentage": 100,
-                            "message": f"Failed to {beautify_func_name(func.__name__)}. {e.user_message}",
-                            "error": e.tech_message,
-                        }
+                if e.status_code == 200:
+                    # Handle warning notifications, status code 200
+                    notification.status = "warning"
+                    # notification.message = f"Warning during {beautify_func_name(func.__name__)}. {e.user_message}"
+                    notification.message = e.user_message
+                    notification.error = {"detail": e.tech_message}
+                    #  Emit warning user notifications for both independent and dependent transactions
+                    await handle_notifications(
+                        error_notification_rooms, notification, kwargs, None, sid
                     )
-                # If not an independent transaction, re-raise the ApiException
+                    if independent_transaction or (
+                        func.__name__ == "rematch_batch" and parent_id
+                    ):
+                        await handle_reloads(error_reload, kwargs, None)
+
+                    if not independent_transaction and parent_id:
+                        # Re-raise warning exceptions to be caught in parent handler
+                        user_message = f"Warning during {beautify_func_name(func.__name__)}. {e.user_message}"
+                        raise ApiException(user_message, e.tech_message, e.status_code)
                 else:
-                    # Handle already processed exceptions
-                    context_message = (
-                        error_message
-                        or f"Failed to {beautify_func_name(func.__name__)}"
-                    )
-                    user_message = f"{context_message}. {e.user_message}"
-                    raise ApiException(user_message, e.tech_message, e.status_code)
+                    # Update the payload with ApiException error details
+                    notification.status = "error"
+                    notification.message = f"Failed to {beautify_func_name(func.__name__)}.  {e.user_message}"
+                    notification.error = {"detail": e.tech_message}
+                    #  Emit error user notifications only if this is an independent transaction
+                    if independent_transaction:
+                        # NOTE: for the error_notification_rooms the sio room id should be provided
+                        # in the controller kwargs, since the result is not available
+                        await handle_notifications(
+                            error_notification_rooms, notification, kwargs, None, sid
+                        )
+                        await handle_reloads(error_reload, kwargs, None)
+                    # If not an independent transaction, re-raise the ApiException
+                    else:
+                        # Handle already processed exceptions
+                        context_message = (
+                            f"Failed to {beautify_func_name(func.__name__)}"
+                        )
+                        user_message = f"{context_message}. {e.user_message}"
+                        raise ApiException(user_message, e.tech_message, e.status_code)
 
             except Exception as e:
-                context_message = (
-                    error_message or f"Failed to {beautify_func_name(func.__name__)}"
-                )
+                context_message = f"Failed to {beautify_func_name(func.__name__)}"
                 api_exc = process_exception(e, context_message)
 
-                # Update the payload with error details if it is the independent transaction
+                #  Emit error user notifications only if this is an independent transaction
                 if independent_transaction:
                     # Update the payload with error details
-                    payload.update(
-                        {
-                            "status": "error",
-                            "progress_percentage": 100,
-                            "message": api_exc.user_message,
-                            "error": api_exc.tech_message,
-                        }
+                    notification.status = "error"
+                    notification.message = api_exc.user_message
+                    notification.error = {"detail": api_exc.tech_message}
+                    # NOTE: for the error_notification_rooms the sio room id should be provided
+                    # in the controller kwargs, since the result is not available
+                    await handle_notifications(
+                        error_notification_rooms, notification, kwargs, None, sid
                     )
+                    await handle_reloads(error_reload, kwargs, None)
                 # If not an independent transaction, re-raise the ApiException
                 else:
-                    raise api_exc
-
-            #  Emit error events only if this is an independent transaction
-            if independent_transaction:
-                # Emit error events
-                for event_name, room_key in error_emit_events:
-                    # for the error_emit_events the sio room id should be provided in the controller kwargs, since the result is not available
-                    room_id = kwargs.get(room_key)
-                    if room_id:
-                        await emit_sio_event(event_name, payload, room_id, sid)
+                    raise api_exc from e
 
         return wrapper
 

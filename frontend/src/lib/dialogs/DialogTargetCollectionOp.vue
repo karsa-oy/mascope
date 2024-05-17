@@ -1,0 +1,723 @@
+<script setup>
+import FloatLabel from 'primevue/floatlabel'
+import Select from 'primevue/select'
+import { useConfirm } from 'primevue/useconfirm'
+
+import { ref, reactive, computed, watch, watchEffect } from 'vue'
+
+import BaseClipboardContext from '@/lib/base/BaseClipboardContext.vue'
+
+import { api } from '@/api'
+import { useAppStore, useTargetsStore, useWorkspaceStore } from '@/stores'
+import { fromSpreadsheet, equals } from '@/lib/table'
+import { clone } from '@/lib/utils'
+
+const confirm = useConfirm()
+
+const appStore = useAppStore()
+const targetsStore = useTargetsStore()
+const workspaceStore = useWorkspaceStore()
+
+const action = defineModel('action')
+
+const props = defineProps({
+  collection: {
+    type: Object
+  }
+})
+const original = computed(() => props.collection ?? targetsStore.active)
+
+// dialog visibility reactivity
+const visible = ref(false)
+watch(action, (value) => {
+  visible.value = !!value
+})
+watch(visible, (value) => {
+  if (!value) {
+    action.value = null
+  }
+})
+
+const info = reactive({
+  id: null,
+  name: null,
+  desc: null,
+  type: null
+})
+const compounds = reactive({
+  loaded: [],
+  selected: [],
+  initial: [],
+  created: [],
+  deleted: []
+})
+const batches = reactive({
+  loaded: [],
+  selected: [],
+  initial: []
+})
+const selected = reactive({
+  workspace: null,
+  source: null, // for adding compounds
+  tab: null,
+  all: {
+    targets: false,
+    batches: false
+  }
+})
+const options = reactive({
+  deleteOrphans: true
+})
+const key = reactive({
+  targets: 0,
+  batches: 0
+})
+
+const columns = [
+  { field: 'target_compound_name', label: 'Name' },
+  { field: 'target_compound_formula', label: 'Formula' },
+  { field: 'cas_number', label: 'CAS' },
+  { field: 'status', label: 'Status' }
+]
+
+const title = computed(() => {
+  // Define the modal title based on the action
+  let title = ''
+  switch (action.value) {
+    case 'create':
+      title = `Create a new target collection ${info.name ?? ''}`
+      break
+    case 'update':
+      title = `Update target collection "${info.name}"`
+      break
+    case 'update_batches':
+      title = `Manage batches of "${info.name}" target collection`
+      break
+    case 'delete':
+      title = `Delete target collection "${info.name}"`
+      break
+  }
+  return title
+})
+
+const changes = computed(() =>
+  [
+    ...compounds.selected,
+    ...compounds.initial.filter(
+      (initial) =>
+        !compounds.selected.find(
+          (selected) => selected.target_compound_id == initial.target_compound_id
+        )
+    )
+  ].map((comp) => {
+    const selected = compounds.selected.some(
+      (selected) => selected.target_compound_id == comp.target_compound_id
+    )
+    const prexisting = compounds.initial.some(
+      (init) => init.target_compound_id == comp.target_compound_id
+    )
+    const created = compounds.created.some(
+      (created) => created.target_compound_id == comp.target_compound_id
+    )
+    const added = comp.target_compound_id && !prexisting
+    const removed = prexisting && !selected
+    let status
+    if (selected) {
+      if (created) {
+        status = '1 create'
+      } else if (added) {
+        status = '2 add'
+      } else if (prexisting) {
+        status = '3 keep'
+      }
+    } else {
+      if (removed) {
+        status = '4 remove'
+      }
+    }
+    return {
+      ...comp,
+      status
+    }
+  })
+)
+
+function remove(compound) {
+  compounds.selected = compounds.selected.filter(
+    (selected) => selected.target_compound_formula !== compound.target_compound_formula
+  )
+}
+function restore(compound) {
+  compounds.selected.push(compound)
+}
+
+watchEffect(async () => {
+  let pending = []
+  if (!selected.source || selected.source == 'Selection') {
+    return
+  } else if (selected.source === 'All') {
+    pending = targetsStore.getAllCompounds
+  } else if (selected.source) {
+    const id = targetsStore.getAllCollections.find(
+      ({ target_collection_name }) => target_collection_name == selected.source
+    ).target_collection_id
+    const collection = await targetsStore.getTargetCollection(id)
+    pending = collection?.target_compounds ?? []
+  }
+  if (pending.length) {
+    loadCompounds(pending)
+  }
+  // select all checkbox state
+  selected.all.targets =
+    compounds.loaded.length > 0
+      ? compounds.loaded.every((comp) =>
+          compounds.selected
+            .map(({ target_compound_id }) => target_compound_id)
+            .includes(comp.target_compound_id)
+        )
+      : false
+})
+function loadCompounds(data) {
+  const index = new Map(
+    [...compounds.selected, ...data].map((compound) => [
+      compound.target_compound_id ?? compound.target_compound_formula,
+      compound
+    ])
+  )
+  // reconcile with exisiting compounds
+  const reconciled = data.map(
+    (compound) =>
+      index.get(compound.target_compound_id ?? compound.target_compound_formula) ?? compound
+  )
+  if (selected.source !== 'Selection') {
+    compounds.loaded = reconciled
+  } else {
+    const unselected = (added) =>
+      !compounds.selected.find(
+        (selected) => selected.target_compound_formula == added.target_compound_formula
+      )
+    compounds.selected.push(...reconciled.filter(unselected))
+  }
+}
+function loadSpreadsheet({ data }) {
+  let prexisting = []
+  data.forEach((compound) => {
+    const record = targetsStore.targetCompoundsAll.find(
+      (comp) => comp.target_compound_formula === compound.target_compound_formula
+    )
+    if (record) {
+      prexisting.push(record)
+    } else {
+      const created = compounds.created.find(
+        ({ target_compound_formula }) => target_compound_formula == compound.target_compound_formula
+      )
+      if (!created) {
+        compounds.created.push(compound)
+        compounds.selected.push(compound)
+      }
+    }
+  })
+  loadCompounds(prexisting)
+}
+
+watchEffect(() => loadBatches(selected.workspace))
+
+async function loadBatches(workspace) {
+  if (workspace) {
+    const latest = await workspaceStore.getWorkspaceBatches(workspace.workspace_id)
+    // reconcile with existing data
+    batches.loaded = latest.map(
+      (batch) =>
+        batches.loaded.find(({ sample_batch_id }) => sample_batch_id === batch.sample_batch_id) ??
+        batch
+    )
+    // select all checkbox state
+    selected.all.batches =
+      batches.loaded.length > 0
+        ? batches.loaded.every((batch) =>
+            batches.selected
+              .map(({ sample_batch_id }) => sample_batch_id)
+              .includes(batch.sample_batch_id)
+          )
+        : false
+  }
+}
+
+function execute() {
+  const common = {
+    target_collection_name: info.name,
+    target_collection_description: info.desc,
+    target_collection_type: info.type
+  }
+  const target_collection_id = original.value?.target_collection_id
+  const target_compound_ids = compounds.selected.map(({ target_compound_id }) => target_compound_id)
+  const sample_batch_ids = batches.selected.map(({ sample_batch_id }) => sample_batch_id)
+  const target_compounds_create = compounds.created
+
+  switch (action.value) {
+    case 'create': {
+      targetsStore.createCollection({
+        ...common,
+        target_compound_ids,
+        sample_batch_ids,
+        target_compounds_create
+      })
+      break
+    }
+    case 'update': {
+      targetsStore.updateCollection({
+        ...common,
+        target_collection_id,
+        target_compound_ids,
+        target_compounds_create
+      })
+      break
+    }
+    case 'update_batches': {
+      targetsStore.updateCollection({
+        ...common,
+        target_collection_id,
+        sample_batch_ids
+      })
+      break
+    }
+    case 'delete': {
+      confirm.require({
+        header: 'Delete collection',
+        message: `Are you sure you want to delete '${info.name}' target collection?`,
+        rejectIcon: 'pi pi-times',
+        rejectLabel: 'Cancel',
+        acceptIcon: 'pi pi-trash',
+        acceptLabel: 'Delete',
+        accept: () => {
+          targetsStore.deleteCollection({
+            collectionId: info.id,
+            collectionName: info.name,
+            deleteOrphanCompounds: options.deleteOrphans
+          })
+          action.value = null
+        }
+      })
+      break
+    }
+  }
+  action.value = null
+}
+const executeLabel = computed(() => (action.value == 'delete' ? 'Delete' : 'Save'))
+const invalidated = computed(() => {
+  switch (action.value) {
+    case 'create':
+      return !info.name || !info.type || compounds.created.length + compounds.selected.length == 0
+
+    case 'update': {
+      const infoChanged =
+        info.name !== original.value.target_collection_name ||
+        info.desc !== original.value.target_collection_description ||
+        info.type !== original.value.target_collection_type
+      const compoundsChanged = !equals(compounds.initial, compounds.selected, 'target_compound_id')
+      return !(infoChanged || compoundsChanged)
+    }
+    case 'update_batches':
+      return equals(batches.initial, batches.selected, 'sample_batch_id')
+    default:
+      return false
+  }
+})
+
+watch(action, init)
+async function init(mode) {
+  if (!mode) {
+    return
+  }
+  selected.tab = 0
+  selected.source = 'Selection'
+  compounds.loaded = []
+  compounds.selected = []
+  compounds.initial = []
+  compounds.created = []
+  batches.loaded = []
+  batches.selected = []
+  if (mode.startsWith('update')) {
+    info.id = original.value?.target_collection_id
+    info.name = original.value?.target_collection_name
+    info.desc = original.value?.target_collection_description
+    info.type = original.value?.target_collection_type
+    compounds.selected = original.value?.target_compounds ?? original.value?.children ?? []
+  }
+  switch (mode) {
+    case 'create': {
+      info.id = ''
+      info.name = ''
+      info.desc = ''
+      info.type = null
+      selected.workspace = workspaceStore.active
+      break
+    }
+    case 'update_batches': {
+      selected.tab = 2
+      selected.workspace = workspaceStore.active
+      batches.selected = (
+        await api.request.read({
+          method: 'getTargetCollection',
+          body: original.value.target_collection_id
+        })
+      )?.sample_batches
+      break
+    }
+    case 'delete': {
+      info.id = original.value?.target_collection_id
+      info.name = original.value?.target_collection_name
+      options.deleteOrphans = true
+    }
+  }
+  compounds.initial = clone(compounds.selected)
+  batches.initial = clone(batches.selected)
+  loadBatches(selected.workspace)
+}
+</script>
+
+<template>
+  <Dialog v-model:visible="visible" :header="title" style="min-width: 900px; min-height: 600px">
+    <!-- create or update -->
+    <template v-if="['create', 'update', 'update_batches'].includes(action)">
+      <TabView v-model:activeIndex="selected.tab">
+        <TabPanel header="Info">
+          <FloatLabel>
+            <InputText
+              v-model="info.name"
+              id="target-collection-name"
+              :disabled="action == 'update_batches'"
+              required
+            />
+            <label for="target-collection-name">Name</label>
+          </FloatLabel>
+          <FloatLabel>
+            <InputText
+              v-model="info.desc"
+              id="target-collection-desc"
+              :disabled="action == 'update_batches'"
+            />
+            <label for="target-collection-desc">Description</label>
+          </FloatLabel>
+          <FloatLabel>
+            <Select
+              v-model="info.type"
+              :options="targetsStore.collectionTypes"
+              id="target-collection-type"
+              :disabled="action == 'update_batches'"
+              required
+            />
+            <label for="target-collection-type">Type</label>
+          </FloatLabel>
+        </TabPanel>
+        <!-- compounds -->
+        <TabPanel header="Compounds" :disabled="action == 'update_batches'">
+          <div class="row" style="min-height: 300px">
+            <Listbox
+              v-model="selected.source"
+              :options="[
+                'Selection',
+                'All',
+                ...targetsStore.getAllCollections
+                  .filter((coll) =>
+                    action !== 'create'
+                      ? coll.target_collection_id !== original.target_collection_id
+                      : true
+                  )
+                  .map((coll) => coll.target_collection_name)
+              ]"
+              id="target-collection-source"
+              style="min-width: 200px"
+            >
+              <template #option="slotProps">
+                <div style="display: flex; flex-flow: row; gap: 0.5rem; align-items: center">
+                  <Avatar
+                    :icon="`pi ${slotProps.option == 'Selection' ? 'pi-list-check' : 'pi-book'}`"
+                    shape="circle"
+                  />
+                  <span>{{ slotProps.option }}</span>
+                </div>
+              </template>
+            </Listbox>
+            <Panel>
+              <BaseClipboardContext
+                v-if="selected.source == 'Selection'"
+                info="Paste spreadsheet cells to add compounds"
+                @validated="loadSpreadsheet"
+                :parse="
+                  (text) => {
+                    const { rows } = fromSpreadsheet(text, [
+                      'target_compound_name',
+                      'target_compound_formula',
+                      'cas_number' // optional
+                    ])
+                    return rows
+                  }
+                "
+                :validate="
+                  (data) => {
+                    const cols = Object.keys(data[0]).length
+                    const rows = data.length
+                    if (cols == 1 && rows == 1) {
+                      return {
+                        valid: false,
+                        severity: 'warn',
+                        message: 'Please paste spreadsheet cells'
+                      }
+                    }
+                    const validCols = 2 <= cols && cols <= 3
+                    const validRows = data.map((row) => row?.target_compound_formula?.length > 0)
+                    const valid = validRows && validCols
+                    const messageCols = !validCols
+                      ? `You pasted ${cols} columns but 2 or 3 are expected`
+                      : null
+                    const messageRows = !validRows
+                      ? `Some rows are missing a formula, which is required`
+                      : null
+                    const message =
+                      messageCols ?? messageRows ?? `Pasted ${cols} columns and ${rows} rows`
+                    return {
+                      valid,
+                      severity: valid ? 'success' : 'warn',
+                      message
+                    }
+                  }
+                "
+              >
+                <DataTable
+                  dataKey="target_compound_formula"
+                  :value="changes"
+                  sortMode="multiple"
+                  :multiSortMeta="[
+                    { field: 'status', order: 1 },
+                    { field: 'target_compound_formula', order: 1 }
+                  ]"
+                  scrollable
+                  scrollHeight="300px"
+                  style="flex-grow: 1"
+                >
+                  <Column header="Status" field="status" key="status" columnKey="status" sortable>
+                    <template #body="slotProps">
+                      <InlineMessage v-if="slotProps.data.status == '1 create'" severity="success">
+                        Create
+                      </InlineMessage>
+                      <InlineMessage v-else-if="slotProps.data.status == '2 add'" severity="info">
+                        Add
+                      </InlineMessage>
+                      <InlineMessage
+                        v-else-if="slotProps.data.status == '3 keep'"
+                        severity="secondary"
+                        icon="pi pi-thumbtack"
+                      >
+                        Keep
+                      </InlineMessage>
+                      <InlineMessage
+                        v-else-if="slotProps.data.status == '4 remove'"
+                        severity="warn"
+                      >
+                        Remove
+                      </InlineMessage>
+                    </template>
+                  </Column>
+                  <Column
+                    v-for="col of columns.filter(({ field }) => field !== 'status')"
+                    :key="col.field"
+                    :field="col.field"
+                    :header="col.label"
+                    sortable
+                  />
+                  <Column headerStyle="width: 3rem">
+                    <template #body="slotProps">
+                      <Button
+                        v-if="slotProps.data.status == '4 remove'"
+                        @click="restore(slotProps.data)"
+                        icon="pi pi-plus"
+                        severity="secondary"
+                        text
+                      />
+                      <Button
+                        v-else
+                        @click="remove(slotProps.data)"
+                        icon="pi pi-times"
+                        severity="secondary"
+                        text
+                      />
+                    </template>
+                  </Column>
+                </DataTable>
+              </BaseClipboardContext>
+              <DataTable
+                v-else
+                :key="key.targets"
+                dataKey="target_compound_id"
+                v-model:selection="compounds.selected"
+                :value="compounds.loaded"
+                sortField="mz"
+                scrollable
+                scrollHeight="300px"
+                style="flex-grow: 1"
+              >
+                <Column selectionMode="multiple" header="" headerStyle="width: 3rem">
+                  <template #header>
+                    <Checkbox
+                      :binary="true"
+                      v-model="selected.all.targets"
+                      :disabled="compounds.loaded.length == 0"
+                      @update:modelValue="
+                        (select) => {
+                          if (select) {
+                            const selected = compounds.selected.map(
+                              ({ target_compound_formula }) => target_compound_formula
+                            )
+                            compounds.selected.push(
+                              ...compounds.loaded.filter(
+                                (loaded) => !selected.includes(loaded.target_compound_formula)
+                              )
+                            )
+                          } else {
+                            const loaded = compounds.loaded.map(
+                              ({ target_compound_formula }) => target_compound_formula
+                            )
+                            compounds.selected = compounds.selected.filter(
+                              (selected) => !loaded.includes(selected.target_compound_formula)
+                            )
+                          }
+                          key.targets += 1
+                        }
+                      "
+                      inputClass="custom"
+                    />
+                  </template>
+                </Column>
+                <Column
+                  v-for="col of columns.filter(({ field }) => field !== 'status')"
+                  :key="col.field"
+                  :field="col.field"
+                  :header="col.label"
+                  sortable
+                />
+              </DataTable>
+            </Panel>
+          </div>
+        </TabPanel>
+        <!-- batches -->
+        <TabPanel header="Batches" :disabled="action == 'update'">
+          <div class="row">
+            <Listbox
+              v-model="selected.workspace"
+              dataKey="workspace_id"
+              optionLabel="label"
+              :options="
+                appStore.workspaces
+                  .sort((a, b) => {
+                    // ensure the current workspace comes first
+                    if (a.workspace_id == workspaceStore.active.workspace_id) return -1
+                    if (b.workspace_id == workspaceStore.active.workspace_id) return 1
+                    return 0
+                  })
+                  .map((workspace, index) => ({
+                    // create labels, demarcating the current one
+                    ...workspace,
+                    label:
+                      index > 0 ? workspace.workspace_name : `${workspace.workspace_name} (current)`
+                  }))
+              "
+              style="min-width: 200px"
+            />
+            <!-- batches -->
+            <DataTable
+              :key="key.batches"
+              dataKey="sample_batch_id"
+              v-model:selection="batches.selected"
+              :value="batches.loaded"
+              scrollable
+              scrollHeight="300px"
+              tableStyle="min-width: 450px;"
+              style="flex-grow: 1"
+            >
+              <Column selectionMode="multiple" header="" headerStyle="width: 3rem">
+                <template #header>
+                  <Checkbox
+                    :binary="true"
+                    v-model="selected.all.batches"
+                    :disabled="batches.loaded.length == 0"
+                    @update:modelValue="
+                      (select) => {
+                        if (select) {
+                          const selected = batches.selected.map(
+                            ({ sample_batch_id }) => sample_batch_id
+                          )
+                          batches.selected.push(
+                            ...batches.loaded.filter(
+                              (loaded) => !selected.includes(loaded.sample_batch_id)
+                            )
+                          )
+                        } else {
+                          const loaded = batches.loaded.map(
+                            ({ sample_batch_id }) => sample_batch_id
+                          )
+                          batches.selected = batches.selected.filter(
+                            (selected) => !loaded.includes(selected.sample_batch_id)
+                          )
+                        }
+                        key.batches += 1
+                      }
+                    "
+                    inputClass="custom"
+                  />
+                </template>
+              </Column>
+              <Column header="Batch" field="sample_batch_name" />
+            </DataTable>
+          </div>
+        </TabPanel>
+      </TabView>
+    </template>
+    <!-- delete -->
+    <template v-else-if="action == 'delete'">
+      <p>
+        Would you like to keep or remove compounds from {{ info.name }}
+        that are not part of any other collection?
+      </p>
+      <div class="col">
+        <RadioButton v-model="options.deleteOrphans" :modelValue="false" name="delete-orphans" />
+        <label for=""> Delete the collection but keep the unique compounds </label>
+        <RadioButton v-model="options.deleteOrphans" :modelValue="true" name="delete-orphans" />
+        <label> Delete the collection and its unique compounds </label>
+      </div>
+    </template>
+    <!-- dialog menu -->
+    <menu>
+      <Button label="Cancel" severity="secondary" @click="action = null" />
+      <Button :label="executeLabel" @click="execute" :disabled="invalidated" />
+    </menu>
+  </Dialog>
+</template>
+
+<style scoped>
+.col {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.row > * {
+  min-height: 300px;
+}
+
+:deep(.p-panel-header) {
+  padding-top: 0;
+}
+:deep(.p-message) {
+  margin: 0;
+}
+:deep(.p-inline-message) {
+  font-size: smaller;
+}
+:deep(.p-datatable-column-header-content :not(.custom) + .p-checkbox-box) {
+  display: none;
+}
+
+:deep(.p-listbox-list-container) {
+  min-height: 300px;
+}
+</style>

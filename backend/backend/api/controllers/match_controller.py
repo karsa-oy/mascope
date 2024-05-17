@@ -8,16 +8,18 @@ This module contains all the functionalities and endpoints related to the matchi
 # Imports
 # -------------------------------------------------------------------
 import asyncio
-import pandas as pd
-from fastapi import HTTPException
 from typing import List, Optional
+import pandas as pd
 from sqlalchemy import select
 from backend.db import async_session
-from backend.api_sio import sio
-from ..utils.api_features import api_controller_background_task
-from ..exceptions import process_exception, ApiException
+from backend.db.id import gen_id
+from ..utils.api_features import (
+    api_controller,
+    api_controller_background_task,
+    send_progress_user_notification,
+)
+from ..exceptions import ApiException, NotFoundException
 from .samples_controller import get_sample, get_samples
-from .helpers_controller import emit_progress_update
 from .target_compounds_controller import get_target_compounds
 from .target_isotopes_controller import (
     get_target_isotopes,
@@ -39,12 +41,13 @@ from .match_interferences_controller import (
 from ..models.models import (
     Sample,
     SampleBatch,
-    SampleItem,
 )
 from ..models.pydantic_models.match_pydantic_model import (
     RematchBatchesBody,
     MatchComputeSample,
-    ProgressProperties,
+)
+from ..models.pydantic_models.user_notification_pydantic_model import (
+    UserNotification,
 )
 
 # TODO_configuration
@@ -56,10 +59,11 @@ DEFAULT_MIN_ISOTOPE_ABUNDANCE = 0.15
 # -------------------------------------------------------------------
 
 
+@api_controller()
 async def compute_sample_match(
     sample: MatchComputeSample,
     target_isotopes_df,
-    progress_properties: ProgressProperties = None,
+    notification: UserNotification = None,
 ):
     """
     Computes matches and match interferences for a given sample against a set of target isotopes.
@@ -78,67 +82,54 @@ async def compute_sample_match(
     :type sample: MatchComputeSample
     :param target_isotopes_df: A DataFrame containing target isotope information for match computation.
     :type target_isotopes_df: DataFrame
-    :param progress_properties: Optional parameters for tracking progress of match computation.
-    :type progress_properties: ProgressProperties, optional
+    :param notification: Optional notification for sending progress user notifications of match computation.
+    :type notification: UserNotification, optional
     :raises RuntimeError: If no match interferences or matches are found during computation.
     """
-    try:
-        # Step 1: Unpack the sample parameters for ease of use
-        sample_item_id = sample.sample_item_id
-        filename = sample.filename
+    # Step 1: Unpack the sample parameters for ease of use
+    sample_item_id = sample.sample_item_id
+    filename = sample.filename
 
-        #  Update progress if properties are provided (initial increment for setup/start).
-        if progress_properties:
-            await emit_progress_update(
-                progress_properties=progress_properties, increment=0.25
-            )
+    #  Sent progress user notificaton if notification is provided
+    if notification:
+        await send_progress_user_notification(notification, 0.25)
 
-        # Step 2: Compute match interferences for the given sample and target isotopes.
-        print("Computing match interferences for file: %s" % filename)
-        match_interference_df = await compute_match_interferences(
-            filename, target_isotopes_df
-        )
-        # Emit a progress update after computing interferences
-        if progress_properties:
-            await emit_progress_update(
-                progress_properties=progress_properties, increment=0.5
-            )
+    # Step 2: Compute match interferences for the given sample and target isotopes.
+    print("Computing match interferences for file: %s" % filename)
+    match_interference_df = await compute_match_interferences(
+        filename, target_isotopes_df
+    )
+    # Send progress user notificaton after computing interferences
+    if notification:
+        await send_progress_user_notification(notification, 0.5)
 
-        # Step 3: Compute matches for the given sample and target isotopes.
-        print("Computing matches for file: %s" % filename)
-        match_isotope_df = await compute_matches(
-            filename=filename,
-            target_isotopes_df=target_isotopes_df,
-            min_isotope_abundance=DEFAULT_MIN_ISOTOPE_ABUNDANCE,
-        )
-        # Emit a progress update after computing matches
-        if progress_properties:
-            await emit_progress_update(
-                progress_properties=progress_properties, increment=0.75
-            )
+    # Step 3: Compute matches for the given sample and target isotopes.
+    print("Computing matches for file: %s" % filename)
+    match_isotope_df = await compute_matches(
+        filename=filename,
+        target_isotopes_df=target_isotopes_df,
+        min_isotope_abundance=DEFAULT_MIN_ISOTOPE_ABUNDANCE,
+    )
+    # Send progress user notificaton after computing matches
+    if notification:
+        await send_progress_user_notification(notification, 0.75)
 
-        # Step 4: Save computed interferences and matches to the database
-        # Check if any interferences were found and save them
-        if not match_interference_df.empty:
-            await create_match_interferences(match_interference_df, sample_item_id)
-        else:
-            raise RuntimeError("No match interferences found")
+    # Step 4: Save computed interferences and matches to the database
+    # Check if any interferences were found and save them
+    if not match_interference_df.empty:
+        await create_match_interferences(match_interference_df, sample_item_id)
+    else:
+        raise RuntimeError("No match interferences found")
 
-        # Check if any matches were found and save them
-        if not match_isotope_df.empty:
-            await create_matches(match_isotope_df, sample_item_id)
-        else:
-            raise RuntimeError("No matches found")
+    # Check if any matches were found and save them
+    if not match_isotope_df.empty:
+        await create_matches(match_isotope_df, sample_item_id)
+    else:
+        raise RuntimeError("No matches found")
 
-        # Emit a final progress update indicating completion
-        if progress_properties:
-            await emit_progress_update(
-                progress_properties=progress_properties, increment=1
-            )
-
-    except Exception as e:
-        error_message = f"Computing sample matches failed: {e}"
-        raise RuntimeError(error_message)
+    # Send progress user notificaton indicating completion of compute_sample_match process
+    if notification:
+        await send_progress_user_notification(notification, 0.95)
 
 
 async def filter_existing_sample_matches_and_interferences(
@@ -206,18 +197,9 @@ async def filter_existing_sample_matches_and_interferences(
 # Sample level
 # -------------------------------------------------------------------
 @api_controller_background_task(
-    success_emit_events=[
-        ("rematch_finished", "sample_batch_id"),
-        ("sample_batch_reload", "sample_batch_id"),
-    ],
-    error_emit_events=[
-        ("rematch_finished", "sid"),
-    ],
-    default_payload={
-        "action": "rematch",
-        "type": "sample",
-    },
-    success_message="Sample was successfully rematched",
+    success_notification_rooms=["sample_batch_id"],
+    success_reload=[("sample_batch_reload", "sample_batch_id")],
+    error_notification_rooms=["sid"],
 )
 async def rematch_sample(
     sample_item_id: str,
@@ -227,6 +209,7 @@ async def rematch_sample(
     removed_ionization_mechanism_ids: Optional[List[str]] = None,
     independent_transaction: bool = False,
     sid: str = None,
+    process_id=None,
 ) -> dict:
     """
     Performs a rematch of sample by removing and/or computing matches based on the specified parameters.
@@ -241,8 +224,7 @@ async def rematch_sample(
     3. In the absence of specified parameters for addition or removal, perform a full rematch by removing all matches and recomputing them for all targets of the sample.
     4. Return the rematched sample.
     5. Emit a finished and reload events to update the system with the changes, if the operation is flagged as an independent transaction.
-        TODO_notifications handle the events + send the data to payload
-        The event emission for 'rematch_finished' and 'sample_batch_reload' is handled by the api_controller_background_task decorator based on operation success or failure
+        The event emission for 'user_notification' and 'sample_batch_reload' is handled by the api_controller_background_task decorator based on operation success or failure
 
     :param sample_item_id: ID of the sample item for which the rematch is to be performed.
     :type sample_item_id: str
@@ -267,15 +249,16 @@ async def rematch_sample(
         - If no `added_*` or `removed_*` parameters are provided, the function removes all existing matches and computes new matches for all targets.
     """
     print(f"...Rematching sample: {sample_item_id} ...")
-    # Fetch sample data
-    sample = await get_sample(sample_item_id)
-
     # Step 1: Remove existing matches based on provided removed parameters
     if removed_target_compound_ids or removed_ionization_mechanism_ids:
         await match_sample_remove(
             sample_item_id=sample_item_id,
             removed_target_compound_ids=removed_target_compound_ids,
             removed_ionization_mechanism_ids=removed_ionization_mechanism_ids,
+            independent_transaction=False,
+            sid=sid,
+            process_id=gen_id(8),
+            parent_id=process_id,
         )
 
     # Step 2: Compute new matches based on provided added parameters
@@ -284,25 +267,53 @@ async def rematch_sample(
             sample_item_id=sample_item_id,
             added_target_compound_ids=added_target_compound_ids,
             added_ionization_mechanism_ids=added_ionization_mechanism_ids,
+            independent_transaction=False,
+            sid=sid,
+            process_id=gen_id(8),
+            parent_id=process_id,
         )
     # Step 3: Perform a complete rematch if no specific targets are provided
     elif not removed_target_compound_ids and not removed_ionization_mechanism_ids:
         await match_sample_remove(
-            sample_item_id=sample_item_id
+            sample_item_id=sample_item_id,
+            independent_transaction=False,
+            sid=sid,
+            process_id=gen_id(8),
+            parent_id=process_id,
         )  # Remove all existing matches
         await match_sample_compute(
-            sample_item_id=sample_item_id
+            sample_item_id=sample_item_id,
+            independent_transaction=False,
+            sid=sid,
+            process_id=gen_id(8),
+            parent_id=process_id,
         )  # Compute matches for all targets
 
-    # Step 4: Return rematched sample dict so that api_controller_background_task wrapper would have access to the sio room keys for success_emit_events
-    return sample
+    # Step 4: Return rematched sample and message
+    sample = await get_sample(sample_item_id)
+    sample_item_name = sample["sample_item_name"]
+    return {
+        "data": sample,
+        "message": f"Sample '{sample_item_name}' was rematched.",
+        "_notification_data": {
+            "sample_item_id": sample_item_id,
+        },
+    }
 
 
+@api_controller_background_task(
+    success_notification_rooms=["sample_batch_id"],
+    success_reload=[("sample_batch_reload", "sample_batch_id")],
+    error_notification_rooms=["sid"],
+)
 async def match_sample_remove(
     sample_item_id: str,
     removed_target_compound_ids: Optional[List[str]] = None,
     removed_ionization_mechanism_ids: Optional[List[str]] = None,
     independent_transaction: bool = False,
+    sid: str = None,
+    process_id=None,
+    parent_id=None,
 ):
     """
     Removes matches and match interferences for a specific sample item, potentially filtered by specific target compounds or ionization mechanisms.
@@ -316,7 +327,6 @@ async def match_sample_remove(
     1. Identify the sample item for match deletion.
     2. If specified, determine the target isotope IDs linked to the removed compounds or ionization mechanisms, which will limit the deletion of related matches.
     3. Execute the deletion of matches and associated interferences based on the identified target isotope IDs or remove all matches if no filters are applied.
-    4. If operating as an independent transaction, emit a reload event for the sample batch to reflect the changes.
 
     :param sample_item_id: Unique identifier for the sample item whose matches are to be removed.
     :type sample_item_id: str
@@ -329,70 +339,44 @@ async def match_sample_remove(
     :raises HTTPException: Raises an HTTPException if the operation fails during an independent transaction.
     :raises RuntimeError: Raises a RuntimeError for internal call failures when not in an independent transaction.
     """
-    try:
-        print(f"...Removing matches for sample: {sample_item_id} ...")
+    print(f"...Removing matches for sample: {sample_item_id} ...")
 
-        # Step 1: Identify the sample item for match deletion.
-        sample_item_ids = [sample_item_id]
-        target_isotope_ids = None
+    # Step 1: Identify the sample item for match deletion.
+    sample_item_ids = [sample_item_id]
+    target_isotope_ids = None
+    # Step 2: Determine the target isotope IDs that are associated with the removed compounds or ionization mechanisms.
+    target_isotope_ids = None
+    if removed_target_compound_ids or removed_ionization_mechanism_ids:
+        (
+            target_isotope_ids,
+            applied_filters,
+        ) = await get_target_isotopes_for_match_remove(
+            removed_target_compound_ids,
+            removed_ionization_mechanism_ids,
+        )
+        print(f"Removing matches associated with {applied_filters}")
+    else:
+        print("Removing all matches and match interferences")
 
-        # Step 2: Determine the target isotope IDs that are associated with the removed compounds or ionization mechanisms.
-        target_isotope_ids = None
-        if removed_target_compound_ids or removed_ionization_mechanism_ids:
-            (
-                target_isotope_ids,
-                applied_filters,
-            ) = await get_target_isotopes_for_match_remove(
-                removed_target_compound_ids,
-                removed_ionization_mechanism_ids,
-            )
-            print(f"Removing matches associated with {applied_filters}")
-        else:
-            print(f"Removing all matches and match interferences")
+    # Step 3: Delete matches and match interferences corresponding to these isotopes.
+    await delete_matches(sample_item_ids, target_isotope_ids)
+    await delete_match_interferences(sample_item_ids, target_isotope_ids)
 
-        # Step 3: Delete matches and match interferences corresponding to these isotopes.
-        await delete_matches(sample_item_ids, target_isotope_ids)
-        await delete_match_interferences(sample_item_ids, target_isotope_ids)
-
-        # Step 4: Emit a reload event for the sample batch if this is an independent transaction.
-        # Reload affected sample batch if called by http request
-        if independent_transaction:
-            async with async_session() as session:
-                result = await session.execute(
-                    select(SampleItem.sample_batch_id).where(
-                        SampleItem.sample_item_id == sample_item_id
-                    )
-                )
-                sample_batch_id = result.scalar_one_or_none()
-                if sample_batch_id:
-                    await sio.emit(
-                        "sample_batch_reload", room=sample_batch_id, namespace="/"
-                    )
-    except Exception as e:
-        error_message = f"Removing sample item matches failed: {e}"
-        print(error_message)
-        if independent_transaction:
-            raise HTTPException(status_code=400, detail=error_message)
-        else:
-            # Exception for internal calls (from rematch_sample)
-            raise RuntimeError(error_message)
+    # Step 4: Return sample and message
+    sample = await get_sample(sample_item_id)
+    sample_item_name = sample["sample_item_name"]
+    return {
+        "data": sample,
+        "message": f"Match data for sample '{sample_item_name}' removed.",
+        "_notification_data": {"sample_item_id": sample_item_id},
+    }
 
 
 @api_controller_background_task(
-    # success_emit_events=[
-    #     ("match_compute_finished", "sample_batch_id"),
-    #     ("sample_batch_reload", "sample_batch_id"),
-    # ],
-    # error_emit_events=[
-    #     ("match_compute_finished", "sid"),
-    # ],
-    # default_payload={
-    #     "action": "match_compute",
-    #     "type": "sample",
-    # },
-    # success_message="Sample matches were successfully computed",
-    # TODO_notifications refactor the events + send the data to payload when success as a result["sio_payload"] (?) if success, in the exception
-    # we should (?) emit the error event to sid, since it is accessible from the wrapper kwargs
+    success_notification_rooms=["sample_item_id", "instrument"],
+    success_reload=[("sample_batch_reload", "sample_batch_id")],
+    error_notification_rooms=["sid"],
+    error_reload=[("sample_batch_reload", "sid")],
 )
 async def match_sample_compute(
     sample_item_id: str,
@@ -400,6 +384,8 @@ async def match_sample_compute(
     added_ionization_mechanism_ids: Optional[List[str]] = None,
     independent_transaction: bool = False,
     sid: str = None,
+    process_id=None,
+    parent_id=None,
 ):
     """
     Computes new matches for a specific sample item, taking into account any added target compounds or ionization mechanisms.
@@ -414,7 +400,6 @@ async def match_sample_compute(
     3. Determine target isotopes that require new match computation.
     4. Check if there are existing match records for these target isotopes to avoid redundancy.
     5. Proceed with match computation if there are target isotopes to process.
-    6. Emit reload event for the affected batch users if this function is called as an independent transaction.
 
     :param sample_item_id: ID of the sample item for which matches are to be computed.
     :type sample_item_id: str
@@ -429,197 +414,131 @@ async def match_sample_compute(
     :raises RuntimeError: Raised when no new target isotopes are available for match computation.
     :return: The dict with rematched Sample object.
     rtype: dict
-
-    TODO: - optimize instrument/compute_sample_match notifications emits/listeners. item compute for instrument users (Scenthound)
-          - sid can be passed to send the notifications for user who triggered computing (for example when copy the sample item)
     """
-    try:
-        # Step 1: Gather sample information
+    # Step 1: Gather sample information
+    sample = await get_sample(sample_item_id)
+    sample_item_name = sample["sample_item_name"]
+    sample_batch_id = sample["sample_batch_id"]
+    filename = sample["filename"]
+    instrument = sample["instrument"]
 
-        # Fetch sample data
-        sample = await get_sample(sample_item_id)
+    # Check if 'verified' exists in mz_calibration. If not, provide a default value of False
+    verified = (
+        sample["mz_calibration"].get("verified", False)
+        if sample["mz_calibration"] is not None
+        else True
+    )
 
-        # Extract sample required fields
-        sample_item_name = sample["sample_item_name"]
-        sample_batch_id = sample["sample_batch_id"]
-        filename = sample["filename"]
-        instrument = sample["instrument"]
+    # Prepare data for match computation
+    sample_pydantic = MatchComputeSample(
+        sample_item_id=sample_item_id,
+        sample_item_name=sample_item_name,
+        sample_batch_id=sample_batch_id,
+        filename=filename,
+        instrument=instrument,
+    )
 
-        # Check if 'verified' exists in mz_calibration. If not, provide a default value of False
-        verified = (
-            sample["mz_calibration"].get("verified", False)
-            if sample["mz_calibration"] is not None
-            else True
+    # Prepare progress user notification.
+    notification = UserNotification(
+        process_id=process_id,
+        parent_id=parent_id,
+        type="match_sample_compute",
+        status="pending",
+        message=f"Computing matches for sample '{sample_item_name}'.",
+        # NOTE: Set the internal metadata for the pending user_notifications like
+        # room_ids and sid of the user.
+        # The _instrument_room is provided separately to skip the check if the user
+        # has moved from the room (by not providing sid to emit_user_notification).
+        # Internal metadata will be cleaned up the from data in send_progress_user_notification.
+        data={
+            "sample_item_id": sample_item_id,
+            "_room_ids": [sample_item_id],
+            "_instrument_room": instrument,
+            "_sid": sid,
+        },
+    )
+
+    # Step 2: Gather batch information
+    # Fetch ionization mechanisms from the batch
+    async with async_session() as session:
+        result = await session.execute(
+            select(SampleBatch)
+            .join(Sample)
+            .where(Sample.sample_item_id == sample_item_id)
         )
+        sample_batch = result.scalars().first()
 
-        # Prepare data for match computation
-        sample_pydantic = MatchComputeSample(
-            sample_item_id=sample_item_id,
-            sample_item_name=sample_item_name,
+    build_params = sample_batch.build_params
+    batch_ion_mechanisms_ids = build_params["ion_mechanisms"]
+
+    # Fetch target compounds of the batch
+    batch_target_compounds_result = await get_target_compounds(
+        sample_batch_id=sample_batch.sample_batch_id,
+    )
+    batch_target_compounds_ids = [
+        compound["target_compound_id"]
+        for compound in batch_target_compounds_result["data"]
+    ]
+
+    # Step 3: Get the target isotopes for which match computing is needed.
+    # If compounds/ion_mechanisms were added get isotopes with specific filters.
+    # If no compounds/ion_mechanisms were added get all target isotopes for the sample's batch.
+
+    # Compute new matches for added compounds and mechanisms
+    target_isotopes_df = None
+
+    if added_target_compound_ids or added_ionization_mechanism_ids:
+        # Get necessary target isotopes for computing new matches of added compounds/ion_mechanisms
+        (
+            target_isotopes,
+            applied_filters,
+        ) = await get_target_isotopes_for_match_compute(
+            batch_target_compounds_ids,
+            batch_ion_mechanisms_ids,
+            added_target_compound_ids,
+            added_ionization_mechanism_ids,
+        )
+        print(f"Match computing is specifed for the list of {applied_filters}")
+        target_isotopes_df = pd.DataFrame(target_isotopes)
+    else:
+        # Fetch all target isotopes for the sample's batch
+        target_isotopes_result = await get_target_isotopes(
             sample_batch_id=sample_batch_id,
-            filename=filename,
-            instrument=instrument,
         )
-
-        # Prepare progress_properties for correct notifications.
-        progress_properties = ProgressProperties(
-            progress_type="match_item",
-            sample_batch_id=sample_batch_id,
-        )
-
-        # Step 2: Gather batch information
-
-        # Fetch ionization mechanisms from the batch
-        async with async_session() as session:
-            result = await session.execute(
-                select(SampleBatch)
-                .join(Sample)
-                .where(Sample.sample_item_id == sample_item_id)
-            )
-            sample_batch = result.scalars().first()
-
-        build_params = sample_batch.build_params
-        batch_ion_mechanisms_ids = build_params["ion_mechanisms"]
-
-        # Fetch target compounds of the batch
-        batch_target_compounds_result = await get_target_compounds(
-            sample_batch_id=sample_batch.sample_batch_id,
-        )
-        batch_target_compounds_ids = [
-            compound["target_compound_id"]
-            for compound in batch_target_compounds_result["data"]
-        ]
-
-        # Step 3: Get the target isotopes for which match computing is needed.
-        # If compounds/ion_mechanisms were added get isotopes with specific filters.
-        # If no compounds/ion_mechanisms were added get all target isotopes for the sample's batch.
-
-        # Compute new matches for added compounds and mechanisms
-        target_isotopes_df = None
-
-        if added_target_compound_ids or added_ionization_mechanism_ids:
-            # Get necessary target isotopes for computing new matches of added compounds/ion_mechanisms
-            (
-                target_isotopes,
-                applied_filters,
-            ) = await get_target_isotopes_for_match_compute(
-                batch_target_compounds_ids,
-                batch_ion_mechanisms_ids,
-                added_target_compound_ids,
-                added_ionization_mechanism_ids,
-            )
-            print(f"Match computing is specifed for the list of {applied_filters}")
-            target_isotopes_df = pd.DataFrame(target_isotopes)
-        else:
-            # Fetch all target isotopes for the sample's batch
-            target_isotopes_result = await get_target_isotopes(
-                sample_batch_id=sample_batch_id,
-            )
-            target_isotopes_df = pd.DataFrame(target_isotopes_result["data"])
-            print(
-                f"Computing matches and match interferences for all sample target isotopes. Total isotopes: {len(target_isotopes_df)}"
-            )
-
-        # Check if there are already records in matches and match interferences for the target isotopes.
-        target_isotopes_df = await filter_existing_sample_matches_and_interferences(
-            target_isotopes_df, sample_item_id
-        )
-
-        # Step 4: Process sample for match computation.
+        target_isotopes_df = pd.DataFrame(target_isotopes_result["data"])
         print(
-            f"...Computing matches for sample {sample_item_name}: {sample_item_id} ..."
+            f"Computing matches and match interferences for all sample target isotopes. Total isotopes: {len(target_isotopes_df)}"
         )
 
-        # notification for the batch users
-        await sio.emit(
-            "match_item_update_compute_started",
-            {
-                "sample_item_name": sample_item_name,
-            },
-            room=sample_batch_id,
-            namespace="/",
-        )
+    # Check if there are already records in matches and match interferences for the target isotopes.
+    target_isotopes_df = await filter_existing_sample_matches_and_interferences(
+        target_isotopes_df, sample_item_id
+    )
 
-        # notification for the instrument users
-        await sio.emit(
-            "match_item_compute_started",
-            {
-                "filename": filename,
-                "progress": 0,
-            },
-            room=instrument,
-            namespace="/",
-        )
-        await sio.emit(
-            "match_item_compute_progress", {}, room=instrument, namespace="/"
-        )
+    # Step 4: Process sample for match computation.
+    print(f"...Computing matches for sample {sample_item_name}: {sample_item_id} ...")
 
-        # Skip computation if no new target isotopes are found for this sample item
-        if target_isotopes_df.empty or target_isotopes_df is None:
-            error_message = f"No new target isotopes to compute matches for."
-            raise ValueError(error_message)
+    # Skip computation if no new target isotopes are found for this sample item
+    if target_isotopes_df.empty or target_isotopes_df is None:
+        error_message = "No new target isotopes to compute matches for."
+        raise ValueError(error_message)
 
-        # Check if m/z calibration is verified for the sample
-        if not verified:
-            error_message = f"m/z calibration is not verified for sample file: {filename}. Please try to calibrate the file."
-            raise ValueError(error_message)
+    # Check if m/z calibration is verified for the sample
+    if not verified:
+        error_message = f"m/z calibration is not verified for sample file: {filename}. Please try to calibrate the file."
+        raise ValueError(error_message)
 
-        # Step 5: Compute matches for the sample if passed all checks,
+    # Step 5: Compute matches for the sample if passed all checks,
+    await compute_sample_match(sample_pydantic, target_isotopes_df, notification)
 
-        await compute_sample_match(
-            sample_pydantic, target_isotopes_df, progress_properties
-        )
-
-        # notification for the batch users
-        await sio.emit(
-            "match_item_update_compute_finished",
-            {
-                "sample_item_name": sample_item_name,
-            },
-            room=sample_batch_id,
-            namespace="/",
-        )
-
-        # notification for the instrument users
-        await sio.emit(
-            "match_item_compute_finished",
-            {
-                "filename": filename,
-                "progress": 100,
-            },
-            room=instrument,
-            namespace="/",
-        )
-
-        # Step 6: Emit reload event for the batch users if this function is called as an independent transaction.
-        if independent_transaction:
-            await sio.emit("sample_batch_reload", room=sample_batch_id, namespace="/")
-    except Exception as e:
-        print(f"Computing sample item matches failed: {e}")
-
-        # notification for the instrument users
-        await sio.emit(
-            "match_item_compute_failed",
-            {
-                "filename": filename,
-                "progress": 100,
-            },
-            room=instrument,
-            namespace="/",
-        )
-
-        # notification for the batch users
-        await sio.emit(
-            "match_item_update_compute_failed",
-            {
-                "sample_item_name": sample_item_name,
-                "errorMessage": str(e),
-            },
-            room=sample_batch_id,
-            namespace="/",
-        )
-        if independent_transaction:
-            await sio.emit("sample_batch_reload", room=sample_batch_id, namespace="/")
+    # Step 6: Return sample with computed match data and status message
+    sample = await get_sample(sample_item_id)
+    sample_item_name = sample["sample_item_name"]
+    return {
+        "data": sample,
+        "message": f"Matches computed for sample '{sample_item_name}'.",
+        "_notification_data": {"sample_item_id": sample_item_id},
+    }
 
 
 # -------------------------------------------------------------------
@@ -628,19 +547,15 @@ async def match_sample_compute(
 
 
 @api_controller_background_task(
-    # TODO_notifications implement the success/error notifications as example below
-    error_emit_events=[
-        ("rematch_finished", "sid"),
-    ],
-    default_payload={
-        "action": "rematch",
-        "type": "batch",
-    },
+    success_notification_rooms=["sid"],
+    error_notification_rooms=["sid"],
 )
 async def rematch_batches(
     rematch_batches_body: RematchBatchesBody,
     independent_transaction: bool,
     sid: str,
+    process_id=None,
+    parent_id=None,
 ) -> dict:
     """
     Performs a rematch operation on multiple sample batches based on the provided for each batch batch-specific
@@ -666,18 +581,13 @@ async def rematch_batches(
     :type sid: str
     :return: A status message indicating the outcome of the batch rematch operation, including any failed match computations for samples.
     :rtype: dict
-
-    TODO_notifications
-        - Refactor notifications
-        - return data and add this as "data" to sio notification success payload in the api_controller_background_task
     """
     # Initialize variables for tracking overall progress and failures for correct user notifications
     total_batches = len(rematch_batches_body.sample_batches)
     total_number_of_items = 0
     items_per_batch = []
-    samples_compute_failed_all = []  # to collect failed samples from all batches
 
-    # Step 1: Gather data for each batch and set workspace_id for each batch
+    # Step 1: Collect total items and individual batch items count
     for sample_batch in rematch_batches_body.sample_batches:
         sample_items_info = await get_samples(
             sample_batch_id=sample_batch.sample_batch_id, batch_matches_info=False
@@ -685,103 +595,117 @@ async def rematch_batches(
         total_number_of_items += sample_items_info["results"]
         items_per_batch.append(sample_items_info["results"])
 
-        # Fetch workspace_id from the database
-        async with async_session() as session:
-            result = await session.execute(
-                select(SampleBatch.workspace_id).filter(
-                    SampleBatch.sample_batch_id == sample_batch.sample_batch_id
-                )
-            )
-            sample_batch.workspace_id = result.scalar_one_or_none()
-
-    # Calculate weight for each batch based on the number of items
-    item_weights_per_batch = [1.0 / items if items else 0 for items in items_per_batch]
-
-    # Step 2: Notify client who triggered rematch_batches that batches processing has started.
-    await sio.emit(
-        "rematch_batches_started",
-        {"total_batches": total_batches},
-        room=sid,
-        namespace="/",
-    )
+    # Calculate batch weights based on the number of items per batch
+    batch_weights = [
+        items / total_number_of_items if total_number_of_items else 0
+        for items in items_per_batch
+    ]
 
     # Step 3: Process each batch
-    for batch_index, sample_batch in enumerate(
-        rematch_batches_body.sample_batches, start=1
+    samples_compute_failed_all = []  # to collect failed samples from all batches
+    rematched_sample_batch_ids = []  # Collect batch IDs that were rematched
+    for batch_index, (sample_batch, batch_weight) in enumerate(
+        zip(rematch_batches_body.sample_batches, batch_weights), start=1
     ):
         sample_batch_id = sample_batch.sample_batch_id
-        workspace_id = sample_batch.workspace_id
         added_target_compound_ids = sample_batch.added_target_compound_ids
         removed_target_compound_ids = sample_batch.removed_target_compound_ids
 
-        # Notify workspace client of the current progres batch
-        await sio.emit(
-            "rematch_batch_progress",
-            {"current_batch": batch_index},
-            room=sid,
-            namespace="/",
+        notification = UserNotification(
+            process_id=process_id,
+            type="rematch_batches",
+            status="pending",
+            message=f"Rematching sample batch {batch_index}/{total_batches}.",
+            # NOTE: Set the internal metadata for the pending user_notifications like
+            # room_ids and sid of the user.
+            # Internal metadata will be cleaned up the from data in send_progress_user_notification.
+            data={
+                "sample_batch_id": sample_batch_id,
+                "_room_ids": [sid],
+                "_sid": sid,
+                "_batch_weight": batch_weight,
+                "_batch_index": batch_index,
+            },
         )
-
-        # Compute progress properties for the current batch
-        progress_properties = ProgressProperties(
-            progress_type="rematch_batches",
-            sample_batch_id=sample_batch_id,
-            item_weight=item_weights_per_batch[batch_index - 1],
-            batch_index=batch_index,
-            workspace_id=workspace_id,
-            total_batches=total_batches,
-            sid=sid,
-        )
+        await send_progress_user_notification(notification, 0.2)
 
         # Create rematching task for the current batch
         task = asyncio.create_task(
             rematch_batch(
                 sample_batch_id=sample_batch_id,
-                workspace_id=workspace_id,
                 added_target_compound_ids=added_target_compound_ids,
                 removed_target_compound_ids=removed_target_compound_ids,
                 independent_transaction=False,
-                progress_properties=progress_properties,
+                sid=sid,
+                process_id=gen_id(8),
+                parent_id=process_id,
             )
         )
 
         # Perform the rematch operation for the current batch
-        task_result = await task
+        try:
+            task_result = await task
+            rematched_sample_batch_ids.append(
+                task_result["_notification_data"]["sample_batch_id"]
+            )
+        except ApiException as e:
+            # If the task fails, log the error and continue with the next batch
+            if e.status_code == 200:  # Warning ApiException with 2-- code
+                # Collect failed samples and continue processing next batches
+                samples_compute_failed_all.extend(
+                    e.tech_message.get("samples_compute_failed", [])
+                )
+                rematched_sample_batch_ids.append(
+                    e.tech_message.get("sample_batch_id", None)
+                )
+            else:
+                # Log critical error and re-raise exception to stop rematching all batches
+                print(f"Critical Error in rematch_batch: {e.user_message}")
+                raise e from e
 
         # Step 4: Aggregate failed samples from the batch for reporting
         # If the task result contains information about failed samples, aggregate this information for all batches
-        if task_result and "samples_compute_failed" in task_result:
-            samples_compute_failed_all.extend(task_result["samples_compute_failed"])
+        notification.message = (
+            f"Finished rematching sample batch {batch_index}/{total_batches}."
+        )
+        await send_progress_user_notification(notification, 0.8)
 
-    # Step 5: Notify client who triggered rematching that batches processing has finished, including information about any failures
-    await sio.emit(
-        "rematch_batches_finished",
-        {
-            "total_batches": total_batches,
-            "samples_compute_failed": samples_compute_failed_all,
-        },
-        room=sid,
-        namespace="/",
-    )
-
+    # If there are any aggregated failed samples from all batches, send the waring notificatoin
     if samples_compute_failed_all:
-        # If there are any aggregated failed samples from all batches, include this information in the final result
-        return {
-            "status": f"Match computation for {total_batches} batches. Failed samples: {samples_compute_failed_all}"
-        }
-    else:
-        return {"status": f"Match computation for {total_batches} batches"}
+        user_message = f"Warning during rematching {total_batches} sample batch{'es' if total_batches != 1 else ''}: failed to compute matches for {len(samples_compute_failed_all)} sample{'s' if len(samples_compute_failed_all) != 1 else ''}."
+        raise ApiException(
+            user_message,
+            {
+                "sample_batch_ids": rematched_sample_batch_ids,
+                "samples_compute_failed": samples_compute_failed_all,
+            },
+            200,
+        )
+
+    # Step 8: Return sample batch data and message
+    return {
+        "message": f"{total_batches} sample batch{'es' if total_batches != 1 else ''} rematched.",
+        "_notification_data": {"sample_batch_ids": rematched_sample_batch_ids},
+    }
 
 
+@api_controller_background_task(
+    success_notification_rooms=["sample_batch_id"],
+    success_reload=[("sample_batch_reload", "sample_batch_id")],
+    error_notification_rooms=["sample_batch_id"],
+    error_reload=[("sample_batch_reload", "sample_batch_id")],
+)
 async def rematch_batch(
     sample_batch_id: str,
-    workspace_id: Optional[str] = None,
     added_target_compound_ids: Optional[List[str]] = None,
     added_ionization_mechanism_ids: Optional[List[str]] = None,
     removed_target_compound_ids: Optional[List[str]] = None,
     removed_ionization_mechanism_ids: Optional[List[str]] = None,
     independent_transaction: bool = False,
-    progress_properties: ProgressProperties = None,
+    notification: UserNotification = None,
+    sid: str = None,
+    process_id=None,
+    parent_id=None,
 ):
     """
     Performs a rematch of sample batch by removing and/or computing matches based on the specified parameters.
@@ -815,142 +739,122 @@ async def rematch_batch(
         - If `removed_*` parameters are provided, the function removes matches related to these parameters.
         - If `added_*` parameters are provided, the function computes new matches related to these parameters.
         - If no `added_*` or `removed_*` parameters are provided, the function removes all existing matches and computes new matches for all targets.
-    TODO_notifications
-        - Handle the separate types of notifications when called from rematch_batches or when an independent transaction, potentially using sid
+
+    :param sample_batch_id: _description_
+    :type sample_batch_id: str
+    :param added_target_compound_ids: _description_, defaults to None
+    :type added_target_compound_ids: Optional[List[str]], optional
+    :param added_ionization_mechanism_ids: _description_, defaults to None
+    :type added_ionization_mechanism_ids: Optional[List[str]], optional
+    :param removed_target_compound_ids: _description_, defaults to None
+    :type removed_target_compound_ids: Optional[List[str]], optional
+    :param removed_ionization_mechanism_ids: _description_, defaults to None
+    :type removed_ionization_mechanism_ids: Optional[List[str]], optional
+    :param independent_transaction: _description_, defaults to False
+    :type independent_transaction: bool, optional
+    :param notification: _description_, defaults to None
+    :type notification: UserNotification, optional
+    :param sid: _description_, defaults to None
+    :type sid: str, optional
+    :param process_id: _description_, defaults to None
+    :type process_id: _type_, optional
+    :param parent_id: _description_, defaults to None
+    :type parent_id: _type_, optional
+    :raises NotFoundException: _description_
+    :return: _description_
+    :rtype: _type_
     """
-    print(f"...Rematching batch: {sample_batch_id} ...")
-    samples_compute_failed = []
-    try:
-        # Step 1: Notify batch clients that batch processing has started.
-        await sio.emit(
-            "rematch_batch_started",
-            {"total_batches": 1},
-            room=sample_batch_id,
-            namespace="/",
-        )
-        if progress_properties.progress_type == "rematch_batch":
-            # Compute progress properties for the current batch
-            sample_items_info = await get_samples(
-                sample_batch_id=sample_batch_id,
-                batch_matches_info=False,
+    # Step 1: Retrieve batch data.
+    async with async_session() as session:
+        sample_batch = await session.get(SampleBatch, sample_batch_id)
+        if not sample_batch:
+            raise NotFoundException(
+                f"Sample batch with ID '{sample_batch_id}' not found"
             )
-            item_weight = 1.0 / sample_items_info["results"]
-            if progress_properties.workspace_reload is not None:
-                workspace_reload = progress_properties.workspace_reload
-            else:
-                workspace_reload = False
-
-            progress_properties = ProgressProperties(
-                progress_type=progress_properties.progress_type,
-                item_weight=item_weight,
-                batch_index=1,
-                total_batches=1,
-                workspace_reload=workspace_reload,
-                sample_batch_id=sample_batch_id,
-            )
-            if not workspace_id:
-                # Fetch workspace_id from the database
-                async with async_session() as session:
-                    result = await session.execute(
-                        select(SampleBatch.workspace_id).filter(
-                            SampleBatch.sample_batch_id == sample_batch_id
-                        )
-                    )
-                    workspace_id = result.scalar_one_or_none()
-
-            # Notify batch clients of the progres
-            await sio.emit(
-                "rematch_batch_progress",
-                {"current_batch": progress_properties.batch_index},
-                room=sample_batch_id,
-                namespace="/",
-            )
-        # Notify sample batch clients of the selected batch processing
-        await sio.emit(
-            "rematch_batch_progress",
-            {
-                "current_batch_message": "Selected batch is processing now",
-            },
-            room=sample_batch_id,
-            namespace="/",
-        )
-
-        # Step 2: Remove existing matches based on provided removed parameters
-        if removed_target_compound_ids or removed_ionization_mechanism_ids:
-            await match_batch_remove(
-                sample_batch_id=sample_batch_id,
-                removed_target_compound_ids=removed_target_compound_ids,
-                removed_ionization_mechanism_ids=removed_ionization_mechanism_ids,
-            )
-
-        # Step 3: Compute new matches based on provided added parameters
-        if added_target_compound_ids or added_ionization_mechanism_ids:
-            await match_batch_compute(
-                sample_batch_id=sample_batch_id,
-                added_target_compound_ids=added_target_compound_ids,
-                added_ionization_mechanism_ids=added_ionization_mechanism_ids,
-                progress_properties=progress_properties,
-            )
-        # Step 4: Perform a complete rematch if no specific targets are provided
-        elif not removed_target_compound_ids and not removed_ionization_mechanism_ids:
-            await match_batch_remove(
-                sample_batch_id=sample_batch_id,
-            )  # Remove all existing matches
-            await match_batch_compute(
-                sample_batch_id=sample_batch_id, progress_properties=progress_properties
-            )  # Compute matches for all targets
-
-    except Exception as e:
-        # Extract error information from the exception, specifically looking for "failed_samples"
-        context_message = f"Failed to rematch sample batch '{sample_batch_id}'"
-        api_exc = process_exception(e, context_message)
-        user_error_message = api_exc.user_message
-        detail = api_exc.tech_message
-
-        # reise the error if called internally, from import_sample_items
-        if independent_transaction:
-            print(user_error_message)
-            print(detail)
-        else:
-            raise ApiException(user_error_message, detail, api_exc.status_code)
-
-        error_info = e.args[0]
-        # If the exception contains information about failed samples, extend the failed samples list with this information
-        if "failed_samples" in error_info:
-            samples_compute_failed = error_info["failed_samples"]
-        else:
-            # If no specific failed samples information is present, log the general error
-            print("Error:", error_info)
-
-    # Step 5: Emit a reload event if this operation is independent
-    if progress_properties.workspace_reload:
-        await sio.emit("workspace_reload", room=workspace_id, namespace="/")
-    else:
-        await sio.emit("sample_batch_reload", room=sample_batch_id, namespace="/")
-
-    # Step 6: Notify batch clients that  batch rematching has finished, including information about any failures
-    await sio.emit(
-        "rematch_batch_finished",
-        {
-            "total_batches": 1,
-            "samples_compute_failed": samples_compute_failed,
+    sample_batch_name = sample_batch.sample_batch_name
+    print(
+        f"...Rematching sample batch '{sample_batch_name}' with ID {sample_batch_id} ..."
+    )
+    # Prepare progress user notification.
+    notification = UserNotification(
+        process_id=process_id,
+        parent_id=parent_id,
+        type="rematch_batch",
+        status="pending",
+        message=f"Rematching sample batch '{sample_batch_name}'.",
+        # NOTE: Set the internal metadata for the pending user_notifications like
+        # room_ids and sid of the user.
+        # Internal metadata will be cleaned up the from data in send_progress_user_notification.
+        data={
+            "sample_batch_id": sample_batch_id,
+            "_room_ids": [sample_batch_id],
+            "_sid": sid,
         },
-        room=sample_batch_id,
-        namespace="/",
     )
 
-    # Step 7: If there are any failed samples, return them as part of the function's result to be processed in rematch_batches endpoint
-    if samples_compute_failed:
-        return {"samples_compute_failed": samples_compute_failed}
+    await send_progress_user_notification(notification)
 
-    return None
+    # Step 2: Remove existing matches based on provided removed parameters
+    if removed_target_compound_ids or removed_ionization_mechanism_ids:
+        await match_batch_remove(
+            sample_batch_id=sample_batch_id,
+            removed_target_compound_ids=removed_target_compound_ids,
+            removed_ionization_mechanism_ids=removed_ionization_mechanism_ids,
+            independent_transaction=False,
+            sid=sid,
+            process_id=gen_id(8),
+            parent_id=process_id,
+        )
+
+    # Step 3: Compute new matches based on provided added parameters
+    if added_target_compound_ids or added_ionization_mechanism_ids:
+        await match_batch_compute(
+            sample_batch_id=sample_batch_id,
+            added_target_compound_ids=added_target_compound_ids,
+            added_ionization_mechanism_ids=added_ionization_mechanism_ids,
+            independent_transaction=False,
+            sid=sid,
+            process_id=gen_id(8),
+            parent_id=process_id,
+        )
+    # Step 4: Perform a complete rematch if no specific targets are provided
+    elif not removed_target_compound_ids and not removed_ionization_mechanism_ids:
+        await match_batch_remove(
+            sample_batch_id=sample_batch_id,
+            independent_transaction=False,
+            sid=sid,
+            process_id=gen_id(8),
+            parent_id=process_id,
+        )  # Remove all existing matches
+        await match_batch_compute(
+            sample_batch_id=sample_batch_id,
+            independent_transaction=False,
+            sid=sid,
+            process_id=gen_id(8),
+            parent_id=process_id,
+        )  # Compute matches for all targets
+
+    # Step 8: Return sample batch data and message
+    return {
+        "data": sample_batch.to_dict(),
+        "message": f"Sample batch '{sample_batch_name}' was rematched.",
+        "_notification_data": {"sample_batch_id": sample_batch_id},
+    }
 
 
+@api_controller_background_task(
+    success_notification_rooms=["sample_batch_id"],
+    success_reload=[("sample_batch_reload", "sample_batch_id")],
+    error_notification_rooms=["sid"],
+)
 async def match_batch_remove(
     sample_batch_id: str,
     removed_target_compound_ids: Optional[List[str]] = None,
     removed_ionization_mechanism_ids: Optional[List[str]] = None,
     independent_transaction: bool = False,
+    sid: str = None,
+    process_id=None,
+    parent_id=None,
 ):
     """
     Removes matches associated with a sample batch, optionally filtering by removed target compounds or ionization mechanisms.
@@ -960,10 +864,9 @@ async def match_batch_remove(
     If no filters are provided, all matches for the batch are deleted.
 
     Steps:
-    1. Retrieve all sample items associated with the sample batch.
+    1. Retrieve batch data and associated sample items.
     2. Determine the target isotope IDs that are associated with the removed compounds or ionization mechanisms.
     3. Execute the deletion of matches and associated interferences based on the identified target isotope IDs or remove all matches if no filters are applied.
-    4. Emit a reload event for the sample batch if this is an independent transaction.
 
     :param sample_batch_id: ID of the sample batch for which matches are to be removed.
     :type sample_batch_id: str
@@ -974,55 +877,68 @@ async def match_batch_remove(
     :param independent_transaction: Flag indicating if the operation should be an independent transaction, default to False.
     :type independent_transaction: bool
     """
-    try:
-        print(f"...Removing matches for batch: {sample_batch_id} ...")
-
-        # Step 1: Retrieve all sample items associated with the sample batch.
-        sample_items_data = await get_samples(
-            sample_batch_id=sample_batch_id, batch_matches_info=False
-        )
-        sample_item_ids = [
-            sample_item["sample_item_id"] for sample_item in sample_items_data["data"]
-        ]
-
-        # Step 2: Determine the target isotope IDs that are associated with the removed compounds or ionization mechanisms.
-        target_isotope_ids = None
-        if removed_target_compound_ids or removed_ionization_mechanism_ids:
-            (
-                target_isotope_ids,
-                applied_filters,
-            ) = await get_target_isotopes_for_match_remove(
-                removed_target_compound_ids,
-                removed_ionization_mechanism_ids,
+    # Step 1: Retrieve batch data and associated sample items.
+    async with async_session() as session:
+        sample_batch = await session.get(SampleBatch, sample_batch_id)
+        if not sample_batch:
+            raise NotFoundException(
+                f"Sample batch with ID '{sample_batch_id}' not found"
             )
-            print(f"Removing matches associated with {applied_filters}")
-        else:
-            print(f"Removing all matches and match interferences")
 
-        # Step 3: Delete matches and match interferences corresponding to these isotopes.
-        await delete_matches(sample_item_ids, target_isotope_ids)
-        await delete_match_interferences(sample_item_ids, target_isotope_ids)
+    sample_batch_name = sample_batch.sample_batch_name
+    print(
+        f"...Removing matches for sampe batch '{sample_batch_name}' with ID {sample_batch_id} ..."
+    )
+    sample_items_data = await get_samples(
+        sample_batch_id=sample_batch_id, batch_matches_info=False
+    )
+    sample_item_ids = [
+        sample_item["sample_item_id"] for sample_item in sample_items_data["data"]
+    ]
 
-        # Step 4: Emit a reload event for the sample batch if this is an independent transaction.
-        # Reload affected sample batch if called by http request
-        if independent_transaction:
-            await sio.emit("sample_batch_reload", room=sample_batch_id, namespace="/")
-    except Exception as e:
-        error_message = f"Removing batch matches failed: {e}"
-        print(error_message)
-        if independent_transaction:
-            raise HTTPException(status_code=400, detail=error_message)
-        else:
-            # Exception for internal calls (from rematch_batch)
-            raise RuntimeError(error_message)
+    # Step 2: Determine the target isotope IDs that are associated with the removed compounds or ionization mechanisms.
+    target_isotope_ids = None
+    if removed_target_compound_ids or removed_ionization_mechanism_ids:
+        (
+            target_isotope_ids,
+            applied_filters,
+        ) = await get_target_isotopes_for_match_remove(
+            removed_target_compound_ids,
+            removed_ionization_mechanism_ids,
+        )
+        print(f"Removing matches associated with {applied_filters}")
+    else:
+        print("Removing all matches and match interferences")
+
+    # Step 3: Delete matches and match interferences corresponding to these isotopes.
+    await delete_matches(sample_item_ids, target_isotope_ids)
+    await delete_match_interferences(sample_item_ids, target_isotope_ids)
+
+    # Step 4: Return sample batch data and message
+    return {
+        "data": sample_batch.to_dict(),
+        "message": f"Match data for sample batch '{sample_batch_name}' removed.",
+        "_notification_data": {"sample_batch_id": sample_batch_id},
+    }
 
 
+@api_controller_background_task(
+    success_notification_rooms=["sample_batch_id"],
+    success_reload=[("sample_batch_reload", "sample_batch_id")],
+    error_notification_rooms=[
+        "sample_batch_id"
+    ],  # NOTE: send to sample_batch_id for warning notifications
+    error_reload=[("sample_batch_reload", "sample_batch_id")],
+)
 async def match_batch_compute(
     sample_batch_id: str,
     added_target_compound_ids: Optional[List[str]] = None,
     added_ionization_mechanism_ids: Optional[List[str]] = None,
     independent_transaction: bool = False,
-    progress_properties: ProgressProperties = None,
+    notification: UserNotification = None,
+    sid: str = None,
+    process_id=None,
+    parent_id=None,
 ):
     """
     Computes new matches for all samples within a given batch, taking into account any added target compounds or ionization mechanisms.
@@ -1048,14 +964,9 @@ async def match_batch_compute(
     :type added_ionization_mechanism_ids: Optional[List[str]], optional
     :param independent_transaction: Indicates whether the match computation operation should be treated as a standalone process, which affects event emission and UI updates.
     :type independent_transaction: bool, optional
-    :param progress_properties: Properties related to the progress tracking of the match computation process, facilitating user feedback.
-    :type progress_properties: ProgressProperties, optional
     :raises ValueError: Raised in cases where match computation cannot proceed due to issues such as unverified m/z calibration or the absence new target isotopes to compute matches for.
     """
-    print(f"...Computing matches of batch: {sample_batch_id} ...")
-
     # Step 1: Retrieve all samples associated with the specified sample batch.
-
     async with async_session() as session:
         # Fetch samples
         result = await session.execute(
@@ -1064,15 +975,14 @@ async def match_batch_compute(
 
         samples = result.scalars().all()
 
-    # Step 2: Gather batch information
-
-    # Fetch ionization mechanisms from the batch
+    # Step 2: Retrieve batch data and ionization mechanisms from the batch.
     async with async_session() as session:
-        result = await session.execute(
-            select(SampleBatch).where(SampleBatch.sample_batch_id == sample_batch_id)
-        )
-        sample_batch = result.scalars().first()
-
+        sample_batch = await session.get(SampleBatch, sample_batch_id)
+        if not sample_batch:
+            raise NotFoundException(
+                f"Sample batch with ID '{sample_batch_id}' not found"
+            )
+    sample_batch_name = sample_batch.sample_batch_name
     build_params = sample_batch.build_params
     batch_ion_mechanisms_ids = build_params["ion_mechanisms"]
 
@@ -1085,6 +995,9 @@ async def match_batch_compute(
         for compound in batch_target_compounds_result["data"]
     ]
 
+    print(
+        f"...Computing matches for sample batch '{sample_batch_name}' with ID {sample_batch_id} ..."
+    )
     # Step 3: Identify target isotopes for computation.
     #   If compounds/ion_mechanisms were added get isotopes with specific filters.
     #   If no compounds/ion_mechanisms were added get all target isotopes for the sample's batch.
@@ -1112,8 +1025,9 @@ async def match_batch_compute(
             f"Computing matches and match interferences for all batch target isotopes. Total isotopes: {len(target_isotopes_df)}"
         )
 
-    # Step 4: Process each sample item for match computation.
+    # Step 4: Process each sample item for match computation and send progress user notification.
     samples_compute_failed = []
+    total_samples = len(samples)
     for item_index, sample in enumerate(samples):
         # Prepare data for match computation
         sample_pydantic = MatchComputeSample(
@@ -1123,15 +1037,30 @@ async def match_batch_compute(
             filename=sample.filename,
             instrument=sample.instrument,
         )
-        # Prepare progress_properties for correct notifications.
-        if progress_properties is not None:
-            # Convert to dict and update 'item_index'
-            progress_properties_dict = progress_properties.dict()
-            progress_properties_dict["item_index"] = item_index
 
-            progress_properties = ProgressProperties(**progress_properties_dict)
+        # Prepare progress user notification.
+        notification = UserNotification(
+            process_id=process_id,
+            parent_id=parent_id,
+            type="match_batch_compute",
+            status="pending",
+            message=f"Computing matches for sample batch '{sample_batch_name}'.",
+            # NOTE: Set the internal metadata for the pending user_notifications like
+            # room_ids and sid of the user.
+            # Internal metadata will be cleaned up the from data in send_progress_user_notification.
+            data={
+                "sample_batch_id": sample_batch_id,
+                "_room_ids": [sample_batch_id],
+                "_sid": sid,
+                "_total_samples": total_samples,
+                "_item_index": item_index,
+            },
+        )
 
         try:
+            print(
+                f"...Computing matches for sample '{sample.sample_item_name}' with ID {sample.sample_item_id} ..."
+            )
             # Gather sample information
             # Check if 'verified' exists in mz_calibration. If not, provide a default value of False
             verified = (
@@ -1154,17 +1083,14 @@ async def match_batch_compute(
 
             # Skip computation if no new target isotopes are found for this sample item
             if filtered_target_isotopes_df.empty:
-                error_message = f"No new target isotopes to compute matches for."
+                error_message = f"No new target isotopes to compute matches for sample '{sample.sample_item_name}'."
                 raise ValueError(error_message)
 
             # Step 5: Compute matches for the sample items that passed all checks,
             # where new target isotopes are identified, m/z calibration is verified.
 
-            print(
-                f"...Computing matches of sample item '{sample_pydantic.sample_item_name}' ..."
-            )
             await compute_sample_match(
-                sample_pydantic, filtered_target_isotopes_df, progress_properties
+                sample_pydantic, filtered_target_isotopes_df, notification
             )
         except Exception as e:
             # If an exception occurs during sample match computation, log the error and add the sample to the failed list
@@ -1176,17 +1102,27 @@ async def match_batch_compute(
                         "sample_item_name": sample_pydantic.sample_item_name,
                         "filename": sample_pydantic.filename,
                     },
-                    "error_message": str(e),
+                    "warning_message": str(e),
                 }
             )
 
-    # Step 6: Emit reload event for the batch if this function is called as an independent transaction.
-    if independent_transaction:
-        await sio.emit("sample_batch_reload", room=sample_batch_id, namespace="/")
-
     # Step 7: If there are any failed samples, raise an exception with the list of failed samples included in the error message
     if samples_compute_failed:
-        error_message = f"{len(samples_compute_failed)} samples failed to compute."
-        raise ValueError(
-            {"message": error_message, "failed_samples": samples_compute_failed}
+        # raise warning user_notifications (ApiException with 200 code)
+        user_message = f"Failed to compute matches for {len(samples_compute_failed)} sample{'s' if len(samples_compute_failed) != 1 else ''} in sample batch '{sample_batch_name}'."
+
+        raise ApiException(
+            user_message,
+            {
+                "sample_batch_id": sample_batch_id,
+                "samples_compute_failed": samples_compute_failed,
+            },
+            200,
         )
+
+    # Step 8: Return sample batch data and message
+    return {
+        "data": sample_batch.to_dict(),
+        "message": f"Matches computed for sample batch '{sample_batch_name}'.",
+        "_notification_data": {"sample_batch_id": sample_batch_id},
+    }

@@ -17,24 +17,7 @@ export const useTargetsStore = defineStore('targets', () => {
 
   const getAllCollections = computed(() => targetCollectionsAll.value ?? [])
   const getAllCompounds = computed(() => targetCompoundsAll.value ?? [])
-  const getTargetsCollections = computed(
-    () =>
-      targetCollectionsAll.value?.filter(
-        (collection) => collection.target_collection_type === 'TARGETS'
-      ) ?? []
-  )
-  const getCalibrantsCollections = computed(
-    () =>
-      targetCollectionsAll.value?.filter(
-        (collection) => collection.target_collection_type === 'CALIBRANTS'
-      ) ?? []
-  )
-  const getDiagnosticsCollections = computed(
-    () =>
-      targetCollectionsAll.value?.filter(
-        (collection) => collection.target_collection_type === 'DIAGNOSTICS'
-      ) ?? []
-  )
+
   const getCollection = computed(
     () => (targetCollectionId) =>
       getAllCollections.value.find((row) => row.target_collection_id == targetCollectionId) ?? null
@@ -68,7 +51,7 @@ export const useTargetsStore = defineStore('targets', () => {
 
   async function loadAllCollections() {
     let collections = await getAllTargetCollections()
-
+    if (!collections) return
     collections = collections.map((collection) => {
       return { ...collection, selection: 0 }
     })
@@ -76,11 +59,15 @@ export const useTargetsStore = defineStore('targets', () => {
   }
 
   async function loadAllCompounds() {
-    targetCompoundsAll.value = await getAllTargetCompounds()
+    const compounds = await getAllTargetCompounds()
+    if (!compounds) return
+    targetCompoundsAll.value = compounds
   }
 
   async function loadActiveCollection(collectionId) {
-    activeCollection.value = await getTargetCollection(collectionId)
+    const collection = await getTargetCollection(collectionId)
+    if (!collection) return
+    activeCollection.value = collection
   }
 
   async function reload() {
@@ -99,90 +86,50 @@ export const useTargetsStore = defineStore('targets', () => {
     if (!activeCollection.value) return
     activeCollection.value = null
   }
-
-  function processSpreadsheetInput(rows) {
-    // process the spreadsheet input to check if compounds already exist
-    let existingCompounds = []
-    let notExistingCompounds = []
-    let processedFormulas = new Set() // Set to track processed compound formulas
-    rows.forEach((row) => {
-      // Skip processing if this formula has already been processed
-      if (processedFormulas.has(row.target_compound_formula)) {
-        return
-      }
-
-      const existingCompound = targetCompoundsAll.value.find(
-        (compound) => compound.target_compound_formula === row.target_compound_formula
-      )
-
-      if (existingCompound) {
-        //  If an existing compound is found, add it to existingCompounds
-        existingCompounds.push(existingCompound)
-      } else {
-        // If no existing compound is found, add the row to notExistingCompounds
-        notExistingCompounds.push(row)
-      }
-
-      // Mark this formula as processed
-      processedFormulas.add(row.target_compound_formula)
-    })
-    return { existingCompounds, notExistingCompounds }
-  }
-
   // http client endpoints
   async function getAllTargetCollections() {
-    const collections = await api.request({
-      httpMethod: 'getAllTargetCollections',
-      errorMessage: `Failed to load all target collections.`
+    const collections = await api.request.read({
+      method: 'getAllTargetCollections'
     })
-    return collections.data
+    return collections?.data ?? null
   }
 
   async function getTargetCollection(collectionId) {
-    return await api.request({
-      httpMethod: 'getTargetCollection',
-      requestData: collectionId,
-      errorMessage: `Failed to get target collection.`
+    return await api.request.read({
+      method: 'getTargetCollection',
+      body: collectionId
     })
   }
 
   async function getAllTargetCompounds(params = {}) {
-    const compounds = await api.request({
-      httpMethod: 'getAllTargetCompounds',
-      requestData: params,
-      errorMessage: `Failed to load all target compounds.`
+    const compounds = await api.request.read({
+      method: 'getAllTargetCompounds',
+      body: params
     })
-    return compounds.data
+    return compounds?.data ?? null
   }
 
   async function createCollection(collection) {
-    return await api.process({
-      httpMethod: 'createTargetCollection',
-      requestData: collection,
-      successMessage: `Target collection ${collection.target_collection_name} created successfully!`,
-      errorMessage: `Failed to create target collection ${collection.target_collection_name}. Please try again.`
+    return await api.request.create({
+      method: 'createTargetCollection',
+      body: collection
     })
   }
 
   async function updateCollection(collection) {
     const collectionId = collection.target_collection_id
     const body = collection
-    return await api.process({
-      httpMethod: 'updateTargetCollection',
-      requestData: { collectionId, body },
-      successMessage: `Target collection ${collection.target_collection_name} updated successfully!`,
-      errorMessage: `Failed to update target collection ${body.target_collection_name}. Please try again.`
+    return await api.request.update({
+      method: 'updateTargetCollection',
+      body: { collectionId, body }
     })
   }
 
   async function deleteCollection({ collectionId, collectionName, deleteOrphanCompounds }) {
     activeCollection.value = {} // TODO check if this should be null or call unload
-    return await api.process({
-      httpMethod: 'deleteTargetCollection',
-      requestData: { collectionId, collectionName, deleteOrphanCompounds },
-      successNotificationType: 'deleted',
-      successMessage: `Target collection ${collectionName} was deleted successfully!`,
-      errorMessage: `Failed to delete target collection ${collectionName}. Please try again.`
+    return await api.request.delete({
+      method: 'deleteTargetCollection',
+      body: { collectionId, collectionName, deleteOrphanCompounds }
     })
   }
 
@@ -204,7 +151,8 @@ export const useTargetsStore = defineStore('targets', () => {
     )
 
     // If a collection is selected, fetch its details
-    const selectedCollections = targetCollectionsSelected.value
+    const selectedCollections =
+      targetCollectionsAll.value?.filter((row) => row.selection >= 2) ?? []
     if (selectionValue === 2 && selectedCollections.length === 1) {
       await loadActiveCollection(collectionId)
     } else {
@@ -223,9 +171,6 @@ export const useTargetsStore = defineStore('targets', () => {
     // getters
     getAllCollections,
     getAllCompounds,
-    getTargetsCollections,
-    getCalibrantsCollections,
-    getDiagnosticsCollections,
     getCollection,
     collectionTypes,
     alarmsList,
@@ -237,7 +182,6 @@ export const useTargetsStore = defineStore('targets', () => {
     loadActiveCollection,
     reload,
     unload,
-    processSpreadsheetInput,
     getAllTargetCollections,
     getTargetCollection,
     getAllTargetCompounds,

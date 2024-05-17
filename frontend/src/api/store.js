@@ -6,7 +6,9 @@ export async function apiPlugin({ store }) {
   // REGISTER EVENT HANDLERS
 
   let handlers = Object.keys(store)
-    .filter((path) => getAction(path).startsWith(HANDLER_PREFIX))
+    .filter(
+      (path) => getAction(path).startsWith(HANDLER_PREFIX) && getAction(path) !== HANDLER_PREFIX
+    )
     .map((path) => ({ [getEvent(path)]: path }))
     .reduce((prev, curr) => ({ ...prev, ...curr }), {})
   // react to events using handlers if they exist

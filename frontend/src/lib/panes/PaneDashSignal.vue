@@ -1,0 +1,87 @@
+<script setup>
+import ScrollPanel from 'primevue/scrollpanel'
+import Tag from 'primevue/tag'
+
+import { computed, reactive } from 'vue'
+
+import { ChartSignalSpectrum, ChartSignalTimeseries } from '@/lib/charts'
+import {
+  ToolbarSettingsFilterIon,
+  ToolbarSettingsSignalCharts,
+  ToolbarMatchRating
+} from '@/lib/menus'
+import { useAppStore, useVisualizationStore, useBatchStore } from '@/stores'
+
+const appStore = useAppStore()
+const visualizationStore = useVisualizationStore()
+const batchStore = useBatchStore()
+
+const compound = computed(() =>
+  batchStore.targetCompounds.find(
+    ({ target_compound_id }) =>
+      target_compound_id == visualizationStore.activeIon.target_compound_id
+  )
+)
+
+const settings = reactive({
+  intensityScale: null
+})
+
+const score = new Intl.NumberFormat('en-US', {
+  style: 'percent',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2
+})
+</script>
+
+<template>
+  <ScrollPanel
+    style="height: calc(100vh - 150px); max-height: calc(100vh - 150px); position: relative"
+  >
+    <h1 style="text-align: center">
+      <Tag
+        :value="score.format(visualizationStore.activeIon.match_score)"
+        :severity="
+          Math.abs(visualizationStore.activeIon.match_score) >
+          visualizationStore.paramProbableMatchThreshold
+            ? 'danger'
+            : 'success'
+        "
+        style="font-size: large"
+      />
+      match: ion <i>{{ visualizationStore.activeIon.target_ion_formula }}</i>
+      for
+      <i>{{ visualizationStore.activeIon.sample_item_name }}</i> with target
+      <i>{{ compound.target_compound_formula }}</i>
+    </h1>
+    <div
+      class="col"
+      :style="`gap: 1rem; align-items: stretch; width: calc(${appStore.split.right}vw - 5rem)`"
+    >
+      <ChartSignalSpectrum :settings="settings" />
+      <ChartSignalTimeseries />
+    </div>
+    <div class="row k-match-tools">
+      <ToolbarSettingsFilterIon />
+      <ToolbarSettingsSignalCharts v-model:scale="settings.intensityScale" />
+      <ToolbarMatchRating />
+    </div>
+  </ScrollPanel>
+</template>
+
+<style scoped>
+.k-match-tools {
+  position: fixed;
+  top: 75px;
+  right: 15px;
+  z-index: 50;
+  justify-content: flex-end;
+  background-color: var(--p-panel-background);
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+}
+
+.k-match-tools :deep(*) {
+  margin: 0;
+}
+</style>

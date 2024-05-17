@@ -1,219 +1,196 @@
-import { ref } from 'vue'
+import { ref, reactive, computed, watch, watchEffect } from 'vue'
 import { defineStore } from 'pinia'
 
 import { api } from '@/api'
 
-import { useCalibrationStore } from './calibration'
+import { useNotification } from './notification'
+import { useMzFit } from './mzFit'
 import { useSampleStore } from './sample'
+import { useAppStore } from './app'
 
 export const useInstrumentStore = defineStore('instrument', () => {
+  const appStore = useAppStore()
+  const notification = useNotification()
+
   const active = ref(null)
-  const acquisitionActiveFilename = ref(null)
-  const acquisitionProgress = ref(0)
-  const acquisitions = ref(null)
-  const conversionProgress = ref(0)
-  const matchingProgress = ref(0)
+  const acquisitions = ref([])
+  const pending = reactive({
+    filename: null,
+    sampleItem: null,
+    acquisition: null,
+    conversion: null
+  })
+
+  const time = reactive({
+    mode: 'Last 24 hours',
+    range: null
+  })
+  const days = computed(() =>
+    time.mode == 'range' ? null : time.mode == 'Last 24 hours' ? 1 : Number(time.mode.split(' ')[1])
+  )
+  watchEffect(() => {
+    const range = time.range
+    if (range && range[0] && range[1]) {
+      time.mode = 'range'
+    }
+  })
+  watchEffect(() => {
+    const appStore = useAppStore()
+    if (appStore.mode?.measuring) {
+      time.mode = 'Last 24 hours'
+    }
+  })
+
   const mzCalibration = ref(null)
-  const recentAcquisitions = ref(null)
-  const sampleItemPending = ref(null)
-  const scenthoundModeActive = ref(false)
+  const orbi = computed(() => active.value?.instrument.toLowerCase().includes('orbi'))
+  // instrument
 
-  // data loading
+  watch(active, async (next, prev) => {
+    if (prev) await unload(prev.instrument)
+    load(next.instrument)
+  })
+
   async function load(instrument) {
-    if (active.value) await unload()
     api.emit('subscribe', instrument)
-    active.value = instrument
     await loadMzCalibration()
-    await loadRecentAcquisitions()
+    await loadAcquisitions()
   }
 
-  async function loadMzCalibration() {
-    const lastMzCalibration = await getLastMzCalibration()
-    if (!lastMzCalibration) return
-    mzCalibration.value = lastMzCalibration
+  async function unload(instrument) {
+    if (!instrument) return
+    api.emit('unsubscribe', instrument)
+    mzCalibration.value = null
+    acquisitions.value = null
+    await resetAcquisitionStatus()
   }
 
-  async function loadAcquisitions(datetimeRange) {
-    const sampleFiles = await getSampleFiles(datetimeRange)
-    if (!sampleFiles) return
-    acquisitions.value = sampleFiles
+  // acquisitions
+
+  watch(time, loadAcquisitions)
+
+  function loadAcquisitions() {
+    if (time.mode.startsWith('Last')) {
+      loadAcquisitionsRecent(days.value)
+    } else if (time.mode == 'range') {
+      const [min, max] = time.range
+      if (min && max) {
+        loadAcquisitionsRange({
+          min,
+          max
+        })
+      }
+    }
   }
 
-  async function loadRecentAcquisitions() {
-    const recentAcquisitionsData = await getRecentSampleFiles()
-    if (!recentAcquisitionsData) return
-    recentAcquisitions.value = recentAcquisitionsData
+  async function loadAcquisitionsRange(range) {
+    const sampleFiles = await (
+      await api.request.read({
+        method: 'getAllSampleFiles',
+        body: {
+          datetime_min: range.min.toISOString(),
+          datetime_max: range.max.toISOString(),
+          instrument: active.value,
+          sort: 'datetime_utc',
+          order: 'asc'
+        }
+      })
+    )?.data
+    if (sampleFiles) {
+      acquisitions.value = sampleFiles
+    }
+  }
+
+  async function loadAcquisitionsRecent(days = 7) {
+    const recent = (
+      await api.request.read({
+        method: 'getRecentSampleFiles',
+        body: {
+          instrument: active.value.instrument,
+          sort: 'datetime_utc',
+          order: 'asc',
+          days
+        }
+      })
+    )?.data
+    if (recent) {
+      acquisitions.value = recent
+    }
   }
 
   async function resetAcquisitionStatus() {
-    acquisitionActiveFilename.value = null
-    acquisitionProgress.value = 0
-    const calibrationStore = useCalibrationStore()
-    calibrationStore.calibrationStatus = null
-    conversionProgress.value = 0
-    matchingProgress.value = 0
+    pending.filename = null
+    const mzFit = useMzFit()
+    mzFit.status = null
   }
 
-  async function unload() {
-    if (!active.value) return
-    api.emit('unsubscribe', active.value)
-    active.value = null
-    mzCalibration.value = null
-    acquisitions.value = null
-    recentAcquisitions.value = null
-    await resetAcquisitionStatus()
-    scenthoundModeActive.value = false
-  }
-
-  async function matchSample() {
-    const sampleStore = useSampleStore()
-    const calibrationVerified = sampleStore.active?.mz_calibration.verified
-    if (calibrationVerified) {
-      await sampleStore.matchSampleCompute(sampleStore.active)
-    } else {
-      // Try again in 1 second if scenthound is still opened
-      if (!scenthoundModeActive.value) return
-      setTimeout(() => {
-        matchSample()
-      }, 1000)
-    }
-  }
-
-  // http client endpoints
-  async function getSampleFiles(datetimeRange) {
-    const reqData = {
-      datetime_min: datetimeRange.min.toISOString(),
-      datetime_max: datetimeRange.max.toISOString(),
-      instrument: active.value,
-      sort: 'datetime_utc',
-      order: 'asc'
-    }
-
-    const sampleFiles = await api.request({
-      httpMethod: 'getAllSampleFiles',
-      requestData: reqData
-    })
-    return sampleFiles?.data ?? null
-  }
-
-  async function getRecentSampleFiles() {
-    const reqData = {
-      instrument: active.value,
-      sort: 'datetime_utc',
-      order: 'asc'
-    }
-
-    const sampleFiles = await api.request({
-      httpMethod: 'getRecentSampleFiles',
-      requestData: reqData
-    })
-    return sampleFiles?.data ?? null
-  }
-
-  async function getLastMzCalibration() {
-    const reqData = {
-      instrument: active.value
-    }
-
-    const mzCalibration = await api.request({
-      httpMethod: 'getMzCalibration',
-      requestData: reqData
-    })
-
-    return mzCalibration
-  }
-
-  // backend notifications
-  async function onInstrumentAcquisitionFinished({ filename, progress }) {
-    acquisitionActiveFilename.value = filename
-    acquisitionProgress.value = progress
-  }
-  async function onInstrumentAcquisitionProgress({ filename, progress }) {
-    acquisitionActiveFilename.value = filename
-    acquisitionProgress.value = progress
-  }
-  async function onInstrumentAcquisitionStarted({ filename, progress }) {
-    const sampleStore = useSampleStore()
-    await sampleStore.unload()
-    await resetAcquisitionStatus()
-    acquisitionActiveFilename.value = filename
-    acquisitionProgress.value = progress
-  }
-  async function onInstrumentConversionFinished({ progress }) {
-    conversionProgress.value = progress
-    // Wait for sample to be saved, then start mass calibration
-    if (scenthoundModeActive.value) {
-      const calibrationStore = useCalibrationStore()
-      calibrationStore.calibrationMzCalibrateSample()
-    }
-  }
-  async function onInstrumentConversionProgress({ progress }) {
-    conversionProgress.value = progress
-  }
-  async function onInstrumentConversionStarted({ progress }) {
-    conversionProgress.value = progress
-  }
-  async function onMatchItemComputeStarted({ progress }) {
-    matchingProgress.value = progress
-  }
-  async function onMatchItemComputeProgress({ progress }) {
-    matchingProgress.value = progress
-  }
-  async function onMatchItemComputeFinished({ progress }) {
-    matchingProgress.value = progress
-    // TODO: case: background, verify interferences
-    // TODO: case: else, display matches
-  }
-  async function onMatchItemComputeFailed({ progress }) {
-    matchingProgress.value = progress
-  }
-  async function onSampleFileCreated() {
-    console.log('onSampleFileCreated')
-    await loadRecentAcquisitions()
-    if (scenthoundModeActive.value) {
-      console.log('scenthound active')
-      if (sampleItemPending.value) {
-        console.log('sample item pending')
-        const sampleStore = useSampleStore()
-        await sampleStore.create(sampleItemPending.value)
-        sampleItemPending.value = null
+  notification.on('instrument_acquisition', ({ process_id, data, status }) => {
+    if (appStore.mode.measuring) {
+      // acquisition started
+      if (process_id !== pending.acquisition) {
+        resetAcquisitionStatus()
+        pending.acquisition = process_id
+        pending.filename = data?.filename
+      } else {
+        if (status !== 'pending') {
+          pending.acquisition = null
+        }
       }
     }
+  })
+
+  notification.on('instrument_conversion', ({ process_id, data, status }) => {
+    if (appStore.mode.measuring) {
+      // conversion started
+      if (process_id !== pending.conversion) {
+        resetAcquisitionStatus()
+        pending.conversion = process_id
+        if (orbi.value) {
+          pending.filename = data?.filename
+        }
+      } else {
+        if (status !== 'pending') {
+          pending.conversion = null
+        }
+      }
+    }
+  })
+
+  // measurement mode
+  notification.on('create_sample_file', async () => {
+    loadAcquisitions()
+    if (pending.sampleItem) {
+      const sampleStore = useSampleStore()
+      await sampleStore.process(pending.sampleItem)
+      pending.sampleItem = null
+    }
+  })
+
+  // mz calibration
+
+  async function loadMzCalibration() {
+    const lastMzCalibration = (
+      await api.request.read({
+        method: 'getMzCalibration',
+        body: {
+          instrument: active.value.instrument
+        }
+      })
+    )?.data
+    if (!lastMzCalibration) return
+    mzCalibration.value = lastMzCalibration
   }
 
   return {
     // state
     active,
-    acquisitionActiveFilename,
-    acquisitionProgress,
     acquisitions,
-    conversionProgress,
-    matchingProgress,
+    pending,
+    time,
     mzCalibration,
-    recentAcquisitions,
-    sampleItemPending,
-    scenthoundModeActive,
     // actions
     load,
-    loadMzCalibration,
-    loadAcquisitions,
-    loadRecentAcquisitions,
-    resetAcquisitionStatus,
     unload,
-    matchSample,
-    getSampleFiles,
-    getRecentSampleFiles,
-    getLastMzCalibration,
-    onInstrumentAcquisitionFinished,
-    onInstrumentAcquisitionProgress,
-    onInstrumentAcquisitionStarted,
-    onInstrumentConversionFinished,
-    onInstrumentConversionProgress,
-    onInstrumentConversionStarted,
-    onMatchItemComputeFailed,
-    onMatchItemComputeFinished,
-    onMatchItemComputeProgress,
-    onMatchItemComputeStarted,
-    onSampleFileCreated
+    loadAcquisitions,
+    resetAcquisitionStatus
   }
 })

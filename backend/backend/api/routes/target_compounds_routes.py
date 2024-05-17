@@ -35,7 +35,7 @@ async def get_target_compound_route(target_compound_id: str):
 
 @target_compounds_router.post("/api/target_compounds")
 @api_route(
-    status_code_success=201,
+    status_code=201,
     include_message=True,
     success_message="Target compounds created successfully",
 )

@@ -3,12 +3,14 @@ import { defineStore } from 'pinia'
 
 import { api } from '@/api'
 
-import { useAppStore } from './app'
+import { useNotification } from './notification'
 import { useBatchStore } from './batch'
-import { useCalibrationStore } from './calibration'
+import { useMzFit } from './mzFit'
 import { useTargetsStore } from './targets'
 
 export const useSampleStore = defineStore('sample', () => {
+  const notification = useNotification()
+
   const active = ref(null)
   // matches
   const matched = ref(null)
@@ -40,23 +42,44 @@ export const useSampleStore = defineStore('sample', () => {
 
   // data loading
   async function load(sample) {
+    if (!sample) return
     // reset if previous sample loaded
     if (active.value) await unload()
     const sampleItemId = sample.sample_item_id
     api.emit('subscribe', sampleItemId)
     active.value = sample
     await loadSampleData(sampleItemId)
-    const calibrationStore = useCalibrationStore()
-    await calibrationStore.load(sample)
+    const mzFit = useMzFit()
+    await mzFit.load(sample)
   }
 
   async function loadSampleData(sampleItemId) {
     // Check if matches exist for the given sampleItemId
-    const sampleMatches = await getSampleMatches(sampleItemId)
+    const sampleMatches = (
+      await api.request.read({
+        method: 'getAllMatches',
+        body: {
+          sample_item_id: sampleItemId
+        }
+      })
+    )?.data
     matched.value = sampleMatches.length > 0 ? 1 : 0
 
     // Get detailed sample data
-    const sampleData = await getSampleData(sampleItemId)
+    const targetsStore = useTargetsStore()
+    const alarms_list = targetsStore.alarmsList
+
+    const sampleData = (
+      await api.request.read({
+        method: 'getSample',
+        body: {
+          sampleId: sampleItemId,
+          body: {
+            alarms_list
+          }
+        }
+      })
+    )?.data
     if (!sampleData) return
     // Set the selection of the active collection
     const targetStore = useTargetsStore()
@@ -86,8 +109,8 @@ export const useSampleStore = defineStore('sample', () => {
     matchIons.value = null
     matchIsotopes.value = null
 
-    const calibrationStore = useCalibrationStore()
-    calibrationStore.unload(null) // should this be awaited?
+    const mzFit = useMzFit()
+    mzFit.unload(null) // should this be awaited?
   }
 
   async function reload(sample = null) {
@@ -98,114 +121,97 @@ export const useSampleStore = defineStore('sample', () => {
     }
   }
 
-  // http client endpoints
-  async function getSampleData(sampleId) {
-    const targetStore = useTargetsStore()
-    const alarmsList = targetStore.alarmsList
-
-    const body = {
-      alarms_list: alarmsList
-    }
-
-    const sampleData = await api.request({
-      httpMethod: 'getSample',
-      requestData: {
-        sampleId,
-        body
-      }
-    })
-    return sampleData?.data || null
-  }
-
-  async function getSampleMatches(sampleItemId) {
-    const sampleMatches = await api.request({
-      httpMethod: 'getAllMatches',
-      requestData: {
-        sample_item_id: sampleItemId
-      },
-      errorMessage: `Failed to check for matches of the sample.`
-    })
-    return sampleMatches.data
-  }
+  notification.on('create_sample_item', async ({ data }) => {
+    const batchStore = useBatchStore()
+    await batchStore.reload()
+    const sampleItem = batchStore.sampleItem(data?.sample_item_id)
+    await load(sampleItem)
+  })
 
   async function create(sample) {
-    await api.http.createSampleItem(sample)
+    return await api.request.create({
+      method: 'createSampleItem',
+      body: sample
+    })
+  }
+  async function process(sample) {
+    const mzFit = useMzFit()
+    const targetsStore = useTargetsStore()
+    return await api.request.process({
+      method: 'processSampleItem',
+      body: {
+        sample,
+        params: mzFit.params,
+        alarms: targetsStore.alarmsList
+      }
+    })
   }
   async function update(sample) {
-    await api.http.updateSampleItem(sample.sample_item_id, sample)
+    const sampleId = sample.sample_item_id
+    const body = sample
+    return await api.request.update({
+      method: 'updateSampleItem',
+      body: { sampleId, body }
+    })
   }
-  async function deleteSampleItem(sampleItemId) {
-    await api.http.deleteSampleItem(sampleItemId)
+  async function deleteSampleItem(sampleId) {
+    return await api.request.delete({
+      method: 'deleteSampleItem',
+      body: { sampleId }
+    })
   }
   async function matchSampleCompute(sample) {
     const sampleId = sample.sample_item_id
-    await api.http.matchSampleCompute({ sampleId })
+    return await api.request.process({
+      method: 'matchSampleCompute',
+      body: { sampleId }
+    })
   }
   async function matchSampleRematch(sample) {
     const sampleId = sample.sample_item_id
-    await api.http.matchSampleRematch({ sampleId })
+    return await api.request.process({
+      method: 'rematchSample',
+      body: { sampleId }
+    })
   }
 
   async function copySample(sample) {
-    const sampleId = sample.sample_item_id
-    const body = {
-      sample_batch_id: sample.sample_batch_id,
-      sample_item_name: sample.sample_item_name
-    }
-    return await api.process({
-      httpMethod: 'copySampleItem',
-      requestData: { sampleId, body },
-      progressNotificationPayload: {
-        action: 'copy',
-        type: 'sample',
-        message: `Copying sample "${body.sample_item_name}" to "${body.workspace_name}/${body.sample_batch_name}", please wait`
+    return await api.request.process({
+      method: 'copySampleItem',
+      body: {
+        sampleId: sample.sample_item_id,
+        body: {
+          sample_batch_id: sample.sample_batch_id,
+          sample_item_name: sample.sample_item_name
+        }
       }
     })
   }
 
   // Attribute templates
-  async function createAttributeTemplate(newTemplate) {
-    return await api.process({
-      httpMethod: 'createAttributeTemplate',
-      requestData: newTemplate,
-      successMessage: `Attribute template "${newTemplate.name}" created successfully!`,
-      errorMessage: `Failed to create attribute template "${newTemplate.name}". Please try again.`
-    })
-  }
-
-  async function updateAttributeTemplate(template) {
-    const templateId = template.attribute_template_id
-    const body = template
-    return await api.process({
-      httpMethod: 'updateAttributeTemplate',
-      requestData: { templateId, body },
-      successMessage: `Attribute template "${template.name}" updated successfully!`,
-      errorMessage: `Failed to update attribute template "${template.name}". Please try again.`
-    })
-  }
-
-  async function deleteAttributeTemplate(template) {
-    const templateId = template.attribute_template_id
-    const templateName = template.name
-    return await api.process({
-      httpMethod: 'deleteAttributeTemplate',
-      requestData: { templateId, templateName },
-      successNotificationType: 'deleted',
-      successMessage: `Attribute template "${templateName}" was deleted successfully!`,
-      errorMessage: `Failed to delete attribute template ${templateName}. Please try again.`
-    })
-  }
-
-  // backend notifications
-  async function onSampleItemCreated(sample_item_id) {
-    const batchStore = useBatchStore()
-    await batchStore.reload(null)
-    const sampleItem = batchStore.sampleItem(sample_item_id)
-    await load(sampleItem)
-  }
-  async function onSampleProcessingFinished() {
-    console.log(`sample item processing was finished`)
-    // TODO can be used for the Scenthound Page and for 'Process File' buttnon on the Home page for processing 1 selected sample_file
+  const template = {
+    create: async (newTemplate) => {
+      return await api.request.create({
+        method: 'createAttributeTemplate',
+        body: newTemplate
+      })
+    },
+    update: async (template) => {
+      const templateId = template.attribute_template_id
+      const body = template
+      return await api.request.update({
+        method: 'updateAttributeTemplate',
+        body: { templateId, body }
+      })
+    },
+    delete: async (template) => {
+      const templateId = template.attribute_template_id
+      const templateName = template.name
+      return await api.request.delete({
+        method: 'deleteAttributeTemplate',
+        body: { templateId, templateName }
+      })
+    }
   }
 
   // selection
@@ -240,19 +246,14 @@ export const useSampleStore = defineStore('sample', () => {
     loadSampleData,
     unload,
     reload,
-    getSampleData,
-    getSampleMatches,
     create,
+    process,
     update,
     deleteSampleItem,
     matchSampleCompute,
     matchSampleRematch,
     copySample,
-    createAttributeTemplate,
-    updateAttributeTemplate,
-    deleteAttributeTemplate,
-    onSampleItemCreated,
-    onSampleProcessingFinished,
+    template,
     updateCollectionSelection
   }
 })

@@ -2,16 +2,18 @@ from sqlalchemy import asc, desc, func
 from sqlalchemy.future import select
 from datetime import datetime
 from backend.db import async_session
-from backend.api_sio import sio
 from lib.file_func import load_file
 from lib.peak import get_peaks
 from backend.db.id import gen_id
-from ..utils.api_features import api_controller
+from ..utils.api_features import api_controller, emit_user_notification
 from ..exceptions import NotFoundException
 from ..models.models import SampleFile
 from ..models.pydantic_models.sample_file_pydantic_model import (
     SampleFileCreate,
     SampleFileUpdate,
+)
+from ..models.pydantic_models.user_notification_pydantic_model import (
+    UserNotification,
 )
 
 # ===================================================================
@@ -159,13 +161,18 @@ async def create_sample_file(sample_file: SampleFileCreate) -> dict:
         # Step 3: Refresh instance
         await session.refresh(new_sample_file)
 
-        # Step 4: Emit event
-        # TODO_notifications Refactor notifications
-        await sio.emit(
-            "sample_file_created",
-            {"filename": sample_file.filename, "instrument": sample_file.instrument},
-            namespace="/",
+        # Step 4: Emit create_sample_file event
+        notification = UserNotification(
+            process_id=gen_id(8),
+            type="create_sample_file",
+            status="success",
+            message=f"Sample file record '{sample_file.filename}' created.",
+            data={
+                "filename": sample_file.filename,
+                "instrument": sample_file.instrument,
+            },
         )
+        await emit_user_notification(notification, sample_file.instrument)
 
         # Step 5: Return created sample file
         return new_sample_file.to_dict()

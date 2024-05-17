@@ -5,7 +5,6 @@ import { api } from '@/api'
 
 import { useTargetsStore } from './targets.js'
 import { useSampleStore } from './sample.js'
-import { useNotificationStore } from './notification.js'
 import { useWorkspaceStore } from './workspace.js'
 
 export const useBatchStore = defineStore('batch', () => {
@@ -26,6 +25,8 @@ export const useBatchStore = defineStore('batch', () => {
   const paramCalibrationCollection = ref([])
   const paramIonMechanisms = ref([])
 
+  const loading = ref(false)
+
   // getters
 
   // get row from id
@@ -33,54 +34,15 @@ export const useBatchStore = defineStore('batch', () => {
     () => (sampleItemId) =>
       sampleItems.value.find((row) => row.sample_item_id == sampleItemId) ?? null
   )
-  const targetCollection = computed(
-    () => (targetCollectionId) =>
-      targetCollections.value.find((row) => row.target_collection_id == targetCollectionId) ?? null
-  )
-  const targetCompound = computed(
-    () => (targetCompoundId) =>
-      targetCompounds.value.find((row) => row.target_compound_id == targetCompoundId) ?? null
-  )
-  const targetIon = computed(
-    () => (targetIonId) => targetIons.value.find((row) => row.target_ion_id == targetIonId) ?? null
-  )
-  const targetIsotope = computed(
-    () => (targetIsotopeId) =>
-      targetIsotopes.value.find((row) => row.target_isotope_id == targetIsotopeId) ?? null
-  )
-  // get selected
-  const sampleItemsSelected = computed(() =>
-    sampleItems.value.filter((sampleItem) => sampleItem.selection >= 2)
-  )
-  const sampleItemFocused = computed(
-    () => sampleItems.value.find((sampleItem) => sampleItem.selection == 3) ?? null
-  )
-  const targetCollectionsSelected = computed(() =>
-    targetCollections.value.filter((row) => row.selection >= 2)
-  )
-  const targetCompoundsSelected = computed(() =>
-    targetCompounds.value.filter((row) => row.selection >= 2)
-  )
-  const targetIonsSelected = computed(() => targetIons.value.filter((row) => row.selection >= 2))
-  const targetIsotopesSelected = computed(() =>
-    targetIsotopes.value.filter((row) => row.selection >= 2)
-  )
-
-  // actions
-
-  function setCollectionSelection({ collectionId, selectionValue }) {
-    const collection = targetCollections.value?.find(
-      (coll) => coll.target_collection_id === collectionId
-    )
-    if (collection) collection.selection = selectionValue
-  }
 
   // data loading
   async function load(batchId) {
+    loading.value = true
     if (active.value) await unload()
     api.emit('subscribe', batchId)
     await loadBatch(batchId)
     await loadBatchSamplesData(batchId)
+    loading.value = false
     await unpackParams()
     await loadBatchTargets(batchId)
   }
@@ -103,9 +65,21 @@ export const useBatchStore = defineStore('batch', () => {
   }
 
   async function loadBatchTargets(batchId) {
-    const batchTargetsData = await getBatchTargets(batchId)
-    if (!batchTargetsData) return
-    let newTargetCollections = batchTargetsData.target_collections
+    const targetsStore = useTargetsStore()
+    const alarms_list = targetsStore.alarmsList
+    const batchTargets = (
+      await api.request.read({
+        method: 'getBatchTargets',
+        body: {
+          batchId,
+          body: {
+            alarms_list
+          }
+        }
+      })
+    )?.data
+    if (!batchTargets) return
+    let newTargetCollections = batchTargets.target_collections
 
     const targetStore = useTargetsStore()
     const activeCollection = targetStore.activeCollection
@@ -123,9 +97,9 @@ export const useBatchStore = defineStore('batch', () => {
       })
     }
     targetCollections.value = newTargetCollections
-    targetCompounds.value = batchTargetsData.target_compounds
-    targetIons.value = batchTargetsData.target_ions
-    targetIsotopes.value = batchTargetsData.target_isotopes
+    targetCompounds.value = batchTargets.target_compounds
+    targetIons.value = batchTargets.target_ions
+    targetIsotopes.value = batchTargets.target_isotopes
   }
 
   async function reload(batch = null) {
@@ -150,10 +124,11 @@ export const useBatchStore = defineStore('batch', () => {
         (coll) => coll.target_collection_id === activeCollectionId
       )
       if (matchingCollection) {
-        setCollectionSelection({
-          collectionId: activeCollectionId,
-          selectionValue: 2
-        })
+        // set collection selection
+        const collection = targetCollections.value?.find(
+          (coll) => coll.target_collection_id === activeCollectionId
+        )
+        if (collection) collection.selection = 2
       } else {
         // Dispatch to targets module to update selection there as well
         targetStore.updateCollectionSelection({
@@ -206,9 +181,9 @@ export const useBatchStore = defineStore('batch', () => {
 
   // http client endpoints
   async function getBatch(batchId) {
-    return await api.request({
-      httpMethod: 'getBatch',
-      requestData: { batchId }
+    return await api.request.read({
+      method: 'getBatch',
+      body: { batchId }
     })
   }
 
@@ -223,70 +198,41 @@ export const useBatchStore = defineStore('batch', () => {
       alarms_list: alarmsList
     }
 
-    return await api.request({
-      httpMethod: 'getAllSamples',
-      requestData: body
+    return await api.request.read({
+      method: 'getAllSamples',
+      body: body
     })
   }
 
-  async function getBatchTargets(batchId) {
-    const targetStore = useTargetsStore()
-    const alarmsList = targetStore.alarmsList
-
-    const reqData = {
-      batchId,
-      body: {
-        alarms_list: alarmsList
-      }
-    }
-    const batchTargetsData = await api.request({
-      httpMethod: 'getBatchTargets',
-      requestData: reqData
-    })
-    if (!batchTargetsData) return
-    return batchTargetsData.data
-  }
-
-  async function importSamplesToBatch(data) {
+  async function importItems(data) {
     const body = {
       sample_items: data.sample_items
     }
     const batch = data.batch
-    return await api.process({
-      httpMethod: 'importSamplesToBatch',
-      requestData: { batch, body },
-      successMessage: `Sample batch "${batch.sample_batch_name}" import started`,
-      errorMessage: `Failed to import sample batch "${batch.sample_batch_name}". Please try again.`
+    return await api.request.process({
+      method: 'importSamplesToBatch',
+      body: { batch, body }
     })
   }
   async function createBatch(newBatch) {
-    return await api.process({
-      httpMethod: 'createBatch',
-      requestData: newBatch,
-      successMessage: `Sample batch "${newBatch.sample_batch_name}" created successfully!`,
-      errorMessage: `Failed to create sample batch "${newBatch.sample_batch_name}". Please try again.`
+    return await api.request.create({
+      method: 'createBatch',
+      body: newBatch
     })
   }
   async function updateBatch(newBatch) {
     const batchId = newBatch.sample_batch_id
     const body = newBatch
-    return await api.process({
-      httpMethod: 'updateBatch',
-      requestData: { batchId, body },
-      successMessage: `Sample batch "${newBatch.sample_batch_name}"  updated successfully!`,
-      errorMessage: `Failed to update sample batch "${newBatch.sample_batch_name}". Please try again.`
+    return await api.request.update({
+      method: 'updateBatch',
+      body: { batchId, body }
     })
   }
 
   async function deleteBatch(batch) {
-    return await api.process({
-      httpMethod: 'deleteBatch',
-      requestData: batch,
-      progressNotificationPayload: {
-        action: 'delete',
-        type: 'batch',
-        message: `Deleting batch "${batch.sample_batch_name}", please wait`
-      }
+    return await api.request.process({
+      method: 'deleteBatch',
+      body: batch
     })
   }
   async function copyBatch(batchCopyData) {
@@ -296,44 +242,26 @@ export const useBatchStore = defineStore('batch', () => {
       sample_batch_name: batchCopyData.sample_batch_name,
       sample_batch_description: batchCopyData.sample_batch_description
     }
-    return await api.process({
-      httpMethod: 'copySampleBatch',
-      requestData: { batchId, body },
-      progressNotificationPayload: {
-        action: 'copy',
-        type: 'batch',
-        message: `Copying batch "${batchCopyData.sample_batch_name}" to the workspace "${batchCopyData.workspace_name}", please wait`
-      }
+    return await api.request.process({
+      method: 'copySampleBatch',
+      body: { batchId, body }
     })
   }
 
-  async function batchExportPeakData(sampleBatch) {
-    return await api.process({
-      httpMethod: 'batchExportPeakData',
-      requestData: sampleBatch,
-      progressNotificationPayload: {
-        action: 'export',
-        type: 'peaks',
-        message: `Exporting peak data for batch "${sampleBatch.sample_batch_name}", please wait.`
-      }
+  async function exportPeaks(sampleBatch) {
+    return await api.request.process({
+      method: 'batchExportPeakData',
+      body: sampleBatch
     })
   }
 
   async function rematchBatch(batch = null) {
     const batchId = batch?.sample_batch_id ?? active.value.sample_batch_id
-    const body = {}
-    try {
-      await api.http.rematchBatch({ batchId, body })
-    } catch (error) {
-      // TODO_error_handling and use handleApiRequest for start notification
-      console.error(`Failed to rematch batch.`, error)
-      const userErrorMessage = `${error.message}. ${error}`
-      const notificationStore = useNotificationStore()
-      notificationStore.showGeneralNotification({
-        notification: 'error',
-        message: userErrorMessage
-      })
-    }
+    if (!batchId) return
+    return await api.request.process({
+      method: 'rematchBatch',
+      body: { batchId }
+    })
   }
 
   // backend notifications
@@ -344,9 +272,8 @@ export const useBatchStore = defineStore('batch', () => {
   // selection
   async function batchToggle(batch) {
     const workspaceStore = useWorkspaceStore()
-    workspaceStore.batches.forEach((row) => (row.selection = 0))
-    const active_batch_id = active.value?.sample_batch_id ?? null
-    if (active_batch_id == batch.sample_batch_id) {
+    //workspaceStore.batches.forEach((row) => (row.selection = 0))
+    if (!batch || active.value?.sample_batch_id == batch?.sample_batch_id) {
       unload()
     } else {
       load(batch.sample_batch_id)
@@ -355,97 +282,11 @@ export const useBatchStore = defineStore('batch', () => {
         .forEach((row) => (row.selection = 2))
     }
   }
-  // Sample selection toggling
-  async function sampleItemFocus(sampleItemFocused) {
-    const sampleItemFocusedId = sampleItemFocused.sample_item_id
-    sampleItems.value
-      .filter((row) => row.sample_item_id != sampleItemFocusedId && row.selection == 3)
-      .forEach((item) => (item.selection = 0))
-    sampleItemFocused = sampleItem.value(sampleItemFocusedId)
-    const sampleStore = useSampleStore()
-    switch (sampleItemFocused.selection) {
-      case 0:
-      case 2:
-        // Focus
-        sampleItemFocused.selection = 3
-        await sampleStore.load(sampleItemFocused)
-        break
-      case 3:
-        // Unfocus
-        sampleItemFocused.selection = 0
-        await sampleStore.unload(null)
-        break
-    }
-  }
-  async function sampleItemToggle(sampleItemToggled) {
-    const sampleItemToggledId = sampleItemToggled.sample_item_id
-    sampleItems.value
-      .filter((row) => row.sample_item_id != sampleItemToggledId && row.selection == 2)
-      .forEach((item) => (item.selection = 0))
-    sampleItemToggled = sampleItem.value(sampleItemToggledId)
-    switch (sampleItemToggled.selection) {
-      case 0:
-        // Select
-        sampleItemToggled.selection = 2
-        break
-      case 2:
-        // Unselect
-        sampleItemToggled.selection = 0
-        break
-      case 3:
-        // Stay focused
-        sampleItemToggled.selection = 3
-        break
-    }
-  }
-  // target collection selection toggling
-  async function targetCollectionToggle(targetCollectionToggled) {
-    const targetCollectionToggledId = targetCollectionToggled.target_collection_id
-    targetCollections.value
-      ?.filter((row) => row.target_collection_id != targetCollectionToggledId && row.selection == 2)
-      .forEach((collection) => (collection.selection = 0))
-    targetCollectionToggled = targetCollection.value(targetCollectionToggledId)
-    switch (targetCollectionToggled.selection) {
-      case 0:
-        setCollectionSelection({
-          collectionId: targetCollectionToggledId,
-          selectionValue: 2
-        })
-        break
-      case 2:
-        // Unselect
-        setCollectionSelection({
-          collectionId: targetCollectionToggledId,
-          selectionValue: 0
-        })
-        break
-      case 3:
-        // Stay focused
-        setCollectionSelection({
-          collectionId: targetCollectionToggledId,
-          selectionValue: 3
-        })
-        break
-    }
-    // Dispatch to targets module to update selection there as well
-    const targetStore = useTargetsStore()
-    targetStore.updateCollectionSelection({
-      collectionId: targetCollectionToggledId,
-      selectionValue: targetCollectionToggled.selection
-    })
-    // Dispatch to sample module if sample is active to update selection there as well
-    const sampleStore = useSampleStore()
-    if (sampleStore.matchCollections?.length > 0) {
-      sampleStore.updateCollectionSelection({
-        collectionId: targetCollectionToggledId,
-        selectionValue: targetCollectionToggled.selection
-      })
-    }
-  }
 
   return {
     // state
     active,
+    loading,
     sampleItems,
     targetCollections,
     targetCompounds,
@@ -458,40 +299,18 @@ export const useBatchStore = defineStore('batch', () => {
     paramIonMechanisms,
     // getters
     sampleItem,
-    targetCollection,
-    targetCompound,
-    targetIon,
-    targetIsotope,
-    sampleItemsSelected,
-    sampleItemFocused,
-    targetCollectionsSelected,
-    targetCompoundsSelected,
-    targetIonsSelected,
-    targetIsotopesSelected,
     // actions
-    setCollectionSelection,
     load,
-    loadBatch,
-    loadBatchSamplesData,
-    loadBatchTargets,
     reload,
     unload,
-    resetParams,
-    unpackParams,
-    getBatch,
-    getBatchSamplesData,
-    getBatchTargets,
-    importSamplesToBatch,
+    importItems,
     createBatch,
     updateBatch,
     deleteBatch,
     copyBatch,
-    batchExportPeakData,
+    exportPeaks,
     rematchBatch,
     onSampleBatchReload,
-    batchToggle,
-    sampleItemFocus,
-    sampleItemToggle,
-    targetCollectionToggle
+    batchToggle
   }
 })

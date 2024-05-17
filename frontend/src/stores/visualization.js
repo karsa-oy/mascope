@@ -1,9 +1,10 @@
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { defineStore } from 'pinia'
 
 import { api, snakeToCamel } from '@/api'
 
 import { useTargetsStore } from './targets'
+import { useWorkspaceStore } from './workspace'
 
 export const useVisualizationStore = defineStore('visualization', () => {
   // state
@@ -21,6 +22,8 @@ export const useVisualizationStore = defineStore('visualization', () => {
   // chart data
   const tracesSignalTimeseries = ref(null)
   const tracesSignalSumSpectrum = ref(null)
+
+  const current = ref(null)
 
   // TODO_configuration Default filter parameters
   const paramDefaults = {
@@ -57,6 +60,12 @@ export const useVisualizationStore = defineStore('visualization', () => {
 
     await loadMatches({ sampleId, ionId, collectionId })
     await loadVisualizationIonFocus({ sampleId, ionId })
+    current.value = {
+      sampleId,
+      ionId,
+      collectionId,
+      filterParams
+    }
   }
 
   async function loadMatches(params = {}) {
@@ -69,7 +78,7 @@ export const useVisualizationStore = defineStore('visualization', () => {
       ionId,
       collectionId
     })
-
+    if (!sampleIonData) return
     const existingIsotopes = activeIsotopes.value
 
     activeIsotopes.value = sampleIonData.match_isotopes.map((isotope) => {
@@ -127,7 +136,16 @@ export const useVisualizationStore = defineStore('visualization', () => {
     if (!activeIon.value) return
     activeIon.value = null
     activeIsotopes.value = null
+    current.value = null
   }
+
+  const workspaceStore = useWorkspaceStore()
+  watch(
+    computed(() => workspaceStore.active),
+    () => {
+      unload()
+    }
+  )
 
   // parameters
   async function setFilterParams(params = null) {
@@ -174,21 +192,20 @@ export const useVisualizationStore = defineStore('visualization', () => {
       alarms_list: alarmsList
     }
 
-    const sampleIonData = await api.request({
-      httpMethod: 'getSampleIonMatches',
-      requestData: {
+    const sampleIonData = await api.request.read({
+      method: 'getSampleIonMatches',
+      body: {
         sampleId,
         body
-      },
-      errorMessage: `Failed to load sample ion data.`
+      }
     })
-    return sampleIonData.data
+    return sampleIonData?.data ?? null
   }
 
   async function getVisualizationIonFocus({ sampleId, ionId }) {
-    return await api.request({
-      httpMethod: 'getVisualizationIonFocus',
-      requestData: {
+    return await api.request.read({
+      method: 'getVisualizationIonFocus',
+      body: {
         sample_item_id: sampleId,
         target_ion_id: ionId,
         min_isotope_abundance: paramMinIsotopeAbundance.value,
@@ -199,11 +216,9 @@ export const useVisualizationStore = defineStore('visualization', () => {
   }
 
   async function submitMatchRating(newMatchRating) {
-    return await api.process({
-      httpMethod: 'submitMatchRating',
-      requestData: newMatchRating,
-      successMessage: 'Rating submitted successfully. Thanks for your feedback!',
-      errorMessage: 'Failed to submit rating. Please try again.'
+    return await api.request.create({
+      method: 'submitMatchRating',
+      body: newMatchRating
     })
   }
   async function saveFilterParams() {
@@ -224,11 +239,9 @@ export const useVisualizationStore = defineStore('visualization', () => {
         }
       }
     }
-    return await api.process({
-      httpMethod: 'updateTargetIon',
-      requestData: targetIonUpdate,
-      successMessage: `Filtering parameters for ${targetIonUpdate.target_ion_formula} saved successfully!`,
-      errorMessage: 'Failed to save filtering parameters. Please try again.'
+    return await api.request.update({
+      method: 'saveTargetIonFilterParams',
+      body: targetIonUpdate
     })
   }
   async function deleteInstrumentFilterParams() {
@@ -239,17 +252,14 @@ export const useVisualizationStore = defineStore('visualization', () => {
         delete_instrument_filters: activeIon.value.instrument
       }
     }
-    return await api.process({
-      httpMethod: 'updateTargetIon',
-      requestData: targetIonUpdate,
-      successMessage: `Filtering parameters for ${targetIonUpdate.body.delete_instrument_filters} instrument were deleted successfully!`,
-      errorMessage: 'Failed to delete filtering parameters. Please try again.'
+    return await api.request.delete({
+      method: 'deleteTargetIonFilterParams',
+      body: targetIonUpdate
     })
   }
 
   // backend notifications
   async function onVisualizationSignalSumSpectrum(traces) {
-    console.log('XXX')
     for (let trace of traces) {
       trace.x = new Float32Array(trace.x)
       trace.y = new Float32Array(trace.y)
@@ -297,6 +307,7 @@ export const useVisualizationStore = defineStore('visualization', () => {
     paramPossibleMatchThreshold,
     tracesSignalTimeseries,
     tracesSignalSumSpectrum,
+    current,
     // getters
     getActiveIsotopes,
     defaultFilterParams,

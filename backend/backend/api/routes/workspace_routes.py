@@ -36,7 +36,7 @@ async def update_workspace_route(workspace_id: str, workspace: WorkspaceUpdate):
 
 @workspace_router.post("/api/workspaces")
 @api_route(
-    status_code_success=201,
+    status_code=201,
     include_message=True,
     success_message="Workspace created successfully",
 )

@@ -115,9 +115,11 @@ async def detect_peaks(
     if "peak_areas" in sample_file_data:
         if if_exists == "fail":
             raise FileExistsError("Peak data exists!")
-        old_peak_mzs = list(sample_file_data.peak_areas.mz.values)
-        old_peak_areas = list(sample_file_data.peak_areas.sum(dim="time").values)
-        old_peak_heights = list(sample_file_data.peak_heights.sum(dim="time").values)
+        peak_areas = sample_file_data.peak_areas.dropna(dim="mz")
+        peak_heights = sample_file_data.peak_heights.dropna(dim="mz")
+        old_peak_mzs = list(peak_areas.mz.values)
+        old_peak_areas = list(peak_areas.sum(dim="time").values)
+        old_peak_heights = list(peak_heights.sum(dim="time").values)
         u_list_fitted = np.unique(np.round(old_peak_mzs))
     else:
         u_list_fitted = np.array([])
@@ -130,6 +132,7 @@ async def detect_peaks(
 
     if len(u_list) == 0:
         # Nothing to fit
+        print("Nothing to fit")
         return sample_file_data
 
     print(f"Fitting unit masses: {u_list}")

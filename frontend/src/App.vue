@@ -1,15 +1,23 @@
 <script setup>
-import { computed, watch, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { onMounted } from 'vue'
 
-import { dialog } from '@/main'
+import ProgressSpinner from 'primevue/progressspinner'
+import ConfirmDialog from 'primevue/confirmdialog'
+import Toast from 'primevue/toast'
+import { useToast } from 'primevue/usetoast'
 
-import { useAppStore, useKeyStore } from '@/stores'
+import { beautifySnakeCase } from '@/lib/utils'
+import { BaseKarsaLogo } from '@/lib/base'
+import { useAppStore, useNotification, useKeyStore } from '@/stores'
+
+const toast = useToast()
 
 const appStore = useAppStore()
 const keyStore = useKeyStore()
 
-// load data
+const notification = useNotification()
+
+// init
 
 appStore.load()
 
@@ -23,35 +31,53 @@ onMounted(() => {
   })
 })
 
-// return to home page at reload
-const router = useRouter()
-if (router.currentRoute !== '/') router.push('/')
+// toaster
 
-watch(
-  computed(() => appStore.pushNotification?.message),
-  () => {
-    dialog.alert(appStore.pushNotification?.message)
+const cleanup = notification.on('*', ({ status, type, message }) => {
+  if (status !== 'pending') {
+    const severity =
+      {
+        warning: 'warn'
+      }[status] ?? status
+    toast.add({
+      severity,
+      summary: `${beautifySnakeCase(type)} ${status}`,
+      detail: message,
+      life: status === 'error' ? 10000 : 3000
+    })
   }
-)
+})
+cleanup()
 </script>
 
 <template>
-  <div id="app">
-    <div v-if="appStore.ready">
-      <router-view></router-view>
-    </div>
-    <b-loading :active="!appStore.ready" :is-full-page="true"> </b-loading>
+  <div id="app" v-if="appStore.ready">
+    <RouterView />
   </div>
+  <div id="loading" v-else>
+    <div class="col">
+      <BaseKarsaLogo />
+      <ProgressSpinner />
+      <strong>Loading...</strong>
+    </div>
+  </div>
+  <Toast position="bottom-right" />
+  <ConfirmDialog />
 </template>
 
-<style lang="scss">
-@import './assets/style.scss';
-</style>
-
 <style>
-.columns {
-  margin: 0 auto;
-  width: 100%;
-  max-width: 140ch;
+@import './style.css';
+
+#loading {
+  width: 100vw;
+  height: 100vh;
+  display: grid;
+  place-items: center;
+}
+.col {
+  gap: 5rem;
+}
+strong {
+  opacity: 0.5;
 }
 </style>

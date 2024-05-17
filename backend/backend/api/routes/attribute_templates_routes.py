@@ -33,7 +33,7 @@ async def get_attribute_template_route(attribute_template_id: str):
 
 @attribute_templates_router.post("/api/attribute_templates")
 @api_route(
-    status_code_success=201,
+    status_code=201,
     include_message=True,
     success_message="Attribute template created successfully",
 )

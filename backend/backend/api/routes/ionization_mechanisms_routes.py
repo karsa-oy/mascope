@@ -31,7 +31,7 @@ async def get_ionization_mechanism_route(ionization_mechanism_id: str):
 
 @ionization_mechanisms_router.post("/api/ionization_mechanisms")
 @api_route(
-    status_code_success=201,
+    status_code=201,
     include_message=True,
     success_message="Ionization mechanism created successfully",
 )

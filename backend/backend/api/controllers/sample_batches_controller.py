@@ -19,15 +19,17 @@ from backend.db import async_session
 from backend.db.id import gen_id
 from backend.api_sio import sio
 
-
-from ..utils.api_features import api_controller, api_controller_background_task
+from ..utils.api_features import (
+    api_controller,
+    api_controller_background_task,
+    send_progress_user_notification,
+)
 from ..exceptions import NotFoundException
 from .match_controller import rematch_batch
 from .target_compounds_controller import get_target_compounds
 from .sample_items_controller import create_sample_item, copy_sample_item
 from .calibration_controller import calibration_mz_calibrate_batch
 from .instrument_functions_controller import read_instrument_functions
-from .helpers_controller import emit_progress_update
 from ..models.models import (
     Workspace,
     SampleBatch,
@@ -43,14 +45,12 @@ from ..models.models import (
 from ..models.pydantic_models.sample_batch_pydantic_model import (
     SampleBatchCreateBody,
     SampleBatchUpdateBody,
-    SampleBatchExportPeaks,
 )
 from ..models.pydantic_models.sample_pydantic_model import AlarmsList
 from ..models.pydantic_models.sample_item_pydantic_model import SampleItemCreate
 from ..models.pydantic_models.calibration_pydantic_model import CalibrationMzFitParams
-from ..models.pydantic_models.match_pydantic_model import (
-    RematchBatchBody,
-    ProgressProperties,
+from ..models.pydantic_models.user_notification_pydantic_model import (
+    UserNotification,
 )
 
 
@@ -457,7 +457,10 @@ async def create_sample_batch(
         await session.refresh(new_sample_batch)
 
     # Step 6: Return created sample batch
-    return new_sample_batch.to_dict()
+    return {
+        "message": f"Sample batch '{new_sample_batch.sample_batch_name}' was created.",
+        "data": new_sample_batch.to_dict(),
+    }
 
 
 @api_controller()
@@ -465,6 +468,8 @@ async def update_sample_batch(
     sample_batch_id: str,
     sample_batch_update_body: SampleBatchUpdateBody,
     background_tasks: BackgroundTasks,
+    sid: str = None,
+    process_id=None,
 ) -> dict:
     """
     Updates the specified sample batch with new information and associations. It checks for changes in associated target collections
@@ -551,6 +556,7 @@ async def update_sample_batch(
                 if old_name != value:  # name value changed
                     # set flag to inform clients about sample batch basic fields changes (emit workspace reload event)
                     workspace_reload = True
+                    # BUG_reload do we really need to reload whole workspsce for batch name change? Improve listener sample_batch_reload
             if key in ["sample_batch_description"]:
                 old_description = getattr(existing_sample_batch, key)
                 if old_description != value:  # description value changed
@@ -565,7 +571,9 @@ async def update_sample_batch(
             sample_batch_update_body.build_params.dict()
         )
 
-        if "target_collection_ids" in update_data:
+        if "target_collection_ids" in update_data and (
+            new_collections != existing_collections
+        ):
             targets_all_reload = True
             # Remove all previous associations
             existing_sample_batch.target_collection.clear()
@@ -627,34 +635,17 @@ async def update_sample_batch(
                 existing_ion_mechanisms - current_ion_mechanisms
             )
 
-        # prepare data for rematching
-        rematch_body = RematchBatchBody(
+        # create backfround task for rematch_batch process
+        background_tasks.add_task(
+            rematch_batch,
             sample_batch_id=sample_batch_id,
-            workspace_id=updated_sample_batch.workspace_id,
             added_target_compound_ids=list(added_target_compound_ids),
             removed_target_compound_ids=list(removed_target_compound_ids),
             added_ionization_mechanism_ids=list(added_ionization_mechanism_ids),
             removed_ionization_mechanism_ids=list(removed_ionization_mechanism_ids),
             independent_transaction=True,
-            progress_properties=ProgressProperties(
-                progress_type="rematch_batch",
-                workspace_reload=workspace_reload,
-            ),
-        )
-        # Set workspace_reload flag to False, since the reload will happen in rematch process
-        workspace_reload = False
-
-        # create backfround task for batch rematching
-        background_tasks.add_task(
-            rematch_batch,
-            sample_batch_id=rematch_body.sample_batch_id,
-            workspace_id=rematch_body.workspace_id,
-            added_target_compound_ids=rematch_body.added_target_compound_ids,
-            added_ionization_mechanism_ids=rematch_body.added_ionization_mechanism_ids,
-            removed_target_compound_ids=rematch_body.removed_target_compound_ids,
-            removed_ionization_mechanism_ids=rematch_body.removed_ionization_mechanism_ids,
-            independent_transaction=True,
-            progress_properties=rematch_body.progress_properties,
+            sid=sid,
+            process_id=process_id,
         )
 
     # Step 5: Based on the updates, emit workspace reload or a sample batch reload.
@@ -678,28 +669,23 @@ async def update_sample_batch(
             "targets_all_reload",
             namespace="/",
         )
-    return updated_sample_batch.to_dict()
+    return {
+        "data": updated_sample_batch.to_dict(),
+        "message": f"Sample '{updated_sample_batch.sample_batch_name}' was updated.",
+    }
 
 
 @api_controller_background_task(
-    success_emit_events=[
-        ("delete_finished", "workspace_id"),
-        ("workspace_reload", "workspace_id"),
-    ],
-    error_emit_events=[
-        ("delete_finished", "workspace_id"),
-    ],
-    default_payload={
-        "action": "delete",
-        "type": "batch",
-    },
-    success_message="Sample batch was successfully deleted",
+    success_notification_rooms=["workspace_id"],
+    success_reload=[("workspace_reload", "workspace_id")],
+    error_notification_rooms=["workspace_id"],
 )
 async def delete_sample_batch(
     sample_batch_id: str,
     workspace_id: str = None,
     independent_transaction: bool = False,
     sid: str = None,
+    process_id=None,
 ):
     """
     Deletes a sample batch by its unique ID and optionally emits relevant events.
@@ -732,15 +718,18 @@ async def delete_sample_batch(
         await session.delete(sample_batch)
         await session.commit()
 
+    return {
+        "message": f"Sample batch '{sample_batch.sample_batch_name}' was deleted.",
+        "_notification_data": {
+            "sample_batch_id": sample_batch_id,
+        },
+    }
+
 
 @api_controller_background_task(
-    error_emit_events=[
-        ("import_samples_to_batch_finished", "sample_batch_id"),
-    ],
-    default_payload={
-        "action": "import",
-        "type": "samples",
-    },
+    success_notification_rooms=["sid"],
+    error_notification_rooms=["sid"],
+    error_reload=[("sample_batch_reload", "sample_batch_id")],
 )
 async def import_sample_items(
     sample_batch_id: str,
@@ -749,6 +738,7 @@ async def import_sample_items(
     calibrate_batch: bool = True,
     independent_transaction: bool = False,
     sid: str = None,
+    process_id=None,
 ):
     """
     Imports sample items to a specified batch by creating provided sample items,
@@ -775,6 +765,9 @@ async def import_sample_items(
     :param sid: Session ID, used for emitting notifications to specific clients, defaults to None.
     :type sid: str, optional
     """
+    sample_batch = await get_sample_batch(sample_batch_id)
+    sample_batch_name = sample_batch["sample_batch_name"]
+
     # Step 1: Verify all sample items are for the same instrument
     instrument_types = {get_instrument_type(item.filename) for item in sample_items}
     if len(instrument_types) > 1:
@@ -783,44 +776,71 @@ async def import_sample_items(
         )
     instrument_type = instrument_types.pop()  # Extract the single instrument type
 
+    notification = UserNotification(
+        process_id=process_id,
+        type="import_sample_items",
+        status="pending",
+        message=f"Importing {len(sample_items)} sample{'s' if len(sample_items) > 1 else ''}.",
+        # NOTE: Set the internal metadata for the pending user_notifications like
+        # room_ids and sid of the user.
+        # Internal metadata will be cleaned up the from data in send_progress_user_notification.
+        data={
+            "sample_batch_id": sample_batch_id,
+            "_room_ids": [sid],
+            "_sid": sid,
+        },
+    )
+    await send_progress_user_notification(notification, 0.1)
+
     # Step 2: Create provided sample items and save to database
     for sample_item in sample_items:
         await create_sample_item(sample_item=sample_item)
 
+    notification.message = f"Created {len(sample_items)} sample{'s records' if len(sample_items) > 1 else 'record'}."
+    await send_progress_user_notification(notification, 0.2)
+
     # Step 3: Optionally calibrate batch if calibrate_batch flag is True and instrument is TOF
     if calibrate_batch and instrument_type == "tof":
-        calibration_results = await calibration_mz_calibrate_batch(
-            sample_batch_id, params
+        calibration_mz_calibrate_batch_data = await calibration_mz_calibrate_batch(
+            sample_batch_id=sample_batch_id,
+            params=params,
+            independent_transaction=False,
+            sid=sid,
+            process_id=gen_id(8),
+            parent_id=process_id,
         )
-        # TODO_error_handling Check the failed calibrations samples
-        # TODO_notifications refactor failed_calibration_samples notificationsm
+        affected_sample_batch_ids = calibration_mz_calibrate_batch_data["data"].get(
+            "affected_sample_batch_ids", None
+        )
+        notification.message = f"Sample batch'{sample_batch_name}' m/z calibrated."
+        if len(affected_sample_batch_ids):
+            notification.message += f" Calibration affected {len(affected_sample_batch_ids)} other sample batch{'es' if (len(affected_sample_batch_ids)) > 1 else ''}."
+        await send_progress_user_notification(notification, 0.6)
 
-    # Step 4: Compute matches for the batch
-    progress_properties = ProgressProperties(
-        progress_type="rematch_batch",
-    )
-
+    # Step 4: Compute matches for the batch, this would reload the current batch, the other affected_sample_batch_ids reloaded in the calibration_mz_calibrate_batch
     await rematch_batch(
         sample_batch_id=sample_batch_id,
         independent_transaction=False,
-        progress_properties=progress_properties,
+        sid=sid,
+        process_id=gen_id(8),
+        parent_id=process_id,
     )
+
+    notification.message = f"Sample batch'{sample_batch_name}' rematched."
+    await send_progress_user_notification(notification, 0.95)
+
+    # Step 4: Return the status message
+    return {
+        "message": f"{len(sample_items)} sample{'s' if len(sample_items) > 1 else ''} was imported to the sample batch '{sample_batch_name}'.",
+        "_notification_data": {"sample_batch_id": sample_batch_id},
+    }
 
 
 @api_controller_background_task(
-    success_emit_events=[
-        ("copy_finished", "workspace_id"),
-        ("workspace_reload", "workspace_id"),
-    ],
-    error_emit_events=[
-        ("copy_finished", "sid"),
-        ("workspace_reload", "workspace_id"),
-    ],
-    default_payload={
-        "action": "copy",
-        "type": "batch",
-    },
-    success_message="Sample batch was successfully copied",
+    success_notification_rooms=["workspace_id"],
+    success_reload=[("workspace_reload", "workspace_id")],
+    error_notification_rooms=["sid"],
+    error_reload=[("workspace_reload", "workspace_id")],
 )
 async def copy_sample_batch(
     sample_batch_id: str,
@@ -829,6 +849,7 @@ async def copy_sample_batch(
     sample_batch_description: str,
     independent_transaction: bool = False,
     sid=None,
+    process_id=None,
 ) -> dict:
     """
     Copies a sample batch, including its associated sample items and target collections, into a specified workspace with a new name and description.
@@ -896,7 +917,8 @@ async def copy_sample_batch(
     )
 
     # Create the new sample batch
-    new_sample_batch = await create_sample_batch(new_sample_batch_body)
+    create_sample_batch_result = await create_sample_batch(new_sample_batch_body)
+    new_sample_batch = create_sample_batch_result["data"]
 
     # Step 5: Copy sample items associated with the original sample batch
     for sample_item in original_sample_batch.sample_item:
@@ -904,29 +926,34 @@ async def copy_sample_batch(
             sample_item_id=sample_item.sample_item_id,
             sample_item_name=sample_item.sample_item_name,
             sample_batch_id=new_sample_batch["sample_batch_id"],
+            sid=sid,
+            process_id=gen_id(8),
+            parent_id=process_id,
         )
 
-    return new_sample_batch
+    # Step 6: Return the copied batch and message
+    sample_batch_name = new_sample_batch["sample_batch_name"]
+    new_sample_batch_id = new_sample_batch["sample_batch_id"]
+    return {
+        "data": new_sample_batch,
+        "message": f"Sample batch '{sample_batch_name}' was successfully copied to workspace '{workspace.workspace_name}'.",
+        "_notification_data": {
+            "sample_item_id": new_sample_batch_id,
+            "workspace_id": workspace_id,
+        },
+    }
 
 
 @api_controller_background_task(
-    success_emit_events=[
-        ("batch_export_peak_data_finished", "sid"),
-    ],
-    error_emit_events=[
-        ("batch_export_peak_data_finished", "sid"),
-    ],
-    default_payload={
-        "action": "export",
-        "type": "peaks",
-    },
-    success_message="Peak data for sample batch was successfully exported",
-    error_message="Failed to export sample batch peak data",
+    success_notification_rooms=["sid"],
+    error_notification_rooms=["sid"],
 )
 async def sample_batch_export_peaks(
-    sample_batch: SampleBatchExportPeaks,
+    sample_batch_id: str,
     independent_transaction: bool = False,
     sid=None,
+    process_id=None,
+    parent_id=None,
 ):
     """
     Exports peak data for a specific sample batch to a parquet file. This process involves loading sample files,
@@ -939,33 +966,41 @@ async def sample_batch_export_peaks(
     4. Save the DataFrame to a parquet file named with the sample batch name and current datetime.
     5. If independent_transaction is True, emit a 'batch_export_peak_data_finished' event with the session ID.
 
-    :param sample_batch: Sample batch for which peak data is being exported.
-    :type sample_batch: SampleBatchExportPeaks
+    :param sample_batch_id: ID of the original sample batch to be copied.
+    :type sample_batch_id: str
     :param independent_transaction: Flag to indicate if the operation should be treated as an independent transaction, defaults to False.
     :type independent_transaction: bool, optional
     :param sid: Session ID for targeting specific clients when emitting events, defaults to None.
     :type sid: str, optional
     """
+    sample_batch = await get_sample_batch(sample_batch_id)
+    sample_batch_name = sample_batch["sample_batch_name"]
+
     async with async_session() as session:
         # Fetch sample items for the batch
-        stmt = select(SampleItem).filter(
-            SampleItem.sample_batch_id == sample_batch.sample_batch_id
-        )
+        stmt = select(SampleItem).filter(SampleItem.sample_batch_id == sample_batch_id)
         result = await session.execute(stmt)
         sample_items_dict_list = [row.to_dict() for row in result.scalars()]
         sample_items_df = pd.DataFrame(sample_items_dict_list)
 
     peak_data = []
     total_samples = len(sample_items_df)
-    item_weight = 1 // total_samples
 
     for index, row in sample_items_df.iterrows():
-        progress_properties = ProgressProperties(
-            progress_type="export_peaks",
-            total_samples=total_samples,
-            item_weight=item_weight,
-            item_index=index,
-            sid=sid if sid is not None else None,
+        # Prepare progress user notification.
+        notification = UserNotification(
+            process_id=process_id,
+            parent_id=parent_id,
+            type="sample_batch_export_peaks",
+            status="pending",
+            message=f"Exporting peak data for batch '{sample_batch_name}'.",
+            # NOTE set the internal room_ids for the pending user_notifications and sid of the user, will be removed from the data.
+            data={
+                "_room_ids": [sid],
+                "_sid": sid,
+                "_total_samples": total_samples,
+                "_item_index": index,
+            },
         )
 
         try:
@@ -973,9 +1008,8 @@ async def sample_batch_export_peaks(
             instrument_functions = await read_instrument_functions(filename)
             instrument_type = get_instrument_type(filename)
 
-            await emit_progress_update(
-                progress_properties=progress_properties, increment=0.1
-            )
+            await send_progress_user_notification(notification, 0.1)
+
             # Assign peak fitting threshold depending on the instrument type
             # Correct intrument type unsured by get_instrument_type
             if instrument_type == "orbi":
@@ -991,15 +1025,11 @@ async def sample_batch_export_peaks(
                 instrument_type=instrument_type,
             )
 
-            await emit_progress_update(
-                progress_properties=progress_properties, increment=0.9
-            )
+            await send_progress_user_notification(notification, 0.9)
 
             peak_data_item = get_peaks(sample_file, "area").sum(dim="time")
 
-            await emit_progress_update(
-                progress_properties=progress_properties, increment=1
-            )
+            await send_progress_user_notification(notification, 1)
         except Exception as e:
             print(repr(e))
             continue
@@ -1007,7 +1037,7 @@ async def sample_batch_export_peaks(
         peak_data.extend(
             [
                 (
-                    sample_batch.sample_batch_name,
+                    sample_batch["sample_batch_name"],
                     row["sample_item_name"],
                     row["sample_item_type"],
                     row["filter_id"],
@@ -1038,7 +1068,7 @@ async def sample_batch_export_peaks(
     peakfile_filename = (
         dt_str
         + "_peaks_"
-        + sample_batch.sample_batch_name.replace(" ", "_")
+        + sample_batch["sample_batch_name"].replace(" ", "_")
         + ".parquet"
     )
     print(f"Writing peak data to file {peakfile_filename}")
@@ -1046,3 +1076,11 @@ async def sample_batch_export_peaks(
         os.path.join(peakfile_path, peakfile_filename), index=False
     )
     print("Write complete")
+
+    # Step 6: Return the status message
+    return {
+        "message": f"Peak data for sample batch '{sample_batch_name}' was exported to file '{peakfile_filename}' and saved to '{peakfile_path}'.",
+        "_notification_data": {
+            "sample_batch_id": sample_batch_id,
+        },
+    }

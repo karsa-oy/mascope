@@ -16,9 +16,6 @@ import pandas as pd
 from hardware.tofwerk.calibration import mz_calibrate
 from hardware.tofwerk.lib.TwTool import TwTof2Mass
 
-from backend.db import async_session
-from backend.api_sio import sio
-
 from lib.file_func import (
     get_zarr_var_shape,
     load_coord,
@@ -26,13 +23,19 @@ from lib.file_func import (
     update_zarr_array_coord,
 )
 from lib.peak import calculate_tic
-
 from zarr.errors import PathNotFoundError
-
-from fastapi import BackgroundTasks, HTTPException
 from sqlalchemy import select, func, and_
+from sqlalchemy.orm import joinedload
+from backend.db import async_session
+from backend.api_sio import sio
+from backend.db.id import gen_id
+from ..utils.api_features import (
+    api_controller,
+    api_controller_background_task,
+    send_progress_user_notification,
+)
 
-from ..exceptions import process_exception, ApiException, NotFoundException
+from ..exceptions import ApiException, NotFoundException
 from .match_controller import match_sample_remove
 from .matches_controller import compute_matches
 from .sample_files_controller import (
@@ -46,39 +49,14 @@ from .target_compound_in_target_collection_controller import (
 )
 
 
+from ..models.models import Sample, SampleBatch, SampleItem
 from ..models.pydantic_models.sample_file_pydantic_model import (
     SampleFileUpdate,
 )
 from ..models.pydantic_models.calibration_pydantic_model import CalibrationMzFitParams
-from ..models.models import Sample, SampleBatch, SampleItem
-
-
-# -------------------------------------------------------------------
-# Utility Functions
-# -------------------------------------------------------------------
-async def emit_progress_update(progress_properties, increment):
-    """
-    Emit progress updates to the given sample item room.
-
-    :param progress_properties: Dictionary containing information about the current item being processed.
-    :param increment: Float representing the progress percentage increment.
-    """
-
-    if not progress_properties:
-        return
-
-    sample_item_id = progress_properties.get("sample_item_id")
-    progress_percentage = increment * 100
-
-    await sio.emit(
-        "calibration_mz_fit_progress",
-        {
-            "action": "m/z Fit",
-            "progress_percentage": progress_percentage,
-        },
-        room=sample_item_id,
-        namespace="/",
-    )
+from ..models.pydantic_models.user_notification_pydantic_model import (
+    UserNotification,
+)
 
 
 # -------------------------------------------------------------------
@@ -86,6 +64,7 @@ async def emit_progress_update(progress_properties, increment):
 # -------------------------------------------------------------------
 
 
+@api_controller()
 async def mz_fit(
     filename,
     calibration_collection_id,
@@ -94,7 +73,7 @@ async def mz_fit(
     isotope_abundance_min,
     match_score_min,
     refine_window,
-    sample_item_id,
+    notification: UserNotification,
 ):
     """
     Main function to fit m/z. Fits the mass-to-charge ratio (m/z) for a given sample file.
@@ -102,21 +81,19 @@ async def mz_fit(
     :param ...:  parameters.
     :return: fit, stats, error.
     """
-
     fit = None
     stats = None
     error = None
-    progress_properties = {"sample_item_id": sample_item_id}
 
     # calculate tic
-    await emit_progress_update(progress_properties, 0.25)
+    await send_progress_user_notification(notification, 0.25)
 
     tic = calculate_tic(filename)
     if tic < 1e6:
         error = "TIC is too low! Check ionization device."
         return fit, stats, error
 
-    await emit_progress_update(progress_properties, 0.35)
+    await send_progress_user_notification(notification, 0.35)
 
     # Compute matches for calibration compounds
     # Fetch target compounds in the calibration collection
@@ -151,7 +128,7 @@ async def mz_fit(
     )
     calibrant_signal_intensity = good_matches_df["sample_peak_area"]
     calibrant_to_tic = calibrant_signal_intensity / tic
-    await emit_progress_update(progress_properties, 0.75)
+    await send_progress_user_notification(notification, 0.75)
 
     if (
         n_relevant_isotopes > 3
@@ -185,7 +162,7 @@ async def mz_fit(
         }
         stats.append(summary_row)
 
-        await emit_progress_update(progress_properties, 1)
+        await send_progress_user_notification(notification, 0.95)
     else:
         # Not enough calibration peaks
         fit = None
@@ -193,100 +170,6 @@ async def mz_fit(
         error = "Not enough calibration peaks"
 
     return fit, stats, error
-
-
-async def mz_calibrate_sample(
-    sample_item,
-    params,
-    filename,
-    autosampler_mode: bool = None,
-):
-    """
-    Calibrates a single sample. It first fits the sample and then applies the calibration.
-    Notifications are sent based on the progress using socket IO.
-
-    :param sample_item: The sample item to calibrate.
-    :param params: Calibration parameters defined by the CalibrationMzFitParams pydantic model.
-    :param filename: Name of the file corresponding to the sample item.
-    :param autosampler_mode: Indicates whether the calibration is in autosampler mode or not.
-    :return: The calibration result for the given sample.
-    """
-    print(f"...m/z calibrating sample: {sample_item['sample_item_name']} ...")
-
-    # Initializing the result dictionary.
-    result = {
-        "status": "",
-        "index": "",
-        "sample_item_name": sample_item["sample_item_name"],
-        "filename": sample_item["filename"],
-        "error": "",
-    }
-
-    fit, stats, error = await calibration_mz_fit(
-        sample_item["sample_item_id"],
-        params,
-    )
-
-    if fit:
-        print(
-            f"Calibration m/z Fit finished successfully. Sample - {sample_item['sample_item_name']}, filename - {sample_item['filename']}"
-        )
-        await sio.emit(
-            "calibration_mz_fit_finished",
-            {
-                "fit": fit,
-                "stats": stats,
-                "error": error,
-            },
-            room=sample_item["sample_item_id"],
-        )
-
-        await calibration_mz_apply(fit, sample_item["filename"], autosampler_mode)
-
-        print(
-            f"Calibration m/z calibrate sample finished successfully. Sample - {sample_item['sample_item_name']}, filename - {sample_item['filename']}"
-        )
-        await sio.emit(
-            "calibration_mz_calibrate_sample_finished",
-            {
-                "filename": filename,
-                "progress": 100,
-            },
-            room=sample_item["sample_item_id"],
-            namespace="/",
-        )
-        result["status"] = "calibrated"
-    else:
-        print(
-            f"Calibration m/z Fit failed: {error}. Sample - {sample_item['sample_item_name']}, filename - {sample_item['filename']}"
-        )
-        await sio.emit(
-            "calibration_mz_fit_failed",
-            {
-                "fit": fit,
-                "stats": stats,
-                "error": error,
-            },
-            room=sample_item["sample_item_id"],
-        )
-        print(
-            f"Calibration m/z calibrate sample failed: {error}. Sample - {sample_item['sample_item_name']}, filename - {sample_item['filename']}"
-        )
-        await sio.emit(
-            "calibration_mz_calibrate_sample_failed",
-            {
-                "filename": filename,
-                "progress": 100,
-                "error": error,
-            },
-            room=sample_item["sample_item_id"],
-            namespace="/",
-        )
-
-        result["status"] = "calibration failed"
-        result["error"] = error
-
-    return result
 
 
 def remove_duplicate_mz_values(mz):
@@ -336,67 +219,11 @@ def signal_mz_calibration_update(fit, filename):
 
 
 # -------------------------------------------------------------------
-# Background Tasks
-# -------------------------------------------------------------------
-
-
-async def background_mz_fit(
-    filename,
-    calibration_collection_id,
-    ionization_mechanism_ids,
-    peak_intensity_min,
-    isotope_abundance_min,
-    match_score_min,
-    refine_window,
-    sample_item_id,
-):
-    """
-    Run mz_fit as a background task asynchronously.
-
-    :param ...: parameters.
-    """
-    fit, stats, error = await mz_fit(
-        filename,
-        calibration_collection_id,
-        ionization_mechanism_ids,
-        peak_intensity_min,
-        isotope_abundance_min,
-        match_score_min,
-        refine_window,
-        sample_item_id,
-    )
-
-    if fit:
-        await sio.emit(
-            "calibration_mz_fit_finished",
-            {
-                "action": "m/z Fit",
-                "progress_percentage": 100,
-                "fit": fit,
-                "stats": stats,
-                "error": error,
-            },
-            room=sample_item_id,
-        )
-    else:
-        await sio.emit(
-            "calibration_mz_fit_failed",
-            {
-                "action": "m/z Fit",
-                "progress_percentage": 100,
-                "fit": fit,
-                "stats": stats,
-                "error": error,
-            },
-            room=sample_item_id,
-        )
-
-
-# -------------------------------------------------------------------
 # Controller or Route Handlers
 # -------------------------------------------------------------------
 
 
+@api_controller()
 async def get_mz_calibration(
     instrument: str = None,
     sample_item_id: str = None,
@@ -411,7 +238,6 @@ async def get_mz_calibration(
     :return: The m/z calibration for the given parameters.
     :rtype: dict
     """
-
     async with async_session() as session:
         stmt = select(Sample.mz_calibration)
         if instrument:
@@ -436,140 +262,167 @@ async def get_mz_calibration(
         result = await session.execute(stmt)
         mz_calibration = result.scalars().first()
 
-        return mz_calibration
+    # TODO_data wrapper
+    return mz_calibration or {}  # Return empty dict if mz_calibration is None
 
 
+@api_controller_background_task(
+    success_notification_rooms=["sid"],
+    error_notification_rooms=["sid"],
+)
 async def calibration_mz_fit(
     sample_item_id: str,
     params: CalibrationMzFitParams,
-    background_tasks: BackgroundTasks = None,
+    independent_transaction: bool = False,
+    sid: str = None,
+    process_id=None,
+    parent_id=None,
 ):
     """
-    Start m/z fit calibration for a given sample item based on the calibration parameters. It also manages
-    background tasks and communicates the progress using socket IO.
+    Start m/z fit calibration for a given sample item based on the calibration parameters.
 
     :param sample_item_id: ID of the sample item.
     :param params: Calibration parameters.
     :param background_tasks: Optional background task parameter.
-    :return: Status message if called from route endpoint or fit, stats, error if called during automatica sample calibration from the mz_calibrate_sample.
     """
-    await sio.emit(
-        "calibration_mz_fit_started",
-        {
-            "action": "m/z Fit",
-            "progress_percentage": 0,
+    # Step 2: Retrieve sample and batch data
+    async with async_session() as session:
+        sample = await session.get(SampleItem, sample_item_id)
+        if not sample:
+            raise NotFoundException(f"Sample item with ID '{sample_item_id}' not found")
+
+    async with async_session() as session:
+        sample_batch = await session.get(SampleBatch, sample.sample_batch_id)
+        if not sample_batch:
+            raise NotFoundException(
+                f"Sample batch with ID '{sample.sample_batch_id}' not found"
+            )
+
+    build_params = sample_batch.build_params
+
+    # Step 3: Prepare progress user notification.
+    notification = UserNotification(
+        process_id=process_id,
+        parent_id=parent_id,
+        type="calibration_mz_fit",
+        status="pending",
+        message=f"m/z fitting sample '{sample.sample_item_name}'.",
+        # NOTE: Set the internal metadata for the pending user_notifications like
+        # room_ids and sid of the user.
+        # Internal metadata will be cleaned up the from data in send_progress_user_notification.
+        data={
+            "sample_item_id": sample_item_id,
+            "filename": sample.filename,
+            "_room_ids": [sid],
+            # "_sid": sid,
         },
-        room=sample_item_id,
-        namespace="/",
     )
 
-    async with async_session() as session:
-        result = await session.execute(
-            select(Sample.filename, Sample.sample_batch_id).where(
-                Sample.sample_item_id == sample_item_id
-            )
-        )
-        sample = result.one_or_none()
+    # Step 3: m/z fit the sample file
+    fit, stats, error = await mz_fit(
+        filename=sample.filename,
+        calibration_collection_id=build_params["calibration_collection"],
+        ionization_mechanism_ids=build_params["ion_mechanisms"],
+        peak_intensity_min=params.peak_intensity_min,
+        isotope_abundance_min=params.isotope_abundance_min,
+        match_score_min=params.match_score_min,
+        refine_window=params.refine_window,
+        notification=notification,
+    )
 
-        if not sample:
-            # if called from the route function
-            if background_tasks:
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"Sample with ID {sample_item_id} not found",
-                )
-            # if called from the mz_calibrate_sample
-            else:
-                raise ValueError(f"Sample with ID {sample_item_id} not found")
-
-        filename, sample_batch_id = sample.filename, sample.sample_batch_id
-
-    # unpack parameters
-    peak_intensity_min = params.peak_intensity_min
-    isotope_abundance_min = params.isotope_abundance_min
-    match_score_min = params.match_score_min
-    refine_window = params.refine_window
-
-    async with async_session() as session:
-        result = await session.execute(
-            select(SampleBatch.build_params).where(
-                SampleBatch.sample_batch_id == sample_batch_id
-            )
-        )
-        sample_batch = result.one()
-
-    # get m/z calibration parameters
-    build_params = sample_batch.build_params
-    calibration_collection_id = build_params["calibration_collection"]
-    ionization_mechanism_ids = build_params["ion_mechanisms"]
-
-    if background_tasks:
-        background_tasks.add_task(
-            background_mz_fit,
-            filename,
-            calibration_collection_id,
-            ionization_mechanism_ids,
-            peak_intensity_min,
-            isotope_abundance_min,
-            match_score_min,
-            refine_window,
-            sample_item_id,
+    # Raise an error if the m/z fit failed, error user notification will be send in wrapper
+    if error is not None:
+        raise ApiException(
+            f"Failed to m/z fit sample '{sample.sample_item_name}'. {error}",
+            {
+                "data": {
+                    "fit": fit,
+                    "stats": stats,
+                    "error": error,
+                }
+            },
+            422,
         )
 
-        return {"message": "m/z Fit Calibration started"}
-    else:
-        fit, stats, error = await mz_fit(
-            filename,
-            calibration_collection_id,
-            ionization_mechanism_ids,
-            peak_intensity_min,
-            isotope_abundance_min,
-            match_score_min,
-            refine_window,
-            sample_item_id,
-        )
-        return fit, stats, error
+    # Step 4: Return m/z fit result data and message
+    data = {
+        "fit": fit,
+        "stats": stats,
+        "error": error,
+    }
+    return {
+        "data": data,
+        "message": f"Finished to m/z fit sample '{sample.sample_item_name}'.",
+        "_notification_data": {
+            "fit": fit,
+            "stats": stats,
+            "error": error,
+            "sample_item_id": sample_item_id,
+            "filename": sample.filename,
+        },
+    }
 
 
-async def calibration_mz_apply(fit: dict, filename: str, autosampler_mode: bool = None):
+@api_controller_background_task(
+    success_notification_rooms=["sid"],
+    error_notification_rooms=["sid"],
+)
+async def calibration_mz_apply(
+    fit: dict,
+    filename: str,
+    independent_transaction: bool = False,
+    sid: str = None,
+    process_id=None,
+    parent_id=None,
+):
     """
     Apply m/z calibration to a sample file.
 
     :param fit: Fit dictionary.
     :param filename: Name of the sample file.
-    :param autosampler_mode: Optional flag for autosampler mode. In the calibration.js store affects if the batch will be reloaded onCalibrationMzApplyFinished
     :return: List of calibrated sample item IDs.
     """
-
-    # Read affected sample items
+    # Step 1: Get affected sample items and their batches
     async with async_session() as session:
         result = await session.execute(
-            select(SampleItem).filter(SampleItem.filename == filename)
+            select(SampleItem)
+            .options(joinedload(SampleItem.sample_batch))
+            .filter(SampleItem.filename == filename)
         )
-    sample_item_ids = [
-        item.to_dict()["sample_item_id"] for item in result.scalars().all()
-    ]
+        sample_items = result.scalars().all()
 
-    for sample_item_id in sample_item_ids:
-        await sio.emit(
-            "calibration_mz_apply_started",
-            {
-                "action": "m/z Apply",
-                "sample_item_id": sample_item_id,
-                "progress": 0,
-            },
-            room=sample_item_id,
-            namespace="/",
-        )
+    if not sample_items:
+        raise NotFoundException(f"No sample items found for sample file '{filename}'")
 
-    # Retrieve the sample file directly using filename
+    affected_batches = {item.sample_batch for item in sample_items}
+    total_samples = len(sample_items)
+    sample_item_ids = [item.to_dict()["sample_item_id"] for item in sample_items]
+    sample_batch_ids = set([item.to_dict()["sample_batch_id"] for item in sample_items])
+
+    # Step 2: Prepare progress user notification.
+    notification = UserNotification(
+        process_id=process_id,
+        parent_id=parent_id,
+        type="calibration_mz_apply",
+        status="pending",
+        message=f"Applying m/z fit for sample file '{filename}', {total_samples} sample item{'s' if total_samples != 1 else ''} affected.",
+        # NOTE: Set the internal metadata for the pending user_notifications like
+        # room_ids and sid of the user.
+        # Internal metadata will be cleaned up the from data in send_progress_user_notification.
+        data={
+            "sample_item_ids": sample_item_ids,
+            "filename": filename,
+            "_room_ids": [sid],
+            "_sid": sid,
+        },
+    )
+
+    await send_progress_user_notification(notification, 0.1)
+
+    # Retrieve the sample file data
     sample_file_data = await get_sample_files(filename=filename)
-
     if not sample_file_data["data"]:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Sample file with filename {filename} not found",
-        )
+        raise NotFoundException(f"Sample file '{filename}' not found")
 
     sample_file = sample_file_data["data"][0]
 
@@ -579,37 +432,80 @@ async def calibration_mz_apply(fit: dict, filename: str, autosampler_mode: bool 
 
     fit.update({"verified": True})
 
+    await send_progress_user_notification(notification, 0.3)
+
     # Update database record
     sample_file["mz_calibration"] = fit
     sample_file["range"] = new_range
     await update_sample_file(
         sample_file["sample_file_id"], SampleFileUpdate(**sample_file)
     )
-    for sample_item_id in sample_item_ids:
-        # FAQ_match removes mathces in all samples assosiated with filename
-        #  TODO shoud we rematch the non active samples?
 
-        # Delete outdated matches
-        await match_sample_remove(sample_item_id)
+    await send_progress_user_notification(notification, 0.8)
 
-        await sio.emit(
-            "calibration_mz_apply_finished",
-            {
-                "action": "m/z Apply",
-                "sample_item_id": sample_item_id,
-                "progress": 100,
-                "autosampler_mode": autosampler_mode,
+    # Step 3: Notify completion and emit a reload event for each affected batch
+    for sample_batch in affected_batches:
+        sample_batch_id = sample_batch.sample_batch_id
+        sample_batch_name = sample_batch.sample_batch_name
+        batch_samples = [
+            item for item in sample_items if item.sample_batch_id == sample_batch_id
+        ]
+        batch_samples_count = len(batch_samples)
+
+        # Notify batch specific application
+        batch_notification = UserNotification(
+            process_id=gen_id(8),
+            parent_id=process_id,
+            type="calibration_mz_apply",
+            status="pending",
+            message=f"New m/z fit applied for sample file '{filename}'. {batch_samples_count} sample{'s' if batch_samples_count != 1 else ''} affected in sample batch '{sample_batch_name}'.",
+            data={
+                "sample_batch_id": sample_batch_id,
+                "_room_ids": [sample_batch_id],
+                "_sid": sid,
             },
-            room=sample_item_id,
-            namespace="/",
         )
+        await send_progress_user_notification(batch_notification)
 
-    return sample_item_ids
+        # FAQ_match removes mathces in all samples assosiated with filename
+        # Delete outdated matches, sid is not send to not receive the match_sample_remove notification for every sample
+        for sample_item in batch_samples:
+            await match_sample_remove(
+                sample_item_id=sample_item.sample_item_id,
+                independent_transaction=False,
+                process_id=gen_id(8),
+                parent_id=process_id,
+            )
+
+        # Emit reload event if independent transaction
+        if independent_transaction:
+            await sio.emit("sample_batch_reload", room=sample_batch_id, namespace="/")
+
+    # Step 4: Return m/z fit result data and message
+    return {
+        "data": {
+            "sample_item_ids": sample_item_ids,
+            "sample_batch_ids": list(sample_batch_ids),
+        },
+        "message": f"Applied m/z fit for sample file '{filename}', {total_samples} sample item{'s' if total_samples != 1 else ''} affected.",
+        "_notification_data": {
+            "sample_item_ids": sample_item_ids,
+            "filename": filename,
+        },
+    }
 
 
+@api_controller_background_task(
+    success_notification_rooms=["sid"],
+    error_notification_rooms=["sid"],
+)
 async def calibration_mz_calibrate_sample(
     sample_item_id: str,
     params: CalibrationMzFitParams,
+    independent_transaction: bool = False,
+    sid: str = None,
+    process_id=None,
+    parent_id=None,
 ):
     """
     Performs m/z calibration on a single sample using specified calibration parameters.
@@ -630,74 +526,89 @@ async def calibration_mz_calibrate_sample(
     :raises ValueError: If the sample does not have a valid filename associated with it.
     :raises ApiException: For any exceptions that occur during the calibration process.
     """
-    try:
-        # Step 1: Fetch sample data
-        async with async_session() as session:
-            # Fetch samples
-            result = await session.execute(
-                select(Sample).filter(Sample.sample_item_id == sample_item_id)
-            )
+    # Step 1: Retrieve sample data
+    async with async_session() as session:
+        sample = await session.get(SampleItem, sample_item_id)
+    if not sample:
+        raise NotFoundException(f"Sample item with ID '{sample_item_id}' not found")
 
-            sample = result.scalars().first()
+    print(f"...m/z calibrating sample '{sample.sample_item_name}' ...")
 
-        if not sample:
-            raise NotFoundException(f"Sample with ID {sample_item_id} not found")
+    # Step 2: Prepare progress user notification.
+    notification = UserNotification(
+        process_id=process_id,
+        parent_id=parent_id,
+        type="calibration_mz_calibrate_sample",
+        status="pending",
+        message=f"m/z calibrating sample '{sample.sample_item_name}'.",
+        # NOTE: Set the internal metadata for the pending user_notifications like
+        # room_ids and sid of the user.
+        # Internal metadata will be cleaned up the from data in send_progress_user_notification.
+        data={
+            "sample_item_id": sample_item_id,
+            "filename": sample.filename,
+            "_room_ids": [sid],
+            "_sid": sid,
+        },
+    )
 
-        filename = sample.filename
-        if not filename:
-            raise ValueError(f"Invalid sample item: {sample.sample_item_name}")
+    await send_progress_user_notification(notification, 0.1)
 
-        # Step 2: Notify the start of calibration
-        await sio.emit(
-            "calibration_mz_calibrate_sample_started",
-            {
-                "filename": filename,
-                "progress": 0,
-            },
-            room=sample_item_id,
-            namespace="/",
-        )
+    calibration_mz_fit_data = await calibration_mz_fit(
+        sample_item_id=sample_item_id,
+        params=params,
+        independent_transaction=False,
+        sid=sid,
+        process_id=gen_id(8),
+        parent_id=process_id,
+    )
+    fit = calibration_mz_fit_data["data"].get("fit", None)
 
-        await sio.emit(
-            "calibration_mz_calibrate_sample_progress",
-            {},
-            room=sample_item_id,
-            namespace="/",
-        )
+    await send_progress_user_notification(notification, 0.3)
 
-        # Step 3: Calibrate sample using specified parameters
-        result = await mz_calibrate_sample(
-            sample.to_dict(),
-            params,
-            filename,
-        )
+    calibration_mz_apply_data = await calibration_mz_apply(
+        fit=fit,
+        filename=sample.filename,
+        sid=sid,
+        process_id=gen_id(8),
+        parent_id=process_id,
+    )
+    sample_item_ids = calibration_mz_apply_data["data"].get("sample_item_ids", None)
+    sample_batch_ids = calibration_mz_apply_data["data"].get("sample_batch_ids", None)
 
-    except Exception as e:
-        # TODO_error_handling construct some common backfround task fail notification
-        # Emit an error message indicating calibration failure
-        await sio.emit(
-            "calibration_mz_calibrate_sample_failed",
-            {
-                "action": "m/z Calibrate Sample",
-                "filename": filename,
-                "error": str(e),
-                "progress": 100,
-                "sample_item_id": sample_item_id,
-            },
-            room=sample_item_id,
-            namespace="/",
-        )
-        raise process_exception(
-            e, f"Failed to m/z calibrate samples '{sample_item_id}'."
-        )
+    await send_progress_user_notification(notification, 0.95)
 
-    return result
+    # TODO_reload Reload affected sample batches
+    if independent_transaction:
+        for sample_batch_id in sample_batch_ids:
+            await sio.emit("sample_batch_reload", room=sample_batch_id, namespace="/")
+
+    # Step 4: Return rematched sample and message
+    return {
+        "data": {
+            "affected_sample_batch_ids": list(sample_batch_ids),
+        },
+        "message": f"Sample '{sample.sample_item_name}' m/z calibrated.",
+        "_notification_data": {
+            "sample_item_id": sample_item_id,
+            "filename": sample.filename,
+            "affected_sample_item_ids": sample_item_ids,
+            "affected_sample_batch_ids": sample_batch_ids,
+        },
+    }
 
 
+@api_controller_background_task(
+    success_notification_rooms=["sid"],
+    error_notification_rooms=["sid"],
+)
 async def calibration_mz_calibrate_batch(
     sample_batch_id: str,
     params: CalibrationMzFitParams,
     independent_transaction: bool = False,
+    sid: str = None,
+    process_id=None,
+    parent_id=None,
 ) -> list:
     """
     Performs m/z calibration on all samples within a given batch using specified calibration parameters.
@@ -722,90 +633,90 @@ async def calibration_mz_calibrate_batch(
     :return: A list of calibration results for each sample in the batch.
     :rtype: list
     """
-    try:
-        calibration_results = []
+    # Step 1: Fetch sample batch data
+    async with async_session() as session:
+        sample_batch = await session.get(SampleBatch, sample_batch_id)
+    if not sample_batch:
+        raise NotFoundException(f"Sample batch with ID '{sample_batch_id}' not found")
 
-        # Step 1: Notify the start of calibration
-
-        print(f"...m/z calibrating batch: {sample_batch_id} ...")
-        await sio.emit(
-            "calibration_mz_calibrate_batch_started",
-            {
-                "action": "m/z Calibrate Batch",
-                "sample_batch_id": sample_batch_id,
-                "progress": 0,
-            },
-            room=sample_batch_id,
-            namespace="/",
+    async with async_session() as session:
+        # Fetch samples
+        result = await session.execute(
+            select(Sample).where(Sample.sample_batch_id == sample_batch_id)
         )
 
-        # Step 2: Fetch all samples in the batch
+        samples = result.scalars().all()
+    if not samples:
+        raise NotFoundException(
+            f"Sample batch '{sample_batch.sample_batch_name}' has no samples"
+        )
+
+    print(f"...m/z calibrating batch: '{sample_batch.sample_batch_name}' ...")
+    # Prepare progress user notification.
+    notification = UserNotification(
+        process_id=process_id,
+        parent_id=parent_id,
+        type="calibration_mz_calibrate_batch",
+        status="pending",
+        message=f"m/z calibrating sample batch '{sample_batch.sample_batch_name}'.",
+        # NOTE: Set the internal metadata for the pending user_notifications like
+        # room_ids and sid of the user.
+        # Internal metadata will be cleaned up the from data in send_progress_user_notification.
+        data={
+            "sample_batch_id": sample_batch_id,
+            "_room_ids": [sid],
+            "_sid": sid,
+        },
+    )
+    await send_progress_user_notification(notification)
+
+    # Step 3: Calibrate each sample and collect results
+    sample_batch_ids_to_reload = set()
+    for sample in samples:
+        # Calibrate sample using specified parameters
+        calibration_mz_calibrate_sample_data = await calibration_mz_calibrate_sample(
+            sample_item_id=sample.sample_item_id,
+            params=params,
+            independent_transaction=False,
+            sid=sid,
+            process_id=gen_id(8),
+            parent_id=process_id,
+        )
+
+        affected_sample_batch_ids = calibration_mz_calibrate_sample_data["data"].get(
+            "affected_sample_batch_ids", None
+        )
+        sample_batch_ids_to_reload.update(affected_sample_batch_ids)
+
+    if not independent_transaction:
+        # Reload only other affected batches, not the currently processed one when part of bigger operation
+        sample_batch_ids_to_reload.discard(sample_batch_id)
+
+    for reload_sample_batch_id in sample_batch_ids_to_reload:
         async with async_session() as session:
-            # Fetch samples
-            result = await session.execute(
-                select(Sample).where(Sample.sample_batch_id == sample_batch_id)
-            )
-
-            samples = result.scalars().all()
-
-        if not samples:
-            raise NotFoundException(f"Sample batch has no samples")
-
-        # Step 3: Calibrate each sample and collect results
-        for index, sample in enumerate(samples):
-            filename = sample.filename
-            if not filename:
-                raise ValueError(f"Invalid sample: {sample.sample_item_name}")
-
-            # Calibrate sample using specified parameters
-            result = await mz_calibrate_sample(
-                sample.to_dict(),
-                params,
-                filename,
-                autosampler_mode=True,
-            )
-            result["index"] = index
-            calibration_results.append(result)
-
-        # Step 4: Notify the completion of calibration
-        await sio.emit(
-            "calibration_mz_calibrate_batch_finished",
-            {
-                "action": "m/z Calibrate Batch",
-                "sample_batch_id": sample_batch_id,
-                "progress": 100,
-                "calibration_results": calibration_results,
-            },
-            room=sample_batch_id,
-            namespace="/",
+            reload_sample_batch = await session.get(SampleBatch, reload_sample_batch_id)
+        notification.status = "success"
+        notification.message = (
+            f"Sample batch'{reload_sample_batch.sample_batch_name}' m/z calibrated."
         )
-        # Step 5: Emit a reload event for the sample batch if this is an independent transaction.
-        # Reload affected sample batch if called by http request
-        if independent_transaction:
-            await sio.emit("sample_batch_reload", room=sample_batch_id, namespace="/")
-    except Exception as e:
-        # Step 5: Handle exceptions and notify calibration failure
-        error_message = f"Failed to m/z calibrate batch '{sample_batch_id}'. {str(e)}"
-
+        notification.data = {
+            "sample_batch_id": reload_sample_batch_id,
+            "_room_ids": [reload_sample_batch_id],
+            # "_sid": sid,
+        }
+        await send_progress_user_notification(notification)
         await sio.emit(
-            "calibration_mz_calibrate_batch_failed",
-            {
-                "action": "m/z Calibrate Batch",
-                "sample_batch_id": sample_batch_id,
-                "progress": 100,
-                "calibration_results": calibration_results,
-                "error": error_message,
-            },
-            room=sample_batch_id,
-            namespace="/",
+            "sample_batch_reload", room=reload_sample_batch_id, namespace="/"
         )
 
-        # reise the error if called internally, from import_sample_items
-        if independent_transaction:
-            print(error_message)
-        else:
-            raise process_exception(
-                e, f"Failed to m/z calibrate batch '{sample_batch_id}'."
-            )
-
-    return calibration_results
+    # Step 4: Return rematched batch and message
+    return {
+        "data": {
+            "affected_sample_batch_ids": list(sample_batch_ids_to_reload),
+        },
+        "message": f"Sample batch '{sample_batch.sample_batch_name}' m/z calibrated. {len(sample_batch_ids_to_reload)} sample batch{'es were' if len(sample_batch_ids_to_reload) > 1 else 'was'} affected.",
+        "_notification_data": {
+            "sample_batch_id": sample_batch_id,
+            "affected_sample_batch_ids": list(sample_batch_ids_to_reload),
+        },
+    }

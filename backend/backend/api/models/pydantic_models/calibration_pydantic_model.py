@@ -1,22 +1,37 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, root_validator
 from typing import Optional
+
+
+class GetMzCalibrationQueryParams(BaseModel):
+    sample_item_id: Optional[str] = Field(
+        None,
+        description="Filter by the sample item ID for which you want to fetch m/z calibration.",
+    )
+    instrument: Optional[str] = Field(
+        None,
+        description="The instrument name to query for the last m/z calibration of that instrument.",
+    )
+
+    @root_validator
+    def check_sample_item_id_or_instrument(cls, values):
+        sample_item_id, instrument = values.get("sample_item_id"), values.get(
+            "instrument"
+        )
+        if (sample_item_id and instrument) or (not sample_item_id and not instrument):
+            raise ValueError(
+                "Must provide either ID of the sample or instrument name, not both."
+            )
+        return values
 
 
 class CalibrationMzFitParams(BaseModel):
     # TODO_configuration default values
     match_score_min: float = Field(0, description="Minimum match score")
     refine_window: int = Field(100, description="Refine window parameter")
+    # TODO check the default peak_intensity_min
     peak_intensity_min: float = Field(1000.0, description="Minimum peak intensity")
     isotope_abundance_min: float = Field(0.1, description="Minimum isotope abundance")
 
 
-class CalibrationMzApplyData(BaseModel):
+class CalibrationMzApplyBody(BaseModel):
     fit: dict = Field(..., description="Fit parameteres")
-
-
-class CalibrationMzCalibrateBody(BaseModel):
-    params: CalibrationMzFitParams = CalibrationMzFitParams()
-    independent_transaction: Optional[bool] = Field(
-        default=True,
-        description="Flag indicating whether the calibration is an independent transaction and if the operation should emit a reload event for the sample batch, raise the error if called internally.",
-    )

@@ -5,8 +5,12 @@ import { api } from '@/api'
 
 import { useBatchStore } from './batch'
 import { useTargetsStore } from './targets'
+import { useNotification } from './notification'
+import { useAppStore } from './app'
 
 export const useWorkspaceStore = defineStore('workspace', () => {
+  const notification = useNotification()
+
   const active = ref(null)
   const batches = ref([])
 
@@ -23,23 +27,14 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   // actions
 
   async function load(workspaceId) {
+    const targetsStore = useTargetsStore()
     if (active.value) await unload(false)
     api.emit('subscribe', workspaceId)
-    await loadWorkspace(workspaceId)
-    await loadBatches(workspaceId)
-  }
-
-  async function loadWorkspace(workspaceId) {
-    const workspace = await getWorkspace(workspaceId)
-    active.value = workspace
-  }
-
-  async function loadBatches(workspaceId) {
-    const workspaceBatches = await getWorkspaceBatches(workspaceId)
-
-    batches.value = workspaceBatches.map((batch) => {
+    active.value = await getWorkspace(workspaceId)
+    batches.value = (await getWorkspaceBatches(workspaceId)).map((batch) => {
       return { ...batch, selection: 0 }
     })
+    await targetsStore.load()
   }
 
   async function reload() {
@@ -72,16 +67,15 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   }
   // http client endpoints
   async function getWorkspace(workspaceId) {
-    return await api.request({
-      httpMethod: 'getWorkspace',
-      requestData: workspaceId,
-      errorMessage: `Failed to load workspace.`
+    return await api.request.read({
+      method: 'getWorkspace',
+      body: { workspaceId }
     })
   }
   async function getWorkspaceBatches(workspaceId) {
-    const batches = await api.request({
-      httpMethod: 'getAllBatches',
-      requestData: {
+    const batches = await api.request.read({
+      method: 'getAllBatches',
+      body: {
         workspace_id: workspaceId
       },
       errorMessage: `Failed to load the workspace batches.`
@@ -90,20 +84,24 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   }
 
   async function createWorkspace(newWorkspace) {
-    await api.http.createWorkspace(newWorkspace)
+    return await api.request.create({
+      method: 'createWorkspace',
+      body: newWorkspace
+    })
   }
 
   async function updateWorkspace(newWorkspace) {
-    await api.http.updateWorkspace(newWorkspace)
+    const workspaceId = newWorkspace.workspace_id
+    const body = newWorkspace
+    return await api.request.update({
+      method: 'updateWorkspace',
+      body: { workspaceId, body }
+    })
   }
-
   async function deleteWorkspace(workspace) {
-    return await api.process({
-      httpMethod: 'deleteWorkspace',
-      requestData: workspace,
-      successNotificationType: 'deleted',
-      successMessage: `Workspace ${workspace.workspace_name} was deleted successfully!`,
-      errorMessage: `Failed to delete workspace ${workspace.workspace_name}. Please try again.`
+    return await api.request.delete({
+      method: 'deleteWorkspace',
+      body: workspace
     })
   }
 
@@ -111,6 +109,14 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   async function onWorkspaceReload() {
     await reload()
   }
+
+  notification.on('create_workspace', ({ status, data }) => {
+    const appStore = useAppStore()
+    if (status == 'success') {
+      const workspace_id = data.response.data.workspace_id
+      active.value = appStore.workspaces.find((workspace) => workspace.workspace_id == workspace_id)
+    }
+  })
 
   return {
     // state
@@ -122,8 +128,6 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     sampleBatchesSelected,
     // actions
     load,
-    loadWorkspace,
-    loadBatches,
     reload,
     unload,
     getWorkspace,

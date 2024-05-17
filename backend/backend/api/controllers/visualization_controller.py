@@ -12,18 +12,11 @@ from colorcet import glasbey_hv as colormap
 from lib.file_func import load_file
 from lib.peak import filter_peaks, get_peaks
 from ..utils.api_features import api_controller_background_task
-from ..exceptions import NotFoundException
-from ..models.models import Sample, TargetIsotope
 
 
 @api_controller_background_task(
-    # TODO_notifications implement errors notification
-    default_payload={
-        "action": "visualize",
-        "type": "ion",
-    },
-    success_message="Visualized target ion target in sample successfully",
-    error_message="Failed to visualize ion for sample",
+    success_notification_rooms=["sid"],
+    error_notification_rooms=["sid"],
 )
 async def visualize_ion_focus(
     sample_item_id: str,
@@ -33,6 +26,7 @@ async def visualize_ion_focus(
     mz_tolerance: int,
     independent_transaction: bool = False,
     sid: str = None,
+    process_id=None,
 ):
     """
     Visualizes the focus on a specific ion for a given sample item by computing and emitting sum spectrum and time series data.
@@ -110,7 +104,9 @@ async def visualize_ion_focus(
 
         isotope_slice = sample_file.sel(mz=slice(*mz_range)).compute()
         isotope_sum_spectrum = isotope_slice.sum_signal
-        isotope_height = isotope_sum_spectrum.sel(mz=mz, method="nearest")
+        isotope_height = isotope_sum_spectrum.dropna(dim="mz").sel(
+            mz=mz, method="nearest"
+        )
         # Sum spectrum traces
         sum_spectrum_mz = isotope_sum_spectrum.mz.values.astype(np.float32)
         sum_spectrum_y = isotope_sum_spectrum.values.astype(np.float32)
@@ -132,8 +128,6 @@ async def visualize_ion_focus(
                 "fillcolor": "rgba({},{},{}, .3)".format(*colormap[i]),
                 "x": sum_spectrum_mz.tobytes(),
                 "y": sum_spectrum_y.tobytes(),
-                "xaxis": "x{:d}".format(i + 1),
-                "yaxis": "y{:d}".format(i + 1),
             }
         )
         # Peak traces (vertical lines)
@@ -153,13 +147,11 @@ async def visualize_ion_focus(
                     },
                     "x": [peak_mz, peak_mz],
                     "y": [0, peak_height],
-                    "xaxis": "x{:d}".format(i + 1),
-                    "yaxis": "y{:d}".format(i + 1),
                 }
             )
             if match:
                 # Timeseries trace
-                match_timeseries = isotope_slice.signal.sel(
+                match_timeseries = isotope_slice.signal.dropna(dim="mz").sel(
                     mz=peak_mz, method="nearest"
                 )
                 timeseries_time = match_timeseries.time.values.astype(np.float32)
@@ -189,8 +181,6 @@ async def visualize_ion_focus(
                 },
                 "x": [float(mz), float(mz)],
                 "y": [0, isotope_expected_height],
-                "xaxis": "x{:d}".format(i + 1),
-                "yaxis": "y{:d}".format(i + 1),
             }
         )
 

@@ -29,9 +29,10 @@ async def get_match_rating_route(match_rating_id: str):
 
 @match_rating_router.post("/api/match_ratings")
 @api_route(
-    status_code_success=201,
+    status_code=201,
     include_message=True,
-    success_message="Match rating created successfully",
+    success_message="Rating submitted successfully. Thanks for your feedback!",
+    error_message="Failed to submit rating. Please try again.",
 )
 async def create_match_rating_route(match_rating: MatchRatingCreate):
     return await create_match_rating(match_rating=match_rating)

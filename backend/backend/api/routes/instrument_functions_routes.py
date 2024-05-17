@@ -37,7 +37,7 @@ async def get_instrument_function_route(
 
 @instrument_functions_router.post("/api/instrument_functions")
 @api_route(
-    status_code_success=201,
+    status_code=201,
     include_message=True,
     success_message="Instrument function created successfully",
 )

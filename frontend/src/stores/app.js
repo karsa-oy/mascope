@@ -1,64 +1,70 @@
-import { ref } from 'vue'
+import { ref, reactive } from 'vue'
 import { defineStore } from 'pinia'
 
 import { api, extractDistinctValues } from '@/api'
+import { useInstrumentStore } from './instrument'
 
 export const useAppStore = defineStore('app', () => {
+  const instrumentStore = useInstrumentStore()
+
   const attributeTemplates = ref([])
   const instruments = ref([])
   const ionMechanisms = ref([])
-  const pushNotification = ref(null)
-  const mode = ref(import.meta.env.MASCOPE_PUBLIC_MODE)
+  const mode = reactive({
+    measuring: false,
+    dark: true
+  })
+  const savedSplit = JSON.parse(localStorage.getItem('mascope-dashboard-split'))
+  const split = reactive({
+    left: savedSplit[0],
+    right: savedSplit[1]
+  })
   const ready = ref(false)
   const workspaces = ref([])
 
   // data loading
   async function load() {
-    attributeTemplates.value = await getAllAttributeTemplates()
-    instruments.value = await getAllInstrumentFunctions().then((funcs) =>
-      extractDistinctValues(funcs, 'instrument')
-    )
-    ionMechanisms.value = await getAllIonizationMechanisms()
-    workspaces.value = await getAllWorkspaces()
+    // init darkmode
+    const systemPreference = window.matchMedia('(prefers-color-scheme:dark)').matches
+    const savedPreference =
+      localStorage.getItem('mascope-darkmode') == 'true'
+        ? true
+        : localStorage.getItem('mascope-darkmode') == 'false'
+          ? false
+          : null
+    mode.dark = savedPreference ?? systemPreference ?? true
+    if (mode.dark) {
+      document.body.classList.add('darkmode')
+    }
+    // init data
+    attributeTemplates.value = (
+      await api.request.read({
+        method: 'getAllAttributeTemplates'
+      })
+    )?.data
+    instruments.value = await api.request
+      .read({
+        method: 'getAllInstrumentFunctions'
+      })
+      .then((res) => extractDistinctValues(res.data, 'instrument'))
+    instrumentStore.active = instruments.value[0]
+    ionMechanisms.value = (
+      await api.request.read({
+        method: 'getAllIonizationMechanisms'
+      })
+    )?.data
+    workspaces.value = (
+      await api.request.read({
+        method: 'getAllWorkspaces'
+      })
+    )?.data
 
     ready.value = true
 
     api.log('loaded root data')
   }
-  async function reload() {
-    load()
-  }
-  // http client endpoints
-  async function getAllAttributeTemplates() {
-    const attributeTemplatesData = await api.request({
-      httpMethod: 'getAllAttributeTemplates'
-    })
-    return attributeTemplatesData.data
-  }
-  async function getAllInstrumentFunctions() {
-    const instrumentFunctions = await api.request({
-      httpMethod: 'getAllInstrumentFunctions'
-    })
-    return instrumentFunctions.data
-  }
-  async function getAllIonizationMechanisms() {
-    const ionizationMechanisms = await api.request({
-      httpMethod: 'getAllIonizationMechanisms'
-    })
-    return ionizationMechanisms.data
-  }
-  async function getAllWorkspaces() {
-    const workspaces = await api.request({
-      httpMethod: 'getAllWorkspaces'
-    })
-    return workspaces.data
-  }
-  // backend notifications
   async function onOrgReload() {
-    reload()
-  }
-  async function pushNotify(message) {
-    pushNotification.value = message
+    load()
   }
 
   return {
@@ -68,14 +74,8 @@ export const useAppStore = defineStore('app', () => {
     mode,
     ready,
     workspaces,
+    split,
     load,
-    reload,
-    getAllAttributeTemplates,
-    getAllInstrumentFunctions,
-    getAllIonizationMechanisms,
-    getAllWorkspaces,
-    onOrgReload,
-    pushNotification,
-    pushNotify
+    onOrgReload
   }
 })

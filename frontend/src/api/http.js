@@ -26,6 +26,10 @@ const logResponse = (response) => {
   let logMessage = `[http] Response: ${response.status} ${
     response.statusText
   } from ${response.config.method.toUpperCase()} ${response.config.url}`
+  // Get process_id from headers
+  if (response.headers['process-id']) {
+    logMessage += ` | Process-ID: ${response.headers['process-id']}`
+  }
   // Append the message if available
   if (response.data && response.data.message) {
     logMessage += ` | Message: ${response.data.message}`
@@ -102,36 +106,46 @@ export function createHttpClient() {
         return await client.get(workspacesBaseUrl, { params })
       } catch (error) {
         const userErrorMessage =
-          error?.response?.data?.error || `Failed to load all workspaces: ${error}`
+          error?.response?.data?.error || `Failed to get all workspaces: ${error}`
         throw new Error(userErrorMessage)
       }
     },
-    getWorkspace: async (workspaceId) => {
+    getWorkspace: async ({ workspaceId }) => {
       try {
         return await client.get(`${workspacesBaseUrl}/${workspaceId}`)
       } catch (error) {
-        console.error('Failed to get workspace: ', error)
+        const userErrorMessage = error?.response?.data?.error || `Failed to get workspace: ${error}`
+        throw new Error(userErrorMessage)
       }
     },
     createWorkspace: async (newWorkspace) => {
       try {
         return await client.post(workspacesBaseUrl, newWorkspace)
       } catch (error) {
-        console.error('Failed to create workspace: ', error)
+        const userErrorMessage =
+          error?.response?.data?.error ||
+          `Failed to create workspace '${newWorkspace.workspace_name}': ${error}`
+        throw new Error(userErrorMessage)
       }
     },
     deleteWorkspace: async (workspace) => {
       try {
         return await client.delete(`${workspacesBaseUrl}/${workspace.workspace_id}`)
       } catch (error) {
-        console.error(`Failed to delete workspace ${workspace.workspace_name}: `, error)
+        const userErrorMessage =
+          error?.response?.data?.error ||
+          `Failed to delete workspace '${workspace.workspace_name}': ${error}`
+        throw new Error(userErrorMessage)
       }
     },
-    updateWorkspace: async (newWorkspace) => {
+    updateWorkspace: async ({ workspaceId, body }) => {
       try {
-        return await client.patch(`${workspacesBaseUrl}/${newWorkspace.workspace_id}`, newWorkspace)
+        return await client.patch(`${workspacesBaseUrl}/${workspaceId}`, body)
       } catch (error) {
-        console.error(`Failed to update workspace ${newWorkspace.workspace_name}: `, error)
+        const userErrorMessage =
+          error?.response?.data?.error ||
+          `Failed to update workspace '${body.workspace_name}': ${error}`
+        throw new Error(userErrorMessage)
       }
     },
     // Sample batches
@@ -147,7 +161,7 @@ export function createHttpClient() {
         return await client.get(`${batchesBaseUrl}/${batchId}`)
       } catch (error) {
         const userErrorMessage =
-          error?.response?.data?.error || `Failed to load sample batch: ${error}`
+          error?.response?.data?.error || `Failed to get sample batch: ${error}`
         throw new Error(userErrorMessage)
       }
     },
@@ -156,7 +170,7 @@ export function createHttpClient() {
         return await client.post(`${batchesBaseUrl}/${batchId}/targets`, body)
       } catch (error) {
         const userErrorMessage =
-          error?.response?.data?.error || `Failed to load batch targets data: ${error}`
+          error?.response?.data?.error || `Failed to get batch targets data: ${error}`
         throw new Error(userErrorMessage)
       }
     },
@@ -170,11 +184,14 @@ export function createHttpClient() {
         throw new Error(userErrorMessage)
       }
     },
-    deleteBatch: async (batch) => {
+    deleteBatch: async ({ sample_batch_id, sample_batch_name }) => {
       try {
-        return await client.delete(`${batchesBaseUrl}/${batch.sample_batch_id}`)
+        return await client.delete(`${batchesBaseUrl}/${sample_batch_id}`)
       } catch (error) {
-        console.error(`Failed to delete batch "${batch.sample_batch_name}".`, error)
+        const userErrorMessage =
+          error?.response?.data?.error ||
+          `Failed to delete sample batch "${sample_batch_name}": ${error}`
+        throw new Error(userErrorMessage)
       }
     },
     updateBatch: async ({ batchId, body }) => {
@@ -191,9 +208,8 @@ export function createHttpClient() {
       try {
         return await client.post(`${batchesBaseUrl}/${batch.sample_batch_id}/import`, body)
       } catch (error) {
-        // TODO_error_handling
         const userErrorMessage =
-          error?.response?.data?.error || `Failed to import sample batch: ${error}`
+          error?.response?.data?.error || `Failed to import samples: ${error}`
         throw new Error(userErrorMessage)
       }
     },
@@ -206,11 +222,13 @@ export function createHttpClient() {
         throw new Error(userErrorMessage)
       }
     },
-    batchExportPeakData: async (sampleBatchData) => {
+    batchExportPeakData: async ({ sample_batch_id }) => {
       try {
-        return await client.post(`${batchesBaseUrl}/export_peaks`, sampleBatchData)
+        return await client.get(`${batchesBaseUrl}/${sample_batch_id}/export_peaks`)
       } catch (error) {
-        console.error('Failed to export sample batch peaks: ', error)
+        const userErrorMessage =
+          error?.response?.data?.error || `Failed to export sample batch peaks: ${error}`
+        throw new Error(userErrorMessage)
       }
     },
     // Samples
@@ -219,7 +237,7 @@ export function createHttpClient() {
         return await client.post(samplesBaseUrl, body)
       } catch (error) {
         const userErrorMessage =
-          error?.response?.data?.error || `Failed to load batch samples data: ${error}`
+          error?.response?.data?.error || `Failed to get batch samples data: ${error}`
         throw new Error(userErrorMessage)
       }
     },
@@ -229,7 +247,7 @@ export function createHttpClient() {
         return await client.post(`${samplesBaseUrl}/${sampleId}`, body)
       } catch (error) {
         const userErrorMessage =
-          error?.response?.data?.error || `Failed to load the sample data: ${error}`
+          error?.response?.data?.error || `Failed to get the sample data: ${error}`
         throw new Error(userErrorMessage)
       }
     },
@@ -238,7 +256,9 @@ export function createHttpClient() {
       try {
         return await client.post(`${samplesBaseUrl}/${sampleId}/ion_matches`, body)
       } catch (error) {
-        console.error('Failed to get sample ion matches: ', error)
+        const userErrorMessage =
+          error?.response?.data?.error || `Failed to get sample ion match data: ${error}`
+        throw new Error(userErrorMessage)
       }
     },
 
@@ -264,7 +284,7 @@ export function createHttpClient() {
         return await client.get(filesBaseUrl, { params })
       } catch (error) {
         const userErrorMessage =
-          error?.response?.data?.error || `Failed to load all sample files: ${error}`
+          error?.response?.data?.error || `Failed to get all sample files: ${error}`
         throw new Error(userErrorMessage)
       }
     },
@@ -273,7 +293,7 @@ export function createHttpClient() {
         return await client.get(`${filesBaseUrl}/recent`, { params })
       } catch (error) {
         const userErrorMessage =
-          error?.response?.data?.error || `Failed to load recent acquisitions: ${error}`
+          error?.response?.data?.error || `Failed to get recent acquisitions: ${error}`
         throw new Error(userErrorMessage)
       }
     },
@@ -322,32 +342,53 @@ export function createHttpClient() {
       }
     },
 
-    createSampleItem: async (newSampleItem) => {
+    createSampleItem: async (sample) => {
       try {
-        return await client.post(itemsBaseUrl, newSampleItem)
+        return await client.post(itemsBaseUrl, sample)
       } catch (error) {
-        console.error('Failed to create sample item: ', error)
+        const userErrorMessage =
+          error?.response?.data?.error ||
+          `Failed to create sample item ${sample.sample_item_name}: ${error}`
+        throw new Error(userErrorMessage)
       }
     },
-    updateSampleItem: async (sample_item_id, updatedSampleItem) => {
+    processSampleItem: async ({ sample, alarms, params }) => {
       try {
-        return await client.patch(`${itemsBaseUrl}/${sample_item_id}`, updatedSampleItem)
+        return await client.post(`${itemsBaseUrl}/process`, {
+          sample_item: sample,
+          mz_calibration_params: params,
+          alarms_list: alarms
+        })
       } catch (error) {
-        console.error('Failed to update sample item: ', error)
+        const userErrorMessage =
+          error?.response?.data?.error ||
+          `Failed to process sample item ${sample.sample_item_name}: ${error}`
+        throw new Error(userErrorMessage)
       }
     },
-    deleteSampleItem: async (sample_item_id) => {
+    updateSampleItem: async ({ sampleId, body }) => {
       try {
-        return await client.delete(`${itemsBaseUrl}/${sample_item_id}`)
+        return await client.patch(`${itemsBaseUrl}/${sampleId}`, body)
       } catch (error) {
-        console.error('Failed to delete sample item: ', error)
+        const userErrorMessage =
+          error?.response?.data?.error ||
+          `Failed to update sample item ${body.sample_item_name}: ${error}`
+        throw new Error(userErrorMessage)
+      }
+    },
+    deleteSampleItem: async ({ sampleId }) => {
+      try {
+        return await client.delete(`${itemsBaseUrl}/${sampleId}`)
+      } catch (error) {
+        const userErrorMessage =
+          error?.response?.data?.error || `Failed to delete sample item: ${error}`
+        throw new Error(userErrorMessage)
       }
     },
     copySampleItem: async ({ sampleId, body }) => {
       try {
         return await client.post(`${itemsBaseUrl}/${sampleId}/copy`, body)
       } catch (error) {
-        // TODO_error_handling
         const userErrorMessage =
           error?.response?.data?.error || `Failed to copy sample item: ${error}`
         throw new Error(userErrorMessage)
@@ -428,7 +469,7 @@ export function createHttpClient() {
       try {
         return await client.get(`${matchesBaseUrl}`, { params })
       } catch (error) {
-        const userErrorMessage = error?.response?.data?.error || `Failed to load matches: ${error}`
+        const userErrorMessage = error?.response?.data?.error || `Failed to get matches: ${error}`
         throw new Error(userErrorMessage)
       }
     },
@@ -454,15 +495,19 @@ export function createHttpClient() {
       try {
         return await client.post(`${matchBaseUrl}/sample/${sampleId}/compute`, body)
       } catch (error) {
-        console.error('Failed to compute mathes for sample: ', error)
+        const userErrorMessage =
+          error?.response?.data?.error || `Failed to compute mathes for sample: ${error}`
+        throw new Error(userErrorMessage)
       }
     },
 
-    matchSampleRematch: async ({ sampleId, body = {} }) => {
+    rematchSample: async ({ sampleId, body = {} }) => {
       try {
         return await client.post(`${matchBaseUrl}/sample/${sampleId}/rematch`, body)
       } catch (error) {
-        console.error('Failed to rematch sample: ', error)
+        const userErrorMessage =
+          error?.response?.data?.error || `Failed to rematch sample: ${error}`
+        throw new Error(userErrorMessage)
       }
     },
 
@@ -471,7 +516,9 @@ export function createHttpClient() {
       try {
         return await client.post(matchRatingsBaseUrl, newMatchRating)
       } catch (error) {
-        console.error('Failed to submit match rating: ', error)
+        const userErrorMessage =
+          error?.response?.data?.error || `Failed to submit match rating: ${error}`
+        throw new Error(userErrorMessage)
       }
     },
 
@@ -480,7 +527,9 @@ export function createHttpClient() {
       try {
         return await client.get(`${targetCollectionsBaseUrl}`, { params })
       } catch (error) {
-        console.error('Failed to get all target collections: ', error)
+        const userErrorMessage =
+          error?.response?.data?.error || `Failed to get all target collections: ${error}`
+        throw new Error(userErrorMessage)
       }
     },
 
@@ -488,7 +537,9 @@ export function createHttpClient() {
       try {
         return await client.get(`${targetCollectionsBaseUrl}/${collectionId}`)
       } catch (error) {
-        console.error('Failed to get target collection: ', error)
+        const userErrorMessage =
+          error?.response?.data?.error || `Failed to get target collection: ${error}`
+        throw new Error(userErrorMessage)
       }
     },
 
@@ -545,7 +596,9 @@ export function createHttpClient() {
       try {
         return await client.get(`${targetCompoundsBaseUrl}`, { params })
       } catch (error) {
-        console.error('Failed to get all target compounds: ', error)
+        const userErrorMessage =
+          error?.response?.data?.error || `Failed to get all target compounds: ${error}`
+        throw new Error(userErrorMessage)
       }
     },
 
@@ -613,6 +666,30 @@ export function createHttpClient() {
         console.error(`Failed to update target ion ${data.target_ion_formula}`, error)
       }
     },
+    saveTargetIonFilterParams: async (data) => {
+      try {
+        const response = await client.patch(`${targetIonsBaseUrl}/${data.target_ion_id}`, data.body)
+        // TEMP the message forming should move to api route
+        const successMessage = `Filtering parameters for '${data.target_ion_formula}' saved successfully!`
+        response.data.message = successMessage
+        return response
+      } catch (error) {
+        const userErrorMessage = `Failed to save filtering parameters: ${error?.response?.data?.error || error}. Please try again.`
+        throw new Error(userErrorMessage)
+      }
+    },
+    deleteTargetIonFilterParams: async (data) => {
+      try {
+        const response = await client.patch(`${targetIonsBaseUrl}/${data.target_ion_id}`, data.body)
+        // TEMP the message forming should move to api route
+        const successMessage = `Filtering parameters for '${data.body.delete_instrument_filters}' instrument were deleted successfully!`
+        response.data.message = successMessage
+        return response
+      } catch (error) {
+        const userErrorMessage = `Failed to delete filtering parameters: ${error?.response?.data?.error || error}. Please try again.`
+        throw new Error(userErrorMessage)
+      }
+    },
 
     // Ionization mechanisms
     getAllIonizationMechanisms: async (params = {}) => {
@@ -622,7 +699,7 @@ export function createHttpClient() {
         })
       } catch (error) {
         const userErrorMessage =
-          error?.response?.data?.error || `Failed to load all ionization mechanisms: ${error}`
+          error?.response?.data?.error || `Failed to get all ionization mechanisms: ${error}`
         throw new Error(userErrorMessage)
       }
     },
@@ -674,7 +751,7 @@ export function createHttpClient() {
         })
       } catch (error) {
         const userErrorMessage =
-          error?.response?.data?.error || `Failed to load all instrument functions: ${error}`
+          error?.response?.data?.error || `Failed to get all instrument functions: ${error}`
         throw new Error(userErrorMessage)
       }
     },
@@ -694,7 +771,7 @@ export function createHttpClient() {
         return await client.get(`${attributeTemplatesBaseUrl}`, { params })
       } catch (error) {
         const userErrorMessage =
-          error?.response?.data?.error || `Failed to load attribute templates: ${error}`
+          error?.response?.data?.error || `Failed to get attribute templates: ${error}`
         throw new Error(userErrorMessage)
       }
     },

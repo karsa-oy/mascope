@@ -1,7 +1,7 @@
 import { reactive } from 'vue'
 import { defineStore } from 'pinia'
 
-let mapCodeToKey = {
+const keymap = {
   AltLeft: 'alt',
   AltRight: 'alt',
   ControlLeft: 'control',
@@ -9,7 +9,8 @@ let mapCodeToKey = {
   ShiftLeft: 'shift',
   ShiftRight: 'shift',
   KeyC: 'c',
-  KeyV: 'v'
+  KeyV: 'v',
+  KeyX: 'x'
 }
 
 export const useKeyStore = defineStore('key', () => {
@@ -27,14 +28,14 @@ export const useKeyStore = defineStore('key', () => {
   // actions
 
   function down(event) {
-    const key = mapCodeToKey[event.code]
+    const key = keymap[event.code]
     if (key && key in state) {
       state[key] = true
     }
   }
 
   function up(event) {
-    const key = mapCodeToKey[event.code]
+    const key = keymap[event.code]
     if (key && key in state) {
       state[key] = false
     }

@@ -278,6 +278,7 @@ async def create_target_collection(
     target_collection_create_body: TargetCollectionCreateBody,
     background_tasks: BackgroundTasks,
     sid=None,
+    process_id=None,
 ) -> dict:
     """
     Creates a new target collection with the specified name, description, and type, and optionally associates it
@@ -463,6 +464,7 @@ async def create_target_collection(
             rematch_batches_body=rematch_batches_body,
             independent_transaction=True,
             sid=sid,
+            process_id=process_id,
         )
 
     # Step 9: Emit reload events for affected batches and inform clients about collection changes
@@ -501,7 +503,8 @@ async def create_target_collection(
         )
 
     return {
-        "new_target_collection": new_target_collection_with_associations,
+        "data": new_target_collection_with_associations,
+        "message": f"Target collection '{new_target_collection.target_collection_name}' was created.",
         "message_logs": message_logs,
     }
 
@@ -512,6 +515,7 @@ async def update_target_collection(
     target_collection_update_body: TargetCollectionUpdateBody,
     background_tasks: BackgroundTasks,
     sid=None,
+    process_id=None,
 ) -> dict:
     """
     Based on the provided changes this function updates a target collection's basic fields and modifies its associated sample batches or target compounds.
@@ -817,6 +821,7 @@ async def update_target_collection(
             rematch_batches_body=rematch_batches_body,
             independent_transaction=True,
             sid=sid,
+            process_id=process_id,
         )
 
     # Step 10: Emit reload events for affected batches and inform clients about collection changes
@@ -840,7 +845,8 @@ async def update_target_collection(
         )
 
     return {
-        "updated_target_collection": updated_target_collection,
+        "data": updated_target_collection,
+        "message": f"Target collection '{updated_target_collection.target_collection_name}' was updated.",
         "message_logs": message_logs,
     }
 
@@ -851,6 +857,7 @@ async def delete_target_collection(
     background_tasks: BackgroundTasks,
     delete_orphan_compounds: bool = False,
     sid=None,
+    process_id=None,
 ) -> dict:
     """
     Deletes a specified target collection and optionally its orphan compounds, then performs a rematch on affected sample batches.
@@ -980,6 +987,7 @@ async def delete_target_collection(
             rematch_batches_body=rematch_batches_body,
             independent_transaction=True,
             sid=sid,
+            process_id=process_id,
         )
         if delete_orphan_compounds and orphan_compound_ids:
 
@@ -1000,7 +1008,11 @@ async def delete_target_collection(
     await sio.emit("targets_all_reload", namespace="/")
 
     # Step 8: Construct and return message_logs
+    message_logs = ""
     if delete_orphan_compounds and orphan_compound_ids:
         message_logs = f"Additionally, {len(orphan_compound_ids)} orphan compound{' was' if len(orphan_compound_ids)==1 else 's were'} deleted"
 
-        return {"message_logs": message_logs}
+    return {
+        "message": f"Target collection '{target_collection.target_collection_name}' was deleted.",
+        "message_logs": message_logs,
+    }

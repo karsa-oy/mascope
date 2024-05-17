@@ -1,8 +1,9 @@
 import { io } from 'socket.io-client'
 
-import { useNotificationStore } from '@/stores/notification'
-
 import { createHttpClient } from './http.js'
+
+import { strToSnakeCase } from '@/lib/utils'
+import { useNotification } from '@/stores'
 
 // LOAD ENV VARS
 const mode = import.meta.env.MASCOPE_PUBLIC_MODE
@@ -15,63 +16,108 @@ async function initApi() {
   const [socket, emit] = await initSocket()
   const http = createHttpClient(host, api_port)
 
-  async function process({
-    httpMethod,
-    requestData,
-    successNotificationType = 'submitted',
-    successMessage = null, // empty for progress notification
-    errorMessage = 'An error occurred while processing your request.',
-    progressNotificationPayload = null // parameter for progress notification
-  }) {
+  // Catch errors, show error norification and return response from api
+  async function apiResponse({ method, body = {} }) {
+    const notification = useNotification()
     try {
-      const response = await http[httpMethod](requestData)
-      if (response.status === 200 || response.status === 201) {
-        const notificationStore = useNotificationStore()
-        if (progressNotificationPayload) {
-          notificationStore.showProgressNotification(progressNotificationPayload)
-        } else {
-          notificationStore.showGeneralNotification({
-            notification: successNotificationType,
-            message: successMessage
-          })
-        }
-      }
-      return response
+      return await http[method](body)
     } catch (error) {
-      // TODO_error_handling
-      console.error(`Failed to process ${httpMethod}.`, error)
-      const userErrorMessage = `${errorMessage}. ${error}`
-      const notificationStore = useNotificationStore()
-      notificationStore.showGeneralNotification({
-        notification: 'error',
-        message: userErrorMessage
+      console.error(`Failed to ${method}:`, error)
+      notification.push({
+        type: strToSnakeCase(method),
+        status: 'error',
+        message: error.message
       })
     }
   }
 
-  async function request({ httpMethod, requestData = {} }) {
-    try {
-      const response = await http[httpMethod](requestData)
-      if (response.status === 200) {
-        const { data } = response
+  const request = {
+    // method to write the data to api (http_methods: POST, success_status: 201)
+    create: async ({ method, body = {} }) => {
+      const notification = useNotification()
+      const { data, status } = await apiResponse({ method, body })
+      if (status === 201) {
+        notification.push({
+          type: strToSnakeCase(method),
+          status: 'success',
+          message: data.message,
+          data: {
+            request: {
+              body,
+              method
+            },
+            response: {
+              data,
+              status
+            }
+          }
+        })
+      }
+    },
+    // method to get the data from api (http_methods: GET,POST, success_status: 200)
+    read: async ({ method, body = {} }) => {
+      const { data, status } = await apiResponse({ method, body })
+      if (status === 200) {
         return data
       }
-    } catch (error) {
-      console.error(`Failed to process ${httpMethod}.`, error)
-      const notificationStore = useNotificationStore()
-      notificationStore.showGeneralNotification({
-        notification: 'error',
-        message: error
-      })
+    },
+    // method to update the data in api (http_methods: PATCH, success_status: 200)
+    update: async ({ method, body = {} }) => {
+      const notification = useNotification()
+      const { data, status } = await apiResponse({ method, body })
+      if (status === 200) {
+        notification.push({
+          type: strToSnakeCase(method),
+          status: 'success',
+          message: data.message,
+          data: {
+            request: {
+              body,
+              method
+            },
+            response: {
+              data,
+              status
+            }
+          }
+        })
+      }
+    },
+    // method to delete the data from api (http_methods: DELETE, success_status: 200)
+    delete: async ({ method, body = {} }) => {
+      const notification = useNotification()
+      const { data, status } = await apiResponse({ method, body })
+      if (status === 200) {
+        notification.push({
+          type: strToSnakeCase(method),
+          status: 'success',
+          message: data.message,
+          data: {
+            request: {
+              body,
+              method
+            },
+            response: {
+              data,
+              status
+            }
+          }
+        })
+      }
+    },
+    // method to start the long running process in api (http_methods: GET, POST, success_status: 202, data is returned in sio user_notifications)
+    process: async ({ method, body = {} }) => {
+      const { data, status } = await apiResponse({ method, body })
+      if (status === 202) {
+        console.log('Progress notification', data)
+      }
     }
   }
 
   return {
     socket,
     emit,
-    http,
     request,
-    process,
     log
   }
 }

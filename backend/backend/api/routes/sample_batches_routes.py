@@ -1,4 +1,5 @@
 from fastapi import APIRouter, BackgroundTasks, Request, Depends
+from backend.db.id import gen_id
 from ..utils.api_features import api_route
 from ..controllers.sample_batches_controller import (
     get_sample_batches,
@@ -18,7 +19,6 @@ from ..models.pydantic_models.sample_batch_pydantic_model import (
     GetSampleBatchesQueryParams,
     SampleBatchImportSamplesBody,
     SampleBatchCopyBody,
-    SampleBatchExportPeaks,
 )
 
 sample_batches_router = APIRouter()
@@ -54,54 +54,71 @@ async def get_batch_targets_route(sample_batch_id: str, body: AlarmsList):
 
 @sample_batches_router.post("/api/sample_batches")
 @api_route(
-    status_code_success=201,
-    include_message=True,
-    success_message="Sample batch created successfully",
+    status_code=201,
 )
 async def create_sample_batch_route(body: SampleBatchCreateBody):
     return await create_sample_batch(sample_batch=body, independent_transaction=True)
 
 
 @sample_batches_router.patch("/api/sample_batches/{sample_batch_id}")
-@api_route(include_message=True, success_message="Sample batch updated successfully")
+@api_route()
 async def update_sample_batch_route(
+    request: Request,
     sample_batch_id: str,
     body: SampleBatchUpdateBody,
     background_tasks: BackgroundTasks,
 ):
-    return await update_sample_batch(
+    sid = request.headers.get("X-SID")
+    # generate process_id for the background task ramatch_batches
+    process_id = gen_id(8)
+
+    result = await update_sample_batch(
         sample_batch_id=sample_batch_id,
         sample_batch_update_body=body,
         background_tasks=background_tasks,
+        sid=sid,
+        process_id=process_id,
     )
+
+    return {
+        "data": result["data"],
+        "message": result["message"],
+        "process_id": process_id,
+    }
 
 
 @sample_batches_router.delete("/api/sample_batches/{sample_batch_id}")
 @api_route(
-    include_data=False,
-    include_message=True,
-    success_message="The sample batch deletion has started",
+    status_code=202,
 )
 async def delete_sample_batch_route(
     request: Request, sample_batch_id: str, background_tasks: BackgroundTasks
 ):
-    sid = request.headers.get("X-SID")
     # Fetch sample batch to have access to workspace_id and verify sample batch existence
     sample_batch = await get_sample_batch(sample_batch_id)
+    sample_batch_name = sample_batch["sample_batch_name"]
+
+    sid = request.headers.get("X-SID")
+    process_id = gen_id(8)
+
     background_tasks.add_task(
         delete_sample_batch,
         sample_batch_id=sample_batch_id,
         workspace_id=sample_batch["workspace_id"],
         independent_transaction=True,
         sid=sid,
+        process_id=process_id,
     )
+
+    return {
+        "message": f"Deleting batch '{sample_batch_name}', please wait.",
+        "process_id": process_id,
+    }
 
 
 @sample_batches_router.post("/api/sample_batches/{sample_batch_id}/import")
 @api_route(
-    include_data=False,
-    include_message=True,
-    success_message="Importing samples to the sample batch has started",
+    status_code=202,
 )
 async def import_sample_items_route(
     request: Request,
@@ -109,14 +126,16 @@ async def import_sample_items_route(
     body: SampleBatchImportSamplesBody,
     background_tasks: BackgroundTasks,
 ):
-    sid = request.headers.get("X-SID")
-
     # Ensure that sample_batch_id in path matches sample_batch_id in sample_items
     if any(si.sample_batch_id != sample_batch_id for si in body.sample_items):
         raise ValueError("The sample_batch_id in the route and sample_items must match")
 
     # Verify the existance of sample batch
-    await get_sample_batch(sample_batch_id)
+    sample_batch = await get_sample_batch(sample_batch_id)
+    sample_batch_name = sample_batch["sample_batch_name"]
+
+    sid = request.headers.get("X-SID")
+    process_id = gen_id(8)
 
     background_tasks.add_task(
         import_sample_items,
@@ -126,14 +145,17 @@ async def import_sample_items_route(
         calibrate_batch=body.calibrate_batch,
         independent_transaction=True,
         sid=sid,
+        process_id=process_id,
     )
+    return {
+        "message": f"Importing {len(body.sample_items)} samples to the sample batch '{sample_batch_name}', please wait.",
+        "process_id": process_id,
+    }
 
 
 @sample_batches_router.post("/api/sample_batches/{sample_batch_id}/copy")
 @api_route(
-    include_data=False,
-    include_message=True,
-    success_message="Copying sample batch has started",
+    status_code=202,
 )
 async def copy_sample_batch_route(
     request: Request,
@@ -142,6 +164,8 @@ async def copy_sample_batch_route(
     background_tasks: BackgroundTasks,
 ):
     sid = request.headers.get("X-SID")
+    process_id = gen_id(8)
+
     background_tasks.add_task(
         copy_sample_batch,
         sample_batch_id=sample_batch_id,
@@ -150,24 +174,38 @@ async def copy_sample_batch_route(
         sample_batch_description=body.sample_batch_description,
         independent_transaction=True,
         sid=sid,
+        process_id=process_id,
     )
+    return {
+        "message": f"Copying batch '{body.sample_batch_name}', please wait.",
+        "process_id": process_id,
+    }
 
 
-@sample_batches_router.post("/api/sample_batches/export_peaks")
+@sample_batches_router.get("/api/sample_batches/{sample_batch_id}/export_peaks")
 @api_route(
-    include_data=False,
-    include_message=True,
-    success_message="The export peaks process for batch has started",
+    status_code=202,
 )
 async def sample_batch_export_peaks_route(
     request: Request,
-    sample_batch: SampleBatchExportPeaks,
+    sample_batch_id: str,
     background_tasks: BackgroundTasks,
 ):
+    # Verify the existance of sample batch
+    sample_batch = await get_sample_batch(sample_batch_id)
+    sample_batch_name = sample_batch["sample_batch_name"]
+
     sid = request.headers.get("X-SID")
+    process_id = gen_id(8)
+
     background_tasks.add_task(
         sample_batch_export_peaks,
-        sample_batch=sample_batch,
+        sample_batch_id=sample_batch_id,
         independent_transaction=True,
         sid=sid,
+        process_id=process_id,
     )
+    return {
+        "message": f"Exporting peak data for batch '{sample_batch_name}', please wait.",
+        "process_id": process_id,
+    }

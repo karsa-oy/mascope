@@ -1,11 +1,9 @@
-# TODO_error_handling
 import traceback
 from fastapi import HTTPException, status
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.exc import SQLAlchemyError
-from pydantic import ValidationError
 
 
 class ApiException(Exception):

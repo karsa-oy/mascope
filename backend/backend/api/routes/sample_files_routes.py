@@ -59,7 +59,7 @@ async def get_sample_file_route(sample_file_id: str):
 
 @sample_files_router.post("/api/sample_files")
 @api_route(
-    status_code_success=201,
+    status_code=201,
     include_message=True,
     success_message="Sample file created successfully",
 )

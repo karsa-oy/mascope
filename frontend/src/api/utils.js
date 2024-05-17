@@ -5,6 +5,7 @@ export const extractDistinctValues = (objects, property) => {
 }
 
 export function generateCopyName(originalName) {
+  if (!originalName) return null
   const cleanedName = originalName.replace(/\s+/g, ' ').trim()
 
   const namePattern = cleanedName.match(/(.*\sCopy)(?:\((\d+)\))?$/)
