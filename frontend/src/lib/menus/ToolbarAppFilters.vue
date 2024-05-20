@@ -4,6 +4,7 @@ import Select from 'primevue/select'
 import ContextMenu from 'primevue/contextmenu'
 import ToggleSwitch from 'primevue/toggleswitch'
 import Popover from 'primevue/popover'
+import Button from 'primevue/button'
 
 import { ref, reactive, computed, watch, watchEffect } from 'vue'
 

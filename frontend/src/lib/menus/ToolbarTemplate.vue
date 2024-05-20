@@ -1,6 +1,7 @@
 <script setup>
 import FloatLabel from 'primevue/floatlabel'
 import Select from 'primevue/select'
+import Button from 'primevue/button'
 import { useConfirm } from 'primevue/useconfirm'
 
 import { ref, computed } from 'vue'

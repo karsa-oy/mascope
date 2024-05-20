@@ -3,6 +3,8 @@ import { ref, computed, watch } from 'vue'
 
 import Splitter from 'primevue/splitter'
 import SplitterPanel from 'primevue/splitterpanel'
+import TabMenu from 'primevue/tabmenu'
+import Panel from 'primevue/panel'
 
 import { ToolbarAppFilters } from '@/lib/menus'
 import {

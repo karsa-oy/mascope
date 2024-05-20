@@ -4,6 +4,8 @@ import { reactive, computed, watch, watchEffect } from 'vue'
 import Button from 'primevue/button'
 import Select from 'primevue/select'
 import DatePicker from 'primevue/datepicker'
+import DataTable from 'primevue/datatable'
+import Column from 'primevue/column'
 
 import { DialogSampleItemOp, DialogSampleBatchImport } from '@/lib/dialogs'
 

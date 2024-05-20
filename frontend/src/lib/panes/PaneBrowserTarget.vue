@@ -1,12 +1,28 @@
 <script setup>
 import { ref, reactive, computed, watchEffect } from 'vue'
 
-import BaseMatchTag from '@/lib/base/BaseMatchTag.vue'
+import Panel from 'primevue/panel'
+import ScrollPanel from 'primevue/scrollpanel'
+import Button from 'primevue/button'
+import TabMenu from 'primevue/tabmenu'
+import DataTable from 'primevue/datatable'
+import Column from 'primevue/column'
+import ProgressSpinner from 'primevue/progressspinner'
+import ContextMenu from 'primevue/contextmenu'
+import { useConfirm } from 'primevue/useconfirm'
 
-import DialogTargetCollectionOp from '@/lib/dialogs/DialogTargetCollectionOp.vue'
+import { BaseMatchTag } from '@/lib/base'
+import {
+  DialogTargetCollectionOp,
+  PopoverTargetCompoundAdd,
+  DialogTargetCompoundUpdate
+} from '@/lib/dialogs'
 
-import { useSampleStore, useBatchStore, useVisualizationStore } from '@/stores'
+import { useSampleStore, useBatchStore, useVisualizationStore, useTargetsStore } from '@/stores'
 
+const confirm = useConfirm()
+
+const targetsStore = useTargetsStore()
 const sampleStore = useSampleStore()
 const batchStore = useBatchStore()
 const visualizationStore = useVisualizationStore()
@@ -25,11 +41,13 @@ const selected = reactive({
   isotope: null
 })
 const context = reactive({
-  collection: null
+  collection: null,
+  compound: null
 })
 
 const dialog = reactive({
-  collection: null
+  collection: null,
+  compound: false
 })
 
 const formatter = new Intl.NumberFormat('en-US', {
@@ -111,6 +129,10 @@ const collectionContextMenu = ref()
 const collectionPreventDefault = (event) => {
   collectionContextMenu.value.show(event.originalEvent)
 }
+const compoundContextMenu = ref()
+const compoundPreventDefault = (event) => {
+  compoundContextMenu.value.show(event.originalEvent)
+}
 
 const menu = computed(() => ({
   collection: [
@@ -128,6 +150,48 @@ const menu = computed(() => ({
       label: 'Delete collection',
       icon: 'pi pi-trash',
       command: () => (dialog.collection = 'delete')
+    }
+  ],
+  compound: [
+    {
+      label: 'Edit compound',
+      icon: 'pi pi-pen-to-square',
+      command: () => {
+        dialog.compound = true
+      }
+    },
+    {
+      label: 'Remove compound',
+      icon: 'pi pi-minus',
+      command: () => {
+        const collection = tree.value.find(
+          ({ target_collection_id }) =>
+            target_collection_id == context.compound.target_collection_id
+        )
+        confirm.require({
+          message: `Are you sure you want to remove the compound '${context.compound.target_compound_formula}' from the '${collection.target_collection_name}' collection?`,
+          header: `Remove target compound '${context.compound.target_compound_formula}'`,
+          icon: 'pi pi-exclamation-triangle',
+          rejectProps: {
+            label: 'Cancel',
+            severity: 'secondary'
+          },
+          acceptProps: {
+            icon: 'pi pi-minus',
+            label: 'Remove'
+          },
+          accept: () => {
+            targetsStore.updateCollection({
+              target_collection_id: collection.target_collection_id,
+              target_collection_name: collection.target_collection_name,
+              target_collection_type: collection.target_collection_type,
+              target_compound_ids: collection.children
+                .map(({ target_compound_id }) => target_compound_id)
+                .filter((id) => id !== context.compound.target_compound_id)
+            })
+          }
+        })
+      }
     }
   ]
 }))
@@ -257,6 +321,11 @@ watchEffect(() => {
             {{ data.target_collection_name }}
           </template>
         </Column>
+        <Column>
+          <template #body="{ data }">
+            <PopoverTargetCompoundAdd :collection="data" />
+          </template>
+        </Column>
         <template #expansion="{ data }">
           <!-- compounds   -->
           <DataTable
@@ -267,6 +336,8 @@ watchEffect(() => {
             v-model:selection="selected.compound"
             selectionMode="single"
             :metaKeySelection="false"
+            v-model:contextMenuSelection="context.compound"
+            @rowContextmenu="compoundPreventDefault"
             @rowSelect="(e) => showMatch(e.data)"
             @rowUnselect="hideMatch"
             size="small"
@@ -374,7 +445,9 @@ watchEffect(() => {
         </template>
       </DataTable>
       <ContextMenu ref="collectionContextMenu" :model="menu.collection" />
+      <ContextMenu ref="compoundContextMenu" :model="menu.compound" />
     </ScrollPanel>
   </Panel>
   <DialogTargetCollectionOp v-model:action="dialog.collection" :collection="context.collection" />
+  <DialogTargetCompoundUpdate v-model:visible="dialog.compound" :compound="context.compound" />
 </template>

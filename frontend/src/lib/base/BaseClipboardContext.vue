@@ -1,6 +1,8 @@
 <script setup>
 import { watch } from 'vue'
 
+import Message from 'primevue/message'
+
 import { useKeyStore } from '@/stores'
 
 const keyStore = useKeyStore()

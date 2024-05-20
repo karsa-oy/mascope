@@ -36,6 +36,10 @@ body {
     color: var(--p-dialog-color);
     opacity: 0.75;
   }
+
+  .p-contextmenu-item-link > .pi {
+    margin-right: 0.3rem;
+  }
 }
 
 body {

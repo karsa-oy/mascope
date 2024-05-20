@@ -1,6 +1,7 @@
 <script setup>
 import FloatLabel from 'primevue/floatlabel'
 import Slider from 'primevue/slider'
+import InputNumber from 'primevue/inputnumber'
 
 import { ref, watch } from 'vue'
 

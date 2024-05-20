@@ -1,5 +1,9 @@
 <script setup>
 import FloatLabel from 'primevue/floatlabel'
+import Dialog from 'primevue/dialog'
+import InputText from 'primevue/inputtext'
+import Button from 'primevue/button'
+
 
 import { reactive, computed, watch } from 'vue'
 

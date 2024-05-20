@@ -4,6 +4,13 @@ import { useConfirm } from 'primevue/useconfirm'
 import { ref, reactive, computed, watch } from 'vue'
 
 import ScrollPanel from 'primevue/scrollpanel'
+import Panel from 'primevue/panel'
+import Button from 'primevue/button'
+import TabMenu from 'primevue/tabmenu'
+import DataTable from 'primevue/datatable'
+import Column from 'primevue/column'
+import ProgressSpinner from 'primevue/progressspinner'
+import ContextMenu from 'primevue/contextmenu'
 
 import { generateCopyName } from '@/api'
 

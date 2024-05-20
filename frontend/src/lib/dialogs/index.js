@@ -5,5 +5,7 @@ export { default as DialogSampleItemCalibration } from './DialogSampleItemCalibr
 export { default as DialogSampleItemOp } from './DialogSampleItemOp.vue'
 export { default as DialogSampleBatchImport } from './DialogSampleBatchImport.vue'
 export { default as DialogTargetCollectionOp } from './DialogTargetCollectionOp.vue'
+export { default as DialogTargetCompoundUpdate } from './DialogTargetCompoundUpdate.vue'
 export { default as DialogTemplateCreate } from './DialogTargetCollectionOp.vue'
 export { default as DialogWorkspaceOp } from './DialogWorkspaceOp.vue'
+export { default as PopoverTargetCompoundAdd } from './PopoverTargetCompoundAdd.vue'

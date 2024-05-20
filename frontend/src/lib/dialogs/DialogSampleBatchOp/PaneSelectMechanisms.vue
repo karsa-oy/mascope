@@ -1,5 +1,8 @@
 <script setup>
+import Panel from 'primevue/panel'
 import ScrollPanel from 'primevue/scrollpanel'
+import DataTable from 'primevue/datatable'
+import Column from 'primevue/column'
 
 import { useAppStore } from '@/stores'
 

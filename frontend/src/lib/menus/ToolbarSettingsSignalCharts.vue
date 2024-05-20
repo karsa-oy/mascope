@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 
+import Button from 'primevue/button'
 import Popover from 'primevue/popover'
 
 import BaseParamField from '@/lib/base/BaseParamField.vue'

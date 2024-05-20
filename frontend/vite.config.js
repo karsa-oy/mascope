@@ -1,8 +1,5 @@
 import { fileURLToPath, URL } from 'node:url'
 
-import Components from 'unplugin-vue-components/vite'
-import { PrimeVueResolver } from 'unplugin-vue-components/resolvers'
-
 import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
@@ -13,12 +10,7 @@ export default ({ mode }) => {
   const env = loadEnv(mode, envDir, 'MASCOPE_PUBLIC_')
 
   return defineConfig({
-    plugins: [
-      vue(),
-      Components({
-        resolvers: [PrimeVueResolver()]
-      })
-    ],
+    plugins: [vue()],
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url))

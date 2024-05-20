@@ -2,6 +2,15 @@
 import { ref, reactive, computed, watch } from 'vue'
 
 import FloatLabel from 'primevue/floatlabel'
+import Dialog from 'primevue/dialog'
+import Button from 'primevue/button'
+import Panel from 'primevue/panel'
+import InputText from 'primevue/inputtext'
+import Tabs from 'primevue/tabs'
+import TabList from 'primevue/tablist'
+import Tab from 'primevue/tab'
+import TabPanels from 'primevue/tabpanels'
+import TabPanel from 'primevue/tabpanel'
 
 import { api } from '@/api'
 import { equals } from '@/lib/table'
@@ -41,11 +50,7 @@ watch(visible, (value) => {
 })
 
 // reactive
-const tabIndex = ref(0)
-function tabSet(label) {
-  const tabs = ['info', 'targets', 'mechanisms', 'calibrants']
-  tabIndex.value = tabs.indexOf(label)
-}
+const tab = ref('info')
 const initial = reactive({
   info: {
     name: '',
@@ -189,7 +194,7 @@ async function init(value) {
   initial.targets = clone(selected.targets)
   initial.calibrants = clone(selected.calibrants)
   // set initial tab
-  tabSet(action.value == 'update_targets' ? 'targets' : 'info')
+  tab.value == 'update_targets' ? 'targets' : 'info'
 }
 
 // confirmation
@@ -216,48 +221,56 @@ function execute() {
     style="min-width: 800px; min-height: 600px"
     contentStyle="flex-grow: 1; display: flex; flex-flow: column; gap: 0.5rem; justify-content: space-between"
   >
-    <TabView v-model:activeIndex="tabIndex">
-      <TabPanel header="Info">
-        <Panel>
-          <FloatLabel>
-            <InputText
-              id="batch-name"
-              v-model="selected.info.name"
-              :disabled="action == 'update_targets'"
-            />
-            <label for="batch-name">Name</label>
-          </FloatLabel>
-          <FloatLabel>
-            <InputText
-              id="batch-desc"
-              v-model="selected.info.desc"
-              :disabled="action == 'update_targets'"
-            />
-            <label for="batch-desc">Description</label>
-          </FloatLabel>
-        </Panel>
-      </TabPanel>
+    <Tabs v-model:value="tab">
+      <TabList>
+        <Tab value="info">Info</Tab>
+        <Tab value="targets">Targets</Tab>
+        <Tab value="mechanisms" :disabled="action == 'update_targets'">Mechanisms</Tab>
+        <Tab value="calibrants" :disabled="action !== 'create'">Calibrants</Tab>
+      </TabList>
+      <TabPanels>
+        <TabPanel value="info">
+          <Panel>
+            <FloatLabel>
+              <InputText
+                id="batch-name"
+                v-model="selected.info.name"
+                :disabled="action == 'update_targets'"
+              />
+              <label for="batch-name">Name</label>
+            </FloatLabel>
+            <FloatLabel>
+              <InputText
+                id="batch-desc"
+                v-model="selected.info.desc"
+                :disabled="action == 'update_targets'"
+              />
+              <label for="batch-desc">Description</label>
+            </FloatLabel>
+          </Panel>
+        </TabPanel>
 
-      <TabPanel header="Targets">
-        <PaneSelectTargets
-          mode="targets"
-          :batch="selected.info.name"
-          v-model:selected="selected.targets"
-        />
-      </TabPanel>
+        <TabPanel value="targets">
+          <PaneSelectTargets
+            mode="targets"
+            :batch="selected.info.name"
+            v-model:selected="selected.targets"
+          />
+        </TabPanel>
 
-      <TabPanel header="Mechanisms" :disabled="action == 'update_targets'">
-        <PaneSelectMechanisms v-model:selected="selected.mechanisms" />
-      </TabPanel>
+        <TabPanel value="mechanisms">
+          <PaneSelectMechanisms v-model:selected="selected.mechanisms" />
+        </TabPanel>
 
-      <TabPanel header="Calibrants" :disabled="action !== 'create'">
-        <PaneSelectTargets
-          mode="calibrants"
-          :batch="selected.info.name"
-          v-model:selected="selected.calibrants"
-        />
-      </TabPanel>
-    </TabView>
+        <TabPanel value="calibrants">
+          <PaneSelectTargets
+            mode="calibrants"
+            :batch="selected.info.name"
+            v-model:selected="selected.calibrants"
+          />
+        </TabPanel>
+      </TabPanels>
+    </Tabs>
 
     <menu>
       <Button label="Cancel" @click="action = null" icon="pi pi-times" severity="secondary" />

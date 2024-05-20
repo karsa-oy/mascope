@@ -2,6 +2,9 @@
 import { ref, reactive, computed, watch } from 'vue'
 
 import FloatLabel from 'primevue/floatlabel'
+import Dialog from 'primevue/dialog'
+import InputText from 'primevue/inputtext'
+import Button from 'primevue/button'
 
 import { useAppStore, useWorkspaceStore } from '@/stores'
 

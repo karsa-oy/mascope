@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 
+import Button from 'primevue/button'
 import ContextMenu from 'primevue/contextmenu'
 import Popover from 'primevue/popover'
 

@@ -2,6 +2,17 @@
 import FloatLabel from 'primevue/floatlabel'
 import Select from 'primevue/select'
 import ScrollPanel from 'primevue/scrollpanel'
+import Panel from 'primevue/panel'
+import Button from 'primevue/button'
+import Tabs from 'primevue/tabs'
+import TabList from 'primevue/tablist'
+import Tab from 'primevue/tab'
+import TabPanels from 'primevue/tabpanels'
+import TabPanel from 'primevue/tabpanel'
+import DataTable from 'primevue/datatable'
+import Column from 'primevue/column'
+import Message from 'primevue/message'
+import Dialog from 'primevue/dialog'
 import { useConfirm } from 'primevue/useconfirm'
 
 import { ref, reactive, computed, watch } from 'vue'
@@ -26,7 +37,7 @@ const props = defineProps({
   }
 })
 
-const tabIndex = ref(0)
+const tab = ref('data')
 
 const imported = reactive({
   parsed: [],
@@ -86,7 +97,7 @@ const columns = computed(() => {
 watch(visible, init)
 function init(active) {
   if (!active) return
-  tabIndex.value = 0
+  tab.value = 'data'
   imported.parsed = []
   imported.items = []
   imported.filterId = ''
@@ -220,7 +231,7 @@ function validateColumns(cols) {
 
   // Show warning notification if there are any failed validations
   if (validation.cols.issues.length > 0) {
-    tabIndex.value = 1
+    tab.value = 'issues'
     validation.cols.passed = false
   } else {
     validation.cols.passed = true
@@ -290,7 +301,7 @@ function validateRows() {
   }
   // Show warning notification if there are any failed validations
   if (validation.rows.issues.length > 0) {
-    tabIndex.value = 1
+    tab.value = 'issues'
     validation.rows.passed = false
   } else {
     validation.rows.passed = true
@@ -302,81 +313,88 @@ watch(
   autoswitchTab
 )
 function autoswitchTab(passed) {
-  const issuesTab = tabIndex.value == 1
-  if (issuesTab && passed) {
+  if (tab.value == 'issues' && passed) {
     // switch to data data
-    tabIndex.value = 0
+    tab.value = 'data'
   }
 }
 </script>
 
 <template>
   <Dialog v-model:visible="visible" :header="title">
-    <TabView v-model:activeIndex="tabIndex">
-      <TabPanel header="Data">
-        <BaseClipboardContext info="Paste spreadsheet cells to import data" :parse="parse">
-          <p v-if="imported.type">
-            Please check carefully the details of the samples parsed from the
-            {{ imported.type == 'autosampler' ? 'autosample report' : 'spreedsheet input:' }}
-          </p>
-          <Panel v-if="imported.items.length > 0">
-            <ScrollPanel style="height: 25vh; max-width: 80vw">
-              <DataTable
-                :value="imported.items"
-                scrollable
-                scrollHeight="300px"
-                tableStyle="max-width: 70vw"
-              >
-                <Column
-                  v-for="col of columns"
-                  :key="col.field"
-                  :field="col.field"
-                  :header="col.label"
-                />
-              </DataTable>
-            </ScrollPanel>
-          </Panel>
-        </BaseClipboardContext>
-      </TabPanel>
-      <TabPanel
-        header="Issues"
-        :disabled="validation.cols.issues.length == 0 && validation.rows.issues.length == 0"
-      >
-        <Panel>
-          <ScrollPanel style="height: 300px; max-width: 80vw">
-            <template v-if="validation.cols.issues.length > 0">
-              <b>Column issues:</b>
-              <Message
-                icon="pi pi-exclamation-circle"
-                severity="secondary"
-                v-for="msg in validation.cols.issues"
-                :key="msg"
-                :closable="false"
-              >
-                {{ msg }}
-              </Message>
-            </template>
-            <template v-if="validation.rows.issues.length > 0">
-              <b>Row issues</b>
-              <template v-for="issue in validation.rows.issues" :key="issue.key">
-                <p v-if="issue.sample">
-                  Item <i>{{ issue.sample }}</i> (#{{ issue.key }}):
-                </p>
+    <Tabs v-model:value="tab">
+      <TabList>
+        <Tab value="data">Data</Tab>
+        <Tab
+          value="issues"
+          :disabled="validation.cols.issues.length == 0 && validation.rows.issues.length == 0"
+        >
+          Issues
+        </Tab>
+      </TabList>
+      <TabPanels>
+        <TabPanel value="data">
+          <BaseClipboardContext info="Paste spreadsheet cells to import data" :parse="parse">
+            <p v-if="imported.type">
+              Please check carefully the details of the samples parsed from the
+              {{ imported.type == 'autosampler' ? 'autosample report' : 'spreedsheet input:' }}
+            </p>
+            <Panel v-if="imported.items.length > 0">
+              <ScrollPanel style="height: 25vh; max-width: 80vw">
+                <DataTable
+                  :value="imported.items"
+                  scrollable
+                  scrollHeight="300px"
+                  tableStyle="max-width: 70vw"
+                >
+                  <Column
+                    v-for="col of columns"
+                    :key="col.field"
+                    :field="col.field"
+                    :header="col.label"
+                  />
+                </DataTable>
+              </ScrollPanel>
+            </Panel>
+          </BaseClipboardContext>
+        </TabPanel>
+        <TabPanel value="issues">
+          <Panel>
+            <ScrollPanel style="height: 300px; max-width: 80vw">
+              <template v-if="validation.cols.issues.length > 0">
+                <b>Column issues:</b>
                 <Message
                   icon="pi pi-exclamation-circle"
-                  v-for="failure in issue.failures"
                   severity="secondary"
+                  v-for="msg in validation.cols.issues"
+                  :key="msg"
                   :closable="false"
-                  :key="failure"
                 >
-                  {{ failure }}
+                  {{ msg }}
                 </Message>
               </template>
-            </template>
-          </ScrollPanel>
-        </Panel>
-      </TabPanel>
-    </TabView>
+              <template v-if="validation.rows.issues.length > 0">
+                <b>Row issues</b>
+                <template v-for="issue in validation.rows.issues" :key="issue.key">
+                  <p v-if="issue.sample">
+                    Item <i>{{ issue.sample }}</i> (#{{ issue.key }}):
+                  </p>
+                  <Message
+                    icon="pi pi-exclamation-circle"
+                    v-for="failure in issue.failures"
+                    severity="secondary"
+                    :closable="false"
+                    :key="failure"
+                  >
+                    {{ failure }}
+                  </Message>
+                </template>
+              </template>
+            </ScrollPanel>
+          </Panel>
+        </TabPanel>
+      </TabPanels>
+    </Tabs>
     <!-- Dialog Menu -->
     <menu style="justify-content: space-between">
       <div v-if="imported.type == 'general'" />

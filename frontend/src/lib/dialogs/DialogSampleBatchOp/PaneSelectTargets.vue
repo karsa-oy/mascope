@@ -1,5 +1,9 @@
 <script setup>
 import ScrollPanel from 'primevue/scrollpanel'
+import DataTable from 'primevue/datatable'
+import Column from 'primevue/column'
+import Panel from 'primevue/panel'
+import SelectButton from 'primevue/selectbutton'
 
 import { ref, computed } from 'vue'
 
