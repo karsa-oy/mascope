@@ -20,6 +20,9 @@ export const useInstrumentStore = defineStore('instrument', () => {
     acquisition: null,
     conversion: null
   })
+  const ready = reactive({
+    filename: null
+  })
 
   const time = reactive({
     mode: 'Last 24 hours',
@@ -142,7 +145,6 @@ export const useInstrumentStore = defineStore('instrument', () => {
     if (appStore.mode.measuring) {
       // conversion started
       if (process_id !== pending.conversion) {
-        resetAcquisitionStatus()
         pending.conversion = process_id
         if (orbi.value) {
           pending.filename = data?.filename
@@ -162,6 +164,8 @@ export const useInstrumentStore = defineStore('instrument', () => {
       const sampleStore = useSampleStore()
       await sampleStore.process(pending.sampleItem)
       pending.sampleItem = null
+    } else {
+      ready.filename = pending.filename
     }
   })
 
@@ -185,6 +189,7 @@ export const useInstrumentStore = defineStore('instrument', () => {
     active,
     acquisitions,
     pending,
+    ready,
     time,
     mzCalibration,
     // actions

@@ -19,7 +19,7 @@ const props = defineProps({
   }
 })
 
-const original = computed(() => props.item ?? sampleStore.active)
+const original = computed(() => props.item)
 
 // dialog visibility reactivity
 const action = defineModel('action') // create, create_pending update
@@ -81,19 +81,21 @@ function init(active) {
   if (!active) return
   // reset state
   state.tab = 'info'
+  template.selected = initial.value
   // reset inputs
-  input.filename = action.value !== 'create_pending' ? original.value?.filename : instrumentStore.pending.filename
+  input.filename =
+    action.value !== 'create_pending' ? original.value?.filename : instrumentStore.pending.filename
   input.instrument = original.value?.instrument
   input.filterId = original.value?.filter_id ?? null
   input.type = original.value?.sample_item_type ?? null
   // fill fields
-  input.fields = Object.entries(original.value?.sample_item_attributes ?? {}).map(
-    ([label, value]) => ({
-      label,
-      value
-    })
-  )
-  input.fields.push({ label: 'sample_item_name', value: original.value?.sample_item_name })
+  input.fields = Object.entries({
+    sample_item_name: original.value?.sample_item_name,
+    ...original.value?.sample_item_attributes
+  }).map(([label, value]) => ({
+    label,
+    value
+  }))
 }
 // autofill fields when template is selected
 watch(template, autofill)
@@ -144,10 +146,21 @@ async function save() {
       ...sample_item
     })
   } else if (props.action == 'create_pending') {
-    instrumentStore.pending.sampleItem = {
-      ...sample_item,
-      filename: instrumentStore.pending.filename
+    if (!(instrumentStore.ready.filename == input.filename)) {
+      // submitted before conversion completed
+      instrumentStore.pending.sampleItem = {
+        ...sample_item,
+        filename: instrumentStore.pending.filename
+      }
+    } else {
+      // submitted after conversion completed
+      sampleStore.process({
+        ...sample_item,
+        filename: input.filename
+      })
+      instrumentStore.ready.filename = null
     }
+    instrumentStore.pending.filename = null
   } else if (props.action == 'update') {
     await sampleStore.update({
       ...props.item, // To include sample_item_id

@@ -1,14 +1,14 @@
 <script setup>
-import { reactive, computed, watch } from 'vue'
+import { reactive } from 'vue'
 
 import SelectButton from 'primevue/selectbutton'
 
 import { DialogSampleItemOp } from '@/lib/dialogs'
-import { useAppStore, useInstrumentStore, useBatchStore } from '@/stores'
+import { useAppStore, useBatchStore } from '@/stores'
+import { watchEffect } from 'vue'
 
 const appStore = useAppStore()
 const batchStore = useBatchStore()
-const instrumentStore = useInstrumentStore()
 
 appStore.mode.measuring = false
 
@@ -16,15 +16,11 @@ const dialog = reactive({
   sampleItem: null
 })
 
-watch(
-  computed(() => dialog.sampleItem == null),
-  update
-)
-function update(closing) {
-  if (closing) {
-    instrumentStore.resetAcquisitionStatus()
+watchEffect(() => {
+  if (!batchStore.active) {
+    appStore.mode.measuring = false
   }
-}
+})
 </script>
 
 <template>
@@ -32,12 +28,12 @@ function update(closing) {
     v-model="appStore.mode.measuring"
     :options="[
       {
-        tooltip: appStore.mode.measuring  ? 'Pause' : 'Paused',
+        tooltip: appStore.mode.measuring ? 'Pause' : 'Paused',
         value: false,
         icon: 'pi pi-pause'
       },
       {
-        tooltip: appStore.mode.measuring  ? 'Measuring' : 'Measure',
+        tooltip: appStore.mode.measuring ? 'Measuring' : 'Measure',
         value: true,
         icon: 'pi pi-play'
       }
@@ -45,7 +41,7 @@ function update(closing) {
     optionValue="value"
     optionLabel="label"
     dataKey="value"
-    :class="appStore.mode.measuring  ? 'k-measuremode' : ''"
+    :class="appStore.mode.measuring ? 'k-measuremode' : ''"
     style="height: 32px"
     :disabled="!batchStore.active"
     :allowEmpty="false"

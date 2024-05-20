@@ -6,6 +6,7 @@ import { api } from '@/api'
 import { useTargetsStore } from './targets.js'
 import { useSampleStore } from './sample.js'
 import { useWorkspaceStore } from './workspace.js'
+import { useAppStore } from './app.js'
 
 export const useBatchStore = defineStore('batch', () => {
   const active = ref(null)
@@ -103,6 +104,9 @@ export const useBatchStore = defineStore('batch', () => {
   }
 
   async function reload(batch = null) {
+    const appStore = useAppStore()
+    const wasMeasuring = appStore.mode.measuring
+
     const targetStore = useTargetsStore()
     const batchToLoad = batch ?? active.value
     if (!batchToLoad) return
@@ -110,6 +114,11 @@ export const useBatchStore = defineStore('batch', () => {
     await unload(false)
     const batchToLoadId = batchToLoad.sample_batch_id
     await load(batchToLoadId)
+
+    if (wasMeasuring) {
+      appStore.mode.measuring = true
+    }
+
     const sampleStore = useSampleStore()
     const activeSampleId = sampleStore.active?.sample_item_id ?? null
     if (activeSampleId) {
