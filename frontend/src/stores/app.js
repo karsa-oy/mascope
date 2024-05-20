@@ -14,10 +14,10 @@ export const useAppStore = defineStore('app', () => {
     measuring: false,
     dark: true
   })
-  const savedSplit = JSON.parse(localStorage.getItem('mascope-dashboard-split'))
+  const [left, right] = JSON.parse(localStorage.getItem('mascope-dashboard-split')) ?? [25, 75]
   const split = reactive({
-    left: savedSplit[0],
-    right: savedSplit[1]
+    left,
+    right
   })
   const ready = ref(false)
   const workspaces = ref([])
