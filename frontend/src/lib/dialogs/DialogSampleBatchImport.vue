@@ -334,7 +334,11 @@ function autoswitchTab(passed) {
       </TabList>
       <TabPanels>
         <TabPanel value="data">
-          <BaseClipboardContext info="Paste spreadsheet cells to import data" :parse="parse">
+          <BaseClipboardContext
+            info="Paste spreadsheet cells to import data"
+            :parse="parse"
+            :persistMessage="imported.items.length == 0"
+          >
             <p v-if="imported.type">
               Please check carefully the details of the samples parsed from the
               {{ imported.type == 'autosampler' ? 'autosample report' : 'spreedsheet input:' }}
@@ -356,6 +360,7 @@ function autoswitchTab(passed) {
                 </DataTable>
               </ScrollPanel>
             </Panel>
+            <i v-else>No spreadsheet data pasted</i>
           </BaseClipboardContext>
         </TabPanel>
         <TabPanel value="issues">

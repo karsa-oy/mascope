@@ -1,5 +1,5 @@
 <script setup>
-import { watch } from 'vue'
+import { ref, watch } from 'vue'
 
 import Message from 'primevue/message'
 
@@ -31,6 +31,10 @@ const props = defineProps({
     type: String,
     required: false,
     default: 'Paste here'
+  },
+  persistMessage: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -74,31 +78,46 @@ async function process() {
     }
   }
 }
+
+let alive = ref(true)
+setTimeout(
+  () => {
+    alive.value = false
+  },
+  status.value ? 3000 : 2000
+)
 </script>
 
 <template>
   <div class="grid">
     <slot />
-    <Message v-if="status" :severity="status.severity">
-      {{ status.message }}
-    </Message>
-    <Message v-else severity="secondary" icon="pi pi-clipboard" :closable="false">
-      {{ info }}
-    </Message>
+    <template v-if="alive || persistMessage">
+      <Message v-if="status" :severity="status.severity">
+        {{ status.message }}
+      </Message>
+      <Message v-else severity="secondary" icon="pi pi-clipboard">
+        {{ info }}
+      </Message>
+    </template>
   </div>
 </template>
 
 <style scoped>
 .grid {
+  position: relative;
   min-width: 300px;
-  min-height: 150px;
+  min-height: 200px;
+  height: 100%;
   display: grid;
   place-items: center;
   gap: 0.5rem;
 }
 
 :deep(.p-message) {
+  position: absolute;
   font-size: smaller;
-  margin: 0;
+  bottom: 1rem;
+  opacity: 0.8;
+  max-width: 300px;
 }
 </style>

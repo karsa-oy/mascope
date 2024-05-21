@@ -85,6 +85,7 @@ body {
   align-items: center;
   justify-content: flex-end;
   gap: 0.5rem;
+  margin: 0;
 }
 
 .p-dialog menu > * {
@@ -172,4 +173,8 @@ figure {
 .darkmode .k-measuremode .p-togglebutton.p-togglebutton-checked::before {
   --dark: var(--p-sky-800);
   --light: var(--p-sky-600);
+}
+
+.p-confirmdialog-message {
+  max-width: 400px;
 }

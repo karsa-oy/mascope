@@ -1,7 +1,7 @@
 <script setup>
 import Dialog from 'primevue/dialog'
 import FloatLabel from 'primevue/floatlabel'
-import Select from 'primevue/select'
+import SelectButton from 'primevue/selectbutton'
 import Tabs from 'primevue/tabs'
 import TabList from 'primevue/tablist'
 import Tab from 'primevue/tab'
@@ -19,12 +19,12 @@ import Listbox from 'primevue/listbox'
 import Avatar from 'primevue/avatar'
 import { useConfirm } from 'primevue/useconfirm'
 
-import { ref, reactive, computed, watch, watchEffect } from 'vue'
+import { ref, reactive, computed, watch, watchEffect, onMounted, onBeforeUnmount } from 'vue'
 
 import BaseClipboardContext from '@/lib/base/BaseClipboardContext.vue'
 
 import { api } from '@/api'
-import { useAppStore, useTargetsStore, useWorkspaceStore } from '@/stores'
+import { useAppStore, useTargetsStore, useWorkspaceStore, useBatchStore } from '@/stores'
 import { fromSpreadsheet, equals } from '@/lib/table'
 import { clone } from '@/lib/utils'
 
@@ -33,6 +33,7 @@ const confirm = useConfirm()
 const appStore = useAppStore()
 const targetsStore = useTargetsStore()
 const workspaceStore = useWorkspaceStore()
+const batchStore = useBatchStore()
 
 const action = defineModel('action')
 
@@ -56,9 +57,9 @@ watch(visible, (value) => {
 
 const info = reactive({
   id: null,
-  name: null,
-  desc: null,
-  type: null
+  name: '',
+  desc: '',
+  type: 'TARGETS'
 })
 const compounds = reactive({
   loaded: [],
@@ -75,15 +76,20 @@ const batches = reactive({
 const selected = reactive({
   workspace: null,
   source: null, // for adding compounds
-  tab: 'info',
+  tab: 'compounds',
   all: {
     targets: false,
     batches: false
   }
 })
-const options = reactive({
-  deleteOrphans: true
+const add = reactive({
+  expanded: false,
+  formula: null,
+  name: null,
+  cas: null
 })
+const deleteOrphans = ref(true)
+
 const key = reactive({
   targets: 0,
   batches: 0
@@ -96,12 +102,18 @@ const columns = [
   { field: 'status', label: 'Status' }
 ]
 
+const batchLabel = computed(() =>
+  batches.selected.length == 1
+    ? `"${batches.selected[0].sample_batch_name}" batch`
+    : `${batches.selected.length} batches`
+)
+
 const title = computed(() => {
   // Define the modal title based on the action
   let title = ''
   switch (action.value) {
     case 'create':
-      title = `Create a new target collection ${info.name ?? ''}`
+      title = `Create a new target collection "${info.name}" and add to ${batchLabel.value}`
       break
     case 'update':
       title = `Update target collection "${info.name}"`
@@ -119,6 +131,7 @@ const title = computed(() => {
 const changes = computed(() =>
   [
     ...compounds.selected,
+    ...compounds.created,
     ...compounds.initial.filter(
       (initial) =>
         !compounds.selected.find(
@@ -133,15 +146,16 @@ const changes = computed(() =>
       (init) => init.target_compound_id == comp.target_compound_id
     )
     const created = compounds.created.some(
-      (created) => created.target_compound_id == comp.target_compound_id
+      (created) => created.target_compound_formula == comp.target_compound_formula
     )
     const added = comp.target_compound_id && !prexisting
     const removed = prexisting && !selected
     let status
+    if (created) {
+      status = '1 create'
+    }
     if (selected) {
-      if (created) {
-        status = '1 create'
-      } else if (added) {
+      if (added) {
         status = '2 add'
       } else if (prexisting) {
         status = '3 keep'
@@ -159,9 +173,15 @@ const changes = computed(() =>
 )
 
 function remove(compound) {
-  compounds.selected = compounds.selected.filter(
-    (selected) => selected.target_compound_formula !== compound.target_compound_formula
-  )
+  if (compound.status == '1 create') {
+    compounds.created = compounds.created.filter(
+      (selected) => selected.target_compound_formula !== compound.target_compound_formula
+    )
+  } else {
+    compounds.selected = compounds.selected.filter(
+      (selected) => selected.target_compound_formula !== compound.target_compound_formula
+    )
+  }
 }
 function restore(compound) {
   compounds.selected.push(compound)
@@ -229,7 +249,6 @@ function loadSpreadsheet({ data }) {
       )
       if (!created) {
         compounds.created.push(compound)
-        compounds.selected.push(compound)
       }
     }
   })
@@ -266,7 +285,8 @@ function execute() {
     target_collection_type: info.type
   }
   const target_collection_id = original.value?.target_collection_id
-  const target_compound_ids = compounds.selected.map(({ target_compound_id }) => target_compound_id)
+  const target_compound_ids =
+    compounds.selected?.map(({ target_compound_id }) => target_compound_id) ?? []
   const sample_batch_ids = batches.selected.map(({ sample_batch_id }) => sample_batch_id)
   const target_compounds_create = compounds.created
 
@@ -309,7 +329,7 @@ function execute() {
           targetsStore.deleteCollection({
             collectionId: info.id,
             collectionName: info.name,
-            deleteOrphanCompounds: options.deleteOrphans
+            deleteOrphanCompounds: deleteOrphans.value
           })
           action.value = null
         }
@@ -345,12 +365,16 @@ async function init(mode) {
   if (!mode) {
     return
   }
-  selected.tab = 'info'
+  selected.tab = 'compounds'
   selected.source = 'Selection'
   compounds.loaded = []
   compounds.selected = []
   compounds.initial = []
   compounds.created = []
+  add.expanded = false
+  add.name = ''
+  add.formula = ''
+  add.cas = ''
   batches.loaded = []
   batches.selected = []
   if (mode.startsWith('update')) {
@@ -365,8 +389,9 @@ async function init(mode) {
       info.id = ''
       info.name = ''
       info.desc = ''
-      info.type = null
+      info.type = 'TARGETS'
       selected.workspace = workspaceStore.active
+      batches.selected = batchStore.active ? [batchStore.active] : []
       break
     }
     case 'update_batches': {
@@ -383,58 +408,76 @@ async function init(mode) {
     case 'delete': {
       info.id = original.value?.target_collection_id
       info.name = original.value?.target_collection_name
-      options.deleteOrphans = true
+      deleteOrphans.value = true
     }
   }
   compounds.initial = clone(compounds.selected)
   batches.initial = clone(batches.selected)
   loadBatches(selected.workspace)
 }
+
+const addCompound = () => {
+  loadSpreadsheet({
+    data: [
+      {
+        target_compound_formula: add.formula,
+        target_compound_name: add.name,
+        cas_number: add.cas
+      }
+    ]
+  })
+  add.formula = ''
+  add.name = ''
+  add.cas = ''
+}
+const onEnter = (event) => {
+  if (event.code == 'Enter') {
+    addCompound()
+  }
+}
+onMounted(() => window.addEventListener('keydown', onEnter))
+onBeforeUnmount(() => window.removeEventListener('keydown', onEnter))
 </script>
 
 <template>
-  <Dialog v-model:visible="visible" :header="title" style="min-width: 900px; min-height: 600px">
+  <Dialog v-model:visible="visible" :header="title">
     <!-- create or update -->
     <template v-if="['create', 'update', 'update_batches'].includes(action)">
+      <div class="row">
+        <FloatLabel>
+          <InputText
+            v-model="info.name"
+            id="target-collection-name"
+            :disabled="action == 'update_batches'"
+            required
+          />
+          <label for="target-collection-name">Name</label>
+        </FloatLabel>
+        <FloatLabel style="flex-grow: 1">
+          <InputText
+            v-model="info.desc"
+            id="target-collection-desc"
+            :disabled="action == 'update_batches'"
+            style="width: 100%"
+          />
+          <label for="target-collection-desc">Description</label>
+        </FloatLabel>
+        <SelectButton
+          v-model="info.type"
+          :options="targetsStore.collectionTypes"
+          :allowEmpty="false"
+          :disabled="action == 'update_batches'"
+        />
+      </div>
       <Tabs v-model:value="selected.tab">
         <TabList>
-          <Tab value="info">Info</Tab>
           <Tab value="compounds" :disabled="action == 'update_batches'">Compounds</Tab>
           <Tab value="batches" :disabled="action == 'update'">Batches</Tab>
         </TabList>
         <TabPanels>
-          <TabPanel value="info">
-            <FloatLabel>
-              <InputText
-                v-model="info.name"
-                id="target-collection-name"
-                :disabled="action == 'update_batches'"
-                required
-              />
-              <label for="target-collection-name">Name</label>
-            </FloatLabel>
-            <FloatLabel>
-              <InputText
-                v-model="info.desc"
-                id="target-collection-desc"
-                :disabled="action == 'update_batches'"
-              />
-              <label for="target-collection-desc">Description</label>
-            </FloatLabel>
-            <FloatLabel>
-              <Select
-                v-model="info.type"
-                :options="targetsStore.collectionTypes"
-                id="target-collection-type"
-                :disabled="action == 'update_batches'"
-                required
-              />
-              <label for="target-collection-type">Type</label>
-            </FloatLabel>
-          </TabPanel>
           <!-- compounds -->
           <TabPanel value="compounds">
-            <div class="row" style="min-height: 300px">
+            <div class="row selector">
               <Listbox
                 v-model="selected.source"
                 :options="[
@@ -462,9 +505,38 @@ async function init(mode) {
                 </template>
               </Listbox>
               <Panel>
+                <div class="row">
+                  <Button
+                    :icon="add.expanded ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
+                    @click="add.expanded = !add.expanded"
+                    text
+                  />
+                  <FloatLabel style="flex-grow: 1">
+                    <InputText
+                      v-model="add.formula"
+                      id="add-compound-formula"
+                      style="width: 100%"
+                    />
+                    <label for="add-compound-formula">Formula*</label>
+                  </FloatLabel>
+                  <Button label="Add" icon="pi pi-plus" @click="addCompound" />
+                </div>
+                <div
+                  :class="`row expandable ${add.expanded ? 'expanded' : 'collapsed'}`"
+                  style="padding-left: 5ch"
+                >
+                  <FloatLabel>
+                    <InputText v-model="add.name" id="add-compound-name" />
+                    <label for="add-compound-name">Name</label>
+                  </FloatLabel>
+                  <FloatLabel>
+                    <InputText v-model="add.cas" id="add-compound-cas" />
+                    <label for="add-compound-cas">CAS Number</label>
+                  </FloatLabel>
+                </div>
                 <BaseClipboardContext
                   v-if="selected.source == 'Selection'"
-                  info="Paste spreadsheet cells to add compounds"
+                  info="You can also add compounds by pasting spreadsheet cells"
                   @validated="loadSpreadsheet"
                   :parse="
                     (text) => {
@@ -505,9 +577,11 @@ async function init(mode) {
                       }
                     }
                   "
+                  :persistMessage="changes.length == 0"
                 >
                   <DataTable
                     dataKey="target_compound_formula"
+                    v-if="changes.length"
                     :value="changes"
                     sortMode="multiple"
                     :multiSortMeta="[
@@ -515,7 +589,7 @@ async function init(mode) {
                       { field: 'target_compound_formula', order: 1 }
                     ]"
                     scrollable
-                    scrollHeight="300px"
+                    :scrollHeight="add.expanded ? '130px' : '200px'"
                     style="flex-grow: 1"
                   >
                     <Column header="Status" field="status" key="status" columnKey="status" sortable>
@@ -570,64 +644,66 @@ async function init(mode) {
                       </template>
                     </Column>
                   </DataTable>
+                  <i v-else style="margin-bottom: 5rem"> No compounds added yet </i>
                 </BaseClipboardContext>
-                <DataTable
-                  v-else
-                  :key="key.targets"
-                  dataKey="target_compound_id"
-                  v-model:selection="compounds.selected"
-                  :value="compounds.loaded"
-                  sortField="mz"
-                  scrollable
-                  scrollHeight="300px"
-                  style="flex-grow: 1"
-                >
-                  <Column selectionMode="multiple" header="" headerStyle="width: 3rem">
-                    <template #header>
-                      <Checkbox
-                        :binary="true"
-                        v-model="selected.all.targets"
-                        :disabled="compounds.loaded.length == 0"
-                        @update:modelValue="
-                          (select) => {
-                            if (select) {
-                              const selected = compounds.selected.map(
-                                ({ target_compound_formula }) => target_compound_formula
-                              )
-                              compounds.selected.push(
-                                ...compounds.loaded.filter(
-                                  (loaded) => !selected.includes(loaded.target_compound_formula)
+                <div v-else class="grid">
+                  <DataTable
+                    :key="key.targets"
+                    dataKey="target_compound_id"
+                    v-model:selection="compounds.selected"
+                    :value="compounds.loaded"
+                    sortField="mz"
+                    scrollable
+                    scrollHeight="250px"
+                    style="min-width: 400px"
+                  >
+                    <Column selectionMode="multiple" header="" headerStyle="width: 3rem">
+                      <template #header>
+                        <Checkbox
+                          :binary="true"
+                          v-model="selected.all.targets"
+                          :disabled="compounds.loaded.length == 0"
+                          @update:modelValue="
+                            (select) => {
+                              if (select) {
+                                const selected = compounds.selected.map(
+                                  ({ target_compound_formula }) => target_compound_formula
                                 )
-                              )
-                            } else {
-                              const loaded = compounds.loaded.map(
-                                ({ target_compound_formula }) => target_compound_formula
-                              )
-                              compounds.selected = compounds.selected.filter(
-                                (selected) => !loaded.includes(selected.target_compound_formula)
-                              )
+                                compounds.selected.push(
+                                  ...compounds.loaded.filter(
+                                    (loaded) => !selected.includes(loaded.target_compound_formula)
+                                  )
+                                )
+                              } else {
+                                const loaded = compounds.loaded.map(
+                                  ({ target_compound_formula }) => target_compound_formula
+                                )
+                                compounds.selected = compounds.selected.filter(
+                                  (selected) => !loaded.includes(selected.target_compound_formula)
+                                )
+                              }
+                              key.targets += 1
                             }
-                            key.targets += 1
-                          }
-                        "
-                        inputClass="custom"
-                      />
-                    </template>
-                  </Column>
-                  <Column
-                    v-for="col of columns.filter(({ field }) => field !== 'status')"
-                    :key="col.field"
-                    :field="col.field"
-                    :header="col.label"
-                    sortable
-                  />
-                </DataTable>
+                          "
+                          inputClass="custom"
+                        />
+                      </template>
+                    </Column>
+                    <Column
+                      v-for="col of columns.filter(({ field }) => field !== 'status')"
+                      :key="col.field"
+                      :field="col.field"
+                      :header="col.label"
+                      sortable
+                    />
+                  </DataTable>
+                </div>
               </Panel>
             </div>
           </TabPanel>
           <!-- batches -->
           <TabPanel value="batches">
-            <div class="row">
+            <div class="row selector">
               <Listbox
                 v-model="selected.workspace"
                 dataKey="workspace_id"
@@ -659,8 +735,10 @@ async function init(mode) {
                 :value="batches.loaded"
                 scrollable
                 scrollHeight="300px"
-                tableStyle="min-width: 450px;"
-                style="flex-grow: 1"
+                tableStyle="min-width: 450px; "
+                style="min-width: 400px"
+                sortField="sample_batch_name"
+                :sortOrder="-1"
               >
                 <Column selectionMode="multiple" header="" headerStyle="width: 3rem">
                   <template #header>
@@ -703,15 +781,29 @@ async function init(mode) {
     </template>
     <!-- delete -->
     <template v-else-if="action == 'delete'">
-      <p>
+      <p style="max-width: 50ch">
         Would you like to keep or remove compounds from {{ info.name }}
         that are not part of any other collection?
       </p>
-      <div class="col">
-        <RadioButton v-model="options.deleteOrphans" :modelValue="false" name="delete-orphans" />
-        <label for=""> Delete the collection but keep the unique compounds </label>
-        <RadioButton v-model="options.deleteOrphans" :modelValue="true" name="delete-orphans" />
-        <label> Delete the collection and its unique compounds </label>
+      <div class="col" style="align-items: flex-start; margin: 2rem; gap: 1rem">
+        <div class="row">
+          <RadioButton
+            v-model="deleteOrphans"
+            :value="true"
+            name="orphans"
+            inputId="keep-orphans"
+          />
+          <label for="keep-orphans"> Delete the collection and its unique compounds </label>
+        </div>
+        <div class="row">
+          <RadioButton
+            v-model="deleteOrphans"
+            :value="false"
+            name="orphans"
+            inputId="delete-orphans"
+          />
+          <label for="delete-orphans"> Delete the collection but keep the unique compounds </label>
+        </div>
       </div>
     </template>
     <!-- dialog menu -->
@@ -723,12 +815,28 @@ async function init(mode) {
 </template>
 
 <style scoped>
+.grid {
+  min-width: 300px;
+  min-height: 150px;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  gap: 0.5rem;
+}
+
+.row {
+  align-items: flex-end;
+}
+.row > * {
+  margin-bottom: 0.5rem;
+}
+
 .col {
   display: flex;
   gap: 0.5rem;
 }
 
-.row > * {
+.selector > * {
   min-height: 300px;
 }
 
@@ -747,5 +855,18 @@ async function init(mode) {
 
 :deep(.p-listbox-list-container) {
   min-height: 300px;
+}
+
+.expandable {
+  overflow: hidden;
+  transition: height 1s ease-in-out;
+  margin-bottom: 0.5rem;
+}
+
+.expandable.expanded {
+  height: fit-content;
+}
+.expandable.collapsed {
+  height: 0;
 }
 </style>
