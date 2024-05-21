@@ -74,7 +74,7 @@ const title = computed(
   () =>
     ({
       create: `Create a new sample batch`,
-      update: `Update sample batch "${selected.info.name}"`,
+      update: `Edit sample batch "${selected.info.name}"`,
       update_targets: `Edit collections of sample batch "${selected.info.name}"`
     })[action.value]
 )

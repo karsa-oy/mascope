@@ -92,7 +92,7 @@ export const useInstrumentStore = defineStore('instrument', () => {
         body: {
           datetime_min: range.min.toISOString(),
           datetime_max: range.max.toISOString(),
-          instrument: active.value,
+          instrument: active.value.instrument,
           sort: 'datetime_utc',
           order: 'asc'
         }
@@ -139,7 +139,7 @@ export const useInstrumentStore = defineStore('instrument', () => {
         }
       }
     }
-  })
+  })()
 
   notification.on('instrument_conversion', ({ process_id, data, status }) => {
     if (appStore.mode.measuring) {
@@ -155,7 +155,7 @@ export const useInstrumentStore = defineStore('instrument', () => {
         }
       }
     }
-  })
+  })()
 
   // measurement mode
   notification.on('create_sample_file', async () => {
@@ -167,7 +167,7 @@ export const useInstrumentStore = defineStore('instrument', () => {
     } else {
       ready.filename = pending.filename
     }
-  })
+  })()
 
   // mz calibration
 

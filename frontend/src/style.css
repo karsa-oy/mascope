@@ -40,6 +40,10 @@ body {
   .p-contextmenu-item-link > .pi {
     margin-right: 0.3rem;
   }
+  
+  .hiddenlabel .p-button-label, .hidden {
+    display: none;
+  }
 }
 
 body {

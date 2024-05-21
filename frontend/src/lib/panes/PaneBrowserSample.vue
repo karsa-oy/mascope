@@ -140,13 +140,17 @@ const menu = computed(() => ({
     {
       label: 'Edit batch',
       icon: 'pi pi-pen-to-square',
-      command: () => (dialog.batch.op = 'update'),
+      command: () => {
+        dialog.batch.op = 'update'
+      },
       visible: batch.context !== null
     },
     {
       label: 'Edit batch targets',
       icon: 'pi pi-bullseye',
-      command: () => (dialog.batch.op = 'update_targets'),
+      command: () => {
+        dialog.batch.op = 'update_targets'
+      },
       visible: batch.context !== null
     },
     {
@@ -209,7 +213,9 @@ const menu = computed(() => ({
     {
       label: `Edit item`,
       icon: 'pi pi-file-edit',
-      command: () => (dialog.item.op = 'update')
+      command: () => {
+        dialog.item.op = 'update'
+      }
     },
     {
       label: 'Copy item',
@@ -243,7 +249,9 @@ const menu = computed(() => ({
     {
       label: `Recalibrate item`,
       icon: 'pi pi-replay',
-      command: () => (dialog.item.calibration = true)
+      command: () => {
+        dialog.item.calibration = true
+      }
     },
     {
       label: `Rematch item`,
@@ -343,11 +351,17 @@ async function hideMatch() {
     </template>
     <template #icons>
       <Button
+        v-tooltip="'Create batch'"
+        label="Create batch"
+        class="hiddenlabel"
         icon="pi pi-plus"
         text
         size="small"
-        v-tooltip="'Create batch'"
-        @click="() => (dialog.batch.op = 'create')"
+        @click="
+          () => {
+            dialog.batch.op = 'create'
+          }
+        "
       />
     </template>
     <ScrollPanel class="k-browser-sample-scroller">

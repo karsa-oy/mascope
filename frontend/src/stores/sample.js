@@ -126,7 +126,7 @@ export const useSampleStore = defineStore('sample', () => {
     await batchStore.reload()
     const sampleItem = batchStore.sampleItem(data?.sample_item_id)
     await load(sampleItem)
-  })
+  })()
 
   async function create(sample) {
     return await api.request.create({

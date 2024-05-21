@@ -24,7 +24,7 @@ The backend and frontend have their own setup documentation for Windows and Linu
 
    - [Python 3.10](https://www.python.org/downloads/release/python-31011/) - Python interpreter
    - [poetry](https://python-poetry.org/) - Python dependency manager
-   - [Node](https://nodejs.org/en) - JavaScript runtime environment
+   - [Node 22](https://nodejs.org/en) - JavaScript runtime environment
 
 2. Set up deployment environment by creating file `/scripts/deploy/dev.win/.debug_env`, with the following contents (example, note that the specified directories must exist):
 
@@ -34,6 +34,13 @@ MASCOPE_PRIVATE_INSTRUMENT_DIR=C:/mascope_data/instrument
 ```
 
 3. Run `/scripts/deploy/dev.win/deploy.cmd`. This will install and run the application (frontend and backend).
+
+4. Setup Playwright for frontend tests:
+
+```
+cd ./frontend
+npx playright install
+```
 
 ### Build for production (Linux)
 

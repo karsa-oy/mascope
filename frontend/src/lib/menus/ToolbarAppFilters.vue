@@ -103,13 +103,15 @@ watchEffect(() => {
           </div>
         </Popover>
         <div v-tooltip.bottom="filter.workspace?.workspace_description">
+          <label for="workspace-selector" class="hidden">Workspace selector</label>
           <Select
-            props.inputId="workspace"
+            inputId="workspace-selector"
             dataKey="workspace_id"
             v-model="filter.workspace"
             :options="appStore.workspaces"
             optionLabel="workspace_name"
             style="flex-direction: row-reverse"
+            appendTo="self"
           >
             <template #dropdownicon>
               <svg
@@ -126,36 +128,48 @@ watchEffect(() => {
             </template>
           </Select>
         </div>
-        <Button
-          icon="pi pi-ellipsis-h"
-          severity="secondary"
-          text
-          @click="
-            (event) => {
-              menu.show(event)
-            }
-          "
-        />
-        <ContextMenu
-          ref="menu"
-          :model="[
-            {
-              label: 'Create workspace',
-              icon: 'pi pi-plus',
-              command: () => (dialog.workspace = 'create')
-            },
-            {
-              label: 'Edit workspace',
-              icon: 'pi pi-pen-to-square',
-              command: () => (dialog.workspace = 'edit')
-            },
-            {
-              label: 'Delete workspace',
-              icon: 'pi pi-trash',
-              command: () => (dialog.workspace = 'delete')
-            }
-          ]"
-        />
+        <div id="workspace-menu">
+          <Button
+            icon="pi pi-ellipsis-h"
+            severity="secondary"
+            text
+            @click="
+              (event) => {
+                menu.show(event)
+              }
+            "
+            class="hiddenlabel"
+            label="Workspace menu"
+            v-tooltip.right="'Workspace menu'"
+          />
+          <ContextMenu
+            ref="menu"
+            appendTo="self"
+            :model="[
+              {
+                label: 'Create workspace',
+                icon: 'pi pi-plus',
+                command: () => {
+                  dialog.workspace = 'create'
+                }
+              },
+              {
+                label: 'Edit workspace',
+                icon: 'pi pi-pen-to-square',
+                command: () => {
+                  dialog.workspace = 'edit'
+                }
+              },
+              {
+                label: 'Delete workspace',
+                icon: 'pi pi-trash',
+                command: () => {
+                  dialog.workspace = 'delete'
+                }
+              }
+            ]"
+          />
+        </div>
       </div>
     </template>
     <template #center>
@@ -164,11 +178,13 @@ watchEffect(() => {
     <template #end>
       <div class="row">
         <ModeMeasurement />
+        <label for="instrument-selector" class="hidden">Instrument selector</label>
         <Select
-          props.inputId="instrument"
+          inputId="instrument-selector"
           v-model="instrumentStore.active"
           :options="appStore.instruments"
           optionLabel="instrument"
+          appendTo="self"
         >
           <template #value="{ value }">
             <span v-if="value?.instrument">
@@ -197,10 +213,6 @@ watchEffect(() => {
 </template>
 
 <style scoped>
-:deep(.p-calendar) {
-  min-width: 40ch;
-}
-
 .k-filters :deep(*) {
   font-size: small;
 }

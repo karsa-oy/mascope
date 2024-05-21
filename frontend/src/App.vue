@@ -32,8 +32,7 @@ onMounted(() => {
 })
 
 // toaster
-
-const cleanup = notification.on('*', ({ status, type, message }) => {
+notification.on('*', ({ status, type, message }) => {
   if (status !== 'pending') {
     const severity =
       {
@@ -46,8 +45,7 @@ const cleanup = notification.on('*', ({ status, type, message }) => {
       life: status === 'error' ? 10000 : 3000
     })
   }
-})
-cleanup()
+})()
 </script>
 
 <template>
