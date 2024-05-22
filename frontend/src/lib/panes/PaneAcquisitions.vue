@@ -1,11 +1,14 @@
 <script setup>
-import { reactive, computed, watch, watchEffect } from 'vue'
+import { ref, reactive, computed, watch, watchEffect } from 'vue'
 
 import Button from 'primevue/button'
 import Select from 'primevue/select'
 import DatePicker from 'primevue/datepicker'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
+import IconField from 'primevue/iconfield'
+import InputIcon from 'primevue/inputicon'
+import InputText from 'primevue/inputtext'
 
 import { DialogSampleItemOp, DialogSampleBatchImport } from '@/lib/dialogs'
 
@@ -30,6 +33,14 @@ const selected = reactive({
   files: []
 })
 
+const search = ref('')
+
+const acquisitions = computed(() =>
+  instrumentStore.acquisitions.filter(({ filename }) =>
+    filename.toLowerCase().includes(search.value.toLowerCase())
+  )
+)
+
 watchEffect(() => {
   if (instrumentStore.pending.filename && appStore.mode.measuring && props.active) {
     dialog.sampleItem = 'create_pending'
@@ -45,7 +56,7 @@ watch(
 </script>
 
 <template>
-  <menu>
+  <menu style="gap: 2rem">
     <Select
       props.inputId="time"
       v-model="instrumentStore.time.mode"
@@ -60,7 +71,14 @@ watch(
       showTime
       showIcon
       :class="instrumentStore.time.mode == 'range' ? '' : 'inactive'"
+      style="flex-grow: 1"
     />
+    <IconField style="flex-grow: 1">
+      <InputIcon>
+        <i class="pi pi-search" />
+      </InputIcon>
+      <InputText v-model="search" placeholder="Search" style="width: 100%" />
+    </IconField>
     <menu>
       <Button
         label="Process"
@@ -81,10 +99,10 @@ watch(
     </menu>
   </menu>
   <DataTable
-    v-if="instrumentStore.acquisitions?.length"
+    v-if="acquisitions?.length"
     v-model:selection="selected.files"
-    :value="instrumentStore.acquisitions"
-    :totalRecords="instrumentStore.acquisitions.length"
+    :value="acquisitions"
+    :totalRecords="acquisitions.length"
     scrollable
     scrollHeight="calc(100vh - 200px)"
     sortField="datetime"
@@ -97,6 +115,9 @@ watch(
     <Column header="Filename" field="filename" sortable />
     <Column header="Datetime" field="datetime" sortable />
   </DataTable>
+  <div v-else class="center" style="min-height: 150px">
+    <i>No acquisitions found</i>
+  </div>
   <DialogSampleItemOp v-model:action="dialog.sampleItem" :item="selected.files[0]" />
   <DialogSampleBatchImport v-model:visible="dialog.batchImport" :files="selected.files" />
 </template>
