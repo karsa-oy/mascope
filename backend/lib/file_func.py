@@ -348,7 +348,7 @@ def get_instrument_type(filename: str) -> str:
     instrument_name = get_instrument_name(filename)
     if "orbi" in instrument_name.lower():
         instrument_type = "orbi"
-    elif "tof" in instrument_name.lower():
+    elif "tof" in instrument_name.lower() or "api" in instrument_name.lower():
         instrument_type = "tof"
     else:
         raise ValueError(f"Failed to get instrument type for file {filename}")
