@@ -101,6 +101,7 @@ class BaseGenerator(Thread):
             "t_range": [0, self.length],
             "single_ion_signal": self.single_ion_signal,
             "polarity": self.polarity,
+            "sample_interval": self.sample_interval,
         }
         self.spec_queue.put(coordinates)
         # tps_info = {
