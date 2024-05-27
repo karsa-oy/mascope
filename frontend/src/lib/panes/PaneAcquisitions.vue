@@ -35,10 +35,11 @@ const selected = reactive({
 
 const search = ref('')
 
-const acquisitions = computed(() =>
-  instrumentStore.acquisitions.filter(({ filename }) =>
-    filename.toLowerCase().includes(search.value.toLowerCase())
-  )
+const acquisitions = computed(
+  () =>
+    instrumentStore.acquisitions?.filter(({ filename }) =>
+      filename.toLowerCase().includes(search.value.toLowerCase())
+    ) ?? []
 )
 
 watchEffect(() => {
@@ -56,70 +57,74 @@ watch(
 </script>
 
 <template>
-  <menu style="gap: 2rem">
-    <Select
-      props.inputId="time"
-      v-model="instrumentStore.time.mode"
-      :options="['Last 24 hours', 'Last 7 days', 'Last 30 days', 'Last 90 days']"
-      style="flex-direction: row-reverse"
-      :disabled="appStore.mode.measuring"
-    />
-    <DatePicker
-      v-model="instrumentStore.time.range"
-      selectionMode="range"
-      inputId="range"
-      showTime
-      showIcon
-      :class="instrumentStore.time.mode == 'range' ? '' : 'inactive'"
-      style="flex-grow: 1"
-    />
-    <IconField style="flex-grow: 1">
-      <InputIcon>
-        <i class="pi pi-search" />
-      </InputIcon>
-      <InputText v-model="search" placeholder="Search" style="width: 100%" />
-    </IconField>
-    <menu>
-      <Button
-        label="Process"
-        icon="pi pi-file-import"
-        :disabled="
-          selected.files?.length == 0 || !batchStore.active || !instrumentStore.acquisitions?.length
-        "
-        @click="
-          () => {
-            if (selected.files?.length == 1) {
-              dialog.sampleItem = 'create'
-            } else if (selected.files?.length > 1) {
-              dialog.batchImport = true
-            }
-          }
-        "
+  <div id="acquisitions">
+    <menu style="gap: 2rem">
+      <Select
+        props.inputId="time"
+        v-model="instrumentStore.time.mode"
+        :options="['Last 24 hours', 'Last 7 days', 'Last 30 days', 'Last 90 days']"
+        style="flex-direction: row-reverse"
+        :disabled="appStore.mode.measuring"
       />
+      <DatePicker
+        v-model="instrumentStore.time.range"
+        selectionMode="range"
+        inputId="range"
+        showTime
+        showIcon
+        :class="instrumentStore.time.mode == 'range' ? '' : 'inactive'"
+        style="flex-grow: 1"
+      />
+      <IconField style="flex-grow: 1">
+        <InputIcon>
+          <i class="pi pi-search" />
+        </InputIcon>
+        <InputText v-model="search" placeholder="Search" style="width: 100%" />
+      </IconField>
+      <menu>
+        <Button
+          label="Process"
+          icon="pi pi-file-import"
+          :disabled="
+            selected.files?.length == 0 ||
+            !batchStore.active ||
+            !instrumentStore.acquisitions?.length
+          "
+          @click="
+            () => {
+              if (selected.files?.length == 1) {
+                dialog.sampleItem = 'create'
+              } else if (selected.files?.length > 1) {
+                dialog.batchImport = true
+              }
+            }
+          "
+        />
+      </menu>
     </menu>
-  </menu>
-  <DataTable
-    v-if="acquisitions?.length"
-    v-model:selection="selected.files"
-    :value="acquisitions"
-    :totalRecords="acquisitions.length"
-    scrollable
-    scrollHeight="calc(100vh - 200px)"
-    sortField="datetime"
-    :sortOrder="-1"
-    :rows="12"
-    paginator
-    size="small"
-  >
-    <Column selectionMode="multiple" headerStyle="width: 3rem" />
-    <Column header="Filename" field="filename" sortable />
-    <Column header="Datetime" field="datetime" sortable />
-  </DataTable>
-  <div v-else class="center" style="min-height: 150px">
-    <i>No acquisitions found</i>
+    <DataTable
+      v-if="acquisitions?.length"
+      v-model:selection="selected.files"
+      :value="acquisitions"
+      :totalRecords="acquisitions.length"
+      scrollable
+      scrollHeight="calc(100vh - 200px)"
+      sortField="datetime"
+      :sortOrder="-1"
+      :rows="12"
+      paginator
+      size="small"
+    >
+      <Column selectionMode="multiple" headerStyle="width: 3rem" />
+      <Column header="Filename" field="filename" sortable />
+      <Column header="Datetime" field="datetime" sortable />
+    </DataTable>
+    <div v-else class="center" style="min-height: 150px">
+      <i>No acquisitions found</i>
+    </div>
+    <DialogSampleItemOp v-model:action="dialog.sampleItem" :item="selected.files[0]" />
+    <DialogSampleBatchImport v-model:visible="dialog.batchImport" :files="selected.files" />
   </div>
-  <DialogSampleItemOp v-model:action="dialog.sampleItem" :item="selected.files[0]" />
-  <DialogSampleBatchImport v-model:visible="dialog.batchImport" :files="selected.files" />
 </template>
 
 <style scoped>

@@ -116,7 +116,7 @@ const title = computed(() => {
       title = `Create a new target collection "${info.name}" and add to ${batchLabel.value}`
       break
     case 'update':
-      title = `Update target collection "${info.name}"`
+      title = `Edit target collection "${info.name}"`
       break
     case 'update_batches':
       title = `Manage batches of "${info.name}" target collection`

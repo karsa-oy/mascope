@@ -236,6 +236,7 @@ watchEffect(() => {
               dataKey="value"
               optionValue="value"
               optionLabel="label"
+              appendTo="self"
             />
             <label for="item-type"> Sample type </label>
           </FloatLabel>

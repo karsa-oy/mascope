@@ -91,7 +91,7 @@ export const useMzFit = defineStore('mz-fit', () => {
       error.value = error?.detail?.data?.error
       stats.value = error?.detail?.data?.stats
     }
-  })
+  })()
 
   return {
     // state

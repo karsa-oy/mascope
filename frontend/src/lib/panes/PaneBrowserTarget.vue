@@ -139,17 +139,23 @@ const menu = computed(() => ({
     {
       label: 'Edit collection',
       icon: 'pi pi-pen-to-square',
-      command: () => (dialog.collection = 'update')
+      command: () => {
+        dialog.collection = 'update'
+      }
     },
     {
       label: 'Edit batches',
       icon: 'pi pi-pen-to-square',
-      command: () => (dialog.collection = 'update_batches')
+      command: () => {
+        dialog.collection = 'update_batches'
+      }
     },
     {
       label: 'Delete collection',
       icon: 'pi pi-trash',
-      command: () => (dialog.collection = 'delete')
+      command: () => {
+        dialog.collection = 'delete'
+      }
     }
   ],
   compound: [
@@ -277,11 +283,17 @@ watchEffect(() => {
     </template>
     <template #icons>
       <Button
+        v-tooltip="'Create collection'"
+        label="Create collection"
+        class="hiddenlabel"
         icon="pi pi-plus"
         text
         size="small"
-        v-tooltip="'Create collection'"
-        @click="() => (dialog.collection = 'create')"
+        @click="
+          () => {
+            dialog.collection = 'create'
+          }
+        "
       />
     </template>
     <ScrollPanel class="k-browser-target-scroller">

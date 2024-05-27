@@ -116,7 +116,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       const workspace_id = data.response.data.workspace_id
       active.value = appStore.workspaces.find((workspace) => workspace.workspace_id == workspace_id)
     }
-  })
+  })()
 
   return {
     // state
