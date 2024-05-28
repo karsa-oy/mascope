@@ -1,4 +1,6 @@
-import { test as base } from '@playwright/test'
+import { default as base } from './app'
+import * as fs from 'fs/promises'
+import * as path from 'path'
 
 export default base.extend({
   instrumentSelector: async ({ page }, use) => {
@@ -10,5 +12,75 @@ export default base.extend({
       await items.getByLabel(instrument).click({ delay: 50 })
     }
     await use({ dropdown, items, open, select })
+  },
+  acquisitionsTab: async ({ page }, use) => {
+    const panel = page.locator('#acquisitions')
+    const open = () => page.getByLabel('Acquisitions').click({ delay: 100 })
+    const datetime = page.locator('#range')
+    const filter = async (range) => {
+      await datetime.fill(range)
+      await datetime.press('Enter')
+    }
+    const select = async (value) => {
+      if (typeof value == 'string') {
+        await panel
+          .getByRole('row', { name: `Row Unselected ${value}` })
+          .getByLabel('Row Unselected')
+          .check()
+      } else if (typeof value == 'number') {
+        const indeces = [...Array(value).keys()]
+        // eslint-disable-next-line no-unused-vars
+        for (const i in indeces) {
+          await panel
+            .getByRole('row', { name: 'Row Unselected' })
+            .first()
+            .getByLabel('Row Unselected')
+            .check()
+        }
+      } else {
+        await panel
+          .getByRole('row', { name: 'Row Unselected' })
+          .first()
+          .getByLabel('Row Unselected')
+          .check()
+      }
+    }
+    const unselect = (filename) =>
+      panel
+        .getByRole('row', { name: `Row Selected ${filename}` })
+        .getByLabel('Row Selected')
+        .uncheck()
+    const process = () => panel.getByLabel('Process').click({ delay: 50 })
+    await use({ open, filter, datetime, select, unselect, process })
+  },
+  measurementMode: async ({ page }, use) => {
+    const active = () => page.locator('#measurement-mode').textContent().includes('active')
+    const activate = () => page.locator('#start-measuring').click()
+    const deactivate = () => page.locator('#stop-measuring').click()
+    await use({ active, activate, deactivate })
+  },
+  // eslint-disable-next-line no-empty-pattern
+  orbi: async ({ page }, use) => {
+    const converterDir = process.env.MASCOPE_PRIVATE_CONVERTER_DIR
+    const testfileDir = process.env.MASCOPE_PRIVATE_TESTFILE_DIR
+    const testfile = (await fs.readdir(testfileDir)).find((file) =>
+      file.split('_')[0].toLowerCase().includes('orbi')
+    )
+    const datetime = (await page.evaluate('new Date().toISOString()'))
+      .replaceAll('-', '')
+      .replace('T', '_')
+      .replace(':', '')
+      .split(':')[0]
+    const filename = `KORBI2_${datetime}_MION2_DBrMe_MM_NG_500pgul_x_1ul_60-600mz.raw`
+    const acquire = async () => {
+      const sourcepath = path.join(testfileDir, testfile)
+      const targetpath = path.join(converterDir, filename)
+      await fs.copyFile(sourcepath, targetpath)
+      return { sourcepath, targetpath, filename }
+    }
+    await use({ converterDir, testfile, acquire })
+    for (const file of await fs.readdir(converterDir)) {
+      await fs.unlink(path.join(converterDir, file))
+    }
   }
 })

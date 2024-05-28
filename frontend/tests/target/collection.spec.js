@@ -5,9 +5,6 @@ import { workspace, sample, target } from '../fixtures'
 const test = mergeTests(workspace, sample, target)
 
 test.describe('target collection ops', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('http://localhost:8080/')
-  })
   test('create target collection', async ({ freshCollection }) => {
     // validate
     await freshCollection.browserRow.click({ delay: 50 })

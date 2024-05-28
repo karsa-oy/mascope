@@ -9,46 +9,6 @@ export default base.extend({
     const createBatch = () => button.click({ delay: 200, force: true })
     await use({ panel, header, content, createBatch })
   },
-  acquisitionsTab: async ({ page }, use) => {
-    const panel = page.locator('#acquisitions')
-    const open = () => page.getByLabel('Acquisitions').click({ delay: 100 })
-    const datetime = page.locator('#range')
-    const filter = async (range) => {
-      await datetime.fill(range)
-      await datetime.press('Enter')
-    }
-    const select = async (value) => {
-      if (typeof value == 'string') {
-        await panel
-          .getByRole('row', { name: `Row Unselected ${value}` })
-          .getByLabel('Row Unselected')
-          .check()
-      } else if (typeof value == 'number') {
-        const indeces = [...Array(value).keys()]
-        // eslint-disable-next-line no-unused-vars
-        for (const i in indeces) {
-          await panel
-            .getByRole('row', { name: 'Row Unselected' })
-            .first()
-            .getByLabel('Row Unselected')
-            .check()
-        }
-      } else {
-        await panel
-          .getByRole('row', { name: 'Row Unselected' })
-          .first()
-          .getByLabel('Row Unselected')
-          .check()
-      }
-    }
-    const unselect = (filename) =>
-      panel
-        .getByRole('row', { name: `Row Selected ${filename}` })
-        .getByLabel('Row Selected')
-        .uncheck()
-    const process = () => panel.getByLabel('Process').click({ delay: 50 })
-    await use({ open, filter, datetime, select, unselect, process })
-  },
   existingBatch: async ({ page }, use) => {
     const name = '20230726_stability'
     const browserRow = page.getByRole('cell', { name })

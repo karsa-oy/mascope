@@ -1,4 +1,6 @@
-import { test as base, expect } from '@playwright/test'
+import { expect } from '@playwright/test'
+
+import { default as base } from './app'
 
 export default base.extend({
   workspaceSelector: async ({ page }, use) => {

@@ -1,13 +1,10 @@
 import { expect, mergeTests } from '@playwright/test'
 
-import { workspace, sample } from '../fixtures'
+import { workspace, sample, instrument } from '../fixtures'
 
-const test = mergeTests(workspace, sample)
+const test = mergeTests(workspace, sample, instrument)
 
 test.describe('sample batch ops', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('http://localhost:8080/')
-  })
   test('create sample batch', async ({ freshBatch }) => {
     // validate
     await expect(freshBatch.browserRow).toContainText(freshBatch.name)

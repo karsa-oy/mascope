@@ -24,22 +24,26 @@ watchEffect(() => {
 </script>
 
 <template>
+  <div id="measurement-mode" class="hidden">
+    {{ appStore.mode.measuring ? 'active' : '' }}
+  </div>
   <SelectButton
     v-model="appStore.mode.measuring"
     :options="[
       {
+        id: 'stop-measuring',
         tooltip: appStore.mode.measuring ? 'Pause' : 'Paused',
         value: false,
         icon: 'pi pi-pause'
       },
       {
+        id: 'start-measuring',
         tooltip: appStore.mode.measuring ? 'Measuring' : 'Measure',
         value: true,
         icon: 'pi pi-play'
       }
     ]"
     optionValue="value"
-    optionLabel="label"
     dataKey="value"
     :class="appStore.mode.measuring ? 'k-measuremode' : ''"
     style="height: 32px"
@@ -47,7 +51,13 @@ watchEffect(() => {
     :allowEmpty="false"
   >
     <template #option="{ option }">
-      <div style="z-index: 100" :class="option.icon" v-tooltip.bottom="option.tooltip" />
+      <div
+        :id="option.id"
+        style="z-index: 100"
+        :class="option.icon"
+        v-tooltip.bottom="option.tooltip"
+      />
+      <label :for="option.id" class="hidden">{{ option.id.replace('-', ' ') }}</label>
     </template>
   </SelectButton>
   <DialogSampleItemOp v-model:action="dialog.sampleItem" />
