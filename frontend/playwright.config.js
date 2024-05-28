@@ -21,7 +21,8 @@ export default defineConfig({
   retries: 2, // process.env.CI ? 2 : 0,
   forbidOnly: !!process.env.CI,
   use: {
-    trace: 'on-all-retries'
+    trace: 'on-all-retries',
+    permissions: ['clipboard-read', 'clipboard-write']
   },
   reporter: [['list'], ['html']],
   projects: [

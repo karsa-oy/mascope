@@ -17,17 +17,30 @@ export default base.extend({
       await datetime.fill(range)
       await datetime.press('Enter')
     }
-    const select = (filename) =>
-      filename
-        ? panel
-            .getByRole('row', { name: `Row Unselected ${filename}` })
-            .getByLabel('Row Unselected')
-            .check()
-        : panel
+    const select = async (value) => {
+      if (typeof value == 'string') {
+        await panel
+          .getByRole('row', { name: `Row Unselected ${value}` })
+          .getByLabel('Row Unselected')
+          .check()
+      } else if (typeof value == 'number') {
+        const indeces = [...Array(value).keys()]
+        // eslint-disable-next-line no-unused-vars
+        for (const i in indeces) {
+          await panel
             .getByRole('row', { name: 'Row Unselected' })
             .first()
             .getByLabel('Row Unselected')
             .check()
+        }
+      } else {
+        await panel
+          .getByRole('row', { name: 'Row Unselected' })
+          .first()
+          .getByLabel('Row Unselected')
+          .check()
+      }
+    }
     const unselect = (filename) =>
       panel
         .getByRole('row', { name: `Row Selected ${filename}` })
