@@ -66,6 +66,7 @@ class zarr_sdk:
         t_range = value["t_range"]
         mz_calibration = value.get("mz_calibration")
         polarity = value.get("polarity")
+        sample_interval = value.get("sample_interval")
 
         base_path = get_base_path()
         try:
@@ -93,6 +94,7 @@ class zarr_sdk:
             "mz_calibration": mz_calibration,
             "single_ion_signal": single_ion_signal,
             "polarity": polarity,
+            "sample_interval": sample_interval,
             "utc_offset": utc_offset,
         }
         write_props(filename, properties)
