@@ -14,7 +14,7 @@ import ContextMenu from 'primevue/contextmenu'
 
 import { generateCopyName } from '@/api'
 
-import BaseMatchTag from '@/lib/base/BaseMatchTag.vue'
+import { BaseMatchTag } from '@/lib/base'
 import {
   DialogSampleBatchOp,
   DialogSampleItemOp,
@@ -58,18 +58,35 @@ const item = reactive({
 const batchContextMenu = ref()
 const itemContextMenu = ref()
 
+const pending = reactive({
+  batchExport: false,
+  peakExport: false
+})
+
 watch(
   computed(() => batch.selected),
-  (selected) => {
+  async (selected) => {
     if (selected) {
       const batchId = batch.selected.sample_batch_id
       batch.expanded = { [batchId]: true }
+      await batchStore.load(selected.sample_batch_id)
+      handlePending()
     } else {
       batch.expanded = {}
+      batchStore.unload()
     }
-    batchStore.batchToggle(selected)
   }
 )
+function handlePending() {
+  if (pending.batchExport) {
+    batchExportCsv()
+    pending.batchExport = false
+  }
+  if (pending.peakExport) {
+    batchStore.exportPeaks(batchStore.active)
+    pending.peakExport = false
+  }
+}
 watch(
   computed(() => item.selected),
   (selected) => {
@@ -170,7 +187,14 @@ const menu = computed(() => ({
       label: 'Export batch',
 
       icon: 'pi pi-file-export',
-      command: () => batchExportCsv(),
+      command: () => {
+        if (batch.selected?.sample_batch_id == batch.context.sample_batch_id) {
+          batchExportCsv()
+        } else {
+          batch.selected = batch.context
+          pending.batchExport = true
+        }
+      },
       visible: batch.context !== null
     },
     {
@@ -183,7 +207,12 @@ const menu = computed(() => ({
           acceptIcon: 'pi pi-file-export',
           acceptLabel: 'Export',
           accept: () => {
-            batchStore.exportPeaks(batchStore.active)
+            if (batch.selected?.sample_batch_id == batch.context.sample_batch_id) {
+              batchStore.exportPeaks(batchStore.active)
+            } else {
+              batch.selected = batch.context
+              pending.peakExport = true
+            }
           },
           rejectLabel: 'Cancel',
           rejectIcon: 'pi pi-times'
