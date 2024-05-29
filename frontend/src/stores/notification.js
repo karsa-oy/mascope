@@ -4,6 +4,7 @@ import { defineStore } from 'pinia'
 import { genId } from '@/lib/utils'
 
 export const useNotification = defineStore('notification', () => {
+  const retentionLimit = 25
   const state = reactive({
     latest: null,
     log: [],
@@ -16,8 +17,15 @@ export const useNotification = defineStore('notification', () => {
   }
   function push(notification) {
     const id = genId()
-    state.latest = { id, ...notification }
-    state.log.push(notification)
+    state.latest = {
+      id,
+      timestamp: new Date(),
+      ...notification
+    }
+    if (notification.status !== 'pending') {
+      state.log.unshift(state.latest)
+      state.log = state.log.slice(0, retentionLimit)
+    }
   }
   function on(trigger, callback) {
     const id = genId()
