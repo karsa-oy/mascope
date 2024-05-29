@@ -118,6 +118,13 @@ watch(
       <Column selectionMode="multiple" headerStyle="width: 3rem" />
       <Column header="Filename" field="filename" sortable />
       <Column header="Datetime" field="datetime" sortable />
+      <template #paginatorstart>
+        <strong v-if="selected.files.length" style="font-style: italic">
+          {{ selected.files.length }} files selected
+        </strong>
+        <div v-else style="min-width: 11ch" />
+      </template>
+      <template #paginatorend> <div style="min-width: 12ch" /> </template>
     </DataTable>
     <div v-else class="center" style="min-height: 150px">
       <i>No acquisitions found</i>
