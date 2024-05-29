@@ -222,6 +222,15 @@ export function createHttpClient() {
         throw new Error(userErrorMessage)
       }
     },
+    recalibrateSampleBatch: async ({ batchId, body }) => {
+      try {
+        return await client.post(`${calibrationBaseUrl}/mz_calibrate/batch/${batchId}`, body)
+      } catch (error) {
+        const userErrorMessage =
+          error?.response?.data?.error || `Failed to calibrate sample batch: ${error}`
+        throw new Error(userErrorMessage)
+      }
+    },
     batchExportPeakData: async ({ sample_batch_id }) => {
       try {
         return await client.get(`${batchesBaseUrl}/${sample_batch_id}/export_peaks`)

@@ -12,7 +12,7 @@ import Column from 'primevue/column'
 import ProgressSpinner from 'primevue/progressspinner'
 import ContextMenu from 'primevue/contextmenu'
 
-import { generateCopyName } from '@/api'
+import { api, generateCopyName } from '@/api'
 
 import { BaseMatchTag } from '@/lib/base'
 import {
@@ -23,7 +23,13 @@ import {
 } from '@/lib/dialogs'
 
 import { batchExportCsv } from '@/lib/table'
-import { useWorkspaceStore, useSampleStore, useBatchStore, useVisualizationStore } from '@/stores'
+import {
+  useWorkspaceStore,
+  useSampleStore,
+  useBatchStore,
+  useVisualizationStore,
+  useMzFit
+} from '@/stores'
 
 const confirm = useConfirm()
 
@@ -222,6 +228,21 @@ const menu = computed(() => ({
     },
     { separator: true, visible: batch.context !== null },
     {
+      label: `Recalibrate batch`,
+      icon: 'pi pi-replay',
+      command: async () => {
+        const mzFit = useMzFit()
+        await api.request.process({
+          method: 'recalibrateSampleBatch',
+          body: {
+            batchId: batch.context.sample_batch_id,
+            body: mzFit.params
+          }
+        })
+      },
+      visible: batch.context !== null
+    },
+    {
       label: 'Rematch batch',
       icon: 'pi pi-replay',
       command: () => batchStore.rematchBatch(batch.context),
@@ -306,7 +327,6 @@ async function parseClipboard() {
     clipboard = await navigator.clipboard.readText()
     pasted = JSON.parse(clipboard)
   } catch (err) {
-    console.warn('Sample browser: could not parse clipboard contents')
     return
   }
   if (pasted?.sample_batch_id) {

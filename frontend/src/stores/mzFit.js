@@ -42,7 +42,6 @@ export const useMzFit = defineStore('mz-fit', () => {
   }
 
   async function compute(sample) {
-    console.log(params)
     await api.request.process({
       method: 'calibrationMzFit',
       body: {
