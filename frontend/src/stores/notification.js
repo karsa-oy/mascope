@@ -55,11 +55,19 @@ export const useNotification = defineStore('notification', () => {
           parent_id,
           root_id,
           message,
-          progress
+          progress,
+          timeout: setTimeout(() => {
+            state.progress = state.progress.filter((prog) => prog.process_id !== process_id)
+          }, 30 * 1000)
         })
       }
     } else {
-      // update existing process
+      // reset the timeout
+      clearTimeout(saved.timeout)
+      saved.timeout = setTimeout(() => {
+        state.progress = state.progress.filter((prog) => prog.process_id !== process_id)
+      }, 30 * 1000)
+      // update progress
       saved.progress = progress
       if (status !== 'pending') {
         // cleanup completed processes
@@ -70,7 +78,7 @@ export const useNotification = defineStore('notification', () => {
         }
       }
     }
-  })
+  })()
 
   watchEffect(() => {
     state.watchers.forEach(({ type, callback }) => {
