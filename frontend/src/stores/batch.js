@@ -7,6 +7,7 @@ import { useTargetsStore } from './targets.js'
 import { useSampleStore } from './sample.js'
 import { useWorkspaceStore } from './workspace.js'
 import { useAppStore } from './app.js'
+import { useMzFit } from './mzFit.js'
 
 export const useBatchStore = defineStore('batch', () => {
   const active = ref(null)
@@ -213,14 +214,17 @@ export const useBatchStore = defineStore('batch', () => {
     })
   }
 
-  async function importItems(data) {
-    const body = {
-      sample_items: data.sample_items
-    }
-    const batch = data.batch
+  async function importItems({ batch, sample_items }) {
+    const mzFit = useMzFit()
     return await api.request.process({
       method: 'importSamplesToBatch',
-      body: { batch, body }
+      body: {
+        batch,
+        body: {
+          sample_items,
+          params: mzFit.params
+        }
+      }
     })
   }
   async function createBatch(newBatch) {
