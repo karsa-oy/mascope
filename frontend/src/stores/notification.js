@@ -69,6 +69,7 @@ export const useNotification = defineStore('notification', () => {
       }, 30 * 1000)
       // update progress
       saved.progress = progress
+      saved.message = message
       if (status !== 'pending') {
         // cleanup completed processes
         state.progress = state.progress.filter((proc) => proc.process_id !== process_id)
