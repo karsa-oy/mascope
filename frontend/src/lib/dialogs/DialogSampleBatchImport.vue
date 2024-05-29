@@ -335,7 +335,7 @@ function autoswitchTab(passed) {
       <TabPanels>
         <TabPanel value="data">
           <BaseClipboardContext
-            info="Paste spreadsheet cells to import data"
+            info="Paste sample spreadsheet cells with 'name', 'type', 'filter id' columns, and (optionally) extra fields. Include headers and verify the row count matches your selection."
             :parse="parse"
             :persistMessage="imported.items.length == 0"
           >
@@ -360,7 +360,7 @@ function autoswitchTab(passed) {
                 </DataTable>
               </ScrollPanel>
             </Panel>
-            <i v-else>No spreadsheet data pasted</i>
+            <i v-else style="position: absolute; top: 1rem">No spreadsheet data pasted</i>
           </BaseClipboardContext>
         </TabPanel>
         <TabPanel value="issues">

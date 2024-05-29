@@ -116,8 +116,8 @@ setTimeout(
 :deep(.p-message) {
   position: absolute;
   font-size: smaller;
-  bottom: 1rem;
+  margin: auto;
   opacity: 0.8;
-  max-width: 300px;
+  width: 300px;
 }
 </style>
