@@ -1,16 +1,17 @@
-import { reactive, watchEffect, computed, onBeforeUnmount } from 'vue'
+import { ref, reactive, watchEffect, computed, onBeforeUnmount } from 'vue'
 import { defineStore } from 'pinia'
 
 import { genId } from '@/lib/utils'
 
 export const useNotification = defineStore('notification', () => {
-  const retentionLimit = 25
+  const retentionLimit = 250
   const state = reactive({
     latest: null,
     log: [],
     watchers: [],
     progress: []
   })
+  const drawer = ref(false)
 
   async function onUserNotification(notification) {
     push(notification)
@@ -98,6 +99,7 @@ export const useNotification = defineStore('notification', () => {
   })
 
   return {
+    drawer,
     // api
     on,
     push,

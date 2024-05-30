@@ -8,12 +8,16 @@ import Button from 'primevue/button'
 import Drawer from 'primevue/drawer'
 import ScrollPanel from 'primevue/scrollpanel'
 import Message from 'primevue/message'
+import IconField from 'primevue/iconfield'
+import InputIcon from 'primevue/inputicon'
+import InputText from 'primevue/inputtext'
 
 import { ref, reactive, computed, watch, watchEffect } from 'vue'
 
 import { BaseKarsaLogo } from '@/lib/base'
 import { ModeMeasurement } from '@/lib/modes'
 import { DialogWorkspaceOp } from '@/lib/dialogs'
+import { beautifySnakeCase } from '@/lib/utils'
 
 import { useAppStore, useWorkspaceStore, useInstrumentStore, useNotification } from '@/stores'
 
@@ -39,7 +43,9 @@ const filter = reactive({
 })
 const settings = ref()
 const menu = ref()
-const notificationDrawer = ref(false)
+const log = reactive({
+  query: ''
+})
 
 // initial load
 workspaceStore.load(filter.workspace.workspace_id)
@@ -225,19 +231,28 @@ function parseTimestamp(timestamp) {
           text
           @click="
             (event) => {
-              notificationDrawer = true
+              notification.drawer = true
             }
           "
         />
         <Drawer
-          v-model:visible="notificationDrawer"
+          v-model:visible="notification.drawer"
           header="Notifications"
           position="right"
           style="width: 350px"
         >
+          <IconField style="width: 100%">
+            <InputIcon>
+              <i class="pi pi-search" />
+            </InputIcon>
+            <InputText v-model="log.query" placeholder="Search" style="width: 100%" />
+          </IconField>
           <ScrollPanel>
             <Message
-              v-for="{ process_id, status, message, timestamp } in notification.log"
+              v-for="{ process_id, type, status, message, timestamp } in notification.log.filter(
+                ({ type, status, message }) =>
+                  `${beautifySnakeCase(type)} ${status} ${message}`.includes(log.query)
+              )"
               :key="process_id"
               :severity="
                 {
@@ -248,20 +263,21 @@ function parseTimestamp(timestamp) {
             >
               <div class="col" style="gap: 0.5rem">
                 <ScrollPanel style="width: 250px">
-                  <p style="margin-bottom: 0">
+                  <h4 style="margin: 0.5rem 0">{{ beautifySnakeCase(type) }} {{ status }}</h4>
+                  <p style="margin: 0">
                     {{ message }}
                   </p>
                 </ScrollPanel>
                 <div
                   class="row timestamp"
-                  style="width: 250px; justify-content: flex-end; gap: 0"
+                  style="width: 250px; opacity: 0.6; justify-content: flex-end; gap: 0"
                   :set="({ date, time, ms } = parseTimestamp(timestamp))"
                 >
-                  <span style="opacity: 0.4">
+                  <span>
                     {{ date }}
                   </span>
-                  <span style="opacity: 0.7; margin-left: 1rem">{{ time }}</span
-                  ><span style="opacity: 0.4">.{{ ms }}</span>
+                  <span style="margin-left: 1rem">{{ time }}</span
+                  ><span>.{{ ms }}</span>
                 </div>
               </div>
             </Message>
@@ -284,5 +300,9 @@ function parseTimestamp(timestamp) {
 
 .timestamp {
   margin: 0;
+}
+
+:deep(.p-scrollpanel-content) {
+  padding-bottom: 0.8rem;
 }
 </style>
