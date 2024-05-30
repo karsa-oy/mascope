@@ -467,10 +467,11 @@ async function hideMatch() {
                 <template #header>
                   <span class="pi pi-verified" />
                 </template>
-                <template #body="slotProps">
+                <template #body="{ data }">
                   <BaseMatchTag
-                    :row="slotProps.data"
-                    :tooltip="`Peak intensity: ${formatter.format(slotProps.data?.sample_peak_area_sum)}`"
+                    v-if="data.matched == 1"
+                    :row="data"
+                    :tooltip="`Peak intensity: ${formatter.format(data?.sample_peak_area_sum)}`"
                   />
                 </template>
               </Column>
