@@ -27,7 +27,7 @@ test.describe('sample item ops', () => {
     await dialog.getByLabel('save').click()
     await expect(sampleBrowser.content).toContainText(name)
   })
-  test('acquisition orbi file', async ({
+  test('acquire orbi file (convert & create)', async ({
     page,
     freshBatch,
     orbi,

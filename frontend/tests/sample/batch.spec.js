@@ -28,7 +28,7 @@ test.describe('sample batch ops', () => {
     // validate
     await expect(sampleBrowser.content).not.toContainText(freshBatch.name)
   })
-  test('import sample items (creation)', async ({
+  test('import sample items (create)', async ({
     page,
     freshBatch,
     sampleBrowser,
