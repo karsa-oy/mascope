@@ -27,7 +27,7 @@ import {
   useWorkspaceStore,
   useSampleStore,
   useBatchStore,
-  useVisualizationStore,
+  useFocusedMatch,
   useMzFit
 } from '@/stores'
 
@@ -36,7 +36,7 @@ const confirm = useConfirm()
 const workspaceStore = useWorkspaceStore()
 const sampleStore = useSampleStore()
 const batchStore = useBatchStore()
-const visualizationStore = useVisualizationStore()
+const focusedMatch = useFocusedMatch()
 
 const dialog = reactive({
   batch: {
@@ -366,18 +366,14 @@ const itemPreventDefault = (event) => {
   itemContextMenu.value.show(event.originalEvent)
 }
 async function showMatch(row) {
-  if (visualizationStore.current && row) {
-    await visualizationStore.load({
-      sampleId: row.sample_item_id,
-      ionId: visualizationStore.current.ionId,
-      collectionId: visualizationStore.current.collectionId,
-      // pass the ion specific filter params if available to the loadSampleIon function
-      filterParams: visualizationStore.current.filterParams
+  if (row) {
+    await focusedMatch.load({
+      sampleId: row.sample_item_id
     })
   }
 }
 async function hideMatch() {
-  visualizationStore.unload()
+  focusedMatch.unload()
 }
 </script>
 

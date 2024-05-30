@@ -2,13 +2,17 @@
 import { computed } from 'vue'
 import Tag from 'primevue/tag'
 
-import BaseChartPlotly from './BaseChartPlotly.vue'
+import BaseChartPlotly from '../BaseChartPlotly.vue'
 
-import { useVisualizationStore } from '@/stores'
+import { useData } from './data'
 
-const visualizationStore = useVisualizationStore()
+import { useFocusedMatch, useFilterParams } from '@/stores'
 
-const data = computed(() => visualizationStore.tracesSignalTimeseries ?? [])
+const focusedMatch = useFocusedMatch()
+const filterParams = useFilterParams()
+
+const data = useData()
+
 const layout = computed(() => ({
   xaxis: {
     title: 'Time [s]',
@@ -41,10 +45,10 @@ const corr = new Intl.NumberFormat('en-US', {
     <span>
       isotope correlation coefficient:
       <Tag
-        :value="corr.format(visualizationStore.activeIsotopes[0].match_isotope_correlation)"
+        :value="corr.format(focusedMatch.isotopes[0].match_isotope_correlation)"
         :severity="
-          Math.abs(visualizationStore.activeIsotopes[0].match_isotope_correlation) >
-          visualizationStore.paramMinIsotopeCorrelation
+          Math.abs(focusedMatch.isotopes[0].match_isotope_correlation) >
+          filterParams.min_isotope_correlation
             ? 'info'
             : 'warn'
         "
@@ -53,7 +57,7 @@ const corr = new Intl.NumberFormat('en-US', {
     <BaseChartPlotly
       id="ChartSampleSignalTimeseries"
       title="Timeseries"
-      :data="data"
+      :data="data.traces"
       :layout="layout"
     />
   </figure>

@@ -19,7 +19,7 @@ import { ChartBatchOverview } from '@/lib/charts'
 import {
   useAppStore,
   useBatchStore,
-  useVisualizationStore,
+  useFocusedMatch,
   useInstrumentStore,
   useWorkspaceStore,
   useSampleStore,
@@ -30,7 +30,7 @@ const appStore = useAppStore()
 const workspaceStore = useWorkspaceStore()
 const batchStore = useBatchStore()
 const sampleStore = useSampleStore()
-const visualizationStore = useVisualizationStore()
+const focusedMatch = useFocusedMatch()
 const instrumentStore = useInstrumentStore()
 const targetsStore = useTargetsStore()
 
@@ -43,7 +43,7 @@ const tabs = computed(() => [
   {
     label: 'Match',
     icon: 'pi pi-wave-pulse',
-    disabled: !visualizationStore.activeIon
+    disabled: !focusedMatch.ion
   },
   {
     label: 'Acquisitions',
@@ -61,7 +61,7 @@ watch(
   }
 )
 watch(
-  computed(() => visualizationStore.activeIon),
+  computed(() => focusedMatch.ion),
   (visualization) => {
     if (!visualization) {
       tab.value = 0
@@ -112,7 +112,7 @@ watch(
             <TabMenu v-model:activeIndex="tab" :model="tabs" />
           </template>
           <ChartBatchOverview v-if="tab == 0 && batchStore.active" />
-          <PaneTabMatch v-if="tab == 1 && visualizationStore.activeIon" />
+          <PaneTabMatch v-if="tab == 1 && focusedMatch.ion" />
           <PaneTabAcquisitions v-if="tab == 2 && instrumentStore.active" :active="tab == 2" />
         </Panel>
       </SplitterPanel>

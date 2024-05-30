@@ -10,16 +10,16 @@ import {
   ToolbarSettingsSignalCharts,
   ToolbarMatchRating
 } from '@/lib/menus'
-import { useAppStore, useVisualizationStore, useBatchStore } from '@/stores'
+import { useAppStore, useFocusedMatch, useFilterParams, useBatchStore } from '@/stores'
 
 const appStore = useAppStore()
-const visualizationStore = useVisualizationStore()
+const focusedMatch = useFocusedMatch()
 const batchStore = useBatchStore()
+const filterParams = useFilterParams()
 
 const compound = computed(() =>
   batchStore.targetCompounds.find(
-    ({ target_compound_id }) =>
-      target_compound_id == visualizationStore.activeIon.target_compound_id
+    ({ target_compound_id }) => target_compound_id == focusedMatch.ion.target_compound_id
   )
 )
 
@@ -40,18 +40,17 @@ const score = new Intl.NumberFormat('en-US', {
   >
     <h1 style="text-align: center">
       <Tag
-        :value="score.format(visualizationStore.activeIon.match_score)"
+        :value="score.format(focusedMatch.ion.match_score)"
         :severity="
-          Math.abs(visualizationStore.activeIon.match_score) >
-          visualizationStore.paramProbableMatchThreshold
+          Math.abs(focusedMatch.ion.match_score) > filterParams.current.probable_match_threshold
             ? 'danger'
             : 'success'
         "
         style="font-size: large"
       />
-      match: ion <i>{{ visualizationStore.activeIon.target_ion_formula }}</i>
+      match: ion <i>{{ focusedMatch.ion.target_ion_formula }}</i>
       for
-      <i>{{ visualizationStore.activeIon.sample_item_name }}</i> with target
+      <i>{{ focusedMatch.ion.sample_item_name }}</i> with target
       <i>{{ compound.target_compound_formula }}</i>
     </h1>
     <div

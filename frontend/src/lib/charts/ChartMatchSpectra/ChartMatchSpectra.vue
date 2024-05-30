@@ -4,12 +4,14 @@ import { computed } from 'vue'
 import ScrollPanel from 'primevue/scrollpanel'
 import Tag from 'primevue/tag'
 
-import BaseChartPlotly from './BaseChartPlotly.vue'
+import BaseChartPlotly from '../BaseChartPlotly.vue'
 
-import { useVisualizationStore } from '@/stores'
-import { clone } from '../utils'
+import { clone } from '@/lib/utils'
+import { useFocusedMatch, useFilterParams } from '@/stores'
 
-const visualizationStore = useVisualizationStore()
+import { useData } from './data'
+
+const filterParams = useFilterParams()
 
 const props = defineProps({
   settings: {
@@ -18,23 +20,25 @@ const props = defineProps({
   }
 })
 
-const isotopes = computed(() =>
-  clone(visualizationStore.activeIsotopes).map((isotope) => {
-    const start = visualizationStore.tracesSignalSumSpectrum?.findIndex(
+const isotopes = computed(() => {
+  const focusedMatch = useFocusedMatch()
+  const data = useData()
+  return clone(focusedMatch.isotopes).map((isotope) => {
+    const start = data.traces?.findIndex(
       (trace) => trace.target_isotope_id === isotope.target_isotope_id
     )
-    const nextStart = visualizationStore.tracesSignalSumSpectrum?.findIndex(
+    const nextStart = data.traces?.findIndex(
       ({ target_isotope_id }, index) => target_isotope_id && index > start
     )
-    const end = nextStart !== -1 ? nextStart : visualizationStore.tracesSignalSumSpectrum?.length
-    const traces = visualizationStore.tracesSignalSumSpectrum?.slice(start, end)
+    const end = nextStart !== -1 ? nextStart : data.traces?.length
+    const traces = data.traces?.slice(start, end)
 
     return {
       ...isotope,
       traces
     }
   })
-)
+})
 
 const layout = computed(() => ({
   yaxis: {
@@ -77,7 +81,7 @@ const error = new Intl.NumberFormat('en-US', {
             <Tag
               :value="error.format(isotope.match_mz_error)"
               :severity="
-                Math.abs(isotope.match_mz_error) > visualizationStore.paramMzTolerance
+                Math.abs(isotope.match_mz_error) > filterParams.current.mz_tolerance
                   ? 'warn'
                   : 'info'
               "
@@ -87,7 +91,7 @@ const error = new Intl.NumberFormat('en-US', {
               :value="error.format(isotope.match_abundance_error)"
               :severity="
                 Math.abs(isotope.match_abundance_error) >
-                visualizationStore.paramIsotopeRatioTolerance
+                filterParams.current.isotope_ratio_tolerance
                   ? 'warn'
                   : 'info'
               "

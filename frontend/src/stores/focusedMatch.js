@@ -1,0 +1,133 @@
+import { ref, reactive, computed, watch } from 'vue'
+import { defineStore } from 'pinia'
+
+import { api } from '@/api'
+
+import { useTargetsStore } from './targets'
+import { useWorkspaceStore } from './workspace'
+import { useFilterParams } from './filterParams'
+import { useDashboard } from './dashboard'
+
+export const useFocusedMatch = defineStore('focusedMatch', () => {
+  // state
+  const ion = ref(null)
+  const isotopes = ref(null)
+  const cache = reactive({
+    sampleId: null,
+    ionId: null,
+    collectionId: null
+  })
+
+  // actions
+  async function load({
+    sampleId = cache.sampleId,
+    ionId = cache.ionId,
+    collectionId = cache.collectionId,
+    params = null
+  }) {
+    const filterParams = useFilterParams()
+    await unload()
+    if (params) await filterParams.set(params)
+    await loadMatches({ sampleId, ionId, collectionId })
+    await focus({ sampleId, ionId })
+    // cache
+    cache.sampleId = sampleId
+    cache.ionId = ionId
+    cache.collectionId = collectionId
+  }
+
+  async function reload() {
+    await loadMatches()
+  }
+
+  async function unload() {
+    const dashboard = useDashboard()
+    dashboard.clear()
+    if (!ion.value) return
+    ion.value = null
+    isotopes.value = null
+  }
+
+  async function loadMatches({ sampleId, ionId, collectionId } = {}) {
+    const target_ion_id = ionId ?? ion.value?.target_ion_id
+    if (!target_ion_id) return
+    const filterParams = useFilterParams()
+    const targetsStore = useTargetsStore()
+    const sampleIon = await api.request.read({
+      method: 'getSampleIonMatches',
+      body: {
+        sampleId: sampleId ?? ion.value?.sample_item_id,
+        body: {
+          target_ion_id,
+          target_collection_id: collectionId ?? ion.value?.target_collection_id,
+          filter_params: filterParams.current,
+          alarms_list: targetsStore.alarmsList
+        }
+      }
+    })
+    if (!sampleIon?.data) return
+    const existingIsotopes = isotopes.value
+
+    ion.value = sampleIon.data.match_ions[0]
+    isotopes.value = sampleIon.data.match_isotopes.map((isotope) => {
+      let existingIsotope = null
+      if (existingIsotopes) {
+        existingIsotope = existingIsotopes.find(
+          (existing) => existing.target_isotope_id === isotope.target_isotope_id
+        )
+      }
+
+      return {
+        target_isotope_id: isotope.target_isotope_id,
+        color: existingIsotope?.color || null, // Preserve color if exists
+        mz: isotope.mz.toFixed(4),
+        match_score: isotope.match_score,
+        match_category: isotope.match_category,
+        alarm_mode: isotope.alarm_mode,
+        target_collection_type: isotope.target_collection_type,
+        relative_abundance: isotope.relative_abundance,
+        sample_peak_area: isotope.sample_peak_area,
+        match_mz_error: isotope.match_mz_error,
+        match_abundance_error: isotope.match_abundance_error,
+        match_isotope_correlation: isotope.match_isotope_correlation
+      }
+    })
+  }
+
+  async function focus({ sampleId, ionId }) {
+    if (!ion.value) return
+    const filterParams = useFilterParams()
+    const dashboard = useDashboard()
+
+    dashboard.clear()
+
+    await api.request.read({
+      method: 'getVisualizationIonFocus',
+      body: {
+        sample_item_id: sampleId ?? ion.value.sample_item_id,
+        target_ion_id: ionId ?? ion.value.target_ion_id,
+        min_isotope_abundance: filterParams.current.min_isotope_abundance,
+        peak_min_intensity: filterParams.current.peak_min_intensity,
+        mz_tolerance: filterParams.current.mz_tolerance
+      }
+    })
+  }
+
+  const workspaceStore = useWorkspaceStore()
+  watch(
+    computed(() => workspaceStore.active),
+    () => {
+      unload()
+    }
+  )
+
+  return {
+    // state
+    ion,
+    isotopes,
+    // actions
+    load,
+    reload,
+    unload
+  }
+})

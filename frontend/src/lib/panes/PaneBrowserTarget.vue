@@ -18,14 +18,14 @@ import {
   DialogTargetCompoundUpdate
 } from '@/lib/dialogs'
 
-import { useSampleStore, useBatchStore, useVisualizationStore, useTargetsStore } from '@/stores'
+import { useSampleStore, useBatchStore, useFocusedMatch, useTargetsStore } from '@/stores'
 
 const confirm = useConfirm()
 
 const targetsStore = useTargetsStore()
 const sampleStore = useSampleStore()
 const batchStore = useBatchStore()
-const visualizationStore = useVisualizationStore()
+const focusedMatch = useFocusedMatch()
 
 const emit = defineEmits(['focused'])
 
@@ -207,8 +207,9 @@ async function showMatch(row) {
     row?.target_ion_id ??
     sampleStore.matchIons?.find((ion) => ion.target_compound_id === row.target_compound_id)
       ?.target_ion_id
-  if (ionId && sampleStore.active && visualizationStore.activeIon?.target_ion_id !== ionId) {
-    await visualizationStore.load({
+  if (ionId && sampleStore.active && focusedMatch.ion?.target_ion_id !== ionId) {
+    console.log('showMatch loading')
+    await focusedMatch.load({
       sampleId: sampleStore.active.sample_item_id,
       ionId,
       collectionId: row?.target_collection_id,
@@ -222,7 +223,7 @@ async function showMatch(row) {
 }
 async function hideMatch() {
   if (!selected.compound) {
-    visualizationStore.unload()
+    focusedMatch.unload()
   } else {
     showMatch(selected.compound)
   }
