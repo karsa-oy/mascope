@@ -429,7 +429,7 @@ async function hideMatch() {
             parseClipboard()
           }
         "
-        sortField="sample_batch_name"
+        sortField="sample_batch_utc_created"
         :sortOrder="-1"
         size="small"
       >
