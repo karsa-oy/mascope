@@ -134,13 +134,14 @@ watch(
   preprocess
 )
 function preprocess() {
+  const acquisitions = [...props.files].sort((a, b) => (b.datetime < a.datetime ? 1 : -1))
   if (imported.type === 'autosampler') {
     if (!imported.filterId) {
       imported.filterId = generated.filterId = genId(6, false)
     }
     imported.items = imported.parsed.map((parsed, i) => {
       const item = {
-        filename: props.files[i]?.filename ?? null,
+        filename: acquisitions[i]?.filename ?? null,
         sample_batch_id: batchStore.active.sample_batch_id,
         filter_id: imported.filterId,
         sample_item_attributes: {}
@@ -163,7 +164,7 @@ function preprocess() {
     imported.items = imported.parsed.map((parsed, index) => ({
       ...parsed,
       sample_batch_id: batchStore.active.sample_batch_id,
-      filename: props.files[index]?.filename ?? null
+      filename: acquisitions[index]?.filename ?? null
     }))
   }
   validateRows()
