@@ -28,8 +28,15 @@ test.describe('sample batch ops', () => {
     // validate
     await expect(sampleBrowser.content).not.toContainText(freshBatch.name)
   })
-  test('import sample batch', async ({ page, freshBatch, sampleBrowser, acquisitionsTab }) => {
+  test('import sample items (creation)', async ({
+    page,
+    freshBatch,
+    sampleBrowser,
+    acquisitionsTab,
+    instrumentSelector
+  }) => {
     await freshBatch.browserRow.click()
+    await instrumentSelector.select('KLTOF1')
     await acquisitionsTab.open()
     await acquisitionsTab.filter('01/01/2020 00:00 - 01/01/2030 00:00')
     await acquisitionsTab.select(2)

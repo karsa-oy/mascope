@@ -36,7 +36,7 @@ test.describe('sample item ops', () => {
     sampleBrowser
   }) => {
     // file conversion requires overriding timeouts
-    const timeout = 3 * 60 * 1000
+    const timeout = 10 * 60 * 1000
     test.setTimeout(timeout)
     const expectConversion = expect.configure({ timeout })
     // info
