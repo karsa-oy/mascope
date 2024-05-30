@@ -9,33 +9,6 @@ export default base.extend({
     const createBatch = () => button.click({ delay: 200, force: true })
     await use({ panel, header, content, createBatch })
   },
-  acquisitionsTab: async ({ page }, use) => {
-    const panel = page.locator('#acquisitions')
-    const open = () => page.getByLabel('Acquisitions').click({ delay: 100 })
-    const datetime = page.locator('#range')
-    const filter = async (range) => {
-      await datetime.fill(range)
-      await datetime.press('Enter')
-    }
-    const select = (filename) =>
-      filename
-        ? panel
-            .getByRole('row', { name: `Row Unselected ${filename}` })
-            .getByLabel('Row Unselected')
-            .check()
-        : panel
-            .getByRole('row', { name: 'Row Unselected' })
-            .first()
-            .getByLabel('Row Unselected')
-            .check()
-    const unselect = (filename) =>
-      panel
-        .getByRole('row', { name: `Row Selected ${filename}` })
-        .getByLabel('Row Selected')
-        .uncheck()
-    const process = () => panel.getByLabel('Process').click({ delay: 50 })
-    await use({ open, filter, datetime, select, unselect, process })
-  },
   existingBatch: async ({ page }, use) => {
     const name = '20230726_stability'
     const browserRow = page.getByRole('cell', { name })

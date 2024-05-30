@@ -1,16 +1,10 @@
 import { expect, mergeTests } from '@playwright/test'
 
-import { workspace, sample } from '../fixtures'
+import { workspace, sample, instrument } from '../fixtures'
 
-const test = mergeTests(workspace, sample)
+const test = mergeTests(workspace, sample, instrument)
 
 test.describe('sample batch ops', () => {
-  test.beforeEach(async ({ page, context, browser }) => {
-    await page.goto('http://localhost:8080/')
-    if (browser.browserType() == 'chromium') {
-      await context.grantPermissions(['clipboard-read', 'clipboard-write'])
-    }
-  })
   test('create sample batch', async ({ freshBatch }) => {
     // validate
     await expect(freshBatch.browserRow).toContainText(freshBatch.name)
@@ -33,5 +27,36 @@ test.describe('sample batch ops', () => {
     await dialog.getByLabel('delete').click()
     // validate
     await expect(sampleBrowser.content).not.toContainText(freshBatch.name)
+  })
+  test('import sample items (create)', async ({
+    page,
+    freshBatch,
+    sampleBrowser,
+    acquisitionsTab,
+    instrumentSelector
+  }) => {
+    await freshBatch.browserRow.click()
+    await instrumentSelector.select('KLTOF1')
+    await acquisitionsTab.open()
+    await acquisitionsTab.filter('01/01/2020 00:00 - 01/01/2030 00:00')
+    await acquisitionsTab.select(2)
+    await acquisitionsTab.process()
+    const dialog = page.getByLabel('import spreadsheet sample data')
+    // paste data
+    await page.evaluate(() =>
+      navigator.clipboard.writeText(
+        `name	type	filter id	foo	bar
+    test_blank_item	BLANK	ABC123	1	fizz
+    test_sample_item	SAMPLE	XYZ456	2	fuzz
+    `
+      )
+    )
+    await dialog.press('Control+v')
+    await dialog.getByLabel('process').click()
+    const confirm = page.getByLabel('import samples')
+    await confirm.getByLabel('import').click()
+    await expect(sampleBrowser.content).toContainText(
+      'test_sample_item1XYZ456test_blank_item2ABC123'
+    )
   })
 })

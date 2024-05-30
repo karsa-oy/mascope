@@ -5,12 +5,6 @@ import { workspace, sample, target } from '../fixtures'
 const test = mergeTests(workspace, sample, target)
 
 test.describe('target collection ops', () => {
-  test.beforeEach(async ({ page, context, browser }) => {
-    await page.goto('http://localhost:8080/')
-    if (browser.browserType() == 'chromium') {
-      await context.grantPermissions(['clipboard-read', 'clipboard-write'])
-    }
-  })
   test('create target collection', async ({ freshCollection }) => {
     // validate
     await freshCollection.browserRow.click({ delay: 50 })
