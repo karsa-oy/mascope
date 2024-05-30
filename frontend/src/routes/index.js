@@ -1,6 +1,6 @@
 import { createRouter, createMemoryHistory } from 'vue-router'
 
-import PageHome from './PageHome.vue'
+import MainRoute from './MainRoute.vue'
 
 export default createRouter({
   //mode: process.env.NODE_ENV == "production" ? "hash" : "history",
@@ -8,7 +8,7 @@ export default createRouter({
   routes: [
     {
       path: '/',
-      component: PageHome
+      component: MainRoute
     }
   ]
 })

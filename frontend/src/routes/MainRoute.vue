@@ -11,8 +11,8 @@ import {
   PaneProgress,
   PaneBrowserSample,
   PaneBrowserTarget,
-  PaneDashSignal,
-  PaneAcquisitions
+  PaneTabMatch,
+  PaneTabAcquisitions
 } from '@/lib/panes'
 import { ChartBatchOverview } from '@/lib/charts'
 
@@ -112,8 +112,8 @@ watch(
             <TabMenu v-model:activeIndex="tab" :model="tabs" />
           </template>
           <ChartBatchOverview v-if="tab == 0 && batchStore.active" />
-          <PaneDashSignal v-if="tab == 1 && visualizationStore.activeIon" />
-          <PaneAcquisitions v-if="tab == 2 && instrumentStore.active" :active="tab == 2" />
+          <PaneTabMatch v-if="tab == 1 && visualizationStore.activeIon" />
+          <PaneTabAcquisitions v-if="tab == 2 && instrumentStore.active" :active="tab == 2" />
         </Panel>
       </SplitterPanel>
     </Splitter>

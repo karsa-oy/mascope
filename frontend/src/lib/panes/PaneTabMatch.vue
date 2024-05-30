@@ -4,7 +4,7 @@ import Tag from 'primevue/tag'
 
 import { computed, reactive } from 'vue'
 
-import { ChartSignalSpectrum, ChartSignalTimeseries } from '@/lib/charts'
+import { ChartMatchSpectra, ChartMatchTimeseries } from '@/lib/charts'
 import {
   ToolbarSettingsFilterIon,
   ToolbarSettingsSignalCharts,
@@ -58,8 +58,8 @@ const score = new Intl.NumberFormat('en-US', {
       class="col"
       :style="`gap: 1rem; align-items: stretch; width: calc(${appStore.split.right}vw - 5rem)`"
     >
-      <ChartSignalSpectrum :settings="settings" />
-      <ChartSignalTimeseries />
+      <ChartMatchSpectra :settings="settings" />
+      <ChartMatchTimeseries />
     </div>
     <div class="row k-match-tools">
       <ToolbarSettingsFilterIon />
