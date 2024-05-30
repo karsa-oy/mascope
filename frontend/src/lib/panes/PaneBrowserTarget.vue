@@ -318,7 +318,7 @@ watchEffect(() => {
           </template>
           <template #body="{ data }">
             <BaseMatchTag
-              v-if="sampleStore.active"
+              v-if="data.match_score >= 0 && sampleStore.active?.matched == 1"
               :row="data"
               :tooltip="`Peak intensity: ${formatter.format(data?.sample_peak_area_sum)}`"
             />
@@ -362,7 +362,7 @@ watchEffect(() => {
               </template>
               <template #body="{ data }">
                 <BaseMatchTag
-                  v-if="sampleStore.active"
+                  v-if="data.match_score >= 0 && sampleStore.active?.matched == 1"
                   :row="data"
                   :tooltip="`Peak intensity: ${formatter.format(data?.sample_peak_area_sum)}`"
                 />
@@ -397,7 +397,7 @@ watchEffect(() => {
                   </template>
                   <template #body="{ data }">
                     <BaseMatchTag
-                      v-if="sampleStore.active"
+                      v-if="data.match_score >= 0 && sampleStore.active?.matched == 1"
                       :row="data"
                       :tooltip="`Peak intensity: ${formatter.format(data?.sample_peak_area_sum)}`"
                     />
@@ -427,7 +427,7 @@ watchEffect(() => {
                       </template>
                       <template #body="{ data }">
                         <BaseMatchTag
-                          v-if="sampleStore.active"
+                          v-if="data.match_score >= 0 && sampleStore.active?.matched == 1"
                           :row="data"
                           :tooltip="`Peak intensity: ${formatter.format(data?.sample_peak_area_sum)}`"
                         />

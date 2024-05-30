@@ -1,23 +1,32 @@
-import { reactive, watchEffect, computed, onBeforeUnmount } from 'vue'
+import { ref, reactive, watchEffect, computed, onBeforeUnmount } from 'vue'
 import { defineStore } from 'pinia'
 
 import { genId } from '@/lib/utils'
 
 export const useNotification = defineStore('notification', () => {
+  const retentionLimit = 250
   const state = reactive({
     latest: null,
     log: [],
     watchers: [],
     progress: []
   })
+  const drawer = ref(false)
 
   async function onUserNotification(notification) {
     push(notification)
   }
   function push(notification) {
     const id = genId()
-    state.latest = { id, ...notification }
-    state.log.push(notification)
+    state.latest = {
+      id,
+      timestamp: new Date(),
+      ...notification
+    }
+    if (notification.status !== 'pending') {
+      state.log.unshift(state.latest)
+      state.log = state.log.slice(0, retentionLimit)
+    }
   }
   function on(trigger, callback) {
     const id = genId()
@@ -55,12 +64,21 @@ export const useNotification = defineStore('notification', () => {
           parent_id,
           root_id,
           message,
-          progress
+          progress,
+          timeout: setTimeout(() => {
+            state.progress = state.progress.filter((prog) => prog.process_id !== process_id)
+          }, 30 * 1000)
         })
       }
     } else {
-      // update existing process
+      // reset the timeout
+      clearTimeout(saved.timeout)
+      saved.timeout = setTimeout(() => {
+        state.progress = state.progress.filter((prog) => prog.process_id !== process_id)
+      }, 30 * 1000)
+      // update progress
       saved.progress = progress
+      saved.message = message
       if (status !== 'pending') {
         // cleanup completed processes
         state.progress = state.progress.filter((proc) => proc.process_id !== process_id)
@@ -70,7 +88,7 @@ export const useNotification = defineStore('notification', () => {
         }
       }
     }
-  })
+  })()
 
   watchEffect(() => {
     state.watchers.forEach(({ type, callback }) => {
@@ -81,6 +99,7 @@ export const useNotification = defineStore('notification', () => {
   })
 
   return {
+    drawer,
     // api
     on,
     push,

@@ -5,7 +5,7 @@ import { workspace, sample, instrument } from '../fixtures'
 const test = mergeTests(workspace, instrument, sample)
 
 test.describe('sample item ops', () => {
-  test('process sample item', async ({
+  test('process sample item (create)', async ({
     page,
     freshBatch,
     instrumentSelector,
@@ -23,7 +23,7 @@ test.describe('sample item ops', () => {
     const dialog = page.getByLabel('create a new sample item')
     await dialog.getByLabel('sample item name').fill(name)
     await dialog.locator('#item-type').click({ delay: 50 })
-    await dialog.getByLabel('instrument background').click({ delay: 50 })
+    await page.getByLabel('instrument background').click({ delay: 50 })
     await dialog.getByLabel('save').click()
     await expect(sampleBrowser.content).toContainText(name)
   })
@@ -51,7 +51,7 @@ test.describe('sample item ops', () => {
     const dialog = page.getByLabel('create a new sample item')
     await dialog.getByLabel('sample item name').fill(name)
     await dialog.locator('#item-type').click({ delay: 50 })
-    await dialog.getByLabel('instrument background').click({ delay: 50 })
+    await page.getByLabel('instrument background').click({ delay: 50 })
     await dialog.getByLabel('save').click()
     // validation
     await expectConversion(sampleBrowser.content).toContainText(name)

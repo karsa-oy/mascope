@@ -43,6 +43,7 @@ watchEffect(() => {
         icon: 'pi pi-play'
       }
     ]"
+    optionLabel="tooltip"
     optionValue="value"
     dataKey="value"
     :class="appStore.mode.measuring ? 'k-measuremode' : ''"

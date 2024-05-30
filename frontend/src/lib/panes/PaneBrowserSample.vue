@@ -12,9 +12,9 @@ import Column from 'primevue/column'
 import ProgressSpinner from 'primevue/progressspinner'
 import ContextMenu from 'primevue/contextmenu'
 
-import { generateCopyName } from '@/api'
+import { api, generateCopyName } from '@/api'
 
-import BaseMatchTag from '@/lib/base/BaseMatchTag.vue'
+import { BaseMatchTag } from '@/lib/base'
 import {
   DialogSampleBatchOp,
   DialogSampleItemOp,
@@ -23,7 +23,13 @@ import {
 } from '@/lib/dialogs'
 
 import { batchExportCsv } from '@/lib/table'
-import { useWorkspaceStore, useSampleStore, useBatchStore, useVisualizationStore } from '@/stores'
+import {
+  useWorkspaceStore,
+  useSampleStore,
+  useBatchStore,
+  useVisualizationStore,
+  useMzFit
+} from '@/stores'
 
 const confirm = useConfirm()
 
@@ -58,18 +64,35 @@ const item = reactive({
 const batchContextMenu = ref()
 const itemContextMenu = ref()
 
+const pending = reactive({
+  batchExport: false,
+  peakExport: false
+})
+
 watch(
   computed(() => batch.selected),
-  (selected) => {
+  async (selected) => {
     if (selected) {
       const batchId = batch.selected.sample_batch_id
       batch.expanded = { [batchId]: true }
+      await batchStore.load(selected.sample_batch_id)
+      handlePending()
     } else {
       batch.expanded = {}
+      batchStore.unload()
     }
-    batchStore.batchToggle(selected)
   }
 )
+function handlePending() {
+  if (pending.batchExport) {
+    batchExportCsv()
+    pending.batchExport = false
+  }
+  if (pending.peakExport) {
+    batchStore.exportPeaks(batchStore.active)
+    pending.peakExport = false
+  }
+}
 watch(
   computed(() => item.selected),
   (selected) => {
@@ -170,7 +193,14 @@ const menu = computed(() => ({
       label: 'Export batch',
 
       icon: 'pi pi-file-export',
-      command: () => batchExportCsv(),
+      command: () => {
+        if (batch.selected?.sample_batch_id == batch.context.sample_batch_id) {
+          batchExportCsv()
+        } else {
+          batch.selected = batch.context
+          pending.batchExport = true
+        }
+      },
       visible: batch.context !== null
     },
     {
@@ -183,7 +213,12 @@ const menu = computed(() => ({
           acceptIcon: 'pi pi-file-export',
           acceptLabel: 'Export',
           accept: () => {
-            batchStore.exportPeaks(batchStore.active)
+            if (batch.selected?.sample_batch_id == batch.context.sample_batch_id) {
+              batchStore.exportPeaks(batchStore.active)
+            } else {
+              batch.selected = batch.context
+              pending.peakExport = true
+            }
           },
           rejectLabel: 'Cancel',
           rejectIcon: 'pi pi-times'
@@ -192,6 +227,21 @@ const menu = computed(() => ({
       visible: batch.context !== null
     },
     { separator: true, visible: batch.context !== null },
+    {
+      label: `Recalibrate batch`,
+      icon: 'pi pi-replay',
+      command: async () => {
+        const mzFit = useMzFit()
+        await api.request.process({
+          method: 'recalibrateSampleBatch',
+          body: {
+            batchId: batch.context.sample_batch_id,
+            body: mzFit.params
+          }
+        })
+      },
+      visible: batch.context !== null
+    },
     {
       label: 'Rematch batch',
       icon: 'pi pi-replay',
@@ -277,7 +327,6 @@ async function parseClipboard() {
     clipboard = await navigator.clipboard.readText()
     pasted = JSON.parse(clipboard)
   } catch (err) {
-    console.warn('Sample browser: could not parse clipboard contents')
     return
   }
   if (pasted?.sample_batch_id) {
@@ -380,7 +429,7 @@ async function hideMatch() {
             parseClipboard()
           }
         "
-        sortField="sample_batch_name"
+        sortField="sample_batch_utc_created"
         :sortOrder="-1"
         size="small"
       >
@@ -418,10 +467,11 @@ async function hideMatch() {
                 <template #header>
                   <span class="pi pi-verified" />
                 </template>
-                <template #body="slotProps">
+                <template #body="{ data }">
                   <BaseMatchTag
-                    :row="slotProps.data"
-                    :tooltip="`Peak intensity: ${formatter.format(slotProps.data?.sample_peak_area_sum)}`"
+                    v-if="data.matched == 1"
+                    :row="data"
+                    :tooltip="`Peak intensity: ${formatter.format(data?.sample_peak_area_sum)}`"
                   />
                 </template>
               </Column>

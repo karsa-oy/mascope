@@ -59,7 +59,7 @@ notification.on('*', ({ status, type, message }) => {
       <strong>Loading...</strong>
     </div>
   </div>
-  <Toast position="bottom-right" />
+  <Toast position="bottom-right" v-if="!notification.drawer" />
   <ConfirmDialog />
 </template>
 

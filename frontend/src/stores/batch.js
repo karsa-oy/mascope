@@ -5,8 +5,8 @@ import { api } from '@/api'
 
 import { useTargetsStore } from './targets.js'
 import { useSampleStore } from './sample.js'
-import { useWorkspaceStore } from './workspace.js'
 import { useAppStore } from './app.js'
+import { useMzFit } from './mzFit.js'
 
 export const useBatchStore = defineStore('batch', () => {
   const active = ref(null)
@@ -213,14 +213,17 @@ export const useBatchStore = defineStore('batch', () => {
     })
   }
 
-  async function importItems(data) {
-    const body = {
-      sample_items: data.sample_items
-    }
-    const batch = data.batch
+  async function importItems({ batch, sample_items }) {
+    const mzFit = useMzFit()
     return await api.request.process({
       method: 'importSamplesToBatch',
-      body: { batch, body }
+      body: {
+        batch,
+        body: {
+          sample_items,
+          params: mzFit.params
+        }
+      }
     })
   }
   async function createBatch(newBatch) {
@@ -278,20 +281,6 @@ export const useBatchStore = defineStore('batch', () => {
     await reload()
   }
 
-  // selection
-  async function batchToggle(batch) {
-    const workspaceStore = useWorkspaceStore()
-    //workspaceStore.batches.forEach((row) => (row.selection = 0))
-    if (!batch || active.value?.sample_batch_id == batch?.sample_batch_id) {
-      unload()
-    } else {
-      load(batch.sample_batch_id)
-      workspaceStore.batches
-        .filter((row) => row.sample_batch_id == batch.sample_batch_id)
-        .forEach((row) => (row.selection = 2))
-    }
-  }
-
   return {
     // state
     active,
@@ -319,7 +308,6 @@ export const useBatchStore = defineStore('batch', () => {
     copyBatch,
     exportPeaks,
     rematchBatch,
-    onSampleBatchReload,
-    batchToggle
+    onSampleBatchReload
   }
 })

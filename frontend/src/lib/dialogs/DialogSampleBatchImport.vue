@@ -134,13 +134,14 @@ watch(
   preprocess
 )
 function preprocess() {
+  const acquisitions = [...props.files].sort((a, b) => (b.datetime < a.datetime ? 1 : -1))
   if (imported.type === 'autosampler') {
     if (!imported.filterId) {
       imported.filterId = generated.filterId = genId(6, false)
     }
     imported.items = imported.parsed.map((parsed, i) => {
       const item = {
-        filename: props.files[i]?.filename ?? null,
+        filename: acquisitions[i]?.filename ?? null,
         sample_batch_id: batchStore.active.sample_batch_id,
         filter_id: imported.filterId,
         sample_item_attributes: {}
@@ -163,7 +164,7 @@ function preprocess() {
     imported.items = imported.parsed.map((parsed, index) => ({
       ...parsed,
       sample_batch_id: batchStore.active.sample_batch_id,
-      filename: props.files[index]?.filename ?? null
+      filename: acquisitions[index]?.filename ?? null
     }))
   }
   validateRows()
@@ -335,7 +336,7 @@ function autoswitchTab(passed) {
       <TabPanels>
         <TabPanel value="data">
           <BaseClipboardContext
-            info="Paste spreadsheet cells to import data"
+            info="Paste sample spreadsheet cells with 'name', 'type', 'filter id' columns, and (optionally) extra fields. Include headers and verify the row count matches your selection."
             :parse="parse"
             :persistMessage="imported.items.length == 0"
           >
@@ -360,7 +361,7 @@ function autoswitchTab(passed) {
                 </DataTable>
               </ScrollPanel>
             </Panel>
-            <i v-else>No spreadsheet data pasted</i>
+            <i v-else style="position: absolute; top: 1rem">No spreadsheet data pasted</i>
           </BaseClipboardContext>
         </TabPanel>
         <TabPanel value="issues">
