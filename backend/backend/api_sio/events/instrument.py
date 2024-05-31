@@ -1,11 +1,10 @@
-from .. import sio
+from backend.api_sio import sio
 from backend.db.id import gen_id
 from backend.api.models.pydantic_models.user_notification_pydantic_model import (
     UserNotification,
 )
-from backend.api.utils.api_features import (
-    emit_user_notification,
-)
+from backend.api.utils import api_features
+
 
 instrument_acquisition_notification_process_id = gen_id(8)
 instrument_conversion_notification_process_id = gen_id(8)
@@ -25,7 +24,9 @@ async def instrument_acquisition_started(sid, acquisition_data):
         data={"instrument": instrument, "filename": filename},
     )
 
-    await emit_user_notification(instrument_acquisition_notification, instrument)
+    await api_features.emit_user_notification(
+        instrument_acquisition_notification, instrument
+    )
 
 
 @sio.event(namespace="/")
@@ -43,7 +44,9 @@ async def instrument_acquisition_progress(sid, acquisition_data):
         data={"instrument": instrument, "filename": filename},
     )
 
-    await emit_user_notification(instrument_acquisition_notification, instrument)
+    await api_features.emit_user_notification(
+        instrument_acquisition_notification, instrument
+    )
 
 
 @sio.event(namespace="/")
@@ -61,7 +64,9 @@ async def instrument_acquisition_finished(sid, acquisition_data):
         data={"instrument": instrument, "filename": filename},
     )
 
-    await emit_user_notification(instrument_acquisition_notification, instrument)
+    await api_features.emit_user_notification(
+        instrument_acquisition_notification, instrument
+    )
 
 
 @sio.event(namespace="/")
@@ -81,7 +86,9 @@ async def instrument_conversion_started(sid, conversion_data):
         },
     )
 
-    await emit_user_notification(instrument_conversion_notification, instrument)
+    await api_features.emit_user_notification(
+        instrument_conversion_notification, instrument
+    )
 
 
 @sio.event(namespace="/")
@@ -102,7 +109,9 @@ async def instrument_conversion_progress(sid, conversion_data):
         },
     )
 
-    await emit_user_notification(instrument_conversion_notification, instrument)
+    await api_features.emit_user_notification(
+        instrument_conversion_notification, instrument
+    )
 
 
 @sio.event(namespace="/")
@@ -123,4 +132,6 @@ async def instrument_conversion_finished(sid, conversion_data):
         },
     )
 
-    await emit_user_notification(instrument_conversion_notification, instrument)
+    await api_features.emit_user_notification(
+        instrument_conversion_notification, instrument
+    )
