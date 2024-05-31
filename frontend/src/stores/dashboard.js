@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 
 export const useDashboard = defineStore('dashboard', () => {
   const charts = ref([])
+  const tab = ref('batch')
 
   function register(chart) {
     charts.value.push(chart)
@@ -21,6 +22,7 @@ export const useDashboard = defineStore('dashboard', () => {
   }
 
   return {
+    tab,
     charts,
     register,
     clear

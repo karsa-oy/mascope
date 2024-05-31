@@ -55,7 +55,7 @@ const corr = new Intl.NumberFormat('en-US', {
       />
     </span>
     <BaseChartPlotly
-      id="ChartSampleSignalTimeseries"
+      id="ChartMatchTimeseries"
       title="Timeseries"
       :data="data.traces"
       :layout="layout"

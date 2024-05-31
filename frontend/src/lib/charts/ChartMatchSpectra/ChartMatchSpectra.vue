@@ -71,7 +71,7 @@ const error = new Intl.NumberFormat('en-US', {
       <div class="row" style="gap: 1rem; justify-content: flex-start; padding: 0 2rem">
         <figure v-for="isotope of isotopes" :key="isotope.target_isotope_id">
           <BaseChartPlotly
-            :id="`ChartSampleSignalSumSpectrum-${isotope.target_isotope_id}`"
+            :id="`ChartMatchSpectrum-${isotope.target_isotope_id}`"
             :title="`Target isotope intensity: ${area.format(isotope.sample_peak_area)}`"
             :data="isotope.traces"
             :layout="layout"

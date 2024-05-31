@@ -10,7 +10,6 @@ html,
 body {
   overflow: hidden;
   font-size: 13px;
-  font-family: Inter, sans-serif;
   height: 100vh;
   max-height: 100vh;
   margin: 0;
@@ -18,6 +17,10 @@ body {
 }
 
 @layer override {
+  * {
+    font-family: Inter, sans-serif;
+  }
+
   * {
     --p-listbox-background: var(--p-panel-background);
     /* form input */

@@ -3,8 +3,12 @@ import { ref, computed, watch } from 'vue'
 
 import Splitter from 'primevue/splitter'
 import SplitterPanel from 'primevue/splitterpanel'
-import TabMenu from 'primevue/tabmenu'
 import Panel from 'primevue/panel'
+import Tabs from 'primevue/tabs'
+import TabList from 'primevue/tablist'
+import Tab from 'primevue/tab'
+import TabPanels from 'primevue/tabpanels'
+import TabPanel from 'primevue/tabpanel'
 
 import { ToolbarAppFilters } from '@/lib/menus'
 import {
@@ -14,7 +18,7 @@ import {
   PaneTabMatch,
   PaneTabAcquisitions
 } from '@/lib/panes'
-import { ChartBatchOverview } from '@/lib/charts'
+import { ChartBatchOverview, ChartSampleSpectrum } from '@/lib/charts'
 
 import {
   useAppStore,
@@ -23,7 +27,8 @@ import {
   useInstrumentStore,
   useWorkspaceStore,
   useSampleStore,
-  useTargetsStore
+  useTargetsStore,
+  useDashboard
 } from '@/stores'
 
 const appStore = useAppStore()
@@ -34,11 +39,18 @@ const focusedMatch = useFocusedMatch()
 const instrumentStore = useInstrumentStore()
 const targetsStore = useTargetsStore()
 
+const dashboard = useDashboard()
+
 const tab = ref(0)
 const tabs = computed(() => [
   {
     label: 'Batch',
     icon: 'pi pi-hashtag'
+  },
+  {
+    label: 'Spectrum',
+    icon: 'pi pi-chart-bar',
+    disabled: !sampleStore.active
   },
   {
     label: 'Match',
@@ -108,12 +120,34 @@ watch(
       </SplitterPanel>
       <SplitterPanel :size="80">
         <Panel id="charts" class="k-browser" style="border: none">
-          <template #header>
-            <TabMenu v-model:activeIndex="tab" :model="tabs" />
-          </template>
-          <ChartBatchOverview v-if="tab == 0 && batchStore.active" />
-          <PaneTabMatch v-if="tab == 1 && focusedMatch.ion" />
-          <PaneTabAcquisitions v-if="tab == 2 && instrumentStore.active" :active="tab == 2" />
+          <Tabs v-model:value="dashboard.tab">
+            <TabList>
+              <Tab
+                v-for="{ icon, label, disabled } in tabs"
+                :value="label.toLowerCase()"
+                :key="label"
+                :disabled="disabled"
+              >
+                <div class="row">
+                  <span :class="icon" /><span>{{ label }}</span>
+                </div>
+              </Tab>
+            </TabList>
+            <TabPanels>
+              <TabPanel value="batch">
+                <ChartBatchOverview v-if="batchStore.active" />
+              </TabPanel>
+              <TabPanel value="spectrum">
+                <ChartSampleSpectrum />
+              </TabPanel>
+              <TabPanel value="match">
+                <PaneTabMatch v-if="focusedMatch.ion" />
+              </TabPanel>
+              <TabPanel value="acquisitions">
+                <PaneTabAcquisitions v-if="instrumentStore.active" :active="tab == 2" />
+              </TabPanel>
+            </TabPanels>
+          </Tabs>
         </Panel>
       </SplitterPanel>
     </Splitter>
