@@ -23,7 +23,9 @@ from .file_func import load_file, zarr_sdk, get_sum_signal
 SIGMA_MULTIPLIER = 2 * np.sqrt(2 * np.log(2))
 
 
-def calculate_peak_area(x: np.ndarray, peakshape: dict, peak: tuple) -> float:
+def calculate_peak_area(
+    x: np.ndarray, peakshape: dict, peak: tuple, sample_interval: float
+) -> float:
     """Calculate the area of a peak.
 
     This function calculates the area under a peak shape using Simpson's rule.
@@ -39,14 +41,29 @@ def calculate_peak_area(x: np.ndarray, peakshape: dict, peak: tuple) -> float:
     """
     pos, hei, res = peak
     peak_y = gen_peak(x, pos, hei, res, peakshape)
-    peak_area = simpson(y=peak_y, x=x)
-    return peak_area
+    if sample_interval:
+        # calculate peak area in TOF space
+        return np.sum(peak_y) * sample_interval
+    # calculate peak area in mz space
+    return simpson(y=peak_y, x=x)
 
 
-def calculate_tic(filename):
+def calculate_tic(filename: str) -> float:
+    """Calculates the full integral of the signal in TOF or mz space
+    depending on signal sampling interval availability in the sample file
+
+    :param filename: name of the sample file
+    :type filename: str
+    :return: area under the sum signal
+    :rtype: float
+    """
     sum_spec = get_sum_signal(filename)
-    tic = sum_spec.sum(dim="mz").compute().item()
-    return tic
+    sample_interval = load_file(filename).attrs["props"].get("sample_interval")
+    if sample_interval:
+        # return sum signal full integral in tof space
+        return sum_spec.sum(dim="mz").compute().item() * sample_interval
+    # return sum signal full integral in mz space
+    return simpson(y=sum_spec.values(), x=sum_spec.mz.values())
 
 
 def segment_spec(sum_spec):
@@ -139,6 +156,8 @@ async def detect_peaks(
 
     sum_spec = get_sum_signal(filename)
     mz = sum_spec.mz
+    # Sample interval for peak area calculation in counts vs TOF
+    sample_interval = load_file(filename).attrs["props"].get("sample_interval")
 
     cpu_cores = os.cpu_count()
     max_workers = max(1, cpu_cores // 2)
@@ -184,6 +203,7 @@ async def detect_peaks(
             peakshape,
             R(mz_to_fit.mean()),
             add_peak_threshold,
+            sample_interval,
             max_n_peaks,
         )
         for mz_to_fit, spec_to_fit in specs_to_fit
@@ -399,6 +419,7 @@ def fit_n_peaks(
     peak_shape,
     resolution_function,
     threshold,
+    sample_interval=None,
     max_n_peaks=5,
     fit_pos=True,
     fit_hei=True,
@@ -416,6 +437,8 @@ def fit_n_peaks(
         peak shape {x: array, y: array}
     resolution_function : callable or float
         function to calculate the width of the peak
+    sample_interval : float
+        signal sampling interval, by default None
     max_n_peaks : int, optional
         maximum number of peaks to fit, by default 5
     threshold : float, optional
@@ -508,7 +531,10 @@ def fit_n_peaks(
             else resolution_function
         )
     # Calculate peak areas
-    peaks = [(*peak, calculate_peak_area(x, peak_shape, peak)) for peak in peaks]
+    peaks = [
+        (*peak, calculate_peak_area(x, peak_shape, peak, sample_interval))
+        for peak in peaks
+    ]
     return fit, peaks
 
 
