@@ -37,7 +37,7 @@ function undoChanges() {
   Object.keys(initialParams.value).forEach((key) => {
     filterParams.current[key] = initialParams.value[key]
   })
-   focusedMatch.reload()
+  focusedMatch.reload()
 }
 
 function storeInitialParams() {
@@ -112,7 +112,7 @@ const items = computed(() => [
 </script>
 
 <template>
-  <menu class="k-settings-filter-ion row">
+  <menu class="settings-filter-ion row">
     <Button
       v-tooltip.bottom="'Save & restore settings'"
       icon="pi pi-ellipsis-h"
@@ -236,7 +236,7 @@ const items = computed(() => [
 </template>
 
 <style scoped>
-.k-settings-filter-ion {
+.settings-filter-ion {
   padding: 0;
   z-index: 100;
 }

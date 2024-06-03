@@ -379,7 +379,7 @@ watchEffect(async () => {
 
 <template v-if="workspaceStore.batches">
   <Panel
-    class="k-browser"
+    class="browser"
     style="border: none"
     @contextmenu.prevent="
       (event) => {
@@ -457,7 +457,7 @@ watchEffect(async () => {
               "
               size="small"
             >
-              <Column field="match_score" sortable class="k-match-column">
+              <Column field="match_score" sortable class="match-column">
                 <template #header>
                   <span class="pi pi-verified" />
                 </template>
@@ -477,7 +477,7 @@ watchEffect(async () => {
               Empty - no sample items
             </i>
           </div>
-          <div class="k-spinner" v-else><ProgressSpinner strokeWidth="5px" />loading...</div>
+          <div class="spinner" v-else><ProgressSpinner strokeWidth="5px" />loading...</div>
         </template>
       </DataTable>
       <ContextMenu ref="batchContextMenu" :model="menu.batch" />

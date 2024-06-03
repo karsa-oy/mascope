@@ -99,47 +99,47 @@
 
   /* sample and target browsers */
 
-  .k-browser {
+  .browser {
     height: 100%;
     max-height: max-content;
   }
 
-  .k-browser .p-scrollpanel {
+  .browser .p-scrollpanel {
     height: calc(100% - 1rem) !important;
     max-height: calc(100% - 1rem) !important;
     width: 100%;
     max-width: 100%;
   }
 
-  .k-browser .p-panel-content-container,
-  .k-browser .p-panel-content {
+  .browser .p-panel-content-container,
+  .browser .p-panel-content {
     height: calc(100% - 1rem) !important;
     max-height: calc(100% - 1rem) !important;
   }
 
-  .k-browser .p-panel-header {
+  .browser .p-panel-header {
     padding: 0 0.5rem;
   }
 
-  .k-browser .p-panel-header .p-menuitem-link {
+  .browser .p-panel-header .p-menuitem-link {
     padding: 0.8rem !important;
     font-size: small;
   }
 
-  .k-browser .p-datatable-row-expansion > td {
+  .browser .p-datatable-row-expansion > td {
     padding: 0 !important;
     padding-left: 1.5rem !important;
   }
 
-  .k-browser .p-datatable-row-toggle-icon {
+  .browser .p-datatable-row-toggle-icon {
     z-index: 50 !important;
   }
 
-  .k-browser .k-match-column {
+  .browser .match-column {
     width: 8ch;
   }
 
-  .k-browser .k-spinner {
+  .browser .spinner {
     display: flex;
     flex-flow: row nowrap;
     align-items: center;
@@ -148,14 +148,14 @@
     padding: 0.5rem;
     padding-left: 2rem;
   }
-  .k-browser .k-spinner .p-progressspinner {
+  .browser .spinner .p-progressspinner {
     width: 15px;
     height: 15px;
     padding: 0;
     margin: 0;
     flex-shrink: 1;
   }
-  .k-browser .k-spinner .p-progressspinner::before {
+  .browser .spinner .p-progressspinner::before {
     height: 15px;
     padding: 0;
   }
@@ -171,11 +171,11 @@
 
   /* measurement mode */
 
-  .k-measuremode .p-togglebutton.p-togglebutton-checked::before {
+  .measure-mode .p-togglebutton.p-togglebutton-checked::before {
     --dark: var(--p-sky-400);
     --light: var(--p-sky-200);
   }
-  .darkmode .k-measuremode .p-togglebutton.p-togglebutton-checked::before {
+  .darkmode .measure-mode .p-togglebutton.p-togglebutton-checked::before {
     --dark: var(--p-sky-800);
     --light: var(--p-sky-600);
   }

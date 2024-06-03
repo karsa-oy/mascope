@@ -275,7 +275,7 @@ watchEffect(() => {
 </script>
 
 <template v-if="collections">
-  <Panel style="border: none" class="k-browser">
+  <Panel style="border: none" class="browser">
     <template #header>
       <TabMenu :model="[{ label: 'Targets', icon: 'pi pi-bullseye' }]" />
     </template>
@@ -310,7 +310,7 @@ watchEffect(() => {
         sortField="match_score"
         :sortOrder="-1"
       >
-        <Column field="match_score" sortable class="k-match-column">
+        <Column field="match_score" sortable class="match-column">
           <template #header>
             <span class="pi pi-verified" />
           </template>
@@ -353,7 +353,7 @@ watchEffect(() => {
             sortField="match_score"
             :sortOrder="-1"
           >
-            <Column field="match_score" sortable class="k-match-column">
+            <Column field="match_score" sortable class="match-column">
               <template #header>
                 <span class="pi pi-verified" />
               </template>
@@ -387,7 +387,7 @@ watchEffect(() => {
                 sortField="match_score"
                 :sortOrder="-1"
               >
-                <Column field="match_score" sortable class="k-match-column">
+                <Column field="match_score" sortable class="match-column">
                   <template #header>
                     <span class="pi pi-verified" />
                   </template>
@@ -417,7 +417,7 @@ watchEffect(() => {
                     sortField="match_score"
                     :sortOrder="-1"
                   >
-                    <Column field="match_score" sortable class="k-match-column">
+                    <Column field="match_score" sortable class="match-column">
                       <template #header>
                         <span class="pi pi-verified" />
                       </template>
@@ -441,15 +441,13 @@ watchEffect(() => {
                       </template>
                     </Column>
                   </DataTable>
-                  <div class="k-spinner" v-else>
-                    <ProgressSpinner strokeWidth="5px" />loading...
-                  </div>
+                  <div class="spinner" v-else><ProgressSpinner strokeWidth="5px" />loading...</div>
                 </template>
               </DataTable>
-              <div class="k-spinner" v-else><ProgressSpinner strokeWidth="5px" />loading...</div>
+              <div class="spinner" v-else><ProgressSpinner strokeWidth="5px" />loading...</div>
             </template>
           </DataTable>
-          <div class="k-spinner" v-else><ProgressSpinner strokeWidth="5px" />loading...</div>
+          <div class="spinner" v-else><ProgressSpinner strokeWidth="5px" />loading...</div>
         </template>
       </DataTable>
       <ContextMenu ref="collectionContextMenu" :model="menu.collection" />

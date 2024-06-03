@@ -99,7 +99,7 @@ function parseTimestamp(timestamp) {
 </script>
 
 <template>
-  <Toolbar class="k-filters">
+  <Toolbar class="filters">
     <template #start>
       <div class="row">
         <Button
@@ -290,11 +290,11 @@ function parseTimestamp(timestamp) {
 </template>
 
 <style scoped>
-.k-filters :deep(*) {
+.filters :deep(*) {
   font-size: small;
 }
 
-.k-filters :deep(.p-toolbar) {
+.filters :deep(.p-toolbar) {
   padding: 0.3rem;
 }
 

@@ -49,7 +49,7 @@ const score = new Intl.NumberFormat('en-US', {
       </h1>
       <ChartMatchSpectra :settings="settings" />
       <ChartMatchTimeseries />
-      <div class="row k-match-tools">
+      <div class="row match-tools">
         <ToolbarFilterIon />
         <ToolbarMatchCharts v-model:scale="settings.intensityScale" />
         <ToolbarMatchRating />
@@ -59,7 +59,7 @@ const score = new Intl.NumberFormat('en-US', {
 </template>
 
 <style scoped>
-.k-match-tools {
+.match-tools {
   position: fixed;
   top: 75px;
   right: 15px;
@@ -70,7 +70,7 @@ const score = new Intl.NumberFormat('en-US', {
   border-radius: 0.5rem;
 }
 
-.k-match-tools :deep(*) {
+.match-tools :deep(*) {
   margin: 0;
 }
 </style>

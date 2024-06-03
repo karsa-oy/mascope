@@ -107,10 +107,6 @@ async function submit(rating) {
   padding: 0.75rem;
 }
 
-.k-match-rating :deep(.p-button) {
-  opacity: 0.7;
-}
-
 .row {
   margin-bottom: 0.3rem;
 }

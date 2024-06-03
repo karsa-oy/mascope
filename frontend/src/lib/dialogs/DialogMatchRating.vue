@@ -244,7 +244,7 @@ const peak = new Intl.NumberFormat('en-US', {
             v-model:expandedRows="expandedIsotopes"
           >
             <Column expander style="width: 3ch" />
-            <Column field="match_score" sortable class="k-match-column">
+            <Column field="match_score" sortable class="match-column">
               <template #header>
                 <span class="pi pi-verified" />
               </template>

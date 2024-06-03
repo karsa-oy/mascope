@@ -129,7 +129,7 @@ watch(
         </Splitter>
       </SplitterPanel>
       <SplitterPanel :size="80">
-        <Panel id="charts" class="k-browser" style="border: none">
+        <Panel id="charts" class="browser" style="border: none">
           <Tabs v-model:value="dashboard.tab">
             <TabList>
               <Tab
