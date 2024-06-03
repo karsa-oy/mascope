@@ -1,12 +1,14 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watchEffect } from 'vue'
 
 import ToggleSwitch from 'primevue/toggleswitch'
+import Select from 'primevue/select'
 
 import BaseChartPlotly from './BaseChartPlotly.vue'
 
 import { glasbey } from './colors.js'
 
+import { beautifySnakeCase } from '@/lib/utils'
 import { useAppStore, useBatchStore, useSampleStore } from '@/stores'
 
 const appStore = useAppStore()
@@ -25,6 +27,76 @@ const hovertemplate = `
   %{customdata}
 `
 const log = ref(false)
+
+const xFields = computed(() => {
+  const standard = [
+    ...new Set(
+      batchStore.sampleItems
+        ?.map((item) => Object.keys(item ?? {}))
+        .flat()
+        .filter((field) => field !== 'sample_item_attributes')
+    )
+  ].map((field) => ({ field, kind: 'standard' }))
+  const custom = [
+    ...new Set(
+      batchStore.sampleItems?.map((item) => Object.keys(item?.sample_item_attributes ?? {})).flat()
+    )
+  ].map((field) => ({ field, kind: 'custom' }))
+  return [...standard, ...custom]
+    .map(({ field, kind }) => ({
+      field,
+      kind,
+      label: beautifySnakeCase(field),
+      type:
+        kind == 'custom'
+          ? 'string'
+          : typeof batchStore.sampleItems.find((item) => field in item)[field]
+    }))
+    .filter(({ type }) => type !== 'object')
+})
+const xField = ref()
+
+watchEffect(() => {
+  xField.value = xFields.value.find(({ field }) => field == 'sample_item_id')
+})
+
+const num = new Intl.NumberFormat('en-US', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2
+})
+const score = new Intl.NumberFormat('en-US', {
+  style: 'percent',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2
+})
+const toField =
+  ({ field, type }) =>
+  (item) => {
+    let value
+    if (field in item) {
+      value = item[field]
+    } else if (field in item.sample_item_attributes) {
+      value = item.sample_item_attributes[field]
+    } else {
+      value = 'NA'
+    }
+    let formatted
+    switch (field) {
+      case 'match_score':
+        formatted = score.format(value)
+        break
+      case 'matched':
+        formatted = value > 0.5 ? 'true' : 'false'
+        break
+      default:
+        if (field.includes('datetime') || field.includes('utc')) {
+          formatted = value.split('T')[1].split('.')[0]
+        } else {
+          formatted = type == 'number' ? num.format(value) : value
+        }
+    }
+    return formatted
+  }
 
 const data = computed(() => {
   if (!(batchStore.sampleItems && batchStore.matchCompounds)) return []
@@ -107,16 +179,27 @@ const data = computed(() => {
 
   return data
 })
+
+const xAxis = computed(() =>
+  xField.value?.field && xField.value?.field !== 'sample_item_id'
+    ? {
+        tickvals: batchStore.sampleItems?.map((_, i) => i) ?? [],
+        ticktext: batchStore.sampleItems?.map(toField(xField.value)) ?? []
+      }
+    : {
+        tickvals: batchStore.sampleItems?.map((item) => item.sample_item_id) ?? [],
+        ticktext: batchStore.sampleItems?.map((_, i) => i + 1) ?? []
+      }
+)
 const layout = computed(() => ({
   xaxis: {
-    title: 'Sample item',
+    title: xField.value?.label,
     autorange: true,
     showgrid: true,
     gridcolor: '#33333399',
     tickmode: 'array',
-    tickvals: batchStore.sampleItems?.map((item) => item.sample_item_id) ?? [],
-    ticktext: batchStore.sampleItems?.map((_, i) => i + 1) ?? [],
-    gridwidth: 1
+    gridwidth: 1,
+    ...xAxis.value
   },
   yaxis: {
     title: 'Intensity',
@@ -146,7 +229,15 @@ function onClick({ points }) {
 <template>
   <figure>
     <div class="row">
-      <ToggleSwitch v-model="log" />
+      <Select
+        v-model:modelValue="xField"
+        :options="xFields"
+        optionLabel="label"
+        dataKey="field"
+        style="z-index: 100"
+        filter
+      />
+      <ToggleSwitch v-model="log" style="margin-left: 1rem" />
       <span> log scale </span>
     </div>
     <BaseChartPlotly
