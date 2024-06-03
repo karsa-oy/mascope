@@ -24,7 +24,7 @@ const hovertemplate = `
   <br>
   %{customdata}
 `
-const yAxisLog = ref(false)
+const log = ref(false)
 
 const data = computed(() => {
   if (!(batchStore.sampleItems && batchStore.matchCompounds)) return []
@@ -120,7 +120,7 @@ const layout = computed(() => ({
   },
   yaxis: {
     title: 'Intensity',
-    type: yAxisLog.value ? 'log' : 'lin',
+    type: log.value ? 'log' : 'lin',
     showgrid: true,
     gridcolor: '#33333399',
     autorange: true,
@@ -146,7 +146,7 @@ function onClick({ points }) {
 <template>
   <figure>
     <div class="row">
-      <ToggleSwitch v-model="yAxisLog" />
+      <ToggleSwitch v-model="log" />
       <span> log scale </span>
     </div>
     <BaseChartPlotly

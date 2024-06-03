@@ -1,6 +1,8 @@
 <script setup>
 import { ref, computed } from 'vue'
 
+import ToggleSwitch from 'primevue/toggleswitch'
+
 import { BaseParamField } from '@/lib/base'
 
 import BaseChartPlotly from '../BaseChartPlotly.vue'
@@ -10,6 +12,7 @@ import { useData } from './data'
 const data = useData()
 
 const scale = ref()
+const log = ref()
 
 const layout = computed(() => ({
   xaxis: {
@@ -25,6 +28,7 @@ const layout = computed(() => ({
     rangemode: 'nonnegative',
     gridcolor: '#33333399',
     gridwidth: 1,
+    type: log.value ? 'log' : 'lin',
     ...(scale.value
       ? { range: [0, scale.value] }
       : {
@@ -39,7 +43,8 @@ const layout = computed(() => ({
 <template>
   <figure style="position: relative">
     <div
-      style="width: 100%; max-width: 300px; position: absolute; top: 1rem; left: 0rem; z-index: 100"
+      class="row"
+      style="width: 100%; max-width: 350px; position: absolute; top: 1rem; left: 0rem; z-index: 100"
     >
       <BaseParamField
         label="Intensity scale"
@@ -47,6 +52,8 @@ const layout = computed(() => ({
         :range="{ min: 0, max: 100000, step: 2000 }"
         hideSlider
       />
+      <ToggleSwitch v-model="log" />
+      <span> log scale </span>
     </div>
     <BaseChartPlotly
       id="ChartSampleSpectrum"
