@@ -37,6 +37,7 @@ function undoChanges() {
   Object.keys(initialParams.value).forEach((key) => {
     filterParams.current[key] = initialParams.value[key]
   })
+   focusedMatch.reload()
 }
 
 function storeInitialParams() {

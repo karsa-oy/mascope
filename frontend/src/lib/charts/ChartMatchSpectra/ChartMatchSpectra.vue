@@ -6,6 +6,7 @@ import Tag from 'primevue/tag'
 
 import BaseChartPlotly from '../BaseChartPlotly.vue'
 
+import { BaseMatchTag } from '@/lib/base'
 import { clone } from '@/lib/utils'
 import { useFocusedMatch, useFilterParams } from '@/stores'
 
@@ -52,8 +53,8 @@ const layout = computed(() => ({
   },
   dragmode: 'zoom',
   showlegend: false,
-  height: '350',
-  width: '400'
+  height: '300',
+  width: '450'
 }))
 
 const area = new Intl.NumberFormat('en-US', {
@@ -70,25 +71,35 @@ const error = new Intl.NumberFormat('en-US', {
     <ScrollPanel>
       <div class="row" style="gap: 1rem; justify-content: flex-start; padding: 0 2rem">
         <figure v-for="isotope of isotopes" :key="isotope.target_isotope_id">
+          <h3 :style="`color: ${isotope.traces[0]?.line.color}; margin: 0`">
+            Isotope {{ error.format(isotope.mz) }}
+          </h3>
           <BaseChartPlotly
             :id="`ChartMatchSpectrum-${isotope.target_isotope_id}`"
-            :title="`Target isotope intensity: ${area.format(isotope.sample_peak_area)}`"
+            :title="`Isotope ${error.format(isotope.mz)}`"
             :data="isotope.traces"
             :layout="layout"
+            hideTitle
           />
-          <span>
-            mz error:
+          <div class="row" style="flex-wrap: wrap; max-width: 35ch; justify-content: center">
+            <BaseMatchTag :row="isotope" text />
             <Tag
-              :value="error.format(isotope.match_mz_error)"
+              :value="`Intensity: ${area.format(isotope.sample_peak_area)}`"
+              :severity="
+                isotope.sample_peak_area < filterParams.current.peak_min_intensity ? 'warn' : 'info'
+              "
+            />
+            <Tag
+              :value="`mz error: ${error.format(isotope.match_mz_error)}`"
               :severity="
                 Math.abs(isotope.match_mz_error) > filterParams.current.mz_tolerance
                   ? 'warn'
                   : 'info'
               "
             />
-            • abundance error:
+
             <Tag
-              :value="error.format(isotope.match_abundance_error)"
+              :value="`Abundance error: ${error.format(isotope.match_abundance_error)}`"
               :severity="
                 Math.abs(isotope.match_abundance_error) >
                 filterParams.current.isotope_ratio_tolerance
@@ -96,7 +107,7 @@ const error = new Intl.NumberFormat('en-US', {
                   : 'info'
               "
             />
-          </span>
+          </div>
         </figure>
       </div>
     </ScrollPanel>

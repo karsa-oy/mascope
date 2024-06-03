@@ -1,5 +1,5 @@
 export { default as ToolbarAppFilters } from './ToolbarAppFilters.vue'
 export { default as ToolbarMatchRating } from './ToolbarMatchRating.vue'
-export { default as ToolbarSettingsFilterIon } from './ToolbarSettingsFilterIon.vue'
+export { default as ToolbarFilterIon } from './ToolbarFilterIon.vue'
 export { default as ToolbarTemplate } from './ToolbarTemplate.vue'
-export { default as ToolbarSettingsSignalCharts } from './ToolbarSettingsSignalCharts.vue'
+export { default as ToolbarMatchCharts } from './ToolbarMatchCharts.vue'

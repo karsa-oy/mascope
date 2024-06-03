@@ -3,7 +3,6 @@ import { defineStore } from 'pinia'
 
 import { api } from '@/api'
 
-import { useSampleStore } from './sample'
 import { useFocusedMatch } from './focusedMatch'
 
 export const useFilterParams = defineStore('filterParams', () => {

@@ -5,11 +5,7 @@ import Tag from 'primevue/tag'
 import { computed, reactive } from 'vue'
 
 import { ChartMatchSpectra, ChartMatchTimeseries } from '@/lib/charts'
-import {
-  ToolbarSettingsFilterIon,
-  ToolbarSettingsSignalCharts,
-  ToolbarMatchRating
-} from '@/lib/menus'
+import { ToolbarFilterIon, ToolbarMatchCharts, ToolbarMatchRating } from '@/lib/menus'
 import { useFocusedMatch, useFilterParams, useBatchStore } from '@/stores'
 
 const focusedMatch = useFocusedMatch()
@@ -54,8 +50,8 @@ const score = new Intl.NumberFormat('en-US', {
       <ChartMatchSpectra :settings="settings" />
       <ChartMatchTimeseries />
       <div class="row k-match-tools">
-        <ToolbarSettingsFilterIon />
-        <ToolbarSettingsSignalCharts v-model:scale="settings.intensityScale" />
+        <ToolbarFilterIon />
+        <ToolbarMatchCharts v-model:scale="settings.intensityScale" />
         <ToolbarMatchRating />
       </div>
     </ScrollPanel>

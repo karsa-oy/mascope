@@ -10,6 +10,10 @@ const props = defineProps({
   },
   tooltip: {
     type: String
+  },
+  text: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -43,7 +47,7 @@ const severity = computed(() => {
     v-if="row?.match_score !== null"
     :key="score"
     v-tooltip.right="tooltip"
-    :value="score"
+    :value="text ? `Match score: ${score}` : score"
     :severity="severity"
     :class="!row.alarm_mode || score == '00.00%' ? 'pale' : ''"
     style="font-size: 11px"
