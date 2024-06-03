@@ -16,7 +16,7 @@ from scipy.signal._peak_finding_utils import _select_by_peak_distance
 from scipy.stats import norm
 from scipy.integrate import simpson
 
-from .file_func import load_file, zarr_sdk, get_sum_signal
+from .file_func import load_file, zarr_sdk, get_instrument_type, get_sum_signal
 
 
 # Precompute sigma multiplier for peak generation
@@ -58,12 +58,17 @@ def calculate_tic(filename: str) -> float:
     :rtype: float
     """
     sum_spec = get_sum_signal(filename)
-    sample_interval = load_file(filename).attrs["props"].get("sample_interval")
-    if sample_interval:
+    instrument_type = get_instrument_type(filename)
+    if instrument_type == "tof":
+        # default 0.25 for backwards compatibility
+        sample_interval = (
+            load_file(filename).attrs["props"].get("sample_interval", 0.25)
+        )
         # return sum signal full integral in tof space
         return sum_spec.sum(dim="mz").compute().item() * sample_interval
-    # return sum signal full integral in mz space
-    return simpson(y=sum_spec.values(), x=sum_spec.mz.values())
+    else:
+        # return sum signal full integral in mz space
+        return simpson(y=sum_spec.values, x=sum_spec.mz.values)
 
 
 def segment_spec(sum_spec):
@@ -157,7 +162,13 @@ async def detect_peaks(
     sum_spec = get_sum_signal(filename)
     mz = sum_spec.mz
     # Sample interval for peak area calculation in counts vs TOF
-    sample_interval = load_file(filename).attrs["props"].get("sample_interval")
+    if instrument_type == "tof":
+        # default 0.25 for backwards compatibility
+        sample_interval = (
+            load_file(filename).attrs["props"].get("sample_interval", 0.25)
+        )
+    else:
+        sample_interval = None
 
     cpu_cores = os.cpu_count()
     max_workers = max(1, cpu_cores // 2)
