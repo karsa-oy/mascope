@@ -84,6 +84,7 @@ onMounted(() => {
   // event listener
   plot.value.on('plotly_click', (e) => emit('click', e))
   ready.value = true
+  Plotly.react(plot.value, props.data, derived.value.layout, derived.value.config)
 })
 
 watchEffect(() => {
