@@ -1,8 +1,9 @@
-import { reactive, computed } from 'vue'
+import { ref, reactive, computed, watchEffect } from 'vue'
 import { defineStore } from 'pinia'
 
 import { api } from '@/api'
 
+import { useSampleStore } from './sample'
 import { useFocusedMatch } from './focusedMatch'
 
 export const useFilterParams = defineStore('filterParams', () => {
@@ -15,13 +16,15 @@ export const useFilterParams = defineStore('filterParams', () => {
     probable_match_threshold: 0.8,
     possible_match_threshold: 0.7
   }
-  const current = reactive(defaults)
+  const current = reactive({ ...defaults })
+  const hash = ref()
 
   const areDefault = computed(() =>
     Object.keys(defaults).every((key) => current[key] === defaults[key])
   )
 
   async function set(params = {}) {
+    console.log('set', params)
     // fallback to defaults for missing params
     current.mz_tolerance = params?.mz_tolerance ?? defaults.mz_tolerance
     current.min_isotope_abundance = params?.min_isotope_abundance ?? defaults.min_isotope_abundance
@@ -34,6 +37,7 @@ export const useFilterParams = defineStore('filterParams', () => {
       params?.probable_match_threshold ?? defaults.probable_match_threshold
     current.possible_match_threshold =
       params?.possible_match_threshold ?? defaults.possible_match_threshold
+    console.log(current)
   }
   async function reset() {
     await set(defaults)
@@ -67,6 +71,18 @@ export const useFilterParams = defineStore('filterParams', () => {
       }
     })
   }
+
+  const focusedMatch = useFocusedMatch()
+  watchEffect(async () => {
+    if (focusedMatch.hash) {
+      if (focusedMatch.hash !== hash.value) {
+        await set(focusedMatch.filterParams)
+        hash.value = focusedMatch.hash
+      }
+    } else {
+      hash.value = null
+    }
+  })
 
   return {
     current,

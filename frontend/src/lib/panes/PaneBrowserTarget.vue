@@ -208,13 +208,12 @@ async function showMatch(row) {
     sampleStore.matchIons?.find((ion) => ion.target_compound_id === row.target_compound_id)
       ?.target_ion_id
   if (ionId && sampleStore.active && focusedMatch.ion?.target_ion_id !== ionId) {
-    console.log('showMatch loading')
     await focusedMatch.load({
       sampleId: sampleStore.active.sample_item_id,
       ionId,
       collectionId: row?.target_collection_id,
       // pass the ion specific filter params if available to the loadSampleIon function
-      filterParams: sampleStore.matchIons.find((ion) => ion.target_ion_id === ionId)?.filter_params[
+      params: sampleStore.matchIons.find((ion) => ion.target_ion_id === ionId)?.filter_params[
         sampleStore.active.instrument
       ]
     })
@@ -297,7 +296,7 @@ watchEffect(() => {
         "
       />
     </template>
-    <ScrollPanel class="k-browser-target-scroller">
+    <ScrollPanel>
       <!-- collections -->
       <DataTable
         :value="tree"

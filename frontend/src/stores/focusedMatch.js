@@ -3,12 +3,16 @@ import { defineStore } from 'pinia'
 
 import { api } from '@/api'
 
+import { useSampleStore } from './sample'
 import { useTargetsStore } from './targets'
 import { useWorkspaceStore } from './workspace'
 import { useFilterParams } from './filterParams'
 import { useDashboard } from './dashboard'
 
 export const useFocusedMatch = defineStore('focusedMatch', () => {
+  const workspaceStore = useWorkspaceStore()
+  const sampleStore = useSampleStore()
+
   // state
   const ion = ref(null)
   const isotopes = ref(null)
@@ -17,6 +21,17 @@ export const useFocusedMatch = defineStore('focusedMatch', () => {
     ionId: null,
     collectionId: null
   })
+
+  const hash = computed(() => {
+    const sampleId = ion.value?.sample_item_id
+    const collectionId = ion.value?.target_collection_id
+    const ionId = ion.value?.target_ion_id
+    return sampleId && collectionId && ionId ? `${sampleId}_${collectionId}_${ionId}` : null
+  })
+
+  const filterParams = computed(() =>
+    hash.value ? ion.value?.filter_params[sampleStore.active.instrument] : null
+  )
 
   // actions
   async function load({
@@ -28,6 +43,7 @@ export const useFocusedMatch = defineStore('focusedMatch', () => {
     const filterParams = useFilterParams()
     await unload()
     if (params) await filterParams.set(params)
+    console.log(filterParams.current)
     await loadMatches({ sampleId, ionId, collectionId })
     await focus({ sampleId, ionId })
     // cache
@@ -38,6 +54,7 @@ export const useFocusedMatch = defineStore('focusedMatch', () => {
 
   async function reload() {
     await loadMatches()
+    await focus()
   }
 
   async function unload() {
@@ -94,7 +111,7 @@ export const useFocusedMatch = defineStore('focusedMatch', () => {
     })
   }
 
-  async function focus({ sampleId, ionId }) {
+  async function focus({ sampleId, ionId } = {}) {
     if (!ion.value) return
     const filterParams = useFilterParams()
     const dashboard = useDashboard()
@@ -113,7 +130,6 @@ export const useFocusedMatch = defineStore('focusedMatch', () => {
     })
   }
 
-  const workspaceStore = useWorkspaceStore()
   watch(
     computed(() => workspaceStore.active),
     () => {
@@ -125,6 +141,8 @@ export const useFocusedMatch = defineStore('focusedMatch', () => {
     // state
     ion,
     isotopes,
+    hash,
+    filterParams,
     // actions
     load,
     reload,

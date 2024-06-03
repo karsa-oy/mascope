@@ -409,7 +409,7 @@ async function hideMatch() {
         "
       />
     </template>
-    <ScrollPanel class="k-browser-sample-scroller">
+    <ScrollPanel>
       <DataTable
         :value="tree"
         v-model:expandedRows="batch.expanded"

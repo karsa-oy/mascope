@@ -10,16 +10,15 @@ import {
   ToolbarSettingsSignalCharts,
   ToolbarMatchRating
 } from '@/lib/menus'
-import { useAppStore, useFocusedMatch, useFilterParams, useBatchStore } from '@/stores'
+import { useFocusedMatch, useFilterParams, useBatchStore } from '@/stores'
 
-const appStore = useAppStore()
 const focusedMatch = useFocusedMatch()
 const batchStore = useBatchStore()
 const filterParams = useFilterParams()
 
 const compound = computed(() =>
   batchStore.targetCompounds.find(
-    ({ target_compound_id }) => target_compound_id == focusedMatch.ion.target_compound_id
+    ({ target_compound_id }) => target_compound_id == focusedMatch.ion?.target_compound_id
   )
 )
 
@@ -35,37 +34,32 @@ const score = new Intl.NumberFormat('en-US', {
 </script>
 
 <template>
-  <ScrollPanel
-    style="height: calc(100vh - 150px); max-height: calc(100vh - 150px); position: relative"
-  >
-    <h1 style="text-align: center">
-      <Tag
-        :value="score.format(focusedMatch.ion.match_score)"
-        :severity="
-          Math.abs(focusedMatch.ion.match_score) > filterParams.current.probable_match_threshold
-            ? 'danger'
-            : 'success'
-        "
-        style="font-size: large"
-      />
-      match: ion <i>{{ focusedMatch.ion.target_ion_formula }}</i>
-      for
-      <i>{{ focusedMatch.ion.sample_item_name }}</i> with target
-      <i>{{ compound.target_compound_formula }}</i>
-    </h1>
-    <div
-      class="col"
-      :style="`gap: 1rem; align-items: stretch; width: calc(${appStore.split.right}vw - 5rem)`"
-    >
+  <div style="height: calc(100vh - 150px)">
+    <ScrollPanel style="height: calc(100vh - 150px)">
+      <h1 style="text-align: center">
+        <Tag
+          :value="score.format(focusedMatch.ion?.match_score)"
+          :severity="
+            Math.abs(focusedMatch.ion?.match_score) > filterParams.current.probable_match_threshold
+              ? 'danger'
+              : 'success'
+          "
+          style="font-size: large"
+        />
+        match: ion <i>{{ focusedMatch.ion?.target_ion_formula }}</i>
+        for
+        <i>{{ focusedMatch.ion?.sample_item_name }}</i> with target
+        <i>{{ compound?.target_compound_formula }}</i>
+      </h1>
       <ChartMatchSpectra :settings="settings" />
       <ChartMatchTimeseries />
-    </div>
-    <div class="row k-match-tools">
-      <ToolbarSettingsFilterIon />
-      <ToolbarSettingsSignalCharts v-model:scale="settings.intensityScale" />
-      <ToolbarMatchRating />
-    </div>
-  </ScrollPanel>
+      <div class="row k-match-tools">
+        <ToolbarSettingsFilterIon />
+        <ToolbarSettingsSignalCharts v-model:scale="settings.intensityScale" />
+        <ToolbarMatchRating />
+      </div>
+    </ScrollPanel>
+  </div>
 </template>
 
 <style scoped>

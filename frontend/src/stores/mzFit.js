@@ -7,7 +7,7 @@ import { useNotification } from './notification'
 import { useSampleStore } from './sample'
 import { useAppStore } from './app'
 
-export const useMzFit = defineStore('mz-fit', () => {
+export const useMzFit = defineStore('mzFit', () => {
   const notification = useNotification()
 
   // state
