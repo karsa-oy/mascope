@@ -83,10 +83,10 @@ watch(
 )
 watchEffect(() => {
   if (appStore.mode.dark) {
-    document.body.classList.add('darkmode')
+    document.documentElement.classList.add('darkmode')
     localStorage.setItem('mascope-darkmode', 'true')
   } else {
-    document.body.classList.remove('darkmode')
+    document.documentElement.classList.remove('darkmode')
     localStorage.setItem('mascope-darkmode', 'false')
   }
 })

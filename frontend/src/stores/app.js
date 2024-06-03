@@ -34,7 +34,7 @@ export const useAppStore = defineStore('app', () => {
           : null
     mode.dark = savedPreference ?? systemPreference ?? true
     if (mode.dark) {
-      document.body.classList.add('darkmode')
+      document.documentElement.classList.add('darkmode')
     }
     // init data
     attributeTemplates.value = (
