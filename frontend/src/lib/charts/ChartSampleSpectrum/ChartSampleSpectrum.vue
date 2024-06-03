@@ -9,7 +9,7 @@ const data = useData()
 
 const layout = computed(() => ({
   xaxis: {
-    title: 'Mass [mz]',
+    title: 'm/z [Th]',
     autorange: true,
     showgrid: true,
     gridcolor: '#33333399',
@@ -19,7 +19,7 @@ const layout = computed(() => ({
     title: 'Intensity [cps]',
     showgrid: true,
     autorange: true,
-    rangemode: 'tozero',
+    rangemode: 'nonnegative',
     gridcolor: '#33333399',
     gridwidth: 1
   },

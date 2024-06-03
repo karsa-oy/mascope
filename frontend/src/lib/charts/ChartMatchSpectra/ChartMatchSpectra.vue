@@ -45,6 +45,7 @@ const layout = computed(() => ({
   yaxis: {
     title: 'Signal intensity [cps]',
     gridcolor: '#33333399',
+    rangemode: 'nonnegative',
     ...(props.settings.intensityScale ? { range: [0, props.settings.intensityScale] } : {})
   },
   xaxis: {

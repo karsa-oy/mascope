@@ -7,6 +7,7 @@ import { api } from '@/api'
 export const useData = defineStore('sampleSpectrumChartData', () => {
   const traces = ref([])
   const loadedFileId = ref()
+  const length = ref()
 
   const dashboard = useDashboard()
   const sampleStore = useSampleStore()
@@ -14,7 +15,7 @@ export const useData = defineStore('sampleSpectrumChartData', () => {
   dashboard.register({
     name: 'ChartSampleSpectrum',
     clear: () => {
-      //traces.value = []
+      // not needed
     }
   })
 
@@ -57,8 +58,9 @@ export const useData = defineStore('sampleSpectrumChartData', () => {
           y: new Float32Array(data.intensity)
         }
       ]
+      length.value = data.intensity.length
     }
   }
 
-  return { traces }
+  return { traces, length }
 })

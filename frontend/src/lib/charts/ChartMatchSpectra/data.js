@@ -5,18 +5,21 @@ import { useDashboard, useFocusedMatch } from '@/stores'
 
 export const useData = defineStore('matchSpectraChartData', () => {
   const traces = ref([])
+  const length = ref()
 
   const dashboard = useDashboard()
   dashboard.register({
     name: 'ChartMatchSpectra',
     clear: () => {
       traces.value = []
+      length.value = 0
     }
   })
 
   async function onVisualizationSignalSumSpectrum(payload) {
     const match = useFocusedMatch()
     for (let trace of payload) {
+      length.value = length.value + trace.x.length
       trace.x = new Float32Array(trace.x)
       trace.y = new Float32Array(trace.y)
 
@@ -39,5 +42,5 @@ export const useData = defineStore('matchSpectraChartData', () => {
     }
     traces.value = [...traces.value, ...payload]
   }
-  return { traces, onVisualizationSignalSumSpectrum }
+  return { traces, onVisualizationSignalSumSpectrum, length }
 })
