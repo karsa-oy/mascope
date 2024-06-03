@@ -23,7 +23,6 @@ export const useFilterParams = defineStore('filterParams', () => {
   )
 
   async function set(params = {}) {
-    console.log('set', params)
     // fallback to defaults for missing params
     current.mz_tolerance = params?.mz_tolerance ?? defaults.mz_tolerance
     current.min_isotope_abundance = params?.min_isotope_abundance ?? defaults.min_isotope_abundance
@@ -36,7 +35,6 @@ export const useFilterParams = defineStore('filterParams', () => {
       params?.probable_match_threshold ?? defaults.probable_match_threshold
     current.possible_match_threshold =
       params?.possible_match_threshold ?? defaults.possible_match_threshold
-    console.log(current)
   }
   async function reset() {
     await set(defaults)

@@ -6,8 +6,9 @@ import { computed, reactive } from 'vue'
 
 import { ChartMatchSpectra, ChartMatchTimeseries } from '@/lib/charts'
 import { ToolbarFilterIon, ToolbarMatchCharts, ToolbarMatchRating } from '@/lib/menus'
-import { useFocusedMatch, useFilterParams, useBatchStore } from '@/stores'
+import { useAppStore, useFocusedMatch, useFilterParams, useBatchStore } from '@/stores'
 
+const appStore = useAppStore()
 const focusedMatch = useFocusedMatch()
 const batchStore = useBatchStore()
 const filterParams = useFilterParams()
@@ -30,8 +31,13 @@ const score = new Intl.NumberFormat('en-US', {
 </script>
 
 <template>
-  <div style="height: calc(100vh - 150px)">
-    <ScrollPanel style="height: calc(100vh - 150px)">
+  <div
+    :style="`
+      height: calc(100vh - 150px); 
+      width: calc(${appStore.split.right}vw - 4rem);
+    `"
+  >
+    <ScrollPanel style="height: calc(100vh - 150px); width: calc(100%-4rem)">
       <h1 style="text-align: center">
         <Tag
           :value="score.format(focusedMatch.ion?.match_score)"
@@ -61,11 +67,10 @@ const score = new Intl.NumberFormat('en-US', {
 <style scoped>
 .match-tools {
   position: fixed;
-  top: 75px;
-  right: 15px;
+  top: 72px;
+  right: 7px;
   z-index: 50;
   justify-content: flex-end;
-  background-color: var(--p-panel-background);
   padding: 0.5rem;
   border-radius: 0.5rem;
 }
