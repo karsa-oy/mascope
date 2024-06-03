@@ -8,6 +8,7 @@ export const useData = defineStore('sampleSpectrumChartData', () => {
   const traces = ref([])
   const loadedFileId = ref()
   const length = ref()
+  const loading = ref(false)
 
   const dashboard = useDashboard()
   const sampleStore = useSampleStore()
@@ -37,6 +38,7 @@ export const useData = defineStore('sampleSpectrumChartData', () => {
   })
 
   async function load(sampleFileId) {
+    loading.value = true
     const data = (
       await api.request.read({
         method: 'getSampleSpectrum',
@@ -60,7 +62,8 @@ export const useData = defineStore('sampleSpectrumChartData', () => {
       ]
       length.value = data.intensity.length
     }
+    loading.value = false
   }
 
-  return { traces, length }
+  return { traces, length, loading }
 })

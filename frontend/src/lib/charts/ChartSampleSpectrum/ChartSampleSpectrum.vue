@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 
 import ToggleSwitch from 'primevue/toggleswitch'
+import ProgressSpinner from 'primevue/progressspinner'
 
 import { BaseParamField } from '@/lib/base'
 
@@ -41,7 +42,23 @@ const layout = computed(() => ({
 </script>
 
 <template>
-  <figure style="position: relative">
+  <figure style="position: relative" :class="data.loading ? 'faded' : ''">
+    <div
+      style="
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        min-height: 100%;
+        z-index: 100;
+        display: grid;
+        place-items: center;
+      "
+      v-if="data.loading"
+    >
+      <ProgressSpinner />
+    </div>
     <div
       class="row"
       style="width: 100%; max-width: 350px; position: absolute; top: 1rem; left: 0rem; z-index: 100"
@@ -63,3 +80,9 @@ const layout = computed(() => ({
     />
   </figure>
 </template>
+
+<style scoped>
+.faded {
+  opacity: 0.3;
+}
+</style>
