@@ -34,9 +34,18 @@ const isotopes = computed(() => {
     const end = nextStart !== -1 ? nextStart : data.traces?.length
     const traces = data.traces?.slice(start, end)
 
+    let match_category = 0
+    if (isotope.match_score > filterParams.current.possible_match_threshold) {
+      match_category = 1
+    }
+    if (isotope.match_score > filterParams.current.probable_match_threshold) {
+      match_category = 2
+    }
+
     return {
       ...isotope,
-      traces
+      traces,
+      match_category
     }
   })
 })

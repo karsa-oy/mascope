@@ -44,8 +44,6 @@ export const useFocusedMatch = defineStore('focusedMatch', () => {
       return
     }
     const filterParams = useFilterParams()
-    const dashboard = useDashboard()
-    dashboard.clear()
     if (params) await filterParams.set(params)
     await loadMatches({ sampleId, ionId, collectionId })
     await focus({ sampleId, ionId })
