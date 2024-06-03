@@ -68,17 +68,27 @@ watch(
   computed(() => appStore.mode.measuring),
   (scenthound) => {
     if (scenthound) {
-      tab.value = 2
+      dashboard.tab = 'acquisitions'
     }
   }
 )
 watch(
   computed(() => focusedMatch.ion),
-  (visualization) => {
-    if (!visualization) {
-      tab.value = 0
+  (focused) => {
+    if (focused && dashboard.tab !== 'spectrum') {
+      dashboard.tab = 'match'
     } else {
-      tab.value = 1
+      if (dashboard.tab == 'match') {
+        dashboard.tab = 'batch'
+      }
+    }
+  }
+)
+watch(
+  computed(() => sampleStore.active),
+  (sample) => {
+    if (!sample && dashboard.tab == 'spectrum') {
+      dashboard.tab = 'batch'
     }
   }
 )

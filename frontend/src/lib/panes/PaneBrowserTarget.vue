@@ -220,13 +220,11 @@ async function showMatch(row) {
     emit('focused')
   }
 }
-async function hideMatch() {
+watchEffect(() => {
   if (!selected.compound) {
     focusedMatch.unload()
-  } else {
-    showMatch(selected.compound)
   }
-}
+})
 
 watchEffect(() => {
   const collection_id = selected.collection?.target_collection_id
@@ -351,7 +349,6 @@ watchEffect(() => {
             v-model:contextMenuSelection="context.compound"
             @rowContextmenu="compoundPreventDefault"
             @rowSelect="(e) => showMatch(e.data)"
-            @rowUnselect="hideMatch"
             size="small"
             sortField="match_score"
             :sortOrder="-1"
@@ -386,7 +383,6 @@ watchEffect(() => {
                 selectionMode="single"
                 :metaKeySelection="false"
                 @rowSelect="(e) => showMatch(e.data)"
-                @rowUnselect="hideMatch"
                 size="small"
                 sortField="match_score"
                 :sortOrder="-1"

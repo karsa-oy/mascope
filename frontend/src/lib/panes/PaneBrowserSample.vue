@@ -1,7 +1,7 @@
 <script setup>
 import { useConfirm } from 'primevue/useconfirm'
 
-import { ref, reactive, computed, watch } from 'vue'
+import { ref, reactive, computed, watch, watchEffect } from 'vue'
 
 import ScrollPanel from 'primevue/scrollpanel'
 import Panel from 'primevue/panel'
@@ -365,16 +365,16 @@ const batchPreventDefault = (event) => {
 const itemPreventDefault = (event) => {
   itemContextMenu.value.show(event.originalEvent)
 }
-async function showMatch(row) {
-  if (row) {
+
+watchEffect(async () => {
+  if (item.selected) {
     await focusedMatch.load({
-      sampleId: row.sample_item_id
+      sampleId: item.selected.sample_item_id
     })
+  } else {
+    focusedMatch.unload({ target: false })
   }
-}
-async function hideMatch() {
-  focusedMatch.unload()
-}
+})
 </script>
 
 <template v-if="workspaceStore.batches">
@@ -455,8 +455,6 @@ async function hideMatch() {
                   parseClipboard()
                 }
               "
-              @rowSelect="(e) => showMatch(e.data)"
-              @rowUnselect="hideMatch"
               size="small"
             >
               <Column field="match_score" sortable class="k-match-column">

@@ -40,10 +40,13 @@ export const useFocusedMatch = defineStore('focusedMatch', () => {
     collectionId = cache.collectionId,
     params = null
   }) {
+    if (sampleId == cache.sampleId && ionId == cache.ionId && collectionId == cache.collectionId) {
+      return
+    }
     const filterParams = useFilterParams()
-    await unload()
+    const dashboard = useDashboard()
+    dashboard.clear()
     if (params) await filterParams.set(params)
-    console.log(filterParams.current)
     await loadMatches({ sampleId, ionId, collectionId })
     await focus({ sampleId, ionId })
     // cache
@@ -57,12 +60,19 @@ export const useFocusedMatch = defineStore('focusedMatch', () => {
     await focus()
   }
 
-  async function unload() {
+  async function unload({ sample = true, target = true } = {}) {
     const dashboard = useDashboard()
     dashboard.clear()
     if (!ion.value) return
     ion.value = null
     isotopes.value = null
+    if (sample) {
+      cache.sampleId = null
+    }
+    if (target) {
+      cache.ionId = null
+      cache.collectionId = null
+    }
   }
 
   async function loadMatches({ sampleId, ionId, collectionId } = {}) {
