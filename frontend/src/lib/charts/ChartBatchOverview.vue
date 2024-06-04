@@ -28,6 +28,13 @@ const hovertemplate = `
 `
 const log = ref(false)
 
+const inferType = (field) => {
+  const withField = batchStore.sampleItems.filter((item) => field in item)
+  const types = [
+    ...new Set(withField.map((item) => (item[field] ? typeof item[field] : 'null')))
+  ].filter((type) => type !== 'null')
+  return types.length == 1 ? types[0] : 'unknown'
+}
 const xFields = computed(() => {
   const standard = [
     ...new Set(
@@ -47,10 +54,7 @@ const xFields = computed(() => {
       field,
       kind,
       label: beautifySnakeCase(field),
-      type:
-        kind == 'custom'
-          ? 'string'
-          : typeof batchStore.sampleItems.find((item) => field in item)[field]
+      type: kind == 'custom' ? 'string' : inferType(field)
     }))
     .filter(({ type }) => type !== 'object')
 })
