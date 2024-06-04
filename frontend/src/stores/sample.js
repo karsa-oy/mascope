@@ -97,7 +97,7 @@ export const useSampleStore = defineStore('sample', () => {
     matchIsotopes.value = sampleData.match_isotopes
   }
 
-  async function unload({ deactivate = true } = {}) {
+  async function unload({ deactivate } = { deactivate: true }) {
     if (!active.value) return
     api.emit('unsubscribe', active.value.sample_item_id)
     if (deactivate) {

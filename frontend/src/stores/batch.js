@@ -165,7 +165,7 @@ export const useBatchStore = defineStore('batch', () => {
     matchCompounds.value = []
     matchIons.value = []
     const sampleStore = useSampleStore()
-    if (propagate) sampleStore.unload(null)
+    if (propagate) sampleStore.unload()
   }
 
   // parameters
