@@ -17,31 +17,19 @@ const focusedMatch = useFocusedMatch()
 const filterParams = useFilterParams()
 
 const menu = ref()
-const initialParams = ref({})
 const isSaving = ref(false)
 
 const isotopeSettings = ref()
 const peakSettings = ref()
 
-onMounted(() => storeParams())
-
-const paramsChanged = computed(() => {
-  // Check if any parameter has changed
-  return Object.keys(initialParams.value).some((key) => {
-    return initialParams.value[key] !== filterParams.current[key]
-  })
-})
+onMounted(() => filterParams.init())
 
 function undoChanges() {
   // Revert filter parameters to their initial values
-  Object.keys(initialParams.value).forEach((key) => {
-    filterParams.current[key] = initialParams.value[key]
+  Object.keys(filterParams.initial).forEach((key) => {
+    filterParams.current[key] = filterParams.initial[key]
   })
   focusedMatch.reload()
-}
-
-function storeParams() {
-  initialParams.value = { ...filterParams.current }
 }
 
 async function saveParams() {
@@ -54,7 +42,7 @@ async function saveParams() {
       isSaving.value = true
       await filterParams.save()
       isSaving.value = false
-      storeParams()
+      filterParams.init()
       await focusedMatch.reload()
     },
     rejectLabel: 'Cancel',
@@ -72,7 +60,7 @@ function deleteParams() {
       filterParams.reset()
       await filterParams.remove()
       await focusedMatch.reload()
-      storeParams()
+      filterParams.init()
     },
     rejectLabel: 'Cancel',
     rejectIcon: 'pi pi-times'
@@ -89,13 +77,13 @@ const items = computed(() => [
     label: 'Save params',
     icon: 'pi pi-save',
     command: saveParams,
-    disabled: !paramsChanged.value
+    disabled: !filterParams.changed
   },
   {
     label: 'Revert changes',
     icon: 'pi pi-undo',
     command: undoChanges,
-    disabled: !paramsChanged.value
+    disabled: !filterParams.changed
   },
   {
     label: 'Set defaults',

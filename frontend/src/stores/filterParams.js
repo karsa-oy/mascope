@@ -16,10 +16,16 @@ export const useFilterParams = defineStore('filterParams', () => {
     possible_match_threshold: 0.7
   }
   const current = reactive({ ...defaults })
+  const initial = ref({ ...defaults })
   const hash = ref()
 
   const areDefault = computed(() =>
     Object.keys(defaults).every((key) => current[key] === defaults[key])
+  )
+  const changed = computed(() =>
+    Object.keys(initial.value).some((key) => {
+      return initial.value[key] !== current[key]
+    })
   )
 
   async function set(params = {}) {
@@ -69,11 +75,16 @@ export const useFilterParams = defineStore('filterParams', () => {
     })
   }
 
+  function init() {
+    initial.value = { ...current }
+  }
+
   const focusedMatch = useFocusedMatch()
   watchEffect(async () => {
     if (focusedMatch.hash) {
       if (focusedMatch.hash !== hash.value) {
         await set(focusedMatch.filterParams)
+        init()
         hash.value = focusedMatch.hash
       }
     } else {
@@ -83,8 +94,11 @@ export const useFilterParams = defineStore('filterParams', () => {
 
   return {
     current,
+    initial,
     default: areDefault,
+    changed,
     set,
+    init,
     reset,
     save,
     remove
