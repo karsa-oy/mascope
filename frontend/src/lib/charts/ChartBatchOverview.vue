@@ -57,7 +57,7 @@ const xFields = computed(() => {
 const xField = ref()
 
 watchEffect(() => {
-  xField.value = xFields.value.find(({ field }) => field == 'sample_item_id')
+  xField.value = xFields.value.find(({ field }) => field == 'index')
 })
 
 const num = new Intl.NumberFormat('en-US', {
@@ -97,6 +97,10 @@ const toField =
     }
     return formatted
   }
+const xAxis = computed(() => ({
+  tickvals: batchStore.sampleItems?.map((_, i) => i) ?? [],
+  ticktext: batchStore.sampleItems?.map(toField(xField.value ?? 'index')) ?? []
+}))
 
 const data = computed(() => {
   if (!(batchStore.sampleItems && batchStore.matchCompounds)) return []
@@ -180,17 +184,6 @@ const data = computed(() => {
   return data
 })
 
-const xAxis = computed(() =>
-  xField.value?.field && xField.value?.field !== 'sample_item_id'
-    ? {
-        tickvals: batchStore.sampleItems?.map((_, i) => i) ?? [],
-        ticktext: batchStore.sampleItems?.map(toField(xField.value)) ?? []
-      }
-    : {
-        tickvals: batchStore.sampleItems?.map((item) => item.sample_item_id) ?? [],
-        ticktext: batchStore.sampleItems?.map((_, i) => i + 1) ?? []
-      }
-)
 const layout = computed(() => ({
   xaxis: {
     title: xField.value?.label,
