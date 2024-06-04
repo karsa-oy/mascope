@@ -39,6 +39,10 @@ const layout = computed(() => ({
   dragmode: 'zoom',
   showlegend: false
 }))
+
+const config = {
+  modeBarButtonsToRemove: ['autoScale', 'resetScale2d', 'pan2d']
+}
 </script>
 
 <template>
@@ -77,6 +81,7 @@ const layout = computed(() => ({
       title="Spectrum"
       :data="data.traces"
       :layout="layout"
+      :config="config"
     />
   </figure>
 </template>
