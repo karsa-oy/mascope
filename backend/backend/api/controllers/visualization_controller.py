@@ -1,23 +1,21 @@
 import asyncio
-
-from sqlalchemy.future import select
-from backend.db import async_session
-from backend.api_sio import sio
-from ..models.models import Sample, TargetIsotope
-from ..exceptions import NotFoundException
 import numpy as np
 import pandas as pd
 from sqlalchemy.future import select
 from colorcet import glasbey_hv as colormap
 from lib.file_func import load_file
 from lib.peak import filter_peaks, get_peaks
+from backend.db import async_session
+from backend.api_sio import sio
+from ..models.models import Sample, TargetIsotope
+from ..exceptions import NotFoundException
 from ..utils.api_features import api_controller_background_task
 
+# TODO_configuration shift traces color
 COLOR_OFFSET = 5
 
 
 @api_controller_background_task(
-    success_notification_rooms=["sid"],
     error_notification_rooms=["sid"],
 )
 async def visualize_ion_focus(
@@ -163,7 +161,9 @@ async def visualize_ion_focus(
                         "name": "{:.4f}".format(mz),
                         "type": "scatter",
                         "mode": "lines",
-                        "line": {"color": "rgb({},{},{})".format(*colormap[i + COLOR_OFFSET])},
+                        "line": {
+                            "color": "rgb({},{},{})".format(*colormap[i + COLOR_OFFSET])
+                        },
                         "x": timeseries_time.tobytes(),
                         "y": timeseries_y.tobytes(),
                     }
