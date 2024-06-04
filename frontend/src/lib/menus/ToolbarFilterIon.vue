@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 
 import Button from 'primevue/button'
 import ContextMenu from 'primevue/contextmenu'
@@ -23,7 +23,7 @@ const isSaving = ref(false)
 const isotopeSettings = ref()
 const peakSettings = ref()
 
-storeInitialParams()
+onMounted(() => storeParams())
 
 const paramsChanged = computed(() => {
   // Check if any parameter has changed
@@ -40,11 +40,11 @@ function undoChanges() {
   focusedMatch.reload()
 }
 
-function storeInitialParams() {
+function storeParams() {
   initialParams.value = { ...filterParams.current }
 }
 
-async function saveFilterSettings() {
+async function saveParams() {
   confirm.require({
     header: 'Saving filtering parameters',
     message: `Are you sure you want to save current ${focusedMatch.ion.target_ion_formula} filtering parameters for ${focusedMatch.ion.instrument} instrument?`,
@@ -54,7 +54,7 @@ async function saveFilterSettings() {
       isSaving.value = true
       await filterParams.save()
       isSaving.value = false
-      storeInitialParams()
+      storeParams()
       await focusedMatch.reload()
     },
     rejectLabel: 'Cancel',
@@ -62,7 +62,7 @@ async function saveFilterSettings() {
   })
 }
 
-function filterParamsDelete() {
+function deleteParams() {
   confirm.require({
     header: 'Deleting filtering parameters',
     message: `Are you sure you want to delete ${focusedMatch.ion?.target_ion_formula} filtering parameters for ${focusedMatch.ion?.instrument} instrument?`,
@@ -72,18 +72,23 @@ function filterParamsDelete() {
       filterParams.reset()
       await filterParams.remove()
       await focusedMatch.reload()
-      storeInitialParams()
+      storeParams()
     },
     rejectLabel: 'Cancel',
     rejectIcon: 'pi pi-times'
   })
 }
 
+async function resetParams() {
+  await filterParams.reset()
+  await focusedMatch.reload()
+}
+
 const items = computed(() => [
   {
     label: 'Save params',
     icon: 'pi pi-save',
-    command: saveFilterSettings,
+    command: saveParams,
     disabled: !paramsChanged.value
   },
   {
@@ -95,13 +100,13 @@ const items = computed(() => [
   {
     label: 'Set defaults',
     icon: 'pi pi-file-import',
-    command: filterParams.reset,
+    command: resetParams,
     disabled: filterParams.default
   },
   {
     label: 'Delete filtering params',
     icon: 'pi pi-trash',
-    command: filterParamsDelete,
+    command: deleteParams,
     disabled:
       focusedMatch.ion?.filter_params &&
       focusedMatch.ion?.instrument in focusedMatch.ion.filter_params
