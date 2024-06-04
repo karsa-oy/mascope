@@ -49,7 +49,7 @@ const xFields = computed(() => {
       batchStore.sampleItems?.map((item) => Object.keys(item?.sample_item_attributes ?? {})).flat()
     )
   ].map((field) => ({ field, kind: 'custom' }))
-  return [...standard, ...custom]
+  return [...standard, { field: 'time', kind: 'custom', label: 'Time' }, ...custom]
     .map(({ field, kind }) => ({
       field,
       kind,
@@ -92,12 +92,11 @@ const toField =
       case 'matched':
         formatted = value > 0.5 ? 'true' : 'false'
         break
+      case 'time':
+        formatted = item['datetime'].split('T')[1].split('.')[0]
+        break
       default:
-        if (field.includes('datetime') || field.includes('utc')) {
-          formatted = value.split('T')[1].split('.')[0]
-        } else {
-          formatted = type == 'number' ? num.format(value) : value
-        }
+        formatted = type == 'number' ? num.format(value) : value
     }
     return formatted
   }
